@@ -109,6 +109,18 @@ export const KEY_REVIEW_SESSION_ACTIVE = "poke-memory:session-active";
  */
 export const KEY_OFFLINE_DOWNLOADED_AT = "poke-memory:offline-downloaded-at";
 
+/**
+ * Persists the manifest signature and species-id count at the time of the
+ * last completed offline download. Used by `OfflineSection` to determine
+ * whether a content update is available since the last download.
+ *
+ * Value is a JSON object `{ signature: string, count: number }` where
+ * `signature` is a hash of the sorted `buildPrecacheUrls(ALL_OFFLINE_IDS)`
+ * output folded with `SW_CACHE_VERSION`, and `count` is the number of
+ * species IDs in `ALL_OFFLINE_IDS` at download time.
+ */
+export const KEY_OFFLINE_MANIFEST = "poke-memory:offline-manifest:v1";
+
 // ─── Pasture tab visibility shortcut ─────────────────────────────────────────
 
 /**

@@ -247,7 +247,10 @@
       "updateButton": "[Update]",
       "downloadingProgress": "[Downloading {done} of {total}]",
       "downloadProgressAriaLabel": "[Download progress]",
-      "stopButton": "[Stop]"
+      "stopButton": "[Stop]",
+      "upToDate": "[Up to date]",
+      "updateAvailable": "[Update available]",
+      "updateAvailableCount": "[Update available ({count} new)]"
     },
     "optimizerCooldown": "[{count, plural, one {Next optimisation in # day} other {Next optimisation in # days}}]",
     "optimizerRetryAfter": "[{count, plural, one {Try again in # day.} other {Try again in # days.}}]",
@@ -461,6 +464,11 @@
     "practiceScopeNudge": {
       "title": "[Tip: filter by generation, type, or group]",
       "body": "[Use the Scope control below to focus practice on a generation, type, or a group like Starters or Incomplete chains.]"
+    },
+    "offlineDownloadNudge": {
+      "title": "[Practising offline? Download for speed]",
+      "body": "[Sprites loading slowly? Pre-fetch every sprite and cry (about 166 MB) so practice works instantly, even with no connection.]",
+      "cta": "[Open offline download]"
     }
   },
   "review": {

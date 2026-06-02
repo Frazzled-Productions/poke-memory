@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import {
@@ -10,6 +10,8 @@ import {
   stopDownload,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
+import { buildPrecacheUrls } from "@/lib/pwa/precache";
+import { computeManifestSignature } from "@/lib/pwa/manifestSignature";
 import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
 
 /**
@@ -18,6 +20,14 @@ import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/
  * this avoids re-running the filter+map on every render.
  */
 const ALL_OFFLINE_IDS: number[] = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
+
+/**
+ * Current manifest signature + URL count, computed once at module load.
+ * Stable for the lifetime of the page since the URL set is determined at
+ * build time by the seed data and `SW_CACHE_VERSION`.
+ */
+const CURRENT_SIGNATURE: string = computeManifestSignature(buildPrecacheUrls(ALL_OFFLINE_IDS));
+const CURRENT_ID_COUNT: number = ALL_OFFLINE_IDS.length;
 
 /** Format bytes as MB, e.g. 47.3 MB */
 function formatMb(bytes: number): string {
@@ -45,6 +55,29 @@ export function OfflineSection() {
   const [downloadState, setDownloadState] = useState<DownloadState>(getState);
 
   const [storageInfo, setStorageInfo] = useState<{ usedMb: string; totalMb: string } | null>(null);
+
+  /**
+   * Derive the update-available state from the persisted manifest vs. the
+   * current one (#1539). Only meaningful in the "done" phase.
+   *
+   * - `null`             — not applicable (not in done state)
+   * - `{ isStale: false }` — downloaded signature matches current; up to date
+   * - `{ isStale: true, newCount: number | null }` — signatures differ;
+   *   `newCount` is the number of new species IDs when countable (may be null
+   *   when the count is unchanged but the signature still differs, e.g. a
+   *   sprite-width or cache-version bump — avoids a misleading "0 new").
+   */
+  const manifestStatus = useMemo<
+    null | { isStale: false } | { isStale: true; newCount: number | null }
+  >(() => {
+    if (downloadState.phase !== "done") return null;
+    const persisted = downloadState.manifest;
+    if (persisted.signature === CURRENT_SIGNATURE) return { isStale: false };
+    // Signatures differ — compute how many new species IDs there are.
+    const countDiff = CURRENT_ID_COUNT - persisted.count;
+    const newCount = countDiff > 0 ? countDiff : null;
+    return { isStale: true, newCount };
+  }, [downloadState]);
 
   // Subscribe to the singleton on mount and unsubscribe on unmount.
   // The subscription re-emits the current state immediately, so the component
@@ -130,6 +163,20 @@ export function OfflineSection() {
                     year: "numeric",
                   }),
                 })}
+                {manifestStatus !== null && (
+                  <>
+                    {" · "}
+                    {manifestStatus.isStale ? (
+                      <span className="text-amber-600 dark:text-amber-400">
+                        {manifestStatus.newCount !== null
+                          ? t("updateAvailableCount", { count: manifestStatus.newCount })
+                          : t("updateAvailable")}
+                      </span>
+                    ) : (
+                      t("upToDate")
+                    )}
+                  </>
+                )}
               </p>
             )}
             {downloadState.phase === "error" && (
@@ -140,7 +187,9 @@ export function OfflineSection() {
             <button
               type="button"
               onClick={handleDownload}
-              className="self-start min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+              disabled={manifestStatus !== null && !manifestStatus.isStale}
+              aria-disabled={manifestStatus !== null && !manifestStatus.isStale}
+              className="self-start min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700"
             >
               {downloadState.phase === "done" ? t("updateButton") : t("downloadButton")}
             </button>

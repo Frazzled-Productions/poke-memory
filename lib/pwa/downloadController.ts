@@ -25,9 +25,12 @@
  *                         very first render.
  */
 
-import { precacheAll, OFFLINE_DOWNLOADED_AT_KEY, type PrecacheProgress, type PrecacheSummary } from "./precache";
+import { precacheAll, OFFLINE_DOWNLOADED_AT_KEY, buildPrecacheUrls, type PrecacheProgress, type PrecacheSummary } from "./precache";
+import { computeManifestSignature, parseOfflineManifest, type OfflineManifest } from "./manifestSignature";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
+import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
+import { SEED_POKEMON } from "@/lib/pokemon/seed";
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -36,7 +39,7 @@ import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
 export type DownloadState =
   | { phase: "idle" }
   | { phase: "downloading"; progress: PrecacheProgress }
-  | { phase: "done"; summary: PrecacheSummary; downloadedAt: string }
+  | { phase: "done"; summary: PrecacheSummary; downloadedAt: string; manifest: OfflineManifest }
   | { phase: "error"; message: string };
 
 // ---------------------------------------------------------------------------
@@ -79,12 +82,31 @@ function seedFromStorage(): void {
   // pass it through without JSON.parse. SSR returns null (window undefined).
   const at = readLocalStorage(OFFLINE_DOWNLOADED_AT_KEY, (raw) => raw, null);
   if (at !== null) {
+    // Read the persisted manifest (may be absent for downloads predating #1539).
+    const rawManifest = readLocalStorage(KEY_OFFLINE_MANIFEST, (raw) => raw, null);
+    const manifest = parseOfflineManifest(rawManifest) ?? _buildCurrentManifest();
     currentState = {
       phase: "done",
       summary: { totalRequested: 0, downloaded: 0, skipped: 0, failed: 0 },
       downloadedAt: at,
+      manifest,
     };
   }
+}
+
+/**
+ * Build a manifest representing the current asset set.
+ * Used as a fallback when there is a download timestamp but no persisted
+ * manifest (e.g. a download that predates #1539). Treating the baseline as
+ * "current" avoids a spurious "Update available" on first upgrade.
+ */
+function _buildCurrentManifest(): OfflineManifest {
+  const allOfflineIds = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
+  const urls = buildPrecacheUrls(allOfflineIds);
+  return {
+    signature: computeManifestSignature(urls),
+    count: allOfflineIds.length,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +201,15 @@ export async function startDownload(ids: number[]): Promise<void> {
     // best-effort; the UI still transitions to "done" even if storage fails.
     writeLocalStorageRaw(OFFLINE_DOWNLOADED_AT_KEY, downloadedAt);
 
-    setState({ phase: "done", summary, downloadedAt });
+    // Build and persist the manifest signature alongside the timestamp (#1539).
+    const manifest = _buildCurrentManifest();
+    try {
+      writeLocalStorageRaw(KEY_OFFLINE_MANIFEST, JSON.stringify(manifest));
+    } catch {
+      // Best-effort; non-fatal if localStorage is full.
+    }
+
+    setState({ phase: "done", summary, downloadedAt, manifest });
     abortController = null;
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
