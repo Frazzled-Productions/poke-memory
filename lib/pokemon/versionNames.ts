@@ -71,7 +71,7 @@ export const VERSION_NAMES: Record<string, VersionMeta> = {
   // Gen IX
   scarlet:             { display: "Scarlet",          order: 38 },
   violet:              { display: "Violet",           order: 39 },
-  // Side games that PokéAPI occasionally includes in flavor-text entries
+  // Side games that PokéAPI occasionally includes in flavour-text entries
   colosseum:           { display: "Colosseum",        order: 40 },
   xd:                  { display: "XD",               order: 41 },
 };

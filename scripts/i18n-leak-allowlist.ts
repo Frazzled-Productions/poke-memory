@@ -123,8 +123,10 @@ export const ALLOWLIST: Array<string | RegExp> = [
   /^(Sun|Moon|Ultra Sun|Ultra Moon|Let's Go Pikachu|Let's Go Eevee)$/,
   /^(Sword|Shield|Isle of Armor|Crown Tundra|Brilliant Diamond|Shining Pearl)$/,
   /^(Legends: Arceus|Scarlet|Violet|Colosseum|XD)$/,
-  // Formatted game-label strings: "Red · Blue", "FireRed · LeafGreen", overflow "+N"
-  /^[A-Z][A-Za-z0-9' :-]+(?:\s·\s[A-Z][A-Za-z0-9' :-]+)*(?:\s\+\d+)?$/,
+  // Formatted game-label strings: "Red · Blue", "X · Y", "FireRed · LeafGreen", overflow "+N".
+  // Uses * (not +) after the leading uppercase letter so single-char game names
+  // like "X" and "Y" are valid in any position of the · -joined list.
+  /^[A-Z][A-Za-z0-9' :-]*(?:\s·\s[A-Z][A-Za-z0-9' :-]*)*(?:\s\+\d+)?$/,
 
   // -------------------------------------------------------------------------
   // Version strings (v0.1.2 etc.).

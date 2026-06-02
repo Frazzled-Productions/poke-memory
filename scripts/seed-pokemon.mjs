@@ -39,6 +39,9 @@ const MAX_RETRIES = 3;
 const BACKOFF_MS = [500, 1000, 2000];
 const PROGRESS_INTERVAL = 50;
 
+// NOTE: FLAVOR_TEXTS_MAX, normalizeFlavorText, and extractFlavorTexts are
+// mirrored in lib/pokemon/flavorTextAccumulator.ts (the typed, testable
+// canonical form). Keep both in sync when changing the accumulation logic.
 const FLAVOR_TEXTS_MAX = 12;
 
 // ---------------------------------------------------------------------------
