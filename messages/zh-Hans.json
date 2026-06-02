@@ -915,7 +915,8 @@
     "streakLabel": "{count, number}天",
     "startStreakLabel": "开始连续",
     "tokenLabel": "{count, number}",
-    "masteryLabel": "{pct, number}%"
+    "masteryLabel": "{pct, number}%",
+    "pillPopoverCloseLabel": "关闭"
   },
   "languageSwitcher": {
     "heading": "宝可梦名称语言",

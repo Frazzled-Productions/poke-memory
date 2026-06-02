@@ -915,7 +915,8 @@
     "streakLabel": "{count, number}d",
     "startStreakLabel": "Start streak",
     "tokenLabel": "{count, number}",
-    "masteryLabel": "{pct, number}%"
+    "masteryLabel": "{pct, number}%",
+    "pillPopoverCloseLabel": "Close"
   },
   "languageSwitcher": {
     "heading": "Pokémon name language",
