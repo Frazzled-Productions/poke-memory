@@ -2169,6 +2169,9 @@ export function ReviewSession() {
     if (superuserGuarded) return;
     const settingsForSlowLoad = loadSettings();
     const current = settingsForSlowLoad.onboarding?.slowSpriteLoadCount ?? 0;
+    // Cap at the nudge threshold to avoid unbounded loadSettings/saveSettings
+    // calls on the grade critical path on persistently slow networks.
+    if (current >= OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD) return;
     const next = current + 1;
     saveSettings({
       ...settingsForSlowLoad,
@@ -2719,6 +2722,7 @@ export function ReviewSession() {
             {/* Cry card wraps ScopeControl in a max-width column for alignment. */}
             <div className="flex w-full max-w-xl flex-col gap-2">
               {scopeNudge}
+              {offlineNudge}
               <ScopeControl
                 scope={scope}
                 onChange={handleScopeChange}
@@ -2844,6 +2848,7 @@ export function ReviewSession() {
             )}
             <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
             {scopeNudge}
+            {offlineNudge}
             <ScopeControl
               scope={scope}
               onChange={handleScopeChange}
