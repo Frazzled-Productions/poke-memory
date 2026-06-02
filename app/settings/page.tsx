@@ -2171,10 +2171,20 @@ export default function SettingsPage() {
                                             )
                                               ? activeStored
                                               : "en";
+                                            // Maintain removedLocales tombstone set (#1568):
+                                            // enrol clears the tombstone; remove adds it.
+                                            const currentRemoved =
+                                              settings.removedLocales ?? [];
+                                            const nextRemoved = checked
+                                              ? currentRemoved.filter((l) => l !== loc)
+                                              : loc !== "en" && !currentRemoved.includes(loc)
+                                                ? [...currentRemoved, loc]
+                                                : currentRemoved;
                                             const updated = {
                                               ...settings,
                                               learningLocales: next,
                                               activePokemonNameLocale: active,
+                                              removedLocales: nextRemoved,
                                             };
                                             setSettings(updated);
                                             saveSettings(updated);
@@ -2212,11 +2222,22 @@ export default function SettingsPage() {
                                                 if (!next.includes("en")) {
                                                   next = ["en", ...next];
                                                 }
+                                                // Maintain removedLocales tombstone set (#1568):
+                                                // confirmed removal of the active locale adds
+                                                // it to the tombstone (English excluded always).
+                                                const currentRemoved =
+                                                  settings.removedLocales ?? [];
+                                                const nextRemoved =
+                                                  loc !== "en" &&
+                                                  !currentRemoved.includes(loc)
+                                                    ? [...currentRemoved, loc]
+                                                    : currentRemoved;
                                                 const updated = {
                                                   ...settings,
                                                   learningLocales: next,
                                                   activePokemonNameLocale:
                                                     "en" as AppLocale,
+                                                  removedLocales: nextRemoved,
                                                 };
                                                 setSettings(updated);
                                                 saveSettings(updated);

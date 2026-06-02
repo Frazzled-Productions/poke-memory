@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { useVisibilityPull } from "@/lib/sync/useVisibilityPull";
 
 /**
@@ -11,7 +12,10 @@ import { useVisibilityPull } from "@/lib/sync/useVisibilityPull";
  */
 export function SyncOnVisible() {
   const { user, supabase } = useAuth();
+  const { anyFlagOn } = useSuperuser();
   const pathname = usePathname();
-  useVisibilityPull(supabase, user?.id ?? null, pathname);
+  // Mirror the OnlineReconnectSync pattern: pulls are allowed while superuser
+  // flags are on, but the push-back inside pullAndMerge must be suppressed.
+  useVisibilityPull(supabase, user?.id ?? null, pathname, anyFlagOn);
   return null;
 }

@@ -4,6 +4,7 @@ import {
   saveSettings,
   DEFAULT_SETTINGS,
   DEFAULT_ONBOARDING,
+  validateRemovedLocales,
   type ThemeIntensity,
 } from '@/lib/settings/persistence';
 import { DEFAULT_LABS_FLAGS } from '@/lib/labs/flags';
@@ -179,6 +180,7 @@ describe('loadSettings migration', () => {
       activePokemonNameLocale: 'ja' as const,
       pushNotificationHour: 20,
       dismissedMtBannerLocales: ['ja', 'zh-Hans'],
+      removedLocales: ['zh-Hant' as const],
     };
     saveSettings(custom);
     const loaded = loadSettings();
@@ -1017,5 +1019,100 @@ describe("dismissedMtBannerLocales (#1387)", () => {
 
   it("DEFAULT_SETTINGS has dismissedMtBannerLocales: []", () => {
     expect(DEFAULT_SETTINGS.dismissedMtBannerLocales).toEqual([]);
+  });
+});
+
+// ─── validateRemovedLocales (#1568) ──────────────────────────────────────────
+
+describe("validateRemovedLocales (#1568)", () => {
+  it("returns [] for non-array input", () => {
+    for (const bad of [null, undefined, 42, "ja", true, {}]) {
+      expect(validateRemovedLocales(bad)).toEqual([]);
+    }
+  });
+
+  it("returns [] for an empty array", () => {
+    expect(validateRemovedLocales([])).toEqual([]);
+  });
+
+  it("keeps known non-English locales", () => {
+    expect(validateRemovedLocales(["ja", "zh-Hans", "zh-Hant"])).toEqual([
+      "ja",
+      "zh-Hans",
+      "zh-Hant",
+    ]);
+  });
+
+  it("always drops 'en' — English can never be in the removed set", () => {
+    expect(validateRemovedLocales(["en", "ja"])).toEqual(["ja"]);
+    expect(validateRemovedLocales(["en"])).toEqual([]);
+  });
+
+  it("deduplicates entries", () => {
+    expect(validateRemovedLocales(["ja", "ja", "zh-Hans"])).toEqual(["ja", "zh-Hans"]);
+  });
+
+  it("drops unknown / non-string values silently", () => {
+    expect(validateRemovedLocales(["fr", "de", "ja", 42, null, "zh-Hans"])).toEqual([
+      "ja",
+      "zh-Hans",
+    ]);
+  });
+});
+
+// ─── removedLocales field (#1568) ────────────────────────────────────────────
+
+describe("removedLocales field (#1568)", () => {
+  it("DEFAULT_SETTINGS has removedLocales: []", () => {
+    expect(DEFAULT_SETTINGS.removedLocales).toEqual([]);
+  });
+
+  it("defaults to [] when the field is absent from stored JSON (back-fill)", () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ masteryRepetitions: 3 }));
+    expect(loadSettings().removedLocales).toEqual([]);
+  });
+
+  it("defaults to [] when the stored value is not an array", () => {
+    for (const bad of [null, 42, "ja", true, {}]) {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, removedLocales: bad }),
+      );
+      expect(loadSettings().removedLocales).toEqual([]);
+    }
+  });
+
+  it("drops 'en' from a stored removedLocales array", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, removedLocales: ["en", "ja"] }),
+    );
+    expect(loadSettings().removedLocales).toEqual(["ja"]);
+  });
+
+  it("deduplicates stored entries", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, removedLocales: ["ja", "ja", "zh-Hans"] }),
+    );
+    expect(loadSettings().removedLocales).toEqual(["ja", "zh-Hans"]);
+  });
+
+  it("drops unknown locale values silently", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, removedLocales: ["fr", "ja", "de"] }),
+    );
+    expect(loadSettings().removedLocales).toEqual(["ja"]);
+  });
+
+  it("round-trips a non-empty removedLocales via saveSettings + loadSettings", () => {
+    saveSettings({ ...DEFAULT_SETTINGS, removedLocales: ["ja", "zh-Hans"] });
+    expect(loadSettings().removedLocales).toEqual(["ja", "zh-Hans"]);
+  });
+
+  it("round-trips an empty removedLocales via saveSettings + loadSettings", () => {
+    saveSettings({ ...DEFAULT_SETTINGS, removedLocales: [] });
+    expect(loadSettings().removedLocales).toEqual([]);
   });
 });

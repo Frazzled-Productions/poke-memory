@@ -109,6 +109,7 @@ const VALID_SETTINGS: UserSettings = {
   activePokemonNameLocale: "en" as const,
   pushNotificationHour: null,
   dismissedMtBannerLocales: [],
+  removedLocales: [],
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

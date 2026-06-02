@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { pullAndMerge, SYNC_PULL_APPLIED_EVENT } from "./pullAndMerge";
 import { pullSession, mergeCloudIntoLocalSilent } from "@/lib/sync/cloud";
-import { pullUserSettingsRow } from "@/lib/sync/settings";
+import { pullUserSettingsRow, pushSettings } from "@/lib/sync/settings";
 import { pullStreak } from "@/lib/sync/streak";
 import { pullGradeLog } from "@/lib/sync/gradeLog";
 import { saveSession, loadSession } from "@/lib/review/persistence";
@@ -19,10 +19,19 @@ vi.mock("@/lib/sync/cloud", () => ({
   maxCloudUpdatedAt: vi.fn(() => "2026-05-13T12:00:00.000Z"),
 }));
 
-vi.mock("@/lib/sync/settings", () => ({
-  pullUserSettingsRow: vi.fn(),
-  pullRegionalPrefs: vi.fn().mockResolvedValue(null),
-}));
+vi.mock("@/lib/sync/settings", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/sync/settings")>(
+    "@/lib/sync/settings",
+  );
+  return {
+    ...actual,
+    pullUserSettingsRow: vi.fn(),
+    pullRegionalPrefs: vi.fn().mockResolvedValue(null),
+    pushSettings: vi.fn().mockResolvedValue(true),
+    // mergeLearnedLocales + mergeRemovedLocales keep the real implementation so
+    // pullAndMerge union-merge tests verify correctness end-to-end.
+  };
+});
 
 vi.mock("@/lib/storage/reset", () => ({
   clearLocalProgress: vi.fn(async () => {}),
@@ -48,16 +57,22 @@ vi.mock("@/lib/review/session", () => ({
   },
 }));
 
-vi.mock("@/lib/settings/persistence", () => ({
-  hasStoredSettings: vi.fn(() => false),
-  loadSettings: vi.fn(),
-  saveSettings: vi.fn(),
-  DEFAULT_SETTINGS: {
-    evolutionCardsEnabled: true,
-    reverseEvolutionCardsEnabled: false,
-    cryCardsEnabled: false,
-  },
-}));
+vi.mock("@/lib/settings/persistence", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/settings/persistence")>(
+    "@/lib/settings/persistence",
+  );
+  return {
+    ...actual,
+    hasStoredSettings: vi.fn(() => false),
+    loadSettings: vi.fn(),
+    saveSettings: vi.fn(),
+    DEFAULT_SETTINGS: {
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      cryCardsEnabled: false,
+    },
+  };
+});
 
 vi.mock("@/lib/pokemon/seed", () => ({
   SEED_POKEMON: [],
@@ -98,6 +113,7 @@ vi.mock("@/lib/gradelog/persistence", () => ({
 
 const mockPullSession = vi.mocked(pullSession);
 const mockPullUserSettingsRow = vi.mocked(pullUserSettingsRow);
+const mockPushSettings = vi.mocked(pushSettings);
 const mockClearLocalProgress = vi.mocked(clearLocalProgress);
 const mockPullStreak = vi.mocked(pullStreak);
 const mockPullGradeLog = vi.mocked(pullGradeLog);
@@ -133,6 +149,7 @@ describe("pullAndMerge", () => {
   beforeEach(() => {
     mockPullSession.mockResolvedValue([]);
     mockPullUserSettingsRow.mockResolvedValue(null);
+    mockPushSettings.mockResolvedValue(true);
     mockPullStreak.mockResolvedValue(null);
     mockMerge.mockReturnValue([]);
     mockSaveSession.mockResolvedValue({ ok: true });
@@ -144,7 +161,10 @@ describe("pullAndMerge", () => {
       evolutionCardsEnabled: true,
       reverseEvolutionCardsEnabled: false,
       cryCardsEnabled: false,
-    } as ReturnType<typeof loadSettings>);
+      learningLocales: ["en"],
+      removedLocales: [],
+      activePokemonNameLocale: "en",
+    } as unknown as ReturnType<typeof loadSettings>);
     mockLoadStreakData.mockReturnValue([]);
     mockPullGradeLog.mockResolvedValue(null);
     mockLoadGradeLog.mockResolvedValue([]);
@@ -205,7 +225,10 @@ describe("pullAndMerge", () => {
       evolutionCardsEnabled: true,
       reverseEvolutionCardsEnabled: false,
       cryCardsEnabled: true,
-    } as ReturnType<typeof loadSettings>);
+      learningLocales: ["en"],
+      removedLocales: [],
+      activePokemonNameLocale: "en",
+    } as unknown as ReturnType<typeof loadSettings>);
 
     const result = await pullAndMerge(fakeClient, fakeUserId);
 
@@ -770,6 +793,323 @@ describe("pullAndMerge", () => {
         k.startsWith("poke-memory:mt-banner-dismissed:"),
       );
       expect(bannerKeys).toHaveLength(0);
+    });
+  });
+
+  // ─── learningLocales + removedLocales union-merge (#1568) ─────────────────
+
+  describe("learningLocales + removedLocales union-merge (#1568)", () => {
+    let mockWindow: { dispatchEvent: ReturnType<typeof vi.fn> };
+
+    beforeEach(() => {
+      mockWindow = { dispatchEvent: vi.fn() };
+      vi.stubGlobal("window", mockWindow);
+      vi.stubGlobal(
+        "CustomEvent",
+        class {
+          type: string;
+          constructor(type: string, _init?: unknown) { this.type = type; }
+        },
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it("union-merges cloud+local learningLocales and pushes result back", async () => {
+      // Cloud has zh-Hans; local has ja. Merged result should be ["en","ja","zh-Hans"].
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: {
+          learningLocales: ["en", "zh-Hans"],
+          removedLocales: [],
+        } as unknown as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      mockLoadSettings.mockReturnValue({
+        learningLocales: ["en", "ja"],
+        removedLocales: [],
+        activePokemonNameLocale: "ja",
+      } as unknown as ReturnType<typeof loadSettings>);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      // saveSettings should be called with merged set.
+      expect(mockSaveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          learningLocales: ["en", "ja", "zh-Hans"],
+          removedLocales: [],
+        }),
+      );
+      // Should push the merged result back (fire-and-forget).
+      expect(mockPushSettings).toHaveBeenCalledWith(
+        fakeClient,
+        fakeUserId,
+        expect.objectContaining({
+          learningLocales: ["en", "ja", "zh-Hans"],
+          removedLocales: [],
+        }),
+      );
+    });
+
+    it("tombstone: local has zh-Hans in removedLocales → zh-Hans stays absent and tombstone pushed to cloud", async () => {
+      // Cloud still has zh-Hans enrolled; local removed it.
+      // Local is already correct (["en"], tombstone ["zh-Hans"]) — no local save needed.
+      // But cloud must receive the tombstone so zh-Hans disappears on the next cloud pull.
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: {
+          learningLocales: ["en", "zh-Hans"],
+          removedLocales: [],
+        } as unknown as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      mockLoadSettings.mockReturnValue({
+        learningLocales: ["en"],
+        removedLocales: ["zh-Hans"],
+        activePokemonNameLocale: "en",
+      } as unknown as ReturnType<typeof loadSettings>);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      // Local is already correct; saveSettings may or may not be called for the
+      // locale-merge path, but pushSettings MUST be called to propagate the tombstone.
+      expect(mockPushSettings).toHaveBeenCalledWith(
+        fakeClient,
+        fakeUserId,
+        expect.objectContaining({
+          learningLocales: ["en"],
+          removedLocales: ["zh-Hans"],
+        }),
+      );
+    });
+
+    it("back-compat: cloud blob missing learningLocales/removedLocales fields does not throw", async () => {
+      // Pre-#1568 cloud blob with neither field.
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: {
+          masteryRepetitions: 3,
+        } as unknown as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      mockLoadSettings.mockReturnValue({
+        learningLocales: ["en", "ja"],
+        removedLocales: [],
+        activePokemonNameLocale: "ja",
+      } as unknown as ReturnType<typeof loadSettings>);
+
+      const result = await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(result).toBe("ok");
+      // Cloud lacks the fields so mergeLearnedLocales treats them as ["en"]/[].
+      // Local already has "en" + "ja"; union with ["en"] gives ["en","ja"] — no change.
+      // So saveSettings must NOT be called for the locale-specific path.
+    });
+
+    it("no-op: does not call saveSettings or pushSettings when learningLocales + removedLocales are already equal", async () => {
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: {
+          learningLocales: ["en", "ja"],
+          removedLocales: [],
+        } as unknown as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      // Local matches cloud exactly; no change needed.
+      mockLoadSettings.mockReturnValue({
+        learningLocales: ["en", "ja"],
+        removedLocales: [],
+        activePokemonNameLocale: "ja",
+      } as unknown as ReturnType<typeof loadSettings>);
+      // hasStoredSettings must be true so the general settings path doesn't
+      // also call saveSettings and pollute our assertion.
+      mockHasStoredSettings.mockReturnValue(true);
+      mockLoadSyncStatus.mockReturnValue({
+        ...baseSyncStatus,
+        lastSettingsPullAt: "2026-05-30T12:00:00.000Z", // equal to updatedAt → cloud not newer
+      });
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      // Neither saveSettings nor pushSettings should fire for the locale-merge path.
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+      expect(mockPushSettings).not.toHaveBeenCalled();
+    });
+
+    it("does not flip sync into error when the push-back throws", async () => {
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: {
+          learningLocales: ["en", "zh-Hans"],
+          removedLocales: [],
+        } as unknown as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      mockLoadSettings.mockReturnValue({
+        learningLocales: ["en", "ja"],
+        removedLocales: [],
+        activePokemonNameLocale: "ja",
+      } as unknown as ReturnType<typeof loadSettings>);
+      mockPushSettings.mockRejectedValue(new Error("network error"));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const result = await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(result).toBe("ok");
+      warn.mockRestore();
+    });
+
+    it("skips locale merge when pulledRow is null (no cloud settings)", async () => {
+      mockPullUserSettingsRow.mockResolvedValue(null);
+      mockLoadSettings.mockReturnValue({
+        learningLocales: ["en", "ja"],
+        removedLocales: [],
+        activePokemonNameLocale: "ja",
+      } as unknown as ReturnType<typeof loadSettings>);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(mockPushSettings).not.toHaveBeenCalled();
+    });
+
+    // ─── regression: fix #1 — LWW saveSettings must not clobber locale fields ──
+    //
+    // Scenario: cloudIsNewer = true, local has ["en","ja"] enrolled and ["zh-Hant"]
+    // tombstoned. The LWW saveSettings block strips learningLocales/removedLocales
+    // from the cloud patch and fills them from DEFAULT_SETTINGS (["en"] / []).
+    // Without the fix, the locale merge step's second loadSettings() call reads
+    // those reset values, discarding the local-only enrolment ("ja") and tombstone
+    // ("zh-Hant"). With the fix, preLocalSettings (captured before the LWW write)
+    // preserves them.
+    //
+    // The mock sequence simulates the real storage behaviour:
+    //   call 1 (preLocalSettings capture) → original local state (["en","ja"], ["zh-Hant"])
+    //   call 2 (currentLocal in merge block) → post-LWW state (["en"], [])
+    //
+    // The merged/saved/pushed result must still contain the original local locale
+    // values, not the reset ones.
+    it("fix #1 — locale merge uses pre-LWW local values even when cloudIsNewer resets them via saveSettings", async () => {
+      // Cloud is newer and has zh-Hans enrolled; local has ja enrolled + zh-Hant tombstoned.
+      mockHasStoredSettings.mockReturnValue(true);
+      mockLoadSyncStatus.mockReturnValue({
+        ...baseSyncStatus,
+        lastSettingsPullAt: "2026-05-01T00:00:00.000Z",
+      });
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: {
+          // Cloud has zh-Hans enrolled; learningLocales/removedLocales will be
+          // STRIPPED by the LWW block and will therefore NOT appear in the
+          // saveSettings call from LWW.
+          learningLocales: ["en", "zh-Hans"],
+          removedLocales: [],
+          masteryRepetitions: 3,
+        } as unknown as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+
+      // First call → pre-LWW local state (original enrolment + tombstone).
+      // Second call (currentLocal inside the locale-merge if-block) → simulates
+      // what loadSettings() would return after the LWW saveSettings reset the
+      // locale fields to DEFAULT_SETTINGS values.
+      const preLwwLocal = {
+        learningLocales: ["en", "ja"] as ReturnType<typeof loadSettings>["learningLocales"],
+        removedLocales: ["zh-Hant"] as ReturnType<typeof loadSettings>["removedLocales"],
+        activePokemonNameLocale: "ja" as ReturnType<typeof loadSettings>["activePokemonNameLocale"],
+        masteryRepetitions: 3,
+      } as unknown as ReturnType<typeof loadSettings>;
+      const postLwwLocal = {
+        learningLocales: ["en"] as ReturnType<typeof loadSettings>["learningLocales"],
+        removedLocales: [] as ReturnType<typeof loadSettings>["removedLocales"],
+        activePokemonNameLocale: "en" as ReturnType<typeof loadSettings>["activePokemonNameLocale"],
+        masteryRepetitions: 3,
+      } as unknown as ReturnType<typeof loadSettings>;
+
+      mockLoadSettings
+        .mockReturnValueOnce(preLwwLocal)    // preLocalSettings capture
+        .mockReturnValue(postLwwLocal);       // currentLocal + any subsequent reads
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      // Merged result: union(local["en","ja"], cloud["en","zh-Hans"]) minus tombstone(["zh-Hant"])
+      // = ["en","ja","zh-Hans"]. The tombstone ["zh-Hant"] must be preserved and pushed.
+      expect(mockSaveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          learningLocales: expect.arrayContaining(["en", "ja", "zh-Hans"]),
+          removedLocales: ["zh-Hant"],
+        }),
+      );
+      expect(mockPushSettings).toHaveBeenCalledWith(
+        fakeClient,
+        fakeUserId,
+        expect.objectContaining({
+          learningLocales: expect.arrayContaining(["en", "ja", "zh-Hans"]),
+          removedLocales: ["zh-Hant"],
+        }),
+      );
+    });
+
+    // ─── superuser write-guard: push-back must be suppressed when superuserPaused ──
+    it("does not push back to cloud when superuserPaused = true, but still saves merged locale locally", async () => {
+      // Cloud has zh-Hans; local has ja. Without superuserPaused the merged
+      // result would be pushed back to cloud. With it, the local save runs but
+      // the cloud push is skipped.
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: {
+          learningLocales: ["en", "zh-Hans"],
+          removedLocales: [],
+        } as unknown as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      mockLoadSettings.mockReturnValue({
+        learningLocales: ["en", "ja"],
+        removedLocales: [],
+        activePokemonNameLocale: "ja",
+      } as unknown as ReturnType<typeof loadSettings>);
+
+      await pullAndMerge(fakeClient, fakeUserId, /* superuserPaused= */ true);
+
+      // Cloud push must be suppressed.
+      expect(mockPushSettings).not.toHaveBeenCalled();
+      // But the local merge save should still run — reads are always allowed.
+      expect(mockSaveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          learningLocales: ["en", "ja", "zh-Hans"],
+          removedLocales: [],
+        }),
+      );
+    });
+
+    // ─── order-insensitive set comparison ─────────────────────────────────────
+    it("does not push back when cloud locale order differs but membership is equal (order-insensitive)", async () => {
+      // Cloud has ["zh-Hans","en"] — same set as ["en","zh-Hans"], just different order.
+      // A purely order-sensitive comparison would see a mismatch and push on every cycle.
+      mockHasStoredSettings.mockReturnValue(true);
+      mockLoadSyncStatus.mockReturnValue({
+        ...baseSyncStatus,
+        lastSettingsPullAt: "2026-05-30T12:00:00.000Z", // equal to updatedAt → no LWW write
+      });
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: {
+          learningLocales: ["zh-Hans", "en"], // reversed order
+          removedLocales: [],
+        } as unknown as ReturnType<typeof loadSettings>,
+        updatedAt: "2026-05-30T12:00:00.000Z",
+        lastResetAt: null,
+      });
+      mockLoadSettings.mockReturnValue({
+        learningLocales: ["en", "zh-Hans"],
+        removedLocales: [],
+        activePokemonNameLocale: "zh-Hans",
+      } as unknown as ReturnType<typeof loadSettings>);
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      // Membership is equal — no push needed.
+      expect(mockPushSettings).not.toHaveBeenCalled();
     });
   });
 

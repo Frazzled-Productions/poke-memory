@@ -24,11 +24,18 @@ export function useVisibilityPull(
   client: SupabaseClient | null,
   userId: string | null,
   pathname: string,
+  /**
+   * When true, the locale push-back inside `pullAndMerge` is suppressed.
+   * Pulls (reads) remain enabled regardless — same contract as every other
+   * write-guarded hook. Pass `anyFlagOn` from `useSuperuser()`.
+   */
+  superuserPaused = false,
 ): void {
   const hiddenAtRef = useRef<number | null>(null);
   const clientRef = useLatestRef(client);
   const userIdRef = useLatestRef(userId);
   const pathnameRef = useLatestRef(pathname);
+  const superuserPausedRef = useLatestRef(superuserPaused);
 
   useEffect(() => {
     function handleVisibilityChange() {
@@ -59,7 +66,7 @@ export function useVisibilityPull(
 
       hiddenAtRef.current = null;
 
-      void pullAndMerge(cl, uid);
+      void pullAndMerge(cl, uid, superuserPausedRef.current);
     }
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
