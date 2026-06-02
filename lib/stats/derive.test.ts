@@ -690,3 +690,70 @@ describe("computeStats struggling gate", () => {
     expect(result.struggling).toHaveLength(10);
   });
 });
+
+// ---------------------------------------------------------------------------
+// computeStats([]) — empty card array (issue #1527)
+// ---------------------------------------------------------------------------
+
+describe("computeStats([]) — empty card array", () => {
+  it("does not throw for an empty card array", () => {
+    expect(() => computeStats([], TODAY)).not.toThrow();
+  });
+
+  it("returns totalCards = 0", () => {
+    const result = computeStats([], TODAY);
+    expect(result.totalCards).toBe(0);
+  });
+
+  it("returns introduced / learning / mastered / locked all zero", () => {
+    const result = computeStats([], TODAY);
+    expect(result.introduced).toBe(0);
+    expect(result.learning).toBe(0);
+    expect(result.mastered).toBe(0);
+    expect(result.locked).toBe(0);
+  });
+
+  it("returns a dueForecast with 14 entries, all with count 0", () => {
+    const result = computeStats([], TODAY);
+    expect(result.dueForecast).toHaveLength(14);
+    for (const day of result.dueForecast) {
+      expect(day.count).toBe(0);
+    }
+    // First entry is today, last is 13 days ahead.
+    expect(result.dueForecast[0].date).toBe(TODAY);
+  });
+
+  it("returns all 9 generations in perGeneration, each with zero counts", () => {
+    const result = computeStats([], TODAY);
+    expect(result.perGeneration).toHaveLength(9);
+    for (const gen of result.perGeneration) {
+      expect(gen.total).toBe(0);
+      expect(gen.introduced).toBe(0);
+      expect(gen.mastered).toBe(0);
+    }
+  });
+
+  it("returns all 18 types in perType, each with zero counts", () => {
+    const result = computeStats([], TODAY);
+    expect(result.perType).toHaveLength(18);
+    for (const t of result.perType) {
+      expect(t.total).toBe(0);
+      expect(t.introduced).toBe(0);
+      expect(t.mastered).toBe(0);
+    }
+  });
+
+  it("returns an empty struggling array", () => {
+    const result = computeStats([], TODAY);
+    expect(result.struggling).toEqual([]);
+  });
+
+  it("returns zero-initialised result with forceAllMastered=true on empty input", () => {
+    const result = computeStats([], TODAY, 10, 3, true);
+    expect(result.totalCards).toBe(0);
+    expect(result.introduced).toBe(0);
+    expect(result.mastered).toBe(0);
+    expect(result.locked).toBe(0);
+    expect(result.struggling).toEqual([]);
+  });
+});

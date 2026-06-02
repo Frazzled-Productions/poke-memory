@@ -2384,3 +2384,82 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
     expect(jaEvos[0].state.reps).toBe(9);
   });
 });
+
+// ---------------------------------------------------------------------------
+// buildSessionQueues([]) — empty card list (issue #1528)
+// ---------------------------------------------------------------------------
+
+describe('buildSessionQueues([]) — empty card list', () => {
+  const TODAY = '2026-05-09';
+  const baseLimits: DailyLimits = {
+    name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+    reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  };
+
+  it('does not throw for an empty card list', () => {
+    expect(() => buildSessionQueues([], baseLimits, TODAY)).not.toThrow();
+  });
+
+  it('returns empty learningCardIds', () => {
+    const result = buildSessionQueues([], baseLimits, TODAY);
+    expect(result.learningCardIds).toEqual([]);
+  });
+
+  it('returns empty outOfScopeLearningIds', () => {
+    const result = buildSessionQueues([], baseLimits, TODAY);
+    expect(result.outOfScopeLearningIds).toEqual([]);
+  });
+
+  it('returns empty reviewQueue', () => {
+    const result = buildSessionQueues([], baseLimits, TODAY);
+    expect(result.reviewQueue).toEqual([]);
+  });
+
+  it('returns empty newQueue', () => {
+    const result = buildSessionQueues([], baseLimits, TODAY);
+    expect(result.newQueue).toEqual([]);
+  });
+
+  it('returns newIntroducedToday = 0', () => {
+    const result = buildSessionQueues([], baseLimits, TODAY);
+    expect(result.newIntroducedToday).toBe(0);
+  });
+
+  it('returns reviewsDoneToday = 0', () => {
+    const result = buildSessionQueues([], baseLimits, TODAY);
+    expect(result.reviewsDoneToday).toBe(0);
+  });
+
+  it('returns perType counters all zero for every card type', () => {
+    const result = buildSessionQueues([], baseLimits, TODAY);
+    for (const type of ['name', 'evolution', 'reverse', 'cry'] as const) {
+      expect(result.perType[type].newIntroducedToday).toBe(0);
+      expect(result.perType[type].reviewsDoneToday).toBe(0);
+    }
+  });
+
+  it('result has no undefined fields', () => {
+    const result = buildSessionQueues([], baseLimits, TODAY);
+    expect(result.learningCardIds).toBeDefined();
+    expect(result.outOfScopeLearningIds).toBeDefined();
+    expect(result.reviewQueue).toBeDefined();
+    expect(result.newQueue).toBeDefined();
+    expect(result.perType).toBeDefined();
+    expect(result.newIntroducedToday).toBeDefined();
+    expect(result.reviewsDoneToday).toBeDefined();
+  });
+
+  it('produces the same zero result regardless of limits', () => {
+    const zeroLimits: DailyLimits = {
+      name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      reverse: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    };
+    const resultZero = buildSessionQueues([], zeroLimits, TODAY);
+    expect(resultZero.newQueue).toHaveLength(0);
+    expect(resultZero.reviewQueue).toHaveLength(0);
+  });
+});
