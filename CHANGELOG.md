@@ -6,6 +6,14 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.32] - 2026-06-02
+
+### Added
+
+- Added a persistent profile status bar showing your streak, protection-token balance, and mastery progress at a glance on every page, including the Practice screen on mobile. The three signals render as consistent icon pills drawn from one shared source, and the streak and token pips that previously sat separately on the Practice and Stats screens are now carried by the bar.
+- Each language you are learning now has its own independent practice progress and daily new-card budget. Switching the Pokémon-name language from the status-bar pill draws that language's own queue, so studying Japanese names no longer touches your English progress (your streak and protection tokens stay shared across all languages). Typed-entry answering stays English-only for now and falls back to tap-to-reveal in other languages.
+- Enrolled learning languages now sync across devices and survive signing in on a new device: the union of all enrolled languages (and the tombstone of removed ones) is merged on every background pull, so adding Japanese on your phone is visible on your tablet after the next sync.
+
 ## [0.10.31] - 2026-06-01
 
 ### Changed
@@ -1563,7 +1571,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.31...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.32...HEAD
+[0.10.32]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.32
 [0.10.31]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.31
 [0.10.30]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.30
 [0.10.29]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.29
