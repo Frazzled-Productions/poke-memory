@@ -157,6 +157,14 @@ export const KEY_QA_SEED_ACTIVE = "poke-memory:qa-seed-active";
 export const KEY_MASTERED_COUNT_BY_LOCALE =
   "poke-memory:mastered-count-by-locale:v1";
 
+/**
+ * Lightweight per-locale due-today count (#1484), written by ReviewSession and
+ * read by the LanguageSwitcher to show per-language due badges without a full
+ * card-array parse on every render. Local-only derived state; no sync leg.
+ */
+export const KEY_DUE_COUNT_BY_LOCALE =
+  "poke-memory:due-count-by-locale:v1";
+
 // ─── Pokédex sort preference ──────────────────────────────────────────────────
 
 /**

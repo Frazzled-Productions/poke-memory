@@ -14,21 +14,23 @@
  * contract (role="dialog" + aria-modal, focus move-in, focus trap, Escape +
  * click-outside to close, focus return to the trigger) mirrors `NavDrawer`.
  *
- * Switching writes `pokemonNameLocale` via `saveSettings`, which dispatches
+ * Switching writes `activePokemonNameLocale` via `saveSettings`, which dispatches
  * `SETTINGS_SAVED_EVENT`; `PokemonLocaleProvider` listens and re-resolves, so
  * names update live across the app without a reload.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
-import {
-  SUPPORTED_LOCALES,
-  LOCALE_ENDONYMS,
-  type AppLocale,
-} from "@/i18n/locales";
+import { LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { mutedTextXs } from "@/lib/utils/class-names";
+import {
+  readDueCountCache,
+  type DueCountByLocale,
+} from "@/lib/profile/dueCountCache";
+import { KEY_DUE_COUNT_BY_LOCALE } from "@/lib/storage/keys";
 
 // ─── Icons (lucide-style) ──────────────────────────────────────────────────────
 
@@ -70,8 +72,10 @@ function CheckIcon() {
 
 export function LanguageSwitcher() {
   const t = useTranslations("languageSwitcher");
-  const { locale, languagesEnabled } = usePokemonLocaleContext();
+  const { locale, languagesEnabled, learningLocales } =
+    usePokemonLocaleContext();
   const [open, setOpen] = useState(false);
+  const [dueCounts, setDueCounts] = useState<DueCountByLocale | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -139,12 +143,25 @@ export function LanguageSwitcher() {
     (checked ?? panel.querySelector<HTMLElement>("button"))?.focus();
   }, [open]);
 
+  // Read the per-locale due-count cache when the dropdown opens, and keep it
+  // live while open (ReviewSession writes the cache after grades). The cache is
+  // a lightweight read, not a full card-array parse.
+  useEffect(() => {
+    if (!open) return;
+    setDueCounts(readDueCountCache());
+    function onStorage(e: StorageEvent) {
+      if (e.key === KEY_DUE_COUNT_BY_LOCALE) setDueCounts(readDueCountCache());
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [open]);
+
   if (!languagesEnabled) return null;
 
   function selectLocale(next: AppLocale) {
     const settings = loadSettings();
-    if (settings.pokemonNameLocale !== next) {
-      saveSettings({ ...settings, pokemonNameLocale: next });
+    if (settings.activePokemonNameLocale !== next) {
+      saveSettings({ ...settings, activePokemonNameLocale: next });
     }
     close();
   }
@@ -182,14 +199,19 @@ export function LanguageSwitcher() {
           </h2>
 
           <div role="radiogroup" aria-label={t("groupAriaLabel")}>
-            {SUPPORTED_LOCALES.map((loc) => {
+            {learningLocales.map((loc) => {
               const selected = loc === locale;
+              const due = dueCounts?.[loc] ?? 0;
               return (
                 <button
                   key={loc}
                   type="button"
                   role="radio"
                   aria-checked={selected}
+                  aria-label={t("dueTodayAriaLabel", {
+                    language: LOCALE_ENDONYMS[loc],
+                    count: due,
+                  })}
                   onClick={() => selectLocale(loc)}
                   className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors [@media(hover:hover)]:hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:[@media(hover:hover)]:hover:bg-zinc-800"
                 >
@@ -206,11 +228,25 @@ export function LanguageSwitcher() {
                       </span>
                     )}
                   </span>
-                  {selected && <CheckIcon />}
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className={mutedTextXs} aria-hidden="true">
+                      {t("dueToday", { count: due })}
+                    </span>
+                    {selected && <CheckIcon />}
+                  </span>
                 </button>
               );
             })}
           </div>
+
+          {/* Enrol more languages from the Settings section. */}
+          <Link
+            href="/settings#languages-learning"
+            onClick={close}
+            className={`mt-1 flex min-h-[44px] w-full items-center rounded-lg px-2 py-1.5 text-left text-sm transition-colors [@media(hover:hover)]:hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:[@media(hover:hover)]:hover:bg-zinc-800 ${mutedTextXs}`}
+          >
+            {t("addLanguage")}
+          </Link>
 
           <p className={`mt-1 px-2 pb-1 ${mutedTextXs}`}>
             {t("appLanguageHint")}

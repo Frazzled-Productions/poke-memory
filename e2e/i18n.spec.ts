@@ -30,6 +30,7 @@ async function enableLanguagesFlag(page: import("@playwright/test").Page): Promi
       const merged = {
         mobileNav: "bottom",
         ...existing,
+        learningLocales: ["en", "zh-Hans"],
         labsFlags: {
           ...(typeof existing.labsFlags === "object" && existing.labsFlags !== null
             ? (existing.labsFlags as Record<string, unknown>)

@@ -30,11 +30,18 @@ export type PokemonLocaleContextValue = {
    * always `DEFAULT_LOCALE` and the hook skips all async resolution.
    */
   languagesEnabled: boolean;
+  /**
+   * The set of enrolled learning locales (#1484), English always first. Used by
+   * the LanguageSwitcher to render the options. Always `["en"]` when the flag is
+   * off.
+   */
+  learningLocales: AppLocale[];
 };
 
 const PokemonLocaleCtx = createContext<PokemonLocaleContextValue>({
   locale: DEFAULT_LOCALE,
   languagesEnabled: false,
+  learningLocales: [DEFAULT_LOCALE],
 });
 
 // ---------------------------------------------------------------------------
@@ -43,14 +50,30 @@ const PokemonLocaleCtx = createContext<PokemonLocaleContextValue>({
 
 function readLocaleState(): PokemonLocaleContextValue {
   if (typeof window === "undefined") {
-    return { locale: DEFAULT_LOCALE, languagesEnabled: false };
+    return {
+      locale: DEFAULT_LOCALE,
+      languagesEnabled: false,
+      learningLocales: [DEFAULT_LOCALE],
+    };
   }
   const settings = loadSettings();
   const languagesEnabled = isLabsFlagEnabled(settings.labsFlags, "languages");
+  // Active locale (#1484): activePokemonNameLocale is authoritative;
+  // pokemonNameLocale is the back-compat alias; DEFAULT_LOCALE the safety net.
   const locale = languagesEnabled
-    ? (settings.pokemonNameLocale ?? DEFAULT_LOCALE)
+    ? (settings.activePokemonNameLocale ??
+        settings.pokemonNameLocale ??
+        DEFAULT_LOCALE)
     : DEFAULT_LOCALE;
-  return { locale, languagesEnabled };
+  return {
+    locale,
+    languagesEnabled,
+    // Only meaningful when the flag is on (the switcher is hidden otherwise);
+    // collapse to the default set when off so consumers never see a stale list.
+    learningLocales: languagesEnabled
+      ? (settings.learningLocales ?? [DEFAULT_LOCALE])
+      : [DEFAULT_LOCALE],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -89,10 +112,18 @@ export function PokemonLocaleProvider({ children }: { children: React.ReactNode 
   }, []);
 
   // Stabilise the value object so Context consumers only re-render when the
-  // locale or flag actually changes, not on unrelated parent renders.
+  // locale, flag, or enrolled set actually changes, not on unrelated saves.
+  // Key on the learning-set CONTENT (not its array reference, which is fresh on
+  // every settings save) so a streak/token save does not churn consumers.
+  const learningKey = state.learningLocales.join(",");
   const value = useMemo(
-    () => ({ locale: state.locale, languagesEnabled: state.languagesEnabled }),
-    [state.locale, state.languagesEnabled],
+    () => ({
+      locale: state.locale,
+      languagesEnabled: state.languagesEnabled,
+      learningLocales: state.learningLocales,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.locale, state.languagesEnabled, learningKey],
   );
 
   return <PokemonLocaleCtx.Provider value={value}>{children}</PokemonLocaleCtx.Provider>;

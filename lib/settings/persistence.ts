@@ -352,8 +352,29 @@ export type UserSettings = {
    * practise Japanese names while keeping the app UI in English, or vice
    * versa. Defaults to `"en"`. Only active when the `languages` Labs flag is
    * on. Absent in pre-#1260 records; back-fills to `"en"` on read.
+   *
+   * @deprecated Since #1484 the active learning language is
+   * `activePokemonNameLocale`. This field is kept as a back-compat read alias
+   * and is mirrored from `activePokemonNameLocale` on save so any reader that
+   * only knows the old scalar (including cloud JSONB before the union-merge
+   * RPC ships) stays correct.
    */
   pokemonNameLocale: AppLocale;
+  /**
+   * The set of Pokémon-name languages the user is actively learning (#1484).
+   * English is always present and cannot be removed; at most the four supported
+   * locales; order preserved for rendering. Absent in pre-#1484 records;
+   * back-fills to `["en"]` (or `["en", pokemonNameLocale]` for a returning user
+   * who had a non-English `pokemonNameLocale`) on read.
+   */
+  learningLocales: AppLocale[];
+  /**
+   * The currently-active member of `learningLocales` (#1484): the language shown
+   * on practice cards and flipped by the status-bar switcher. Always a member of
+   * `learningLocales`. Absent in pre-#1484 records; derived from
+   * `pokemonNameLocale` on read.
+   */
+  activePokemonNameLocale: AppLocale;
   /**
    * Locales for which the machine-translation banner has been dismissed
    * (#1387). Each entry is an `AppLocale` string (e.g. `"ja"`, `"zh-Hans"`).
@@ -423,6 +444,10 @@ export const DEFAULT_SETTINGS: UserSettings = {
   labsFlags: { ...DEFAULT_LABS_FLAGS },
   // Default "en": absent in pre-#1260 records; back-fills to English on read.
   pokemonNameLocale: DEFAULT_LOCALE,
+  // Default ["en"]: a fresh user is enrolled in English only (#1484).
+  learningLocales: [DEFAULT_LOCALE],
+  // Default "en": matches the only enrolled locale (#1484).
+  activePokemonNameLocale: DEFAULT_LOCALE,
   // Default []: absent in pre-#1387 records; back-fills to empty array on read.
   dismissedMtBannerLocales: [],
 };
@@ -561,6 +586,22 @@ function parseStoredSettings(raw: string | null): UserSettings {
   }
   if (typeof parsed !== "object" || parsed === null) return { ...DEFAULT_SETTINGS };
   const obj = parsed as RawObj;
+  // Multi-language enrolment (#1484): derive the learning set and the active
+  // member, with a one-shot back-compat promotion from the legacy
+  // pokemonNameLocale scalar for records that predate #1484.
+  const legacyPokemonLocale: AppLocale | null = isAppLocale(obj.pokemonNameLocale)
+    && obj.pokemonNameLocale !== "en"
+    ? obj.pokemonNameLocale
+    : null;
+  const learningLocales: AppLocale[] =
+    obj.learningLocales == null && legacyPokemonLocale !== null
+      ? ["en", legacyPokemonLocale]
+      : validateLearningLocales(obj.learningLocales);
+  const activePokemonNameLocale: AppLocale = resolveActiveLocale(
+    obj.activePokemonNameLocale,
+    legacyPokemonLocale,
+    learningLocales,
+  );
   return {
     masteryRepetitions:        num(obj, "masteryRepetitions"),
     maxNewPerDay:              num(obj, "maxNewPerDay"),
@@ -669,6 +710,9 @@ function parseStoredSettings(raw: string | null): UserSettings {
       obj.pokemonNameLocale === "zh-Hant"
         ? (obj.pokemonNameLocale as AppLocale)
         : DEFAULT_LOCALE,
+    // Multi-language enrolment + active member (#1484), derived above.
+    learningLocales,
+    activePokemonNameLocale,
     // Default []: absent in pre-#1387 records. Non-array or entries that are
     // not strings are silently dropped — same defensive posture as seenStreakMilestones.
     dismissedMtBannerLocales: validateDismissedMtBannerLocales(obj.dismissedMtBannerLocales),
@@ -729,6 +773,44 @@ function validateDismissedMtBannerLocales(value: unknown): string[] {
     out.push(v);
   }
   return out;
+}
+
+/** Type guard for a supported app/Pokémon-name locale. */
+function isAppLocale(v: unknown): v is AppLocale {
+  return v === "en" || v === "ja" || v === "zh-Hans" || v === "zh-Hant";
+}
+
+/**
+ * Validates the learning-locales set (#1484): keeps only known locales, dedupes,
+ * and guarantees English is always present (it is the canonical reverse-card
+ * answer language and cannot be removed). Order is preserved.
+ */
+function validateLearningLocales(value: unknown): AppLocale[] {
+  if (!Array.isArray(value)) return [DEFAULT_LOCALE];
+  const out: AppLocale[] = [];
+  const seen = new Set<AppLocale>();
+  for (const v of value) {
+    if (!isAppLocale(v) || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  if (!seen.has("en")) out.unshift("en");
+  return out;
+}
+
+/**
+ * Resolves the active Pokémon-name locale (#1484): the stored value when it is a
+ * known locale AND enrolled; otherwise the legacy `pokemonNameLocale` (if
+ * enrolled); otherwise the first enrolled locale (always English).
+ */
+function resolveActiveLocale(
+  stored: unknown,
+  legacy: AppLocale | null,
+  learningLocales: AppLocale[],
+): AppLocale {
+  if (isAppLocale(stored) && learningLocales.includes(stored)) return stored;
+  if (legacy !== null && learningLocales.includes(legacy)) return legacy;
+  return learningLocales[0] ?? DEFAULT_LOCALE;
 }
 
 /**
@@ -799,12 +881,19 @@ export const SETTINGS_SAVED_EVENT = "poke-memory:settings-saved";
 // Serialises to localStorage. No-op on server. Never throws.
 export function saveSettings(settings: UserSettings): void {
   if (typeof window === "undefined") return;
+  // Mirror the deprecated `pokemonNameLocale` scalar from the active learning
+  // locale (#1484), so any reader that only knows the old field — including the
+  // cloud settings JSONB before the union-merge RPC ships — stays correct.
+  const toWrite: UserSettings = {
+    ...settings,
+    pokemonNameLocale: settings.activePokemonNameLocale,
+  };
   // writeLocalStorage handles the guard + try/catch. The CustomEvent dispatch
   // is kept explicit here because it carries a typed detail payload that is
   // not a plain StorageEvent.
-  writeLocalStorage(STORAGE_KEY, settings);
+  writeLocalStorage(STORAGE_KEY, toWrite);
   window.dispatchEvent(
-    new CustomEvent(SETTINGS_SAVED_EVENT, { detail: settings }),
+    new CustomEvent(SETTINGS_SAVED_EVENT, { detail: toWrite }),
   );
 }
 

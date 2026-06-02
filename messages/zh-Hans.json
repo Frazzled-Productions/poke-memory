@@ -102,7 +102,14 @@
         "appLanguageDescription": "控制应用界面语言。界面翻译仍在进行中。",
         "pokemonNameLanguageLabel": "宝可梦名称语言",
         "pokemonNameLanguageDescription": "宝可梦名称语言可从每个页面顶部状态栏中的语言按钮切换。",
-        "previewSuffix": "（预览）"
+        "previewSuffix": "（预览）",
+        "enrolment": {
+          "heading": "我正在学习的语言",
+          "description": "始终包含英语。添加一种语言即可用该文字练习宝可梦名称。",
+          "lockedEnglishNote": "始终包含",
+          "machineTranslationNote": "机器翻译",
+          "checkboxAriaLabel": "用 {language} 练习宝可梦名称"
+        }
       }
     },
     "practice": {
@@ -908,7 +915,10 @@
     "groupAriaLabel": "选择宝可梦名称语言",
     "machineTranslation": "机器翻译",
     "closeLabel": "关闭",
-    "appLanguageHint": "应用语言在设置中。"
+    "appLanguageHint": "应用语言在设置中。",
+    "addLanguage": "添加语言",
+    "dueToday": "{count, plural, =0 {已完成} other {今日 {count, number} 张}}",
+    "dueTodayAriaLabel": "{language}：{count, plural, =0 {今日无待复习} other {今日 {count, number} 张待复习}}"
   },
   "sync": {
     "status": {
