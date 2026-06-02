@@ -5,7 +5,7 @@ import type { PokemonFact } from "@/lib/pokemon/facts";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
-import { sectionLabelSubtle } from "@/lib/utils/class-names";
+import { mutedText, sectionLabelSubtle } from "@/lib/utils/class-names";
 import { PRACTICE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 type Props = {
@@ -50,7 +50,7 @@ export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name
                 </p>
                 {/* Transliteration aid (rōmaji / pinyin) when locale is non-Latin */}
                 {localeName.transliteration && (
-                  <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className={`mt-0.5 ${mutedText}`}>
                     {localeName.transliteration}
                   </p>
                 )}

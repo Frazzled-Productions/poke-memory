@@ -17,7 +17,7 @@ import { useState, useId, useMemo, useCallback } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import type { CollectionTimeline } from "@/lib/timeline/reconstruct";
 import { snapshotAtPosition } from "@/lib/timeline/reconstruct";
-import { chartTickText, mutedTextXs } from "@/lib/utils/class-names";
+import { chartTickText, colStack, mutedTextXs } from "@/lib/utils/class-names";
 import { formatDate, isoDate } from "@/lib/utils/format-date";
 import { MeterBar } from "@/components/ui/MeterBar";
 
@@ -250,7 +250,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
         {/* Progress bars — wrapped in aria-hidden; screen-reader content is
             provided by the aria-live region lower in the tree. */}
         {!isFuture && (
-          <div className="mb-5 flex flex-col gap-2" aria-hidden="true">
+          <div className={`mb-5 ${colStack}`} aria-hidden="true">
             <MeterBar
               value={snapshot.introduced}
               max={totalSpecies}
