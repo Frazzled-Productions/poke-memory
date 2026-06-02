@@ -229,14 +229,14 @@ describe("runStreakProtection — spend-leg guard", () => {
 });
 
 // ---------------------------------------------------------------------------
-// "Never throws" contract — SSR and no-settings paths are the documented
-// safe paths that the JSDoc guarantees. Storage errors are not wrapped in
-// a try/catch in the current implementation; these tests document the actual
-// boundary (the SSR guard and hasStoredSettings guard prevent throws in the
-// two documented no-op conditions).
+// Safe-exit paths — SSR and no-settings guards are the two conditions where
+// the function is documented to return null without throwing. Storage errors
+// in the normal path are NOT caught (no try/catch in the implementation);
+// callers that need robustness to storage errors must wrap in their own
+// try/catch. These tests document the actual safe boundary.
 // ---------------------------------------------------------------------------
 
-describe("runStreakProtection — never throws contract (SSR and no-settings paths)", () => {
+describe("runStreakProtection — SSR and no-settings safe-exit paths", () => {
   it("does not throw when window is undefined (SSR path is always safe)", () => {
     vi.stubGlobal("window", undefined);
     expect(() => runStreakProtection(TODAY)).not.toThrow();

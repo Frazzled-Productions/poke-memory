@@ -2440,15 +2440,22 @@ describe('buildSessionQueues([]) — empty card list', () => {
     }
   });
 
-  it('result has no undefined fields', () => {
+  it('result has the expected shape with all zero/empty values', () => {
     const result = buildSessionQueues([], baseLimits, TODAY);
-    expect(result.learningCardIds).toBeDefined();
-    expect(result.outOfScopeLearningIds).toBeDefined();
-    expect(result.reviewQueue).toBeDefined();
-    expect(result.newQueue).toBeDefined();
-    expect(result.perType).toBeDefined();
-    expect(result.newIntroducedToday).toBeDefined();
-    expect(result.reviewsDoneToday).toBeDefined();
+    expect(result).toMatchObject({
+      learningCardIds: [],
+      outOfScopeLearningIds: [],
+      reviewQueue: [],
+      newQueue: [],
+      newIntroducedToday: 0,
+      reviewsDoneToday: 0,
+      perType: {
+        name: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+        evolution: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+        reverse: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+        cry: { newIntroducedToday: 0, reviewsDoneToday: 0 },
+      },
+    });
   });
 
   it('produces the same zero result regardless of limits', () => {

@@ -280,6 +280,21 @@ describe("masteredSpeciesEvents — locale filtering", () => {
     expect(result).toHaveLength(0);
   });
 
+  it("counts zh-Hans locale cards independently from en", () => {
+    const zhHansName = makeNameCard(3, masteredState("2026-05-01"), "zh-Hans");
+    const zhHansReverse = makeReverseCard(3, masteredState("2026-05-02"), "zh-Hans");
+    const enName = makeNameCard(3, { lastReview: null }, "en"); // en row not mastered
+    const result = masteredSpeciesEvents(
+      [zhHansName, zhHansReverse, enName],
+      MASTERY_REPETITIONS,
+      false,
+      "zh-Hans",
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].speciesId).toBe(3);
+    expect(result[0].masteredDate).toBe("2026-05-02");
+  });
+
   it("counts zh-Hant locale cards independently from en", () => {
     const zhHantName = makeNameCard(2, masteredState("2026-04-20"), "zh-Hant");
     const zhHantReverse = makeReverseCard(2, masteredState("2026-04-21"), "zh-Hant");
