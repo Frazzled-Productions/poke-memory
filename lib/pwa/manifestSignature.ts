@@ -45,7 +45,7 @@ function fnv1a32(input: string): number {
  * @param urls - The full sorted/unsorted list of precache URLs.
  * @returns A lowercase hex string representing the 32-bit FNV-1a hash.
  */
-export function computeManifestSignature(urls: string[]): string {
+export function computeManifestSignature(urls: readonly string[]): string {
   const sorted = [...urls].sort();
   // Fold in the cache version as a header so a version bump alone is enough
   // to invalidate: prefix every hash run with the version string.

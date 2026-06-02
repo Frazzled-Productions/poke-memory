@@ -1602,33 +1602,6 @@ export function ReviewSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, learningQueue, eligibleCardIds, limits, extendedReview]);
 
-  // Offline-download discovery nudge (#1538). Gate (in priority order):
-  //   1. offlineDownloadNudgeDismissed (handled by OnboardingHint itself).
-  //   2. offlineDownloaded true   -> suppress (already downloaded; nudge served its purpose).
-  //   3. firstVisitDone false     -> suppress (first-visit modal still showing).
-  //   4. superuserGuarded true    -> suppress (QA sessions must not fire).
-  //   5. Show if: slowSpriteLoadCount >= threshold OR practiceSessionsCount >= threshold.
-  // Placed here (after all hooks) because it reads `superuserGuarded` which
-  // comes from the `useSuperuser()` hook declared above (#1538 cross-layer note).
-  const offlineNudge = (
-    offlineDownloaded ||
-    !firstVisitDone ||
-    superuserGuarded ||
-    (slowSpriteLoadCount < OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD &&
-      practiceSessionsCount < OFFLINE_NUDGE_SESSION_THRESHOLD)
-  ) ? null : (
-    <div className="mb-3">
-      <OnboardingHint
-        id="offlineDownloadNudgeDismissed"
-        title={t("offlineDownloadNudge.title")}
-        ctaHref="/settings#offline"
-        ctaLabel={t("offlineDownloadNudge.cta")}
-      >
-        <p>{t("offlineDownloadNudge.body")}</p>
-      </OnboardingHint>
-    </div>
-  );
-
   // --- Loading skeleton (SSR + first client tick) ---
   if (cards === null) {
     return (
@@ -1643,6 +1616,31 @@ export function ReviewSession() {
       </div>
     );
   }
+
+  // Offline-download discovery nudge (#1538). Gate (in priority order):
+  //   1. offlineDownloadNudgeDismissed (handled by OnboardingHint itself).
+  //   2. offlineDownloaded true   -> suppress (already downloaded; nudge served its purpose).
+  //   3. firstVisitDone false     -> suppress (first-visit modal still showing).
+  //   4. superuserGuarded true    -> suppress (QA sessions must not fire).
+  //   5. Show if: slowSpriteLoadCount >= threshold OR practiceSessionsCount >= threshold.
+  const offlineNudge = (
+    offlineDownloaded ||
+    !firstVisitDone ||
+    superuserGuarded ||
+    (slowSpriteLoadCount < OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD &&
+      practiceSessionsCount < OFFLINE_NUDGE_SESSION_THRESHOLD)
+  ) ? null : (
+    <div className="mb-3">
+      <OnboardingHint
+        id="offlineDownloadNudgeDismissed"
+        title={t("offlineDownloadNudge.title")}
+        ctaHref="/settings#offline-download-heading"
+        ctaLabel={t("offlineDownloadNudge.cta")}
+      >
+        <p>{t("offlineDownloadNudge.body")}</p>
+      </OnboardingHint>
+    </div>
+  );
 
   // --- All opt-in card types disabled ---
   // Name and reverse are always on since #1234, so this guard covers only

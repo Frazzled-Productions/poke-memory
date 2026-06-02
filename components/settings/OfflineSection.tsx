@@ -8,10 +8,9 @@ import {
   subscribe,
   startDownload,
   stopDownload,
+  CURRENT_MANIFEST,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
-import { buildPrecacheUrls } from "@/lib/pwa/precache";
-import { computeManifestSignature } from "@/lib/pwa/manifestSignature";
 import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
 
 /**
@@ -20,14 +19,6 @@ import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/
  * this avoids re-running the filter+map on every render.
  */
 const ALL_OFFLINE_IDS: number[] = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
-
-/**
- * Current manifest signature + URL count, computed once at module load.
- * Stable for the lifetime of the page since the URL set is determined at
- * build time by the seed data and `SW_CACHE_VERSION`.
- */
-const CURRENT_SIGNATURE: string = computeManifestSignature(buildPrecacheUrls(ALL_OFFLINE_IDS));
-const CURRENT_ID_COUNT: number = ALL_OFFLINE_IDS.length;
 
 /** Format bytes as MB, e.g. 47.3 MB */
 function formatMb(bytes: number): string {
@@ -72,9 +63,9 @@ export function OfflineSection() {
   >(() => {
     if (downloadState.phase !== "done") return null;
     const persisted = downloadState.manifest;
-    if (persisted.signature === CURRENT_SIGNATURE) return { isStale: false };
+    if (persisted.signature === CURRENT_MANIFEST.signature) return { isStale: false };
     // Signatures differ — compute how many new species IDs there are.
-    const countDiff = CURRENT_ID_COUNT - persisted.count;
+    const countDiff = CURRENT_MANIFEST.count - persisted.count;
     const newCount = countDiff > 0 ? countDiff : null;
     return { isStale: true, newCount };
   }, [downloadState]);

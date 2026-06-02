@@ -84,7 +84,7 @@ function seedFromStorage(): void {
   if (at !== null) {
     // Read the persisted manifest (may be absent for downloads predating #1539).
     const rawManifest = readLocalStorage(KEY_OFFLINE_MANIFEST, (raw) => raw, null);
-    const manifest = parseOfflineManifest(rawManifest) ?? _buildCurrentManifest();
+    const manifest = parseOfflineManifest(rawManifest) ?? CURRENT_MANIFEST;
     currentState = {
       phase: "done",
       summary: { totalRequested: 0, downloaded: 0, skipped: 0, failed: 0 },
@@ -95,19 +95,16 @@ function seedFromStorage(): void {
 }
 
 /**
- * Build a manifest representing the current asset set.
- * Used as a fallback when there is a download timestamp but no persisted
- * manifest (e.g. a download that predates #1539). Treating the baseline as
- * "current" avoids a spurious "Update available" on first upgrade.
+ * The manifest for the current asset set — computed once at module load.
+ * Used as a fallback when a download timestamp exists but no persisted manifest
+ * (e.g. a download predating #1539), and written to storage after each new
+ * download. Exported so `OfflineSection` can compare without recomputing.
  */
-function _buildCurrentManifest(): OfflineManifest {
-  const allOfflineIds = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
-  const urls = buildPrecacheUrls(allOfflineIds);
-  return {
-    signature: computeManifestSignature(urls),
-    count: allOfflineIds.length,
-  };
-}
+const _currentOfflineIds = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
+export const CURRENT_MANIFEST: OfflineManifest = {
+  signature: computeManifestSignature(buildPrecacheUrls(_currentOfflineIds)),
+  count: _currentOfflineIds.length,
+};
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -201,15 +198,14 @@ export async function startDownload(ids: number[]): Promise<void> {
     // best-effort; the UI still transitions to "done" even if storage fails.
     writeLocalStorageRaw(OFFLINE_DOWNLOADED_AT_KEY, downloadedAt);
 
-    // Build and persist the manifest signature alongside the timestamp (#1539).
-    const manifest = _buildCurrentManifest();
+    // Persist the manifest signature alongside the timestamp (#1539).
     try {
-      writeLocalStorageRaw(KEY_OFFLINE_MANIFEST, JSON.stringify(manifest));
+      writeLocalStorageRaw(KEY_OFFLINE_MANIFEST, JSON.stringify(CURRENT_MANIFEST));
     } catch {
       // Best-effort; non-fatal if localStorage is full.
     }
 
-    setState({ phase: "done", summary, downloadedAt, manifest });
+    setState({ phase: "done", summary, downloadedAt, manifest: CURRENT_MANIFEST });
     abortController = null;
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
