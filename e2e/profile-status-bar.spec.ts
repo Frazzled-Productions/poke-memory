@@ -8,9 +8,8 @@
  *   - Desktop (md+): visible on ALL routes including Practice (/).
  *   - Mobile (<md): hidden on Practice (/); shown on all other routes.
  *
- * Three status chips:
- *   - StreakChip  — `role="img"`, aria-label "Start your streak" at 0,
- *                   "N day(s) streak" when active.
+ * Three status chips (each a `<button>`, `ChipVisual` is `aria-hidden`):
+ *   - StreakChip  — aria-label "Start your streak" at 0, "N day(s) streak" active.
  *   - TokenChip   — renders nothing when balance < 1 (hidden in fresh state).
  *   - MasteryChip — always rendered; aria-label "0 of N Pokémon mastered…" at
  *                   zero, "M of N Pokémon mastered" when non-zero.
@@ -223,7 +222,7 @@ test.describe("ProfileStatusBar — empty state (fresh guest)", () => {
     await expect(bar).toBeVisible({ timeout: 15_000 });
     // StreakChip renders a chip with aria-label "Start your streak".
     await expect(
-      bar.getByRole("img", { name: "Start your streak" }),
+      bar.getByRole("button", { name: "Start your streak" }),
     ).toBeVisible();
   });
 
@@ -235,7 +234,7 @@ test.describe("ProfileStatusBar — empty state (fresh guest)", () => {
     // TokenChip renders null when balance < 1; no shield chip should appear.
     // The aria-label pattern for a token chip is "N protection token(s)".
     await expect(
-      bar.getByRole("img", { name: /protection token/i }),
+      bar.getByRole("button", { name: /protection token/i }),
     ).toHaveCount(0);
   });
 
@@ -248,7 +247,7 @@ test.describe("ProfileStatusBar — empty state (fresh guest)", () => {
     await expect(bar).toBeVisible({ timeout: 15_000 });
     // MasteryChip always renders. At 0 the aria-label uses masteryZeroAriaLabel.
     await expect(
-      bar.getByRole("img", { name: /0 of \d[\d,.]* Pok[eé]mon mastered/i }),
+      bar.getByRole("button", { name: /0 of \d[\d,.]* Pok[eé]mon mastered/i }),
     ).toBeVisible();
   });
 });
@@ -274,7 +273,7 @@ test.describe("ProfileStatusBar — populated state", () => {
     await expect(bar).toBeVisible({ timeout: 15_000 });
     // StreakChip aria-label is "N day(s) streak" (plural-form varies).
     await expect(
-      bar.getByRole("img", { name: /5 days? streak/i }),
+      bar.getByRole("button", { name: /5 days? streak/i }),
     ).toBeVisible();
   });
 
@@ -286,7 +285,7 @@ test.describe("ProfileStatusBar — populated state", () => {
     await expect(bar).toBeVisible({ timeout: 15_000 });
     // TokenChip aria-label is "2 protection tokens".
     await expect(
-      bar.getByRole("img", { name: "2 protection tokens" }),
+      bar.getByRole("button", { name: "2 protection tokens" }),
     ).toBeVisible();
   });
 
@@ -298,7 +297,7 @@ test.describe("ProfileStatusBar — populated state", () => {
     await expect(bar).toBeVisible({ timeout: 15_000 });
     // MasteryChip aria-label is "42 of N Pokémon mastered".
     await expect(
-      bar.getByRole("img", { name: /42 of \d[\d,.]* Pok[eé]mon mastered/i }),
+      bar.getByRole("button", { name: /42 of \d[\d,.]* Pok[eé]mon mastered/i }),
     ).toBeVisible();
   });
 
@@ -312,13 +311,13 @@ test.describe("ProfileStatusBar — populated state", () => {
     await expect(bar).toBeVisible({ timeout: 15_000 });
 
     await expect(
-      bar.getByRole("img", { name: /3 days? streak/i }),
+      bar.getByRole("button", { name: /3 days? streak/i }),
     ).toBeVisible();
     await expect(
-      bar.getByRole("img", { name: "1 protection token" }),
+      bar.getByRole("button", { name: "1 protection token" }),
     ).toBeVisible();
     await expect(
-      bar.getByRole("img", { name: /10 of \d[\d,.]* Pok[eé]mon mastered/i }),
+      bar.getByRole("button", { name: /10 of \d[\d,.]* Pok[eé]mon mastered/i }),
     ).toBeVisible();
   });
 });
@@ -389,7 +388,7 @@ test.describe("ProfileStatusBar — populated state via QA-seed", () => {
 
     // The pasture-progression seed includes mastered Pokémon, so the mastery
     // chip should NOT show the zero-state label. Match a positive mastered count.
-    const masteryChip = bar.getByRole("img", { name: /Pok[eé]mon mastered/i });
+    const masteryChip = bar.getByRole("button", { name: /Pok[eé]mon mastered/i });
     await expect(masteryChip).toBeVisible();
     // The zero-state aria-label starts with "0 of"; assert it is not the zero state.
     const ariaLabel = await masteryChip.getAttribute("aria-label");
@@ -482,7 +481,7 @@ test.describe("ProfileStatusBar — locale rendering (ja)", () => {
     // Japanese streak aria-label is "{count}日連続" (e.g. "4日連続").
     // Numbers may gain digit-group separators via Intl (#1408) — tolerate them.
     await expect(
-      bar.getByRole("img", { name: /[\d,.\s]+日連続/i }),
+      bar.getByRole("button", { name: /[\d,.\s]+日連続/i }),
     ).toBeVisible();
   });
 
@@ -515,7 +514,7 @@ test.describe("ProfileStatusBar — locale rendering (ja)", () => {
 
     // Japanese startStreakChipAriaLabel = "連続記録を始めよう".
     await expect(
-      bar.getByRole("img", { name: "連続記録を始めよう" }),
+      bar.getByRole("button", { name: "連続記録を始めよう" }),
     ).toBeVisible();
   });
 
@@ -539,7 +538,7 @@ test.describe("ProfileStatusBar — locale rendering (ja)", () => {
     // Japanese masteryChipAriaLabel: "{mastered} / {total} 種族習得済み".
     // Numbers may be formatted with separators — tolerate them.
     await expect(
-      bar.getByRole("img", { name: /[\d,.\s]+ \/ [\d,.\s]+ 種族習得済み/i }),
+      bar.getByRole("button", { name: /[\d,.\s]+ \/ [\d,.\s]+ 種族習得済み/i }),
     ).toBeVisible();
   });
 
@@ -554,7 +553,7 @@ test.describe("ProfileStatusBar — locale rendering (ja)", () => {
 
     // MasteryChip visible label is "{pct}%" — the % sign must be present.
     // We do not assert the exact number so digit-grouping doesn't break the test.
-    const masteryChip = bar.getByRole("img", { name: /Pok[eé]mon mastered/i });
+    const masteryChip = bar.getByRole("button", { name: /Pok[eé]mon mastered/i });
     await expect(masteryChip).toBeVisible();
   });
 });

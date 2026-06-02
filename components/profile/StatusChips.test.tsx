@@ -214,6 +214,21 @@ describe("StatusChips — popover closes on Escape (#1556)", () => {
   });
 });
 
+// ─── Popover: click-outside (pointerdown) closes the popover ─────────────────
+
+describe("StatusChips — popover closes on click-outside (#1556)", () => {
+  it("pointerdown outside the wrapper closes an open popover", () => {
+    renderWithIntl(<TokenChip tokenBalance={3} />);
+    const btn = screen.getByRole("button", { name: /3 protection tokens/i });
+
+    fireEvent.click(btn);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+});
+
 // ─── Forcing function: popover body equals button aria-label ─────────────────
 
 describe("StatusChips — single-source invariant: popover text === aria-label (#1556)", () => {

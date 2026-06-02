@@ -26,7 +26,7 @@
  * users.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
 // ─── Icons (lucide-style, currentColor, matches BottomTabBar strokeWidth) ──────
@@ -108,23 +108,20 @@ const TONE_CLASS = {
  * only, so the user can tab past naturally.
  */
 function PillPopover({
+  id,
   description,
-  closeLabel,
   wrapperRef,
   onClose,
 }: {
+  id: string;
   description: string;
-  closeLabel: string;
   wrapperRef: React.RefObject<HTMLSpanElement | null>;
   onClose: () => void;
 }) {
-  const popoverRef = useRef<HTMLDivElement>(null);
-
   // Escape key closes the popover.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        e.preventDefault();
         onClose();
       }
     }
@@ -146,7 +143,7 @@ function PillPopover({
 
   return (
     <div
-      ref={popoverRef}
+      id={id}
       role="tooltip"
       className="absolute left-1/2 top-full z-50 mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs font-medium text-foreground shadow-lg dark:border-zinc-700"
     >
@@ -160,16 +157,6 @@ function PillPopover({
         className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-background"
       />
       {description}
-      {/* Visually hidden close button for keyboard users who need to dismiss
-          without pressing Escape (e.g. mobile keyboard users). */}
-      <button
-        type="button"
-        onClick={onClose}
-        className="sr-only"
-        tabIndex={-1}
-      >
-        {closeLabel}
-      </button>
     </div>
   );
 }
@@ -191,15 +178,14 @@ function PillPopover({
  */
 function ChipButton({
   ariaLabel,
-  closeLabel,
   children,
 }: {
   ariaLabel: string;
-  closeLabel: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLSpanElement>(null);
+  const tooltipId = useId();
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -223,18 +209,20 @@ function ChipButton({
     setOpen(true);
   }
   function handleBlur(e: React.FocusEvent<HTMLButtonElement>) {
-    // Only close when focus leaves the wrapper entirely (not moving to the
-    // close button inside the popover — but the close button is tabIndex=-1
-    // so this edge case cannot occur in practice).
+    // Close when focus leaves the wrapper entirely.
     const wrapper = wrapperRef.current;
     if (!wrapper || !wrapper.contains(e.relatedTarget as Node)) {
       setOpen(false);
     }
   }
 
-  // Click toggles on touch; on hover devices click is redundant but harmless.
+  // Click opens on hover-capable devices (mouse-leave closes); toggles on touch.
   function handleClick() {
-    setOpen((v) => !v);
+    if (window.matchMedia("(hover: hover)").matches) {
+      setOpen(true);
+    } else {
+      setOpen((v) => !v);
+    }
   }
 
   return (
@@ -243,7 +231,7 @@ function ChipButton({
         type="button"
         aria-label={ariaLabel}
         aria-expanded={open}
-        aria-haspopup="true"
+        aria-describedby={open ? tooltipId : undefined}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -255,8 +243,8 @@ function ChipButton({
       </button>
       {open && (
         <PillPopover
+          id={tooltipId}
           description={ariaLabel}
-          closeLabel={closeLabel}
           wrapperRef={wrapperRef}
           onClose={close}
         />
@@ -299,11 +287,10 @@ function ChipVisual({
  */
 export function StreakChip({ streak }: { streak: number }) {
   const t = useTranslations("profileStatus");
-  const closeLabel = t("pillPopoverCloseLabel");
   if (streak === 0) {
     const ariaLabel = t("startStreakChipAriaLabel");
     return (
-      <ChipButton ariaLabel={ariaLabel} closeLabel={closeLabel}>
+      <ChipButton ariaLabel={ariaLabel}>
         <ChipVisual
           tone="amber"
           icon={<FlameIcon />}
@@ -314,7 +301,7 @@ export function StreakChip({ streak }: { streak: number }) {
   }
   const ariaLabel = t("streakChipAriaLabel", { count: streak });
   return (
-    <ChipButton ariaLabel={ariaLabel} closeLabel={closeLabel}>
+    <ChipButton ariaLabel={ariaLabel}>
       <ChipVisual
         tone="amber"
         icon={<FlameIcon />}
@@ -333,7 +320,7 @@ export function TokenChip({ tokenBalance }: { tokenBalance: number }) {
   if (tokenBalance < 1) return null;
   const ariaLabel = t("tokenChipAriaLabel", { count: tokenBalance });
   return (
-    <ChipButton ariaLabel={ariaLabel} closeLabel={t("pillPopoverCloseLabel")}>
+    <ChipButton ariaLabel={ariaLabel}>
       <ChipVisual
         tone="amber"
         icon={<ShieldIcon />}
@@ -367,7 +354,7 @@ export function MasteryChip({
           total: totalSpecies,
         });
   return (
-    <ChipButton ariaLabel={ariaLabel} closeLabel={t("pillPopoverCloseLabel")}>
+    <ChipButton ariaLabel={ariaLabel}>
       <ChipVisual
         tone="emerald"
         icon={<MasteredIcon />}
