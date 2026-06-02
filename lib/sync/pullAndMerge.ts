@@ -57,6 +57,18 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 export const SYNC_PULL_APPLIED_EVENT = "poke-memory:sync-pull-applied";
 
 /**
+ * Order-insensitive set comparison: sort both sides so a mere reordering (e.g.
+ * cloud holding the same locales in a different order) doesn't read as a change
+ * and trigger a spurious push on every pull cycle.
+ */
+const setsEqual = (a: string[], b: string[]): boolean => {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort();
+  const sb = [...b].sort();
+  return sa.every((v, i) => v === sb[i]);
+};
+
+/**
  * True when no card in `cards` has been graded yet — every entry has both
  * `lastReview` and `firstSeen` still null. A freshly-built `buildSession`
  * result satisfies this; a session with even one user grade does not.
@@ -217,7 +229,7 @@ export async function pullAndMerge(
         // (removedLocales) between the LWW write and the merge step's re-read.
         // The pre-LWW local values are preserved by using preLocalSettings (captured
         // above) so the locale merge step below still sees the correct original state.
-        const { learningLocales: _lww, removedLocales: _rll, ...cloudSettingsWithoutLocales } =
+        const { learningLocales: _learningLocales, removedLocales: _removedLocales, ...cloudSettingsWithoutLocales } =
           (pulledRow.settings ?? {}) as Partial<typeof DEFAULT_SETTINGS>;
         saveSettings(
           preserveDeviceLocalKeys(
@@ -376,15 +388,6 @@ export async function pullAndMerge(
           mergedLearning,
         );
 
-        // Order-insensitive set comparison: sort both sides so a mere reordering
-        // in cloud doesn't cause a spurious push on every cycle.
-        function setsEqual(a: string[], b: string[]): boolean {
-          if (a.length !== b.length) return false;
-          const sa = [...a].sort();
-          const sb = [...b].sort();
-          return sa.every((v, i) => v === sb[i]);
-        }
-
         const learningLocalChanged = !setsEqual(mergedLearning, preLocalSettings.learningLocales);
         const removedLocalChanged = !setsEqual(mergedRemoved, preLocalSettings.removedLocales);
         const activeChanged = mergedActive !== preLocalSettings.activePokemonNameLocale;
@@ -398,23 +401,25 @@ export async function pullAndMerge(
           !setsEqual(mergedRemoved, cloudRemoved ?? []);
 
         if (learningLocalChanged || removedLocalChanged || activeChanged) {
-          // Update the last-pushed snapshot BEFORE saveSettings so the
-          // SETTINGS_SAVED_EVENT listener in AutoSyncOnChange sees a zero-key
-          // diff for learningLocales/removedLocales and skips the duplicate push.
-          if (cloudLearningNeedsUpdate || cloudRemovedNeedsUpdate) {
-            const prevSnapshot = loadLastPushedSettings();
-            if (prevSnapshot !== null) {
-              saveLastPushedSettings({
-                ...prevSnapshot,
-                learningLocales: mergedLearning,
-                removedLocales: mergedRemoved,
-              });
-            }
-          }
-
           // Read post-LWW local settings so the save merges with the already-
           // written LWW values rather than clobbering them with preLocalSettings.
           const currentLocal = loadSettings();
+
+          // Update the last-pushed snapshot BEFORE saveSettings so the
+          // SETTINGS_SAVED_EVENT listener in AutoSyncOnChange sees a zero-key
+          // diff for learningLocales/removedLocales and skips the duplicate push.
+          // On a fresh device there is no prior snapshot, so seed it from the
+          // current local settings (rather than skipping the update, which would
+          // let AutoSyncOnChange fire a redundant push on first sign-in).
+          if (cloudLearningNeedsUpdate || cloudRemovedNeedsUpdate) {
+            const snapshotBase = loadLastPushedSettings() ?? currentLocal;
+            saveLastPushedSettings({
+              ...snapshotBase,
+              learningLocales: mergedLearning,
+              removedLocales: mergedRemoved,
+            });
+          }
+
           saveSettings({
             ...currentLocal,
             learningLocales: mergedLearning,
