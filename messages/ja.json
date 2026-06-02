@@ -972,6 +972,15 @@
     "steel": "はがね",
     "water": "みず"
   },
+  "pushDaily": {
+    "title": "Time to practise",
+    "newOnly": "{newEstimate, plural, one {# new card} other {# new cards}} ready to practise.",
+    "multiDueNew": "{dueTotal, plural, one {# card} other {# cards}} due across your languages: {breakdown}. Plus {newEstimate, number} new ready to practise.",
+    "multiDueOnly": "{dueTotal, plural, one {# card} other {# cards}} due across your languages: {breakdown}.",
+    "singleDueNew": "{due, plural, one {# card} other {# cards}} due in {language} plus {newEstimate, number} new ready to practise.",
+    "singleDueOnly": "{due, plural, one {# card} other {# cards}} due in {language} for review.",
+    "breakdownItem": "{language} {count, number}"
+  },
   "privacy": {
     "childFriendlySummary": {
       "heading": "ポケモリーはあなたのデータをどう扱う?",

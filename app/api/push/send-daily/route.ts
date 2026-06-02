@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import webpush from "web-push";
+import { createTranslator as _createTranslatorRaw } from "use-intl/core";
 import { todayInTimezone } from "@/lib/utils/format-date";
 import { isCardEligible } from "@/lib/eligibility";
 import { scopeMatchesEntry, resolveAnchorId } from "@/lib/eligibility/scopePredicate";
@@ -9,6 +10,18 @@ import { SCOPE_LOOKUP } from "@/lib/pokemon/scopeLookup";
 import type { PracticeScope } from "@/lib/review/scope";
 import { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter } from "@/lib/eligibility/scopeConstants";
 import { shouldSendToUser, PUSH_DEFAULT_HOUR_UTC } from "@/lib/push/notificationHour";
+import {
+  SUPPORTED_LOCALES,
+  LOCALE_ENDONYMS,
+  type AppLocale,
+} from "@/i18n/locales";
+
+// use-intl's createTranslator has deeply generic types that conflict with the
+// simple Record<string, unknown> messages shape used here; cast to a plain
+// callable to keep the call sites readable without requiring type imports.
+const _createTranslator = _createTranslatorRaw as unknown as (
+  opts: { locale: string; messages: Record<string, unknown> }
+) => (key: string, values?: Record<string, unknown>) => string;
 
 /**
  * Daily Web Push reminder route (#1056, per-user hour gate: #1315).
@@ -72,9 +85,30 @@ type PushPayload = {
   url: string;
 };
 
-/** Pluralisation helper. Avoids relying on Intl.PluralRules for one word. */
-function plural(n: number, singular: string, plural: string): string {
-  return n === 1 ? singular : plural;
+/**
+ * Per-locale due count for a single user.
+ * Keys are AppLocale values; only locales with due > 0 are present.
+ */
+export type LocaleDueMap = Map<AppLocale, number>;
+
+/**
+ * The `pushDaily` message namespace loaded from the English catalogue.
+ * Used by `createTranslator` to build notification copy (#1504, Option B).
+ * The cron has no per-user `appLocale`, so the notification chrome stays
+ * English for now; the keys exist in all four catalogues so a future locale
+ * swap is a one-line change.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _pushDailyMessages: Record<string, any> | null = null;
+async function getPushDailyMessages(): Promise<Record<string, unknown>> {
+  if (_pushDailyMessages === null) {
+    // Dynamic import keeps the messages bundle out of every other route.
+    const mod = (await import("@/messages/en.json")) as {
+      default: Record<string, unknown>;
+    };
+    _pushDailyMessages = mod.default.pushDaily as Record<string, unknown>;
+  }
+  return _pushDailyMessages;
 }
 
 /**
@@ -106,34 +140,81 @@ function isAuthorized(headerValue: string | null, secret: string): boolean {
  *
  * British English copy. No em dashes (per AGENTS.md "Punctuation").
  *
- * When `newEstimate` is 0 (or omitted), renders the due count only, e.g.
- * "3 cards due for review." When `newEstimate` is positive, renders a
- * combined count so the user sees the full picture, e.g. "3 due plus 15
- * new ready to practise." Both counts must be positive to use the combined
- * form; a zero due count with new cards only renders "15 new cards ready."
+ * Supersedes #1480's single-locale scoping (#1504):
+ *   - `localeDueCounts` maps each learning locale to its due count. Only
+ *     locales with due > 0 should be present (the route omits zero-due
+ *     locales from the map before calling this function).
+ *   - Single learning language (only one locale in the map, or all others
+ *     are zero): unchanged body feel, using the catalogue `singleDue*` keys.
+ *   - Multiple learning languages with due > 0: global total leads; breakdown
+ *     is ordered by due-count descending, ties broken by the canonical locale
+ *     order (en, ja, zh-Hans, zh-Hant). Endonyms from `LOCALE_ENDONYMS`.
+ *   - Exactly one due locale among multiple enrolled: the compact
+ *     "N cards due in <Language>" form (avoids a one-item breakdown list).
+ *   - Zero due across all locales: falls through to the new-only copy
+ *     (same as before — no per-language new-card breakdown in v1).
  *
- * The estimate is capped by per-direction daily new-card limits summed
- * across enabled directions — it does not include cards whose `first_seen`
- * is already today (those are cards started during today's session, not
- * "truly new"). It does not account for learning-step state or
- * `maxReviewsPerDay` caps. Practice scope is applied in `rowIsEligible`
- * before the due and new counts are tallied (#1159).
+ * New-card count: GLOBAL for v1 (per-locale new-card capping is a larger
+ * modelling question; see #1504 PR body for the rationale).
  */
-export function buildDailyMessage(dueCount: number, newEstimate: number = 0): PushPayload {
-  const title = "Time to practise";
-  let body: string;
+export async function buildDailyMessage(
+  localeDueCounts: LocaleDueMap,
+  newEstimate: number = 0,
+): Promise<PushPayload> {
+  const messages = await getPushDailyMessages();
+  const t = _createTranslator({ locale: "en", messages });
 
-  if (dueCount > 0 && newEstimate > 0) {
-    body =
-      `${String(dueCount)} ${plural(dueCount, "card", "cards")} due` +
-      ` plus ${String(newEstimate)} new ready to practise.`;
-  } else if (dueCount > 0) {
-    body = `${String(dueCount)} ${plural(dueCount, "card", "cards")} due for review.`;
-  } else {
-    body = `${String(newEstimate)} new ${plural(newEstimate, "card", "cards")} ready to practise.`;
+  const title = t("title");
+  const url = "/";
+
+  // Sum the global total across all (non-zero) due locales.
+  let dueTotal = 0;
+  for (const count of localeDueCounts.values()) dueTotal += count;
+
+  // ── Zero due: fall through to new-only copy (unchanged path) ─────────────
+  if (dueTotal === 0) {
+    const body = t("newOnly", { newEstimate });
+    return { title, body, url };
   }
 
-  return { title, body, url: "/" };
+  // ── Determine the breakdown: sort by due desc, tie-break by canonical order ─
+  const canonicalOrder = SUPPORTED_LOCALES as readonly AppLocale[];
+  const sorted = Array.from(localeDueCounts.entries())
+    .filter(([, c]) => c > 0)
+    .sort(([locA, countA], [locB, countB]) => {
+      if (countB !== countA) return countB - countA;
+      return canonicalOrder.indexOf(locA) - canonicalOrder.indexOf(locB);
+    });
+
+  // ── Single due-locale: compact form ──────────────────────────────────────
+  // (Only one locale has due > 0, regardless of how many the user is enrolled in.)
+  if (sorted.length === 1) {
+    const [locale, due] = sorted[0];
+    const language = LOCALE_ENDONYMS[locale];
+    let body: string;
+    if (newEstimate > 0) {
+      body = t("singleDueNew", { due, language, newEstimate });
+    } else {
+      body = t("singleDueOnly", { due, language });
+    }
+    return { title, body, url };
+  }
+
+  // ── Multiple due-locales: global total + breakdown ────────────────────────
+  // Build breakdown string: "<Endonym> N, <Endonym> N, ..."
+  // Plain comma join (no Oxford comma via Intl.ListFormat) for scannability.
+  const breakdownParts = sorted.map(([locale, count]) =>
+    t("breakdownItem", { language: LOCALE_ENDONYMS[locale], count }),
+  );
+  const breakdown = breakdownParts.join(", ");
+
+  let body: string;
+  if (newEstimate > 0) {
+    body = t("multiDueNew", { dueTotal, breakdown, newEstimate });
+  } else {
+    body = t("multiDueOnly", { dueTotal, breakdown });
+  }
+  return { title, body, url };
 }
 
 type SubscriptionRow = {
@@ -174,6 +255,12 @@ const SCOPE_LOOKUP_MAP = new Map(SCOPE_LOOKUP.map((e) => [e.id, e]));
  *
  * Name and reverse are always on since #1234. They are not represented here;
  * `isCardEligible` and `computeNewEstimate` treat them as always active.
+ *
+ * #1504: `pokemonNameLocale` replaced by `learningLocales` (the full learning
+ * set from the multi-language model). The route counts due cards across ALL
+ * learning locales and builds a per-language breakdown. `activePokemonNameLocale`
+ * is device-local (a DEVICE_LOCAL_KEYS entry, not reliably in cloud JSONB)
+ * and is NOT read here — ordering is by due-count desc, not active-first.
  */
 type UserEligibility = {
   evolutionCardsEnabled: boolean;
@@ -191,18 +278,17 @@ type UserEligibility = {
    */
   practiceScope: PracticeScope;
   /**
-   * The user's active Pokémon name locale (#1480).
-   * Migration 029 added `locale` as part of the PK on `card_reviews`; a user
-   * who has practised in multiple locales (via the `languages` Labs flag) has
-   * independent FSRS rows per locale. The due-count query must filter to only
-   * the rows that match the user's current active locale, matching the
-   * behaviour of every other locale-aware surface (Mastery, Pasture, Stats).
+   * The user's full learning-locale set (#1504, supersedes #1480's
+   * `pokemonNameLocale` single-locale field).
+   *
+   * Parsed from the `learningLocales` JSONB array (synced via union-merge in
+   * #1568). English is always present and unremovable; the default is `["en"]`
+   * so pre-#1484 users see the correct en-only behaviour.
    *
    * Accepted values: `'en' | 'ja' | 'zh-Hans' | 'zh-Hant'` (DB CHECK constraint).
-   * Falls back to `"en"` when absent/invalid — matches the migration 029 backfill
-   * which set `locale = 'en'` for all pre-existing rows.
+   * Any invalid element is silently dropped.
    */
-  pokemonNameLocale: string;
+  learningLocales: AppLocale[];
 };
 
 /** DEFAULT_SETTINGS-aligned fallbacks, used when a JSONB field is missing or invalid. */
@@ -216,8 +302,9 @@ const DEFAULT_ELIGIBILITY: UserEligibility = {
   maxNewReversePerDay: 10,
   maxNewCryPerDay: 10,
   practiceScope: EMPTY_SCOPE,
-  // "en" matches migration 029 backfill — legacy rows have locale = 'en'.
-  pokemonNameLocale: "en",
+  // Pre-#1484 users have no `learningLocales` JSONB key; default to ["en"]
+  // which matches migration 029's backfill of locale = 'en' for all legacy rows.
+  learningLocales: ["en"],
 };
 
 /**
@@ -281,6 +368,31 @@ function parsePracticeScope(raw: unknown): PracticeScope {
 }
 
 /**
+ * Parse the `learningLocales` array from the raw JSONB blob.
+ *
+ * Only accepts the four DB-valid locale values. Invalid elements are silently
+ * dropped. Deduplicates. Always includes "en" (English is unremovable) so
+ * even a completely invalid array falls back to the English-only default.
+ */
+function parseLearningLocales(raw: unknown): AppLocale[] {
+  const validSet = new Set<string>(SUPPORTED_LOCALES);
+  const out: AppLocale[] = [];
+  const seen = new Set<AppLocale>();
+  if (Array.isArray(raw)) {
+    for (const v of raw) {
+      if (typeof v === "string" && validSet.has(v) && !seen.has(v as AppLocale)) {
+        const locale = v as AppLocale;
+        seen.add(locale);
+        out.push(locale);
+      }
+    }
+  }
+  // English is unremovable — ensure it's always present.
+  if (!seen.has("en")) out.unshift("en");
+  return out;
+}
+
+/**
  * Parse the per-user eligibility settings from the raw JSONB blob. Permissive:
  * a missing or non-boolean field falls back to the DEFAULT_SETTINGS value.
  * Only the fields that affect the daily-push due count are extracted.
@@ -297,20 +409,11 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
     const v = s[key];
     return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : defaultVal;
   }
-  // pokemonNameLocale: accept exactly the four DB-valid values; anything else
-  // falls back to "en". Mirrors the validation in lib/settings/persistence.ts.
-  // Do NOT use SUPPORTED_LOCALES (would import i18n/locales.ts which is fine
-  // here, but the inline check keeps this file self-contained and avoids any
-  // risk of a future locale being accepted before the DB CHECK constraint is
-  // updated).
-  const rawLocale = s.pokemonNameLocale;
-  const pokemonNameLocale: string =
-    rawLocale === "en" ||
-    rawLocale === "ja" ||
-    rawLocale === "zh-Hans" ||
-    rawLocale === "zh-Hant"
-      ? (rawLocale as string)
-      : DEFAULT_ELIGIBILITY.pokemonNameLocale;
+
+  // #1504: parse learningLocales (supersedes the single pokemonNameLocale field
+  // from #1480). Falls back to ["en"] for pre-#1484 records that have no
+  // learningLocales key (migration 029 backfilled locale="en" for all rows).
+  const learningLocales = parseLearningLocales(s.learningLocales);
 
   return {
     evolutionCardsEnabled:        boolField("evolutionCardsEnabled",        DEFAULT_ELIGIBILITY.evolutionCardsEnabled),
@@ -322,7 +425,7 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
     maxNewReversePerDay:   numField("maxNewReversePerDay",   DEFAULT_ELIGIBILITY.maxNewReversePerDay),
     maxNewCryPerDay:       numField("maxNewCryPerDay",       DEFAULT_ELIGIBILITY.maxNewCryPerDay),
     practiceScope: parsePracticeScope(s.practiceScope),
-    pokemonNameLocale,
+    learningLocales,
   };
 }
 
@@ -411,6 +514,9 @@ function rowIsEligible(
  * The started-today count used for the evolution bucket is the sum of
  * `"evolution-edge"` and `"reverse-evolution-edge"` rows started today,
  * matching how `buildSessionQueues` accumulates `perType.evolution.newIntroducedToday`.
+ *
+ * New-card estimate is GLOBAL for v1 (#1504 — per-locale new-card capping
+ * is a separate modelling question).
  */
 function computeNewEstimate(
   startedTodayCounts: Record<string, number>,
@@ -522,7 +628,8 @@ export async function POST(request: Request) {
 
   // Step 2: resolve timezones, notification-hour preference, and per-user
   // eligibility settings. We widen the SELECT to include:
-  //   - `settings` JSONB: card-type enabled flags and alt-forms toggle.
+  //   - `settings` JSONB: card-type enabled flags, alt-forms toggle, and
+  //     `learningLocales` (#1504 — the user's full learning-locale set).
   //   - `timezone`: scalar column (migration 019) — used for "today" bucketing
   //     and for converting the local preferred hour to UTC (#1315).
   //   - `push_notification_hour`: scalar column (migration 030, #1315) — the
@@ -587,14 +694,30 @@ export async function POST(request: Request) {
     else usersByDueDate.set(today, [userId]);
   }
 
-  // Step 4: per-user due counts and started-today counts in a single
-  // round-trip per timezone bucket.
+  // Step 4: per-user, per-locale due counts and started-today counts in a
+  // single round-trip per timezone bucket.
   //
-  // We fetch `user_id`, `card_type`, `subject_key`, and `first_seen` for
-  // every row that satisfies `due_date <= today AND user_id IN bucket AND
+  // We fetch `user_id`, `card_type`, `subject_key`, `locale`, and `first_seen`
+  // for every row that satisfies `due_date <= today AND user_id IN bucket AND
   // hidden_since IS NULL`, then aggregate client-side.
   //
+  // #1504 supersedes #1480's active-locale-only filter:
+  //   OLD (#1480): skip rows whose locale !== eligibility.pokemonNameLocale
+  //   NEW (#1504): skip rows whose locale is NOT in eligibility.learningLocales
+  //   The per-locale accumulator is now a Map<locale, count> rather than a
+  //   scalar, so we can build the per-language breakdown for the notification body.
+  //
+  // NOTE: lib/profile/dueCountCache.ts (the localStorage badge cache) is
+  // intentionally NOT used here — it is client-side only and unreachable
+  // from this Node cron route. The route computes due counts from the same
+  // card_reviews aggregation it has always used; #1480 already threads the
+  // `locale` column through DueRow. The per-locale breakdown is produced by
+  // changing the accumulator from scalar to Map in the same loop.
+  //
   // For each row we apply the per-user eligibility gate:
+  //   - Locale membership: skip rows whose locale is not in the user's
+  //     learningLocales set (before the eligibility gate to avoid inflating
+  //     the count with ineligible rows from non-learning locales).
   //   - Card-type enable flags (evolutionCardsEnabled, etc.) from settings JSONB.
   //     Name and reverse are always on since #1234.
   //   - Alt-forms exclusion: when alternateFormsEnabled is false, rows with
@@ -605,7 +728,9 @@ export async function POST(request: Request) {
   // the due total) but also counted in a separate bucket so we can compute
   // the new-card estimate (cards started today reduce the remaining new-card
   // headroom for that direction).
-  const dueCountByUser = new Map<string, number>();
+
+  // dueByUser: user_id → Map<locale, count>
+  const dueByUser = new Map<string, Map<AppLocale, number>>();
   // startedTodayByUser: user_id → { card_type → count }
   const startedTodayByUser = new Map<string, Record<string, number>>();
   for (const [today, userIds] of usersByDueDate) {
@@ -623,19 +748,25 @@ export async function POST(request: Request) {
     }
     for (const row of (dueData ?? []) as DueRow[]) {
       const eligibility = eligibilityByUser.get(row.user_id) ?? DEFAULT_ELIGIBILITY;
-      // Locale filter (#1480): skip rows that belong to a different locale than
-      // the user's current active pokemonNameLocale. This is a client-side
-      // per-user filter rather than a SQL WHERE clause because the bucket query
-      // covers MULTIPLE users who may each have a DIFFERENT active locale.
-      // The filter must come BEFORE the eligibility gate so ineligible rows
-      // from other locales do not inflate the due count.
-      if (row.locale !== eligibility.pokemonNameLocale) continue;
+
+      // Locale membership filter (#1504, supersedes #1480's single-locale drop):
+      // count only rows whose locale is in the user's learning set. This is a
+      // client-side per-user filter because the bucket query covers MULTIPLE
+      // users each with potentially different learning sets. The filter must
+      // come BEFORE the eligibility gate so ineligible rows from non-learning
+      // locales do not inflate the due count.
+      const rowLocale = row.locale as AppLocale;
+      if (!eligibility.learningLocales.includes(rowLocale)) continue;
+
       if (!rowIsEligible(row.card_type, row.subject_key, eligibility)) continue;
 
-      dueCountByUser.set(
-        row.user_id,
-        (dueCountByUser.get(row.user_id) ?? 0) + 1,
-      );
+      // Accumulate per-locale due count.
+      if (!dueByUser.has(row.user_id)) {
+        dueByUser.set(row.user_id, new Map<AppLocale, number>());
+      }
+      const localeMap = dueByUser.get(row.user_id)!;
+      localeMap.set(rowLocale, (localeMap.get(rowLocale) ?? 0) + 1);
+
       // Track first_seen = today rows per card type so we can subtract them
       // from the new-card estimate (they're already started, not truly new).
       if (row.first_seen === today) {
@@ -655,14 +786,18 @@ export async function POST(request: Request) {
   const toDelete: string[] = [];
   let sent = 0;
   for (const sub of filteredSubscriptions) {
-    const dueCount = dueCountByUser.get(sub.user_id) ?? 0;
+    const localeDueCounts: LocaleDueMap = dueByUser.get(sub.user_id) ?? new Map();
     const eligibility = eligibilityByUser.get(sub.user_id) ?? DEFAULT_ELIGIBILITY;
     const startedTodayCounts = startedTodayByUser.get(sub.user_id) ?? {};
     const newEstimate = computeNewEstimate(startedTodayCounts, eligibility);
 
-    if (dueCount <= 0 && newEstimate <= 0) continue;
+    // Check global due total from the map.
+    let dueTotal = 0;
+    for (const count of localeDueCounts.values()) dueTotal += count;
 
-    const payload = buildDailyMessage(dueCount, newEstimate);
+    if (dueTotal <= 0 && newEstimate <= 0) continue;
+
+    const payload = await buildDailyMessage(localeDueCounts, newEstimate);
     try {
       await webpush.sendNotification(
         {
