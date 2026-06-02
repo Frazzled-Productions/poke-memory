@@ -28,11 +28,7 @@ import PrivacyPage from "@/app/privacy/page";
 // ---------------------------------------------------------------------------
 
 vi.mock("@/components/privacy/ChildFriendlySummary", () => ({
-  default: () => (
-    <section data-testid="child-friendly-summary-stub">
-      Child-friendly summary (stub)
-    </section>
-  ),
+  default: () => <section>Child-friendly summary (stub)</section>,
 }));
 
 // ---------------------------------------------------------------------------

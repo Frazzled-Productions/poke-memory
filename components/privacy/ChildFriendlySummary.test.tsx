@@ -233,6 +233,13 @@ describe("ChildFriendlySummary", () => {
       );
       expect(screen.queryByText(/in plain language/i)).toBeNull();
     });
+
+    it("renders the first item with a Simplified Chinese bold label", async () => {
+      switchLocale(zhHansMessages);
+      render(await ChildFriendlySummary());
+      const bold = screen.getByText(/仅游玩（无需登录）/);
+      expect(bold.tagName.toLowerCase()).toBe("strong");
+    });
   });
 
   describe("Traditional Chinese locale", () => {
@@ -243,6 +250,13 @@ describe("ChildFriendlySummary", () => {
         "用簡單的話說",
       );
       expect(screen.queryByText(/in plain language/i)).toBeNull();
+    });
+
+    it("renders the first item with a Traditional Chinese bold label", async () => {
+      switchLocale(zhHantMessages);
+      render(await ChildFriendlySummary());
+      const bold = screen.getByText(/僅遊玩（無需登入）/);
+      expect(bold.tagName.toLowerCase()).toBe("strong");
     });
   });
 });
