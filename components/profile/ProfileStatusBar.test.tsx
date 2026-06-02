@@ -15,7 +15,7 @@
 
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
 import {
   renderWithIntl,
   renderJa,
@@ -140,7 +140,7 @@ describe("ProfileStatusBar — skeleton (null state)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Accessibility — role="region" + per-chip aria-labels
+// Accessibility — role="region" + per-chip aria-labels (chips are buttons now)
 // ---------------------------------------------------------------------------
 
 describe("ProfileStatusBar — accessibility", () => {
@@ -153,33 +153,33 @@ describe("ProfileStatusBar — accessibility", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("streak chip has an aria-label (populated state)", () => {
+  it("streak chip is a button with an aria-label (populated state)", () => {
     renderWithIntl(<ProfileStatusBar />);
-    expect(screen.getByLabelText(/7 days streak/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /7 days streak/i })).toBeInTheDocument();
   });
 
-  it("token chip has an aria-label (populated state)", () => {
+  it("token chip is a button with an aria-label (populated state)", () => {
     renderWithIntl(<ProfileStatusBar />);
-    expect(screen.getByLabelText(/2 protection tokens/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /2 protection tokens/i })).toBeInTheDocument();
   });
 
-  it("mastery chip has an aria-label (populated state)", () => {
+  it("mastery chip is a button with an aria-label (populated state)", () => {
     renderWithIntl(<ProfileStatusBar />);
-    expect(screen.getByLabelText(/143 of 1025/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /143 of 1025/i })).toBeInTheDocument();
   });
 
   it("mastery chip has an encouraging aria-label when count is zero", () => {
     mockUseProfileStatus.mockReturnValue(ZERO_STATE);
     renderWithIntl(<ProfileStatusBar />);
     expect(
-      screen.getByLabelText(/0 of 1025.*start reviewing/i),
+      screen.getByRole("button", { name: /0 of 1025.*start reviewing/i }),
     ).toBeInTheDocument();
   });
 
   it("streak chip has a 'start your streak' aria-label when streak is 0", () => {
     mockUseProfileStatus.mockReturnValue(ZERO_STATE);
     renderWithIntl(<ProfileStatusBar />);
-    expect(screen.getByLabelText(/start your streak/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /start your streak/i })).toBeInTheDocument();
   });
 });
 
@@ -196,14 +196,14 @@ describe("ProfileStatusBar — populated state", () => {
 
   it("renders the token chip with the terse count when balance >= 1", () => {
     renderWithIntl(<ProfileStatusBar />);
-    expect(screen.getByLabelText(/2 protection tokens/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /2 protection tokens/i })).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
   });
 
   it("renders the mastery chip as a percentage", () => {
     renderWithIntl(<ProfileStatusBar />);
     // Terse label is the percentage; the count lives in the aria-label.
-    const mastery = screen.getByLabelText(/143 of 1025/i);
+    const mastery = screen.getByRole("button", { name: /143 of 1025/i });
     expect(mastery.textContent).toMatch(/14.*%/);
   });
 });
@@ -224,12 +224,12 @@ describe("ProfileStatusBar — zero state", () => {
 
   it("hides the token chip when tokenBalance is 0", () => {
     renderWithIntl(<ProfileStatusBar />);
-    expect(screen.queryByLabelText(/protection token/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /protection token/i })).toBeNull();
   });
 
   it("still shows the mastery chip at zero (teaches the goal)", () => {
     renderWithIntl(<ProfileStatusBar />);
-    const mastery = screen.getByLabelText(/0 of 1025.*start reviewing/i);
+    const mastery = screen.getByRole("button", { name: /0 of 1025.*start reviewing/i });
     expect(mastery.textContent).toMatch(/0.*%/);
   });
 });
@@ -245,7 +245,7 @@ describe("ProfileStatusBar — pretendAllMastered", () => {
 
   it("shows total/total in the mastery aria-label", () => {
     renderWithIntl(<ProfileStatusBar />);
-    expect(screen.getByLabelText(/1025 of 1025/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /1025 of 1025/i })).toBeInTheDocument();
   });
 
   it("mastery label shows 100%", () => {
@@ -330,23 +330,66 @@ describe("ProfileStatusBar — locale rendering", () => {
 
   it("ja: mastery aria-label renders in Japanese", () => {
     renderJa(<ProfileStatusBar />);
-    expect(screen.getByLabelText(/習得済み/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /習得済み/ })).toBeInTheDocument();
   });
 
   it("zh-Hans: mastery aria-label renders in Simplified Chinese", () => {
     renderZhHans(<ProfileStatusBar />);
-    expect(screen.getByLabelText(/已掌握/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /已掌握/ })).toBeInTheDocument();
   });
 
   it("zh-Hant: mastery aria-label renders in Traditional Chinese", () => {
     renderZhHant(<ProfileStatusBar />);
-    expect(screen.getByLabelText(/已掌握/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /已掌握/ })).toBeInTheDocument();
   });
 
   it("renders a numeric percentage (tolerates locale digit-grouping, #1408)", () => {
     renderWithIntl(<ProfileStatusBar />);
     const bar = screen.getByRole("region", { name: /profile status/i });
     expect(bar.textContent).toMatch(/\d/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bar height: must not change (h-9 class) — chips are interactive but the
+// bar height is fixed so mobile Practice one-viewport fit is preserved (#1556)
+// ---------------------------------------------------------------------------
+
+describe("ProfileStatusBar — bar height unchanged (#1556)", () => {
+  it("the inner flex row keeps the h-9 class after making chips interactive", () => {
+    renderWithIntl(<ProfileStatusBar />);
+    const bar = screen.getByRole("region", { name: /profile status/i });
+    // The h-9 height class must appear somewhere in the bar subtree (the inner
+    // flex row, not the outer region wrapper which has no h-9).
+    expect(bar.innerHTML).toContain("h-9");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Popover integration in the bar — chip click opens popover over bar content
+// ---------------------------------------------------------------------------
+
+describe("ProfileStatusBar — popover opens in bar context (#1556)", () => {
+  it("clicking the streak chip shows a popover with the streak description", () => {
+    renderWithIntl(<ProfileStatusBar />);
+
+    // No popover before click.
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /7 days streak/i }));
+
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toBeInTheDocument();
+    expect(tooltip.textContent).toMatch(/7 days streak/i);
+  });
+
+  it("clicking the mastery chip shows a popover with the mastery description", () => {
+    renderWithIntl(<ProfileStatusBar />);
+
+    fireEvent.click(screen.getByRole("button", { name: /143 of 1025/i }));
+
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.textContent).toMatch(/143 of 1025/i);
   });
 });
 
