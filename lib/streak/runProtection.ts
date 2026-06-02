@@ -8,8 +8,10 @@
  * `spendDates`) both prevent double counting.
  *
  * Returns a small summary so callers can surface a UI signal (toast, log
- * line, debug output). The function never throws: storage errors and SSR
- * conditions degrade silently.
+ * line, debug output). Returns null (without throwing) when called on the
+ * server or when no settings record exists yet. Storage operations inside the
+ * normal path are not error-wrapped; callers in a `useEffect` should guard
+ * with try/catch if robustness to storage errors is required.
  */
 
 import { loadStreakData } from "./persistence";
