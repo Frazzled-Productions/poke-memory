@@ -63,6 +63,8 @@ export default defineConfig({
         // covered. Excluding these keeps them out of the diff-coverage gate.
         "app/sw.ts",
         "app/sw/**",
+        // Test-only throw route exercised by the e2e error-boundary spec, not unit tests.
+        "app/test-error/**",
         "components/pwa/ServiceWorkerProvider.tsx",
         "**/*.d.ts",
         "node_modules/**",
