@@ -56,6 +56,13 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
  */
 export const SYNC_PULL_APPLIED_EVENT = "poke-memory:sync-pull-applied";
 
+const setsEqual = (a: string[], b: string[]): boolean => {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort();
+  const sb = [...b].sort();
+  return sa.every((v, i) => v === sb[i]);
+};
+
 /**
  * True when no card in `cards` has been graded yet — every entry has both
  * `lastReview` and `firstSeen` still null. A freshly-built `buildSession`
@@ -217,7 +224,7 @@ export async function pullAndMerge(
         // (removedLocales) between the LWW write and the merge step's re-read.
         // The pre-LWW local values are preserved by using preLocalSettings (captured
         // above) so the locale merge step below still sees the correct original state.
-        const { learningLocales: _lww, removedLocales: _rll, ...cloudSettingsWithoutLocales } =
+        const { learningLocales: _lww, removedLocales: _removedLocales, ...cloudSettingsWithoutLocales } =
           (pulledRow.settings ?? {}) as Partial<typeof DEFAULT_SETTINGS>;
         saveSettings(
           preserveDeviceLocalKeys(
@@ -376,15 +383,6 @@ export async function pullAndMerge(
           mergedLearning,
         );
 
-        // Order-insensitive set comparison: sort both sides so a mere reordering
-        // in cloud doesn't cause a spurious push on every cycle.
-        function setsEqual(a: string[], b: string[]): boolean {
-          if (a.length !== b.length) return false;
-          const sa = [...a].sort();
-          const sb = [...b].sort();
-          return sa.every((v, i) => v === sb[i]);
-        }
-
         const learningLocalChanged = !setsEqual(mergedLearning, preLocalSettings.learningLocales);
         const removedLocalChanged = !setsEqual(mergedRemoved, preLocalSettings.removedLocales);
         const activeChanged = mergedActive !== preLocalSettings.activePokemonNameLocale;
@@ -401,15 +399,15 @@ export async function pullAndMerge(
           // Update the last-pushed snapshot BEFORE saveSettings so the
           // SETTINGS_SAVED_EVENT listener in AutoSyncOnChange sees a zero-key
           // diff for learningLocales/removedLocales and skips the duplicate push.
+          // On a fresh device prevSnapshot is null; fall back to the current
+          // local settings so the dedup-guard still fires on first sign-in.
           if (cloudLearningNeedsUpdate || cloudRemovedNeedsUpdate) {
-            const prevSnapshot = loadLastPushedSettings();
-            if (prevSnapshot !== null) {
-              saveLastPushedSettings({
-                ...prevSnapshot,
-                learningLocales: mergedLearning,
-                removedLocales: mergedRemoved,
-              });
-            }
+            const prevSnapshot = loadLastPushedSettings() ?? loadSettings();
+            saveLastPushedSettings({
+              ...prevSnapshot,
+              learningLocales: mergedLearning,
+              removedLocales: mergedRemoved,
+            });
           }
 
           // Read post-LWW local settings so the save merges with the already-

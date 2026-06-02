@@ -15,6 +15,7 @@
 import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { AppLocale } from "@/i18n/locales";
 
 // ---------------------------------------------------------------------------
 // Module mocks — declared before any imports so vi.mock hoisting works.
@@ -378,7 +379,7 @@ function defaultSettings() {
     typedEntryOnboardingShown: false,
     mcCardOnboardingShown: false,
     labsFlags: { languages: false },
-    removedLocales: [] as string[],
+    removedLocales: [] as AppLocale[],
     pokemonNameLocale: "en" as const,
     pushNotificationHour: null,
     dismissedMtBannerLocales: [] as string[],
@@ -1431,7 +1432,7 @@ describe("SettingsPage — enrolment maintains removedLocales tombstone (#1568)"
       labsFlags: { languages: true },
       learningLocales: ["en", "ja"] as string[],
       activePokemonNameLocale: "ja" as const,
-      removedLocales: [] as string[],
+      removedLocales: [] as AppLocale[],
     };
   }
 
@@ -1469,7 +1470,7 @@ describe("SettingsPage — enrolment maintains removedLocales tombstone (#1568)"
       labsFlags: { languages: true },
       learningLocales: ["en", "ja", "zh-Hans"] as string[],
       activePokemonNameLocale: "ja" as const,
-      removedLocales: [] as string[],
+      removedLocales: [] as AppLocale[],
     });
     render(<SettingsPage />);
 
@@ -1528,7 +1529,7 @@ describe("SettingsPage — enrolment maintains removedLocales tombstone (#1568)"
       labsFlags: { languages: true },
       learningLocales: ["en", "ja", "zh-Hans"] as string[],
       activePokemonNameLocale: "ja" as const,
-      removedLocales: [] as string[],
+      removedLocales: [] as AppLocale[],
     });
     render(<SettingsPage />);
 
