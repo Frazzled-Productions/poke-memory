@@ -390,6 +390,23 @@ export type UserSettings = {
    * dismissed locale not yet pushed is never lost (see `pullAndMerge`).
    */
   dismissedMtBannerLocales: string[];
+  /**
+   * Locales the user has explicitly removed from their learning set (#1568).
+   * A tombstone set: when a locale appears here it must not be re-added by
+   * cross-device union-merge unless the user explicitly re-enrols it on this
+   * device. Never contains `"en"` (English cannot be removed). Absent in
+   * pre-#1568 records; back-fills to `[]` on read.
+   *
+   * Sync semantics: client-side union in `pullAndMerge` (see `mergeRemovedLocales`
+   * in `lib/sync/settings.ts`). A locale in both `learningLocales` and
+   * `removedLocales` is an invalid state — `saveSettings` and the enrol/remove
+   * handlers keep them disjoint.
+   *
+   * v1 limitation: re-enrolling a locale that another OFFLINE device still
+   * has tombstoned may be re-removed when that device syncs (no per-locale
+   * timestamps). Rare and recoverable by re-enrolling.
+   */
+  removedLocales: AppLocale[];
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -450,6 +467,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   activePokemonNameLocale: DEFAULT_LOCALE,
   // Default []: absent in pre-#1387 records; back-fills to empty array on read.
   dismissedMtBannerLocales: [],
+  // Default []: absent in pre-#1568 records; back-fills to empty array on read.
+  removedLocales: [],
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -716,6 +735,8 @@ function parseStoredSettings(raw: string | null): UserSettings {
     // Default []: absent in pre-#1387 records. Non-array or entries that are
     // not strings are silently dropped — same defensive posture as seenStreakMilestones.
     dismissedMtBannerLocales: validateDismissedMtBannerLocales(obj.dismissedMtBannerLocales),
+    // Default []: absent in pre-#1568 records. Deduped; "en" always dropped.
+    removedLocales: validateRemovedLocales(obj.removedLocales),
   };
 }
 
@@ -784,8 +805,11 @@ function isAppLocale(v: unknown): v is AppLocale {
  * Validates the learning-locales set (#1484): keeps only known locales, dedupes,
  * and guarantees English is always present (it is the canonical reverse-card
  * answer language and cannot be removed). Order is preserved.
+ *
+ * Exported so the sync layer can call it when merging cloud and local sets
+ * without re-deriving the logic (#1568).
  */
-function validateLearningLocales(value: unknown): AppLocale[] {
+export function validateLearningLocales(value: unknown): AppLocale[] {
   if (!Array.isArray(value)) return [DEFAULT_LOCALE];
   const out: AppLocale[] = [];
   const seen = new Set<AppLocale>();
@@ -799,11 +823,35 @@ function validateLearningLocales(value: unknown): AppLocale[] {
 }
 
 /**
+ * Validates the removed-locales tombstone set (#1568): keeps only known
+ * `AppLocale`s, dedupes, and ALWAYS drops `"en"` (English cannot be removed).
+ * Order is preserved.
+ *
+ * Exported so the sync layer can call it when merging cloud and local sets
+ * without re-deriving the logic.
+ */
+export function validateRemovedLocales(value: unknown): AppLocale[] {
+  if (!Array.isArray(value)) return [];
+  const out: AppLocale[] = [];
+  const seen = new Set<AppLocale>();
+  for (const v of value) {
+    // English can never be in the removed set.
+    if (!isAppLocale(v) || v === "en" || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
+/**
  * Resolves the active Pokémon-name locale (#1484): the stored value when it is a
  * known locale AND enrolled; otherwise the legacy `pokemonNameLocale` (if
  * enrolled); otherwise the first enrolled locale (always English).
+ *
+ * Exported so the sync layer can call it after computing the merged
+ * `learningLocales` set (#1568).
  */
-function resolveActiveLocale(
+export function resolveActiveLocale(
   stored: unknown,
   legacy: AppLocale | null,
   learningLocales: AppLocale[],

@@ -378,6 +378,10 @@ function defaultSettings() {
     typedEntryOnboardingShown: false,
     mcCardOnboardingShown: false,
     labsFlags: { languages: false },
+    removedLocales: [] as string[],
+    pokemonNameLocale: "en" as const,
+    pushNotificationHour: null,
+    dismissedMtBannerLocales: [] as string[],
   };
 }
 
@@ -1413,5 +1417,134 @@ describe("SettingsPage — clarity polish: unenrol active language confirm (item
 
     // saveSettings must NOT have been called.
     expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// removedLocales tombstone maintenance (#1568)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage — enrolment maintains removedLocales tombstone (#1568)", () => {
+  function settingsWithJaActive() {
+    return {
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+      learningLocales: ["en", "ja"] as string[],
+      activePokemonNameLocale: "ja" as const,
+      removedLocales: [] as string[],
+    };
+  }
+
+  it("enrolling a locale clears it from removedLocales (un-tombstone)", async () => {
+    // Start with zh-Hans in the tombstone set (previously removed).
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+      learningLocales: ["en", "ja"] as string[],
+      activePokemonNameLocale: "ja" as const,
+      removedLocales: ["zh-Hans"],
+    });
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pokémon name practice languages/i)).toBeInTheDocument();
+    });
+
+    // Enrol zh-Hans (currently unenrolled).
+    const zhHansCheckbox = screen.getByRole("checkbox", { name: /简体中文/i });
+    await userEvent.click(zhHansCheckbox);
+
+    // saveSettings must be called with zh-Hans removed from removedLocales.
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        learningLocales: expect.arrayContaining(["zh-Hans"]),
+        removedLocales: expect.not.arrayContaining(["zh-Hans"]),
+      }),
+    );
+  });
+
+  it("removing a non-active locale adds it to removedLocales", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+      learningLocales: ["en", "ja", "zh-Hans"] as string[],
+      activePokemonNameLocale: "ja" as const,
+      removedLocales: [] as string[],
+    });
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pokémon name practice languages/i)).toBeInTheDocument();
+    });
+
+    // Remove zh-Hans (not active).
+    const zhHansCheckbox = screen.getByRole("checkbox", { name: /简体中文/i });
+    await userEvent.click(zhHansCheckbox);
+
+    // saveSettings must be called with zh-Hans in removedLocales.
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        learningLocales: expect.not.arrayContaining(["zh-Hans"]),
+        removedLocales: expect.arrayContaining(["zh-Hans"]),
+      }),
+    );
+  });
+
+  it("confirming unenrol of the active locale adds it to removedLocales", async () => {
+    mockLoadSettings.mockReturnValue(settingsWithJaActive());
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pokémon name practice languages/i)).toBeInTheDocument();
+    });
+
+    const jaCheckbox = screen.getByRole("checkbox", { name: /日本語/i });
+    await userEvent.click(jaCheckbox);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /^confirm$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    // ja must be tombstoned; active must fall back to en.
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        learningLocales: expect.not.arrayContaining(["ja"]),
+        removedLocales: expect.arrayContaining(["ja"]),
+        activePokemonNameLocale: "en",
+      }),
+    );
+  });
+
+  it("'en' is never added to removedLocales when removing any other locale", async () => {
+    // Verify that the removedLocales on any saveSettings call never includes "en".
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      labsFlags: { languages: true },
+      learningLocales: ["en", "ja", "zh-Hans"] as string[],
+      activePokemonNameLocale: "ja" as const,
+      removedLocales: [] as string[],
+    });
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pokémon name practice languages/i)).toBeInTheDocument();
+    });
+
+    // Remove zh-Hans (non-active, no confirm).
+    const zhHansCheckbox = screen.getByRole("checkbox", { name: /简体中文/i });
+    await userEvent.click(zhHansCheckbox);
+
+    await waitFor(() => {
+      expect(mockSaveSettings).toHaveBeenCalled();
+    });
+
+    const calledWith = mockSaveSettings.mock.calls[0][0] as { removedLocales: string[] };
+    expect(calledWith.removedLocales).not.toContain("en");
   });
 });

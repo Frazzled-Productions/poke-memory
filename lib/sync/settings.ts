@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { UserSettings } from "@/lib/settings/persistence";
+import {
+  validateLearningLocales,
+  validateRemovedLocales,
+} from "@/lib/settings/persistence";
+import type { AppLocale } from "@/i18n/locales";
+import { DEFAULT_LOCALE } from "@/i18n/locales";
 import type { DateFormat } from "@/lib/utils/format-date";
 import type { MergeUserSettingsRpc } from "@/lib/supabase/rpc-types";
 
@@ -227,4 +233,74 @@ export async function pullUserSettingsRow(
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Cross-device union-merge for learningLocales + removedLocales (#1568)
+// ---------------------------------------------------------------------------
+//
+// These are pure functions — no I/O, no side effects. They mirror the
+// `mergeStreak` pattern in `lib/sync/streak.ts`.
+//
+// Design contract (maintainer decision, see issue #1568):
+//   - No RPC, no migration. The `merge_user_settings` JSONB `||` stores
+//     whatever array the client sends; we compute the union client-side
+//     before pushing.
+//   - Removal propagates cross-device via the tombstone set (`removedLocales`).
+//   - `activePokemonNameLocale` is device-local (in `DEVICE_LOCAL_KEYS`) and
+//     is therefore resolved separately after the merge, not synced directly.
+//
+// v1 limitation: re-enrolling a locale that another OFFLINE device still has
+// tombstoned may be re-removed when that device syncs (no per-locale
+// timestamps). Rare and recoverable by re-enrolling.
+
+/**
+ * Union-merge the `removedLocales` tombstone sets from both sides.
+ * Dedupes, keeps only known `AppLocale`s, and always drops `"en"`.
+ * A missing/null value on either side is treated as an empty set
+ * (back-compat with cloud blobs that pre-date #1568).
+ */
+export function mergeRemovedLocales(
+  local: AppLocale[] | null | undefined,
+  cloud: AppLocale[] | null | undefined,
+): AppLocale[] {
+  const combined = [...(local ?? []), ...(cloud ?? [])];
+  return validateRemovedLocales(combined);
+}
+
+/**
+ * Union-merge the `learningLocales` enrolled sets from both sides, then
+ * subtract the merged tombstone set. Guarantees `"en"` is always present,
+ * dedupes, drops unknowns, and preserves stable order (local-first, cloud-
+ * only entries appended).
+ *
+ * Missing/null cloud `learningLocales` is treated as `["en"]`
+ * (back-compat with an old client's blob that lacks the field).
+ */
+export function mergeLearnedLocales(
+  local: AppLocale[] | null | undefined,
+  cloud: AppLocale[] | null | undefined,
+  removed: AppLocale[],
+): AppLocale[] {
+  // Treat null/undefined as ["en"] for back-compat.
+  const localSet = local ?? [DEFAULT_LOCALE];
+  const cloudSet = cloud ?? [DEFAULT_LOCALE];
+
+  // Union: local first so local order is preserved; append cloud-only items.
+  const combined: AppLocale[] = [...localSet];
+  const seen = new Set<AppLocale>(localSet);
+  for (const loc of cloudSet) {
+    if (!seen.has(loc)) {
+      seen.add(loc);
+      combined.push(loc);
+    }
+  }
+
+  // Subtract the tombstone set.
+  const removedSet = new Set<AppLocale>(removed);
+  const filtered = combined.filter((loc) => !removedSet.has(loc));
+
+  // validateLearningLocales handles dedup, unknown-locale drops, and
+  // guarantees "en" is present.
+  return validateLearningLocales(filtered);
 }

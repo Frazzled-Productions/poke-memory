@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/lib/auth/AuthContext";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { useSignInPull } from "@/lib/sync/useSignInPull";
 
 /**
@@ -10,6 +11,9 @@ import { useSignInPull } from "@/lib/sync/useSignInPull";
  */
 export function SignInPull() {
   const { user, supabase } = useAuth();
-  useSignInPull(supabase, user?.id ?? null);
+  const { anyFlagOn } = useSuperuser();
+  // Mirror the OnlineReconnectSync pattern: pulls are allowed while superuser
+  // flags are on, but the push-back inside pullAndMerge must be suppressed.
+  useSignInPull(supabase, user?.id ?? null, anyFlagOn);
   return null;
 }

@@ -24,6 +24,12 @@ import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 export function useSignInPull(
   client: SupabaseClient | null,
   userId: string | null,
+  /**
+   * When true, the locale push-back inside `pullAndMerge` is suppressed.
+   * Pulls (reads) remain enabled regardless — same contract as every other
+   * write-guarded hook. Pass `anyFlagOn` from `useSuperuser()`.
+   */
+  superuserPaused = false,
 ): void {
   const lastPulledRef = useRef<string | null>(null);
 
@@ -34,6 +40,6 @@ export function useSignInPull(
     }
     if (lastPulledRef.current === userId) return;
     lastPulledRef.current = userId;
-    void pullAndMerge(client, userId);
-  }, [client, userId]);
+    void pullAndMerge(client, userId, superuserPaused);
+  }, [client, userId, superuserPaused]);
 }
