@@ -39,7 +39,7 @@
       "Bash(gh run list*)",
       "Bash(gh workflow disable*)",
       "Bash(gh workflow enable*)",
-      "Bash(gh workflow run*)",
+      "Bash(gh workflow run \"QA Preview Deploy\"*)",
       "Bash(npm install)",
       "Bash(npm install *)",
       "Bash(npm ci)",
