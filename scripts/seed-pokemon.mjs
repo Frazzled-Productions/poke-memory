@@ -39,6 +39,9 @@ const MAX_RETRIES = 3;
 const BACKOFF_MS = [500, 1000, 2000];
 const PROGRESS_INTERVAL = 50;
 
+// NOTE: FLAVOR_TEXTS_MAX, normalizeFlavorText, and extractFlavorTexts are
+// mirrored in lib/pokemon/flavorTextAccumulator.ts (the typed, testable
+// canonical form). Keep both in sync when changing the accumulation logic.
 const FLAVOR_TEXTS_MAX = 12;
 
 // ---------------------------------------------------------------------------
@@ -260,19 +263,52 @@ async function downloadCry(url, destPath) {
   }
 }
 
+/**
+ * Extract and dedup-accumulate English flavour-text entries from a PokéAPI
+ * `flavor_text_entries` array.
+ *
+ * Changed in #1559: instead of discarding `entry.version.name` and returning
+ * a plain `string[]`, we now accumulate a `{ text, versions }[]` shape where
+ * identical texts are merged and their source game slugs combined.
+ *
+ * @param {Array} flavorTextEntries  Raw `flavor_text_entries` from PokéAPI.
+ * @returns {{ text: string, versions: string[] }[]}
+ */
 function extractFlavorTexts(flavorTextEntries) {
   const en = (flavorTextEntries ?? []).filter(e => e.language?.name === "en");
   if (en.length === 0) return [];
-  const seen = new Set();
-  const results = [];
+
+  // Use an insertion-ordered Map keyed on normalised text so iteration order
+  // matches the first-seen order (same as the old dedup-keep-first behaviour),
+  // while accumulating version slugs across all entries with the same text.
+  /** @type {Map<string, { text: string, versions: string[] }>} */
+  const byText = new Map();
+
   for (const entry of en) {
     const normalized = normalizeFlavorText(entry.flavor_text);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-    results.push(normalized);
-    if (results.length >= FLAVOR_TEXTS_MAX) break;
+    if (!normalized) continue;
+
+    const versionSlug = entry.version?.name ?? "";
+
+    if (byText.has(normalized)) {
+      // Accumulate: add this game to the existing entry's versions list.
+      const existing = byText.get(normalized);
+      if (versionSlug && !existing.versions.includes(versionSlug)) {
+        existing.versions.push(versionSlug);
+      }
+    } else if (byText.size < FLAVOR_TEXTS_MAX) {
+      // New distinct text — insert with this game as the first version.
+      // The loop continues even after reaching the cap so that later entries
+      // whose text matches an already-collected entry can still accumulate
+      // version slugs into the existing record above.
+      byText.set(normalized, {
+        text: normalized,
+        versions: versionSlug ? [versionSlug] : [],
+      });
+    }
   }
-  return results;
+
+  return [...byText.values()];
 }
 
 function normalizeFlavorText(text) {
@@ -652,7 +688,8 @@ async function processSpecies(speciesId) {
   }
   const speciesDisplayName = englishEntry.name;
   const flavorTexts = extractFlavorTexts(speciesData.flavor_text_entries);
-  const flavorText = flavorTexts[0] ?? "";
+  // flavorText (singular) is the headline italic blurb — plain string, first entry's text.
+  const flavorText = flavorTexts[0]?.text ?? "";
   const evolutionChainUrl = speciesData.evolution_chain?.url ?? null;
 
   // ------------------------------------------------------------------

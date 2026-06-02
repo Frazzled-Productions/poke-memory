@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
@@ -48,9 +48,23 @@ vi.mock("@/lib/pokemon/seed", () => ({
   SEED_POKEMON: [],
 }));
 
+// Default mock returns no facts; individual tests override via mockGetPokemonFacts.
+// mockLoadFlavorTexts lets tests control when the async fetch resolves so we can
+// verify the component re-renders once the promise settles.
+const {
+  mockGetPokemonFacts,
+  mockIsFlavorTextsReady,
+  mockLoadFlavorTexts,
+} = vi.hoisted(() => ({
+  mockGetPokemonFacts: vi.fn(() => [] as import("@/lib/pokemon/facts").PokemonFact[]),
+  mockIsFlavorTextsReady: vi.fn(() => false),
+  mockLoadFlavorTexts: vi.fn(() => Promise.resolve(new Map<number, import("@/lib/pokemon/seed").FlavorTextEntry[]>())),
+}));
+
 vi.mock("@/lib/pokemon/facts", () => ({
-  getPokemonFacts: () => [],
-  loadFlavorTexts: () => Promise.resolve(new Map()),
+  getPokemonFacts: (...args: Parameters<typeof mockGetPokemonFacts>) => mockGetPokemonFacts(...args),
+  isFlavorTextsReady: () => mockIsFlavorTextsReady(),
+  loadFlavorTexts: () => mockLoadFlavorTexts(),
 }));
 
 // useNextReviewDate — default to "not-started" so it never renders review-date
@@ -463,5 +477,130 @@ describe("PokemonDetailDisclosure — locked-state signposts (#1440)", () => {
 
     const hints = screen.getAllByText("掌握這隻寶可夢後解鎖。");
     expect(hints.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — game-label facts (#1559)
+// Verifies that FlavorTextEntry facts render with game names instead of the
+// generic "Pokédex entry" label, and that game names stay English across all
+// four supported locales (English proper nouns are locale-invariant by design).
+// ---------------------------------------------------------------------------
+
+import type { PokemonFact } from "@/lib/pokemon/facts";
+
+describe("PokemonDetailDisclosure — game-label facts (#1559)", () => {
+  beforeEach(() => {
+    mockCardClass.value = "mastered";
+    mockPretendAllMastered.value = false;
+    mockGetPokemonFacts.mockReset();
+  });
+
+  // Helper: stub getPokemonFacts with one Pokédex-entry fact
+  function withGameFact(label: string, value: string): PokemonFact[] {
+    return [{ label, value }];
+  }
+
+  it("en locale: renders game-label 'Red · Blue' instead of 'Pokédex entry'", () => {
+    mockGetPokemonFacts.mockReturnValue(withGameFact("Red · Blue", "Its short feet are tipped..."));
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "en" });
+    expect(screen.getByText("Red · Blue")).toBeInTheDocument();
+    expect(screen.queryByText("Pokédex entry")).not.toBeInTheDocument();
+  });
+
+  it("ja locale: game label stays English ('Red · Blue'), not translated", () => {
+    mockGetPokemonFacts.mockReturnValue(withGameFact("Red · Blue", "Its short feet are tipped..."));
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "ja" });
+    expect(screen.getByText("Red · Blue")).toBeInTheDocument();
+  });
+
+  it("zh-Hans locale: game label stays English ('FireRed · LeafGreen'), not translated", () => {
+    mockGetPokemonFacts.mockReturnValue(withGameFact("FireRed · LeafGreen", "Burrow text."));
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "zh-Hans" });
+    expect(screen.getByText("FireRed · LeafGreen")).toBeInTheDocument();
+  });
+
+  it("zh-Hant locale: game label stays English ('Scarlet · Violet'), not translated", () => {
+    mockGetPokemonFacts.mockReturnValue(withGameFact("Scarlet · Violet", "Another text."));
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "zh-Hant" });
+    expect(screen.getByText("Scarlet · Violet")).toBeInTheDocument();
+  });
+
+  it("overflow label '+N' is rendered when many games share a text", () => {
+    mockGetPokemonFacts.mockReturnValue(withGameFact("Red · Blue · Yellow +2", "Old text."));
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "en" });
+    expect(screen.getByText("Red · Blue · Yellow +2")).toBeInTheDocument();
+  });
+
+  it("empty flavour section: panel renders without Pokédex-entry rows (absent-flavour fallback)", () => {
+    mockGetPokemonFacts.mockReturnValue([]);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "en" });
+    // Facts section renders with heading but no flavour rows
+    expect(screen.getByRole("heading", { name: "Facts", level: 2 })).toBeInTheDocument();
+    expect(screen.queryByText("Pokédex entry")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Red · Blue/)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — re-render after async flavour load (#1559 regression guard)
+// Verifies that game labels appear after loadFlavorTexts resolves even on a
+// cold first visit where the module-level cache is empty on initial render.
+// Without the `flavorLoaded` state wiring the component has no re-render
+// trigger and game labels are silently absent.
+// ---------------------------------------------------------------------------
+
+describe("PokemonDetailDisclosure — async flavour re-render (#1559)", () => {
+  beforeEach(() => {
+    mockCardClass.value = "mastered";
+    mockPretendAllMastered.value = false;
+    mockIsFlavorTextsReady.mockReset();
+    mockIsFlavorTextsReady.mockReturnValue(false);
+    mockLoadFlavorTexts.mockReset();
+    mockLoadFlavorTexts.mockReturnValue(Promise.resolve(new Map()));
+    mockGetPokemonFacts.mockReset();
+  });
+
+  it("game-label row is absent before loadFlavorTexts resolves and present after", async () => {
+    // Simulate a deferred fetch: hold the promise open, then resolve it manually.
+    let resolveLoad!: () => void;
+    const deferred = new Promise<Map<number, import("@/lib/pokemon/seed").FlavorTextEntry[]>>(
+      (resolve) => {
+        resolveLoad = () => resolve(new Map());
+      },
+    );
+    mockLoadFlavorTexts.mockReturnValue(deferred);
+
+    // Before resolve: getPokemonFacts returns no rows (cache empty).
+    mockGetPokemonFacts.mockReturnValue([]);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "en" });
+
+    // The Facts heading is present (mastered state) but no game-label row yet.
+    expect(screen.getByRole("heading", { name: "Facts", level: 2 })).toBeInTheDocument();
+    expect(screen.queryByText("Red · Blue · LeafGreen")).not.toBeInTheDocument();
+
+    // After resolve: getPokemonFacts now returns a game-label row (cache populated).
+    mockGetPokemonFacts.mockReturnValue([
+      { label: "Red · Blue · LeafGreen", value: "A strange seed was planted on its back at birth." },
+    ]);
+    await act(async () => {
+      resolveLoad();
+      await deferred;
+    });
+
+    // The component must have re-rendered and the game-label row is now visible.
+    expect(screen.getByText("Red · Blue · LeafGreen")).toBeInTheDocument();
+  });
+
+  it("when cache is already warm (isFlavorTextsReady=true), no deferred render needed", () => {
+    // Cache already populated — component should render game labels immediately.
+    mockIsFlavorTextsReady.mockReturnValue(true);
+    mockLoadFlavorTexts.mockReturnValue(Promise.resolve(new Map()));
+    mockGetPokemonFacts.mockReturnValue([
+      { label: "Red · Blue", value: "A strange seed was planted on its back at birth." },
+    ]);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "en" });
+
+    expect(screen.getByText("Red · Blue")).toBeInTheDocument();
   });
 });
