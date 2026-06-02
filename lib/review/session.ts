@@ -407,11 +407,20 @@ export function hydrateSession(
     };
   });
 
+  // Dedup key: `(id, locale)` for locale-specific card types (name, reverse,
+  // cry) so that adding a new locale creates fresh cards rather than being
+  // silently blocked by an existing "en" row with the same numeric id (#1562).
+  // Evolution and reverse-evolution are locale-invariant (edge-keyed, one row
+  // per edge, always locale "en") and therefore keep the original id-only dedup.
+  const savedIdLocaleKeys = new Set(
+    allSaved.map((c) => `${c.id}::${c.locale ?? "en"}`),
+  );
+  // Id-only set kept for the locale-invariant card types (evo / reverse-evo).
   const savedIds = new Set(allSaved.map((c) => c.id));
 
   const nameAdditions: NameReviewCard[] = nameEnabled
     ? seed
-        .filter((p) => !savedIds.has(p.id))
+        .filter((p) => !savedIdLocaleKeys.has(`${p.id}::${locale}`))
         .map((p) => ({
           ...p,
           cardType: "name",
@@ -421,6 +430,7 @@ export function hydrateSession(
         }))
     : [];
 
+  // Evo cards are locale-invariant — dedup by id only.
   const evoAdditions: EvolutionReviewCard[] = evolutionEnabled
     ? evoSeed
         .filter((e) => !savedIds.has(e.id))
@@ -432,6 +442,7 @@ export function hydrateSession(
         }))
     : [];
 
+  // Reverse-evo cards are locale-invariant — dedup by id only.
   const reverseEvoAdditions: ReverseEvolutionReviewCard[] = reverseEvolutionEnabled
     ? evoSeed
         .map((fwd) => ({
@@ -447,7 +458,7 @@ export function hydrateSession(
 
   const reverseAdditions: ReverseReviewCard[] = reverseEnabled
     ? seed
-        .filter((p) => !savedIds.has(REVERSE_ID_OFFSET + p.id))
+        .filter((p) => !savedIdLocaleKeys.has(`${REVERSE_ID_OFFSET + p.id}::${locale}`))
         .map((p) => ({
           ...p,
           id: REVERSE_ID_OFFSET + p.id,
@@ -461,7 +472,7 @@ export function hydrateSession(
 
   const cryAdditions: CryReviewCard[] = cryEnabled
     ? seed
-        .filter((p) => p.cryUrl !== null && !savedIds.has(CRY_ID_OFFSET + p.id))
+        .filter((p) => p.cryUrl !== null && !savedIdLocaleKeys.has(`${CRY_ID_OFFSET + p.id}::${locale}`))
         .map((p) => ({
           ...p,
           id: CRY_ID_OFFSET + p.id,
@@ -615,6 +626,13 @@ export function buildSessionQueues(
    *  `getOrCreateClientSalt()`. Omitting it (or passing `""`) reproduces the
    *  legacy behaviour — same shuffle for all users on the same day. */
   userSalt: string | number = "",
+  /**
+   * Active Pokémon-name locale for the practice session (#1562). Only cards
+   * whose `locale` matches this value are included in counters, candidates,
+   * and the learning queue. Defaults to `"en"` so every existing call site
+   * and test is unaffected.
+   */
+  activeLocale: AppLocale = "en",
 ): {
   learningCardIds: number[];
   /** Subset of `learningCardIds` whose cards fall outside the active scope.
@@ -632,7 +650,7 @@ export function buildSessionQueues(
   const shuffle = (ids: readonly number[]) => stableShuffleForDay(ids, today, userSalt);
 
   const learningCardIds = cards
-    .filter((c) => c.state.learningStep !== null)
+    .filter((c) => c.state.learningStep !== null && (c.locale ?? "en") === activeLocale)
     .map((c) => c.id);
 
   // Identify learning cards that are outside the active scope. Only meaningful
@@ -663,7 +681,14 @@ export function buildSessionQueues(
   //
   // Reverse-evolution cards bucket under "evolution" via limitBucket so both
   // directions of an edge compete for the same daily new/review budget (#343).
+  //
+  // Per-locale isolation (#1562): counters and candidates are scoped to
+  // `activeLocale` so each enrolled language has its own independent daily
+  // budget. The invariant is that counters run over all active-locale cards
+  // regardless of `eligibleCardIds` — scope/eligibility filtering never resets
+  // daily caps.
   for (const card of cards) {
+    if ((card.locale ?? "en") !== activeLocale) continue;
     const type = limitBucket(card.cardType);
     if (card.state.firstSeen === today) {
       perType[type].newIntroducedToday += 1;
@@ -839,9 +864,16 @@ export function countDueTomorrow(
   cards: readonly ReviewableCard[],
   tomorrow: string,
   eligibleCardIds?: ReadonlySet<number>,
+  /**
+   * Active Pokémon-name locale for the practice session (#1562). Only cards
+   * whose `locale` matches this value are counted. Defaults to `"en"` so
+   * every existing call site is unaffected.
+   */
+  activeLocale: AppLocale = "en",
 ): number {
   let count = 0;
   for (const card of cards) {
+    if ((card.locale ?? "en") !== activeLocale) continue;
     if (eligibleCardIds !== undefined && !eligibleCardIds.has(card.id)) continue;
     const s = card.state;
     if (

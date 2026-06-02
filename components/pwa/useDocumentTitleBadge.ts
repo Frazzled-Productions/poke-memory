@@ -6,6 +6,7 @@ import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { todayString } from "@/lib/review/session";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { computeQueueCount } from "@/lib/stats/dashboard-snapshot";
+import type { AppLocale } from "@/i18n/locales";
 
 /**
  * Prefixes `document.title` with `(N)` when N cards are due, clearing the
@@ -81,6 +82,7 @@ export function useDocumentTitleBadge(): void {
         },
         session.limits,
         today,
+        (settings.activePokemonNameLocale ?? "en") as AppLocale,
       );
 
       currentCount = totalCount;

@@ -300,6 +300,7 @@ describe("useDocumentTitleBadge", () => {
         expect.objectContaining({ evolutionCardsEnabled: true }),
         limits,
         expect.any(String), // today
+        expect.any(String), // active locale (#1562)
       );
     });
   });
@@ -323,6 +324,7 @@ describe("useDocumentTitleBadge", () => {
         expect.any(Object),
         limits,
         expect.any(String),
+        expect.any(String), // active locale (#1562)
       );
       expect(document.title).toBe("(7) Poké Memory");
     });

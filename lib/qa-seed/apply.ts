@@ -87,12 +87,18 @@ export async function applySeedScenario(payload: SeedPayload, slug?: string): Pr
     saveStreakData(lastNDates(payload.streakDays));
   }
 
-  // Settings legs (pokemonNameLocale + streakProtection) — merged into a single
-  // load/save so we touch localStorage once. saveSettings dispatches
-  // SETTINGS_SAVED_EVENT, which the status surfaces also listen to.
+  // Settings legs (pokemonNameLocale + learningLocales + streakProtection) —
+  // merged into a single load/save so we touch localStorage once. saveSettings
+  // dispatches SETTINGS_SAVED_EVENT, which the status surfaces also listen to.
   const settingsPatch: Partial<UserSettings> = {};
   if (payload.pokemonNameLocale !== null && payload.pokemonNameLocale !== undefined) {
     settingsPatch.pokemonNameLocale = payload.pokemonNameLocale;
+  }
+  if (payload.learningLocales !== undefined) {
+    settingsPatch.learningLocales = payload.learningLocales;
+  }
+  if (payload.activePokemonNameLocale !== undefined) {
+    settingsPatch.activePokemonNameLocale = payload.activePokemonNameLocale;
   }
   if (payload.streakProtection !== undefined) {
     settingsPatch.streakProtection = payload.streakProtection;

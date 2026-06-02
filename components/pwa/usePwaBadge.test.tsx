@@ -328,6 +328,7 @@ describe("usePwaBadge", () => {
         expect.objectContaining({ evolutionCardsEnabled: true }),
         limits,
         expect.any(String), // today
+        expect.any(String), // active locale (#1562)
       );
     });
   });

@@ -2158,3 +2158,177 @@ describe('non-destructive re-enable: hydrateSession + cardTypeIsEnabled (#835)',
     expect(result.filter((c) => c.cardType === 'reverse')).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Per-locale session isolation (#1562)
+// ---------------------------------------------------------------------------
+
+describe('buildSessionQueues (per-locale isolation)', () => {
+  const TODAY = '2026-05-09';
+  const baseLimits: DailyLimits = {
+    name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+    reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  };
+
+  function nameCardLocale(id: number, locale: 'en' | 'ja', partialState: Partial<ReturnType<typeof initialReviewState>> = {}): NameReviewCard {
+    return {
+      ...makeSeedPokemon(id),
+      cardType: 'name',
+      subjectKey: String(id),
+      locale,
+      state: { ...initialReviewState(NOW), ...partialState },
+    };
+  }
+
+  it('filters to activeLocale — only active-locale cards appear in queue', () => {
+    // Use disjoint species IDs for each locale so queued IDs are unambiguous.
+    // en locale: species 1, 2. ja locale: species 3, 4.
+    const cards: ReviewableCard[] = [
+      nameCardLocale(1, 'en'),
+      nameCardLocale(2, 'en'),
+      nameCardLocale(3, 'ja'),
+      nameCardLocale(4, 'ja'),
+    ];
+    const jaQueues = buildSessionQueues(cards, baseLimits, TODAY, undefined, '', 'ja');
+    const enQueues = buildSessionQueues(cards, baseLimits, TODAY, undefined, '', 'en');
+
+    // ja session must queue only species 3 and 4.
+    expect(new Set(jaQueues.newQueue)).toEqual(new Set([3, 4]));
+    // en session must queue only species 1 and 2.
+    expect(new Set(enQueues.newQueue)).toEqual(new Set([1, 2]));
+  });
+
+  it('switching activeLocale yields independent queues', () => {
+    const cards: ReviewableCard[] = [
+      nameCardLocale(1, 'en'),
+      nameCardLocale(1, 'ja'),
+      nameCardLocale(2, 'ja'),
+    ];
+    const jaQueues = buildSessionQueues(cards, baseLimits, TODAY, undefined, '', 'ja');
+    const enQueues = buildSessionQueues(cards, baseLimits, TODAY, undefined, '', 'en');
+
+    expect(enQueues.newQueue).toHaveLength(1);  // only id 1 (en)
+    expect(jaQueues.newQueue).toHaveLength(2);  // ids 1 + 2 (ja)
+  });
+
+  it('per-locale daily-budget isolation — en budget spent does not consume ja budget', () => {
+    // en: both cards introduced today (budget spent)
+    // ja: both cards unseen (budget available)
+    const cards: ReviewableCard[] = [
+      nameCardLocale(1, 'en', { firstSeen: TODAY, lastReview: TODAY }),
+      nameCardLocale(2, 'en', { firstSeen: TODAY, lastReview: TODAY }),
+      nameCardLocale(1, 'ja'),
+      nameCardLocale(2, 'ja'),
+    ];
+    const enQueues = buildSessionQueues(cards, { ...baseLimits, name: { maxNewPerDay: 2, maxReviewsPerDay: 10 } }, TODAY, undefined, '', 'en');
+    const jaQueues = buildSessionQueues(cards, { ...baseLimits, name: { maxNewPerDay: 2, maxReviewsPerDay: 10 } }, TODAY, undefined, '', 'ja');
+
+    // en budget is spent — no new en cards
+    expect(enQueues.perType.name.newIntroducedToday).toBe(2);
+    expect(enQueues.newQueue).toHaveLength(0);
+
+    // ja budget independent — both ja cards available as new
+    expect(jaQueues.perType.name.newIntroducedToday).toBe(0);
+    expect(jaQueues.newQueue).toHaveLength(2);
+  });
+
+  it('learningCardIds filtered by locale — different species so IDs are unambiguous', () => {
+    // Use different species IDs so the en and ja learning cards have distinct numeric IDs.
+    const enLearning = nameCardLocale(1, 'en', { learningStep: 0, stepStartedAt: Date.now() - 1000 });
+    const jaLearning = nameCardLocale(2, 'ja', { learningStep: 0, stepStartedAt: Date.now() - 1000 });
+    const cards: ReviewableCard[] = [enLearning, jaLearning];
+
+    const enQueues = buildSessionQueues(cards, baseLimits, TODAY, undefined, '', 'en');
+    const jaQueues = buildSessionQueues(cards, baseLimits, TODAY, undefined, '', 'ja');
+
+    // en session: species 1 learning card is in, species 2 (ja) is not.
+    expect(enQueues.learningCardIds).toContain(enLearning.id);    // 1
+    expect(enQueues.learningCardIds).not.toContain(jaLearning.id); // 2
+
+    // ja session: species 2 learning card is in, species 1 (en) is not.
+    expect(jaQueues.learningCardIds).toContain(jaLearning.id);    // 2
+    expect(jaQueues.learningCardIds).not.toContain(enLearning.id); // 1
+  });
+
+  it('default activeLocale "en" yields same result as explicit "en"', () => {
+    const cards: ReviewableCard[] = [
+      nameCardLocale(1, 'en'),
+      nameCardLocale(2, 'en'),
+    ];
+    const defaultQueues = buildSessionQueues(cards, baseLimits, TODAY);
+    const explicitEnQueues = buildSessionQueues(cards, baseLimits, TODAY, undefined, '', 'en');
+
+    expect(defaultQueues.newQueue).toEqual(explicitEnQueues.newQueue);
+    expect(defaultQueues.perType.name.newIntroducedToday).toBe(explicitEnQueues.perType.name.newIntroducedToday);
+  });
+});
+
+describe('hydrateSession (per-locale dedup, #1562)', () => {
+  const seed = [makeSeedPokemon(1), makeSeedPokemon(2)];
+
+  it('adds ja name cards when only en cards exist in saved state', () => {
+    // All-en saved session: hydrateSession with locale="ja" must add ja rows.
+    const enCards: NameReviewCard[] = seed.map((p) => ({
+      ...p,
+      cardType: 'name',
+      subjectKey: String(p.id),
+      locale: 'en' as const,
+      state: initialReviewState(NOW),
+    }));
+
+    const { cards } = hydrateSession(enCards, seed, [], NOW, { locale: 'ja', nameEnabled: true });
+
+    const jaCards = cards.filter((c) => c.cardType === 'name' && (c.locale ?? 'en') === 'ja');
+    expect(jaCards).toHaveLength(2);
+  });
+
+  it('does not duplicate existing (id, locale) pairs', () => {
+    // Already has en + ja row for species 1.
+    const existing: NameReviewCard[] = [
+      { ...makeSeedPokemon(1), cardType: 'name', subjectKey: '1', locale: 'en', state: initialReviewState(NOW) },
+      { ...makeSeedPokemon(1), cardType: 'name', subjectKey: '1', locale: 'ja', state: initialReviewState(NOW) },
+    ];
+
+    const { cards } = hydrateSession(existing, [makeSeedPokemon(1)], [], NOW, { locale: 'ja', nameEnabled: true });
+
+    const jaCards = cards.filter((c) => c.cardType === 'name' && (c.locale ?? 'en') === 'ja');
+    expect(jaCards).toHaveLength(1);
+  });
+
+  it('evo cards are NOT duplicated per locale — id-only dedup', () => {
+    const evo = makeEvoEdge({ id: 1_500_001, preEvoId: 1, postEvoId: 2 });
+    const evoCard: EvolutionReviewCard = {
+      ...evo,
+      subjectKey: '1>>>2',
+      locale: 'en',
+      state: initialReviewState(NOW),
+    };
+
+    // Call with locale="ja" — evo card already in saved set by id.
+    const { cards } = hydrateSession([evoCard], [], [evo], NOW, { locale: 'ja', evolutionEnabled: true });
+
+    const evos = cards.filter((c) => c.cardType === 'evolution');
+    // Must NOT have a duplicate ja evo row.
+    expect(evos).toHaveLength(1);
+  });
+
+  it('reverse-evo cards are NOT duplicated per locale — id-only dedup', () => {
+    const evo = makeEvoEdge({ id: 1_500_001, preEvoId: 1, postEvoId: 2 });
+    const reverseId = reverseEdgeIdFor(1_500_001);
+    const reverseEvoCard = {
+      ...evo,
+      cardType: 'reverse-evolution' as const,
+      id: reverseId,
+      subjectKey: '1>>>2',
+      locale: 'en' as const,
+      state: initialReviewState(NOW),
+    };
+
+    const { cards } = hydrateSession([reverseEvoCard], [], [evo], NOW, { locale: 'ja', reverseEvolutionEnabled: true });
+
+    const reverseEvos = cards.filter((c) => c.cardType === 'reverse-evolution');
+    expect(reverseEvos).toHaveLength(1);
+  });
+});

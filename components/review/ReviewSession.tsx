@@ -663,6 +663,12 @@ export function ReviewSession() {
   const [evolutionCardsEnabled, setEvolutionCardsEnabled] = useState(true);
   const [cryCardsEnabled, setCryCardsEnabled] = useState(false);
   const [alternateFormsEnabled, setAlternateFormsEnabled] = useState(false);
+  // Active Pokémon-name locale (#1562). Read once from settings at mount so a
+  // mid-session locale switch (via the language switcher) cannot swap cards
+  // mid-render. The storage-event handler already triggers a full page reload
+  // on settings changes, so the next session will pick up the new locale exactly
+  // as it does for card-type toggles.
+  const [activeLocale, setActiveLocale] = useState<AppLocale>("en");
   // Verified typed-entry mode (#1251). Read into state on session load via the
   // session-load effect. Same-tab toggles take effect on the next session via the
   // storage event; the in-flight card always uses the value captured at load time.
@@ -1102,6 +1108,9 @@ export function ReviewSession() {
       setMasteryRepetitions(settings.masteryRepetitions);
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
+      // Capture the active locale once at mount. A mid-session switch takes
+      // effect on the next load (storage-event reload, same as card-type toggles).
+      setActiveLocale((settings.activePokemonNameLocale ?? "en") as AppLocale);
       setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
       setMcCardOnboardingShown(settings.mcCardOnboardingShown ?? false);
       setFirstVisitDone(settings.onboarding?.firstVisitOnboardingDismissed === true);
@@ -1138,7 +1147,7 @@ export function ReviewSession() {
       // Initialize the learning queue from persisted learning-step cards.
       // Use stepStartedAt from persisted state so the countdown resumes correctly
       // after navigation instead of resetting to the full step duration.
-      const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today, undefined, shuffleSalt);
+      const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today, undefined, shuffleSalt, (settings.activePokemonNameLocale ?? "en") as AppLocale);
 
       const initialLearning: LearningQueueEntry[] = learningCardIds.map((cardId) => {
         const card = sessionCards.find((c) => c.id === cardId)!;
@@ -1160,7 +1169,7 @@ export function ReviewSession() {
       if (!superuserGuarded) {
         writeMasteredCountCache(
           sessionCards,
-          (settings.pokemonNameLocale ?? "en") as AppLocale,
+          (settings.activePokemonNameLocale ?? "en") as AppLocale,
           settings.masteryRepetitions,
         );
         writeDueCountCacheFromCards(sessionCards, today);
@@ -1457,6 +1466,7 @@ export function ReviewSession() {
       today,
       eligibleCardIds,
       shuffleSalt,
+      activeLocale,
     );
     const nowMs = Date.now();
     const dueLearningEntries = learningQueue
@@ -1582,6 +1592,7 @@ export function ReviewSession() {
     today,
     eligibleCardIds,
     shuffleSalt,
+    activeLocale,
   );
 
   // Cards that are mid-learning-step but fall outside the active scope.
@@ -1845,7 +1856,7 @@ export function ReviewSession() {
     const tomorrowDate = new Date(todayTz + "T12:00:00Z");
     tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
     const tomorrow = todayString(tomorrowDate, timezone);
-    const dueTomorrow = countDueTomorrow(cards, tomorrow, eligibleCardIds);
+    const dueTomorrow = countDueTomorrow(cards, tomorrow, eligibleCardIds, activeLocale);
     // The share grid is gated on persisted completion state: `sessionGradeSeq`
     // is hydrated at mount from the daily-summary record or, failing that, the
     // grade log (#896), so the button survives a reload or navigation rather
@@ -2123,6 +2134,7 @@ export function ReviewSession() {
       today,
       eligibleCardIds,
       shuffleSalt,
+      activeLocale,
     );
 
     // Compute the post-grade learning queue here, mirroring the `setLearningQueue`
@@ -2288,7 +2300,7 @@ export function ReviewSession() {
     ) {
       writeMasteredCountCache(
         newCards,
-        (settings.pokemonNameLocale ?? "en") as AppLocale,
+        (settings.activePokemonNameLocale ?? "en") as AppLocale,
         settings.masteryRepetitions,
       );
     }
@@ -2735,8 +2747,11 @@ export function ReviewSession() {
     (effectiveCard.state.lastReview === null ||
       effectiveCard.state.learningStep !== null);
   const isMcLearningActive = verifiedTypedEntryMode && isInLearningPhase;
+  // Typed entry is English-only. Non-English sessions fall back to flip /
+  // multiple-choice so the typed answer is never compared against a
+  // Japanese (or other locale) display name. Full fix tracked in #1561.
   const isTypedEntryActive =
-    verifiedTypedEntryMode && isNameCard && !isInLearningPhase;
+    verifiedTypedEntryMode && isNameCard && !isInLearningPhase && activeLocale === "en";
 
   // Pre-build MC options when we know we will render the MC card. The options
   // array is stable per card id: the same 4 options and order appear on every

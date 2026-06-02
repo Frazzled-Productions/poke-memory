@@ -3885,3 +3885,143 @@ describe("ReviewSession locale smoke — Japanese", () => {
     vi.useRealTimers();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Per-locale session isolation (#1562)
+// ---------------------------------------------------------------------------
+
+describe("ReviewSession per-locale session (#1562)", () => {
+  /** Minimal settings for a name-only session. */
+  const nameOnlySettings = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 100,
+    evolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+    earnedBadges: [] as { id: string; earnedAt: string }[],
+  };
+
+  /** A name card stamped with locale="ja". */
+  const jaNameCard: NameReviewCard = {
+    ...FIXTURE_CARD,
+    locale: "ja" as const,
+    state: {
+      stability: 0,
+      difficulty: 0,
+      elapsedDays: 0,
+      scheduledDays: 0,
+      reps: 0,
+      lapses: 0,
+      fsrsState: "new" as const,
+      dueDate: "2026-05-09",
+      lastReview: null,
+      firstSeen: null,
+      learningStep: null,
+      stepStartedAt: null,
+      hiddenSince: null,
+      seenInPasture: false,
+    },
+  };
+
+  it("builds a ja-only queue when activePokemonNameLocale is 'ja'", async () => {
+    // Saved session contains only a ja name card.
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [jaNameCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "ja",
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    // The session should show the Reveal button (a ja card is due).
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+  });
+
+  it("shows no Reveal button when activePokemonNameLocale is 'en' but only ja cards exist", async () => {
+    // Saved session contains only a ja name card — no en cards.
+    // With activeLocale="en" the locale filter excludes the ja card from
+    // the queue, so no card is shown to the user.
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [jaNameCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "en",
+      // Zero new-card budget so a fresh en card added by hydrateSession
+      // cannot be introduced (the new-cards-locked or all-caught-up end
+      // state fires instead of the card front).
+      maxNewPerDay: 0,
+      maxNewReversePerDay: 0,
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    // No Reveal button — no en card is due.
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it("defaults to 'en' queue when activePokemonNameLocale is absent (backward compat)", async () => {
+    // No activePokemonNameLocale field in settings — component must default to "en".
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    // Standard en session: Reveal button should appear for the en fixture card.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+  });
+
+  it("suppresses typed entry when activeLocale is not 'en' (#1561)", async () => {
+    // Session with a graduated ja name card — typed-entry would fire for en
+    // but must be suppressed for ja since typed answers are English-only.
+    const graduatedJaCard: NameReviewCard = {
+      ...jaNameCard,
+      state: {
+        ...jaNameCard.state,
+        stability: 10,
+        difficulty: 5,
+        elapsedDays: 25,
+        scheduledDays: 25,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2026-05-09",
+        lastReview: "2026-04-01",
+        firstSeen: "2026-03-01",
+      },
+    };
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [graduatedJaCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "ja",
+      verifiedTypedEntryMode: true,
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    // Must NOT render a text input — typed entry is English-only (#1561).
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+});

@@ -159,6 +159,7 @@ export type DashboardSnapshotOptions = {
  * @param eligibleCardIds Pre-computed set from `computeEligibleCardIds`.
  * @param limits         Per-type daily new/review limits.
  * @param today          UTC `YYYY-MM-DD` date string.
+ * @param locale         Active Pokémon-name locale (#1562). Defaults to `"en"`.
  * @returns              `QueueCounts` with new / learning / review breakdowns
  *                       and a convenience `totalCount` field.
  */
@@ -167,12 +168,15 @@ export function computeQueueCountFromEligible(
   eligibleCardIds: ReadonlySet<number>,
   limits: DailyLimits,
   today: string,
+  locale: AppLocale = "en",
 ): QueueCounts {
   const { newQueue, learningCardIds, reviewQueue } = buildSessionQueues(
     cards,
     limits,
     today,
     eligibleCardIds,
+    "",
+    locale,
   );
   return {
     newCount: newQueue.length,
@@ -199,6 +203,7 @@ export function computeQueueCountFromEligible(
  * @param settings Eligibility settings (card-type toggles + practice scope).
  * @param limits   Per-type daily new/review limits.
  * @param today    UTC `YYYY-MM-DD` date string. Caller owns timezone resolution.
+ * @param locale   Active Pokémon-name locale (#1562). Defaults to `"en"`.
  * @returns        `QueueCounts` with new / learning / review breakdowns and
  *                 a convenience `totalCount` field.
  */
@@ -207,9 +212,10 @@ export function computeQueueCount(
   settings: EligibilitySettings,
   limits: DailyLimits,
   today: string,
+  locale: AppLocale = "en",
 ): QueueCounts {
   const eligibleCardIds = computeEligibleCardIds(cards, settings);
-  return computeQueueCountFromEligible(cards, eligibleCardIds, limits, today);
+  return computeQueueCountFromEligible(cards, eligibleCardIds, limits, today, locale);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +294,7 @@ export function computeDashboardSnapshot(
     // card collection (#1149). The helper keeps the queue-assembly logic in one
     // place and is reused by computeQueueCount too (#1158).
     const eligibleCardIds = computeEligibleCardIds(cards, settings);
-    const counts = computeQueueCountFromEligible(cards, eligibleCardIds, limits, today);
+    const counts = computeQueueCountFromEligible(cards, eligibleCardIds, limits, today, locale);
 
     if (wants("queue")) {
       queue = counts;
