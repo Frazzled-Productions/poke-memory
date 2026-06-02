@@ -18,7 +18,8 @@ name: Auto Review
 #   - PRs whose title starts with `chore(release):` are skipped — these are
 #     the auto-release workflow's own commits and never want a review.
 #   - Dependabot PRs are skipped (`github.actor == 'dependabot[bot]'`).
-#   - PRs targeting non-`main` branches are skipped — out of scope.
+#   - PRs targeting branches other than `main` or `qa` are skipped. The
+#     gate allows BOTH `main` and `qa`, so batch PRs into `qa` are reviewed.
 #
 # The previous allow-list gated on head-branch prefix `auto/` or an
 # `auto-review` label. Both are dropped: the inverted gate makes the label
