@@ -6,6 +6,24 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.33] - 2026-06-02
+
+### Added
+
+- Practice screen now surfaces a dismissible nudge pointing to Settings > Offline when repeated slow sprite loads (3+) or five practice sessions without a download are detected, so users who experience slowness can discover the 166 MB pre-fetch feature without hunting through Settings.
+- Offline Settings section now shows whether downloaded content is "Up to date" or "Update available (N new)" by comparing a content manifest signature stored at download time against the current asset set. The Update button is disabled when content is already current, removing the blind-click guesswork.
+- Status bar pills (streak, protection tokens, mastery) now reveal their meaning on tap (touch) or hover/focus (desktop), so sighted users do not have to guess what the icons represent.
+
+### Changed
+
+- Daily push notifications now cover all your learning languages, not just the active one. If you are learning multiple languages, the notification body shows a per-language due count (e.g. "English 12, 日本語 8") alongside the global total.
+- The child-facing privacy summary on the Privacy page now renders in your chosen app language (Japanese, Simplified Chinese, Traditional Chinese, and English), instead of always showing in English.
+- Pokédex entry rows in the species detail panel now show the source game name(s) instead of the repeated "Pokédex entry" label (e.g. "Red · Blue", "FireRed · LeafGreen · Emerald +2"). When the same text appears in multiple games, the row is shown once with all its games listed.
+
+### Fixed
+
+- Fixed a crash in the Stats "Accuracy by card direction" chart where Recharts passing an empty payload array during chart transitions caused a `TypeError`.
+
 ## [0.10.32] - 2026-06-02
 
 ### Added
@@ -1571,7 +1589,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.32...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.33...HEAD
+[0.10.33]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.33
 [0.10.32]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.32
 [0.10.31]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.31
 [0.10.30]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.30
