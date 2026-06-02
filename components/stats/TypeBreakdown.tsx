@@ -5,6 +5,7 @@ import type { TypeStats } from "@/lib/stats/derive";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
 import { MeterBar } from "@/components/ui/MeterBar";
 import { getTypeName } from "@/lib/i18n/typeNames";
+import { colStack, mutedTextXs } from "@/lib/utils/class-names";
 
 type Props = {
   perType: readonly TypeStats[];
@@ -46,7 +47,7 @@ export function TypeBreakdown({ perType }: Props) {
           return (
             <li
               key={typeStats.type}
-              className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-background p-3 dark:border-zinc-800"
+              className={`${colStack} rounded-xl border border-zinc-200 bg-background p-3 dark:border-zinc-800`}
             >
               <div className="flex items-center justify-between">
                 <span
@@ -54,7 +55,7 @@ export function TypeBreakdown({ perType }: Props) {
                 >
                   {typeName}
                 </span>
-                <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                <span className={`tabular-nums ${mutedTextXs}`}>
                   {typeStats.mastered}/{typeStats.total}
                 </span>
               </div>

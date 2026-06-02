@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { dialogPanel } from "@/lib/utils/class-names";
+import { dialogPanel, mutedText } from "@/lib/utils/class-names";
 
 interface Props {
   open: boolean;
@@ -58,7 +58,7 @@ export function ResetProgressDialog({ open, onClose, onConfirm }: Props) {
       className={dialogPanel}
     >
       <h2 id="reset-dialog-title" className="text-lg font-semibold text-foreground">Reset all progress?</h2>
-      <p id="reset-dialog-desc" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+      <p id="reset-dialog-desc" className={`mt-2 ${mutedText}`}>
         This will permanently erase all your review history and cannot be undone.
         Type <strong className="text-foreground">RESET</strong> to confirm.
       </p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { dialogPanel } from "@/lib/utils/class-names";
+import { dialogPanel, mutedText } from "@/lib/utils/class-names";
 
 interface Props {
   open: boolean;
@@ -77,7 +77,7 @@ export function DeleteAccountDialog({ open, onClose, onConfirm }: Props) {
       </h2>
       <p
         id="delete-account-dialog-desc"
-        className="mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400"
+        className={`mt-2 max-w-sm ${mutedText}`}
       >
         This permanently erases your account and all of its data (review
         history, streaks, settings, and your sign-in identity) from the cloud
