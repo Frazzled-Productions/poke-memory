@@ -1,24 +1,35 @@
 /**
- * Smoke test for the Privacy Notice page (#1056, #1349).
+ * Smoke test for the Privacy Notice page (#1056, #1349, #1544).
  *
  * Server Components for static legal copy don't need branch coverage in the
  * usual sense, but the diff-coverage gate counts any added product line. The
  * Web Push section added for #1056 (lines 158-179) needs at least one render
  * assertion so those lines are instrumented.
  *
- * The page is a pure server function returning JSX with no data fetching; we
- * can render it directly under jsdom. ChildFriendlySummary renders too and
- * its `next/link` is implicitly handled by jsdom — no router mock needed.
- *
  * #1349: the English-only notice is controlled by resolveLocale(). The mock
  * below exercises both the "en" path (notice absent) and a non-"en" path
  * (notice present).
+ *
+ * #1544: ChildFriendlySummary is now an async server component. It is stubbed
+ * here so the async render does not block or suspend in the jsdom environment.
+ * ChildFriendlySummary.test.tsx carries the locale-coverage assertions;
+ * this file keeps the page-level smoke tests.
  */
 
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 import PrivacyPage from "@/app/privacy/page";
+
+// ---------------------------------------------------------------------------
+// Stub ChildFriendlySummary — it is now async; stubbing avoids the suspended
+// async component causing the page render to return an empty div. Locale
+// rendering is asserted in components/privacy/ChildFriendlySummary.test.tsx.
+// ---------------------------------------------------------------------------
+
+vi.mock("@/components/privacy/ChildFriendlySummary", () => ({
+  default: () => <section>Child-friendly summary (stub)</section>,
+}));
 
 // ---------------------------------------------------------------------------
 // Mock resolveLocale so the server-component locale gate is testable.

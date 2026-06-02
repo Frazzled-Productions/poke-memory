@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { TypedEntryNameCard } from "@/components/review/TypedEntryNameCard";
@@ -40,7 +40,8 @@ import { useStorageQuota } from "@/lib/review/useStorageQuota";
 import { StorageQuotaBanner } from "@/components/review/StorageQuotaBanner";
 import { GradeErrorBanner } from "@/components/review/GradeErrorBanner";
 import { recordReview } from "@/lib/streak";
-import { loadSettings, saveSettings, SETTINGS_SAVED_EVENT, type UserSettings } from "@/lib/settings/persistence";
+import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings/persistence";
+// SETTINGS_SAVED_EVENT is now consumed inside useSessionReloadListeners (#1520).
 import { LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { nextReview, type ReviewState } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
@@ -52,7 +53,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
-import { SYNC_PULL_APPLIED_EVENT } from "@/lib/sync/pullAndMerge";
+// SYNC_PULL_APPLIED_EVENT is now consumed inside useSessionReloadListeners (#1520).
 import { appendGradeEntry, loadGradeLog, removeGradeEntry, todayGradeSequence } from "@/lib/gradelog/persistence";
 import { GradeBreakdownBar } from "@/components/stats/GradeBreakdownBar";
 import {
@@ -69,7 +70,8 @@ import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
 import { triggerHaptic } from "@/lib/review/haptic";
 import { markSessionActive, markSessionInactive, markCardRevealed } from "@/lib/review/sessionActive";
-import { KEY_HAS_MASTERED, KEY_SETTINGS } from "@/lib/storage/keys";
+import { KEY_HAS_MASTERED, KEY_OFFLINE_DOWNLOADED_AT } from "@/lib/storage/keys";
+// KEY_SETTINGS is now consumed inside useSessionReloadListeners (#1520).
 import { writeMasteredCountForLocale } from "@/lib/profile/masteredCountCache";
 import {
   writeDueCounts,
@@ -79,12 +81,14 @@ import {
   type HasHistoryByLocale,
 } from "@/lib/profile/dueCountCache";
 import { filterMastered } from "@/lib/pasture/arrivals";
-import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
+import { type DailySummaryParts } from "@/lib/review/share";
+// formatDailySummary is now consumed inside useShareSheet (#1520).
 import {
   loadDailySummary,
   saveDailySummary,
 } from "@/lib/review/dailySummaryPersistence";
-import { computeStreak, effectiveStreakDates, loadStreakData } from "@/lib/streak";
+// computeStreak / effectiveStreakDates / loadStreakData are now consumed
+// inside useShareSheet (#1520).
 import {
   EMPTY_SCOPE,
   cardIsEligible,
@@ -98,8 +102,12 @@ import { ScopeControl } from "@/components/review/ScopeControl";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
-import { mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { mutedText, mutedTextXs, sectionLabel, colStack } from "@/lib/utils/class-names";
 import { getOrCreateClientSalt } from "@/lib/identity/clientSalt";
+import { addDaysToIsoDate } from "@/lib/utils/dates";
+import { useShareSheet } from "@/components/review/useShareSheet";
+import { useSessionReloadListeners } from "@/components/review/useSessionReloadListeners";
+import { useLearningQueueTimer } from "@/components/review/useLearningQueueTimer";
 
 
 // Pull learning cards forward when due within this window (Anki default: 20 min).
@@ -113,6 +121,11 @@ const SCOPE_NUDGE_SESSION_THRESHOLD = 3;
 // A new key (not reusing PwaInstallNudge's visit key) because this counts
 // sessions with at least one grade, not page visits.
 const SCOPE_NUDGE_SESSION_KEY = "poke-memory:practice-session-counted:v1";
+
+// Thresholds for the offline-download discovery nudge (#1538).
+// The nudge shows when EITHER signal crosses its threshold.
+const OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD = 3;
+const OFFLINE_NUDGE_SESSION_THRESHOLD = 5;
 
 // Module-scoped seed lookup map. Built once at module load — the 1025-entry
 // Map would be wasteful to rebuild on every render of ReviewSession.
@@ -778,6 +791,11 @@ export function ReviewSession() {
   const [scopeEverOpened, setScopeEverOpened] = useState(true);
   // Default to SESSION_THRESHOLD so nudge is hidden before hydration.
   const [practiceSessionsCount, setPracticeSessionsCount] = useState(SCOPE_NUDGE_SESSION_THRESHOLD);
+  // Offline-download nudge signals (#1538). Both default to suppressing values
+  // so the nudge never flashes before settings are loaded.
+  const [slowSpriteLoadCount, setSlowSpriteLoadCount] = useState(OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD);
+  // true = user already has a download, or settings haven't loaded yet.
+  const [offlineDownloaded, setOfflineDownloaded] = useState(true);
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
@@ -949,8 +967,7 @@ export function ReviewSession() {
   // the corrupt grade is skipped and the user can continue.
   const [gradeError, setGradeError] = useState<string | null>(null);
 
-  // Ref for the timeout that fires when the earliest pending learning card is due.
-  const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Note: countdown timeout management moved to useLearningQueueTimer (#1520).
   // Locks the card the user clicked Reveal on so a learning-queue re-render
   // can't swap it out before the user submits a grade.
   const revealedCardId = useRef<number | null>(null);
@@ -1060,6 +1077,15 @@ export function ReviewSession() {
           })
         : [],
     [cards, alternateFormsEnabled, scope, incompleteChains],
+  );
+
+  // Derive share parts/text unconditionally (hooks rule). Used only in the
+  // end-of-session branch but must be called before any early return (#1520).
+  const { shareParts, shareText } = useShareSheet(
+    sessionGradeSeq,
+    newCardsThisSession,
+    masteredThisSession,
+    timezone,
   );
 
   const cardMap = useMemo(
@@ -1224,6 +1250,15 @@ export function ReviewSession() {
       // Scope-nudge gate signals (#1482). Read from persisted settings.
       setScopeEverOpened(settings.onboarding?.scopeEverOpened === true);
       setPracticeSessionsCount(settings.onboarding?.practiceSessionsCount ?? 0);
+      // Offline-download nudge gate signals (#1538).
+      setSlowSpriteLoadCount(settings.onboarding?.slowSpriteLoadCount ?? 0);
+      // Check whether a download already exists — if so, suppress the nudge.
+      // The typeof + optional-chain guards cover SSR and test environments
+      // where window.localStorage may be undefined.
+      const hasDownload = typeof window !== "undefined"
+        && window.localStorage != null
+        && window.localStorage.getItem(KEY_OFFLINE_DOWNLOADED_AT) !== null;
+      setOfflineDownloaded(hasDownload);
 
       // Hydrate the daily summary so the "Share today" button survives a page
       // reload, a navigation away and back, or reopening the app later in the
@@ -1288,49 +1323,9 @@ export function ReviewSession() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notifySaveResult]);
 
-  // Reload when settings change in another tab so reverseEnabled and limits stay current.
-  useEffect(() => {
-    function handleStorage(e: StorageEvent) {
-      if (e.key === KEY_SETTINGS) {
-        window.location.reload();
-      }
-    }
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
-  // Rebuild the session when the active learning language changes in THIS tab
-  // (#1562). A same-tab `saveSettings` fires SETTINGS_SAVED_EVENT but NOT a
-  // `storage` event (the browser only delivers `storage` to other tabs), so the
-  // cross-tab handler above never sees a pill switch made on this page. Reload
-  // only when the active locale actually changed — other settings saves (streak,
-  // onboarding, etc.) must not interrupt practice. The mid-card switch lock
-  // guarantees this only fires between cards, so no in-flight grade is lost.
-  useEffect(() => {
-    function handleSettingsSaved() {
-      const next = (loadSettings().activePokemonNameLocale ?? "en") as AppLocale;
-      if (next !== activeLocale) {
-        window.location.reload();
-      }
-    }
-    window.addEventListener(SETTINGS_SAVED_EVENT, handleSettingsSaved);
-    return () => window.removeEventListener(SETTINGS_SAVED_EVENT, handleSettingsSaved);
-  }, [activeLocale]);
-
-  // Reload when a sign-in or visibility pull applied cloud progress that
-  // wasn't on this device yet (#608). The practice page can't subscribe to
-  // `saveSession`'s synthetic StorageEvent the way Stats/Pasture/Pokédex do
-  // — it would re-fire on every grade — so `pullAndMerge` dispatches this
-  // targeted event only when the merge actually moved a card's progress
-  // markers. A pull that finds local already matches cloud stays silent,
-  // so the reload triggered here cannot loop on the next mount's pull.
-  useEffect(() => {
-    function handlePullApplied() {
-      window.location.reload();
-    }
-    window.addEventListener(SYNC_PULL_APPLIED_EVENT, handlePullApplied);
-    return () => window.removeEventListener(SYNC_PULL_APPLIED_EVENT, handlePullApplied);
-  }, []);
+  // Reload on settings changes (cross-tab), same-tab locale switch, and cloud
+  // pull events. Extracted to useSessionReloadListeners (#1520).
+  useSessionReloadListeners(activeLocale);
 
   // Publish a "review session active" flag while this component is mounted so
   // background side-effects can avoid yanking state mid-card (#1162 / #1163).
@@ -1348,36 +1343,11 @@ export function ReviewSession() {
   }, []);
 
   // Schedule a timeout to re-render when the earliest pending learning card is due.
-  // Re-runs whenever learningQueue changes.
-  useEffect(() => {
-    if (countdownTimeoutRef.current !== null) {
-      clearTimeout(countdownTimeoutRef.current);
-      countdownTimeoutRef.current = null;
-    }
-
-    const now = Date.now();
-    const futureDue = learningQueue.filter((e) => e.dueAt > now);
-    if (futureDue.length === 0) return;
-
-    const earliest = Math.min(...futureDue.map((e) => e.dueAt));
-    const delay = Math.max(0, earliest - now);
-
-    countdownTimeoutRef.current = setTimeout(() => {
-      countdownTimeoutRef.current = null;
-      // Force a re-render so the now-due learning card is picked up. Bumping
-      // a fresh array reference re-runs this effect, which is harmless: the
-      // newly-due entry is filtered out of `futureDue`, and any remaining
-      // future entries chain onto the next setTimeout.
-      setLearningQueue((q) => [...q]);
-    }, delay);
-
-    return () => {
-      if (countdownTimeoutRef.current !== null) {
-        clearTimeout(countdownTimeoutRef.current);
-        countdownTimeoutRef.current = null;
-      }
-    };
-  }, [learningQueue]);
+  // Extracted to useLearningQueueTimer (#1520).
+  useLearningQueueTimer(
+    learningQueue,
+    useCallback(() => setLearningQueue((q) => [...q]), []),
+  );
 
   // Auto-play the cry when a cry card first becomes the current card.
   // Drives the "audio as prompt" loop without requiring a tap. Skipped
@@ -1646,6 +1616,31 @@ export function ReviewSession() {
       </div>
     );
   }
+
+  // Offline-download discovery nudge (#1538). Gate (in priority order):
+  //   1. offlineDownloadNudgeDismissed (handled by OnboardingHint itself).
+  //   2. offlineDownloaded true   -> suppress (already downloaded; nudge served its purpose).
+  //   3. firstVisitDone false     -> suppress (first-visit modal still showing).
+  //   4. superuserGuarded true    -> suppress (QA sessions must not fire).
+  //   5. Show if: slowSpriteLoadCount >= threshold OR practiceSessionsCount >= threshold.
+  const offlineNudge = (
+    offlineDownloaded ||
+    !firstVisitDone ||
+    superuserGuarded ||
+    (slowSpriteLoadCount < OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD &&
+      practiceSessionsCount < OFFLINE_NUDGE_SESSION_THRESHOLD)
+  ) ? null : (
+    <div className="mb-3">
+      <OnboardingHint
+        id="offlineDownloadNudgeDismissed"
+        title={t("offlineDownloadNudge.title")}
+        ctaHref="/settings#offline-download-heading"
+        ctaLabel={t("offlineDownloadNudge.cta")}
+      >
+        <p>{t("offlineDownloadNudge.body")}</p>
+      </OnboardingHint>
+    </div>
+  );
 
   // --- All opt-in card types disabled ---
   // Name and reverse are always on since #1234, so this guard covers only
@@ -1990,37 +1985,13 @@ export function ReviewSession() {
     // share button, not just SESSION_COMPLETE.
     const today = todayString(new Date());
     const todayTz = todayString(new Date(), timezone);
-    const tomorrowDate = new Date(todayTz + "T12:00:00Z");
-    tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
-    const tomorrow = todayString(tomorrowDate, timezone);
+    // Use addDaysToIsoDate so tomorrow is derived the same way as other callers
+    // in lib/stats — replaces the inline setUTCDate arithmetic (#1522).
+    const tomorrow = addDaysToIsoDate(todayTz, 1);
     const dueTomorrow = countDueTomorrow(cards, tomorrow, eligibleCardIds, activeLocale);
-    // The share grid is gated on persisted completion state: `sessionGradeSeq`
-    // is hydrated at mount from the daily-summary record or, failing that, the
-    // grade log (#896), so the button survives a reload or navigation rather
-    // than only appearing in the page-load that graded the final card.
-    // The displayed date uses the user's timezone (a calendar label), while
-    // streak lookup stays on the UTC `today` the streak data is keyed by.
-    const shareParts: DailySummaryParts | null =
-      sessionGradeSeq.length > 0
-        ? {
-            date: todayTz,
-            // Use protection-aware streak (#1227) so a preserved day is
-            // reflected in the daily summary the user shares. Defensive ??
-            // covers test mocks that omit the field.
-            streak: computeStreak(
-              effectiveStreakDates(
-                loadStreakData(),
-                loadSettings().streakProtection?.spendDates ?? [],
-              ),
-              today,
-            ),
-            reviewed: sessionGradeSeq.length,
-            newCards: newCardsThisSession,
-            mastered: masteredThisSession,
-            gradeSequence: sessionGradeSeq,
-          }
-        : null;
-    const shareText = shareParts !== null ? formatDailySummary(shareParts) : null;
+    // shareParts / shareText are derived unconditionally by useShareSheet above
+    // (hooks must be called before early returns). They are used here in the
+    // end-of-session branch (#1520).
     const variant: EndOfSessionVariant =
       endState === "REVIEW_SOFT_WALL"
         ? { kind: "review-wall", onKeepReviewing: () => setExtendedReview(true) }
@@ -2181,6 +2152,32 @@ export function ReviewSession() {
     } else if (speakOn && nameToSpeak !== null) {
       speakName(nameToSpeak, idToSpeak);
     }
+  }
+
+  /**
+   * Called when a grade-path `decodeSpriteUrls` call times out on the 150 ms
+   * ceiling (#1538). Increments the `slowSpriteLoadCount` counter so the
+   * offline-download nudge can surface after repeated slow loads. Skipped under
+   * superuser so QA sessions do not inflate the counter.
+   *
+   * Cross-layer note: this updates `lib/settings/persistence.ts` state from
+   * inside `ReviewSession`. The nudge trigger is directly tied to the grading
+   * critical path (the exact point the user feels the slowness), making
+   * `ReviewSession` the right call site per AGENTS.md "Cross-layer fixes".
+   */
+  function handleSlowSpriteLoad() {
+    if (superuserGuarded) return;
+    const settingsForSlowLoad = loadSettings();
+    const current = settingsForSlowLoad.onboarding?.slowSpriteLoadCount ?? 0;
+    // Cap at the nudge threshold to avoid unbounded loadSettings/saveSettings
+    // calls on the grade critical path on persistently slow networks.
+    if (current >= OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD) return;
+    const next = current + 1;
+    saveSettings({
+      ...settingsForSlowLoad,
+      onboarding: { ...settingsForSlowLoad.onboarding, slowSpriteLoadCount: next },
+    });
+    setSlowSpriteLoadCount(next);
   }
 
   async function handleGrade(grade: Grade) {
@@ -2362,10 +2359,11 @@ export function ReviewSession() {
             await decodeSpriteUrls(
               [target, ...distractors].map((p) => p.spriteUrl),
               DECODE_GRADE_TIMEOUT_MS,
+              handleSlowSpriteLoad,
             );
           }
         } else {
-          await decodeSpriteUrls(preloadableSpriteUrls(nextCard), DECODE_GRADE_TIMEOUT_MS);
+          await decodeSpriteUrls(preloadableSpriteUrls(nextCard), DECODE_GRADE_TIMEOUT_MS, handleSlowSpriteLoad);
         }
       }
     }
@@ -2724,6 +2722,7 @@ export function ReviewSession() {
             {/* Cry card wraps ScopeControl in a max-width column for alignment. */}
             <div className="flex w-full max-w-xl flex-col gap-2">
               {scopeNudge}
+              {offlineNudge}
               <ScopeControl
                 scope={scope}
                 onChange={handleScopeChange}
@@ -2849,6 +2848,7 @@ export function ReviewSession() {
             )}
             <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
             {scopeNudge}
+            {offlineNudge}
             <ScopeControl
               scope={scope}
               onChange={handleScopeChange}
@@ -2960,6 +2960,7 @@ export function ReviewSession() {
           )}
           <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
           {scopeNudge}
+          {offlineNudge}
           <ScopeControl
             scope={scope}
             onChange={handleScopeChange}
@@ -2977,7 +2978,7 @@ export function ReviewSession() {
              Key includes cardPresentationCount so the component remounts (and
              resets chosen state) when the same card reappears via a learning-step
              replay, matching the SpritePicker pattern (#496). */
-          <div className="flex flex-col gap-2 w-full">
+          <div className={`${colStack} w-full`}>
             {/* One-time learning-phase banner (#1271). Visible until the first
                 MC grade fires; after that `mcCardOnboardingShown` is true and
                 the banner never re-renders. */}

@@ -145,6 +145,17 @@ const eslintConfig = defineConfig([
           message:
             "Use the cardPanelPadded constant from lib/utils/class-names.ts instead of this inline literal (#1456).",
         },
+        // Game-label single-source guard (#1559): forbid reading `.display` from
+        // a VERSION_NAMES lookup directly in components/pages. All game-label
+        // strings must flow through `formatVersions(slugs)` (lib/pokemon/versionNames.ts)
+        // so sort order, overflow, and unknown-slug fallback remain centralised.
+        // Selector targets `VERSION_NAMES[expr].display` specifically.
+        {
+          selector:
+            "MemberExpression[property.name='display'][object.type='MemberExpression'][object.object.name='VERSION_NAMES']",
+          message:
+            "Do not read VERSION_NAMES[slug].display directly in components/pages. Use formatVersions(slugs) from lib/pokemon/versionNames.ts so sort order, overflow, and fallback remain centralised (#1559).",
+        },
         // Sprite pixel-literal ban (#1456): forbid raw numeric literals on the
         // `width` and `height` props of <Image> components. Use the corresponding
         // named constant from lib/sprites/sizes.ts so the optimiser variant and

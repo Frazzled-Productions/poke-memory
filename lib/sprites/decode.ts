@@ -30,10 +30,15 @@ export const DECODE_GRADE_TIMEOUT_MS = 150;
  * @param timeoutMs - Safety-valve ceiling in milliseconds. Defaults to
  *   {@link DECODE_TIMEOUT_MS} (500 ms). Pass {@link DECODE_GRADE_TIMEOUT_MS}
  *   (150 ms) on the grade critical path where speed is the priority.
+ * @param onSlowLoad - Optional callback invoked when the timeout wins the race,
+ *   indicating a slow sprite load. Used by the grade critical path in
+ *   `ReviewSession` to increment `slowSpriteLoadCount` for the offline-download
+ *   nudge (#1538). Not called when `urls` is empty (no decode attempted).
  */
 export async function decodeSpriteUrls(
   urls: readonly string[],
   timeoutMs = DECODE_TIMEOUT_MS,
+  onSlowLoad?: () => void,
 ): Promise<void> {
   if (urls.length === 0) return;
   const decodes = urls.map((url) => {
@@ -48,8 +53,18 @@ export async function decodeSpriteUrls(
       // pop-in than to block the swap indefinitely.
     });
   });
-  await Promise.race([
-    Promise.all(decodes),
-    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
-  ]);
+
+  let timedOut = false;
+  const timeoutPromise = new Promise<void>((resolve) =>
+    setTimeout(() => {
+      timedOut = true;
+      resolve();
+    }, timeoutMs),
+  );
+
+  await Promise.race([Promise.all(decodes), timeoutPromise]);
+
+  if (timedOut) {
+    onSlowLoad?.();
+  }
 }

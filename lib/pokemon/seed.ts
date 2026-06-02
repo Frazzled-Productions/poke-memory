@@ -53,6 +53,16 @@ export type PokemonLocaleNames = {
 
 export type { EvolutionDetail };
 
+/**
+ * A single Pokédex flavour-text entry with provenance.
+ * Added in #1559 — each entry carries the normalised text plus the list of
+ * PokéAPI version slugs (e.g. `["red", "blue"]`) whose dex used that text.
+ */
+export type FlavorTextEntry = {
+  text: string;
+  versions: string[];
+};
+
 export type EvolutionNode = {
   speciesId: number;
   name: string;
@@ -118,7 +128,14 @@ export type SeedPokemon = {
   types: string[];
   stats: PokemonStats;
   flavorText: string;
-  flavorTexts: string[] | undefined;
+  /**
+   * Lazy-loaded flavour text entries from `generated-flavor.json`.
+   * Each entry carries the text and the list of PokéAPI version slugs that
+   * used it. `undefined` when the sidecar has not yet loaded (runtime seed).
+   * Plain `string[]` shape is retained here for older payloads that pre-date
+   * #1559 — `facts.ts` normalises both shapes at read time.
+   */
+  flavorTexts: FlavorTextEntry[] | string[] | undefined;
   evolutionChain: EvolutionNode[];
   height: number | null;
   weight: number | null;
@@ -158,8 +175,8 @@ export type SeedPokemon = {
 // (~1.2 MB bundled vs ~2.9 MB with both fields inline). The chain for each
 // Pokémon is resolved from the compact chains map in generated-chains.json.
 // `flavorTexts` stays absent from the runtime SEED_POKEMON (it is
-// `string[] | undefined`); the facts panel loads it lazily via
-// `loadFlavorTexts()` in `lib/pokemon/facts.ts`.
+// `FlavorTextEntry[] | string[] | undefined`); the facts panel loads it lazily
+// via `loadFlavorTexts()` in `lib/pokemon/facts.ts`.
 
 type ChainsPayload = {
   chains: Record<string, EvolutionNode[]>;

@@ -16,10 +16,15 @@ name: Visual Baseline Update
 #
 # Safety posture (these guards stack):
 #   1. `workflow_dispatch` only — no PR/push trigger can fire this.
-#   2. Owner-gated — only the repository owner can dispatch. Implemented as an
-#      actor-vs-`github.repository_owner` check in the `gate` job. The repo
-#      does not have a team-membership API available without an extra token,
-#      so actor-vs-owner is the simplest robust gate.
+#   2. Maintainer-gated — only an approved maintainer can dispatch.
+#      Implemented in the `gate` job as a check against an explicit
+#      maintainer allowlist (`MAINTAINERS`), with an org-membership API
+#      probe (`gh api /orgs/<org>/members/<actor>`) as a secondary signal.
+#      An actor-vs-`github.repository_owner` check is NOT usable here: after
+#      the move to the `Frazzled-Productions` org, `repository_owner` is the
+#      org login, which no human actor can ever equal (#1558). The allowlist
+#      is the load-bearing gate; the org-membership probe is best-effort and
+#      depends on the token's `read:org` visibility.
 #   3. Refuses to push if the input branch is `main` or `qa`. The regenerated
 #      baselines must land on a feature branch only; never on a long-lived
 #      branch directly. See AGENTS.md → "Branching model".
@@ -63,17 +68,44 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Verify dispatcher is the repository owner
+      - name: Verify dispatcher is an approved maintainer
         env:
+          GH_TOKEN: ${{ github.token }}
           ACTOR: ${{ github.actor }}
           OWNER: ${{ github.repository_owner }}
+          # Explicit maintainer allowlist. After the personal -> org move
+          # (#1558) `github.repository_owner` is the org login
+          # (`Frazzled-Productions`), so an `actor == owner` check can never
+          # pass for a human. Gate on this allowlist instead. Add a username
+          # here to grant dispatch rights.
+          MAINTAINERS: "fraserbrookhouse"
         run: |
           set -euo pipefail
-          if [ "$ACTOR" != "$OWNER" ]; then
-            echo "Refusing to run: actor '$ACTOR' is not the repository owner '$OWNER'."
-            exit 1
+
+          # 1. Allowlist (authoritative, token-scope-independent).
+          for m in $MAINTAINERS; do
+            if [ "$ACTOR" = "$m" ]; then
+              echo "Dispatcher '$ACTOR' is on the maintainer allowlist. OK."
+              exit 0
+            fi
+          done
+
+          # 2. Org-membership probe (best-effort secondary signal). A 204/200
+          # means the actor is a member of the org that now owns this repo.
+          # This only succeeds when the token carries `read:org` visibility,
+          # so it can short-circuit to a pass but never to the hard failure
+          # below — a non-member or scope-limited token falls through to the
+          # allowlist verdict already computed above.
+          STATUS=$(gh api "/orgs/${OWNER}/members/${ACTOR}" \
+            --silent -i 2>/dev/null | head -n1 | grep -oE '[0-9]{3}' | head -n1 || true)
+          if [ "$STATUS" = "204" ] || [ "$STATUS" = "200" ]; then
+            echo "Dispatcher '$ACTOR' is a member of org '$OWNER' (HTTP $STATUS). OK."
+            exit 0
           fi
-          echo "Dispatcher '$ACTOR' is the repository owner. OK."
+
+          echo "Refusing to run: actor '$ACTOR' is neither on the maintainer allowlist nor a verifiable member of org '$OWNER'."
+          echo "Add '$ACTOR' to MAINTAINERS in this workflow if they should be able to dispatch baseline regeneration."
+          exit 1
 
       - name: Refuse to target a long-lived branch
         env:

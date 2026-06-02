@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { cardPanelPadded, mutedTextXs } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, mutedTextXs } from "@/lib/utils/class-names";
 import { cn } from "@/lib/utils/cn";
 import { SCENARIOS, SCENARIO_BY_SLUG } from "@/lib/qa-seed/scenarios";
 import { applySeedScenario, clearSeedScenario } from "@/lib/qa-seed/apply";
@@ -121,7 +121,7 @@ export function QaSeedSection() {
       )}
 
       {/* Scenario picker */}
-      <div className="mt-3 flex flex-col gap-2">
+      <div className={`mt-3 ${colStack}`}>
         <label
           htmlFor="qa-seed-scenario-select"
           className="block text-xs font-medium text-foreground"

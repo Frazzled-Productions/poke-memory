@@ -615,6 +615,8 @@ describe('themeIntensity setting (#411)', () => {
           practiceScopeNudgeDismissed: false,
           scopeEverOpened: true,
           practiceSessionsCount: 5,
+          offlineDownloadNudgeDismissed: false,
+          slowSpriteLoadCount: 0,
         },
       });
       expect(loadSettings().onboarding).toEqual({
@@ -632,6 +634,8 @@ describe('themeIntensity setting (#411)', () => {
         practiceScopeNudgeDismissed: false,
         scopeEverOpened: true,
         practiceSessionsCount: 5,
+        offlineDownloadNudgeDismissed: false,
+        slowSpriteLoadCount: 0,
       });
     });
 
@@ -675,6 +679,8 @@ describe('themeIntensity setting (#411)', () => {
         practiceScopeNudgeDismissed: false,
         scopeEverOpened: false,
         practiceSessionsCount: 0,
+        offlineDownloadNudgeDismissed: false,
+        slowSpriteLoadCount: 0,
       });
     });
 
@@ -1114,5 +1120,81 @@ describe("removedLocales field (#1568)", () => {
   it("round-trips an empty removedLocales via saveSettings + loadSettings", () => {
     saveSettings({ ...DEFAULT_SETTINGS, removedLocales: [] });
     expect(loadSettings().removedLocales).toEqual([]);
+  });
+});
+
+// ─── Offline nudge onboarding flags (#1538) ─────────────────────────────────
+
+describe("validateOnboarding — offline nudge flags", () => {
+  it("defaults offlineDownloadNudgeDismissed to false when absent (reaches existing users)", () => {
+    // An existing user's blob will not have this key — it must resolve to false
+    // so the nudge is eligible immediately, reaching existing users by construction.
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ onboarding: {} }),
+    );
+    expect(loadSettings().onboarding.offlineDownloadNudgeDismissed).toBe(false);
+  });
+
+  it("respects offlineDownloadNudgeDismissed: true when stored", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ onboarding: { offlineDownloadNudgeDismissed: true } }),
+    );
+    expect(loadSettings().onboarding.offlineDownloadNudgeDismissed).toBe(true);
+  });
+
+  it("coerces non-boolean offlineDownloadNudgeDismissed to false", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ onboarding: { offlineDownloadNudgeDismissed: 1 } }),
+    );
+    expect(loadSettings().onboarding.offlineDownloadNudgeDismissed).toBe(false);
+  });
+
+  it("defaults slowSpriteLoadCount to 0 when absent (below threshold)", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ onboarding: {} }),
+    );
+    expect(loadSettings().onboarding.slowSpriteLoadCount).toBe(0);
+  });
+
+  it("respects a stored slowSpriteLoadCount integer", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ onboarding: { slowSpriteLoadCount: 5 } }),
+    );
+    expect(loadSettings().onboarding.slowSpriteLoadCount).toBe(5);
+  });
+
+  it("coerces non-integer slowSpriteLoadCount to 0", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ onboarding: { slowSpriteLoadCount: "3" } }),
+    );
+    expect(loadSettings().onboarding.slowSpriteLoadCount).toBe(0);
+  });
+
+  it("coerces negative slowSpriteLoadCount to 0", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ onboarding: { slowSpriteLoadCount: -1 } }),
+    );
+    expect(loadSettings().onboarding.slowSpriteLoadCount).toBe(0);
+  });
+
+  it("round-trips both new flags via saveSettings + loadSettings", () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      onboarding: {
+        ...DEFAULT_SETTINGS.onboarding,
+        offlineDownloadNudgeDismissed: true,
+        slowSpriteLoadCount: 3,
+      },
+    });
+    const loaded = loadSettings();
+    expect(loaded.onboarding.offlineDownloadNudgeDismissed).toBe(true);
+    expect(loaded.onboarding.slowSpriteLoadCount).toBe(3);
   });
 });

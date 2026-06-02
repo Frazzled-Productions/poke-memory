@@ -247,7 +247,10 @@
       "updateButton": "更新",
       "downloadingProgress": "{total} 件中 {done} 件をダウンロード中",
       "downloadProgressAriaLabel": "ダウンロードの進捗",
-      "stopButton": "停止"
+      "stopButton": "停止",
+      "upToDate": "最新の状態",
+      "updateAvailable": "アップデートあり",
+      "updateAvailableCount": "アップデートあり（{count} 件追加）"
     },
     "optimizerCooldown": "{count, plural, other {次の最適化まであと # 日}}",
     "optimizerRetryAfter": "{count, plural, other {# 日後に再試行してください。}}",
@@ -461,6 +464,11 @@
     "practiceScopeNudge": {
       "title": "ヒント: 世代・タイプ・グループで絞り込めます",
       "body": "下の「スコープ」を開いて、特定の世代・タイプ・スターターや未完成の進化チェーンなどのグループに絞って練習できます。"
+    },
+    "offlineDownloadNudge": {
+      "title": "オフライン練習？高速化のためにダウンロードを",
+      "body": "スプライトの読み込みが遅い場合、全スプライトと鳴き声（約166MB）をあらかじめダウンロードすると、接続なしでも瞬時に練習できます。",
+      "cta": "オフラインダウンロードを開く"
     }
   },
   "review": {
@@ -971,5 +979,24 @@
     "rock": "いわ",
     "steel": "はがね",
     "water": "みず"
+  },
+  "pushDaily": {
+    "title": "Time to practise",
+    "newOnly": "{newEstimate, plural, one {# new card} other {# new cards}} ready to practise.",
+    "multiDueNew": "{dueTotal, plural, one {# card} other {# cards}} due across your languages: {breakdown}. Plus {newEstimate, number} new ready to practise.",
+    "multiDueOnly": "{dueTotal, plural, one {# card} other {# cards}} due across your languages: {breakdown}.",
+    "singleDueNew": "{due, plural, one {# card} other {# cards}} due in {language} plus {newEstimate, number} new ready to practise.",
+    "singleDueOnly": "{due, plural, one {# card} other {# cards}} due in {language} for review.",
+    "breakdownItem": "{language} {count, number}"
+  },
+  "privacy": {
+    "childFriendlySummary": {
+      "heading": "ポケモリーはあなたのデータをどう扱う?",
+      "item1": "<s>サインインせずに遊ぶ場合。</s> サインインせずに遊ぶと、ポケモンの進捗はあなたのデバイスだけに保存され、外部には一切送信されません。",
+      "item2": "<s>サインインについて。</s> GitHubまたはGoogleアカウントでサインインすると、カードの進捗をデータベースに安全に保存でき、別のデバイスでも引き継げます。GitHubやGoogleのアカウントを持つには13歳以上である必要があります。",
+      "item3": "<s>保存する情報。</s> 保存するのは、練習したポケモンカード、その習熟度、最後に練習した日時のみです。あなたの名前・住所など、個人に関する情報は一切保存しません。",
+      "item4": "<s>他の人は見られる?</s> あなたの進捗を見られるのはあなただけです。進捗を他者と共有したり、広告に利用したりすることはありません。",
+      "item5": "<s>自分でコントロールできます。</s> 設定ページからいつでも<export>進捗をエクスポート</export>したり<reset>進捗をリセット</reset>したりできます。私たちに許可を求める必要はありません。今すぐ自分で行えます。"
+    }
   }
 }

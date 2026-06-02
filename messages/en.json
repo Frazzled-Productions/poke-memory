@@ -247,7 +247,10 @@
       "updateButton": "Update",
       "downloadingProgress": "Downloading {done} of {total}",
       "downloadProgressAriaLabel": "Download progress",
-      "stopButton": "Stop"
+      "stopButton": "Stop",
+      "upToDate": "Up to date",
+      "updateAvailable": "Update available",
+      "updateAvailableCount": "Update available ({count} new)"
     },
     "optimizerCooldown": "{count, plural, one {Next optimisation in # day} other {Next optimisation in # days}}",
     "optimizerRetryAfter": "{count, plural, one {Try again in # day.} other {Try again in # days.}}",
@@ -461,6 +464,11 @@
     "practiceScopeNudge": {
       "title": "Tip: filter by generation, type, or group",
       "body": "Use the Scope control below to focus practice on a generation, type, or a group like Starters or Incomplete chains."
+    },
+    "offlineDownloadNudge": {
+      "title": "Practising offline? Download for speed",
+      "body": "Sprites loading slowly? Pre-fetch every sprite and cry (about 166 MB) so practice works instantly, even with no connection.",
+      "cta": "Open offline download"
     }
   },
   "review": {
@@ -971,5 +979,24 @@
     "rock": "Rock",
     "steel": "Steel",
     "water": "Water"
+  },
+  "pushDaily": {
+    "title": "Time to practise",
+    "newOnly": "{newEstimate, plural, one {# new card} other {# new cards}} ready to practise.",
+    "multiDueNew": "{dueTotal, plural, one {# card} other {# cards}} due across your languages: {breakdown}. Plus {newEstimate, number} new ready to practise.",
+    "multiDueOnly": "{dueTotal, plural, one {# card} other {# cards}} due across your languages: {breakdown}.",
+    "singleDueNew": "{due, plural, one {# card} other {# cards}} due in {language} plus {newEstimate, number} new ready to practise.",
+    "singleDueOnly": "{due, plural, one {# card} other {# cards}} due in {language} for review.",
+    "breakdownItem": "{language} {count, number}"
+  },
+  "privacy": {
+    "childFriendlySummary": {
+      "heading": "In plain language: what does Poké Memory do with your data?",
+      "item1": "<s>Just playing (no sign-in).</s> When you play without signing in, the app saves your Pokémon progress only on your own device, and nothing is sent to us or stored anywhere on the internet.",
+      "item2": "<s>Signing in.</s> If you sign in with a GitHub or Google account, we save your card progress to a secure database so you can keep it across different devices. You need to be 13 or older to have a GitHub or Google account.",
+      "item3": "<s>What we save.</s> We only save which Pokémon cards you've practised, how well you know them, and when you last practised, and nothing else. We don't know your name, your address, or anything about you as a person.",
+      "item4": "<s>Who else can see it.</s> Nobody else can see your progress. Only you can see your own cards. We never share your progress with anyone else or use it to show you adverts.",
+      "item5": "<s>You're in control.</s> You can <export>export your progress</export> or <reset>reset all progress</reset> at any time from the Settings page. You don't need to ask us; you can do it yourself, right now."
+    }
   }
 }

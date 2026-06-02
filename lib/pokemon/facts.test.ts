@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getPokemonFacts } from '@/lib/pokemon/facts';
-import type { SeedPokemon } from '@/lib/pokemon/seed';
+import type { SeedPokemon, FlavorTextEntry } from '@/lib/pokemon/seed';
 
 function basePokemon(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
   return {
@@ -35,9 +35,14 @@ function basePokemon(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
 }
 
 describe('getPokemonFacts', () => {
-  it('returns facts for a fully-populated pokemon', () => {
+  // ---------------------------------------------------------------------------
+  // Legacy string[] shape (pre-#1559 payloads) — falls back to "Pokédex entry"
+  // ---------------------------------------------------------------------------
+
+  it('returns facts for a fully-populated pokemon (legacy string[] flavourTexts)', () => {
     const facts = getPokemonFacts(basePokemon());
     expect(facts.length).toBeGreaterThan(0);
+    // Legacy plain-string entries → versions=[] → label falls back to "Pokédex entry"
     const entry = facts.find((f) => f.label === 'Pokédex entry');
     expect(entry?.value).toBe('A strange seed was planted on its back at birth.');
   });
@@ -54,6 +59,73 @@ describe('getPokemonFacts', () => {
     expect(() => getPokemonFacts(pokemon)).not.toThrow();
     const facts = getPokemonFacts(pokemon);
     expect(facts.every((f) => f.label !== 'Pokédex entry')).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
+  // New FlavorTextEntry[] shape (post-#1559) — label is formatted game names
+  // ---------------------------------------------------------------------------
+
+  it('uses game-name label when flavorTexts is FlavorTextEntry[] with known versions', () => {
+    const entries: FlavorTextEntry[] = [
+      { text: 'A strange seed.', versions: ['red', 'blue'] },
+    ];
+    const facts = getPokemonFacts(basePokemon({ flavorTexts: entries }));
+    const entry = facts.find((f) => f.value === 'A strange seed.');
+    expect(entry?.label).toBe('Red · Blue');
+  });
+
+  it('falls back to "Pokédex entry" when versions array is empty', () => {
+    const entries: FlavorTextEntry[] = [
+      { text: 'Some text.', versions: [] },
+    ];
+    const facts = getPokemonFacts(basePokemon({ flavorTexts: entries }));
+    const entry = facts.find((f) => f.value === 'Some text.');
+    expect(entry?.label).toBe('Pokédex entry');
+  });
+
+  it('dedup-accumulate: each text appears once, label lists all its games', () => {
+    // Simulates what extractFlavorTexts now produces:
+    // two different texts each shared by two games
+    const entries: FlavorTextEntry[] = [
+      { text: 'Text one.', versions: ['red', 'blue'] },
+      { text: 'Text two.', versions: ['yellow', 'gold'] },
+    ];
+    const facts = getPokemonFacts(basePokemon({ flavorTexts: entries }));
+    const textOneFact = facts.find((f) => f.value === 'Text one.');
+    const textTwoFact = facts.find((f) => f.value === 'Text two.');
+    expect(textOneFact?.label).toBe('Red · Blue');
+    expect(textTwoFact?.label).toBe('Yellow · Gold');
+  });
+
+  it('overflow: shows first 3 games + "+N" when 4+ games share a text', () => {
+    const entries: FlavorTextEntry[] = [
+      { text: 'A text.', versions: ['red', 'blue', 'yellow', 'gold'] },
+    ];
+    const facts = getPokemonFacts(basePokemon({ flavorTexts: entries }));
+    const entry = facts.find((f) => f.value === 'A text.');
+    expect(entry?.label).toBe('Red · Blue · Yellow +1');
+  });
+
+  it('FireRed label formatted correctly (compound slug)', () => {
+    const entries: FlavorTextEntry[] = [
+      { text: 'FireRed text.', versions: ['firered'] },
+    ];
+    const facts = getPokemonFacts(basePokemon({ flavorTexts: entries }));
+    const entry = facts.find((f) => f.value === 'FireRed text.');
+    expect(entry?.label).toBe('FireRed');
+  });
+
+  it('game labels stay English under non-English locale (locale-invariant proper nouns)', () => {
+    // formatVersions always returns English game names regardless of locale
+    const entries: FlavorTextEntry[] = [
+      { text: 'Some text.', versions: ['scarlet', 'violet'] },
+    ];
+    // Tested with English fallback — the label comes from VERSION_NAMES which
+    // is locale-invariant. The locale-coverage test for the component is in
+    // PokemonDetailDisclosure.test.tsx.
+    const facts = getPokemonFacts(basePokemon({ flavorTexts: entries }));
+    const entry = facts.find((f) => f.value === 'Some text.');
+    expect(entry?.label).toBe('Scarlet · Violet');
   });
 
   it('height fact contains " m — " (comparison present)', () => {

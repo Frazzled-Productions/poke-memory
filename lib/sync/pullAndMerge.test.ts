@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { pullAndMerge, SYNC_PULL_APPLIED_EVENT } from "./pullAndMerge";
 import { pullSession, mergeCloudIntoLocalSilent } from "@/lib/sync/cloud";
-import { pullUserSettingsRow, pushSettings } from "@/lib/sync/settings";
+import { pullUserSettingsRow, pushSettings, pullRegionalPrefs } from "@/lib/sync/settings";
 import { pullStreak } from "@/lib/sync/streak";
 import { pullGradeLog } from "@/lib/sync/gradeLog";
 import { saveSession, loadSession } from "@/lib/review/persistence";
@@ -114,6 +114,7 @@ vi.mock("@/lib/gradelog/persistence", () => ({
 const mockPullSession = vi.mocked(pullSession);
 const mockPullUserSettingsRow = vi.mocked(pullUserSettingsRow);
 const mockPushSettings = vi.mocked(pushSettings);
+const mockPullRegionalPrefs = vi.mocked(pullRegionalPrefs);
 const mockClearLocalProgress = vi.mocked(clearLocalProgress);
 const mockPullStreak = vi.mocked(pullStreak);
 const mockPullGradeLog = vi.mocked(pullGradeLog);
@@ -168,6 +169,7 @@ describe("pullAndMerge", () => {
     mockLoadStreakData.mockReturnValue([]);
     mockPullGradeLog.mockResolvedValue(null);
     mockLoadGradeLog.mockResolvedValue([]);
+    mockPullRegionalPrefs.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -488,6 +490,109 @@ describe("pullAndMerge", () => {
     await pullAndMerge(fakeClient, fakeUserId);
 
     expect(mockSaveGradeLog).not.toHaveBeenCalled();
+  });
+
+  // ─── regional prefs pull (timezone / dateFormat / pushNotificationHour) ────
+
+  it("applies non-null cloud timezone to local settings", async () => {
+    mockLoadSettings.mockReturnValue({
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      cryCardsEnabled: false,
+      learningLocales: ["en"],
+      removedLocales: [],
+      activePokemonNameLocale: "en",
+      timezone: "America/New_York",
+      dateFormat: null,
+      pushNotificationHour: null,
+    } as unknown as ReturnType<typeof loadSettings>);
+    mockPullRegionalPrefs.mockResolvedValue({
+      timezone: "Europe/London",
+      dateFormat: null,
+      pushNotificationHour: null,
+    });
+
+    const result = await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(result).toBe("ok");
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ timezone: "Europe/London" }),
+    );
+  });
+
+  it("does not write settings when cloud regional prefs are all null (no change)", async () => {
+    mockLoadSettings.mockReturnValue({
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      cryCardsEnabled: false,
+      learningLocales: ["en"],
+      removedLocales: [],
+      activePokemonNameLocale: "en",
+      timezone: "America/New_York",
+      dateFormat: null,
+      pushNotificationHour: null,
+    } as unknown as ReturnType<typeof loadSettings>);
+    mockPullRegionalPrefs.mockResolvedValue({
+      timezone: null,
+      dateFormat: null,
+      pushNotificationHour: null,
+    });
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    // Cloud returned all-null regional prefs — no fields changed, saveSettings must not fire.
+    // This assertion is sound because mockPullUserSettingsRow defaults to null (set in
+    // beforeEach), which suppresses the LWW/locale-merge saveSettings path entirely —
+    // only the regional-prefs leg is active here.
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+
+  it("does not write settings when pullRegionalPrefs returns null (not signed in / error)", async () => {
+    mockPullRegionalPrefs.mockResolvedValue(null);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when regional prefs pull fails — sync stays 'ok'", async () => {
+    mockPullRegionalPrefs.mockRejectedValue(new Error("network blip"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(result).toBe("ok");
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("applies all three non-null prefs when cloud has full regional data", async () => {
+    mockLoadSettings.mockReturnValue({
+      evolutionCardsEnabled: true,
+      reverseEvolutionCardsEnabled: false,
+      cryCardsEnabled: false,
+      learningLocales: ["en"],
+      removedLocales: [],
+      activePokemonNameLocale: "en",
+      timezone: null,
+      dateFormat: null,
+      pushNotificationHour: null,
+    } as unknown as ReturnType<typeof loadSettings>);
+    mockPullRegionalPrefs.mockResolvedValue({
+      timezone: "Asia/Tokyo",
+      dateFormat: "dmy",
+      pushNotificationHour: 8,
+    });
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        timezone: "Asia/Tokyo",
+        dateFormat: "dmy",
+        pushNotificationHour: 8,
+      }),
+    );
   });
 
   // ─── tombstone / last_reset_at (#576) ─────────────────────────────────────

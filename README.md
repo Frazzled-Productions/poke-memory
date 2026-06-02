@@ -112,19 +112,20 @@ Sign in with GitHub or Google (the **Sign in** button in the nav) to sync your r
 
 ## Run locally
 
-**Node 24 is required** (matches `.nvmrc` and CI). The build fails fast with an
-actionable message if you run under a different major.
+The required Node major is declared in `.nvmrc` (currently Node 24); CI enforces
+it and the build fails fast with an actionable message if you run under a
+different major.
 
 ```bash
 # With nvm:
-nvm install 24   # only needed once; skip if already installed
-nvm use          # picks up .nvmrc automatically
+nvm install   # reads .nvmrc; only needed once per major
+nvm use       # picks up .nvmrc automatically
 
 # If nvm use appears to succeed but your node --version still shows the wrong
 # major, your ~/.nvm/versions/node directory may be empty (common when Node
-# was installed via Homebrew rather than nvm). Run nvm install 24 first.
+# was installed via Homebrew rather than nvm). Run nvm install first.
 
-# With Homebrew node@24 (no nvm needed):
+# With Homebrew (no nvm needed) — replace 24 with the major in .nvmrc:
 export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
 ```
 

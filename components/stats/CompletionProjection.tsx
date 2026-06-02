@@ -53,7 +53,7 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
               <p className="text-2xl font-bold tabular-nums text-foreground">
                 {formatDate(projection.projectedDate, fmt, tz)}
               </p>
-              <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+              <p className={`mt-0.5 ${mutedText}`}>
                 {t("estimatedDate")}
               </p>
             </div>

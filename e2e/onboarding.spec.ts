@@ -571,3 +571,64 @@ test.describe("Discovery nudges (#1443)", () => {
     await expect(nudge).toBeVisible({ timeout: 20_000 });
   });
 });
+
+// E2E smoke for #1538 "Proactively surface the offline download".
+//
+// The offline-download nudge fires on the practice page when:
+//   - firstVisitOnboardingDismissed is true
+//   - no download exists (poke-memory:offline-downloaded-at absent)
+//   - offlineDownloadNudgeDismissed is absent/false
+//   - EITHER slowSpriteLoadCount >= 3 OR practiceSessionsCount >= 5
+//
+// Tests cover the show-path and the primary suppression path (download exists).
+
+test.describe("Offline download nudge (#1538)", () => {
+  test("nudge renders when session threshold is met and no download exists", async ({
+    page,
+  }) => {
+    // Seed: firstVisit done, practiceSessionsCount at/above threshold (5),
+    // no offlineDownloadNudgeDismissed flag, no download timestamp.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceSessionsCount: 5,
+            // offlineDownloadNudgeDismissed deliberately absent (resolves to false)
+          },
+        }),
+      );
+      // poke-memory:offline-downloaded-at deliberately absent (no download)
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    const nudge = page.locator(`[role="note"]`, { hasText: /practising offline/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("nudge is absent when a download already exists", async ({
+    page,
+  }) => {
+    // Seed: firstVisit done, session count above threshold, but download
+    // timestamp present — the nudge must be suppressed once downloaded.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceSessionsCount: 5,
+          },
+        }),
+      );
+      // Simulate a prior download — suppresses the nudge.
+      localStorage.setItem("poke-memory:offline-downloaded-at", new Date().toISOString());
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /practising offline/i }),
+    ).toHaveCount(0, { timeout: 20_000 });
+  });
+});

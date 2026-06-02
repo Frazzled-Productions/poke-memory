@@ -55,23 +55,8 @@ vi.mock("next/link", () => ({
     </a>
   ),
 }));
-vi.mock("@/lib/review/persistence", () => ({
-  loadSession: () => Promise.resolve(null),
-  STORAGE_KEY: "poke-memory:review-session:v1",
-  SESSION_CHANGED_EVENT: "poke-memory:session-changed",
-}));
-vi.mock("@/lib/pasture/arrivals", () => ({
-  filterMastered: () => [],
-}));
-vi.mock("@/lib/settings/persistence", () => ({
-  loadSettings: () => ({ masteryRepetitions: 3 }),
-  SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
-}));
-vi.mock("@/lib/hooks/useLocalStorageKey", () => ({
-  useLocalStorageKey: vi.fn().mockReturnValue(0),
-}));
-vi.mock("@/lib/superuser/SuperuserContext", () => ({
-  useSuperuser: () => ({ flags: { pretendAllMastered: false } }),
+vi.mock("@/lib/pasture/usePastureMasteryState", () => ({
+  usePastureMasteryState: () => ({ showPasture: false }),
 }));
 vi.mock("@/components/whats-new/WhatsNewIndicator", () => ({
   WhatsNewIndicator: () => null,
@@ -80,27 +65,10 @@ vi.mock("@/components/auth/AuthButton", () => ({
   AuthButton: () => null,
 }));
 
-function makeLocalStorage(): Storage {
-  const store = new Map<string, string>();
-  return {
-    get length() { return store.size; },
-    clear: () => store.clear(),
-    getItem: (k) => store.get(k) ?? null,
-    key: (i) => Array.from(store.keys())[i] ?? null,
-    removeItem: (k) => { store.delete(k); },
-    setItem: (k, v) => { store.set(k, String(v)); },
-  };
-}
-
 import { NavDrawer } from "@/components/NavDrawer";
 
 describe("NavDrawer — locale coverage", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: makeLocalStorage(),
-      configurable: true,
-      writable: true,
-    });
     mockPathname.value = "/";
   });
 
@@ -376,6 +344,7 @@ vi.mock("@/lib/pokemon/seed", () => ({
 }));
 vi.mock("@/lib/pokemon/facts", () => ({
   getPokemonFacts: () => [],
+  isFlavorTextsReady: () => false,
   loadFlavorTexts: () => Promise.resolve(new Map()),
 }));
 vi.mock("@/lib/review/useNextReviewDate", () => ({

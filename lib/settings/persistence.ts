@@ -115,6 +115,28 @@ export type OnboardingFlags = {
    * integer coercion.
    */
   practiceSessionsCount: number;
+  /**
+   * One-time dismissal flag for the offline-download discovery nudge (#1538).
+   * Shown on the Practice screen when the user is experiencing slow sprite
+   * loads or has completed N sessions without downloading. `true` = user
+   * dismissed it and it will not re-show.
+   *
+   * `=== true` coercion: absent key in pre-#1538 blobs resolves to `false`
+   * → every existing user is immediately eligible; the live-signal gate
+   * determines whether the nudge actually shows.
+   */
+  offlineDownloadNudgeDismissed: boolean;
+  /**
+   * Running count of slow sprite-load events observed on the grade critical
+   * path (#1538). Incremented each time the 150 ms `DECODE_GRADE_TIMEOUT_MS`
+   * race in `decodeSpriteUrls` times out. Used to gate the offline-download
+   * nudge: shown after reaching `OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD` (3).
+   *
+   * Integer coercion: absent key in pre-#1538 blobs resolves to `0` (below
+   * threshold; nudge does not show on slow-load signal alone until 3 events
+   * have been counted).
+   */
+  slowSpriteLoadCount: number;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -138,6 +160,12 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   // Default 0: absent in pre-#1482 blobs resolves to 0 (below threshold; nudge
   // does not show until N sessions have been completed).
   practiceSessionsCount: 0,
+  // Default false: absent in pre-#1538 blobs resolves to false (not dismissed;
+  // nudge may show subject to the live-signal gate).
+  offlineDownloadNudgeDismissed: false,
+  // Default 0: absent in pre-#1538 blobs resolves to 0 (below threshold; nudge
+  // does not show on slow-load signal alone until 3 events have been counted).
+  slowSpriteLoadCount: 0,
 };
 
 /**
@@ -767,6 +795,15 @@ export function validateOnboarding(value: unknown): OnboardingFlags {
       Number.isInteger(v.practiceSessionsCount) &&
       v.practiceSessionsCount >= 0
         ? v.practiceSessionsCount
+        : 0,
+    // === true coercion: absent key in pre-#1538 blobs resolves to false (nudge shows).
+    offlineDownloadNudgeDismissed: v.offlineDownloadNudgeDismissed === true,
+    // Integer coercion: absent key in pre-#1538 blobs resolves to 0 (below threshold).
+    slowSpriteLoadCount:
+      typeof v.slowSpriteLoadCount === 'number' &&
+      Number.isInteger(v.slowSpriteLoadCount) &&
+      v.slowSpriteLoadCount >= 0
+        ? v.slowSpriteLoadCount
         : 0,
   };
 }
