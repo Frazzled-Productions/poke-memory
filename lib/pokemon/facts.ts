@@ -1,23 +1,45 @@
-import type { SeedPokemon } from "@/lib/pokemon/seed";
+import type { SeedPokemon, FlavorTextEntry } from "@/lib/pokemon/seed";
+import { formatVersions } from "@/lib/pokemon/versionNames";
 
 // Lazy-loaded flavor text map: populated on first call to `loadFlavorTexts()`.
 // `generated-flavor.json` is only fetched after the initial render so it never
 // blocks the critical JS evaluation path.
-let _flavorCache: Map<number, string[]> | null = null;
-let _flavorLoadPromise: Promise<Map<number, string[]>> | null = null;
+let _flavorCache: Map<number, FlavorTextEntry[]> | null = null;
+let _flavorLoadPromise: Promise<Map<number, FlavorTextEntry[]>> | null = null;
 
-type FlavorEntry = { id: number; flavorTexts: string[] };
+/**
+ * Shape stored in `generated-flavor.json` (post-#1559).
+ * Each entry carries the normalised text and the PokéAPI version slugs that
+ * used it. Older payloads used plain `string` — `normaliseFlavorEntry` handles
+ * both forms.
+ */
+type FlavorJsonEntry = {
+  id: number;
+  flavorTexts: Array<FlavorTextEntry | string>;
+};
+
+/**
+ * Normalise a single entry from `generated-flavor.json`.
+ * Accepts both the legacy `string` shape and the new `{ text, versions }` shape
+ * so the app can load pre-#1559 payloads without crashing.
+ */
+function normaliseFlavorEntry(raw: FlavorTextEntry | string): FlavorTextEntry {
+  if (typeof raw === "string") return { text: raw, versions: [] };
+  return raw;
+}
 
 /** Fetch and cache the flavor text lookup. Safe to call multiple times. */
-export async function loadFlavorTexts(): Promise<Map<number, string[]>> {
+export async function loadFlavorTexts(): Promise<Map<number, FlavorTextEntry[]>> {
   if (_flavorCache !== null) return _flavorCache;
   if (_flavorLoadPromise !== null) return _flavorLoadPromise;
   _flavorLoadPromise = (async () => {
     try {
       const res = await fetch("/pokemon-data/generated-flavor.json");
       if (!res.ok) throw new Error(`Flavor fetch failed: ${res.status}`);
-      const entries = (await res.json()) as FlavorEntry[];
-      const map = new Map<number, string[]>(entries.map((e) => [e.id, e.flavorTexts]));
+      const entries = (await res.json()) as FlavorJsonEntry[];
+      const map = new Map<number, FlavorTextEntry[]>(
+        entries.map((e) => [e.id, e.flavorTexts.map(normaliseFlavorEntry)]),
+      );
       _flavorCache = map;
       return map;
     } catch {
@@ -29,8 +51,8 @@ export async function loadFlavorTexts(): Promise<Map<number, string[]>> {
   return _flavorLoadPromise;
 }
 
-/** Return flavor texts for a given Pokémon id, or an empty array if not yet loaded. */
-export function getFlavorTexts(pokemonId: number): string[] {
+/** Return flavor text entries for a given Pokémon id, or an empty array if not yet loaded. */
+export function getFlavorTexts(pokemonId: number): FlavorTextEntry[] {
   return _flavorCache?.get(pokemonId) ?? [];
 }
 
@@ -192,9 +214,15 @@ export function getPokemonFacts(pokemon: SeedPokemon): PokemonFact[] {
 
   // flavorTexts is lazy-loaded and absent on the runtime SEED_POKEMON objects.
   // Callers that want Pokédex entries should await loadFlavorTexts() first and
-  // pass the texts explicitly, or rely on the component using getFlavorTexts().
-  for (const text of (pokemon.flavorTexts ?? getFlavorTexts(pokemon.id))) {
-    facts.push({ label: "Pokédex entry", value: text });
+  // pass the entries explicitly, or rely on the component using getFlavorTexts().
+  // Each entry is a { text, versions } object (post-#1559) or a plain string
+  // (legacy; normalised to { text, versions: [] } via normaliseFlavorEntry).
+  const rawEntries: Array<FlavorTextEntry | string> =
+    pokemon.flavorTexts ?? getFlavorTexts(pokemon.id);
+  for (const raw of rawEntries) {
+    const entry = normaliseFlavorEntry(raw);
+    const label = formatVersions(entry.versions) || "Pokédex entry";
+    facts.push({ label, value: entry.text });
   }
 
   return facts;

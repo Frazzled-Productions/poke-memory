@@ -108,6 +108,25 @@ export const ALLOWLIST: Array<string | RegExp> = [
   // -------------------------------------------------------------------------
 
   // -------------------------------------------------------------------------
+  // Pokémon game title proper nouns (#1559) — intentionally English across all
+  // appLocales. Game names come from `lib/pokemon/versionNames.ts::VERSION_NAMES`
+  // and are not routed through the message catalogue.
+  // Matches display values like "Red", "FireRed", "Brilliant Diamond",
+  // "Legends: Arceus", "Let's Go Pikachu", "Black 2", "Omega Ruby", etc.,
+  // as well as the formatted label string produced by `formatVersions()`:
+  // "Red · Blue", "FireRed · LeafGreen", "Red · Blue · Yellow +2".
+  // -------------------------------------------------------------------------
+  // Individual game title words (Title Case, may include digits and apostrophes)
+  /^(Red|Blue|Yellow|Gold|Silver|Crystal|Ruby|Sapphire|Emerald)$/,
+  /^(FireRed|LeafGreen|Diamond|Pearl|Platinum|HeartGold|SoulSilver)$/,
+  /^(Black|White|Black 2|White 2|X|Y|Omega Ruby|Alpha Sapphire)$/,
+  /^(Sun|Moon|Ultra Sun|Ultra Moon|Let's Go Pikachu|Let's Go Eevee)$/,
+  /^(Sword|Shield|Isle of Armor|Crown Tundra|Brilliant Diamond|Shining Pearl)$/,
+  /^(Legends: Arceus|Scarlet|Violet|Colosseum|XD)$/,
+  // Formatted game-label strings: "Red · Blue", "FireRed · LeafGreen", overflow "+N"
+  /^[A-Z][A-Za-z0-9' :-]+(?:\s·\s[A-Z][A-Za-z0-9' :-]+)*(?:\s\+\d+)?$/,
+
+  // -------------------------------------------------------------------------
   // Version strings (v0.1.2 etc.).
   // -------------------------------------------------------------------------
   /^v\d+\.\d+\.\d+/,

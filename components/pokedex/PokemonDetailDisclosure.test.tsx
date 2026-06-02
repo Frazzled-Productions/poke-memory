@@ -48,8 +48,13 @@ vi.mock("@/lib/pokemon/seed", () => ({
   SEED_POKEMON: [],
 }));
 
+// Default mock returns no facts; individual tests override via mockGetPokemonFacts.
+const { mockGetPokemonFacts } = vi.hoisted(() => ({
+  mockGetPokemonFacts: vi.fn(() => [] as import("@/lib/pokemon/facts").PokemonFact[]),
+}));
+
 vi.mock("@/lib/pokemon/facts", () => ({
-  getPokemonFacts: () => [],
+  getPokemonFacts: (...args: Parameters<typeof mockGetPokemonFacts>) => mockGetPokemonFacts(...args),
   loadFlavorTexts: () => Promise.resolve(new Map()),
 }));
 
@@ -463,5 +468,67 @@ describe("PokemonDetailDisclosure — locked-state signposts (#1440)", () => {
 
     const hints = screen.getAllByText("掌握這隻寶可夢後解鎖。");
     expect(hints.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — game-label facts (#1559)
+// Verifies that FlavorTextEntry facts render with game names instead of the
+// generic "Pokédex entry" label, and that game names stay English across all
+// four supported locales (English proper nouns are locale-invariant by design).
+// ---------------------------------------------------------------------------
+
+import type { PokemonFact } from "@/lib/pokemon/facts";
+
+describe("PokemonDetailDisclosure — game-label facts (#1559)", () => {
+  beforeEach(() => {
+    mockCardClass.value = "mastered";
+    mockPretendAllMastered.value = false;
+    mockGetPokemonFacts.mockReset();
+  });
+
+  // Helper: stub getPokemonFacts with one Pokédex-entry fact
+  function withGameFact(label: string, value: string): PokemonFact[] {
+    return [{ label, value }];
+  }
+
+  it("en locale: renders game-label 'Red · Blue' instead of 'Pokédex entry'", () => {
+    mockGetPokemonFacts.mockReturnValue(withGameFact("Red · Blue", "Its short feet are tipped..."));
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "en" });
+    expect(screen.getByText("Red · Blue")).toBeInTheDocument();
+    expect(screen.queryByText("Pokédex entry")).not.toBeInTheDocument();
+  });
+
+  it("ja locale: game label stays English ('Red · Blue'), not translated", () => {
+    mockGetPokemonFacts.mockReturnValue(withGameFact("Red · Blue", "Its short feet are tipped..."));
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "ja" });
+    expect(screen.getByText("Red · Blue")).toBeInTheDocument();
+  });
+
+  it("zh-Hans locale: game label stays English ('FireRed · LeafGreen'), not translated", () => {
+    mockGetPokemonFacts.mockReturnValue(withGameFact("FireRed · LeafGreen", "Burrow text."));
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "zh-Hans" });
+    expect(screen.getByText("FireRed · LeafGreen")).toBeInTheDocument();
+  });
+
+  it("zh-Hant locale: game label stays English ('Scarlet · Violet'), not translated", () => {
+    mockGetPokemonFacts.mockReturnValue(withGameFact("Scarlet · Violet", "Another text."));
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "zh-Hant" });
+    expect(screen.getByText("Scarlet · Violet")).toBeInTheDocument();
+  });
+
+  it("overflow label '+N' is rendered when many games share a text", () => {
+    mockGetPokemonFacts.mockReturnValue(withGameFact("Red · Blue · Yellow +2", "Old text."));
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "en" });
+    expect(screen.getByText("Red · Blue · Yellow +2")).toBeInTheDocument();
+  });
+
+  it("empty flavour section: panel renders without Pokédex-entry rows (absent-flavour fallback)", () => {
+    mockGetPokemonFacts.mockReturnValue([]);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "en" });
+    // Facts section renders with heading but no flavour rows
+    expect(screen.getByRole("heading", { name: "Facts", level: 2 })).toBeInTheDocument();
+    expect(screen.queryByText("Pokédex entry")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Red · Blue/)).not.toBeInTheDocument();
   });
 });
