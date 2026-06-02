@@ -31,6 +31,7 @@ import {
   type DueCountByLocale,
 } from "@/lib/profile/dueCountCache";
 import { KEY_DUE_COUNT_BY_LOCALE } from "@/lib/storage/keys";
+import { isCardRevealed } from "@/lib/review/sessionActive";
 
 // ─── Icons (lucide-style) ──────────────────────────────────────────────────────
 
@@ -76,6 +77,9 @@ export function LanguageSwitcher() {
     usePokemonLocaleContext();
   const [open, setOpen] = useState(false);
   const [dueCounts, setDueCounts] = useState<DueCountByLocale | null>(null);
+  // Tracks whether a review card is currently mid-reveal so we can block
+  // locale switches until the card is graded (#1562).
+  const [cardRevealed, setCardRevealed] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -88,6 +92,10 @@ export function LanguageSwitcher() {
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e: KeyboardEvent) {
+      // Stop propagation while the panel is open so grade keys (1/2/4/5)
+      // and space/enter don't fire through the open language panel (#1562).
+      e.stopPropagation();
+
       if (e.key === "Escape") {
         e.preventDefault();
         close();
@@ -149,6 +157,8 @@ export function LanguageSwitcher() {
   useEffect(() => {
     if (!open) return;
     setDueCounts(readDueCountCache());
+    // Check whether a card is currently mid-reveal. If so, block switching (#1562).
+    setCardRevealed(isCardRevealed());
     function onStorage(e: StorageEvent) {
       if (e.key === KEY_DUE_COUNT_BY_LOCALE) setDueCounts(readDueCountCache());
     }
@@ -159,6 +169,9 @@ export function LanguageSwitcher() {
   if (!languagesEnabled) return null;
 
   function selectLocale(next: AppLocale) {
+    // Block switching mid-card: the card is revealed and grade buttons are
+    // shown. The user must grade first (#1562).
+    if (cardRevealed) return;
     const settings = loadSettings();
     if (settings.activePokemonNameLocale !== next) {
       saveSettings({ ...settings, activePokemonNameLocale: next });
@@ -198,6 +211,14 @@ export function LanguageSwitcher() {
             {t("heading")}
           </h2>
 
+          {/* When a card is mid-reveal, block switching and show an inline
+              prompt so the user knows to grade first (#1562). */}
+          {cardRevealed && (
+            <p className={`px-2 pb-1.5 ${mutedTextXs}`} role="status">
+              {t("cardRevealedLock")}
+            </p>
+          )}
+
           <div role="radiogroup" aria-label={t("groupAriaLabel")}>
             {learningLocales.map((loc) => {
               const selected = loc === locale;
@@ -208,12 +229,13 @@ export function LanguageSwitcher() {
                   type="button"
                   role="radio"
                   aria-checked={selected}
+                  aria-disabled={cardRevealed && !selected ? true : undefined}
                   aria-label={t("dueTodayAriaLabel", {
                     language: LOCALE_ENDONYMS[loc],
                     count: due,
                   })}
                   onClick={() => selectLocale(loc)}
-                  className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors [@media(hover:hover)]:hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:[@media(hover:hover)]:hover:bg-zinc-800"
+                  className={`flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:[@media(hover:hover)]:hover:bg-zinc-800 ${cardRevealed && !selected ? "opacity-50 cursor-not-allowed" : "[@media(hover:hover)]:hover:bg-zinc-100"}`}
                 >
                   <span className="flex flex-col">
                     <span

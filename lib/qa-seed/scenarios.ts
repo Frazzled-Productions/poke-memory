@@ -27,6 +27,7 @@ import type { ReviewState } from "@/lib/srs/scheduler";
 import { initialReviewState, nextReview } from "@/lib/srs/scheduler";
 import type { StreakProtection } from "@/lib/streak/tokens";
 import type { AppLocale } from "@/i18n/locales";
+import type { LabsFlags } from "@/lib/labs/flags";
 import {
   SEED_POKEMON,
   SEED_EVOLUTION_CARDS,
@@ -126,6 +127,13 @@ export type SeedPayload = {
    * parity test in scenarios.test.ts enforces that.
    */
   masteredCountByLocale?: Partial<Record<AppLocale, number>>;
+  /**
+   * Labs flags to merge into settings when the scenario is applied (#1562).
+   * Use this to enable preview features (e.g. `languages: true`) so the
+   * scenario can exercise gated surfaces without requiring the user to
+   * manually enable them in Settings > Labs. Omit to leave untouched.
+   */
+  labsFlags?: Partial<LabsFlags>;
 };
 
 export type Scenario = {
@@ -524,6 +532,10 @@ function buildFsrsLocaleMastery(): SeedPayload {
     streakProtection: believableStreakProtection(),
     // Both name + reverse mastered for each id → filterMastered counts them all.
     masteredCountByLocale: { en: masteredIds.length, ja: jaMasteredIds.length },
+    // Enable the languages Labs flag so the language pill in the status bar
+    // is visible immediately after applying the seed, without requiring a
+    // manual toggle in Settings > Labs.
+    labsFlags: { languages: true },
   };
 }
 

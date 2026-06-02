@@ -165,3 +165,74 @@ describe("LanguageSwitcher — locale rendering", () => {
     ).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2: mid-card lock tests (#1562)
+// ---------------------------------------------------------------------------
+
+const mockIsCardRevealed = vi.hoisted(() => vi.fn(() => false));
+vi.mock("@/lib/review/sessionActive", () => ({
+  isCardRevealed: mockIsCardRevealed,
+}));
+
+describe("LanguageSwitcher — mid-card lock (#1562)", () => {
+  beforeEach(() => {
+    mockIsCardRevealed.mockReturnValue(false);
+    mockCtx.mockReturnValue({
+      locale: "en",
+      languagesEnabled: true,
+      learningLocales: ["en", "ja"],
+    });
+  });
+
+  it("shows lock message and disables non-active radios when a card is revealed", () => {
+    mockIsCardRevealed.mockReturnValue(true);
+    renderWithIntl(<LanguageSwitcher />);
+    fireEvent.click(screen.getByRole("button", { name: /Pokémon name language/i }));
+
+    // Lock message is shown.
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/finish this card first/i);
+
+    // The non-active (ja) radio is visually disabled.
+    const jaRadio = screen.getByRole("radio", { name: /日本語/ });
+    expect(jaRadio).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("does NOT switch locale when card is revealed and non-active radio is clicked", () => {
+    mockIsCardRevealed.mockReturnValue(true);
+    renderWithIntl(<LanguageSwitcher />);
+    fireEvent.click(screen.getByRole("button", { name: /Pokémon name language/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /日本語/ }));
+    // saveSettings must not be called.
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+
+  it("allows switching when no card is revealed", () => {
+    mockIsCardRevealed.mockReturnValue(false);
+    renderWithIntl(<LanguageSwitcher />);
+    fireEvent.click(screen.getByRole("button", { name: /Pokémon name language/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /日本語/ }));
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ activePokemonNameLocale: "ja" }),
+    );
+  });
+
+  it("grade keys are blocked when the language panel is open (role=dialog present)", () => {
+    // When the panel is open there is a [role=dialog] in the document.
+    // ReviewSession checks document.querySelector('[role="dialog"]') before
+    // firing grade keys. Simulated here at the unit level: the LanguageSwitcher
+    // dialog opening is all we need to verify the guard condition.
+    renderWithIntl(<LanguageSwitcher />);
+    fireEvent.click(screen.getByRole("button", { name: /Pokémon name language/i }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    // The keydown handler on the panel calls stopPropagation, preventing
+    // grade keys from firing. Test that a keydown event on the document
+    // has stopPropagation called by the panel listener.
+    const stopPropSpy = vi.spyOn(KeyboardEvent.prototype, "stopPropagation");
+    fireEvent.keyDown(document, { key: "4" });
+    expect(stopPropSpy).toHaveBeenCalled();
+    stopPropSpy.mockRestore();
+  });
+});

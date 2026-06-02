@@ -64,21 +64,36 @@ function isPristineSession(cards: readonly ReviewableCard[]): boolean {
 
 /**
  * True when at least one card's `lastReview` or `firstSeen` changed between
- * `before` and `after`. Only these two date markers are compared — other FSRS
- * fields (`scheduledDays`, `reps`, `fsrsState`, `dueDate`) are intentionally
- * excluded because the caller only needs to know whether cloud data populated
- * a previously-empty seed card. Both arrays come from the same seed and have
- * matching `id`s in the same order, so a positional comparison is safe.
+ * `before` and `after`, or when `after` contains NEW cards that were not in
+ * `before` (inserted from cloud rows for other enrolled locales).
+ *
+ * Compares by composite key `(card_type, subject_key, locale)` rather than
+ * by array position, because `mergeCloudIntoLocalSilent`'s Pass 2 may now
+ * append new cards — so the two arrays can differ in length and order.
+ *
+ * Only `lastReview` and `firstSeen` are compared — other FSRS fields are
+ * intentionally excluded because the caller only needs to know whether cloud
+ * data populated a previously-empty seed card.
  */
 function mergeAffectsProgress(
   before: readonly ReviewableCard[],
   after: readonly ReviewableCard[],
 ): boolean {
-  if (before.length !== after.length) return true;
-  for (let i = 0; i < after.length; i++) {
-    const a = after[i];
-    const b = before[i];
-    if (a.id !== b.id) return true;
+  // New cards inserted means progress was definitely affected.
+  if (after.length !== before.length) return true;
+
+  // Build a lookup of before-state keyed by composite identity.
+  const beforeByKey = new Map(
+    before.map((c) => [
+      `${c.cardType}:${c.subjectKey}:${c.locale ?? "en"}`,
+      c,
+    ]),
+  );
+
+  for (const a of after) {
+    const key = `${a.cardType}:${a.subjectKey}:${a.locale ?? "en"}`;
+    const b = beforeByKey.get(key);
+    if (!b) return true; // card not present before — new insertion
     if (a.state.lastReview !== b.state.lastReview) return true;
     if (a.state.firstSeen !== b.state.firstSeen) return true;
   }
@@ -226,7 +241,16 @@ export async function pullAndMerge(
     let preMergeCards: ReviewableCard[];
     if (localSession !== null) {
       preMergeCards = localSession.cards;
-      merged = mergeCloudIntoLocalSilent(preMergeCards, cloudRows, syncStatus.lastPullAt);
+      // Pass seed data so mergeCloudIntoLocalSilent can insert unmatched cloud
+      // rows (other-locale cards enrolled on a different device) as new local
+      // cards, ensuring every language's progress is pulled on this device (#1562).
+      merged = mergeCloudIntoLocalSilent(
+        preMergeCards,
+        cloudRows,
+        syncStatus.lastPullAt,
+        SEED_POKEMON,
+        SEED_EVOLUTION_CARDS,
+      );
       saveResult = await saveSession({ cards: merged, limits: localSession.limits });
     } else {
       // Brand-new device (or just-cleared by the tombstone path above):
@@ -241,7 +265,13 @@ export async function pullAndMerge(
         undefined,
         seedOptsFromSettings(settings),
       );
-      merged = mergeCloudIntoLocalSilent(preMergeCards, cloudRows, syncStatus.lastPullAt);
+      merged = mergeCloudIntoLocalSilent(
+        preMergeCards,
+        cloudRows,
+        syncStatus.lastPullAt,
+        SEED_POKEMON,
+        SEED_EVOLUTION_CARDS,
+      );
       saveResult = await saveSession({ cards: merged, limits: DEFAULT_LIMITS });
     }
 

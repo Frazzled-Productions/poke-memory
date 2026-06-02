@@ -577,6 +577,247 @@ describe("mergeCloudIntoLocalSilent", () => {
   });
 });
 
+// ─── per-locale sync (#1562) ──────────────────────────────────────────────────
+
+describe("toCloudRow / pushSingleCard: evo cards sync their actual locale (no force-en)", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  it("pushSingleCard writes the evolution card's own locale (not forced to 'en')", async () => {
+    // Build a minimal evolution card with locale='ja'.
+    const jaEvoCard: ReviewableCard = {
+      cardType: "evolution",
+      id: 1_500_001,
+      preEvoId: 1,
+      preEvoName: "Bulbasaur",
+      preEvoSpriteUrl: "/sprites/1.webp",
+      postEvoId: 2,
+      postEvoName: "Ivysaur",
+      postEvoSpriteUrl: "/sprites/2.webp",
+      triggerPhrase: null,
+      subjectKey: "1>>>2",
+      locale: "ja",
+      state: {
+        stability: 5,
+        difficulty: 3,
+        elapsedDays: 10,
+        scheduledDays: 21,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review",
+        dueDate: "2026-06-01",
+        lastReview: "2026-05-11",
+        firstSeen: "2026-04-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+
+    const client = makeSupabaseClient();
+    await pushSingleCard(client, "user-1", jaEvoCard);
+
+    const [rowArg] = client._upsertSpy.mock.calls[0] as [
+      { locale: string; card_type: string },
+      unknown,
+    ];
+    // Must write "ja", not "en".
+    expect(rowArg.locale).toBe("ja");
+    expect(rowArg.card_type).toBe("evolution-edge");
+  });
+});
+
+describe("mergeCloudIntoLocalSilent: inserts unmatched-locale cloud rows (#1562)", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  function makeSeedPokemon(id: number): SeedPokemon {
+    return {
+      id,
+      speciesId: id,
+      isDefaultForm: true,
+      formCategory: "default",
+      formSlug: null,
+      displayName: `pokemon-${id}`,
+      name: `pokemon-${id}`,
+      spriteUrl: `https://example.com/${id}.png`,
+      types: ["normal"],
+      stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45 },
+      flavorText: "A test pokemon.",
+      flavorTexts: ["A test pokemon."],
+      evolutionChain: [],
+      height: 7,
+      weight: 69,
+      baseExperience: 64,
+      genus: "Test Pokémon",
+      generation: "generation-i",
+      captureRate: null,
+      baseHappiness: null,
+      growthRate: null,
+      habitat: null,
+      genderRate: null,
+      isLegendary: false,
+      isMythical: false,
+      cryUrl: null,
+    };
+  }
+
+  it("inserts a cloud name row whose locale is not represented locally", () => {
+    // Local has only an 'en' name card for species 1.
+    const localEn = makeCard(1, null, null);
+
+    // Cloud also has a 'ja' name card for species 1 (enrolled on another device).
+    const cloudJaRow: CloudRow = {
+      card_type: "name",
+      subject_key: "1",
+      locale: "ja",
+      stability: 5,
+      difficulty: 3,
+      elapsed_days: 10,
+      scheduled_days: 21,
+      reps: 3,
+      lapses: 0,
+      fsrs_state: "review",
+      due_date: "2026-06-01",
+      last_review: "2026-05-11",
+      first_seen: "2026-04-01",
+      hidden_since: null,
+      seen_in_pasture: false,
+      updated_at: "2026-05-11T12:00:00.000Z",
+    };
+
+    const seed = [makeSeedPokemon(1)];
+    const merged = mergeCloudIntoLocalSilent([localEn], [cloudJaRow], null, seed, []);
+
+    // Should now have two cards: the original en + the inserted ja.
+    expect(merged).toHaveLength(2);
+    const jaCard = merged.find((c) => (c.locale ?? "en") === "ja");
+    expect(jaCard).toBeDefined();
+    // The inserted card carries the cloud state.
+    expect(jaCard?.state.reps).toBe(3);
+    expect(jaCard?.state.lastReview).toBe("2026-05-11");
+  });
+
+  it("does not insert when seed is omitted (backward-compat no-op)", () => {
+    const localEn = makeCard(1, null, null);
+    const cloudJaRow: CloudRow = {
+      card_type: "name",
+      subject_key: "1",
+      locale: "ja",
+      stability: 1,
+      difficulty: 1,
+      elapsed_days: 0,
+      scheduled_days: 1,
+      reps: 1,
+      lapses: 0,
+      fsrs_state: "review",
+      due_date: "2026-05-11",
+      last_review: "2026-05-10",
+      first_seen: "2026-05-09",
+      hidden_since: null,
+      seen_in_pasture: false,
+      updated_at: "2026-05-11T12:00:00.000Z",
+    };
+
+    // No seed passed — insert pass skipped.
+    const merged = mergeCloudIntoLocalSilent([localEn], [cloudJaRow], null);
+    expect(merged).toHaveLength(1);
+  });
+
+  it("does not insert a cloud row that already has a matching local card", () => {
+    // Local already has both en and ja name cards for species 1.
+    const localEn = makeCard(1, null, null);
+    const localJa = { ...makeCard(1, "2026-05-11", "2026-05-11"), locale: "ja" as const };
+    const cloudJaRow: CloudRow = {
+      card_type: "name",
+      subject_key: "1",
+      locale: "ja",
+      stability: 3,
+      difficulty: 2,
+      elapsed_days: 5,
+      scheduled_days: 10,
+      reps: 2,
+      lapses: 0,
+      fsrs_state: "review",
+      due_date: "2026-05-20",
+      last_review: "2026-05-10",
+      first_seen: "2026-05-01",
+      hidden_since: null,
+      seen_in_pasture: false,
+      updated_at: "2026-05-11T12:00:00.000Z",
+    };
+
+    const seed = [makeSeedPokemon(1)];
+    const merged = mergeCloudIntoLocalSilent([localEn, localJa], [cloudJaRow], null, seed, []);
+    // No new card inserted — the ja card was matched in Pass 1.
+    expect(merged).toHaveLength(2);
+  });
+});
+
+describe("mergeAffectsProgress: key-based comparison (#1562)", () => {
+  // Access via pullAndMerge's behaviour is integration-level; here we test the
+  // observable effect through mergeCloudIntoLocalSilent.
+  // A direct unit-test of mergeAffectsProgress is in pullAndMerge.test.ts.
+  // This describe block verifies the cloud.ts side (insert producing length change).
+  it("mergeCloudIntoLocalSilent with an insertion changes the result length", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const localEn = makeCard(1, null, null);
+    const cloudJaRow: CloudRow = {
+      card_type: "name",
+      subject_key: "1",
+      locale: "ja",
+      stability: 2,
+      difficulty: 2,
+      elapsed_days: 5,
+      scheduled_days: 14,
+      reps: 2,
+      lapses: 0,
+      fsrs_state: "review",
+      due_date: "2026-05-25",
+      last_review: "2026-05-11",
+      first_seen: "2026-05-01",
+      hidden_since: null,
+      seen_in_pasture: false,
+      updated_at: "2026-05-12T10:00:00.000Z",
+    };
+    const seed: SeedPokemon[] = [{
+      id: 1,
+      speciesId: 1,
+      isDefaultForm: true,
+      formCategory: "default",
+      formSlug: null,
+      displayName: "Bulbasaur",
+      name: "Bulbasaur",
+      spriteUrl: "/sprites/1.webp",
+      types: ["grass"],
+      stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45 },
+      flavorText: "A seed.",
+      flavorTexts: ["A seed."],
+      evolutionChain: [],
+      height: 7,
+      weight: 69,
+      baseExperience: 64,
+      genus: "Seed",
+      generation: "generation-i",
+      captureRate: 45,
+      baseHappiness: 50,
+      growthRate: "medium-slow",
+      habitat: null,
+      genderRate: 1,
+      isLegendary: false,
+      isMythical: false,
+      cryUrl: null,
+    }];
+
+    const merged = mergeCloudIntoLocalSilent([localEn], [cloudJaRow], null, seed, []);
+    // Insertion happened — array is longer, which signals mergeAffectsProgress.
+    expect(merged.length).toBe(2);
+  });
+});
+
 // ─── applyCloudAuthoritative ──────────────────────────────────────────────────
 
 function makeSeedPokemon(id: number): SeedPokemon {

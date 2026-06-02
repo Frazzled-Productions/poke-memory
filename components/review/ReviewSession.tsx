@@ -41,7 +41,7 @@ import { StorageQuotaBanner } from "@/components/review/StorageQuotaBanner";
 import { GradeErrorBanner } from "@/components/review/GradeErrorBanner";
 import { recordReview } from "@/lib/streak";
 import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings/persistence";
-import type { AppLocale } from "@/i18n/locales";
+import { LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { nextReview, type ReviewState } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
 import { getPokemonFacts, selectFact, loadFlavorTexts, type PokemonFact } from "@/lib/pokemon/facts";
@@ -68,10 +68,10 @@ import { checkBadges } from "@/lib/badges/check";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
 import { triggerHaptic } from "@/lib/review/haptic";
-import { markSessionActive, markSessionInactive } from "@/lib/review/sessionActive";
+import { markSessionActive, markSessionInactive, markCardRevealed } from "@/lib/review/sessionActive";
 import { KEY_HAS_MASTERED, KEY_SETTINGS } from "@/lib/storage/keys";
 import { writeMasteredCountForLocale } from "@/lib/profile/masteredCountCache";
-import { writeDueCounts, type DueCountByLocale } from "@/lib/profile/dueCountCache";
+import { writeDueCounts, readDueCountCache, type DueCountByLocale } from "@/lib/profile/dueCountCache";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { formatDailySummary, type DailySummaryParts } from "@/lib/review/share";
 import {
@@ -121,7 +121,14 @@ type EndState = "SESSION_COMPLETE" | "REVIEW_SOFT_WALL" | "NEW_CARDS_LOCKED";
 type LearningQueueEntry = { cardId: number; dueAt: number };
 
 type UndoSnapshot = {
+  /** Locale-filtered card view to restore into React state (#1562). */
   cards: ReviewableCard[];
+  /**
+   * Complete multi-locale card array for `saveSession` (#1562).
+   * MULTI-LOCALE: saveSession always receives the full array; `cards` is only
+   * the active-locale view restored into React state.
+   */
+  fullCards: ReviewableCard[];
   sessionGrades: Record<Grade, number>;
   sessionGradeSeq: Grade[];
   sessionDirectionGrades: SessionDirectionTally;
@@ -340,6 +347,7 @@ const TodayPill = React.memo(function TodayPill({
   reverseEnabled,
   reverseEvolutionEnabled,
   cryEnabled,
+  activeLocaleEndonym,
 }: {
   perType: PerTypeTodayCounts;
   nameEnabled: boolean;
@@ -347,6 +355,12 @@ const TodayPill = React.memo(function TodayPill({
   reverseEnabled: boolean;
   reverseEvolutionEnabled: boolean;
   cryEnabled: boolean;
+  /**
+   * When more than one language is enrolled, show the active language endonym
+   * in the "Done today" heading (#1562). `null` when only English is active
+   * (single-language user — heading stays plain "Done today").
+   */
+  activeLocaleEndonym: string | null;
 }) {
   const t = useTranslations("practice");
   // Passive hint (#880): when more than one card direction is enabled, a user
@@ -369,7 +383,9 @@ const TodayPill = React.memo(function TodayPill({
   return (
     <div className={`${mutedTextXs} tabular-nums text-center`}>
       <p className={`mb-1 ${sectionLabel}`}>
-        {t("todayDoneHeading")}
+        {activeLocaleEndonym !== null
+          ? t("todayDoneHeadingWithLanguage", { language: activeLocaleEndonym })
+          : t("todayDoneHeading")}
       </p>
       {nameEnabled && (
         <p>
@@ -499,6 +515,10 @@ function EndOfSessionScreen({
   dueTomorrow,
   showCardTypesHint,
   directionGrades,
+  activeLocale,
+  learningLocales,
+  dueCountByLocale,
+  onSwitchLocale,
 }: {
   variant: EndOfSessionVariant;
   perType: PerTypeTodayCounts;
@@ -521,16 +541,52 @@ function EndOfSessionScreen({
   showCardTypesHint: boolean;
   /** Per-direction grade tally from the current session, for the accuracy row. */
   directionGrades: SessionDirectionTally;
+  /** The currently active locale for this session (#1562). */
+  activeLocale: AppLocale;
+  /** All enrolled learning locales (#1562). */
+  learningLocales: AppLocale[];
+  /** Per-locale due counts from the cache (#1562). */
+  dueCountByLocale: DueCountByLocale;
+  /** Called when the user taps the "switch to language with due cards" button (#1562). */
+  onSwitchLocale: (locale: AppLocale) => void;
 }) {
   const t = useTranslations("practice");
+
+  // Find another enrolled locale that has due cards (#1562). Used by the
+  // "all caught up in X" end-screen to offer a one-tap language switch.
+  const localeWithDue = learningLocales.find(
+    (loc) => loc !== activeLocale && (dueCountByLocale[loc] ?? 0) > 0,
+  ) ?? null;
+
+  // When more than one language is enrolled, show the language endonym in the
+  // "Done today" heading. Single-locale users get the plain heading.
+  const activeLocaleEndonym =
+    learningLocales.length > 1 ? LOCALE_ENDONYMS[activeLocale] : null;
+
   return (
     <div className="flex flex-col items-center gap-4 text-center">
       {variant.kind === "complete" && (
         <>
-          <p className="text-2xl font-semibold text-foreground">{t("allCaughtUp")}</p>
+          <p className="text-2xl font-semibold text-foreground">
+            {learningLocales.length > 1
+              ? t("allCaughtUpInLanguage", { language: LOCALE_ENDONYMS[activeLocale] })
+              : t("allCaughtUp")}
+          </p>
           <p className="text-zinc-500 dark:text-zinc-400">
             {t("nothingDueBody")}
           </p>
+          {localeWithDue !== null && (
+            <button
+              type="button"
+              className="min-h-[44px] rounded-lg bg-theme-accent px-6 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
+              onClick={() => onSwitchLocale(localeWithDue)}
+            >
+              {t("switchToLanguageWithDue", {
+                count: dueCountByLocale[localeWithDue],
+                language: LOCALE_ENDONYMS[localeWithDue],
+              })}
+            </button>
+          )}
         </>
       )}
       {variant.kind === "new-locked" && (
@@ -561,6 +617,7 @@ function EndOfSessionScreen({
         reverseEnabled={reverseEnabled}
         reverseEvolutionEnabled={reverseEvolutionEnabled}
         cryEnabled={cryEnabled}
+        activeLocaleEndonym={activeLocaleEndonym}
       />
       <DirectionAccuracyRow tally={directionGrades} />
       {shareText !== null && shareParts !== null ? (
@@ -644,7 +701,7 @@ function CountdownScreen({
       <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
         {t("nextCardHangTight")}
       </p>
-      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} />
+      <TodayPill perType={perType} nameEnabled={nameEnabled} evolutionEnabled={evolutionEnabled} reverseEnabled={reverseEnabled} reverseEvolutionEnabled={reverseEvolutionEnabled} cryEnabled={cryEnabled} activeLocaleEndonym={null} />
     </div>
   );
 }
@@ -656,7 +713,17 @@ function CountdownScreen({
 export function ReviewSession() {
   const t = useTranslations("practice");
   // null = SSR / not-yet-hydrated. Same pattern as before.
+  //
+  // MULTI-LOCALE: `cards` is the ACTIVE-LOCALE-FILTERED view of the session.
+  // The complete multi-locale array lives in `fullSessionRef`. Every saveSession
+  // call must write the full array — never the filtered `cards`. See the invariant
+  // comment at each saveSession call site in this file.
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
+  // MULTI-LOCALE: holds the complete multi-locale card array from the last load
+  // or grade. `cards` state is always a subset: full.filter(c => locale matches).
+  // Initialised to [] before the load effect fires; never null (avoids conditional
+  // branches inside the update helpers).
+  const fullSessionRef = useRef<ReviewableCard[]>([]);
   const [limits, setLimits] = useState<DailyLimits>(DEFAULT_LIMITS);
   const [reverseEnabled, setReverseEnabled] = useState(true);
   const [reverseEvolutionEnabled, setReverseEvolutionEnabled] = useState(false);
@@ -669,6 +736,9 @@ export function ReviewSession() {
   // on settings changes, so the next session will pick up the new locale exactly
   // as it does for card-type toggles.
   const [activeLocale, setActiveLocale] = useState<AppLocale>("en");
+  // All enrolled learning locales (#1562). Read from settings at mount.
+  // Used by the end-of-session "switch language" button and TodayPill label.
+  const [learningLocales, setLearningLocales] = useState<AppLocale[]>(["en"]);
   // Verified typed-entry mode (#1251). Read into state on session load via the
   // session-load effect. Same-tab toggles take effect on the next session via the
   // storage event; the in-flight card always uses the value captured at load time.
@@ -836,7 +906,8 @@ export function ReviewSession() {
       // checks scope-eligibility as a self-healing belt-and-braces guard, but
       // clearing here documents intent at the source of the change.
       setDisplayedCardId(null);
-      void saveSession({ cards, limits }).then(notifySaveResult);
+      // MULTI-LOCALE: save the full array, never the filtered view.
+      void saveSession({ cards: fullSessionRef.current, limits }).then(notifySaveResult);
     }
   }
 
@@ -1000,6 +1071,12 @@ export function ReviewSession() {
       // take effect on the next page load, which is the definition of "next session".
       const settingsLimits = limitsFromSettings(settings);
 
+      // Read the session locale BEFORE hydrate/build so it is passed into opts
+      // (#1562). The locale is read once and captured; a mid-session switch takes
+      // effect on the next page load (same as card-type toggles).
+      const sessionLocale = (settings.activePokemonNameLocale ?? "en") as AppLocale;
+      const sessionLearningLocales = (settings.learningLocales as AppLocale[] | undefined) ?? ["en"];
+
       if (saved !== null) {
         // Merge any seed cards added since the last save, and heal any invalid
         // FSRS states written by older app versions (#1506).
@@ -1014,10 +1091,12 @@ export function ReviewSession() {
             evolutionEnabled,
             reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
             cryEnabled,
+            locale: sessionLocale,
           },
         );
         sessionLimits = settingsLimits;
         if (hydrated.length !== saved.cards.length || anyHealed) {
+          // MULTI-LOCALE: save the full array, never the filtered view.
           notifySaveResult(await saveSession({ cards: hydrated, limits: sessionLimits }));
         }
         sessionCards = hydrated;
@@ -1028,7 +1107,9 @@ export function ReviewSession() {
           evolutionEnabled,
           reverseEvolutionEnabled: reverseEvolutionEnabledLocal,
           cryEnabled,
+          locale: sessionLocale,
         });
+        // MULTI-LOCALE: save the full array, never the filtered view.
         notifySaveResult(await saveSession({ cards: fresh, limits: settingsLimits }));
         sessionCards = fresh;
         sessionLimits = settingsLimits;
@@ -1048,6 +1129,7 @@ export function ReviewSession() {
         return c;
       });
       if (stampedAny) {
+        // MULTI-LOCALE: save the full array, never the filtered view.
         notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
       }
 
@@ -1093,9 +1175,18 @@ export function ReviewSession() {
       // page load — the main cause of hydration slowness after #1234 doubled
       // the card count to ~2 050 (#1262).
       if (reconcileChanged) {
+        // MULTI-LOCALE: save the full array, never the filtered view.
         notifySaveResult(await saveSession({ cards: sessionCards, limits: sessionLimits }));
       }
-      setCards(sessionCards);
+
+      // MULTI-LOCALE: store the complete session in the ref, then expose only
+      // the active-locale filtered view to React state. All downstream renders
+      // (cardMap, currentCard, buildSessionQueues) operate on the filtered set,
+      // keeping id-keyed lookups collision-free. Every saveSession call reads
+      // fullSessionRef.current so the other locale's progress is never lost.
+      fullSessionRef.current = sessionCards;
+      setCards(sessionCards.filter((c) => (c.locale ?? "en") === sessionLocale));
+
       setLimits(sessionLimits);
       setReverseEvolutionEnabled(reverseEvolutionEnabledLocal);
       setEvolutionCardsEnabled(evolutionEnabled);
@@ -1108,9 +1199,9 @@ export function ReviewSession() {
       setMasteryRepetitions(settings.masteryRepetitions);
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
-      // Capture the active locale once at mount. A mid-session switch takes
-      // effect on the next load (storage-event reload, same as card-type toggles).
-      setActiveLocale((settings.activePokemonNameLocale ?? "en") as AppLocale);
+      // Capture the active locale and enrolled locales once at mount.
+      setActiveLocale(sessionLocale);
+      setLearningLocales(sessionLearningLocales);
       setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
       setMcCardOnboardingShown(settings.mcCardOnboardingShown ?? false);
       setFirstVisitDone(settings.onboarding?.firstVisitOnboardingDismissed === true);
@@ -1216,6 +1307,9 @@ export function ReviewSession() {
     markSessionActive();
     return () => {
       markSessionInactive();
+      // Clear the card-revealed flag on unmount so LanguageSwitcher
+      // does not stay locked after navigation (#1562).
+      markCardRevealed(false);
     };
   }, []);
 
@@ -1306,7 +1400,9 @@ export function ReviewSession() {
           setNewCardsThisSession(snapshot.newCardsThisSession);
           setMasteredThisSession(snapshot.masteredThisSession);
           setLearningQueue(snapshot.learningQueue);
-          notifySaveResult(await saveSession({ cards: snapshot.cards, limits }));
+          // MULTI-LOCALE: save the full array, never the filtered view.
+          fullSessionRef.current = snapshot.fullCards;
+          notifySaveResult(await saveSession({ cards: snapshot.fullCards, limits }));
           if (snapshot.gradeLogOccurredAt !== null) {
             await removeGradeEntry(snapshot.gradeLogOccurredAt);
           }
@@ -1326,6 +1422,8 @@ export function ReviewSession() {
           setDisplayedCardId(snapshot.cardId);
           revealedCardId.current = snapshot.cardId;
           setRevealed(true);
+          // Undo re-reveals the card, so set the flag accordingly (#1562).
+          markCardRevealed(true);
           // Bump presentation counter so SpritePicker remounts with fresh
           // shuffle if the user re-grades this reverse card (#496).
           setCardPresentationCount((n) => n + 1);
@@ -1387,6 +1485,11 @@ export function ReviewSession() {
       // Never fire while a text field is focused (superuser chord, sign-in
       // fields, search boxes, etc.).
       if (isTextInputFocused()) return;
+
+      // Never fire grade keys while the language-switcher panel is open
+      // so keystrokes don't fire through it (#1562). The keyboard-shortcuts
+      // overlay is handled separately (Escape closes it above).
+      if (document.querySelector('[aria-labelledby="language-switcher-heading"]') !== null) return;
 
       // Escape closes the shortcut overlay.
       if (e.key === "Escape") {
@@ -1890,6 +1993,15 @@ export function ReviewSession() {
         : endState === "NEW_CARDS_LOCKED"
           ? { kind: "new-locked" }
           : { kind: "complete" };
+    // Switching locale writes activePokemonNameLocale to settings, which
+    // dispatches SETTINGS_SAVED_EVENT and triggers a full page reload via the
+    // storage-event handler. This rebuilds the session for the new locale —
+    // exactly the same path as toggling card-type flags (#1562).
+    function handleSwitchLocale(next: AppLocale) {
+      const current = loadSettings();
+      saveSettings({ ...current, activePokemonNameLocale: next });
+    }
+
     return (
       <div className="flex flex-col flex-1 min-h-0 w-full items-center overflow-y-auto">
         <EndOfSessionScreen
@@ -1905,6 +2017,10 @@ export function ReviewSession() {
           dueTomorrow={dueTomorrow}
           showCardTypesHint={!cardTypesAllOn}
           directionGrades={sessionDirectionGrades}
+          activeLocale={activeLocale}
+          learningLocales={learningLocales}
+          dueCountByLocale={readDueCountCache()}
+          onSwitchLocale={handleSwitchLocale}
         />
         {seenPokemon.length >= 2 && (
           <HigherOrLowerGame seenPokemon={seenPokemon} />
@@ -1991,6 +2107,8 @@ export function ReviewSession() {
     if (!isMountedRef.current) return;
 
     setRevealed(true);
+    // Set the card-revealed flag so LanguageSwitcher blocks locale switches (#1562).
+    markCardRevealed(true);
     revealedCardId.current = effectiveCard.id;
     const revealSettings = loadSettings();
     const cryOn = revealSettings.playCryOnReveal;
@@ -2067,7 +2185,8 @@ export function ReviewSession() {
     // Snapshot the pre-grade state for single-step undo. The previous
     // snapshot (if any) is replaced — undo is one-deep, not a stack.
     const snapshot: UndoSnapshot = {
-      cards,
+      cards,                           // locale-filtered view for setCards restore
+      fullCards: fullSessionRef.current, // full array for saveSession
       sessionGrades,
       sessionGradeSeq,
       sessionDirectionGrades,
@@ -2095,9 +2214,21 @@ export function ReviewSession() {
       setGradeError(t("gradeErrorMessage"));
       return;
     }
+    // newCards = locale-filtered view with the graded card updated.
     const newCards = cards.map((card) =>
       card.id === effectiveCard.id ? { ...card, state: nextState } : card,
     );
+
+    // MULTI-LOCALE: merge the updated card back into the full session by
+    // (id, locale) key so the other locale's progress is never lost.
+    // The graded card's locale is read from effectiveCard (stamped at load time).
+    const gradedLocale = effectiveCard.locale ?? "en";
+    const newFullCards = fullSessionRef.current.map((card) =>
+      card.id === effectiveCard.id && (card.locale ?? "en") === gradedLocale
+        ? { ...card, state: nextState }
+        : card,
+    );
+    fullSessionRef.current = newFullCards;
 
     const today = todayString(now);
 
@@ -2339,6 +2470,8 @@ export function ReviewSession() {
 
     setCurrentFact(null);
     setRevealed(false);
+    // Clear the card-revealed flag so LanguageSwitcher unlocks (#1562).
+    markCardRevealed(false);
     revealedCardId.current = null;
     // Release the display lock so the next card can be picked up on the
     // following render (#839).
@@ -2373,7 +2506,10 @@ export function ReviewSession() {
       // create a split-write where the grade log advanced past the saved state
       // (#1196). Surface the failure via notifySaveResult so the user sees the
       // existing storage-error banner.
-      const saveResult = await saveSession({ cards: newCards, limits });
+      // MULTI-LOCALE: save the full array, never the filtered view.
+      // `newFullCards` was computed above (merged graded card into the full
+      // session by (id, locale)) and stored in fullSessionRef.current.
+      const saveResult = await saveSession({ cards: fullSessionRef.current, limits });
       notifySaveResult(saveResult);
       if (!saveResult.ok) {
         console.error(
@@ -2409,6 +2545,9 @@ export function ReviewSession() {
         subjectKey: effectiveCard.subjectKey,
         learningStep: nextState.learningStep,
         stepStartedAt: nextState.stepStartedAt,
+        // Pass the graded card's locale so the grade log row carries the
+        // correct locale for per-locale FSRS optimisation (#1562).
+        locale: effectiveCard.locale ?? activeLocale,
       });
       snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
     });
@@ -2479,13 +2618,15 @@ export function ReviewSession() {
     if (snapshot === null || grading) return;
     // Revert local state to the pre-grade snapshot.
     setCards(snapshot.cards);
+    // MULTI-LOCALE: restore the full array and save it; never the filtered view.
+    fullSessionRef.current = snapshot.fullCards;
     setSessionGrades(snapshot.sessionGrades);
     setSessionGradeSeq(snapshot.sessionGradeSeq);
     setSessionDirectionGrades(snapshot.sessionDirectionGrades);
     setNewCardsThisSession(snapshot.newCardsThisSession);
     setMasteredThisSession(snapshot.masteredThisSession);
     setLearningQueue(snapshot.learningQueue);
-    notifySaveResult(await saveSession({ cards: snapshot.cards, limits }));
+    notifySaveResult(await saveSession({ cards: snapshot.fullCards, limits }));
     if (snapshot.gradeLogOccurredAt !== null) {
       await removeGradeEntry(snapshot.gradeLogOccurredAt);
     }
@@ -2508,6 +2649,8 @@ export function ReviewSession() {
     setDisplayedCardId(snapshot.cardId);
     revealedCardId.current = snapshot.cardId;
     setRevealed(true);
+    // Undo re-reveals the card, so set the flag accordingly (#1562).
+    markCardRevealed(true);
     // Bump the presentation counter so SpritePicker remounts with a fresh
     // shuffle if the user re-grades this reverse card (#496).
     setCardPresentationCount((n) => n + 1);
@@ -2706,6 +2849,7 @@ export function ReviewSession() {
               reverseEnabled={reverseEnabled}
               reverseEvolutionEnabled={reverseEvolutionEnabled}
               cryEnabled={cryCardsEnabled}
+              activeLocaleEndonym={learningLocales.length > 1 ? LOCALE_ENDONYMS[activeLocale] : null}
             />
             <GradeBreakdownBar
               again={sessionGrades[1]}
@@ -2883,14 +3027,24 @@ export function ReviewSession() {
             onCloseShortcuts={() => setShowKeyboardShortcuts(false)}
           />
         ) : (
-          <button
-            type="button"
-            onClick={handleReveal}
-            disabled={revealing}
-            className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
-          >
-            {t("reveal")}
-          </button>
+          <div className="flex flex-col items-center gap-2">
+            {verifiedTypedEntryMode && activeLocale !== "en" && (
+              <p
+                role="note"
+                className={`max-w-xs text-center ${mutedTextXs}`}
+              >
+                {t("typedEntryEnglishOnly")}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleReveal}
+              disabled={revealing}
+              className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
+            >
+              {t("reveal")}
+            </button>
+          </div>
         )
       }
       keyboardShortcutsOverlay={
@@ -2912,6 +3066,7 @@ export function ReviewSession() {
             reverseEnabled={reverseEnabled}
             reverseEvolutionEnabled={reverseEvolutionEnabled}
             cryEnabled={cryCardsEnabled}
+            activeLocaleEndonym={learningLocales.length > 1 ? LOCALE_ENDONYMS[activeLocale] : null}
           />
           <GradeBreakdownBar
             again={sessionGrades[1]}

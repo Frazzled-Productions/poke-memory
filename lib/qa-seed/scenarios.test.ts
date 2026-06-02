@@ -90,6 +90,11 @@ describe("scenario payload builders", () => {
     expect(payload.pokemonNameLocale).toBe("en");
   });
 
+  it("fsrs-locale-mastery: sets labsFlags.languages = true so the language pill is visible (#1562)", () => {
+    const payload = SCENARIO_BY_SLUG.get("fsrs-locale-mastery")!.build();
+    expect(payload.labsFlags?.languages).toBe(true);
+  });
+
   it("fsrs-locale-mastery: stages both en and ja name cards and enrols both languages (#1562)", () => {
     const payload = SCENARIO_BY_SLUG.get("fsrs-locale-mastery")!.build();
     const nameCards = (payload.session?.cards ?? []).filter((c) => c.cardType === "name");

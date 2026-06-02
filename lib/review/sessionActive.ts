@@ -34,7 +34,7 @@
  * importing this module from a server component never throws.
  */
 
-import { KEY_REVIEW_SESSION_ACTIVE } from "@/lib/storage/keys";
+import { KEY_REVIEW_SESSION_ACTIVE, KEY_CARD_REVEALED } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
 
@@ -96,4 +96,45 @@ export function markSessionInactive(): void {
 export function isSessionActive(): boolean {
   if (typeof window === "undefined") return false;
   return readCount() > 0;
+}
+
+// ─── Card-revealed flag (#1562) ──────────────────────────────────────────────
+
+/**
+ * Set or clear the "card currently revealed" flag.
+ *
+ * Call with `true` immediately after `setRevealed(true)` in `handleReveal`,
+ * and with `false` after `setRevealed(false)` in `handleGrade` / `handleUndo`,
+ * and in the component unmount cleanup.
+ *
+ * Read by `LanguageSwitcher` to block mid-card locale switches — switching
+ * language is only safe between cards, never while grade buttons are shown.
+ *
+ * SSR-safe: guards against `window` being undefined.
+ */
+export function markCardRevealed(revealed: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (revealed) {
+      window.localStorage.setItem(KEY_CARD_REVEALED, "1");
+    } else {
+      window.localStorage.removeItem(KEY_CARD_REVEALED);
+    }
+  } catch {
+    // Quota or non-standard environment — silently skip.
+  }
+}
+
+/**
+ * Returns `true` when a card is currently mid-reveal (grade buttons are shown).
+ *
+ * SSR returns `false`.
+ */
+export function isCardRevealed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(KEY_CARD_REVEALED) === "1";
+  } catch {
+    return false;
+  }
 }

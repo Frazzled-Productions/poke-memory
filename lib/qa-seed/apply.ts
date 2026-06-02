@@ -16,6 +16,7 @@ import {
   saveSettings,
   type UserSettings,
 } from "@/lib/settings/persistence";
+import { parseLabsFlags } from "@/lib/labs/flags";
 import { saveStreakData } from "@/lib/streak/persistence";
 import { DEFAULT_STREAK_PROTECTION } from "@/lib/streak/tokens";
 import { writeMasteredCountForLocale } from "@/lib/profile/masteredCountCache";
@@ -102,6 +103,13 @@ export async function applySeedScenario(payload: SeedPayload, slug?: string): Pr
   }
   if (payload.streakProtection !== undefined) {
     settingsPatch.streakProtection = payload.streakProtection;
+  }
+  if (payload.labsFlags !== undefined) {
+    // Merge the scenario's labs flags into the existing labs flags so that
+    // unrelated flags (e.g. flags the user already had on) are preserved.
+    const settings = loadSettings();
+    const existingLabsFlags = parseLabsFlags(settings.labsFlags);
+    settingsPatch.labsFlags = { ...existingLabsFlags, ...payload.labsFlags };
   }
   if (Object.keys(settingsPatch).length > 0) {
     const settings = loadSettings();

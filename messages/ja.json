@@ -346,6 +346,10 @@
     "description": "1025匹の Pokémon の名前と進化を学ぶための無料フラッシュカード（間隔反復法）。登録不要。",
     "signInFailed": "サインインに失敗しました。もう一度お試しください。",
     "allCaughtUp": "すべて完了！",
+    "allCaughtUpInLanguage": "{language}はすべて完了！",
+    "switchToLanguageWithDue": "{count, plural, other {{language}に{count, number}件}}",
+    "todayDoneHeadingWithLanguage": "今日の記録（{language}）",
+    "typedEntryEnglishOnly": "入力による回答は英語のみ対応しています。戻って英語を使用してください。",
     "nothingDue": "今はレビューがありません。",
     "nothingDueBody": "今日のカードはすべて完了です。明日また来て続けましょう。",
     "newCardsLocked": "今日の新規カードはロックされています",
@@ -918,7 +922,8 @@
     "appLanguageHint": "アプリの言語は設定にあります。",
     "addLanguage": "言語を追加",
     "dueToday": "{count, plural, =0 {完了} other {本日 {count, number} 件}}",
-    "dueTodayAriaLabel": "{language}：{count, plural, =0 {本日の予定なし} other {本日 {count, number} 件の予定}}"
+    "dueTodayAriaLabel": "{language}：{count, plural, =0 {本日の予定なし} other {本日 {count, number} 件の予定}}",
+    "cardRevealedLock": "このカードを終えてから言語を切り替えてください。"
   },
   "sync": {
     "status": {

@@ -346,6 +346,10 @@
     "description": "免費間隔重複閃卡，幫助您學習全部 1025 隻寶可夢的名稱和進化。無需註冊。",
     "signInFailed": "登入失敗，請重試。",
     "allCaughtUp": "全部完成！",
+    "allCaughtUpInLanguage": "{language}全部完成！",
+    "switchToLanguageWithDue": "{count, plural, other {{language}還有{count, number}張}}",
+    "todayDoneHeadingWithLanguage": "今日完成（{language}）",
+    "typedEntryEnglishOnly": "輸入模式僅支援英語。請切換回英語使用。",
     "nothingDue": "現在沒有待複習的內容。",
     "nothingDueBody": "今日卡片已全部完成。明天再來繼續吧。",
     "newCardsLocked": "今日新卡片已鎖定",
@@ -918,7 +922,8 @@
     "appLanguageHint": "應用程式語言在設定中。",
     "addLanguage": "新增語言",
     "dueToday": "{count, plural, =0 {已完成} other {今日 {count, number} 張}}",
-    "dueTodayAriaLabel": "{language}：{count, plural, =0 {今日無待複習} other {今日 {count, number} 張待複習}}"
+    "dueTodayAriaLabel": "{language}：{count, plural, =0 {今日無待複習} other {今日 {count, number} 張待複習}}",
+    "cardRevealedLock": "請先完成目前的卡片，再切換語言。"
   },
   "sync": {
     "status": {

@@ -2297,7 +2297,7 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
     expect(jaCards).toHaveLength(1);
   });
 
-  it('evo cards are NOT duplicated per locale — id-only dedup', () => {
+  it('evo cards use (id, locale) dedup — a new locale adds a new evo card (#1562)', () => {
     const evo = makeEvoEdge({ id: 1_500_001, preEvoId: 1, postEvoId: 2 });
     const evoCard: EvolutionReviewCard = {
       ...evo,
@@ -2306,18 +2306,39 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
       state: initialReviewState(NOW),
     };
 
-    // Call with locale="ja" — evo card already in saved set by id.
+    // Call with locale="ja" — the en evo card is already saved but there is
+    // no saved ja evo card yet, so a new ja evo card must be added (#1562).
     const { cards } = hydrateSession([evoCard], [], [evo], NOW, { locale: 'ja', evolutionEnabled: true });
 
     const evos = cards.filter((c) => c.cardType === 'evolution');
-    // Must NOT have a duplicate ja evo row.
-    expect(evos).toHaveLength(1);
+    // One en + one ja — two independent FSRS rows for the same edge.
+    expect(evos).toHaveLength(2);
+    expect(evos.some((c) => (c.locale ?? 'en') === 'en')).toBe(true);
+    expect(evos.some((c) => (c.locale ?? 'en') === 'ja')).toBe(true);
   });
 
-  it('reverse-evo cards are NOT duplicated per locale — id-only dedup', () => {
+  it('evo card is NOT re-added when (id, locale) already in saved set', () => {
+    const evo = makeEvoEdge({ id: 1_500_001, preEvoId: 1, postEvoId: 2 });
+    const jaEvoCard: EvolutionReviewCard = {
+      ...evo,
+      subjectKey: '1>>>2',
+      locale: 'ja',
+      state: { ...initialReviewState(NOW), reps: 3 },
+    };
+
+    // Already has a ja evo card — hydrateSession with locale="ja" must NOT add another.
+    const { cards } = hydrateSession([jaEvoCard], [], [evo], NOW, { locale: 'ja', evolutionEnabled: true });
+
+    const jaEvos = cards.filter((c) => c.cardType === 'evolution' && (c.locale ?? 'en') === 'ja');
+    expect(jaEvos).toHaveLength(1);
+    // State preserved (not reset)
+    expect(jaEvos[0].state.reps).toBe(3);
+  });
+
+  it('reverse-evo cards use (id, locale) dedup — a new locale adds a new reverse-evo card (#1562)', () => {
     const evo = makeEvoEdge({ id: 1_500_001, preEvoId: 1, postEvoId: 2 });
     const reverseId = reverseEdgeIdFor(1_500_001);
-    const reverseEvoCard = {
+    const enReverseEvoCard = {
       ...evo,
       cardType: 'reverse-evolution' as const,
       id: reverseId,
@@ -2326,9 +2347,40 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
       state: initialReviewState(NOW),
     };
 
-    const { cards } = hydrateSession([reverseEvoCard], [], [evo], NOW, { locale: 'ja', reverseEvolutionEnabled: true });
+    // Call with locale="ja" — the en reverse-evo card exists but not a ja one.
+    const { cards } = hydrateSession([enReverseEvoCard], [], [evo], NOW, { locale: 'ja', reverseEvolutionEnabled: true });
 
     const reverseEvos = cards.filter((c) => c.cardType === 'reverse-evolution');
-    expect(reverseEvos).toHaveLength(1);
+    // One en + one ja.
+    expect(reverseEvos).toHaveLength(2);
+    expect(reverseEvos.some((c) => (c.locale ?? 'en') === 'en')).toBe(true);
+    expect(reverseEvos.some((c) => (c.locale ?? 'en') === 'ja')).toBe(true);
+  });
+
+  it('hydrateSession refresh pass resolves saved evo by (id, locale) — ja state not applied to en card', () => {
+    // A saved ja evo card must NOT overwrite the en evo card on refresh.
+    const evo = makeEvoEdge({ id: 1_500_001, preEvoId: 1, postEvoId: 2 });
+    const jaEvoCard: EvolutionReviewCard = {
+      ...evo,
+      subjectKey: '1>>>2',
+      locale: 'ja',
+      state: { ...initialReviewState(NOW), reps: 9 },
+    };
+    const enEvoCard: EvolutionReviewCard = {
+      ...evo,
+      subjectKey: '1>>>2',
+      locale: 'en',
+      state: { ...initialReviewState(NOW), reps: 2 },
+    };
+
+    const { cards } = hydrateSession([jaEvoCard, enEvoCard], [], [evo], NOW, { evolutionEnabled: true, locale: 'en' });
+
+    const enEvos = cards.filter((c) => c.cardType === 'evolution' && (c.locale ?? 'en') === 'en');
+    const jaEvos = cards.filter((c) => c.cardType === 'evolution' && (c.locale ?? 'en') === 'ja');
+    // Both preserved with their correct states.
+    expect(enEvos).toHaveLength(1);
+    expect(jaEvos).toHaveLength(1);
+    expect(enEvos[0].state.reps).toBe(2);
+    expect(jaEvos[0].state.reps).toBe(9);
   });
 });

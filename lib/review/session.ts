@@ -407,16 +407,14 @@ export function hydrateSession(
     };
   });
 
-  // Dedup key: `(id, locale)` for locale-specific card types (name, reverse,
-  // cry) so that adding a new locale creates fresh cards rather than being
-  // silently blocked by an existing "en" row with the same numeric id (#1562).
-  // Evolution and reverse-evolution are locale-invariant (edge-keyed, one row
-  // per edge, always locale "en") and therefore keep the original id-only dedup.
+  // Dedup key: `(id, locale)` for ALL card types so that enrolling a new
+  // language creates fresh cards rather than being silently blocked by an
+  // existing "en" row with the same numeric id (#1562). This applies to
+  // evolution and reverse-evolution too — per-locale isolation is the locked
+  // model (every card type gets its own independent FSRS row per language).
   const savedIdLocaleKeys = new Set(
     allSaved.map((c) => `${c.id}::${c.locale ?? "en"}`),
   );
-  // Id-only set kept for the locale-invariant card types (evo / reverse-evo).
-  const savedIds = new Set(allSaved.map((c) => c.id));
 
   const nameAdditions: NameReviewCard[] = nameEnabled
     ? seed
@@ -430,10 +428,10 @@ export function hydrateSession(
         }))
     : [];
 
-  // Evo cards are locale-invariant — dedup by id only.
+  // Evo cards: dedup by (id, locale) — per-locale isolation (#1562).
   const evoAdditions: EvolutionReviewCard[] = evolutionEnabled
     ? evoSeed
-        .filter((e) => !savedIds.has(e.id))
+        .filter((e) => !savedIdLocaleKeys.has(`${e.id}::${locale}`))
         .map((e) => ({
           ...e,
           subjectKey: Subject.forEdge(e.preEvoId, e.postEvoId),
@@ -442,7 +440,7 @@ export function hydrateSession(
         }))
     : [];
 
-  // Reverse-evo cards are locale-invariant — dedup by id only.
+  // Reverse-evo cards: dedup by (id, locale) — per-locale isolation (#1562).
   const reverseEvoAdditions: ReverseEvolutionReviewCard[] = reverseEvolutionEnabled
     ? evoSeed
         .map((fwd) => ({
@@ -452,7 +450,7 @@ export function hydrateSession(
           subjectKey: Subject.forEdge(fwd.preEvoId, fwd.postEvoId),
           locale,
         }))
-        .filter((c) => !savedIds.has(c.id))
+        .filter((c) => !savedIdLocaleKeys.has(`${c.id}::${locale}`))
         .map((c) => ({ ...c, state: initialReviewState(now) }))
     : [];
 

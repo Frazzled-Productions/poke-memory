@@ -4025,3 +4025,264 @@ describe("ReviewSession per-locale session (#1562)", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2 multi-locale tests (#1562)
+// ---------------------------------------------------------------------------
+
+describe("ReviewSession Phase 2 — multi-locale crown-jewel invariant (#1562)", () => {
+  /** Minimal name-only settings. */
+  const nameOnlySettings = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 100,
+    evolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+    earnedBadges: [] as { id: string; earnedAt: string }[],
+  };
+
+  /** en name card (new). */
+  const enCard: NameReviewCard = {
+    ...FIXTURE_CARD,
+    id: 1,
+    locale: "en" as const,
+    state: {
+      stability: 0, difficulty: 0, elapsedDays: 0, scheduledDays: 0, reps: 0, lapses: 0,
+      fsrsState: "new" as const, dueDate: "1970-01-01", lastReview: null, firstSeen: null,
+      learningStep: null, stepStartedAt: null, hiddenSince: null, seenInPasture: false,
+    },
+  };
+
+  /** ja name card (same species, locale="ja"). */
+  const jaCard: NameReviewCard = {
+    ...FIXTURE_CARD,
+    id: 1,
+    locale: "ja" as const,
+    state: {
+      stability: 0, difficulty: 0, elapsedDays: 0, scheduledDays: 0, reps: 0, lapses: 0,
+      fsrsState: "new" as const, dueDate: "1970-01-01", lastReview: null, firstSeen: null,
+      learningStep: null, stepStartedAt: null, hiddenSince: null, seenInPasture: false,
+    },
+  };
+
+  it("collision regression: active locale=ja → rendered card is a ja card, never en", async () => {
+    // Seed a session with both en and ja cards for the same species.
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [enCard, jaCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "ja",
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    // Session loads. A Reveal button must appear (ja card is due).
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+    // saveSession must have been called with a cards array that includes the ja card.
+    const { saveSession } = await import("@/lib/review/persistence");
+    const savedCards = vi.mocked(saveSession).mock.calls.at(-1)?.[0]?.cards ?? [];
+    const savedJa = savedCards.some((c) => c.locale === "ja");
+    expect(savedJa).toBe(true);
+  });
+
+  it("save invariant: saveSession always receives the full multi-locale array", async () => {
+    // Seed with both en and ja cards.
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [enCard, jaCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "ja",
+    });
+
+    const user = userEvent.setup();
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+
+    const revealBtn = screen.getByRole("button", { name: /reveal/i });
+    await user.click(revealBtn);
+    const easyBtn = screen.getByRole("button", { name: /easy/i });
+    await user.click(easyBtn);
+
+    // After grading the ja card, saveSession must have received BOTH en and ja cards
+    // (the full multi-locale array), not just the active-locale filtered view.
+    const { saveSession } = await import("@/lib/review/persistence");
+    // Look at the most recent call that has an actual cards array.
+    const allCalls = vi.mocked(saveSession).mock.calls;
+    const lastCallCards = allCalls.at(-1)?.[0]?.cards ?? [];
+    const hasEn = lastCallCards.some((c) => (c.locale ?? "en") === "en");
+    const hasJa = lastCallCards.some((c) => c.locale === "ja");
+    expect(hasEn).toBe(true);
+    expect(hasJa).toBe(true);
+  });
+
+  it("typed-entry note shows only when activeLocale is not en", async () => {
+    // A graduated ja card so typed-entry mode would otherwise trigger.
+    const graduatedJaCard: NameReviewCard = {
+      ...jaCard,
+      locale: "ja" as const,
+      state: {
+        ...jaCard.state,
+        fsrsState: "review" as const,
+        stability: 10,
+        difficulty: 5,
+        elapsedDays: 25,
+        scheduledDays: 25,
+        reps: 3,
+        dueDate: "2026-01-01",
+        lastReview: "2025-12-01",
+        firstSeen: "2025-12-01",
+      },
+    };
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [graduatedJaCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "ja",
+      verifiedTypedEntryMode: true,
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+
+    // The typed-entry note must be present (#1562).
+    expect(screen.getByRole("note")).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent(/typed entry is only available/i);
+  });
+
+  it("typed-entry note is absent when activeLocale is en", async () => {
+    // A graduated en name card — typed-entry active for en sessions.
+    // With verifiedTypedEntryMode=true and activeLocale="en", the
+    // typedEntryEnglishOnly note must NOT appear (#1562).
+    const graduatedEnCard: NameReviewCard = {
+      ...enCard,
+      state: {
+        ...enCard.state,
+        fsrsState: "review" as const,
+        stability: 10,
+        difficulty: 5,
+        elapsedDays: 25,
+        scheduledDays: 25,
+        reps: 3,
+        dueDate: "2026-01-01",
+        lastReview: "2025-12-01",
+        firstSeen: "2025-12-01",
+      },
+    };
+    const graduatedEnReverse = { ...GRADUATED_REVERSE_CARD, locale: "en" as const };
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [graduatedEnCard, graduatedEnReverse],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "en",
+      verifiedTypedEntryMode: true,
+      maxNewReversePerDay: 100,
+      maxReviewsReversePerDay: 100,
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    // Wait for the session to load (TypedEntryNameCard or GradeButtons will appear).
+    await waitFor(() => {
+      // Loading skeleton gone = session hydrated.
+      expect(screen.queryByLabelText(/loading review session/i)).not.toBeInTheDocument();
+    });
+
+    // The typedEntryEnglishOnly note must NOT be present for English sessions.
+    expect(screen.queryByText(/typed entry is only available for english/i)).not.toBeInTheDocument();
+  });
+
+  it("all-caught-up screen shows language endonym when >1 locale enrolled", async () => {
+    // Provide graduated ja name + reverse (both reviewed today, not due again).
+    // en name + reverse cards also provided so hydrateSession does not add new ones.
+    // Active locale = "ja" → filtered view shows only ja cards → SESSION_COMPLETE.
+    const today = new Date().toISOString().slice(0, 10);
+    const masteredState = {
+      fsrsState: "review" as const,
+      stability: 10, difficulty: 5, elapsedDays: 25, scheduledDays: 25, reps: 3,
+      dueDate: "2099-01-01", lastReview: today, firstSeen: "2025-01-01",
+      lapses: 0, learningStep: null, stepStartedAt: null, hiddenSince: null, seenInPasture: false,
+    };
+    // ja name card (id=1, locale=ja)
+    const jaName: NameReviewCard = { ...jaCard, state: masteredState };
+    // ja reverse card (id=2_000_001, locale=ja) — needs a reverse shape.
+    // Typed as NameReviewCard for fixture simplicity; hydrateSession will
+    // recognise the saved key `2000001::ja` and skip adding a new one.
+    const jaReverse = { ...jaCard, id: 2_000_001, locale: "ja" as const, cardType: "reverse" as const, pokemonId: 1, subjectKey: "1", state: masteredState };
+    // en name card (id=1, locale=en)
+    const enName: NameReviewCard = { ...enCard, state: masteredState };
+    // en reverse card (id=2_000_001, locale=en)
+    const enReverse = { ...enCard, id: 2_000_001, locale: "en" as const, cardType: "reverse" as const, pokemonId: 1, subjectKey: "1", state: masteredState };
+
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      cards: [jaName, jaReverse as any, enName, enReverse as any],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "ja",
+      learningLocales: ["en", "ja"],
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      // The heading must name the language (#1562).
+      expect(screen.getByText(/all caught up in 日本語/i)).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
+  it("all-caught-up screen uses plain 'All caught up!' for single-locale users", async () => {
+    // Provide graduated en name + reverse (reviewed today, not due).
+    // Active locale = "en" → SESSION_COMPLETE, single locale → plain heading.
+    const today = new Date().toISOString().slice(0, 10);
+    const masteredState = {
+      fsrsState: "review" as const,
+      stability: 10, difficulty: 5, elapsedDays: 25, scheduledDays: 25, reps: 3,
+      dueDate: "2099-01-01", lastReview: today, firstSeen: "2025-01-01",
+      lapses: 0, learningStep: null, stepStartedAt: null, hiddenSince: null, seenInPasture: false,
+    };
+    const enName: NameReviewCard = { ...enCard, state: masteredState };
+    const enReverse = { ...enCard, id: 2_000_001, locale: "en" as const, cardType: "reverse" as const, pokemonId: 1, subjectKey: "1", state: masteredState };
+
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      cards: [enName, enReverse as any],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "en",
+      learningLocales: ["en"],
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up!/i)).toBeInTheDocument();
+    }, { timeout: 3000 });
+    // Must NOT include a language endonym for single-locale users.
+    expect(screen.queryByText(/all caught up in/i)).not.toBeInTheDocument();
+  });
+});
