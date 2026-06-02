@@ -56,7 +56,7 @@ The Code's 15 standards are assessed below. Each is marked **Met**, **Met (recor
 
 ### 4. Transparency
 
-**Gap.** The privacy notice at `app/privacy/page.tsx` is accurate and thorough but is written in adult, semi-legal register (lawful bases, sub-processors, PECR, IDTA). The Children's Code requires privacy information to be presented in a way children can understand — typically a concise, plain-language summary at the point it is needed, suited to the age of the audience. There is currently no child-facing summary. This is the most substantive gap and is filed as a follow-up issue (see below).
+**Partially met (child-facing summary wired; non-English copy review pending).** The privacy notice at `app/privacy/page.tsx` is accurate and thorough but is written in adult, semi-legal register (lawful bases, sub-processors, PECR, IDTA). The Children's Code requires privacy information to be presented in a way children can understand. A `ChildFriendlySummary` component now appears at the top of the privacy page with five concise plain-language points covering data storage, sign-in, what is saved, visibility, and user control including direct links to *Export progress* and *Reset all progress* on the Settings page. As of #1544, this component is wired through the message catalogue and renders in English, Japanese, Simplified Chinese, and Traditional Chinese. The non-English copy was produced at the same register level as the English source but has not yet had native-speaker review (same situation as the onboarding modal — see Standard 4 tracking below).
 
 ### 5. Detrimental use of data
 
@@ -109,7 +109,7 @@ The Code's 15 standards are assessed below. Each is marked **Met**, **Met (recor
 | 1 | Best interests of the child | Met |
 | 2 | Data protection impact assessments | Met (record only) — formal DPIA filed as follow-up |
 | 3 | Age-appropriate application | Met |
-| 4 | Transparency | **Gap** — no child-facing privacy summary |
+| 4 | Transparency | **Partially met** — child-facing summary shipped (#1544); non-English copy review pending (#1376) |
 | 5 | Detrimental use of data | Met (record only) |
 | 6 | Policies and community standards | Met |
 | 7 | Default settings | Met (record only) |
@@ -140,11 +140,11 @@ High-level position for Poké Memory:
 
 ## Outcome and follow-ups
 
-**The Children's Code applies, and Poké Memory's data practices already satisfy the substance of all 15 standards.** The only genuine gap is **transparency (Standard 4)** — the privacy notice is not written in age-appropriate language and there is no child-facing summary.
+**The Children's Code applies, and Poké Memory's data practices already satisfy the substance of all 15 standards.** The only remaining gap is **transparency (Standard 4)** — the child-facing summary on the privacy page (#1544) is now shipped in all four supported locales, but the non-English copy has not yet had native-speaker review (same situation as the onboarding modal).
 
 Follow-up items (filed as separate issues, `priority:later`):
 
-1. **Child-facing privacy summary (Standard 4 / 15).** Add a concise, plain-language summary of what data the app collects and what choices the user has, written so a child can understand it, surfaced at or near the privacy notice. Should also point children at the *Reset all progress* and *Export progress* self-service tools in plain terms.
+1. **Child-facing privacy summary i18n (Standard 4 / 15).** ~~Add a concise, plain-language summary~~ Done (#1544). The `ChildFriendlySummary` component is now wired through the message catalogue. Remaining: native-speaker review of the non-English copy (tracked in #1376, same scope as onboarding modal review).
 2. **Formal standalone DPIA (Standard 2).** Produce a formal DPIA document for completeness. Not legally mandatory given the low-risk, minimal-data processing identified here, but good practice for a service in scope of the Children's Code.
 
 No follow-up is required for COPPA. No data-flow or architecture changes are required by this assessment — the gaps are documentation and copy only.
@@ -160,7 +160,7 @@ As of #1369, the app UI **and** the first-visit onboarding modal are machine-tra
 
 Until the onboarding copy is human-reviewed, the non-English locales are treated as **"preview" quality on the onboarding surface**.
 
-**Required before GA on the child-facing onboarding surface:** human review of the onboarding copy (roughly 200 words per locale) by a fluent speaker of each locale, to confirm the plain-language transparency wording reads correctly and is age-appropriate. This is tracked as **#1376**. If `ChildFriendlySummary` (the child-facing summary on the privacy page) is machine-translated into any of these locales, it falls within the same human-review scope, since it is the dedicated Standard 4 / 15 child-facing surface.
+**Required before GA on the child-facing onboarding surface:** human review of the onboarding copy (roughly 200 words per locale) by a fluent speaker of each locale, to confirm the plain-language transparency wording reads correctly and is age-appropriate. This is tracked as **#1376**. `ChildFriendlySummary` (the child-facing summary on the privacy page) is now i18n-wired (#1544) and falls within the same human-review scope as the onboarding modal, since it is the dedicated Standard 4 / 15 child-facing surface.
 
 No data-flow change is involved — locale selection is a display preference only (see `docs/dpia.md` and `docs/cookies-pecr.md`). The follow-up is copy quality, not data practice.
 
@@ -187,7 +187,7 @@ A further i18n review pass was applied to the `onboarding` namespace in `message
 
 This review was conducted by a non-native expert and materially improves register and accuracy over the prior machine translation. However, it does **not** constitute a native-speaker review and does not satisfy the Standard 4 requirement for fluent human sign-off. The Standard 4 status for non-English locales remains **preview-quality, expert-reviewed** (not Met).
 
-**`ChildFriendlySummary` English-only gap (follow-on finding, #1376):** `components/privacy/ChildFriendlySummary.tsx` is hardcoded in English JSX with no i18n wiring. It is not machine-translated (it was therefore out of #1376's "review machine translation" scope), but non-English-locale users see English-only child-facing privacy copy on the Privacy page. This is filed as a separate follow-on issue (priority:later).
+**`ChildFriendlySummary` i18n gap resolved (#1544, 2026-06-02):** `components/privacy/ChildFriendlySummary.tsx` is now wired through the `privacy.childFriendlySummary` message-catalogue namespace. It renders in English, Japanese, Simplified Chinese, and Traditional Chinese. The non-English copy was authored at the same plain-language register as the English source; it is not machine-translated but has not yet had native-speaker review (same status as the onboarding modal). Native-speaker review remains tracked under #1376.
 
 **Full native-speaker sign-off is still recommended** before relaxing the "preview" locale-picker label or the `banner.machineTranslated` in-product banner for any of the three non-English locales.
 

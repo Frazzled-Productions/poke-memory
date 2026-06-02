@@ -1,7 +1,12 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { inlineLink } from "@/lib/utils/class-names";
 
-export default function ChildFriendlySummary() {
+export default async function ChildFriendlySummary() {
+  const t = await getTranslations("privacy.childFriendlySummary");
+
+  const strong = (chunks: React.ReactNode) => <strong>{chunks}</strong>;
+
   return (
     <section
       aria-labelledby="plain-language-heading"
@@ -11,48 +16,35 @@ export default function ChildFriendlySummary() {
         id="plain-language-heading"
         className="mb-4 text-lg font-semibold"
       >
-        In plain language: what does Poké Memory do with your data?
+        {t("heading")}
       </h2>
       <ol className="list-decimal space-y-3 pl-5 leading-relaxed text-zinc-800 dark:text-zinc-200">
         <li>
-          <strong>Just playing (no sign-in).</strong> When you play without
-          signing in, the app saves your Pokémon progress only on your own
-          device, and nothing is sent to us or stored anywhere on the internet.
+          {t.rich("item1", { s: strong })}
         </li>
         <li>
-          <strong>Signing in.</strong> If you sign in with a GitHub or Google
-          account, we save your card progress to a secure database so you can
-          keep it across different devices. You need to be 13 or older to have
-          a GitHub or Google account.
+          {t.rich("item2", { s: strong })}
         </li>
         <li>
-          <strong>What we save.</strong> We only save which Pokémon cards
-          you&rsquo;ve practised, how well you know them, and when you last
-          practised, and nothing else. We don&rsquo;t know your name, your
-          address, or anything about you as a person.
+          {t.rich("item3", { s: strong })}
         </li>
         <li>
-          <strong>Who else can see it.</strong> Nobody else can see your
-          progress. Only you can see your own cards. We never share your
-          progress with anyone else or use it to show you adverts.
+          {t.rich("item4", { s: strong })}
         </li>
         <li>
-          <strong>You&rsquo;re in control.</strong> You can{" "}
-          <Link
-            href="/settings#backup-heading"
-            className={inlineLink}
-          >
-            export your progress
-          </Link>{" "}
-          or{" "}
-          <Link
-            href="/settings#danger-zone-heading"
-            className={inlineLink}
-          >
-            reset all progress
-          </Link>{" "}
-          at any time from the Settings page. You don&rsquo;t need to ask us;
-          you can do it yourself, right now.
+          {t.rich("item5", {
+            s: strong,
+            export: (chunks) => (
+              <Link href="/settings#backup-heading" className={inlineLink}>
+                {chunks}
+              </Link>
+            ),
+            reset: (chunks) => (
+              <Link href="/settings#danger-zone-heading" className={inlineLink}>
+                {chunks}
+              </Link>
+            ),
+          })}
         </li>
       </ol>
     </section>
