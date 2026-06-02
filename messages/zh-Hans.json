@@ -972,6 +972,14 @@
     "steel": "钢",
     "water": "水"
   },
+  "pushDaily": {
+    "title": "Time to practise",
+    "multiDueNew": "{dueTotal, plural, one {# card} other {# cards}} due across your languages: {breakdown}. Plus {newEstimate, number} new ready to practise.",
+    "multiDueOnly": "{dueTotal, plural, one {# card} other {# cards}} due across your languages: {breakdown}.",
+    "singleDueNew": "{due, plural, one {# card} other {# cards}} due in {language} plus {newEstimate, number} new ready to practise.",
+    "singleDueOnly": "{due, plural, one {# card} other {# cards}} due in {language} for review.",
+    "breakdownItem": "{language} {count, number}"
+  },
   "privacy": {
     "childFriendlySummary": {
       "heading": "用简单的话说：Poké Memory 如何处理你的数据？",
