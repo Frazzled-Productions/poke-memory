@@ -98,7 +98,7 @@ import { ScopeControl } from "@/components/review/ScopeControl";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
-import { mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { colStack, mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 import { getOrCreateClientSalt } from "@/lib/identity/clientSalt";
 
 
@@ -2977,7 +2977,7 @@ export function ReviewSession() {
              Key includes cardPresentationCount so the component remounts (and
              resets chosen state) when the same card reappears via a learning-step
              replay, matching the SpritePicker pattern (#496). */
-          <div className="flex flex-col gap-2 w-full">
+          <div className={`${colStack} w-full`}>
             {/* One-time learning-phase banner (#1271). Visible until the first
                 MC grade fires; after that `mcCardOnboardingShown` is true and
                 the banner never re-renders. */}
