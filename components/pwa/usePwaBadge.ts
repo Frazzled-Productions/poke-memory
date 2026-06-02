@@ -6,6 +6,7 @@ import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { todayString } from "@/lib/review/session";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { computeQueueCount } from "@/lib/stats/dashboard-snapshot";
+import type { AppLocale } from "@/i18n/locales";
 
 /**
  * Syncs the Web Badging API app-icon badge with the number of cards due today.
@@ -75,6 +76,7 @@ export function usePwaBadge(): void {
         },
         session.limits,
         today,
+        (settings.activePokemonNameLocale ?? "en") as AppLocale,
       );
 
       try {

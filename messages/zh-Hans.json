@@ -346,6 +346,10 @@
     "description": "免费间隔重复闪卡，帮助您学习全部 1025 只 Pokémon 的名称和进化。无需注册。",
     "signInFailed": "登录失败，请重试。",
     "allCaughtUp": "全部完成！",
+    "allCaughtUpInLanguage": "{language}全部完成！",
+    "switchToLanguageWithDue": "{count, plural, other {{language}还有{count, number}张}}",
+    "todayDoneHeadingWithLanguage": "今日完成（{language}）",
+    "typedEntryEnglishOnly": "输入模式仅支持英语。请切换回英语使用。",
     "nothingDue": "现在没有待复习的内容。",
     "nothingDueBody": "今日卡片已全部完成。明天再来继续吧。",
     "newCardsLocked": "今日新卡片已锁定",
@@ -918,7 +922,8 @@
     "appLanguageHint": "应用语言在设置中。",
     "addLanguage": "添加语言",
     "dueToday": "{count, plural, =0 {已完成} other {今日 {count, number} 张}}",
-    "dueTodayAriaLabel": "{language}：{count, plural, =0 {今日无待复习} other {今日 {count, number} 张待复习}}"
+    "dueTodayAriaLabel": "{language}：{count, plural, =0 {今日无待复习} other {今日 {count, number} 张待复习}}",
+    "cardRevealedLock": "请先完成当前卡片，再切换语言。"
   },
   "sync": {
     "status": {

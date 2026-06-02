@@ -443,6 +443,28 @@ describe("useProfileStatus — locale-scoped mastery", () => {
 
     expect(result.current.masteryCount).toBe(9);
   });
+
+  it("activePokemonNameLocale takes precedence over pokemonNameLocale (#1562 bug fix)", async () => {
+    // Simulate a user who has switched the active language to 'ja' via the
+    // language switcher — activePokemonNameLocale is 'ja', pokemonNameLocale is
+    // still 'en' (the back-compat alias is not updated on every switch).
+    // Cast is needed because the mock type is intentionally narrow (it only
+    // declares the fields used by other tests); the hook reads the full
+    // UserSettings shape at runtime.
+    mockLoadSettings.mockReturnValue({
+      pokemonNameLocale: "en",
+      activePokemonNameLocale: "ja",
+      masteryRepetitions: 3,
+    } as unknown as ReturnType<typeof mockLoadSettings>);
+    writeMasteredCountForLocale("en", 8);
+    writeMasteredCountForLocale("ja", 3);
+
+    const { result } = renderHook(() => useProfileStatus());
+    await act(async () => {});
+
+    // Must read from the ja bucket (activePokemonNameLocale), not en.
+    expect(result.current.masteryCount).toBe(3);
+  });
 });
 
 // ---------------------------------------------------------------------------

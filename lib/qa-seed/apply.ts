@@ -16,6 +16,7 @@ import {
   saveSettings,
   type UserSettings,
 } from "@/lib/settings/persistence";
+import { parseLabsFlags } from "@/lib/labs/flags";
 import { saveStreakData } from "@/lib/streak/persistence";
 import { DEFAULT_STREAK_PROTECTION } from "@/lib/streak/tokens";
 import { writeMasteredCountForLocale } from "@/lib/profile/masteredCountCache";
@@ -87,15 +88,28 @@ export async function applySeedScenario(payload: SeedPayload, slug?: string): Pr
     saveStreakData(lastNDates(payload.streakDays));
   }
 
-  // Settings legs (pokemonNameLocale + streakProtection) — merged into a single
-  // load/save so we touch localStorage once. saveSettings dispatches
-  // SETTINGS_SAVED_EVENT, which the status surfaces also listen to.
+  // Settings legs (pokemonNameLocale + learningLocales + streakProtection) —
+  // merged into a single load/save so we touch localStorage once. saveSettings
+  // dispatches SETTINGS_SAVED_EVENT, which the status surfaces also listen to.
   const settingsPatch: Partial<UserSettings> = {};
   if (payload.pokemonNameLocale !== null && payload.pokemonNameLocale !== undefined) {
     settingsPatch.pokemonNameLocale = payload.pokemonNameLocale;
   }
+  if (payload.learningLocales !== undefined) {
+    settingsPatch.learningLocales = payload.learningLocales;
+  }
+  if (payload.activePokemonNameLocale !== undefined) {
+    settingsPatch.activePokemonNameLocale = payload.activePokemonNameLocale;
+  }
   if (payload.streakProtection !== undefined) {
     settingsPatch.streakProtection = payload.streakProtection;
+  }
+  if (payload.labsFlags !== undefined) {
+    // Merge the scenario's labs flags into the existing labs flags so that
+    // unrelated flags (e.g. flags the user already had on) are preserved.
+    const settings = loadSettings();
+    const existingLabsFlags = parseLabsFlags(settings.labsFlags);
+    settingsPatch.labsFlags = { ...existingLabsFlags, ...payload.labsFlags };
   }
   if (Object.keys(settingsPatch).length > 0) {
     const settings = loadSettings();

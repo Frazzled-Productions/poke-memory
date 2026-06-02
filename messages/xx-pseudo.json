@@ -346,6 +346,10 @@
     "description": "[Free spaced-repetition flashcards for learning all 1025 Pokémon names and evolutions. No sign-up required.]",
     "signInFailed": "[Sign-in failed. Please try again.]",
     "allCaughtUp": "[All caught up!]",
+    "allCaughtUpInLanguage": "[All caught up in {language}!]",
+    "switchToLanguageWithDue": "[{count, plural, one {{count, number} card due in {language}} other {{count, number} cards due in {language}}}]",
+    "todayDoneHeadingWithLanguage": "[Done today ({language})]",
+    "typedEntryEnglishOnly": "[Typed entry is only available for English. Switch back to use it.]",
     "nothingDue": "[Nothing due right now.]",
     "nothingDueBody": "[No more cards due today. Come back tomorrow to keep going.]",
     "newCardsLocked": "[New cards locked for today]",
@@ -918,7 +922,8 @@
     "appLanguageHint": "[App language is in Settings.]",
     "addLanguage": "[Add a language]",
     "dueToday": "[{count, plural, =0 {Caught up} one {{count, number} due today} other {{count, number} due today}}]",
-    "dueTodayAriaLabel": "[{language}: {count, plural, =0 {caught up} one {{count, number} card due today} other {{count, number} cards due today}}]"
+    "dueTodayAriaLabel": "[{language}: {count, plural, =0 {caught up} one {{count, number} card due today} other {{count, number} cards due today}}]",
+    "cardRevealedLock": "[Finish this card first, then switch language.]"
   },
   "sync": {
     "status": {

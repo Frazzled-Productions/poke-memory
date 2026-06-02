@@ -1,9 +1,20 @@
 import type { SupabaseClient, PostgrestError } from "@supabase/supabase-js";
-import type { ReviewableCard, BuildSessionOpts } from "@/lib/review/session";
+import type {
+  ReviewableCard,
+  BuildSessionOpts,
+  NameReviewCard,
+  EvolutionReviewCard,
+  ReverseEvolutionReviewCard,
+  ReverseReviewCard,
+  CryReviewCard,
+} from "@/lib/review/session";
 import { buildSession } from "@/lib/review/session";
+import { initialReviewState } from "@/lib/srs/scheduler";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
-import { appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKey";
+import { reverseEdgeIdFor, REVERSE_ID_OFFSET, CRY_ID_OFFSET } from "@/lib/pokemon/seed";
+import { Subject, appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKey";
 import { markStructuralSyncError, clearStructuralSyncError } from "@/lib/sync/structuralError";
+import type { AppLocale } from "@/i18n/locales";
 
 // cloud.ts imports markStructuralSyncError from structuralError.ts — a leaf
 // module that has no imports from cloud.ts or persistence.ts — so there is no
@@ -464,13 +475,117 @@ function cardKey(card: ReviewableCard): string {
   return `${appTypeToDbType(card.cardType)}:${card.subjectKey}:${card.locale ?? "en"}`;
 }
 
+/**
+ * Synthesises a fresh local card skeleton from seed data for a given cloud row.
+ * Returns null when the cloud row's card_type or subject_key cannot be resolved
+ * against the seed (unknown type, or species/edge not in the seed).
+ *
+ * Used by `mergeCloudIntoLocalSilent` to INSERT unmatched cloud rows (rows from
+ * other enrolled locales) as new local cards on a fresh device pull, so every
+ * language's progress is present in the local session after the first sync.
+ */
+function synthCardFromCloudRow(
+  row: CloudRow,
+  seedById: ReadonlyMap<number, SeedPokemon>,
+  evoByEndpoints: ReadonlyMap<string, EvolutionCard>,
+  now: Date,
+): ReviewableCard | null {
+  if (row.subject_key === null) return null;
+  const appType = dbTypeToAppType(row.card_type);
+  if (appType === null) return null;
+
+  const locale = (row.locale ?? "en") as AppLocale;
+  const baseState = initialReviewState(now);
+
+  switch (appType) {
+    case "name": {
+      const speciesId = Number(row.subject_key);
+      if (!Number.isInteger(speciesId) || speciesId <= 0) return null;
+      const pokemon = seedById.get(speciesId);
+      if (!pokemon) return null;
+      const card: NameReviewCard = {
+        ...pokemon,
+        cardType: "name",
+        subjectKey: Subject.forSpecies(speciesId),
+        locale,
+        state: baseState,
+      };
+      return applyCloudRow(card, row);
+    }
+    case "reverse": {
+      const speciesId = Number(row.subject_key);
+      if (!Number.isInteger(speciesId) || speciesId <= 0) return null;
+      const pokemon = seedById.get(speciesId);
+      if (!pokemon) return null;
+      const card: ReverseReviewCard = {
+        ...pokemon,
+        id: REVERSE_ID_OFFSET + speciesId,
+        pokemonId: speciesId,
+        cardType: "reverse",
+        subjectKey: Subject.forSpecies(speciesId),
+        locale,
+        state: baseState,
+      };
+      return applyCloudRow(card, row);
+    }
+    case "cry": {
+      const speciesId = Number(row.subject_key);
+      if (!Number.isInteger(speciesId) || speciesId <= 0) return null;
+      const pokemon = seedById.get(speciesId);
+      if (!pokemon) return null;
+      const card: CryReviewCard = {
+        ...pokemon,
+        id: CRY_ID_OFFSET + speciesId,
+        pokemonId: speciesId,
+        cardType: "cry",
+        subjectKey: Subject.forSpecies(speciesId),
+        locale,
+        state: baseState,
+      };
+      return applyCloudRow(card, row);
+    }
+    case "evolution": {
+      const evo = evoByEndpoints.get(row.subject_key);
+      if (!evo) return null;
+      const card: EvolutionReviewCard = {
+        ...evo,
+        subjectKey: Subject.forEdge(evo.preEvoId, evo.postEvoId),
+        locale,
+        state: baseState,
+      };
+      return applyCloudRow(card, row);
+    }
+    case "reverse-evolution": {
+      const evo = evoByEndpoints.get(row.subject_key);
+      if (!evo) return null;
+      const card: ReverseEvolutionReviewCard = {
+        ...evo,
+        cardType: "reverse-evolution",
+        id: reverseEdgeIdFor(evo.id),
+        subjectKey: Subject.forEdge(evo.preEvoId, evo.postEvoId),
+        locale,
+        state: baseState,
+      };
+      return applyCloudRow(card, row);
+    }
+    default:
+      return null;
+  }
+}
+
 export function mergeCloudIntoLocalSilent(
   local: ReviewableCard[],
   cloud: CloudRow[],
   lastPullAt: string | null,
+  seed?: readonly SeedPokemon[],
+  evoSeed?: readonly EvolutionCard[],
+  now: Date = new Date(),
 ): ReviewableCard[] {
+  const localCardKeys = new Set(local.map((c) => cardKey(c)));
   const byKey = new Map(cloud.map((r) => [cloudRowKey(r), r]));
-  return local.map((card) => {
+
+  // Pass 1: update existing local cards from matching cloud rows (existing behaviour).
+  const updated = local.map((card) => {
     const row = byKey.get(cardKey(card));
     if (!row) return card;
 
@@ -500,6 +615,38 @@ export function mergeCloudIntoLocalSilent(
     // Cloud row unchanged since last pull — keep local.
     return card;
   });
+
+  // Pass 2: INSERT cloud rows that have no matching local card. This handles
+  // the case where a user has enrolled multiple languages on another device —
+  // the other-locale rows exist in the cloud but were never seeded locally
+  // (local session was built for a single locale). Without this pass, a fresh
+  // device pull only imports the currently-active locale's progress.
+  //
+  // We only synthesise cards when seed data is provided (callers in guest mode
+  // or callers that deliberately omit seed pass nothing and skip this pass).
+  if (seed && seed.length > 0) {
+    const seedById = new Map(seed.map((p) => [p.id, p]));
+    const evoByEndpoints = new Map(
+      (evoSeed ?? []).map((e) => [Subject.forEdge(e.preEvoId, e.postEvoId), e]),
+    );
+
+    const insertions: ReviewableCard[] = [];
+    for (const row of cloud) {
+      const key = cloudRowKey(row);
+      if (localCardKeys.has(key)) continue;          // already merged in Pass 1
+      if (row.subject_key === null) continue;         // unmigrated edge row
+      const synth = synthCardFromCloudRow(row, seedById, evoByEndpoints, now);
+      if (synth !== null) {
+        insertions.push(synth);
+      }
+    }
+
+    if (insertions.length > 0) {
+      return [...updated, ...insertions];
+    }
+  }
+
+  return updated;
 }
 
 /**

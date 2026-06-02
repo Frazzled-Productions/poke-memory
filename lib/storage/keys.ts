@@ -165,6 +165,18 @@ export const KEY_MASTERED_COUNT_BY_LOCALE =
 export const KEY_DUE_COUNT_BY_LOCALE =
   "poke-memory:due-count-by-locale:v1";
 
+// ─── Card-revealed flag (#1562) ───────────────────────────────────────────────
+
+/**
+ * Transient flag set to `"1"` while a card is mid-reveal (awaiting a grade),
+ * and cleared when the card is graded, the session advances, or the component
+ * unmounts. Read by the LanguageSwitcher to block locale switches mid-card.
+ *
+ * Mirrors the `KEY_REVIEW_SESSION_ACTIVE` pattern — stored in localStorage so
+ * it is readable outside the React tree without prop drilling.
+ */
+export const KEY_CARD_REVEALED = "poke-memory:card-revealed";
+
 // ─── Pokédex sort preference ──────────────────────────────────────────────────
 
 /**

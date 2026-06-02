@@ -27,6 +27,7 @@ import type { ReviewState } from "@/lib/srs/scheduler";
 import { initialReviewState, nextReview } from "@/lib/srs/scheduler";
 import type { StreakProtection } from "@/lib/streak/tokens";
 import type { AppLocale } from "@/i18n/locales";
+import type { LabsFlags } from "@/lib/labs/flags";
 import {
   SEED_POKEMON,
   SEED_EVOLUTION_CARDS,
@@ -96,6 +97,18 @@ export type SeedPayload = {
   /** pokemonNameLocale to write into settings. null = do not touch settings. */
   pokemonNameLocale?: "en" | "ja" | "zh-Hans" | "zh-Hant" | null;
   /**
+   * Enrolled learning locales to write into settings (#1562). Lets a scenario
+   * stage a multi-language state so the language switcher shows more than one
+   * option and per-locale practice can be exercised. Omit to leave untouched.
+   */
+  learningLocales?: AppLocale[];
+  /**
+   * Active Pokémon-name locale to write into settings (#1562). Defaults via the
+   * `pokemonNameLocale` mirror when omitted; set explicitly to start a scenario
+   * in a specific language. Omit to leave untouched.
+   */
+  activePokemonNameLocale?: AppLocale;
+  /**
    * Consecutive review days, ending today, to seed into streak storage.
    * Omit (or 0) to leave streak storage untouched. applySeedScenario expands
    * this into the actual "YYYY-MM-DD" date array relative to today.
@@ -114,6 +127,13 @@ export type SeedPayload = {
    * parity test in scenarios.test.ts enforces that.
    */
   masteredCountByLocale?: Partial<Record<AppLocale, number>>;
+  /**
+   * Labs flags to merge into settings when the scenario is applied (#1562).
+   * Use this to enable preview features (e.g. `languages: true`) so the
+   * scenario can exercise gated surfaces without requiring the user to
+   * manually enable them in Settings > Labs. Omit to leave untouched.
+   */
+  labsFlags?: Partial<LabsFlags>;
 };
 
 export type Scenario = {
@@ -436,13 +456,17 @@ function evolutionCard(preEvoId: number, postEvoId: number, state: SeededState):
 /**
  * `fsrs-locale-mastery`
  *
- * Injects ~30 mastered name cards (locale: 'en') + ~10 due-soon cards +
- * a few in-learning cards. Sets pokemonNameLocale to 'en'.
+ * Injects ~30 mastered name cards (locale: 'en') + ~10 due-soon + a few
+ * in-learning, PLUS a smaller independent Japanese set (locale: 'ja'), and
+ * enrols both languages (`learningLocales: ['en', 'ja']`). Starts in English
+ * (`activePokemonNameLocale: 'en'`).
  *
- * After applying this scenario, switching Settings > Pokémon name language
- * to Japanese should show 0 mastered cards in the Pasture immediately,
- * because the mastered cards are all locale='en' and the locale-reset rule
- * treats locale mismatches as "new".
+ * This stages the multi-language practice state (#1562): the language switcher
+ * in the status bar shows English + 日本語, and switching to Japanese reveals a
+ * SEPARATE, smaller mastered set with its own due/new queue — proving FSRS
+ * progress is tracked per `(id, locale)`. The en and ja cards for the same
+ * species (e.g. 1, 4, 7, 25, 39) coexist without colliding because the session
+ * now filters by the active locale (#1562 fixed the #1394 id-collision class).
  */
 function buildFsrsLocaleMastery(): SeedPayload {
   const cards: SeededCard[] = [];
@@ -480,13 +504,38 @@ function buildFsrsLocaleMastery(): SeedPayload {
   cards.push(evolutionCard(4, 5, deriveMasteredState({ dueDaysFromNow: 21 })));
   cards.push(evolutionCard(7, 8, deriveMasteredState({ dueDaysFromNow: 21 })));
 
+  // Independent Japanese set (#1562). Smaller than the English set so the
+  // per-locale difference is obvious when switching languages. Same species ids
+  // as part of the en set, but locale 'ja' → a separate FSRS row each.
+  // 5 mastered (name + reverse, matching the #1234 Pasture rule).
+  const jaMasteredIds = [1, 4, 7, 25, 39];
+  for (const id of jaMasteredIds) {
+    const state = deriveMasteredState({
+      dueDaysFromNow: 5,
+      lastReviewDaysFromNow: -5,
+    });
+    cards.push(nameCard(id, state, "ja"));
+    cards.push(reverseCard(id, state, "ja"));
+  }
+  // 5 due-soon (ja locale) so a Japanese practice session is non-empty.
+  const jaDueSoonIds = [43, 52, 63, 66, 74];
+  for (const id of jaDueSoonIds) {
+    cards.push(nameCard(id, deriveDueSoonState(), "ja"));
+  }
+
   return {
     session: { cards, limits: DEFAULT_LIMITS },
     pokemonNameLocale: "en",
+    learningLocales: ["en", "ja"],
+    activePokemonNameLocale: "en",
     streakDays: BELIEVABLE_STREAK_DAYS,
     streakProtection: believableStreakProtection(),
     // Both name + reverse mastered for each id → filterMastered counts them all.
-    masteredCountByLocale: { en: masteredIds.length },
+    masteredCountByLocale: { en: masteredIds.length, ja: jaMasteredIds.length },
+    // Enable the languages Labs flag so the language pill in the status bar
+    // is visible immediately after applying the seed, without requiring a
+    // manual toggle in Settings > Labs.
+    labsFlags: { languages: true },
   };
 }
 
@@ -573,13 +622,12 @@ function buildPastureProgression(): SeedPayload {
     cards.push(reverseCard(id, state, "en"));
   }
 
-  // NOTE: we deliberately do NOT seed ja-locale duplicates of the same species.
-  // The local review session keys cards by numeric `id` (locale-agnostic), so an
-  // en and a ja card for the same species would share an `id` and collide in
-  // buildSessionQueues, breaking Practice. Per-locale mastery is still
-  // demonstrable: with pokemonNameLocale 'en' the Pasture shows 40 mastered;
-  // switching to Japanese shows 0 (the en cards don't match the ja locale),
-  // confirming mastery is tracked per locale (#1259). (Regression: #1394 mini-batch.)
+  // NOTE: this scenario stays deliberately single-locale (en only) to give a
+  // clean "switch to Japanese → 0 mastered" demonstration of per-locale storage
+  // (#1259). Multi-locale coexistence (en + ja for one species) is exercised by
+  // the `fsrs-locale-mastery` scenario instead, which is safe since #1562 made
+  // the review session filter by active locale (closing the #1394 id-collision
+  // class). Keeping the two demos separate keeps each one's assertion crisp.
 
   // 20 graduated / due-soon (in progress, not yet mastered)
   const dueSoonIds = [

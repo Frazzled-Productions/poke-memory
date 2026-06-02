@@ -90,11 +90,61 @@ describe("scenario payload builders", () => {
     expect(payload.pokemonNameLocale).toBe("en");
   });
 
-  it("fsrs-locale-mastery: all name cards have locale 'en'", () => {
+  it("fsrs-locale-mastery: sets labsFlags.languages = true so the language pill is visible (#1562)", () => {
+    const payload = SCENARIO_BY_SLUG.get("fsrs-locale-mastery")!.build();
+    expect(payload.labsFlags?.languages).toBe(true);
+  });
+
+  it("fsrs-locale-mastery: stages both en and ja name cards and enrols both languages (#1562)", () => {
     const payload = SCENARIO_BY_SLUG.get("fsrs-locale-mastery")!.build();
     const nameCards = (payload.session?.cards ?? []).filter((c) => c.cardType === "name");
-    for (const c of nameCards) {
-      expect((c as { locale: string }).locale).toBe("en");
+    const enNames = nameCards.filter((c) => (c as { locale?: string }).locale === "en");
+    const jaNames = nameCards.filter((c) => (c as { locale?: string }).locale === "ja");
+    // Every name card is en or ja (no other locale leaked in).
+    expect(enNames.length + jaNames.length).toBe(nameCards.length);
+    // Both locales are represented so the switcher has more than one option.
+    expect(enNames.length).toBeGreaterThan(0);
+    expect(jaNames.length).toBeGreaterThan(0);
+    // ja is the smaller, independent set.
+    expect(jaNames.length).toBeLessThan(enNames.length);
+    expect(payload.learningLocales).toEqual(["en", "ja"]);
+    expect(payload.activePokemonNameLocale).toBe("en");
+  });
+
+  it("fsrs-locale-mastery: en and ja build independent, non-empty sessions via the real hydrate path (#1562)", () => {
+    const payload = SCENARIO_BY_SLUG.get("fsrs-locale-mastery")!.build();
+    const seeded = payload.session!.cards as unknown as ReviewableCard[];
+    const today = todayString(new Date());
+
+    // Mirror the Practice load: hydrate for the active locale (adds new cards for
+    // absent species in that locale), then build queues scoped to it.
+    const hydrateFor = (locale: "en" | "ja") =>
+      hydrateSession(seeded, SEED_POKEMON, SEED_EVOLUTION_CARDS, new Date(), {
+        nameEnabled: true,
+        reverseEnabled: true,
+        locale,
+      }).cards;
+
+    const enCards = hydrateFor("en");
+    const jaCards = hydrateFor("ja");
+    const en = buildSessionQueues(enCards, DEFAULT_LIMITS, today, undefined, "", "en");
+    const ja = buildSessionQueues(jaCards, DEFAULT_LIMITS, today, undefined, "", "ja");
+
+    // Each enrolled language yields a non-empty session (new cards for absent
+    // species, at minimum).
+    expect(en.newQueue.length).toBeGreaterThan(0);
+    expect(ja.newQueue.length).toBeGreaterThan(0);
+
+    // Independence: every id the ja session surfaces resolves to a ja-locale card
+    // in the ja-hydrated set, and likewise for en. The locale filter never lets
+    // one language's cards leak into the other's queues.
+    const hasLocale = (cards: ReviewableCard[], id: number, locale: string) =>
+      cards.some((c) => c.id === id && (c.locale ?? "en") === locale);
+    for (const id of [...en.reviewQueue, ...en.newQueue]) {
+      expect(hasLocale(enCards, id, "en")).toBe(true);
+    }
+    for (const id of [...ja.reviewQueue, ...ja.newQueue]) {
+      expect(hasLocale(jaCards, id, "ja")).toBe(true);
     }
   });
 
@@ -140,28 +190,29 @@ describe("scenario payload builders", () => {
     );
     expect(enMasteredNames.length).toBeGreaterThanOrEqual(40);
 
-    // No ja-locale duplicates: the local session keys cards by numeric `id`, so
-    // seeding an en+ja pair for the same species collides and breaks Practice
-    // (#1394 mini-batch regression). pokemonNameLocale 'en' shows 40; switching
-    // to ja shows 0 — which already demonstrates per-locale storage.
+    // No ja-locale duplicates: this scenario stays single-locale by choice so the
+    // "switch to ja → 0 mastered" demo stays crisp. pokemonNameLocale 'en' shows
+    // 40; switching to ja shows 0. (Multi-locale coexistence is covered by the
+    // fsrs-locale-mastery scenario; the #1394 collision class is fixed since #1562.)
     const jaCards = cards.filter((c) => (c as { locale?: string }).locale === "ja");
     expect(jaCards).toHaveLength(0);
     expect(payload.pokemonNameLocale).toBe("en");
   });
 
-  // Regression guard for the #1394 mini-batch crash: the local review session
-  // keys cards by numeric `id`, so a scenario must never emit two cards sharing
-  // an `id` (e.g. an en+ja pair for one species). Duplicate ids collide in
-  // buildSessionQueues and break the Practice page.
-  it("every scenario emits session cards with unique numeric ids", () => {
+  // Card identity is `(id, locale)` (migration 029). Since #1562 the review
+  // session filters by the active locale, so an en+ja pair for one species is
+  // legal — but two cards sharing the SAME `(id, locale)` would still collide in
+  // buildSessionQueues. Assert uniqueness on the composite key, matching the DB
+  // primary key (the old id-only invariant predated multi-locale seeds).
+  it("every scenario emits session cards with unique (id, locale) keys", () => {
     for (const scenario of SCENARIOS) {
       const cards = scenario.build().session?.cards ?? [];
-      const ids = cards.map((c) => c.id);
-      const unique = new Set(ids);
+      const keys = cards.map((c) => `${c.id}::${(c as { locale?: string }).locale ?? "en"}`);
+      const unique = new Set(keys);
       expect(
         unique.size,
-        `scenario '${scenario.slug}' has ${ids.length - unique.size} duplicate card id(s)`,
-      ).toBe(ids.length);
+        `scenario '${scenario.slug}' has ${keys.length - unique.size} duplicate (id, locale) key(s)`,
+      ).toBe(keys.length);
     }
   });
 
@@ -479,23 +530,23 @@ describe("name/reverse pairing rules (#1234)", () => {
     for (const slug of pairedScenarios) {
       const cards = SCENARIO_BY_SLUG.get(slug)!.build().session?.cards ?? [];
 
-      // Build a map of pokemonId → name card locale.
-      const nameLocaleById = new Map(
+      // Set of (pokemonId, locale) keys for name cards. Keyed on the composite
+      // identity so the en and ja name cards for one species are distinct
+      // (#1562) — a Map keyed on id alone would collapse the pair.
+      const nameKeys = new Set(
         cards
           .filter((c) => c.cardType === "name")
-          .map((c) => [c.id, (c as { locale: string }).locale]),
+          .map((c) => `${c.id}::${(c as { locale?: string }).locale ?? "en"}`),
       );
 
       const reverseCards = cards.filter((c) => c.cardType === "reverse");
       for (const c of reverseCards) {
         const rc = c as { pokemonId: number; locale: string };
-        const nameLocale = nameLocaleById.get(rc.pokemonId);
-        if (nameLocale !== undefined) {
-          expect(
-            rc.locale,
-            `${slug}: reverse card pokemonId=${rc.pokemonId} locale must match its name card locale`,
-          ).toBe(nameLocale);
-        }
+        // Every reverse card must have a name card in the SAME locale.
+        expect(
+          nameKeys.has(`${rc.pokemonId}::${rc.locale}`),
+          `${slug}: reverse card pokemonId=${rc.pokemonId} locale='${rc.locale}' has no matching name card in that locale`,
+        ).toBe(true);
       }
     }
   });
@@ -505,38 +556,47 @@ describe("name/reverse pairing rules (#1234)", () => {
 // AC3: Forcing-function tests — locale model
 // ---------------------------------------------------------------------------
 
-describe("locale model: en mastered visible, ja shows zero mastered", () => {
+describe("locale model: mastery is tracked per locale", () => {
   /**
    * The locale-mastery invariant: mastered cards are stored per locale.
-   * Under pokemonNameLocale='en', mastered count > 0 for scenarios that seed
-   * en-locale mastered cards. Under pokemonNameLocale='ja', mastered count = 0
-   * (because there are no ja-locale mastered cards seeded — we deliberately
-   * do not seed ja duplicates to avoid the #1394 id-collision crash).
+   * `pasture-progression` and `mastery-gaps` seed only en-locale mastered cards,
+   * so switching to ja shows zero mastered — proving per-locale storage.
+   * `fsrs-locale-mastery` (since #1562) additionally seeds a smaller, independent
+   * ja mastered set, so BOTH locales show a non-zero count and the two differ.
    */
-  const localeAwareScenarios = ["fsrs-locale-mastery", "pasture-progression", "mastery-gaps"];
+  const masteredEnOf = (cards: { state: { reps: number; scheduledDays: number } }[]) =>
+    cards.filter(
+      (c) =>
+        (c as { locale?: string }).locale === "en" &&
+        c.state.reps >= MASTERY_REPETITIONS &&
+        c.state.scheduledDays >= MASTERY_INTERVAL_DAYS,
+    );
+  const masteredJaOf = (cards: { state: { reps: number; scheduledDays: number } }[]) =>
+    cards.filter(
+      (c) =>
+        (c as { locale?: string }).locale === "ja" &&
+        c.state.reps >= MASTERY_REPETITIONS &&
+        c.state.scheduledDays >= MASTERY_INTERVAL_DAYS,
+    );
 
-  for (const slug of localeAwareScenarios) {
+  // Single-locale scenarios: en mastered > 0, ja mastered == 0.
+  for (const slug of ["pasture-progression", "mastery-gaps"]) {
     it(`${slug}: has mastered en-locale cards and ZERO mastered ja-locale cards`, () => {
       const cards = SCENARIO_BY_SLUG.get(slug)!.build().session?.cards ?? [];
-
-      const masteredEn = cards.filter(
-        (c) =>
-          (c as { locale?: string }).locale === "en" &&
-          c.state.reps >= MASTERY_REPETITIONS &&
-          c.state.scheduledDays >= MASTERY_INTERVAL_DAYS,
-      );
-
-      const masteredJa = cards.filter(
-        (c) =>
-          (c as { locale?: string }).locale === "ja" &&
-          c.state.reps >= MASTERY_REPETITIONS &&
-          c.state.scheduledDays >= MASTERY_INTERVAL_DAYS,
-      );
-
-      expect(masteredEn.length, `${slug}: must have mastered en-locale cards`).toBeGreaterThan(0);
-      expect(masteredJa.length, `${slug}: must have ZERO mastered ja-locale cards (locale model invariant)`).toBe(0);
+      expect(masteredEnOf(cards).length, `${slug}: must have mastered en cards`).toBeGreaterThan(0);
+      expect(masteredJaOf(cards).length, `${slug}: must have ZERO mastered ja cards`).toBe(0);
     });
   }
+
+  // Multi-locale scenario (#1562): both locales mastered, ja the smaller set.
+  it("fsrs-locale-mastery: has independent mastered sets in BOTH en and ja, ja smaller", () => {
+    const cards = SCENARIO_BY_SLUG.get("fsrs-locale-mastery")!.build().session?.cards ?? [];
+    const en = masteredEnOf(cards);
+    const ja = masteredJaOf(cards);
+    expect(en.length, "fsrs-locale-mastery: must have mastered en cards").toBeGreaterThan(0);
+    expect(ja.length, "fsrs-locale-mastery: must have mastered ja cards (#1562)").toBeGreaterThan(0);
+    expect(ja.length, "fsrs-locale-mastery: ja mastered set is smaller than en").toBeLessThan(en.length);
+  });
 
   it("fsrs-locale-mastery: pokemonNameLocale is 'en' (so mastered cards are visible by default)", () => {
     const payload = SCENARIO_BY_SLUG.get("fsrs-locale-mastery")!.build();
@@ -595,8 +655,11 @@ describe("Practice-load smoke: hydrateSession + buildSessionQueues do not throw 
     expect(masteredHydrated.length).toBeGreaterThanOrEqual(30);
   });
 
-  it("buildSessionQueues: ids are unique after hydration (no collision)", () => {
-    // Guard for the #1394 crash: duplicate ids in the session break Practice.
+  it("buildSessionQueues: (id, locale) keys are unique after hydration (no collision)", () => {
+    // Guard for the #1394 crash class: two cards sharing the same (id, locale)
+    // collide in buildSessionQueues and break Practice. Since #1562 an en+ja pair
+    // for one species is legal (different locale → different identity), so assert
+    // on the composite key that matches the DB primary key (migration 029).
     for (const scenario of SCENARIOS) {
       const payload = scenario.build();
       if (!payload.session) continue;
@@ -608,12 +671,12 @@ describe("Practice-load smoke: hydrateSession + buildSessionQueues do not throw 
         evolutionEnabled: true,
       });
 
-      const ids = hydrated.map((c) => c.id);
-      const unique = new Set(ids);
+      const keys = hydrated.map((c) => `${c.id}::${c.locale ?? "en"}`);
+      const unique = new Set(keys);
       expect(
         unique.size,
-        `scenario '${scenario.slug}': hydrated session has ${ids.length - unique.size} duplicate ids`,
-      ).toBe(ids.length);
+        `scenario '${scenario.slug}': hydrated session has ${keys.length - unique.size} duplicate (id, locale) key(s)`,
+      ).toBe(keys.length);
     }
   });
 });

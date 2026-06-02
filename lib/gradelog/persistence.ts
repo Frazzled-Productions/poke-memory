@@ -224,6 +224,10 @@ export async function appendGradeEntry(
       cardType: entry.cardType,
       occurredAt: Date.now(),
       ...(typeof entry.subjectKey === "string" ? { subjectKey: entry.subjectKey } : {}),
+      // Propagate locale when present (#1562). Legacy call sites that omit it
+      // produce a stamped entry without the field, which reads back as "en" from
+      // the cloud (the grade_log.locale column defaults to "en").
+      ...(entry.locale !== undefined ? { locale: entry.locale } : {}),
       // Propagate learningStep and stepStartedAt when present (migration 033).
       // Both are optional on the entry — legacy call sites that omit them produce
       // a stamped entry without the fields, which is valid and reads back as NULL
