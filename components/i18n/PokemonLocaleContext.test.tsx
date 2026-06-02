@@ -18,11 +18,17 @@ import {
 } from "@/lib/i18n/PokemonLocaleContext";
 import { SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 
-// Settings mock — controlled per-test via `mockSettingsStore`.
-let mockSettingsStore = {
-  labsFlags: { languages: false } as Record<string, boolean>,
-  pokemonNameLocale: "en" as string,
-  learningLocales: ["en"] as string[],
+// Settings mock — controlled per-test via `mockSettingsStore`. learningLocales
+// is optional so tests can omit it to exercise the back-compat (pre-#1484)
+// path, where readLocaleState falls back to the default set.
+let mockSettingsStore: {
+  labsFlags: Record<string, boolean>;
+  pokemonNameLocale: string;
+  learningLocales?: string[];
+} = {
+  labsFlags: { languages: false },
+  pokemonNameLocale: "en",
+  learningLocales: ["en"],
 };
 
 vi.mock("@/lib/settings/persistence", async (importOriginal) => {
