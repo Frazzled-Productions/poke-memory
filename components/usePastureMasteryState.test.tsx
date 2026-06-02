@@ -48,6 +48,7 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
 // ---------------------------------------------------------------------------
 
 import { usePastureMasteryState } from "@/lib/pasture/usePastureMasteryState";
+import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
 
 // ---------------------------------------------------------------------------
 // localStorage stub — jsdom does not always ship one.
@@ -63,20 +64,6 @@ function makeLocalStorage(): Storage {
     removeItem: (k) => { store.delete(k); },
     setItem: (k, v) => { store.set(k, String(v)); },
   };
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Stubs out requestAnimationFrame to call the callback synchronously. */
-function stubRaf() {
-  const original = window.requestAnimationFrame;
-  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-    cb(0);
-    return 0;
-  });
-  return () => { vi.stubGlobal("requestAnimationFrame", original); };
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +127,7 @@ describe("usePastureMasteryState — populated session", () => {
 
 describe("usePastureMasteryState — KEY_HAS_MASTERED fast path", () => {
   it("returns showPasture=true immediately when localStorage flag is 'true'", async () => {
-    localStorage.setItem("poke-memory:has-mastered:v2", "true");
+    localStorage.setItem(KEY_HAS_MASTERED, "true");
 
     const { result } = renderHook(() => usePastureMasteryState());
 
@@ -198,17 +185,28 @@ describe("usePastureMasteryState — epoch catch-up guard", () => {
     // registered its listener (e.g. the E2E seed fires before React hydrates).
     (window as Window & { __pokeMemorySessionWriteEpoch?: number }).__pokeMemorySessionWriteEpoch = 5;
 
-    const restoreRaf = stubRaf();
-
-    mockLoadSession.mockResolvedValue({ cards: [{ id: 1 }] });
+    // First direct load returns null so showPasture stays false; only the
+    // rAF-triggered re-load can flip it to true — proving the epoch guard is
+    // what fires the rAF, not the unconditional void load() call.
+    mockLoadSession
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ cards: [{ id: 1 }] });
     mockFilterMastered.mockReturnValue([{ id: 1 }]);
 
-    const { result } = renderHook(() => usePastureMasteryState());
+    const originalRaf = window.requestAnimationFrame;
+    const rafSpy = vi.fn((cb: FrameRequestCallback) => { cb(0); return 0; });
+    vi.stubGlobal("requestAnimationFrame", rafSpy);
 
-    await waitFor(() => {
-      expect(result.current.showPasture).toBe(true);
-    });
+    try {
+      const { result } = renderHook(() => usePastureMasteryState());
 
-    restoreRaf();
+      await waitFor(() => {
+        expect(result.current.showPasture).toBe(true);
+      });
+
+      expect(rafSpy).toHaveBeenCalledOnce();
+    } finally {
+      vi.stubGlobal("requestAnimationFrame", originalRaf);
+    }
   });
 });

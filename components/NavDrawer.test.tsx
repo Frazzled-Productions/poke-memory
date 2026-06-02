@@ -7,8 +7,11 @@
  * - Esc key closes the drawer and returns focus to the trigger
  * - Clicking the close button inside the drawer closes it
  * - aria-current="page" is set on the active link
- * - Pasture link appears when pretendAllMastered flag is on (hasMastered = false)
- * - Pasture link re-derives on a SETTINGS_SAVED_EVENT (#868 follow-up)
+ * - Pasture link appears when usePastureMasteryState returns showPasture=true
+ *
+ * Mastery derivation logic (SETTINGS_SAVED_EVENT, KEY_HAS_MASTERED fast path,
+ * epoch catch-up) is tested in
+ * components/usePastureMasteryState.test.tsx (#1516).
  */
 
 import { screen, within, waitFor } from "@testing-library/react";

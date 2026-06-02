@@ -1,14 +1,18 @@
 /**
- * Component tests for NavLinks (issue #852, #1369 i18n wiring).
+ * Component tests for NavLinks (issue #852, #1369 i18n wiring, #1516 hook
+ * extraction).
  *
  * Covers:
  *   - The Journey link is present in the nav.
  *   - Active link carries aria-current="page".
- *   - Pasture link appears when pretendAllMastered flag is on.
- *   - Pasture link hidden when hasMastered=false and flag is off.
- *   - Pasture link re-derives on a SETTINGS_SAVED_EVENT (#868 follow-up).
+ *   - Pasture link appears when usePastureMasteryState returns showPasture=true.
+ *   - Pasture link hidden when showPasture=false (default).
  *   - NavLinksFallback renders the same static links (including Journey).
  *   - Japanese locale renders the correct translated label (練習 for Practice).
+ *
+ * Mastery derivation logic (SETTINGS_SAVED_EVENT, KEY_HAS_MASTERED fast path,
+ * epoch catch-up) is tested in
+ * components/usePastureMasteryState.test.tsx (#1516).
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
