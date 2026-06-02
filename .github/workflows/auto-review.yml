@@ -178,7 +178,15 @@ jobs:
           done <<< "$ISSUES"
           echo "found=true" >> "$GITHUB_OUTPUT"
 
-      - uses: anthropics/claude-code-action@v1
+      # Pinned to an immutable release SHA rather than the floating `@v1`
+      # tag (which tracks the action's `main`). The floating tag pulled in
+      # an unstable build whose internal "directory mismatch for ...
+      # tsconfig.json" diagnostic coincided with the run hitting the turn
+      # cap and exiting non-zero, so the Review check went red on the head
+      # SHA without posting a review (#1566). v1.0.133 (2026-05-23) predates
+      # that regression. Bump the pin deliberately after verifying a newer
+      # release on a test PR; do not revert to `@v1`.
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251 # v1.0.133
         if: steps.idem.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}

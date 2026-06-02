@@ -92,7 +92,13 @@ jobs:
             echo "area:workflow label already exists."
           fi
 
-      - uses: anthropics/claude-code-action@v1
+      # Pinned to an immutable release SHA, not the floating `@v1` tag.
+      # The scheduled 2026-06-01 run failed inside the action with the
+      # same internal "directory mismatch for ... tsconfig.json" build
+      # bug + turn-cap exit that broke auto-review (#1566); the prior
+      # 2026-05-25 run on the older pinned-via-floating build succeeded
+      # (#1547). v1.0.133 (2026-05-23) predates the regression.
+      - uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251 # v1.0.133
         if: steps.idempotency.outputs.skip != 'true'
         id: claude
         env:
