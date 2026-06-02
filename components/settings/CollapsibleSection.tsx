@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { sectionLabelSm } from "@/lib/utils/class-names";
+import { colStackLg, sectionLabelSm } from "@/lib/utils/class-names";
 
 const STORAGE_PREFIX = "poke-memory:settings-section:";
 
@@ -127,7 +127,7 @@ export function CollapsibleSection({
         role="region"
         aria-labelledby={`${sectionId}-heading`}
         hidden={!effectiveOpen}
-        className="mt-4 flex flex-col gap-4"
+        className={`mt-4 ${colStackLg}`}
       >
         {children}
       </div>

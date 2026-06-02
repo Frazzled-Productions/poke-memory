@@ -20,7 +20,7 @@ import type {
   FamilyNode,
 } from "@/lib/evolution/chains";
 import { computeEvolutionWallStats } from "@/lib/evolution/chains";
-import { mutedTextXs } from "@/lib/utils/class-names";
+import { mutedText, mutedTextXs } from "@/lib/utils/class-names";
 import { POKEDEX_NODE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 // ---------------------------------------------------------------------------
@@ -425,7 +425,7 @@ export function EvolutionWall({
       </div>
 
       {/* Summary line — always visible, gives a progress snapshot at a glance */}
-      <p className="mb-3 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+      <p className={`mb-3 mt-1 ${mutedText}`}>
         {tWidget("familiesCompleted")}{" "}
         <span className="font-semibold tabular-nums text-foreground">
           {format.number(stats.completedFamilies)}

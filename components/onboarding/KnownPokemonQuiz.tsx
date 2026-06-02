@@ -477,7 +477,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         <h3 id="bulk-confirm-title" className="text-lg font-semibold text-foreground">
           Mark every Pokémon in {GEN_RANGES.find((r) => r.gen === activeGen)?.name}?
         </h3>
-        <p id="bulk-confirm-desc" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <p id="bulk-confirm-desc" className={`mt-2 ${mutedText}`}>
           This will add {activeCards.length} Pokémon to your selection. You can still
           tap individual sprites to deselect them before applying.
         </p>

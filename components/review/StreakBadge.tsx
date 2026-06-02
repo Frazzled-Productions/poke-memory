@@ -31,6 +31,7 @@ import {
   ProtectionToast,
   type ProtectionToastKind,
 } from "@/components/review/ProtectionToast";
+import { mutedTextXs } from "@/lib/utils/class-names";
 
 export function StreakBadge() {
   // Milestone signpost (days to next milestone) — surfaced here on Practice.
@@ -232,7 +233,7 @@ export function StreakBadge() {
         )}
       </div>
       {daysToNextMilestone !== null && (
-        <p className="mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400 sm:mb-4">
+        <p className={`mb-2 text-center ${mutedTextXs} sm:mb-4`}>
           {tChip("milestoneLabel", { count: daysToNextMilestone })}
         </p>
       )}
