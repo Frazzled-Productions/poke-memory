@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
@@ -44,31 +44,9 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-const mockLoadSession = vi.fn().mockResolvedValue(null);
-vi.mock("@/lib/review/persistence", () => ({
-  loadSession: () => mockLoadSession(),
-  STORAGE_KEY: "poke-memory:review-session:v1",
-  SESSION_CHANGED_EVENT: "poke-memory:session-changed",
-}));
-
-const mockFilterMastered = vi.fn().mockReturnValue([]);
-vi.mock("@/lib/pasture/arrivals", () => ({
-  filterMastered: (...args: unknown[]) => mockFilterMastered(...args),
-}));
-
-const mockLoadSettings = vi.fn(() => ({ masteryRepetitions: 3 }));
-vi.mock("@/lib/settings/persistence", () => ({
-  loadSettings: () => mockLoadSettings(),
-  SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
-}));
-
-vi.mock("@/lib/hooks/useLocalStorageKey", () => ({
-  useLocalStorageKey: vi.fn().mockReturnValue(0),
-}));
-
-const mockUseSuperuser = vi.fn(() => ({ flags: { pretendAllMastered: false } }));
-vi.mock("@/lib/superuser/SuperuserContext", () => ({
-  useSuperuser: () => mockUseSuperuser(),
+const mockUsePastureMasteryState = vi.fn(() => ({ showPasture: false }));
+vi.mock("@/lib/pasture/usePastureMasteryState", () => ({
+  usePastureMasteryState: () => mockUsePastureMasteryState(),
 }));
 
 vi.mock("@/components/whats-new/WhatsNewIndicator", () => ({
@@ -85,32 +63,9 @@ import { NavLinks, NavLinksFallback } from "@/components/NavLinks";
 
 // ---------------------------------------------------------------------------
 
-// jsdom on this Node version does not ship localStorage out of the box.
-// Install an in-memory stub before each test, matching the pattern used in
-// ReviewSession.test.tsx.
-function makeLocalStorage(): Storage {
-  const store = new Map<string, string>();
-  return {
-    get length() { return store.size; },
-    clear: () => store.clear(),
-    getItem: (k) => store.get(k) ?? null,
-    key: (i) => Array.from(store.keys())[i] ?? null,
-    removeItem: (k) => { store.delete(k); },
-    setItem: (k, v) => { store.set(k, String(v)); },
-  };
-}
-
 beforeEach(() => {
-  Object.defineProperty(window, "localStorage", {
-    value: makeLocalStorage(),
-    configurable: true,
-    writable: true,
-  });
   mockPathname.value = "/";
-  mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: false } });
-  mockLoadSession.mockResolvedValue(null);
-  mockFilterMastered.mockReturnValue([]);
-  mockLoadSettings.mockReturnValue({ masteryRepetitions: 3 });
+  mockUsePastureMasteryState.mockReturnValue({ showPasture: false });
 });
 
 describe("NavLinks", () => {
@@ -170,65 +125,10 @@ describe("NavLinks", () => {
     expect(screen.queryByRole("link", { name: "Pasture" })).toBeNull();
   });
 
-  it("shows the Pasture link when pretendAllMastered flag is on", async () => {
-    mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: true } });
+  it("shows the Pasture link when usePastureMasteryState returns showPasture=true", async () => {
+    mockUsePastureMasteryState.mockReturnValue({ showPasture: true });
 
     renderWithIntl(<NavLinks />);
-
-    await waitFor(() => {
-      expect(screen.getByRole("link", { name: "Pasture" })).toBeInTheDocument();
-    });
-  });
-
-  it("re-derives Pasture visibility when SETTINGS_SAVED_EVENT fires", async () => {
-    // A real session exists, but with the default threshold nothing is mastered.
-    mockLoadSession.mockResolvedValue({ cards: [] });
-    mockFilterMastered.mockReturnValue([]);
-
-    renderWithIntl(<NavLinks />);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("link", { name: "Practice" }),
-      ).toBeInTheDocument();
-    });
-    expect(screen.queryByRole("link", { name: "Pasture" })).toBeNull();
-
-    // The user lowers the mastery threshold in Settings; now the same session
-    // has a mastered card. A SETTINGS_SAVED_EVENT must re-run the derivation.
-    mockLoadSettings.mockReturnValue({ masteryRepetitions: 1 });
-    mockFilterMastered.mockReturnValue([{ id: 1 }]);
-    act(() => {
-      window.dispatchEvent(new Event("poke-memory:settings-saved"));
-    });
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("link", { name: "Pasture" }),
-      ).toBeInTheDocument();
-    });
-  });
-
-  it("shows Pasture link when KEY_HAS_MASTERED flag is set to 'true'", async () => {
-    // Start with no mastered cards — Pasture should be hidden.
-    mockLoadSession.mockResolvedValue(null);
-    mockFilterMastered.mockReturnValue([]);
-
-    renderWithIntl(<NavLinks />);
-
-    await waitFor(() => {
-      expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
-    });
-    expect(screen.queryByRole("link", { name: "Pasture" })).toBeNull();
-
-    // Simulate ReviewSession writing the lightweight mastery flag after a
-    // name card crosses the mastery threshold (#1191). The component re-reads
-    // the flag whenever its effect re-runs (here we trigger it via
-    // SETTINGS_SAVED_EVENT so settingsVersion bumps and the effect fires).
-    localStorage.setItem("poke-memory:has-mastered:v2", "true");
-    act(() => {
-      window.dispatchEvent(new Event("poke-memory:settings-saved"));
-    });
 
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Pasture" })).toBeInTheDocument();
