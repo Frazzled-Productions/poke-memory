@@ -360,11 +360,9 @@ describe("buildDailyMessage — multi-language breakdown (#1504)", () => {
   });
 
   it("singular 'card' when global total is 1 across two locales", async () => {
-    // ja=1, en=0 → with only ja in map
+    // en=0 is filtered internally; only ja=1 remains → compact single-locale form
     const msg = await buildDailyMessage(makeLocaleDueMap({ ja: 1, en: 0 }));
-    // en=0 → omit from map before calling; but this tests the multi path with a true multi-locale map
-    // Actually with en=0 still in map, the route omits zero-due entries.
-    // Let's test a genuine single non-zero locale among a two-locale map:
+    expect(msg.body).toBe("1 card due in 日本語 for review.");
     const msg2 = await buildDailyMessage(makeLocaleDueMap({ ja: 1 }));
     expect(msg2.body).toBe("1 card due in 日本語 for review.");
   });

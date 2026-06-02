@@ -2,12 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import webpush from "web-push";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createTranslator: _createTranslator } = require("use-intl/core") as {
-  createTranslator: (opts: { locale: string; messages: Record<string, unknown> }) => (
-    (key: string, values?: Record<string, unknown>) => string
-  );
-};
+import { createTranslator as _createTranslatorRaw } from "use-intl/core";
 import { todayInTimezone } from "@/lib/utils/format-date";
 import { isCardEligible } from "@/lib/eligibility";
 import { scopeMatchesEntry, resolveAnchorId } from "@/lib/eligibility/scopePredicate";
@@ -20,6 +15,13 @@ import {
   LOCALE_ENDONYMS,
   type AppLocale,
 } from "@/i18n/locales";
+
+// use-intl's createTranslator has deeply generic types that conflict with the
+// simple Record<string, unknown> messages shape used here; cast to a plain
+// callable to keep the call sites readable without requiring type imports.
+const _createTranslator = _createTranslatorRaw as unknown as (
+  opts: { locale: string; messages: Record<string, unknown> }
+) => (key: string, values?: Record<string, unknown>) => string;
 
 /**
  * Daily Web Push reminder route (#1056, per-user hour gate: #1315).
@@ -110,15 +112,6 @@ async function getPushDailyMessages(): Promise<Record<string, unknown>> {
 }
 
 /**
- * Pluralisation helper. Avoids relying on Intl.PluralRules for one word.
- * Still used for the legacy single-language paths that do NOT go through
- * the catalogue (new-only copy, which stays hand-rolled for now).
- */
-function plural(n: number, singular: string, pluralForm: string): string {
-  return n === 1 ? singular : pluralForm;
-}
-
-/**
  * Constant-time bearer-header comparison. Plain `===` on the assembled
  * `Bearer <secret>` string leaks the shared secret's length and prefix via
  * the early-exit timing characteristic of JavaScript string equality. We
@@ -180,18 +173,18 @@ export async function buildDailyMessage(
 
   // ── Zero due: fall through to new-only copy (unchanged path) ─────────────
   if (dueTotal === 0) {
-    const body = `${String(newEstimate)} new ${plural(newEstimate, "card", "cards")} ready to practise.`;
+    const body = t("newOnly", { newEstimate });
     return { title, body, url };
   }
 
   // ── Determine the breakdown: sort by due desc, tie-break by canonical order ─
   const canonicalOrder = SUPPORTED_LOCALES as readonly AppLocale[];
-  const sorted = Array.from(localeDueCounts.entries()).sort(
-    ([locA, countA], [locB, countB]) => {
+  const sorted = Array.from(localeDueCounts.entries())
+    .filter(([, c]) => c > 0)
+    .sort(([locA, countA], [locB, countB]) => {
       if (countB !== countA) return countB - countA;
       return canonicalOrder.indexOf(locA) - canonicalOrder.indexOf(locB);
-    },
-  );
+    });
 
   // ── Single due-locale: compact form ──────────────────────────────────────
   // (Only one locale has due > 0, regardless of how many the user is enrolled in.)
@@ -396,7 +389,7 @@ function parseLearningLocales(raw: unknown): AppLocale[] {
   }
   // English is unremovable — ensure it's always present.
   if (!seen.has("en")) out.unshift("en");
-  return out.length > 0 ? out : ["en"];
+  return out;
 }
 
 /**
