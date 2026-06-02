@@ -40,7 +40,7 @@ import { useStorageQuota } from "@/lib/review/useStorageQuota";
 import { StorageQuotaBanner } from "@/components/review/StorageQuotaBanner";
 import { GradeErrorBanner } from "@/components/review/GradeErrorBanner";
 import { recordReview } from "@/lib/streak";
-import { loadSettings, saveSettings, type UserSettings } from "@/lib/settings/persistence";
+import { loadSettings, saveSettings, SETTINGS_SAVED_EVENT, type UserSettings } from "@/lib/settings/persistence";
 import { LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { nextReview, type ReviewState } from "@/lib/srs/scheduler";
 import { learningStepsFor, relearningStepsFor } from "@/lib/srs/constants";
@@ -1283,6 +1283,24 @@ export function ReviewSession() {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
+  // Rebuild the session when the active learning language changes in THIS tab
+  // (#1562). A same-tab `saveSettings` fires SETTINGS_SAVED_EVENT but NOT a
+  // `storage` event (the browser only delivers `storage` to other tabs), so the
+  // cross-tab handler above never sees a pill switch made on this page. Reload
+  // only when the active locale actually changed — other settings saves (streak,
+  // onboarding, etc.) must not interrupt practice. The mid-card switch lock
+  // guarantees this only fires between cards, so no in-flight grade is lost.
+  useEffect(() => {
+    function handleSettingsSaved() {
+      const next = (loadSettings().activePokemonNameLocale ?? "en") as AppLocale;
+      if (next !== activeLocale) {
+        window.location.reload();
+      }
+    }
+    window.addEventListener(SETTINGS_SAVED_EVENT, handleSettingsSaved);
+    return () => window.removeEventListener(SETTINGS_SAVED_EVENT, handleSettingsSaved);
+  }, [activeLocale]);
+
   // Reload when a sign-in or visibility pull applied cloud progress that
   // wasn't on this device yet (#608). The practice page can't subscribe to
   // `saveSession`'s synthetic StorageEvent the way Stats/Pasture/Pokédex do
@@ -1993,10 +2011,9 @@ export function ReviewSession() {
         : endState === "NEW_CARDS_LOCKED"
           ? { kind: "new-locked" }
           : { kind: "complete" };
-    // Switching locale writes activePokemonNameLocale to settings, which
-    // dispatches SETTINGS_SAVED_EVENT and triggers a full page reload via the
-    // storage-event handler. This rebuilds the session for the new locale —
-    // exactly the same path as toggling card-type flags (#1562).
+    // Switching locale writes activePokemonNameLocale to settings, which fires
+    // SETTINGS_SAVED_EVENT; the same-tab handler above reloads when the active
+    // locale changed, rebuilding the session for the new language (#1562).
     function handleSwitchLocale(next: AppLocale) {
       const current = loadSettings();
       saveSettings({ ...current, activePokemonNameLocale: next });

@@ -328,6 +328,10 @@ export function computeDashboardSnapshot(
       const futureCounts = new Array<number>(DUE_FORECAST_DAYS).fill(0);
 
       for (const card of cards) {
+        // Scope the forecast to the active locale (#1562), matching the day-0
+        // bar (which comes from the locale-filtered session queues). Applies to
+        // every card type — evolution cards are per-locale too.
+        if ((card.locale ?? "en") !== locale) continue;
         // Exclude ineligible cards (disabled card type, out-of-scope, etc.).
         if (!eligibleCardIds.has(card.id)) continue;
         // Exclude never-reviewed cards — they are new-card candidates, not

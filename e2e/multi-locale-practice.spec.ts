@@ -236,44 +236,35 @@ test.describe("Per-locale practice session (#1562)", () => {
     await page.goto("/settings");
     await page.goto("/");
 
-    // The practice session must be non-empty for the Japanese locale. The seed
-    // provides 5 due-soon ja name cards so a Reveal button (or an end-state
-    // message) must appear. A generous timeout covers IDB hydration + filtering.
-    const reveal = page.getByRole("button", { name: /^reveal$/i });
-    const caughtUp = page.getByText(/all caught up/i);
-    await Promise.race([
-      reveal.waitFor({ state: "visible", timeout: 20_000 }),
-      caughtUp.waitFor({ state: "visible", timeout: 20_000 }),
-    ]);
+    // The ja session must be non-empty. practiceReadyLocator matches every
+    // legitimate first-card surface (Reveal / SpritePicker / MultipleChoice /
+    // end-state), so the assertion is robust to the daily shuffle leading with
+    // any card type — not just a flip card with a Reveal button.
+    await expect(practiceReadyLocator(page)).toBeVisible({ timeout: 20_000 });
 
-    // Confirm the pill still shows Japanese (locale persists across navigation).
+    // The pill still shows Japanese (locale persists across navigation).
     await expect(
       page.getByRole("button", { name: /Pokémon name language.*日本語/ }),
     ).toBeVisible();
 
-    // If a Reveal card loaded (flip name card), reveal it and assert the
-    // displayed name is non-Latin Japanese script.
-    // Japanese Pokémon names are resolved via useLocalePokemonName for locale "ja";
-    // they contain hiragana, katakana, or kanji (U+3040–U+9FFF).
-    const isRevealVisible = await reveal.isVisible().catch(() => false);
-    if (isRevealVisible) {
+    // A Japanese name must be on screen. For a flip card, reveal it first; for a
+    // multiple-choice or sprite-picker card the ja name(s) are already shown.
+    // Japanese names resolve via useLocalePokemonName for locale "ja" — hiragana,
+    // katakana, or kanji (U+3040–U+9FFF). Poll main's text either way.
+    const reveal = page.getByRole("button", { name: /^reveal$/i });
+    if (await reveal.isVisible().catch(() => false)) {
       await reveal.click();
-      // After reveal the Japanese name is shown in the card body. Poll the
-      // main element's text content for Japanese script. We use a waitFor
-      // rather than a one-shot evaluate so natural render latency is handled.
-      await expect.poll(
-        async () => {
-          return page.locator("main").evaluate((el) => {
-            // Hiragana: U+3040–U+309F, Katakana: U+30A0–U+30FF, CJK: U+4E00–U+9FFF
-            return /[぀-鿿]/.test(el.innerText ?? "");
-          });
-        },
-        {
-          message: "Expected at least one Japanese character in the practice card after reveal (locale: ja)",
-          timeout: 5_000,
-        },
-      ).toBe(true);
     }
+    await expect
+      .poll(
+        async () =>
+          page.locator("main").evaluate((el) => /[぀-鿿]/.test(el.textContent ?? "")),
+        {
+          message: "Expected at least one Japanese character in the ja practice session",
+          timeout: 8_000,
+        },
+      )
+      .toBe(true);
   });
 
   // ── Mid-card lock: switching the pill while a card is revealed is blocked ──
@@ -319,17 +310,17 @@ test.describe("Per-locale practice session (#1562)", () => {
       dialog.getByRole("status"),
     ).toContainText(/Finish this card first/i);
 
-    // The Japanese radio option must be present but clicking it does NOT
-    // switch the locale — selectLocale guards on cardRevealed.
+    // The Japanese radio is disabled while a card is revealed (the lock), so it
+    // cannot switch the locale. Playwright treats aria-disabled as
+    // non-actionable — which IS the user-facing block — so assert the disabled
+    // state rather than attempting a click.
     const jaOption = dialog.getByRole("radio", { name: /日本語/ });
     await expect(jaOption).toBeVisible();
-    await jaOption.click();
+    await expect(jaOption).toHaveAttribute("aria-disabled", "true");
 
-    // The dialog must remain open (no locale switch occurred — a switch calls
-    // close(), so if the dialog is still open the guard fired correctly).
+    // The dialog is still open (the lock message is showing) and the pill still
+    // reads English — no switch happened.
     await expect(dialog).toBeVisible();
-
-    // The pill must still show English — locale was not changed.
     await expect(
       page.getByRole("button", { name: /Pokémon name language.*English/i }),
     ).toBeVisible();
