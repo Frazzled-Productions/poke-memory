@@ -2,6 +2,7 @@ import type { ReviewableCard } from "@/lib/review/session";
 import type { GradeLog } from "@/lib/gradelog/persistence";
 import type { AppLocale } from "@/i18n/locales";
 import { isoDate } from "@/lib/utils/format-date";
+import { daysBetweenIsoDates } from "@/lib/utils/dates";
 import { MASTERY_REPETITIONS } from "./derive";
 import { masteredSpeciesEvents, nameCardsForLocale } from "./mastery-species-events";
 
@@ -28,15 +29,6 @@ export type Records = {
    */
   mostMasteredIn7d: number | null;
 };
-
-function daysBetween(fromIso: string, toIso: string): number {
-  // YYYY-MM-DD strings are lexicographic and parseable; using UTC math here
-  // matches `lib/streak/compute.ts` and avoids local-TZ drift for a metric
-  // that aggregates across the user's full history.
-  const from = new Date(fromIso + "T00:00:00Z").getTime();
-  const to = new Date(toIso + "T00:00:00Z").getTime();
-  return Math.round((to - from) / 86_400_000);
-}
 
 /** Longest consecutive-date run in the (possibly unsorted) `dates` set. */
 export function computeLongestStreak(dates: readonly string[]): number {
@@ -127,7 +119,7 @@ export function computeRecords(
     for (const ev of events) {
       const firstSeen = nameCardFirstSeen.get(ev.speciesId);
       if (firstSeen === null || firstSeen === undefined) continue;
-      sum += daysBetween(firstSeen, ev.masteredDate);
+      sum += daysBetweenIsoDates(firstSeen, ev.masteredDate);
       counted++;
     }
     if (counted > 0) {
@@ -143,7 +135,7 @@ export function computeRecords(
     let best = 0;
     let left = 0;
     for (let right = 0; right < dates.length; right++) {
-      while (left < right && daysBetween(dates[left], dates[right]) >= 7) {
+      while (left < right && daysBetweenIsoDates(dates[left], dates[right]) >= 7) {
         left++;
       }
       const span = right - left + 1;

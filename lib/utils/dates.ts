@@ -4,8 +4,8 @@
  * timezone math.
  *
  * Both functions use UTC to avoid local-TZ drift across negative-offset
- * timezones. This matches the convention in lib/stats/records.ts'
- * private `daysBetween`. The local-time variant exists in
+ * timezones. `lib/stats/records.ts` imports `daysBetweenIsoDates` directly
+ * (the local copy was removed in #1517). The local-time variant exists in
  * lib/srs/scheduler.ts (`addDays`) for now-relative arithmetic; this
  * module is for already-ISO inputs where there is no `Date.now()` involved.
  */

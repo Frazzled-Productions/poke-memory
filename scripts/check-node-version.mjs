@@ -54,8 +54,8 @@ and may produce incorrect output or fail deep inside the build.
 
 How to fix:
 
-  Option A — Homebrew node@24 (no nvm required):
-    export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
+  Option A — Homebrew node@${requiredMajor} (no nvm required):
+    export PATH="/opt/homebrew/opt/node@${requiredMajor}/bin:$PATH"
     npm run build
 
   Option B — nvm:
