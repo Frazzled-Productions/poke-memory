@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { TypedEntryNameCard } from "@/components/review/TypedEntryNameCard";
@@ -1325,7 +1325,10 @@ export function ReviewSession() {
 
   // Schedule a timeout to re-render when the earliest pending learning card is due.
   // Extracted to useLearningQueueTimer (#1520).
-  useLearningQueueTimer(learningQueue, () => setLearningQueue((q) => [...q]));
+  useLearningQueueTimer(
+    learningQueue,
+    useCallback(() => setLearningQueue((q) => [...q]), []),
+  );
 
   // Auto-play the cry when a cry card first becomes the current card.
   // Drives the "audio as prompt" loop without requiring a tap. Skipped

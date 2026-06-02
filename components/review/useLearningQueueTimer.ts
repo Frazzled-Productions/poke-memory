@@ -60,9 +60,5 @@ export function useLearningQueueTimer(
         timeoutRef.current = null;
       }
     };
-    // onDue is a stable callback provided by ReviewSession (an inline arrow
-    // that calls setLearningQueue). Re-running on `onDue` identity change would
-    // reset timers spuriously; ReviewSession creates it as a stable closure.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learningQueue]);
+  }, [learningQueue, onDue]);
 }
