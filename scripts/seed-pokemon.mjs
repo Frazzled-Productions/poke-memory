@@ -296,14 +296,15 @@ function extractFlavorTexts(flavorTextEntries) {
       if (versionSlug && !existing.versions.includes(versionSlug)) {
         existing.versions.push(versionSlug);
       }
-    } else {
+    } else if (byText.size < FLAVOR_TEXTS_MAX) {
       // New distinct text — insert with this game as the first version.
+      // The loop continues even after reaching the cap so that later entries
+      // whose text matches an already-collected entry can still accumulate
+      // version slugs into the existing record above.
       byText.set(normalized, {
         text: normalized,
         versions: versionSlug ? [versionSlug] : [],
       });
-      // Apply cap to distinct entries, not raw entries.
-      if (byText.size >= FLAVOR_TEXTS_MAX) break;
     }
   }
 

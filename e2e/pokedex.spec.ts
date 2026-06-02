@@ -1208,3 +1208,84 @@ test.describe("Pokédex detail — locked-state signposts (#1440)", () => {
     ).toBeVisible();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Pokédex detail — game-label facts (#1559)
+// ---------------------------------------------------------------------------
+
+test.describe("Pokédex detail — game-label facts (#1559)", () => {
+  test("facts section shows source game names instead of 'Pokédex entry' for a mastered Pokémon", async ({
+    page,
+  }) => {
+    // The Facts section only renders when the species is mastered at the
+    // species level: both the name card (id=1) and the reverse card
+    // (id=REVERSE_ID_OFFSET+1 = 2_000_001) must have reps >= masteryRepetitions
+    // (default 3) and scheduledDays >= 21.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 30,
+            difficulty: 4,
+            elapsedDays: 30,
+            scheduledDays: 30,
+            reps: 5,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-04-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+        {
+          id: 2_000_001,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "reverse",
+          state: {
+            stability: 30,
+            difficulty: 4,
+            elapsedDays: 30,
+            scheduledDays: 30,
+            reps: 5,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-04-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+    await expect(page.getByRole("heading", { name: "Bulbasaur" })).toBeVisible();
+
+    // The game-label feature (#1559) replaces the repeated "Pokédex entry" dt
+    // label with the source game name(s) from generated-flavor.json.
+    // Bulbasaur's first flavour text is shared by Red, Blue, and LeafGreen →
+    // formatted as "Red · Blue · LeafGreen".
+    // The flavor JSON is fetched asynchronously after mount; allow time for
+    // the fetch and subsequent re-render to complete.
+    await expect(page.getByText("Red · Blue · LeafGreen")).toBeVisible({
+      timeout: 10_000,
+    });
+    // The generic fallback label must not appear for any flavour-text row.
+    await expect(page.getByText("Pokédex entry")).not.toBeVisible();
+  });
+});

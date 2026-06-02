@@ -124,9 +124,13 @@ export const ALLOWLIST: Array<string | RegExp> = [
   /^(Sword|Shield|Isle of Armor|Crown Tundra|Brilliant Diamond|Shining Pearl)$/,
   /^(Legends: Arceus|Scarlet|Violet|Colosseum|XD)$/,
   // Formatted game-label strings: "Red · Blue", "X · Y", "FireRed · LeafGreen", overflow "+N".
-  // Uses * (not +) after the leading uppercase letter so single-char game names
-  // like "X" and "Y" are valid in any position of the · -joined list.
-  /^[A-Z][A-Za-z0-9' :-]*(?:\s·\s[A-Z][A-Za-z0-9' :-]*)*(?:\s\+\d+)?$/,
+  // Inner segments use * (not +) so single-char game names like "X" and "Y"
+  // are valid in any position of the ·-joined list.
+  // The outer group uses + (not *) so the pattern only matches compound labels
+  // (at least one · separator) and does not inadvertently pass arbitrary
+  // Title-Case English phrases through the leak gate.
+  // Single-title names are already matched by the six literal regexes above.
+  /^[A-Z][A-Za-z0-9' :-]*(?:\s·\s[A-Z][A-Za-z0-9' :-]*)+(?:\s\+\d+)?$/,
 
   // -------------------------------------------------------------------------
   // Version strings (v0.1.2 etc.).
