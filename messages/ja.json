@@ -247,7 +247,10 @@
       "updateButton": "更新",
       "downloadingProgress": "{total} 件中 {done} 件をダウンロード中",
       "downloadProgressAriaLabel": "ダウンロードの進捗",
-      "stopButton": "停止"
+      "stopButton": "停止",
+      "upToDate": "最新の状態",
+      "updateAvailable": "アップデートあり",
+      "updateAvailableCount": "アップデートあり（{count} 件追加）"
     },
     "optimizerCooldown": "{count, plural, other {次の最適化まであと # 日}}",
     "optimizerRetryAfter": "{count, plural, other {# 日後に再試行してください。}}",
@@ -461,6 +464,11 @@
     "practiceScopeNudge": {
       "title": "ヒント: 世代・タイプ・グループで絞り込めます",
       "body": "下の「スコープ」を開いて、特定の世代・タイプ・スターターや未完成の進化チェーンなどのグループに絞って練習できます。"
+    },
+    "offlineDownloadNudge": {
+      "title": "オフライン練習？高速化のためにダウンロードを",
+      "body": "スプライトの読み込みが遅い場合、全スプライトと鳴き声（約166MB）をあらかじめダウンロードすると、接続なしでも瞬時に練習できます。",
+      "cta": "オフラインダウンロードを開く"
     }
   },
   "review": {

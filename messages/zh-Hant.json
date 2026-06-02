@@ -247,7 +247,10 @@
       "updateButton": "更新",
       "downloadingProgress": "正在下載 {total} 中的 {done}",
       "downloadProgressAriaLabel": "下載進度",
-      "stopButton": "停止"
+      "stopButton": "停止",
+      "upToDate": "已是最新",
+      "updateAvailable": "有可用更新",
+      "updateAvailableCount": "有可用更新（新增 {count} 個）"
     },
     "optimizerCooldown": "{count, plural, other {下次最佳化還需 # 天}}",
     "optimizerRetryAfter": "{count, plural, other {請在 # 天後重試。}}",
@@ -461,6 +464,11 @@
     "practiceScopeNudge": {
       "title": "提示：可按世代、屬性或分組篩選",
       "body": "使用下方的「範圍」控制項，將練習限定於特定世代、屬性，或「御三家」「未完成進化鏈」等分組。"
+    },
+    "offlineDownloadNudge": {
+      "title": "離線練習？下載以提升速度",
+      "body": "精靈圖載入緩慢？預先擷取所有精靈圖和叫聲（約 166 MB），即使沒有網路也能即時練習。",
+      "cta": "開啟離線下載"
     }
   },
   "review": {

@@ -70,7 +70,7 @@ import { masteredSpeciesIds } from "@/lib/badges/derive";
 import { BadgeToast } from "@/components/badges/BadgeToast";
 import { triggerHaptic } from "@/lib/review/haptic";
 import { markSessionActive, markSessionInactive, markCardRevealed } from "@/lib/review/sessionActive";
-import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
+import { KEY_HAS_MASTERED, KEY_OFFLINE_DOWNLOADED_AT } from "@/lib/storage/keys";
 // KEY_SETTINGS is now consumed inside useSessionReloadListeners (#1520).
 import { writeMasteredCountForLocale } from "@/lib/profile/masteredCountCache";
 import {
@@ -121,6 +121,11 @@ const SCOPE_NUDGE_SESSION_THRESHOLD = 3;
 // A new key (not reusing PwaInstallNudge's visit key) because this counts
 // sessions with at least one grade, not page visits.
 const SCOPE_NUDGE_SESSION_KEY = "poke-memory:practice-session-counted:v1";
+
+// Thresholds for the offline-download discovery nudge (#1538).
+// The nudge shows when EITHER signal crosses its threshold.
+const OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD = 3;
+const OFFLINE_NUDGE_SESSION_THRESHOLD = 5;
 
 // Module-scoped seed lookup map. Built once at module load — the 1025-entry
 // Map would be wasteful to rebuild on every render of ReviewSession.
@@ -786,6 +791,11 @@ export function ReviewSession() {
   const [scopeEverOpened, setScopeEverOpened] = useState(true);
   // Default to SESSION_THRESHOLD so nudge is hidden before hydration.
   const [practiceSessionsCount, setPracticeSessionsCount] = useState(SCOPE_NUDGE_SESSION_THRESHOLD);
+  // Offline-download nudge signals (#1538). Both default to suppressing values
+  // so the nudge never flashes before settings are loaded.
+  const [slowSpriteLoadCount, setSlowSpriteLoadCount] = useState(OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD);
+  // true = user already has a download, or settings haven't loaded yet.
+  const [offlineDownloaded, setOfflineDownloaded] = useState(true);
   // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
   // "Incomplete evolution chains" scope preset derives chain progress against
   // the same mastery threshold the rest of the app uses. Defaults to 3 (the
@@ -1240,6 +1250,15 @@ export function ReviewSession() {
       // Scope-nudge gate signals (#1482). Read from persisted settings.
       setScopeEverOpened(settings.onboarding?.scopeEverOpened === true);
       setPracticeSessionsCount(settings.onboarding?.practiceSessionsCount ?? 0);
+      // Offline-download nudge gate signals (#1538).
+      setSlowSpriteLoadCount(settings.onboarding?.slowSpriteLoadCount ?? 0);
+      // Check whether a download already exists — if so, suppress the nudge.
+      // The typeof + optional-chain guards cover SSR and test environments
+      // where window.localStorage may be undefined.
+      const hasDownload = typeof window !== "undefined"
+        && window.localStorage != null
+        && window.localStorage.getItem(KEY_OFFLINE_DOWNLOADED_AT) !== null;
+      setOfflineDownloaded(hasDownload);
 
       // Hydrate the daily summary so the "Share today" button survives a page
       // reload, a navigation away and back, or reopening the app later in the
@@ -1597,6 +1616,31 @@ export function ReviewSession() {
       </div>
     );
   }
+
+  // Offline-download discovery nudge (#1538). Gate (in priority order):
+  //   1. offlineDownloadNudgeDismissed (handled by OnboardingHint itself).
+  //   2. offlineDownloaded true   -> suppress (already downloaded; nudge served its purpose).
+  //   3. firstVisitDone false     -> suppress (first-visit modal still showing).
+  //   4. superuserGuarded true    -> suppress (QA sessions must not fire).
+  //   5. Show if: slowSpriteLoadCount >= threshold OR practiceSessionsCount >= threshold.
+  const offlineNudge = (
+    offlineDownloaded ||
+    !firstVisitDone ||
+    superuserGuarded ||
+    (slowSpriteLoadCount < OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD &&
+      practiceSessionsCount < OFFLINE_NUDGE_SESSION_THRESHOLD)
+  ) ? null : (
+    <div className="mb-3">
+      <OnboardingHint
+        id="offlineDownloadNudgeDismissed"
+        title={t("offlineDownloadNudge.title")}
+        ctaHref="/settings#offline-download-heading"
+        ctaLabel={t("offlineDownloadNudge.cta")}
+      >
+        <p>{t("offlineDownloadNudge.body")}</p>
+      </OnboardingHint>
+    </div>
+  );
 
   // --- All opt-in card types disabled ---
   // Name and reverse are always on since #1234, so this guard covers only
@@ -2110,6 +2154,32 @@ export function ReviewSession() {
     }
   }
 
+  /**
+   * Called when a grade-path `decodeSpriteUrls` call times out on the 150 ms
+   * ceiling (#1538). Increments the `slowSpriteLoadCount` counter so the
+   * offline-download nudge can surface after repeated slow loads. Skipped under
+   * superuser so QA sessions do not inflate the counter.
+   *
+   * Cross-layer note: this updates `lib/settings/persistence.ts` state from
+   * inside `ReviewSession`. The nudge trigger is directly tied to the grading
+   * critical path (the exact point the user feels the slowness), making
+   * `ReviewSession` the right call site per AGENTS.md "Cross-layer fixes".
+   */
+  function handleSlowSpriteLoad() {
+    if (superuserGuarded) return;
+    const settingsForSlowLoad = loadSettings();
+    const current = settingsForSlowLoad.onboarding?.slowSpriteLoadCount ?? 0;
+    // Cap at the nudge threshold to avoid unbounded loadSettings/saveSettings
+    // calls on the grade critical path on persistently slow networks.
+    if (current >= OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD) return;
+    const next = current + 1;
+    saveSettings({
+      ...settingsForSlowLoad,
+      onboarding: { ...settingsForSlowLoad.onboarding, slowSpriteLoadCount: next },
+    });
+    setSlowSpriteLoadCount(next);
+  }
+
   async function handleGrade(grade: Grade) {
     if (effectiveCard === null || grading) return;
     // Re-narrow cards inside the closure — TS doesn't carry the outer
@@ -2289,10 +2359,11 @@ export function ReviewSession() {
             await decodeSpriteUrls(
               [target, ...distractors].map((p) => p.spriteUrl),
               DECODE_GRADE_TIMEOUT_MS,
+              handleSlowSpriteLoad,
             );
           }
         } else {
-          await decodeSpriteUrls(preloadableSpriteUrls(nextCard), DECODE_GRADE_TIMEOUT_MS);
+          await decodeSpriteUrls(preloadableSpriteUrls(nextCard), DECODE_GRADE_TIMEOUT_MS, handleSlowSpriteLoad);
         }
       }
     }
@@ -2651,6 +2722,7 @@ export function ReviewSession() {
             {/* Cry card wraps ScopeControl in a max-width column for alignment. */}
             <div className="flex w-full max-w-xl flex-col gap-2">
               {scopeNudge}
+              {offlineNudge}
               <ScopeControl
                 scope={scope}
                 onChange={handleScopeChange}
@@ -2776,6 +2848,7 @@ export function ReviewSession() {
             )}
             <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
             {scopeNudge}
+            {offlineNudge}
             <ScopeControl
               scope={scope}
               onChange={handleScopeChange}
@@ -2887,6 +2960,7 @@ export function ReviewSession() {
           )}
           <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
           {scopeNudge}
+          {offlineNudge}
           <ScopeControl
             scope={scope}
             onChange={handleScopeChange}

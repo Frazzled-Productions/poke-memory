@@ -14,6 +14,9 @@ import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import * as precacheModule from "@/lib/pwa/precache";
 import { _resetForTesting } from "@/lib/pwa/downloadController";
+import { computeManifestSignature } from "@/lib/pwa/manifestSignature";
+import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
+import { SEED_POKEMON } from "@/lib/pokemon/seed";
 
 // ------------------------------------------------------------------
 // localStorage stub — jsdom does not always ship localStorage.
@@ -256,6 +259,103 @@ describe("OfflineSection", () => {
     expect(
       window.localStorage.getItem(precacheModule.OFFLINE_DOWNLOADED_AT_KEY),
     ).toBeNull();
+  });
+
+  // ── Manifest signal (#1539) ────────────────────────────────────────────────
+
+  it("shows 'Up to date' when the persisted signature matches the current one", () => {
+    // Compute the same signature OfflineSection would compute at module load.
+    const ids = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
+    const urls = precacheModule.buildPrecacheUrls(ids);
+    const sig = computeManifestSignature(urls);
+
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-06-01T10:00:00.000Z",
+    );
+    window.localStorage.setItem(
+      KEY_OFFLINE_MANIFEST,
+      JSON.stringify({ signature: sig, count: ids.length }),
+    );
+
+    renderWithIntl(<OfflineSection />);
+
+    expect(screen.getByText(/up to date/i)).toBeInTheDocument();
+    // Update button should be disabled when up to date.
+    expect(screen.getByRole("button", { name: /update/i })).toBeDisabled();
+  });
+
+  it("shows 'Update available' when the persisted signature differs from current", () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-05-01T10:00:00.000Z",
+    );
+    // Store a stale signature (different from any real one).
+    window.localStorage.setItem(
+      KEY_OFFLINE_MANIFEST,
+      JSON.stringify({ signature: "00000000", count: 100 }),
+    );
+
+    renderWithIntl(<OfflineSection />);
+
+    // Should show update-available text (either with or without count).
+    expect(screen.getByText(/update available/i)).toBeInTheDocument();
+    // Update button should be enabled when an update is available.
+    expect(screen.getByRole("button", { name: /update/i })).toBeEnabled();
+  });
+
+  it("shows 'Update available (N new)' when current count exceeds persisted count", () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-05-01T10:00:00.000Z",
+    );
+    window.localStorage.setItem(
+      KEY_OFFLINE_MANIFEST,
+      // A very small count (fewer species than the actual seed).
+      JSON.stringify({ signature: "00000000", count: 50 }),
+    );
+
+    renderWithIntl(<OfflineSection />);
+
+    // N new should be shown since current count > 50.
+    // The exact number depends on the seed; just check the format.
+    expect(screen.getByText(/update available.*new/i)).toBeInTheDocument();
+  });
+
+  it("disables the Update button and shows 'Up to date' — locale: ja", () => {
+    const ids = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
+    const urls = precacheModule.buildPrecacheUrls(ids);
+    const sig = computeManifestSignature(urls);
+
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-06-01T10:00:00.000Z",
+    );
+    window.localStorage.setItem(
+      KEY_OFFLINE_MANIFEST,
+      JSON.stringify({ signature: sig, count: ids.length }),
+    );
+
+    renderWithIntl(<OfflineSection />, { locale: "ja" });
+
+    // Japanese locale: button should be disabled (up to date).
+    expect(screen.getByRole("button", { name: /更新/i })).toBeDisabled();
+  });
+
+  it("enables the Update button when update available — locale: zh-Hans", () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-05-01T10:00:00.000Z",
+    );
+    window.localStorage.setItem(
+      KEY_OFFLINE_MANIFEST,
+      JSON.stringify({ signature: "00000000", count: 100 }),
+    );
+
+    renderWithIntl(<OfflineSection />, { locale: "zh-Hans" });
+
+    // Chinese Simplified locale: button should be enabled (update available).
+    expect(screen.getByRole("button", { name: /更新/i })).toBeEnabled();
   });
 
   it("remounting during an active download shows live progress without aborting", async () => {

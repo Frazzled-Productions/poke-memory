@@ -4286,3 +4286,129 @@ describe("ReviewSession Phase 2 — multi-locale crown-jewel invariant (#1562)",
     expect(screen.queryByText(/all caught up in/i)).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Offline-download discovery nudge (#1538)
+// ---------------------------------------------------------------------------
+
+describe("ReviewSession offline-download nudge (#1538)", () => {
+  /** Minimal settings for a name-only session that triggers the nudge. */
+  const nudgeSettings: Partial<import("@/lib/settings/persistence").UserSettings> = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 100,
+    evolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    practiceScope: { gens: [], types: [], presets: [] },
+    earnedBadges: [],
+    // Partial onboarding: ReviewSession reads individual fields with ?? defaults,
+    // so only the fields relevant to the nudge gate need to be set.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onboarding: {
+      firstVisitOnboardingDismissed: true,
+      // slowSpriteLoadCount at threshold → nudge should show.
+      slowSpriteLoadCount: 3,
+      practiceSessionsCount: 0,
+      offlineDownloadNudgeDismissed: false,
+      scopeEverOpened: false,
+    } as import("@/lib/settings/persistence").UserSettings["onboarding"],
+  };
+
+  it("shows the nudge in the name/flip-card branch when slow-load threshold is met", async () => {
+    mockLoadSettings.mockReturnValue(nudgeSettings);
+
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/practising offline\? download for speed/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows the nudge in the cry-card branch when slow-load threshold is met", async () => {
+    // Zero out name/evo limits so the cry branch is the first card rendered.
+    mockSeedPokemon.mockReturnValue([
+      { ...FIXTURE_CARD, cryUrl: "https://example.com/bulbasaur.ogg" },
+    ]);
+    mockLoadSettings.mockReturnValue({
+      ...nudgeSettings,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      cryCardsEnabled: true,
+      maxNewCryPerDay: 10,
+      maxReviewsCryPerDay: 100,
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    // Cry branch renders a "Reveal" button — wait for it to confirm we are in
+    // the cry branch, then check the nudge is present.
+    await screen.findByRole("button", { name: /reveal/i });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/practising offline\? download for speed/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows the nudge in the reverse-card branch when slow-load threshold is met", async () => {
+    // Use 4 Pokémon so SpritePicker can build its distractor tiles.
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue({
+      ...nudgeSettings,
+      maxNewPerDay: 0,
+      maxReviewsPerDay: 0,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+    });
+
+    vi.useFakeTimers();
+    renderWithIntl(<ReviewSession />);
+    await act(async () => { vi.advanceTimersByTime(0); });
+    vi.useRealTimers();
+
+    // Reverse branch shows 4 tile buttons (SpritePicker) — confirm the branch.
+    await waitFor(() => expect(getTileButtons()).toHaveLength(4));
+
+    expect(
+      screen.getByText(/practising offline\? download for speed/i),
+    ).toBeInTheDocument();
+  });
+
+  it("suppresses the nudge when a download is already present", async () => {
+    // Simulate a prior download by setting the localStorage key.
+    window.localStorage.setItem("poke-memory:offline-downloaded-at", "2026-01-01");
+    mockLoadSettings.mockReturnValue(nudgeSettings);
+
+    renderWithIntl(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    expect(
+      screen.queryByText(/practising offline\? download for speed/i),
+    ).not.toBeInTheDocument();
+
+    window.localStorage.removeItem("poke-memory:offline-downloaded-at");
+  });
+
+  it("nudge CTA links to /settings#offline-download-heading so the Offline section expands", async () => {
+    mockLoadSettings.mockReturnValue(nudgeSettings);
+
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/practising offline\? download for speed/i),
+      ).toBeInTheDocument();
+    });
+
+    const cta = screen.getByRole("link", { name: /open offline download/i });
+    expect(cta).toHaveAttribute("href", "/settings#offline-download-heading");
+  });
+});

@@ -1604,6 +1604,7 @@ export default function SettingsPage() {
 
               {/* ── Offline ────────────────────────────────────────────────── */}
               {visibleSectionIds.has("offline-heading") && (
+              <div id="offline">
               <CollapsibleSection
                 sectionId="offline-heading"
                 heading={t("settings.section.offline")}
@@ -1617,6 +1618,7 @@ export default function SettingsPage() {
                   <OfflineSection />
                 </div>
               </CollapsibleSection>
+              </div>
               )}
 
               {/* ── Account & Data ─────────────────────────────────────────── */}

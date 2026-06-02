@@ -116,4 +116,45 @@ describe("decodeSpriteUrls", () => {
 
     await expect(decodeSpriteUrls(["/sprites/old-browser.png"])).resolves.toBeUndefined();
   });
+
+  it("calls onSlowLoad when the timeout wins the race", async () => {
+    vi.useFakeTimers();
+
+    window.Image = class HangingImage {
+      src = "";
+      decode() {
+        return new Promise<void>(() => {/* intentionally never resolves */});
+      }
+    } as unknown as typeof window.Image;
+
+    const onSlowLoad = vi.fn();
+    const promise = decodeSpriteUrls(["/sprites/slow.png"], 500, onSlowLoad);
+
+    // Advance past the safety-valve timeout.
+    vi.advanceTimersByTime(501);
+    await promise;
+
+    expect(onSlowLoad).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
+  });
+
+  it("does NOT call onSlowLoad when decode wins the race", async () => {
+    window.Image = makeFakeImageClass(resolvers);
+
+    const onSlowLoad = vi.fn();
+    const promise = decodeSpriteUrls(["/sprites/fast.png"], 500, onSlowLoad);
+
+    // Resolve the decode immediately — decode wins before the timeout.
+    resolvers.forEach((resolve) => resolve());
+    await promise;
+
+    expect(onSlowLoad).not.toHaveBeenCalled();
+  });
+
+  it("does NOT call onSlowLoad when the URL list is empty", async () => {
+    const onSlowLoad = vi.fn();
+    await decodeSpriteUrls([], 500, onSlowLoad);
+    expect(onSlowLoad).not.toHaveBeenCalled();
+  });
 });

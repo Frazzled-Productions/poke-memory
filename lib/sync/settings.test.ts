@@ -71,6 +71,8 @@ const SAMPLE: UserSettings = {
     practiceScopeNudgeDismissed: false,
     scopeEverOpened: false,
     practiceSessionsCount: 0,
+    offlineDownloadNudgeDismissed: false,
+    slowSpriteLoadCount: 0,
   },
   appVisitCount: 0,
   ttsVoice: null,

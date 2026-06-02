@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import {
@@ -8,6 +8,7 @@ import {
   subscribe,
   startDownload,
   stopDownload,
+  CURRENT_MANIFEST,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
 import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
@@ -45,6 +46,29 @@ export function OfflineSection() {
   const [downloadState, setDownloadState] = useState<DownloadState>(getState);
 
   const [storageInfo, setStorageInfo] = useState<{ usedMb: string; totalMb: string } | null>(null);
+
+  /**
+   * Derive the update-available state from the persisted manifest vs. the
+   * current one (#1539). Only meaningful in the "done" phase.
+   *
+   * - `null`             — not applicable (not in done state)
+   * - `{ isStale: false }` — downloaded signature matches current; up to date
+   * - `{ isStale: true, newCount: number | null }` — signatures differ;
+   *   `newCount` is the number of new species IDs when countable (may be null
+   *   when the count is unchanged but the signature still differs, e.g. a
+   *   sprite-width or cache-version bump — avoids a misleading "0 new").
+   */
+  const manifestStatus = useMemo<
+    null | { isStale: false } | { isStale: true; newCount: number | null }
+  >(() => {
+    if (downloadState.phase !== "done") return null;
+    const persisted = downloadState.manifest;
+    if (persisted.signature === CURRENT_MANIFEST.signature) return { isStale: false };
+    // Signatures differ — compute how many new species IDs there are.
+    const countDiff = CURRENT_MANIFEST.count - persisted.count;
+    const newCount = countDiff > 0 ? countDiff : null;
+    return { isStale: true, newCount };
+  }, [downloadState]);
 
   // Subscribe to the singleton on mount and unsubscribe on unmount.
   // The subscription re-emits the current state immediately, so the component
@@ -130,6 +154,20 @@ export function OfflineSection() {
                     year: "numeric",
                   }),
                 })}
+                {manifestStatus !== null && (
+                  <>
+                    {" · "}
+                    {manifestStatus.isStale ? (
+                      <span className="text-amber-600 dark:text-amber-400">
+                        {manifestStatus.newCount !== null
+                          ? t("updateAvailableCount", { count: manifestStatus.newCount })
+                          : t("updateAvailable")}
+                      </span>
+                    ) : (
+                      t("upToDate")
+                    )}
+                  </>
+                )}
               </p>
             )}
             {downloadState.phase === "error" && (
@@ -140,7 +178,9 @@ export function OfflineSection() {
             <button
               type="button"
               onClick={handleDownload}
-              className="self-start min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+              disabled={manifestStatus !== null && !manifestStatus.isStale}
+              aria-disabled={manifestStatus !== null && !manifestStatus.isStale}
+              className="self-start min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700"
             >
               {downloadState.phase === "done" ? t("updateButton") : t("downloadButton")}
             </button>

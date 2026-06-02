@@ -247,7 +247,10 @@
       "updateButton": "更新",
       "downloadingProgress": "正在下载 {total} 中的 {done}",
       "downloadProgressAriaLabel": "下载进度",
-      "stopButton": "停止"
+      "stopButton": "停止",
+      "upToDate": "已是最新",
+      "updateAvailable": "有可用更新",
+      "updateAvailableCount": "有可用更新（新增 {count} 个）"
     },
     "optimizerCooldown": "{count, plural, other {下次优化还需 # 天}}",
     "optimizerRetryAfter": "{count, plural, other {请在 # 天后重试。}}",
@@ -461,6 +464,11 @@
     "practiceScopeNudge": {
       "title": "提示：可按世代、属性或分组筛选",
       "body": "使用下方的「范围」控件，将练习限定于特定世代、属性，或「御三家」「未完成进化链」等分组。"
+    },
+    "offlineDownloadNudge": {
+      "title": "离线练习？下载以提升速度",
+      "body": "精灵图加载缓慢？预先获取所有精灵图和叫声（约 166 MB），即使没有网络也能即时练习。",
+      "cta": "打开离线下载"
     }
   },
   "review": {
