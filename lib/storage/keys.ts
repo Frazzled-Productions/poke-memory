@@ -157,6 +157,36 @@ export const KEY_QA_SEED_ACTIVE = "poke-memory:qa-seed-active";
 export const KEY_MASTERED_COUNT_BY_LOCALE =
   "poke-memory:mastered-count-by-locale:v1";
 
+/**
+ * Lightweight per-locale due-today count (#1484), written by ReviewSession and
+ * read by the LanguageSwitcher to show per-language due badges without a full
+ * card-array parse on every render. Local-only derived state; no sync leg.
+ */
+export const KEY_DUE_COUNT_BY_LOCALE =
+  "poke-memory:due-count-by-locale:v1";
+
+/**
+ * Per-locale "has review history" flag — `true` when the locale has at least
+ * one card with `state.lastReview !== null`. Written by ReviewSession alongside
+ * the due-count cache. Read by the LanguageSwitcher to distinguish a freshly-
+ * enrolled language (no history) from a caught-up one (history, all due counts
+ * zero). Local-only derived state; no sync leg.
+ */
+export const KEY_HAS_HISTORY_BY_LOCALE =
+  "poke-memory:has-history-by-locale:v1";
+
+// ─── Card-revealed flag (#1562) ───────────────────────────────────────────────
+
+/**
+ * Transient flag set to `"1"` while a card is mid-reveal (awaiting a grade),
+ * and cleared when the card is graded, the session advances, or the component
+ * unmounts. Read by the LanguageSwitcher to block locale switches mid-card.
+ *
+ * Mirrors the `KEY_REVIEW_SESSION_ACTIVE` pattern — stored in localStorage so
+ * it is readable outside the React tree without prop drilling.
+ */
+export const KEY_CARD_REVEALED = "poke-memory:card-revealed";
+
 // ─── Pokédex sort preference ──────────────────────────────────────────────────
 
 /**

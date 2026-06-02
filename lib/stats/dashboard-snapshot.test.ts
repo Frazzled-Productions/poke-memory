@@ -348,6 +348,36 @@ describe("forecast axis", () => {
     expect(futureBar!.count).toBeGreaterThan(0);
   });
 
+  it("future bars are scoped to the active locale (#1562)", () => {
+    const futureDate = "2026-05-25";
+    // One en card and one ja card, both due on the same future date.
+    const enCard = makeCard(
+      5,
+      { lastReview: "2026-05-01", firstSeen: "2026-04-01", reps: 5, scheduledDays: 30, dueDate: futureDate, fsrsState: "review" },
+      { locale: "en" },
+    );
+    const jaCard = makeCard(
+      5,
+      { lastReview: "2026-05-01", firstSeen: "2026-04-01", reps: 5, scheduledDays: 30, dueDate: futureDate, fsrsState: "review" },
+      { locale: "ja" },
+    );
+    const settings = makeSettings();
+
+    const enSnap = computeDashboardSnapshot([enCard, jaCard], settings, DEFAULT_LIMITS, TODAY, {
+      include: ["forecast"],
+      locale: "en",
+    });
+    const jaSnap = computeDashboardSnapshot([enCard, jaCard], settings, DEFAULT_LIMITS, TODAY, {
+      include: ["forecast"],
+      locale: "ja",
+    });
+    const enBar = enSnap.dueForecast!.find((d) => d.date === futureDate)!;
+    const jaBar = jaSnap.dueForecast!.find((d) => d.date === futureDate)!;
+    // Each locale's forecast counts only its own card, never both.
+    expect(enBar.count).toBe(1);
+    expect(jaBar.count).toBe(1);
+  });
+
   it("is null when not in include list", () => {
     const snapshot = computeDashboardSnapshot([newCard(1)], makeSettings(), DEFAULT_LIMITS, TODAY, {
       include: ["mastery"],

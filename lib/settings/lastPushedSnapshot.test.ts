@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { diffSettings, preserveDeviceLocalKeys } from "./lastPushedSnapshot";
+import { diffSettings, preserveDeviceLocalKeys, DEVICE_LOCAL_KEYS } from "./lastPushedSnapshot";
 import type { UserSettings } from "./persistence";
 
 function s(overrides: Partial<UserSettings>): UserSettings {
@@ -71,6 +71,41 @@ describe("preserveDeviceLocalKeys", () => {
     const local = s({ appVisitCount: 4 });
     const result = preserveDeviceLocalKeys(cloud, local);
     expect(result.appVisitCount).toBe(4);
+    expect(result.themeIntensity).toBe("tinted");
+  });
+});
+
+// ─── DEVICE_LOCAL_KEYS includes activePokemonNameLocale (#1568) ──────────────
+
+describe("DEVICE_LOCAL_KEYS (#1568)", () => {
+  it("includes activePokemonNameLocale so the per-device active selection is never synced", () => {
+    expect(DEVICE_LOCAL_KEYS.has("activePokemonNameLocale")).toBe(true);
+  });
+
+  it("includes appVisitCount (existing device-local key)", () => {
+    expect(DEVICE_LOCAL_KEYS.has("appVisitCount")).toBe(true);
+  });
+});
+
+describe("diffSettings excludes activePokemonNameLocale (#1568)", () => {
+  it("does not include activePokemonNameLocale in the first-push diff", () => {
+    const next = s({ activePokemonNameLocale: "ja" as UserSettings["activePokemonNameLocale"] });
+    expect(diffSettings(null, next)).not.toHaveProperty("activePokemonNameLocale");
+  });
+
+  it("does not include activePokemonNameLocale in the incremental diff even when it changes", () => {
+    const prev = s({ activePokemonNameLocale: "en" as UserSettings["activePokemonNameLocale"] });
+    const next = s({ activePokemonNameLocale: "ja" as UserSettings["activePokemonNameLocale"] });
+    expect(diffSettings(prev, next)).not.toHaveProperty("activePokemonNameLocale");
+  });
+});
+
+describe("preserveDeviceLocalKeys: activePokemonNameLocale (#1568)", () => {
+  it("keeps the local activePokemonNameLocale over the cloud value", () => {
+    const cloud = s({ activePokemonNameLocale: "zh-Hans" as UserSettings["activePokemonNameLocale"], themeIntensity: "tinted" });
+    const local = s({ activePokemonNameLocale: "ja" as UserSettings["activePokemonNameLocale"] });
+    const result = preserveDeviceLocalKeys(cloud, local);
+    expect(result.activePokemonNameLocale).toBe("ja");
     expect(result.themeIntensity).toBe("tinted");
   });
 });

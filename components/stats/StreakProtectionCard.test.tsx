@@ -476,39 +476,38 @@ describe("StreakProtectionCard — tokenCount ICU plural (#1408)", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Current-streak line + next-milestone signpost (#1443 QA — surfaced on
-  // Stats as well as Practice, instead of the removed nav chip).
+  // Streak line removed (#1490 de-dup): ProfileStatusBar carries the streak
+  // on all routes. Verify the streak-protection-streak testid is gone.
   // -------------------------------------------------------------------------
 
-  it("shows the start-your-streak prompt when there is no live streak", () => {
-    // No streak data → streak 0 → startStreakLabel, no milestone countdown.
+  it("does NOT render the streak line (removed in #1490 de-dup)", () => {
     renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
-
-    const line = screen.getByTestId("streak-protection-streak");
-    expect(line).toHaveTextContent(/start your streak/i);
-    expect(line).not.toHaveTextContent(/to your next milestone/i);
+    expect(
+      screen.queryByTestId("streak-protection-streak"),
+    ).not.toBeInTheDocument();
   });
 
-  it("shows the current streak and the next-milestone signpost for a live streak", () => {
-    // Seed a single review for today → streak 1 → streakLabel + countdown.
+  it("does NOT render streak text even when streak data is present", () => {
     const today = todayString(new Date(), loadSettings().timezone ?? "UTC");
     saveStreakData([today]);
 
     renderWithIntl(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
-
-    const line = screen.getByTestId("streak-protection-streak");
-    expect(line).toHaveTextContent(/1-day streak\./i);
-    expect(line).toHaveTextContent(/to your next milestone\./i);
+    expect(
+      screen.queryByTestId("streak-protection-streak"),
+    ).not.toBeInTheDocument();
+    // Streak copy must not appear in the card body.
+    expect(screen.queryByText(/1-day streak/i)).not.toBeInTheDocument();
   });
 
-  it("ja: renders the streak line and milestone signpost in Japanese", () => {
+  it("ja: does NOT render the streak line in Japanese locale", () => {
     const today = todayString(new Date(), loadSettings().timezone ?? "UTC");
     saveStreakData([today]);
 
     renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
-
-    const line = screen.getByTestId("streak-protection-streak");
-    expect(line).toHaveTextContent(/1日連続。/);
-    expect(line).toHaveTextContent(/次の目標まであと/);
+    expect(
+      screen.queryByTestId("streak-protection-streak"),
+    ).not.toBeInTheDocument();
+    // Japanese streak copy must not appear.
+    expect(screen.queryByText(/1日連続。/)).not.toBeInTheDocument();
   });
 });

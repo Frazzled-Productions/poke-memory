@@ -48,4 +48,69 @@ describe("formatDailySummary", () => {
     expect([...gridLines[0]].filter((c) => c === "🟩").length).toBe(20);
     expect([...gridLines[1]].filter((c) => c === "🟩").length).toBe(5);
   });
+
+  it("English locale omits the language endonym (unlabelled by design)", () => {
+    const out = formatDailySummary({
+      date: "2026-05-12",
+      streak: 1,
+      reviewed: 3,
+      newCards: 1,
+      mastered: 1,
+      gradeSequence: [4, 4, 5],
+      locale: "en",
+    });
+    expect(out).toContain("1 mastered");
+    expect(out).not.toContain("(");
+  });
+
+  it("ja locale appends Japanese endonym to mastered line", () => {
+    const out = formatDailySummary({
+      date: "2026-05-12",
+      streak: 3,
+      reviewed: 5,
+      newCards: 2,
+      mastered: 1,
+      gradeSequence: [4, 4, 5, 2, 4],
+      locale: "ja",
+    });
+    expect(out).toContain("1 mastered (日本語)");
+  });
+
+  it("zh-Hans locale appends Simplified Chinese endonym", () => {
+    const out = formatDailySummary({
+      date: "2026-05-12",
+      streak: 0,
+      reviewed: 2,
+      newCards: 0,
+      mastered: 2,
+      gradeSequence: [5, 5],
+      locale: "zh-Hans",
+    });
+    expect(out).toContain("2 mastered (简体中文)");
+  });
+
+  it("zh-Hant locale appends Traditional Chinese endonym", () => {
+    const out = formatDailySummary({
+      date: "2026-05-12",
+      streak: 0,
+      reviewed: 1,
+      newCards: 0,
+      mastered: 0,
+      gradeSequence: [4],
+      locale: "zh-Hant",
+    });
+    expect(out).toContain("0 mastered (繁體中文)");
+  });
+
+  it("omitting locale field produces no endonym (backward compat)", () => {
+    const out = formatDailySummary({
+      date: "2026-05-12",
+      streak: 0,
+      reviewed: 1,
+      newCards: 0,
+      mastered: 0,
+      gradeSequence: [4],
+    });
+    expect(out).not.toContain("(");
+  });
 });

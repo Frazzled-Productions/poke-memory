@@ -105,8 +105,11 @@ const VALID_SETTINGS: UserSettings = {
   mcCardOnboardingShown: false,
   labsFlags: { ...DEFAULT_LABS_FLAGS },
   pokemonNameLocale: "en" as const,
+  learningLocales: ["en"] as const,
+  activePokemonNameLocale: "en" as const,
   pushNotificationHour: null,
   dismissedMtBannerLocales: [],
+  removedLocales: [],
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

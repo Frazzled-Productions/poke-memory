@@ -4,6 +4,7 @@ import {
   saveSettings,
   DEFAULT_SETTINGS,
   DEFAULT_ONBOARDING,
+  validateRemovedLocales,
   type ThemeIntensity,
 } from '@/lib/settings/persistence';
 import { DEFAULT_LABS_FLAGS } from '@/lib/labs/flags';
@@ -175,8 +176,11 @@ describe('loadSettings migration', () => {
       mcCardOnboardingShown: false,
       labsFlags: { ...DEFAULT_LABS_FLAGS },
       pokemonNameLocale: 'ja' as const,
+      learningLocales: ['en' as const, 'ja' as const],
+      activePokemonNameLocale: 'ja' as const,
       pushNotificationHour: 20,
       dismissedMtBannerLocales: ['ja', 'zh-Hans'],
+      removedLocales: ['zh-Hant' as const],
     };
     saveSettings(custom);
     const loaded = loadSettings();
@@ -908,9 +912,66 @@ describe('loadSettings: pokemonNameLocale (#1260)', () => {
     }
   });
 
-  it('saveSettings + loadSettings round-trips pokemonNameLocale: "ja"', () => {
-    saveSettings({ ...DEFAULT_SETTINGS, pokemonNameLocale: 'ja' });
-    expect(loadSettings().pokemonNameLocale).toBe('ja');
+  it('saveSettings mirrors the deprecated pokemonNameLocale from the active learning locale (#1484)', () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      learningLocales: ['en', 'ja'],
+      activePokemonNameLocale: 'ja',
+    });
+    const loaded = loadSettings();
+    expect(loaded.activePokemonNameLocale).toBe('ja');
+    // The deprecated scalar is kept in sync with the active locale on save.
+    expect(loaded.pokemonNameLocale).toBe('ja');
+  });
+});
+
+describe('learningLocales + activePokemonNameLocale (#1484)', () => {
+  it('defaults to ["en"] / "en" for a fresh record', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+    const s = loadSettings();
+    expect(s.learningLocales).toEqual(['en']);
+    expect(s.activePokemonNameLocale).toBe('en');
+  });
+
+  it('back-fills the set from a legacy non-English pokemonNameLocale (returning user)', () => {
+    // A pre-#1484 record with no learningLocales but a Japanese pokemonNameLocale.
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ pokemonNameLocale: 'ja' }),
+    );
+    const s = loadSettings();
+    expect(s.learningLocales).toEqual(['en', 'ja']);
+    expect(s.activePokemonNameLocale).toBe('ja');
+  });
+
+  it('always keeps English enrolled and drops unknown / duplicate locales', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ learningLocales: ['ja', 'ja', 'fr', 'zh-Hans'] }),
+    );
+    expect(loadSettings().learningLocales).toEqual(['en', 'ja', 'zh-Hans']);
+  });
+
+  it('falls back the active locale to an enrolled member when it is not enrolled', () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        learningLocales: ['en', 'ja'],
+        activePokemonNameLocale: 'zh-Hans', // not enrolled
+      }),
+    );
+    expect(loadSettings().activePokemonNameLocale).toBe('en');
+  });
+
+  it('round-trips an enrolled active locale through save/load', () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      learningLocales: ['en', 'zh-Hant'],
+      activePokemonNameLocale: 'zh-Hant',
+    });
+    const s = loadSettings();
+    expect(s.learningLocales).toEqual(['en', 'zh-Hant']);
+    expect(s.activePokemonNameLocale).toBe('zh-Hant');
   });
 });
 
@@ -958,5 +1019,100 @@ describe("dismissedMtBannerLocales (#1387)", () => {
 
   it("DEFAULT_SETTINGS has dismissedMtBannerLocales: []", () => {
     expect(DEFAULT_SETTINGS.dismissedMtBannerLocales).toEqual([]);
+  });
+});
+
+// ─── validateRemovedLocales (#1568) ──────────────────────────────────────────
+
+describe("validateRemovedLocales (#1568)", () => {
+  it("returns [] for non-array input", () => {
+    for (const bad of [null, undefined, 42, "ja", true, {}]) {
+      expect(validateRemovedLocales(bad)).toEqual([]);
+    }
+  });
+
+  it("returns [] for an empty array", () => {
+    expect(validateRemovedLocales([])).toEqual([]);
+  });
+
+  it("keeps known non-English locales", () => {
+    expect(validateRemovedLocales(["ja", "zh-Hans", "zh-Hant"])).toEqual([
+      "ja",
+      "zh-Hans",
+      "zh-Hant",
+    ]);
+  });
+
+  it("always drops 'en' — English can never be in the removed set", () => {
+    expect(validateRemovedLocales(["en", "ja"])).toEqual(["ja"]);
+    expect(validateRemovedLocales(["en"])).toEqual([]);
+  });
+
+  it("deduplicates entries", () => {
+    expect(validateRemovedLocales(["ja", "ja", "zh-Hans"])).toEqual(["ja", "zh-Hans"]);
+  });
+
+  it("drops unknown / non-string values silently", () => {
+    expect(validateRemovedLocales(["fr", "de", "ja", 42, null, "zh-Hans"])).toEqual([
+      "ja",
+      "zh-Hans",
+    ]);
+  });
+});
+
+// ─── removedLocales field (#1568) ────────────────────────────────────────────
+
+describe("removedLocales field (#1568)", () => {
+  it("DEFAULT_SETTINGS has removedLocales: []", () => {
+    expect(DEFAULT_SETTINGS.removedLocales).toEqual([]);
+  });
+
+  it("defaults to [] when the field is absent from stored JSON (back-fill)", () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ masteryRepetitions: 3 }));
+    expect(loadSettings().removedLocales).toEqual([]);
+  });
+
+  it("defaults to [] when the stored value is not an array", () => {
+    for (const bad of [null, 42, "ja", true, {}]) {
+      mockLocalStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...DEFAULT_SETTINGS, removedLocales: bad }),
+      );
+      expect(loadSettings().removedLocales).toEqual([]);
+    }
+  });
+
+  it("drops 'en' from a stored removedLocales array", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, removedLocales: ["en", "ja"] }),
+    );
+    expect(loadSettings().removedLocales).toEqual(["ja"]);
+  });
+
+  it("deduplicates stored entries", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, removedLocales: ["ja", "ja", "zh-Hans"] }),
+    );
+    expect(loadSettings().removedLocales).toEqual(["ja", "zh-Hans"]);
+  });
+
+  it("drops unknown locale values silently", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, removedLocales: ["fr", "ja", "de"] }),
+    );
+    expect(loadSettings().removedLocales).toEqual(["ja"]);
+  });
+
+  it("round-trips a non-empty removedLocales via saveSettings + loadSettings", () => {
+    saveSettings({ ...DEFAULT_SETTINGS, removedLocales: ["ja", "zh-Hans"] });
+    expect(loadSettings().removedLocales).toEqual(["ja", "zh-Hans"]);
+  });
+
+  it("round-trips an empty removedLocales via saveSettings + loadSettings", () => {
+    saveSettings({ ...DEFAULT_SETTINGS, removedLocales: [] });
+    expect(loadSettings().removedLocales).toEqual([]);
   });
 });

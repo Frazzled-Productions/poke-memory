@@ -23,7 +23,7 @@ describe("useSignInPull", () => {
   it("pulls once on mount when client and userId are present", () => {
     renderHook(() => useSignInPull(CLIENT, USER_A));
     expect(mockPullAndMerge).toHaveBeenCalledTimes(1);
-    expect(mockPullAndMerge).toHaveBeenCalledWith(CLIENT, USER_A);
+    expect(mockPullAndMerge).toHaveBeenCalledWith(CLIENT, USER_A, false);
   });
 
   it("does not pull when client is null", () => {
@@ -59,7 +59,7 @@ describe("useSignInPull", () => {
     rerender({ uid: USER_B });
 
     expect(mockPullAndMerge).toHaveBeenCalledTimes(2);
-    expect(mockPullAndMerge).toHaveBeenLastCalledWith(CLIENT, USER_B);
+    expect(mockPullAndMerge).toHaveBeenLastCalledWith(CLIENT, USER_B, false);
   });
 
   it("pulls again after sign-out → sign-in as the same user", () => {
@@ -86,7 +86,7 @@ describe("useSignInPull", () => {
     rerender({ uid: USER_A });
 
     expect(mockPullAndMerge).toHaveBeenCalledTimes(1);
-    expect(mockPullAndMerge).toHaveBeenCalledWith(CLIENT, USER_A);
+    expect(mockPullAndMerge).toHaveBeenCalledWith(CLIENT, USER_A, false);
   });
 
   it("ignores promise rejection from pullAndMerge (defensive — real impl never rejects)", async () => {

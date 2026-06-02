@@ -107,7 +107,11 @@ export function useProfileStatus(): ProfileStatus {
       }
 
       const settings = loadSettings();
-      const locale = settings.pokemonNameLocale ?? "en";
+      // Use activePokemonNameLocale first (set by the language switcher on
+      // language-switch), falling back to pokemonNameLocale (the back-compat
+      // alias), then "en". Mirrors the PokemonLocaleContext fallback chain
+      // so the mastery count always reflects the currently-active language.
+      const locale = settings.activePokemonNameLocale ?? settings.pokemonNameLocale ?? "en";
       const cache = readMasteredCountCache();
       const count = cache[locale];
       const percent =

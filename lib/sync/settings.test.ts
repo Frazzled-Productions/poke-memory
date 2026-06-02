@@ -1,6 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { pullSettings, pullSettingsWithTimestamp, pushSettings, pushRegionalPrefs, pullRegionalPrefs } from "./settings";
+import {
+  pullSettings,
+  pullSettingsWithTimestamp,
+  pushSettings,
+  pushRegionalPrefs,
+  pullRegionalPrefs,
+  mergeRemovedLocales,
+  mergeLearnedLocales,
+} from "./settings";
 import type { UserSettings } from "@/lib/settings/persistence";
 import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 import { DEFAULT_LABS_FLAGS } from "@/lib/labs/flags";
@@ -86,8 +94,11 @@ const SAMPLE: UserSettings = {
   mcCardOnboardingShown: false,
   labsFlags: { ...DEFAULT_LABS_FLAGS },
   pokemonNameLocale: "en" as const,
+  learningLocales: ["en"] as const,
+  activePokemonNameLocale: "en" as const,
   pushNotificationHour: null,
   dismissedMtBannerLocales: [],
+  removedLocales: [],
 };
 
 describe("pushSettings", () => {
@@ -365,5 +376,101 @@ describe("pullRegionalPrefs", () => {
       dateFormat: null,
       pushNotificationHour: null,
     });
+  });
+});
+
+// ─── mergeRemovedLocales (#1568) ─────────────────────────────────────────────
+
+describe("mergeRemovedLocales (#1568)", () => {
+  it("union of two disjoint non-empty sets", () => {
+    expect(mergeRemovedLocales(["ja"], ["zh-Hans"])).toEqual(["ja", "zh-Hans"]);
+  });
+
+  it("deduplicates entries appearing on both sides", () => {
+    expect(mergeRemovedLocales(["ja", "zh-Hans"], ["zh-Hans", "zh-Hant"])).toEqual([
+      "ja",
+      "zh-Hans",
+      "zh-Hant",
+    ]);
+  });
+
+  it("always drops 'en' regardless of which side it appears on", () => {
+    expect(mergeRemovedLocales(["en", "ja"], ["en", "zh-Hans"])).toEqual(["ja", "zh-Hans"]);
+  });
+
+  it("drops unknown locale values silently", () => {
+    // @ts-expect-error intentionally passing invalid locale for test
+    expect(mergeRemovedLocales(["fr", "ja"], ["de"])).toEqual(["ja"]);
+  });
+
+  it("treats null/undefined on either side as empty (back-compat)", () => {
+    expect(mergeRemovedLocales(null, ["ja"])).toEqual(["ja"]);
+    expect(mergeRemovedLocales(["zh-Hans"], null)).toEqual(["zh-Hans"]);
+    expect(mergeRemovedLocales(undefined, undefined)).toEqual([]);
+  });
+
+  it("both sides empty returns []", () => {
+    expect(mergeRemovedLocales([], [])).toEqual([]);
+  });
+});
+
+// ─── mergeLearnedLocales (#1568) ─────────────────────────────────────────────
+
+describe("mergeLearnedLocales (#1568)", () => {
+  it("union of two disjoint enrolled sets, no tombstones", () => {
+    expect(mergeLearnedLocales(["en", "ja"], ["en", "zh-Hans"], [])).toEqual([
+      "en",
+      "ja",
+      "zh-Hans",
+    ]);
+  });
+
+  it("deduplicates entries appearing on both sides", () => {
+    expect(mergeLearnedLocales(["en", "ja"], ["en", "ja"], [])).toEqual(["en", "ja"]);
+  });
+
+  it("en is always present in the result even if both sides are empty", () => {
+    expect(mergeLearnedLocales([], [], [])).toEqual(["en"]);
+  });
+
+  it("tombstone subtraction: a removed locale stays absent from merged", () => {
+    // Local has removed zh-Hans; cloud still has it enrolled.
+    // After merge, zh-Hans must remain absent.
+    expect(mergeLearnedLocales(["en", "ja"], ["en", "zh-Hans"], ["zh-Hans"])).toEqual([
+      "en",
+      "ja",
+    ]);
+  });
+
+  it("removal propagates: local removed X + cloud has X enrolled → X absent from merged", () => {
+    expect(mergeLearnedLocales(["en"], ["en", "zh-Hant"], ["zh-Hant"])).toEqual(["en"]);
+  });
+
+  it("tombstone cannot remove en (validateLearningLocales guarantees it)", () => {
+    // Even if someone passes "en" in removed, English must survive.
+    expect(mergeLearnedLocales(["en"], ["en"], ["en" as import("@/i18n/locales").AppLocale])).toEqual(["en"]);
+  });
+
+  it("back-compat: null cloud learningLocales treated as ['en']", () => {
+    expect(mergeLearnedLocales(["en", "ja"], null, [])).toEqual(["en", "ja"]);
+    expect(mergeLearnedLocales(null, ["en", "zh-Hans"], [])).toEqual(["en", "zh-Hans"]);
+  });
+
+  it("back-compat: both sides null → ['en']", () => {
+    expect(mergeLearnedLocales(null, null, [])).toEqual(["en"]);
+  });
+
+  it("stable order: local locales appear first, then cloud-only locales", () => {
+    // local has ja, cloud has zh-Hans; result should be en, ja, zh-Hans.
+    expect(mergeLearnedLocales(["en", "ja"], ["en", "zh-Hans"], [])).toEqual([
+      "en",
+      "ja",
+      "zh-Hans",
+    ]);
+  });
+
+  it("drops unknown locale values silently", () => {
+    // @ts-expect-error intentionally passing invalid locale for test
+    expect(mergeLearnedLocales(["en", "fr"], ["en"], [])).toEqual(["en"]);
   });
 });

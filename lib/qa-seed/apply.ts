@@ -11,9 +11,32 @@
 
 import { idbSet, idbDelete } from "@/lib/idb/db";
 import { KEY_REVIEW_SESSION, KEY_GRADE_LOG, KEY_QA_SEED_ACTIVE } from "@/lib/storage/keys";
-import { loadSettings, saveSettings } from "@/lib/settings/persistence";
+import {
+  loadSettings,
+  saveSettings,
+  type UserSettings,
+} from "@/lib/settings/persistence";
+import { parseLabsFlags } from "@/lib/labs/flags";
+import { saveStreakData } from "@/lib/streak/persistence";
+import { DEFAULT_STREAK_PROTECTION } from "@/lib/streak/tokens";
+import { writeMasteredCountForLocale } from "@/lib/profile/masteredCountCache";
+import { SUPPORTED_LOCALES, type AppLocale } from "@/i18n/locales";
 import { SESSION_CHANGED_EVENT } from "@/lib/review/persistence";
 import type { SeedPayload } from "./scenarios";
+
+/**
+ * Expands a count of consecutive review days into the "YYYY-MM-DD" date array
+ * ending today (oldest first), matching the StreakData shape. Uses Date.now()
+ * because the seeded streak must be anchored to wall-clock today so
+ * computeStreak counts it as the user's current streak.
+ */
+function lastNDates(n: number): string[] {
+  const dates: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    dates.push(new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10));
+  }
+  return dates;
+}
 
 /**
  * Writes a seed payload to IndexedDB (and settings where requested).
@@ -59,9 +82,50 @@ export async function applySeedScenario(payload: SeedPayload, slug?: string): Pr
     }
   }
 
+  // Streak storage (KEY_STREAK) — saveStreakData dispatches STREAK_UPDATED_EVENT
+  // so a mounted StreakBadge / ProfileStatusBar re-reads the seeded streak live.
+  if (payload.streakDays !== undefined && payload.streakDays > 0) {
+    saveStreakData(lastNDates(payload.streakDays));
+  }
+
+  // Settings legs (pokemonNameLocale + learningLocales + streakProtection) —
+  // merged into a single load/save so we touch localStorage once. saveSettings
+  // dispatches SETTINGS_SAVED_EVENT, which the status surfaces also listen to.
+  const settingsPatch: Partial<UserSettings> = {};
   if (payload.pokemonNameLocale !== null && payload.pokemonNameLocale !== undefined) {
+    settingsPatch.pokemonNameLocale = payload.pokemonNameLocale;
+  }
+  if (payload.learningLocales !== undefined) {
+    settingsPatch.learningLocales = payload.learningLocales;
+  }
+  if (payload.activePokemonNameLocale !== undefined) {
+    settingsPatch.activePokemonNameLocale = payload.activePokemonNameLocale;
+  }
+  if (payload.streakProtection !== undefined) {
+    settingsPatch.streakProtection = payload.streakProtection;
+  }
+  if (payload.labsFlags !== undefined) {
+    // Merge the scenario's labs flags into the existing labs flags so that
+    // unrelated flags (e.g. flags the user already had on) are preserved.
     const settings = loadSettings();
-    saveSettings({ ...settings, pokemonNameLocale: payload.pokemonNameLocale });
+    const existingLabsFlags = parseLabsFlags(settings.labsFlags);
+    settingsPatch.labsFlags = { ...existingLabsFlags, ...payload.labsFlags };
+  }
+  if (Object.keys(settingsPatch).length > 0) {
+    const settings = loadSettings();
+    saveSettings({ ...settings, ...settingsPatch });
+  }
+
+  // Warm the mastered-count cache (read by useProfileStatus → ProfileStatusBar)
+  // so mastery is correct on non-Practice pages immediately. Otherwise the bar
+  // shows 0 mastered until ReviewSession (Practice) warms it. writeMasteredCount
+  // ForLocale dispatches a synthetic storage event so the bar refreshes live.
+  if (payload.masteredCountByLocale) {
+    for (const [locale, count] of Object.entries(payload.masteredCountByLocale)) {
+      if (typeof count === "number") {
+        writeMasteredCountForLocale(locale as AppLocale, count);
+      }
+    }
   }
 
   // Persist the active scenario slug so the QaSeedSection can restore the
@@ -77,17 +141,30 @@ export async function applySeedScenario(payload: SeedPayload, slug?: string): Pr
 
 /**
  * Clears seeded QA state — removes the review session and grade log from IDB,
- * dispatches synthetic events so same-tab subscribers notice the cleared state.
+ * resets the seeded streak + protection-token state, and dispatches synthetic
+ * events so same-tab subscribers notice the cleared state.
  *
- * Settings are NOT cleared (pokemonNameLocale etc.) because the user may want
- * to keep their locale preference. If needed, clear settings manually from
- * the Settings page.
+ * The locale preference (pokemonNameLocale) is NOT cleared — the user may want
+ * to keep it. The streak and streakProtection ARE reset, because a scenario
+ * seeds them (so leaving them behind would show a phantom streak/token balance
+ * on the now-empty status bar). This mirrors the apply step.
  */
 export async function clearSeedScenario(): Promise<void> {
   await Promise.all([
     idbDelete(KEY_REVIEW_SESSION),
     idbDelete(KEY_GRADE_LOG),
   ]);
+
+  // Reset the seeded streak + protection tokens (dispatches STREAK_UPDATED_EVENT
+  // and SETTINGS_SAVED_EVENT so the status bar empties live). Locale is left as-is.
+  saveStreakData([]);
+  const settings = loadSettings();
+  saveSettings({ ...settings, streakProtection: { ...DEFAULT_STREAK_PROTECTION } });
+
+  // Reset the seeded mastered-count cache so the bar's mastery returns to 0.
+  for (const locale of SUPPORTED_LOCALES) {
+    writeMasteredCountForLocale(locale, 0);
+  }
 
   // Clear the active-seed indicator and dispatch change events.
   if (typeof window !== "undefined") {

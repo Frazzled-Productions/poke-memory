@@ -33,8 +33,12 @@ export function saveLastPushedSettings(settings: UserSettings): void {
 // direction. appVisitCount is guarded by sessionStorage — it increments once
 // per device session and is only meaningful on the device that recorded it.
 // Syncing it would inflate the PWA nudge threshold on other devices.
+// activePokemonNameLocale is the per-device active selection from the enrolled
+// learning set (#1568) — each device tracks its own active language independently;
+// syncing it would clobber deliberate per-device choices (e.g. practising
+// Japanese on a phone while using Chinese on a tablet).
 export const DEVICE_LOCAL_KEYS: ReadonlySet<keyof UserSettings> =
-  new Set<keyof UserSettings>(["appVisitCount"]);
+  new Set<keyof UserSettings>(["appVisitCount", "activePokemonNameLocale"]);
 
 /**
  * Returns `cloud` with each device-local key overwritten by the local value,

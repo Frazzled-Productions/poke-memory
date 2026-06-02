@@ -186,7 +186,7 @@ describe("useVisibilityPull", () => {
     vi.advanceTimersByTime(HIDDEN_THRESHOLD_MS + 1);
     act(() => fireVisible());
 
-    expect(pullAndMerge).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER);
+    expect(pullAndMerge).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER, false);
   });
 
   // 6. No-op when visible fires without a prior hidden event (hiddenAt is null).
@@ -229,7 +229,7 @@ describe("useVisibilityPull", () => {
     vi.advanceTimersByTime(HIDDEN_THRESHOLD_MS + 1);
     act(() => fireVisible());
 
-    expect(pullAndMerge).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER);
+    expect(pullAndMerge).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER, false);
   });
 
   // 8. Session-active gate (#1163): skip the pull while a session is mounted,
@@ -271,7 +271,7 @@ describe("useVisibilityPull", () => {
     vi.advanceTimersByTime(HIDDEN_THRESHOLD_MS + 1);
     act(() => fireVisible());
 
-    expect(pullAndMerge).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER);
+    expect(pullAndMerge).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER, false);
   });
 
   // 10. Listener is removed on unmount — no calls after cleanup.

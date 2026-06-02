@@ -3,6 +3,9 @@ import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib
 import {
   pullUserSettingsRow,
   pullRegionalPrefs,
+  pushSettings,
+  mergeLearnedLocales,
+  mergeRemovedLocales,
   type UserSettingsRow,
 } from "@/lib/sync/settings";
 import { pullStreak, mergeStreak } from "@/lib/sync/streak";
@@ -11,14 +14,18 @@ import { pullPushSubscriptionCount } from "@/lib/sync/pushSubscriptions";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
 import { buildSession, DEFAULT_LIMITS, type ReviewableCard } from "@/lib/review/session";
-import { DEFAULT_SETTINGS, hasStoredSettings, loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { DEFAULT_SETTINGS, hasStoredSettings, loadSettings, saveSettings, resolveActiveLocale } from "@/lib/settings/persistence";
 import {
   loadStreakData,
   saveStreakData,
   STREAK_UPDATED_EVENT,
 } from "@/lib/streak/persistence";
 import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
-import { preserveDeviceLocalKeys } from "@/lib/settings/lastPushedSnapshot";
+import {
+  preserveDeviceLocalKeys,
+  loadLastPushedSettings,
+  saveLastPushedSettings,
+} from "@/lib/settings/lastPushedSnapshot";
 import { mtBannerDismissedKey } from "@/lib/storage/keys";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
@@ -50,6 +57,18 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 export const SYNC_PULL_APPLIED_EVENT = "poke-memory:sync-pull-applied";
 
 /**
+ * Order-insensitive set comparison: sort both sides so a mere reordering (e.g.
+ * cloud holding the same locales in a different order) doesn't read as a change
+ * and trigger a spurious push on every pull cycle.
+ */
+const setsEqual = (a: string[], b: string[]): boolean => {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort();
+  const sb = [...b].sort();
+  return sa.every((v, i) => v === sb[i]);
+};
+
+/**
  * True when no card in `cards` has been graded yet — every entry has both
  * `lastReview` and `firstSeen` still null. A freshly-built `buildSession`
  * result satisfies this; a session with even one user grade does not.
@@ -64,21 +83,36 @@ function isPristineSession(cards: readonly ReviewableCard[]): boolean {
 
 /**
  * True when at least one card's `lastReview` or `firstSeen` changed between
- * `before` and `after`. Only these two date markers are compared — other FSRS
- * fields (`scheduledDays`, `reps`, `fsrsState`, `dueDate`) are intentionally
- * excluded because the caller only needs to know whether cloud data populated
- * a previously-empty seed card. Both arrays come from the same seed and have
- * matching `id`s in the same order, so a positional comparison is safe.
+ * `before` and `after`, or when `after` contains NEW cards that were not in
+ * `before` (inserted from cloud rows for other enrolled locales).
+ *
+ * Compares by composite key `(card_type, subject_key, locale)` rather than
+ * by array position, because `mergeCloudIntoLocalSilent`'s Pass 2 may now
+ * append new cards — so the two arrays can differ in length and order.
+ *
+ * Only `lastReview` and `firstSeen` are compared — other FSRS fields are
+ * intentionally excluded because the caller only needs to know whether cloud
+ * data populated a previously-empty seed card.
  */
 function mergeAffectsProgress(
   before: readonly ReviewableCard[],
   after: readonly ReviewableCard[],
 ): boolean {
-  if (before.length !== after.length) return true;
-  for (let i = 0; i < after.length; i++) {
-    const a = after[i];
-    const b = before[i];
-    if (a.id !== b.id) return true;
+  // New cards inserted means progress was definitely affected.
+  if (after.length !== before.length) return true;
+
+  // Build a lookup of before-state keyed by composite identity.
+  const beforeByKey = new Map(
+    before.map((c) => [
+      `${c.cardType}:${c.subjectKey}:${c.locale ?? "en"}`,
+      c,
+    ]),
+  );
+
+  for (const a of after) {
+    const key = `${a.cardType}:${a.subjectKey}:${a.locale ?? "en"}`;
+    const b = beforeByKey.get(key);
+    if (!b) return true; // card not present before — new insertion
     if (a.state.lastReview !== b.state.lastReview) return true;
     if (a.state.firstSeen !== b.state.firstSeen) return true;
   }
@@ -101,6 +135,13 @@ function mergeAffectsProgress(
 export async function pullAndMerge(
   client: SupabaseClient | null,
   userId: string | null,
+  /**
+   * When true, the push-back leg of the locale union-merge is suppressed.
+   * Pulls (reads) remain enabled regardless. Pass `true` whenever any
+   * superuser flag is on — the same contract as every other cloud-write path
+   * (see AGENTS.md "Superuser mode").
+   */
+  superuserPaused = false,
 ): Promise<"ok" | "error" | "skipped"> {
   if (!client || !userId) return "skipped";
 
@@ -141,6 +182,15 @@ export async function pullAndMerge(
       localSession = null;
     }
 
+    // Capture the pre-LWW local settings BEFORE any saveSettings call below.
+    // The locale union-merge step later (after the card-merge block) must
+    // read the ORIGINAL local learningLocales/removedLocales, not the
+    // post-LWW values — the LWW block deliberately excludes these two fields
+    // from the cloud blob, so the saveSettings spread fills them in from
+    // DEFAULT_SETTINGS (["en"]/[]), clobbering any local-only enrolments or
+    // tombstones that have not yet been pushed to cloud. Bug #1568-fix-1.
+    const preLocalSettings = loadSettings();
+
     // Apply the JSONB settings blob on every cycle (#572). The brand-new-
     // device path (hasStoredSettings === false) keeps its existing
     // semantics: cloud wins so the base session below is built with the
@@ -171,10 +221,28 @@ export async function pullAndMerge(
         // preserveDeviceLocalKeys keeps this device's appVisitCount — a stale
         // cloud value (legacy row, manual edit) must not reset the nudge
         // threshold, mirroring the push-side exclusion in diffSettings.
+        //
+        // learningLocales + removedLocales are deliberately EXCLUDED from the LWW
+        // path (#1568): they are managed exclusively by the locale union-merge step
+        // below, which computes a tombstone-safe union rather than last-write-wins.
+        // Applying cloud raw values here would clobber a local tombstone
+        // (removedLocales) between the LWW write and the merge step's re-read.
+        // The pre-LWW local values are preserved by using preLocalSettings (captured
+        // above) so the locale merge step below still sees the correct original state.
+        const { learningLocales: _learningLocales, removedLocales: _removedLocales, ...cloudSettingsWithoutLocales } =
+          (pulledRow.settings ?? {}) as Partial<typeof DEFAULT_SETTINGS>;
         saveSettings(
           preserveDeviceLocalKeys(
-            { ...DEFAULT_SETTINGS, ...pulledRow.settings },
-            loadSettings(),
+            {
+              ...DEFAULT_SETTINGS,
+              ...cloudSettingsWithoutLocales,
+              // Re-inject pre-LWW locale fields so saveSettings does not reset
+              // them to DEFAULT_SETTINGS defaults. The locale merge step below
+              // will compute and write the final merged values.
+              learningLocales: preLocalSettings.learningLocales,
+              removedLocales: preLocalSettings.removedLocales,
+            },
+            preLocalSettings,
           ),
         );
       }
@@ -226,7 +294,16 @@ export async function pullAndMerge(
     let preMergeCards: ReviewableCard[];
     if (localSession !== null) {
       preMergeCards = localSession.cards;
-      merged = mergeCloudIntoLocalSilent(preMergeCards, cloudRows, syncStatus.lastPullAt);
+      // Pass seed data so mergeCloudIntoLocalSilent can insert unmatched cloud
+      // rows (other-locale cards enrolled on a different device) as new local
+      // cards, ensuring every language's progress is pulled on this device (#1562).
+      merged = mergeCloudIntoLocalSilent(
+        preMergeCards,
+        cloudRows,
+        syncStatus.lastPullAt,
+        SEED_POKEMON,
+        SEED_EVOLUTION_CARDS,
+      );
       saveResult = await saveSession({ cards: merged, limits: localSession.limits });
     } else {
       // Brand-new device (or just-cleared by the tombstone path above):
@@ -241,7 +318,13 @@ export async function pullAndMerge(
         undefined,
         seedOptsFromSettings(settings),
       );
-      merged = mergeCloudIntoLocalSilent(preMergeCards, cloudRows, syncStatus.lastPullAt);
+      merged = mergeCloudIntoLocalSilent(
+        preMergeCards,
+        cloudRows,
+        syncStatus.lastPullAt,
+        SEED_POKEMON,
+        SEED_EVOLUTION_CARDS,
+      );
       saveResult = await saveSession({ cards: merged, limits: DEFAULT_LIMITS });
     }
 
@@ -263,6 +346,103 @@ export async function pullAndMerge(
       mergeAffectsProgress(preMergeCards, merged)
     ) {
       window.dispatchEvent(new CustomEvent(SYNC_PULL_APPLIED_EVENT));
+    }
+
+    // Union-merge learningLocales + removedLocales (#1568). Runs on EVERY pull
+    // cycle (not gated on cloudIsNewer) because these two arrays must converge
+    // across devices regardless of whether the rest of the settings blob is
+    // "stale" from this device's perspective.
+    //
+    // Uses preLocalSettings (captured before any LWW saveSettings) so the
+    // original local learningLocales/removedLocales are not lost when the LWW
+    // block wrote DEFAULT_SETTINGS.learningLocales/removedLocales as filler.
+    //
+    // Deliberate push-from-pull exception: we send the merged result back to
+    // cloud immediately so the other device sees the union on its next pull.
+    // This is confined to `learningLocales` + `removedLocales` only, is
+    // fire-and-forget, and is guarded by `superuserPaused` so QA sessions
+    // never write to cloud (same contract as every other write path).
+    try {
+      if (pulledRow !== null && pulledRow.settings !== null) {
+        const cloudSettings = pulledRow.settings as Record<string, unknown>;
+        // Use pre-LWW local values — not a second loadSettings() call — so
+        // enrolments/tombstones not yet pushed to cloud are not lost when the
+        // LWW saveSettings block ran with DEFAULT_SETTINGS as the locale filler.
+        const cloudLearning = Array.isArray(cloudSettings.learningLocales)
+          ? (cloudSettings.learningLocales as import("@/i18n/locales").AppLocale[])
+          : null;
+        const cloudRemoved = Array.isArray(cloudSettings.removedLocales)
+          ? (cloudSettings.removedLocales as import("@/i18n/locales").AppLocale[])
+          : null;
+
+        const mergedRemoved = mergeRemovedLocales(preLocalSettings.removedLocales, cloudRemoved);
+        const mergedLearning = mergeLearnedLocales(preLocalSettings.learningLocales, cloudLearning, mergedRemoved);
+
+        // Resolve the active locale against the merged learning set.
+        // resolveActiveLocale keeps the current device choice if still enrolled,
+        // otherwise falls back to English. activePokemonNameLocale is device-local
+        // (DEVICE_LOCAL_KEYS) so a change here must NOT trigger a cloud push.
+        const mergedActive = resolveActiveLocale(
+          preLocalSettings.activePokemonNameLocale,
+          null,
+          mergedLearning,
+        );
+
+        const learningLocalChanged = !setsEqual(mergedLearning, preLocalSettings.learningLocales);
+        const removedLocalChanged = !setsEqual(mergedRemoved, preLocalSettings.removedLocales);
+        const activeChanged = mergedActive !== preLocalSettings.activePokemonNameLocale;
+
+        // Push back ONLY when cloud is missing the merged content (i.e. the merge
+        // actually changes what cloud holds). activePokemonNameLocale is device-local
+        // and must NEVER drive a cloud push — exclude it from the push gate.
+        const cloudLearningNeedsUpdate =
+          !setsEqual(mergedLearning, cloudLearning ?? ["en"]);
+        const cloudRemovedNeedsUpdate =
+          !setsEqual(mergedRemoved, cloudRemoved ?? []);
+
+        if (learningLocalChanged || removedLocalChanged || activeChanged) {
+          // Read post-LWW local settings so the save merges with the already-
+          // written LWW values rather than clobbering them with preLocalSettings.
+          const currentLocal = loadSettings();
+
+          // Update the last-pushed snapshot BEFORE saveSettings so the
+          // SETTINGS_SAVED_EVENT listener in AutoSyncOnChange sees a zero-key
+          // diff for learningLocales/removedLocales and skips the duplicate push.
+          // On a fresh device there is no prior snapshot, so seed it from the
+          // current local settings (rather than skipping the update, which would
+          // let AutoSyncOnChange fire a redundant push on first sign-in).
+          if (cloudLearningNeedsUpdate || cloudRemovedNeedsUpdate) {
+            const snapshotBase = loadLastPushedSettings() ?? currentLocal;
+            saveLastPushedSettings({
+              ...snapshotBase,
+              learningLocales: mergedLearning,
+              removedLocales: mergedRemoved,
+            });
+          }
+
+          saveSettings({
+            ...currentLocal,
+            learningLocales: mergedLearning,
+            removedLocales: mergedRemoved,
+            activePokemonNameLocale: mergedActive,
+          });
+        }
+
+        // Push back only when cloud is missing the merged content, and only
+        // when the superuser write-guard is not active.
+        if (!superuserPaused && (cloudLearningNeedsUpdate || cloudRemovedNeedsUpdate)) {
+          // Push the merged sets back so cloud reflects the union / tombstone.
+          // Fire-and-forget: a failure here must never break the pull cycle.
+          pushSettings(client, userId, {
+            learningLocales: mergedLearning,
+            removedLocales: mergedRemoved,
+          }).catch((e) => {
+            console.warn("[pullAndMerge] learningLocales push-back failed (non-fatal)", e);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[pullAndMerge] learningLocales/removedLocales merge failed (non-fatal)", e);
     }
 
     // Pull regional prefs (timezone + date_format + push_notification_hour

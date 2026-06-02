@@ -62,6 +62,7 @@ import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
 import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
+import { readMasteredCountCache } from "@/lib/profile/masteredCountCache";
 
 /**
  * Curated fallback list for browsers that don't support
@@ -421,6 +422,7 @@ const ALL_ANCHOR_IDS = [
   "regional-heading",
   "about-heading",
   "labs-heading",
+  "languages-learning",
   "developer-heading",
   "danger-zone-heading",
 ] as const;
@@ -449,6 +451,7 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "backup-heading": "account-data-heading",
   "regional-heading": "account-data-heading",
   "about-heading": "account-data-heading",
+  "languages-learning": "labs-heading",
   "developer-heading": "advanced-heading",
   "danger-zone-heading": "advanced-heading",
 };
@@ -487,6 +490,15 @@ export default function SettingsPage() {
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [toggleErrorKey, setToggleErrorKey] = useState<keyof UserSettings | null>(null);
   const [favouriteId, setFavouriteId] = useState<number | null>(null);
+  // Pending unenrol confirmation: the locale the user wants to remove when it
+  // is the currently-active language. An inline confirm block is shown instead
+  // of applying immediately, to avoid accidentally switching practice to English.
+  const [pendingUnenrolLocale, setPendingUnenrolLocale] =
+    useState<AppLocale | null>(null);
+  // Per-locale mastered counts for the enrolment checklist (item 5).
+  const [enrolmentMasteredCounts, setEnrolmentMasteredCounts] = useState<
+    Record<AppLocale, number>
+  >({ en: 0, ja: 0, "zh-Hans": 0, "zh-Hant": 0 });
   // One-time onboarding banner shown when verified typed entry is first enabled (#1271).
   const [typedEntryBannerVisible, setTypedEntryBannerVisible] = useState(false);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -584,6 +596,8 @@ export default function SettingsPage() {
 
     setSettings(loaded);
     setFavouriteId(loadFavourite()?.id ?? null);
+    // Read per-locale mastered counts for the enrolment checklist (item 5).
+    setEnrolmentMasteredCounts(readMasteredCountCache());
     // Count optimizable reviews from local grade log (async now — IDB backed)
     void loadGradeLog().then((log) => setOptimizableReviewCount(countOptimizableReviews(log)));
 
@@ -2049,36 +2063,222 @@ export default function SettingsPage() {
                               </select>
                             </div>
 
-                            {/* Pokémon name language — writes pokemonNameLocale in settings */}
+                            {/* Pokémon name practice languages — enrolment set
+                                (#1484 Phase 3). English is always included;
+                                toggling a language adds/removes it from
+                                learningLocales. Removing the active language
+                                shows an inline confirmation first. */}
+                            <div id="languages-learning" className="scroll-mt-24">
+                              <p className="block text-sm font-medium text-foreground">
+                                {t("settings.labs.languages.enrolment.heading")}
+                              </p>
+                              <p className={`mt-1 ${mutedTextXs}`}>
+                                {t("settings.labs.languages.enrolment.description")}
+                              </p>
+                              <ul className="mt-2 flex flex-col gap-1">
+                                {SUPPORTED_LOCALES.map((loc) => {
+                                  // Guard against a settings object predating the
+                                  // learningLocales field (#1484 back-compat).
+                                  const enrolled = (
+                                    settings.learningLocales ?? ["en"]
+                                  ).includes(loc);
+                                  const isEnglish = loc === "en";
+                                  // Honour pretendAllMastered: when on, every
+                                  // locale shows the full masterable total
+                                  // (mirrors ProfileStatusBar / useProfileStatus).
+                                  const masteredCount = flags.pretendAllMastered
+                                    ? SEED_POKEMON.length
+                                    : (enrolmentMasteredCounts[loc] ?? 0);
+                                  const isPendingConfirm =
+                                    pendingUnenrolLocale === loc;
+                                  return (
+                                    <li
+                                      key={loc}
+                                      className="flex flex-col gap-1.5 py-1"
+                                    >
+                                      <div className="flex items-center justify-between gap-3">
+                                        <span className="flex flex-col">
+                                          <span className="flex items-center gap-2">
+                                            <span
+                                              lang={loc}
+                                              className="text-sm font-medium text-foreground"
+                                            >
+                                              {LOCALE_ENDONYMS[loc]}
+                                            </span>
+                                            {masteredCount > 0 && (
+                                              <span className={mutedTextXs}>
+                                                {t(
+                                                  "settings.labs.languages.enrolment.masteredCount",
+                                                  { count: masteredCount },
+                                                )}
+                                              </span>
+                                            )}
+                                          </span>
+                                          <span className={mutedTextXs}>
+                                            {isEnglish
+                                              ? t(
+                                                  "settings.labs.languages.enrolment.lockedEnglishNote",
+                                                )
+                                              : t(
+                                                  "settings.labs.languages.enrolment.machineTranslationNote",
+                                                )}
+                                          </span>
+                                        </span>
+                                        <input
+                                          type="checkbox"
+                                          checked={enrolled}
+                                          disabled={isEnglish}
+                                          aria-label={t(
+                                            "settings.labs.languages.enrolment.checkboxAriaLabel",
+                                            { language: LOCALE_ENDONYMS[loc] },
+                                          )}
+                                          onChange={(e) => {
+                                            // Dismiss any other locale's pending
+                                            // confirm before branching so opening
+                                            // confirm for locale A then toggling
+                                            // locale B always clears A's confirm.
+                                            setPendingUnenrolLocale(null);
+                                            const checked = e.target.checked;
+                                            if (!checked) {
+                                              // Removing a language.
+                                              const activeStored =
+                                                settings.activePokemonNameLocale ??
+                                                "en";
+                                              if (activeStored === loc) {
+                                                // Active language being removed:
+                                                // show inline confirm first.
+                                                setPendingUnenrolLocale(loc);
+                                                return;
+                                              }
+                                            }
+                                            // Non-active removal or enrolment:
+                                            // apply immediately.
+                                            const current =
+                                              settings.learningLocales ?? ["en"];
+                                            let next = checked
+                                              ? current.includes(loc)
+                                                ? current
+                                                : [...current, loc]
+                                              : current.filter((l) => l !== loc);
+                                            if (!next.includes("en")) {
+                                              next = ["en", ...next];
+                                            }
+                                            const activeStored =
+                                              settings.activePokemonNameLocale ??
+                                              "en";
+                                            const active = next.includes(
+                                              activeStored,
+                                            )
+                                              ? activeStored
+                                              : "en";
+                                            // Maintain removedLocales tombstone set (#1568):
+                                            // enrol clears the tombstone; remove adds it.
+                                            const currentRemoved =
+                                              settings.removedLocales ?? [];
+                                            const nextRemoved = checked
+                                              ? currentRemoved.filter((l) => l !== loc)
+                                              : loc !== "en" && !currentRemoved.includes(loc)
+                                                ? [...currentRemoved, loc]
+                                                : currentRemoved;
+                                            const updated = {
+                                              ...settings,
+                                              learningLocales: next,
+                                              activePokemonNameLocale: active,
+                                              removedLocales: nextRemoved,
+                                            };
+                                            setSettings(updated);
+                                            saveSettings(updated);
+                                          }}
+                                          className="size-4 shrink-0 accent-[var(--theme-accent)] disabled:opacity-50"
+                                        />
+                                      </div>
+                                      {/* Inline confirmation for removing the
+                                          active language (no native confirm()). */}
+                                      {isPendingConfirm && (
+                                        <div
+                                          role="alert"
+                                          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm dark:border-amber-800 dark:bg-amber-950"
+                                        >
+                                          <p className="text-amber-800 dark:text-amber-200">
+                                            {t(
+                                              "settings.labs.languages.enrolment.unenrolConfirmMessage",
+                                              {
+                                                language:
+                                                  LOCALE_ENDONYMS[loc],
+                                              },
+                                            )}
+                                          </p>
+                                          <div className="mt-2 flex gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setPendingUnenrolLocale(null);
+                                                const current =
+                                                  settings.learningLocales ??
+                                                  ["en"];
+                                                let next = current.filter(
+                                                  (l) => l !== loc,
+                                                );
+                                                if (!next.includes("en")) {
+                                                  next = ["en", ...next];
+                                                }
+                                                // Maintain removedLocales tombstone set (#1568):
+                                                // confirmed removal of the active locale adds
+                                                // it to the tombstone (English excluded always).
+                                                const currentRemoved =
+                                                  settings.removedLocales ?? [];
+                                                const nextRemoved =
+                                                  loc !== "en" &&
+                                                  !currentRemoved.includes(loc)
+                                                    ? [...currentRemoved, loc]
+                                                    : currentRemoved;
+                                                const updated = {
+                                                  ...settings,
+                                                  learningLocales: next,
+                                                  activePokemonNameLocale:
+                                                    "en" as AppLocale,
+                                                  removedLocales: nextRemoved,
+                                                };
+                                                setSettings(updated);
+                                                saveSettings(updated);
+                                              }}
+                                              className="min-h-[32px] rounded-md bg-amber-700 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 dark:bg-amber-600 dark:hover:bg-amber-700"
+                                            >
+                                              {t(
+                                                "settings.labs.languages.enrolment.unenrolConfirm",
+                                              )}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setPendingUnenrolLocale(null)
+                                              }
+                                              className="min-h-[32px] rounded-md border border-amber-300 px-3 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900"
+                                            >
+                                              {t(
+                                                "settings.labs.languages.enrolment.unenrolCancel",
+                                              )}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+
+                            {/* Pokémon name language is switched from the
+                                language pill in the status bar (Phase 2 of
+                                #1484); the picker was relocated out of Settings.
+                                This row points there. */}
                             <div>
-                              <label
-                                htmlFor="labs-pokemon-name-locale-select"
-                                className="block text-sm font-medium text-foreground"
-                              >
+                              <p className="block text-sm font-medium text-foreground">
                                 {t("settings.labs.languages.pokemonNameLanguageLabel")}
-                              </label>
+                              </p>
                               <p className={`mt-1 ${mutedTextXs}`}>
                                 {t("settings.labs.languages.pokemonNameLanguageDescription")}
                               </p>
-                              <select
-                                id="labs-pokemon-name-locale-select"
-                                value={settings.pokemonNameLocale}
-                                onChange={(e) => {
-                                  const next = e.target.value as AppLocale;
-                                  const updated = { ...settings, pokemonNameLocale: next };
-                                  setSettings(updated);
-                                  saveSettings(updated);
-                                }}
-                                className="mt-2 rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                              >
-                                {SUPPORTED_LOCALES.map((loc) => (
-                                  <option key={loc} value={loc}>
-                                    {loc === "en"
-                                      ? LOCALE_ENDONYMS[loc]
-                                      : `${LOCALE_ENDONYMS[loc]} ${t("settings.labs.languages.previewSuffix")}`}
-                                  </option>
-                                ))}
-                              </select>
                             </div>
                           </div>
                         )}
