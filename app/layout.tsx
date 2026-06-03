@@ -27,6 +27,7 @@ import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
 import { StoragePersistenceRequester } from "@/components/pwa/StoragePersistenceRequester";
 import { PwaBadge } from "@/components/pwa/PwaBadge";
 import { DocumentTitleBadge } from "@/components/pwa/DocumentTitleBadge";
+import { PwaLoadingSplash } from "@/components/pwa/PwaLoadingSplash";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -167,10 +168,12 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Inline script applies saved theme before first paint to avoid flash of default palette */}
+        {/* Inline script applies saved theme before first paint to avoid flash of default palette.
+            Also sets html background immediately so iOS WKWebView shows the correct colour
+            instead of black while the Tailwind stylesheet is being parsed. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var s=JSON.parse(localStorage.getItem('poke-memory:settings:v1')||'null');if(s){var r=document.documentElement;var h=/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;var c=s.favouriteTheme&&s.favouriteTheme.colors;if(c&&h.test(c.primary))r.style.setProperty('--theme-primary',c.primary);if(c&&h.test(c.secondary))r.style.setProperty('--theme-secondary',c.secondary);if(c&&h.test(c.accent))r.style.setProperty('--theme-accent',c.accent);if(c&&h.test(c.fgOnPrimary))r.style.setProperty('--theme-fg-on-primary',c.fgOnPrimary);var i=s.themeIntensity;if(i==='tinted'||i==='full')r.setAttribute('data-intensity',i);}}catch(e){}`,
+            __html: `try{var r=document.documentElement;r.style.background=window.matchMedia('(prefers-color-scheme: dark)').matches?'#111113':'#fafafa';var s=JSON.parse(localStorage.getItem('poke-memory:settings:v1')||'null');if(s){var h=/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;var c=s.favouriteTheme&&s.favouriteTheme.colors;if(c&&h.test(c.primary))r.style.setProperty('--theme-primary',c.primary);if(c&&h.test(c.secondary))r.style.setProperty('--theme-secondary',c.secondary);if(c&&h.test(c.accent))r.style.setProperty('--theme-accent',c.accent);if(c&&h.test(c.fgOnPrimary))r.style.setProperty('--theme-fg-on-primary',c.fgOnPrimary);var i=s.themeIntensity;if(i==='tinted'||i==='full')r.setAttribute('data-intensity',i);}}catch(e){}`,
           }}
         />
         {/* Captures beforeinstallprompt synchronously — must run before React hydrates
@@ -183,6 +186,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-dvh flex flex-col">
+        {/* Loading screen rendered and managed entirely by PwaLoadingSplash so
+            React owns the DOM node lifecycle. Direct DOM removal of a server-rendered
+            node broke React reconciliation on client-side navigation. */}
+        <PwaLoadingSplash />
         {/*
           LocaleProvider is wrapped in Suspense so the cookie read it performs
           (resolveLocale → cookies()) is isolated from the static shell.

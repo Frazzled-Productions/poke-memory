@@ -1,17 +1,17 @@
 # Spaced repetition
 
-Canonical reference for the SRS scheduler — algorithm, per-card state, queue policy, daily limits, card directions, practice scope, undo, mastery. AGENTS.md keeps a short pointer here.
+Canonical reference for the SRS scheduler - algorithm, per-card state, queue policy, daily limits, card directions, practice scope, undo, mastery. AGENTS.md keeps a short pointer here.
 
 ## Algorithm
 
-FSRS via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Default parameters per FSRS, with a user-controlled `request_retention` knob (Settings → Recall target, 0.80–0.97, default 0.90). Per-user FSRS weight optimisation has shipped (#268) — the optimiser runs against the user's `grade_log` history and persists trained weights to `user_settings`.
+FSRS via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Default parameters per FSRS, with a user-controlled `request_retention` knob (Settings → Recall target, 0.80–0.97, default 0.90). Per-user FSRS weight optimisation has shipped (#268) - the optimiser runs against the user's `grade_log` history and persists trained weights to `user_settings`.
 
 ## Anki-style learning steps layer
 
 Kept on top of FSRS. FSRS schedules graduated cards only; new and lapsed cards go through wall-clock learning steps via `learningStepsFor(difficulty)` / `relearningStepsFor(difficulty)` (`lib/srs/constants.ts`). The bands are:
 
 - **easy** (FSRS difficulty ≤ 4): `[1m]`
-- **medium** (5–7): `[1m, 10m]` for learning and `[10m]` for relearning — the historic default, preserved as `LEARNING_STEPS_MS` / `RELEARNING_STEPS_MS`
+- **medium** (5–7): `[1m, 10m]` for learning and `[10m]` for relearning - the historic default, preserved as `LEARNING_STEPS_MS` / `RELEARNING_STEPS_MS`
 - **hard** (≥ 8): `[1m, 5m, 15m]` for learning and `[5m, 15m]` for relearning
 
 The in-step layer is what `learningStep` / `stepStartedAt` track.
@@ -22,7 +22,7 @@ The in-step layer is what `learningStep` / `stepStartedAt` track.
 
 ## Grading UX
 
-4 buttons — `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5). The 1/2/4/5 internal convention maps to FSRS's `Rating` enum (1/2/3/4) at the boundary in `lib/srs/scheduler.ts`.
+4 buttons - `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5). The 1/2/4/5 internal convention maps to FSRS's `Rating` enum (1/2/3/4) at the boundary in `lib/srs/scheduler.ts`.
 
 ## Per-card review state
 
@@ -50,11 +50,11 @@ Dates as `"YYYY-MM-DD"` strings (string-comparable, no timezone math). The `next
 
 ## Queue policy
 
-Two queues — review (`lastReview !== null && dueDate <= today && lastReview !== today`) served first, then new (`lastReview === null`). Within each queue, deterministic per-day shuffle via FNV-1a hash of `id + today + userSalt` (stable for the day, rotates daily, differs across users). The salt is the Supabase `user.id` for authenticated users, or a stable per-device UUID persisted to `localStorage` under `poke-memory:client-salt:v1` for guests. See `lib/identity/clientSalt.ts` and `stableShuffleForDay` in `lib/review/session.ts`.
+Two queues - review (`lastReview !== null && dueDate <= today && lastReview !== today`) served first, then new (`lastReview === null`). Within each queue, deterministic per-day shuffle via FNV-1a hash of `id + today + userSalt` (stable for the day, rotates daily, differs across users). The salt is the Supabase `user.id` for authenticated users, or a stable per-device UUID persisted to `localStorage` under `poke-memory:client-salt:v1` for guests. See `lib/identity/clientSalt.ts` and `stableShuffleForDay` in `lib/review/session.ts`.
 
 ## Daily limits
 
-10 new cards/day (hard wall — exceeding inflates tomorrow's review queue), 100 reviews/day (soft wall with "Keep reviewing" override). Counters: `newIntroducedToday = firstSeen === today`; `reviewsDoneToday = lastReview === today && firstSeen !== today`.
+10 new cards/day (hard wall - exceeding inflates tomorrow's review queue), 100 reviews/day (soft wall with "Keep reviewing" override). Counters: `newIntroducedToday = firstSeen === today`; `reviewsDoneToday = lastReview === today && firstSeen !== today`.
 
 ## Species-grouped new-card introduction (#928)
 
@@ -67,11 +67,11 @@ When a species has new-card candidates across multiple enabled directions (e.g. 
 3. Species IDs are stable-shuffled for the day. Each species is admitted only if every direction present in its group still has remaining budget. Budgets are consumed atomically: all directions of a species are admitted together, or none are.
 4. Evolution cards are edge-keyed (not species-keyed) and use their own independent budget pass, unchanged.
 
-**No-regression guarantee**: cards with `lastReview !== null` (already introduced on a prior day) are never in `newCandidatesByType`, so they never appear in any species group. A species whose reverse was introduced before its name was enabled will have the reverse as a solo entry — admitted freely with no name partner to block it. No persisted card state is touched; the change is confined to new-card introduction ordering.
+**No-regression guarantee**: cards with `lastReview !== null` (already introduced on a prior day) are never in `newCandidatesByType`, so they never appear in any species group. A species whose reverse was introduced before its name was enabled will have the reverse as a solo entry - admitted freely with no name partner to block it. No persisted card state is touched; the change is confined to new-card introduction ordering.
 
 ## Persisted session shape
 
-`{ cards: ReviewCard[], limits: DailyLimits }` in `localStorage`. `loadSession` runs `migrateReviewState` on every card — including the SM-2 → FSRS conversion for any legacy persisted state — so the migration is idempotent and runs once per device automatically.
+`{ cards: ReviewCard[], limits: DailyLimits }` in `localStorage`. `loadSession` runs `migrateReviewState` on every card - including the SM-2 → FSRS conversion for any legacy persisted state - so the migration is idempotent and runs once per device automatically.
 
 ## Card directions
 
@@ -84,7 +84,7 @@ Three directions, each its own FSRS stream:
 
 ## Practice scope
 
-`lib/review/scope.ts` is a runtime filter over the cards array before `buildSessionQueues` sees it. Persisted as `practiceScope` on `UserSettings` and synced with the rest of settings (#333). The pre-#333 localStorage key `poke-memory:practice-scope:v1` is read once on first load and then cleared by `readLegacyScope` / `clearLegacyScope`. Out-of-scope cards' `dueDate` keeps advancing — the scope only affects which cards surface in a session.
+`lib/review/scope.ts` is a runtime filter over the cards array before `buildSessionQueues` sees it. Persisted as `practiceScope` on `UserSettings` and synced with the rest of settings (#333). The pre-#333 localStorage key `poke-memory:practice-scope:v1` is read once on first load and then cleared by `readLegacyScope` / `clearLegacyScope`. Out-of-scope cards' `dueDate` keeps advancing - the scope only affects which cards surface in a session.
 
 ## Undo
 
@@ -98,4 +98,4 @@ Reverse cards are a required practice direction since #1234 (not opt-in). The `r
 
 The `forceAllMastered` superuser flag bypasses both legs: any species is treated as mastered when the flag is on.
 
-The legacy `easeFactor` / `repetitions` field names survive on `StrugglingCard` (in `lib/stats/derive.ts`) — they are derived from FSRS state at the stats boundary so existing UI consumers stay stable.
+The legacy `easeFactor` / `repetitions` field names survive on `StrugglingCard` (in `lib/stats/derive.ts`) - they are derived from FSRS state at the stats boundary so existing UI consumers stay stable.

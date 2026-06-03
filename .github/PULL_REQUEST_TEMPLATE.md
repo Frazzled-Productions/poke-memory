@@ -23,10 +23,10 @@ coverage against the linked issue at PR open. See AGENTS.md
 <!--
 List every criterion from the linked issue's body. Use:
   - [x] criterion implemented by this PR
-  - [ ] criterion deferred — <reason + follow-up issue link>
+  - [ ] criterion deferred - <reason + follow-up issue link>
 
 If the change is trivial (no linked issue, or the issue body has no
-acceptance-criteria section), state "N/A — trivial change" instead.
+acceptance-criteria section), state "N/A - trivial change" instead.
 -->
 
 - [ ]
