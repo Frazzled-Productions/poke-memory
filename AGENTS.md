@@ -26,6 +26,10 @@ AGENTS.md is loaded into context **every session**, so it earns its size only as
 
 What belongs *here*: rules, lookup tables (helpers, flags, file-ownership), enforcement mechanisms, and runtime commands an implementer types. What does **not**: rationale narration, worked-example chains, or any detail with a canonical home above — collapse those to one line plus a pointer and at most one incident ref (`#NNNN`). A size budget (`npm run lint:agents-size`, in the `lint` chain) fails CI if this file grows past its ceiling; raise the ceiling only with a deliberate decision, the same way the coverage floor is ratcheted.
 
+## Company standards (Layer 1)
+
+Cross-project conventions live in the company standards repo **`Frazzled-Productions/ops` → `standards/`** ([conventions](https://github.com/Frazzled-Productions/ops/blob/main/standards/conventions.md), [process](https://github.com/Frazzled-Productions/ops/blob/main/standards/process.md)) and are the single source of truth for them. This file **references up, never copies**: the rules below are the Poké-Memory-specific instances and operative detail; the general principle behind each sits in `standards/`. What's company-generic (British English, punctuation, attribution, vendor screening, single-source-of-truth, testing discipline, branching, release, the pre-PR gate) is canonical there.
+
 ## Sub-agents and orchestration
 
 Custom agents live in `.claude/agents/`. The full roster, when to use each, and the plan → research → implement → E2E → review playbook are in [WORKFLOW.md](WORKFLOW.md#sub-agent-roster).
@@ -240,11 +244,11 @@ All updated inline in the commit that lands the change — no separate docs-only
 
 ### Spelling
 
-British English everywhere in prose, comments, commit messages, PR descriptions, docs, UI copy, and error messages (`colour`, `behaviour`, `optimise`, `serialise`, `centre`). **Out of scope**: external API/standard identifiers — CSS (`color`, `center`), JS/DOM (`Intl`), React props, PokéAPI fields, FSRS (`optimizer`), shipped Supabase column names. New internal identifiers prefer British, but don't churn existing ones.
+Company standard (British English everywhere): `standards/conventions.md` → Writing. Poké-specific out-of-scope identifiers to leave alone: PokéAPI fields, FSRS (`optimizer`), shipped Supabase column names.
 
 ### Punctuation
 
-No em dashes (`—`) in user-facing copy — restructure, or use a comma/colon/parentheses/spaced hyphen. **In scope**: rendered UI text, button/label text, ARIA labels, `alt`, `placeholder`/`title`, error messages, page metadata, and `CHANGELOG.md` + `changelog.d/` fragments. **Out of scope**: code comments, commit messages, developer docs.
+Company standard (no em dashes in user-facing copy): `standards/conventions.md` → Writing.
 
 ### Screenshots
 
@@ -276,11 +280,7 @@ Two long-lived branches (#806); full diagram and rulesets in [WORKFLOW.md](WORKF
 
 ### Stack decisions
 
-Screening criteria for new vendors/services/libraries. Any addition introducing a new vendor, paid service, auth provider, database, or persistence layer must be surfaced as a `[USER-DECISION]` open question in the planner's output, never resolved unilaterally. **When in doubt, default to blocker** — a false-positive costs one comment, a false-negative costs a closed PR.
-
-- No beta software for auth or security-critical paths (must be stable/GA).
-- Prefer single vendor (one DPA, one dashboard, one bill).
-- Plan for plausible future scope (per-card analytics, friends/social) when picking persistence shape.
+Company standard (new vendor/service/auth/DB → `[USER-DECISION]`, default to blocker, single vendor, no beta for security paths): `standards/conventions.md` → Stack / vendor screening. Poké-specific: plan persistence shape for plausible future scope (per-card analytics, friends/social).
 
 ### Backlog / process
 
