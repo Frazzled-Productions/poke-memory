@@ -7,23 +7,20 @@ describe("PwaLoadingSplash", () => {
     document.getElementById("pwa-splash")?.remove();
   });
 
-  it("adds the hiding class on mount and removes the element after 250 ms", async () => {
-    const splash = document.createElement("div");
-    splash.id = "pwa-splash";
-    document.body.appendChild(splash);
-
+  it("renders the splash div, sets data-hiding on mount, then removes it after 250 ms", async () => {
     render(<PwaLoadingSplash />);
 
-    expect(splash.classList.contains("hiding")).toBe(true);
     expect(document.getElementById("pwa-splash")).not.toBeNull();
+
+    await waitFor(() => {
+      expect(
+        document.getElementById("pwa-splash")?.hasAttribute("data-hiding"),
+      ).toBe(true);
+    });
 
     await waitFor(
       () => expect(document.getElementById("pwa-splash")).toBeNull(),
       { timeout: 1000 },
     );
-  });
-
-  it("does not throw when no pwa-splash element exists", () => {
-    expect(() => render(<PwaLoadingSplash />)).not.toThrow();
   });
 });
