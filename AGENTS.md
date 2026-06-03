@@ -61,7 +61,7 @@ Issue-first, acceptance-criteria cross-check, and skip-the-ceremony: `ops/standa
 
 ## Conventions
 
-Cross-project engineering, process, and writing conventions live in `ops/standards/conventions.md` and `ops/standards/process.md` (the company Layer-1 truth). The sections below state only what is specific to poke-memory or extends a standard for a documented local reason; they reference up rather than restating.
+The sections below state only what is specific to poke-memory or extends a standard for a documented local reason; they reference up rather than restating (see `## Company standards (Layer 1)` above for the canonical pointer to `ops/standards/`).
 
 ### Single source of truth for shared concepts
 
