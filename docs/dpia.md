@@ -1,7 +1,7 @@
 # Data Protection Impact Assessment - Poké Memory
 
 **Date:** May 2026  
-**Controller:** Frazzled Productions (privacy@pokememory.com)  
+**Controller:** Frazzled Productions Ltd (company no. 17258540) — privacy@pokememory.com  
 **Reference:** Issue #721  
 **Status:** Approved - sole-operator sign-off (see Step 7)
 
@@ -283,7 +283,7 @@ None of these conditions apply to Poké Memory:
 
 | Field | Value |
 |---|---|
-| Approved by | Frazzled Productions (sole operator) - privacy@pokememory.com |
+| Approved by | Frazzled Productions Ltd (company no. 17258540) - privacy@pokememory.com |
 | Date | May 2026 |
 | Reference | Issue #721 |
 | Outcome | All residual risks assessed as Low or Very Low. No unacceptable risks identified. No ICO pre-consultation required. |
