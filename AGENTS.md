@@ -18,13 +18,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## How to keep this file lean
 
-AGENTS.md is loaded into context **every session**, so it earns its size only as a fast-lookup index of *runtime* conventions. Heavy detail lives in on-demand files and is pointed to, never duplicated here:
+Lean-AGENTS.md principle (loads every session; index, don't duplicate): `ops/standards/conventions.md` → Documentation. Repo-specific pointer targets and budget:
 
 - **Process / orchestration / GitHub Actions / branching / release mechanics** → [WORKFLOW.md](WORKFLOW.md).
 - **Heavy subsystems** (sync, persistence, SRS, sprites, card-identity) → `docs/*.md`.
 - **Per-agent pre-flight checks and step wording** → `.claude/agents/*.md`.
 
-What belongs *here*: rules, lookup tables (helpers, flags, file-ownership), enforcement mechanisms, and runtime commands an implementer types. What does **not**: rationale narration, worked-example chains, or any detail with a canonical home above — collapse those to one line plus a pointer and at most one incident ref (`#NNNN`). A size budget (`npm run lint:agents-size`, in the `lint` chain) fails CI if this file grows past its ceiling; raise the ceiling only with a deliberate decision, the same way the coverage floor is ratcheted.
+Collapse rationale narration and worked-example chains to one line plus a pointer and at most one incident ref (`#NNNN`). A size budget (`npm run lint:agents-size`, in the `lint` chain) fails CI if this file grows past its ceiling; raise the ceiling only with a deliberate decision, the same way the coverage floor is ratcheted.
 
 ## Company standards (Layer 1)
 
@@ -32,13 +32,9 @@ Cross-project conventions live in the company standards repo **`Frazzled-Product
 
 ## Sub-agents and orchestration
 
-Custom agents live in `.claude/agents/`. The full roster, when to use each, and the plan → research → implement → E2E → review playbook are in [WORKFLOW.md](WORKFLOW.md#sub-agent-roster).
+Issue-first, acceptance-criteria cross-check, and skip-the-ceremony: `ops/standards/process.md`. Custom agents live in `.claude/agents/`. The full roster, when to use each, and the plan → research → implement → E2E → review playbook are in [WORKFLOW.md](WORKFLOW.md#sub-agent-roster).
 
-**Issue-first rule.** Every non-trivial change must have a GitHub issue before implementation begins. Create one if it doesn't exist. PRs reference the issue (`closes #N`).
-
-**Issue-body cross-check (implementer-side).** Every coder sub-agent (`ui-coder`, `data-coder`, `playwright`) runs `gh issue view` against the linked issue before writing code, enumerates its acceptance criteria, and compares them to the orchestrator's brief. If the brief omits a criterion, the coder stops and reports the gap rather than implementing only what the brief covered. The orchestrator either records the omission as a deliberate deferral (PR body, `## Acceptance criteria covered`) or extends the brief. Step-1 wording is in each agent's def. **Briefs may extend, not contract** — a brief that adds detail beyond the issue is fine; one that drops scope is the failure mode this check exists to surface (#1259 / #1260).
-
-**Skip sub-agents** for small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value.
+**Issue-body cross-check (implementer-side, poke-memory wiring).** Every coder sub-agent (`ui-coder`, `data-coder`, `playwright`) runs `gh issue view` against the linked issue before writing code, enumerates its acceptance criteria, and compares them to the orchestrator's brief. If the brief omits a criterion, the coder stops and reports the gap rather than implementing only what the brief covered. The orchestrator either records the omission as a deliberate deferral (PR body, `## Acceptance criteria covered`) or extends the brief. Step-1 wording is in each agent's def (#1259 / #1260).
 
 ## File ownership
 
@@ -61,17 +57,15 @@ Custom agents live in `.claude/agents/`. The full roster, when to use each, and 
 | `.github/workflows/**` | workflow-expert (review); orchestrator (edits) |
 | `.claude/agents/**` | workflow-expert (review); orchestrator (edits) |
 
-**Cross-layer fixes.** The table is the default routing, not a hard wall. When a `ui-coder` finds the root cause in `lib/` (or a `data-coder` finds the visible bug in a component), touch the helper as part of the same change — prefer clean layering over strict ownership; the alternative (a page-layer workaround papering over a `lib/` bug) is the failure mode this carve-out prevents. Document the cross-layer touch in the PR description (#1125; worked example #1117 / #1121).
+**Cross-layer fixes.** File-ownership-as-default-routing-not-a-hard-wall: `ops/standards/process.md` → File-ownership pattern (#1125). Poke-memory worked example: a `ui-coder` finding the root cause in `lib/` touches the helper in the same change (#1117 / #1121).
 
 ## Conventions
 
-These are decisions made through deliberate research/discussion, not guesses. Add to this section only when a real decision is locked in.
+Cross-project engineering, process, and writing conventions live in `ops/standards/conventions.md` and `ops/standards/process.md` (the company Layer-1 truth). The sections below state only what is specific to poke-memory or extends a standard for a documented local reason; they reference up rather than restating.
 
 ### Single source of truth for shared concepts
 
-When the same domain concept appears at multiple call sites — Pokémon names, dates for display, sprite URLs, mastery counts, locale-aware text, accessibility attributes, reused class-name literals — **every site routes through ONE shared helper, hook, or component**. Don't duplicate the logic site-by-site, even as "just a one-liner here". Fragmentation is the failure mode: the #1259 / #1260 multi-locale rollout shipped repeated partial fixes (#1311 → #1318) because names were rendered directly via `.displayName` across many components, so each fix only exposed the next un-audited site.
-
-**How to apply.** Before writing a new render/computation, ask whether the concept is already produced somewhere and import it; if it's rendered elsewhere but not centralised, centralise the existing call sites *in the same PR*. When adding a cross-cutting concern (locale, theme, a11y attr, analytics tag), centralise first, then add the concern in the helper. `code-reviewer` raises any new direct field access on a domain object (`p.displayName`, `card.name`, `pokemon.sprite`) as a **Blocker** tagged "fragmentation".
+Principle and rationale (one shared helper per concept; fragmentation is the failure mode; trade-off; every helper ships a forcing function): `ops/standards/conventions.md` → Single source of truth. Poke-memory wiring: `code-reviewer` raises any new direct field access on a domain object (`p.displayName`, `card.name`, `pokemon.sprite`) as a **Blocker** tagged "fragmentation" (#1259 / #1260, #1311 → #1318).
 
 **Existing helpers — use these, do not re-derive.**
 
@@ -84,9 +78,7 @@ When the same domain concept appears at multiple call sites — Pokémon names, 
 - `useCardClass(…)` from `lib/review/useCardClass.ts` — card-class derivation.
 - Class-name constants in `lib/utils/class-names.ts` (`cardPanel`, `cardPanelPadded`, `colStack`, `colStackLg`, `sectionLabel`, `dialogPanel`, `statValue`, `chartTickText`, `mutedText`, `inlineLink`, `mutedTextXs`, `chartTooltipCard`) — never inline the underlying Tailwind literal.
 
-**Trade-off.** A premature abstraction is worse than three similar lines — the rule is *don't fragment what's already shared*, not *abstract every duplication*.
-
-**Every single-source helper ships with a forcing function.** Convention-only rules fragment eventually, so when you centralise a concept, also add a mechanism that fails CI on a bypassing call site: a **lint rule** banning the raw form (model: #1327's `no-restricted-syntax` ban on raw `.displayName`), and/or a **fitness/contract test** asserting the invariant across all sites (model: #1356 onConflict↔PK parity test), and/or **type-system forcing** that makes the raw form un-representable or requires the cross-cutting argument (model: `computeStats(…, forceAllMastered)`). Enforcement-gap candidates tracked in #1405 / #1406.
+**Forcing-function models (poke-memory).** The standard requires every single-source helper to ship a CI-failing forcing function; the local models are a **lint rule** (#1327's `no-restricted-syntax` ban on raw `.displayName`), a **fitness/contract test** (#1356 onConflict↔PK parity test), and **type-system forcing** (`computeStats(…, forceAllMastered)`). Enforcement-gap candidates tracked in #1405 / #1406.
 
 ### Multi-locale rendering
 
@@ -107,11 +99,10 @@ When the call site is inside a `.map()` (hooks can't be called in map callbacks)
 
 ### Discoverability
 
-Every new user-facing feature must declare its discovery path in the PR body or linked-issue body — how a first-time user encounters the feature (navigation link, onboarding step, empty-state prompt, tooltip, badge, etc.). `ux-advisor` reviews this on the brief before implementation; `code-reviewer` raises an undeclared path as a **Concern** at review time. Surfaces gated behind an existing discoverable action (e.g. a detail view reachable only after tapping a card) are exempt, provided the gating action is itself discoverable.
+Declare-a-discovery-path, reach-existing-users, and mock-up-on-visual-surface-proposals: `ops/standards/conventions.md` → Discoverability. Poke-memory wiring and specifics:
 
-**Mock-up on visual-surface proposals (#1500).** Any plan, exploration report, or ticket that proposes a **new user-facing visual surface or a significant layout change** must append a **mock-up** (ASCII art is fine, or an attached image), desktop and mobile where they differ, so the maintainer can inspect and annotate it before implementation. Owned by `planner` (authoring tickets), the `/batch-issues` exploration brief, and `ux-advisor` (raises a missing mock-up as a **Concern** on the brief). Pure logic/data/process/bugfix work with no visible change is exempt.
-
-**Reach existing users, not just new ones.** An explainer must introduce the feature to users who already have history, not only first-timers. Event-driven nudges and empty/locked-state copy reach everyone by construction (gate them on live data, never an account-age flag). A one-shot contextual hint must use its **own new** `OnboardingFlags` key — never piggyback an already-dismissed flag like `firstVisitOnboardingDismissed`, and never add new content to `FirstVisitOnboardingModal` (every existing user has dismissed it). Add the new key to `DEFAULT_ONBOARDING` (default `false`) and validate it with the `v.x === true` coercion in `validateOnboarding`, so an absent key (= every existing user) resolves to not-seen and the hint shows. The version-based What's-new channel (`WhatsNewIndicator`) targets users-with-history and suppresses first-timers — use it for the batch summary with past-tense copy, never to instruct dismissing a hint. **Verify in a populated existing-user state** (a settings blob predating the change, or the `pasture-progression` / `fsrs-locale-mastery` QA-seed scenario), not only a fresh session.
+- `ux-advisor` reviews the discovery path on the brief; `code-reviewer` raises an undeclared path as a **Concern** at review time. Mock-up requirement (#1500) is owned by `planner` (authoring tickets), the `/batch-issues` exploration brief, and `ux-advisor` (raises a missing mock-up as a **Concern** on the brief).
+- **One-shot hint mechanics.** A one-shot contextual hint must use its **own new** `OnboardingFlags` key — never piggyback an already-dismissed flag like `firstVisitOnboardingDismissed`, and never add new content to `FirstVisitOnboardingModal` (every existing user has dismissed it). Add the new key to `DEFAULT_ONBOARDING` (default `false`) and validate it with the `v.x === true` coercion in `validateOnboarding`, so an absent key (= every existing user) resolves to not-seen and the hint shows. The version-based What's-new channel (`WhatsNewIndicator`) targets users-with-history and suppresses first-timers — use it for the batch summary with past-tense copy, never to instruct dismissing a hint. **Verify in a populated existing-user state** (a settings blob predating the change, or the `pasture-progression` / `fsrs-locale-mastery` QA-seed scenario), not only a fresh session.
 
 ### Message-catalogue completeness gate
 
@@ -198,13 +189,15 @@ Canonical reference: **[docs/srs.md](docs/srs.md)**. Headline facts:
 
 ### Testing
 
+Generic testing discipline (test in/out of every state, verify by running the app not just green CI, de-flake in the FULL suite not file-alone, coverage ratchets upward only, absence-only is insufficient): `ops/standards/conventions.md` → Testing discipline. Poke-memory tooling below.
+
 **Unit / component (vitest).** Two projects in `vitest.config.ts`, partitioned by directory: the **`node`** project (`lib/**/*.test.ts(x)`, env `node`, pure logic) and the **`jsdom`** project (`components/**/*.test.tsx`, `app/**/*.test.tsx`, env `jsdom` + `vitest.setup.ts`, all React rendering). A hook can live in `lib/`, but a test calling `renderHook` must live under `components/` or it fails in CI with `ReferenceError: document is not defined`.
 
-**De-flaking a test: verify in the FULL suite, not file-alone.** When you change a test to fix a flake, re-run the whole project (`npx vitest run --project <node|jsdom>`) and ideally the changed-files run (`npx vitest run --project <proj> --changed origin/qa`) — not just the single file. Flakes are usually cross-file ordering / full-run-timing dependent and will not reproduce file-alone, so a file-alone green is not evidence the fix holds. The #1464 `PwaInstallNudge` de-flake (PR #1469: `act()` + `getByText`) passed file-alone but deterministically broke the `test` job in the full-suite / `--changed` run (`getByText` has no retry, so it hard-failed against the component's async mount render) and had to be reverted (#1470).
+**De-flake run (full suite).** Re-run the whole project (`npx vitest run --project <node|jsdom>`) and ideally the changed-files run (`npx vitest run --project <proj> --changed origin/qa`), not the single file. Worked example: the #1464 `PwaInstallNudge` de-flake (PR #1469: `act()` + `getByText`) passed file-alone but deterministically broke the `test` job in the full-suite / `--changed` run (`getByText` has no retry, so it hard-failed against the component's async mount render) and had to be reverted (#1470).
 
 **Integration (vitest + local Postgres).** `lib/sync/integration/` runs against a local `postgres:15` container — no Supabase Pro/branch quota (#464 / #545 replaced PR #531's branching approach). Opt-in locally: `VITEST_INTEGRATION=1 npm run test:integration`. CI's `integration-tests.yml` runs on PRs touching `lib/sync/**`, `app/api/sync/**`, `db/migrations/**`, `lib/gradelog/**`, or itself (#611); the `integration-tests` label is the escape hatch. In scope: `apply-migrations.test.ts`, `rls.test.ts`, `regression-trigger.test.ts`. `auth.uid()` is polyfilled via `SET LOCAL "request.jwt.claims"` in a transaction.
 
-**Coverage gate (#824).** `npm run test:coverage` runs the fast suite under v8 with two gates: a **global floor** in `coverage-floor.json` (the single source of truth — do not hardcode the numbers elsewhere; ratchet *upward* only, never lower to make a build pass; #1333), and **diff coverage** (`scripts/diff-coverage.mjs`, 90% patch bar on changed product lines, excludes test files / generated seed / non-product dirs). Both run in the `coverage` workflow on every PR.
+**Coverage gate (#824).** `npm run test:coverage` runs the fast suite under v8 with two gates: a **global floor** in `coverage-floor.json` (the single source of truth — do not hardcode the numbers elsewhere; #1333), and **diff coverage** (`scripts/diff-coverage.mjs`, 90% patch bar on changed product lines, excludes test files / generated seed / non-product dirs). Both run in the `coverage` workflow on every PR.
 
 **E2E (Playwright).** Smoke tests in `e2e/` run against Vercel previews via `e2e.yml`; config in `playwright.config.ts`.
 
@@ -213,12 +206,10 @@ Canonical reference: **[docs/srs.md](docs/srs.md)**. Headline facts:
 - **Selectors**: prefer `getByRole` / `getByText` / `getByLabel` over CSS or test IDs; match the accessible names in the markup.
 - **When to add**: any new page, new interactive flow, or change to an existing user-facing flow. Bar is smoke-level happy path. An absence-only suite (asserting the feature is hidden/disabled/absent) is **not** sufficient — at least one test must assert the feature renders and its core interaction succeeds. One spec file per feature area.
 
-**Mandatory coverage rules (state and locale).** Non-negotiable for every user-facing change, in the implementer's own unit/component **and** e2e tests, re-checked by the orchestrator at close-out by running the app. The #1302 / #1327 batch shipped three broken headline behaviours that passed unit tests, CI, and review because nothing exercised them in the broken state/locale.
+**Mandatory coverage rules (state and locale).** The generic state-coverage and verify-by-running-the-app rules are in `ops/standards/conventions.md` → Testing discipline; here they are non-negotiable for every user-facing change in the implementer's unit/component **and** e2e tests and re-checked by the orchestrator at close-out (#1302 / #1327 shipped three broken headline behaviours that passed unit tests, CI, and review). Poke-memory drivers and the locale matrix:
 
-- **State coverage — test IN and OUT of every state.** Both on and off for any flag/setting/mode, signed-in vs guest, and **empty vs populated data** (the empty / all-caught-up branch is where regressions hide). When a fresh preview can't reach a data-dependent state, drive it via QA-seed scenarios (#1326) or superuser flags.
+- **State coverage** — when a fresh preview can't reach a data-dependent state, drive it via QA-seed scenarios (#1326) or superuser flags. Verify locale switched, seed applied, empty branch, eyeballing exempted surfaces too (memory: `feedback_verify_core_mechanics_by_running_app`).
 - **Locale coverage — test names and labels in EVERY supported locale** (`en`, `ja`, `zh-Hans`, `zh-Hant`) on every surface that renders them, for both axes (`appLocale` for chrome, `pokemonNameLocale` for names). This **includes allowlisted / perf-exempted surfaces** (e.g. the Pokédex grid): lint-rule exemption (#1327) is not render-correctness exemption — add a locale-rendering test there too and resolve names via the pure resolver `lib/pokemon/localeNames.ts::getLocaleName`.
-- **Verify by running the app, not just green CI.** At close-out the orchestrator runs the app (or `/verify` / Playwright) in the relevant state — locale switched, seed applied, empty branch — and eyeballs every affected surface including exempted ones. (memory: `feedback_verify_core_mechanics_by_running_app`.)
-
 - **Localising a number can break a `\d+` assertion.** Numbers rendered via `Intl.NumberFormat` / next-intl `useFormatter().number()` / an ICU `#` gain locale digit-grouping (`26,645`, or a narrow-NBSP separator). Update any unit/e2e assertion matching the raw number with `\d+` to tolerate the separator, and grep `e2e/` + tests when touching number rendering (#1408).
 
 ### Local development gotchas
@@ -234,21 +225,18 @@ Two card-mix shapes look "broken" on a fresh dev session but aren't:
 
 ### Documentation
 
-- **README.md** — user-facing entry point; concise, scannable, run-locally instructions.
-- **CHANGELOG.md** — notable user-facing changes ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/)). Never edit directly; add a fragment under `changelog.d/unreleased/` (see `changelog.d/README.md`).
-- **WORKFLOW.md** — process map: sub-agent roster, orchestration playbook, GitHub Actions catalog, issue lifecycle, branching model, release mechanics, build gates, retrospectives.
-- **AGENTS.md** (this file) — implementer conventions index; kept separate from user-facing docs.
-- **`docs/*.md`** — canonical references for heavy subsystems ([sync](docs/sync.md), [persistence](docs/persistence.md), [card-identity](docs/card-identity.md), [srs](docs/srs.md), [sprites](docs/sprites.md)).
+README / CHANGELOG / AGENTS roles (and update-inline-in-the-landing-commit): `ops/standards/conventions.md` → Documentation. Poke-memory canonical references:
 
-All updated inline in the commit that lands the change — no separate docs-only commit, no specialist agent.
+- **WORKFLOW.md** — process map: sub-agent roster, orchestration playbook, GitHub Actions catalog, issue lifecycle, branching model, release mechanics, build gates, retrospectives.
+- **`docs/*.md`** — canonical references for heavy subsystems ([sync](docs/sync.md), [persistence](docs/persistence.md), [card-identity](docs/card-identity.md), [srs](docs/srs.md), [sprites](docs/sprites.md)).
 
 ### Spelling
 
-Company standard (British English everywhere): `standards/conventions.md` → Writing. Poké-specific out-of-scope identifiers to leave alone: PokéAPI fields, FSRS (`optimizer`), shipped Supabase column names.
+Spelling: British English. See `ops/standards/conventions.md` → Writing. Poké-specific out-of-scope identifiers to leave alone: PokéAPI fields, FSRS (`optimizer`), shipped Supabase column names.
 
 ### Punctuation
 
-Company standard (no em dashes in user-facing copy): `standards/conventions.md` → Writing.
+Punctuation: see `ops/standards/conventions.md` → Writing — punctuation.
 
 ### Screenshots
 
@@ -268,33 +256,25 @@ A deterministic lived-in seed (`scripts/screenshot-seed.mjs`, #1296) makes rende
 
 ### Versioning
 
-SemVer 2.0.0, `0.MINOR.PATCH` pre-v1. The daily `auto-release.yml` cron assembles `changelog.d/unreleased/*.md` fragments, decides the bump (`kind: minor-bump` fragment → minor; otherwise patch), and tags. **`package.json` is the single source of truth — never edit the version by hand.** Planners/coders default to a patch fragment; a `minor-bump` fragment needs the owner-applied `version-bump:approved` label (`version-bump-gate.yml`) and explicit user direction. Fragment format and the full release pipeline (cut-release, loop-break, bot bypass-actor prerequisites) live in [WORKFLOW.md](WORKFLOW.md) and `changelog.d/README.md`.
+SemVer, `package.json`-as-single-source, changelog fragments, owner-approval for a non-patch bump: `ops/standards/process.md` → Versioning & release. Poke-memory wiring: the daily `auto-release.yml` cron assembles `changelog.d/unreleased/*.md` fragments (`kind: minor-bump` → minor; otherwise patch) and tags; a `minor-bump` fragment needs the owner-applied `version-bump:approved` label (`version-bump-gate.yml`). Fragment format and the full release pipeline (cut-release, loop-break, bot bypass-actor prerequisites) live in [WORKFLOW.md](WORKFLOW.md) and `changelog.d/README.md`.
 
 ### Branching model
 
-Two long-lived branches (#806); full diagram and rulesets in [WORKFLOW.md](WORKFLOW.md). The rules an implementer needs:
-
-- **`main`** is strict and production-tracked. It accepts PRs **only from `qa`** — the `Restrict main PR source` check fails any other PR unless it carries the owner-applied `hotfix` label.
-- **`qa`** is the integration branch (required checks `test` + `e2e`, no strict-up-to-date). Every PR-producing path targets `qa`: `/batch-issues`, the `auto` pipeline, one-off features.
-- A PR merged into `qa` does **not** auto-close its `closes #N` issue (GitHub auto-closes only on the default branch); the `qa -> main` promotion PR carries the aggregated `Closes #N` lines.
+Two-long-lived-branch model (#806), the `main`-only-from-`qa` rule, and the `qa`-doesn't-auto-close-issues behaviour: `ops/standards/process.md` → Branching model. Full diagram and rulesets in [WORKFLOW.md](WORKFLOW.md). Poke-memory specifics: the source-gate check is named `Restrict main PR source` (overridden by the owner-applied `hotfix` label); `qa`'s required checks are `test` + `e2e` (no strict-up-to-date); every PR-producing path (`/batch-issues`, the `auto` pipeline, one-off features) targets `qa`.
 
 ### Stack decisions
 
-Company standard (new vendor/service/auth/DB → `[USER-DECISION]`, default to blocker, single vendor, no beta for security paths): `standards/conventions.md` → Stack / vendor screening. Poké-specific: plan persistence shape for plausible future scope (per-card analytics, friends/social).
+Stack/vendor screening (`[USER-DECISION]`, default-to-blocker, no-beta, single-vendor): see `ops/standards/conventions.md` → Stack / vendor screening. Poké-specific: plan persistence shape for plausible future scope (per-card analytics, friends/social).
 
 ### Backlog / process
 
-Full process map (Actions catalog, issue lifecycle, scope warnings, graceful-exit/WIP salvage, retrospectives): [WORKFLOW.md](WORKFLOW.md). Runtime rules:
+Backlog priority labels + user-owns-priorities, and the generic pre-PR gate (lint+typecheck+build+test+coverage, two-attempt budget, auto-review on PR open, CI-that-doesn't-converge triage) and pre-push spelling check: `ops/standards/process.md` → Backlog & priorities + The pre-PR gate. Full process map (Actions catalog, issue lifecycle, scope warnings, graceful-exit/WIP salvage, retrospectives): [WORKFLOW.md](WORKFLOW.md). Poke-memory runtime specifics:
 
-- Backlog is GitHub Issues, labelled `priority:now` / `priority:next` / `priority:later`. The orchestrator usually starts with `gh issue list --label "priority:now"`.
-- **The user owns priorities.** Don't move issues between priority labels without explicit direction. Mid-change out-of-scope captures get filed as new issues (`priority:later`, or `priority:next` if clearly higher), never auto-promoted to `priority:now`.
-- Reference the closed issue in the commit (`closes #N`).
-- **Pre-PR build gate.** After pushing, run `npm run lint && npm run typecheck && npm run build && npm test && npm run test:coverage`. `npm run lint` is part of the gate: the CI `test` job runs it, and lint errors (e.g. a `no-restricted-syntax` ban) do **not** surface in typecheck/build/test, so omitting it ships a red PR (#1541). On failure, apply a targeted fix and retry up to twice; after the second failure post the last 80 lines of output and stop without opening a PR. For per-diff coverage locally, pipe a diff into the script while `coverage/coverage-final.json` is still present: `git diff origin/qa...HEAD | node scripts/diff-coverage.mjs`.
+- The orchestrator usually starts with `gh issue list --label "priority:now"`. Reference the closed issue in the commit (`closes #N`).
+- **Pre-PR build gate (exact command).** After pushing, run `npm run lint && npm run typecheck && npm run build && npm test && npm run test:coverage`. `npm run lint` is part of the gate: lint errors (e.g. a `no-restricted-syntax` ban) do **not** surface in typecheck/build/test, so omitting it ships a red PR (#1541). For per-diff coverage locally, pipe a diff into the script while `coverage/coverage-final.json` is still present: `git diff origin/qa...HEAD | node scripts/diff-coverage.mjs`.
 - **Pre-PR e2e smoke** for high-surface-area diffs (touching `app/layout.tsx`, `app/page.tsx`, `components/onboarding/**`, `components/Nav.tsx` / `BottomTabBar.tsx` / `MobileNavPaddingWrapper.tsx`, `lib/settings/persistence.ts`, or `playwright.config.ts`): run `scripts/pre-pr-smoke.sh` (chromium-only subset in the pinned Docker image). Same two-attempt budget.
 - **Push with an explicit `git push origin <branch>` — never a bare `git push`.** A worktree created via `git worktree add -b <branch> origin/qa` sets the branch's upstream to `origin/qa`, so a bare `git push` does NOT update `origin/<branch>`: at best it fast-fails (rejected, harmless), and at worst it silently pushes to `origin/qa` or no-ops, leaving the PR branch stale and CI red on the old commit — the dangerous case the incident hit. Always name the remote and branch: `git push origin <branch>` (mirrors the `gh pr create --head <branch>` rule). Worked example: a pseudo-locale regen "pushed" but never landed on the PR branch (#1474).
-- **Pre-push spelling check** against the British-English convention — catch it in the first commit.
-- **Auto-review on PR open.** `auto-review.yml` runs `code-reviewer` automatically (cross-checking the diff against the linked issue's acceptance criteria); do **not** run `code-reviewer` yourself in the implement stage.
-- **CI that doesn't converge.** After one fix-round still red on the same shape, do not dispatch a second sweep agent — use `/investigate-ci-failure` (logic-vs-perf triage, Playwright traces for perf shapes, read the production path for logic shapes). Worked examples #1234 / #1263.
+- **Auto-review on PR open.** `auto-review.yml` runs `code-reviewer` automatically (cross-checking the diff against the linked issue's acceptance criteria); do **not** run `code-reviewer` yourself in the implement stage. For CI that doesn't converge, use `/investigate-ci-failure` (logic-vs-perf triage, Playwright traces for perf shapes, read the production path for logic shapes; #1234 / #1263).
 - **Planner pre-flight checks** (AC-quality #1321, staleness #1322, testability + first-contact UX #1276) and the **mini-batch after preview QA** / **end-of-session retro** (#1333) flows are owned by `.claude/agents/planner.md` and the `/batch-issues` skill — see those defs for the runbooks.
 
 ### Privacy
