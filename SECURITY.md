@@ -14,7 +14,7 @@ Please include:
 - Steps to reproduce, or a proof-of-concept.
 - Any affected versions or commits you can identify.
 
-I'll acknowledge reports as time allows — this is a personal project, so there's no formal SLA, but credible reports against the authenticated sync surface (Supabase auth, RLS, `app/api/sync/**`, `app/api/srs/**`, `app/api/auth/**`, `lib/sync/**`, `lib/auth/**`) get priority.
+I'll acknowledge reports as time allows - this is a personal project, so there's no formal SLA, but credible reports against the authenticated sync surface (Supabase auth, RLS, `app/api/sync/**`, `app/api/srs/**`, `app/api/auth/**`, `lib/sync/**`, `lib/auth/**`) get priority.
 
 ## Scope
 
@@ -25,6 +25,6 @@ In scope:
 
 Out of scope:
 
-- Issues in third-party services (Vercel, Supabase, GitHub) — report those to the relevant vendor.
+- Issues in third-party services (Vercel, Supabase, GitHub) - report those to the relevant vendor.
 - Bugs that only affect the guest path (no auth, all data in localStorage on the reporter's own machine).
 - Best-practice findings without a demonstrable impact.

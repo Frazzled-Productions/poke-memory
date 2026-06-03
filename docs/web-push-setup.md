@@ -99,7 +99,7 @@ After all five steps are in place:
 
 - **Subscription cleanup.** The route deletes any subscription that
   returns 410 (Gone) or 404 (Not Found) from the push service. Other
-  errors are logged but skipped — a single bad endpoint does not block
+  errors are logged but skipped - a single bad endpoint does not block
   the rest of the batch.
 - **Schedule changes.** To move the daily fire time, update the cron
   expression via `cron.alter_job`:
