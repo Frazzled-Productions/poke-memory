@@ -57,7 +57,7 @@ Children (up to age 18) are in scope for both paths. The Children's Code assessm
 
 ### Context
 
-Poké Memory is a hobby and fan project operated by a sole individual (Frazzled Productions). It has no commercial purpose, no advertising, no social features, no user-to-user interaction, and no monetisation. The sole purpose of data processing is to deliver the cross-device spaced-repetition service and to improve it for the individual user.
+Poké Memory is a hobby and fan project operated by Frazzled Productions Ltd (company no. 17258540), registered in England and Wales. It has no commercial purpose, no advertising, no social features, no user-to-user interaction, and no monetisation. The sole purpose of data processing is to deliver the cross-device spaced-repetition service and to improve it for the individual user.
 
 ### Purposes
 
