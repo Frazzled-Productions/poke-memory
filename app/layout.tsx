@@ -27,6 +27,7 @@ import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
 import { StoragePersistenceRequester } from "@/components/pwa/StoragePersistenceRequester";
 import { PwaBadge } from "@/components/pwa/PwaBadge";
 import { DocumentTitleBadge } from "@/components/pwa/DocumentTitleBadge";
+import { PwaLoadingSplash } from "@/components/pwa/PwaLoadingSplash";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -167,10 +168,28 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Inline script applies saved theme before first paint to avoid flash of default palette */}
+        {/* Inline script applies saved theme before first paint to avoid flash of default palette.
+            Also sets html background immediately so iOS WKWebView shows the correct colour
+            instead of black while the Tailwind stylesheet is being parsed. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var s=JSON.parse(localStorage.getItem('poke-memory:settings:v1')||'null');if(s){var r=document.documentElement;var h=/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;var c=s.favouriteTheme&&s.favouriteTheme.colors;if(c&&h.test(c.primary))r.style.setProperty('--theme-primary',c.primary);if(c&&h.test(c.secondary))r.style.setProperty('--theme-secondary',c.secondary);if(c&&h.test(c.accent))r.style.setProperty('--theme-accent',c.accent);if(c&&h.test(c.fgOnPrimary))r.style.setProperty('--theme-fg-on-primary',c.fgOnPrimary);var i=s.themeIntensity;if(i==='tinted'||i==='full')r.setAttribute('data-intensity',i);}}catch(e){}`,
+            __html: `try{var r=document.documentElement;r.style.background=window.matchMedia('(prefers-color-scheme: dark)').matches?'#111113':'#fafafa';var s=JSON.parse(localStorage.getItem('poke-memory:settings:v1')||'null');if(s){var h=/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;var c=s.favouriteTheme&&s.favouriteTheme.colors;if(c&&h.test(c.primary))r.style.setProperty('--theme-primary',c.primary);if(c&&h.test(c.secondary))r.style.setProperty('--theme-secondary',c.secondary);if(c&&h.test(c.accent))r.style.setProperty('--theme-accent',c.accent);if(c&&h.test(c.fgOnPrimary))r.style.setProperty('--theme-fg-on-primary',c.fgOnPrimary);var i=s.themeIntensity;if(i==='tinted'||i==='full')r.setAttribute('data-intensity',i);}}catch(e){}`,
+          }}
+        />
+        {/* Loading screen animations — inline so they are available before Tailwind loads.
+            The 300 ms appear delay means fast cached loads never show the screen at all.
+            PwaLoadingSplash (client component) adds the "hiding" class once React mounts. */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+#pwa-splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:#fafafa;color:#777;font-family:system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.06em;opacity:0;animation:__pwa_appear .2s ease-out .3s forwards;z-index:9999;}
+@media(prefers-color-scheme:dark){#pwa-splash{background:#111113;color:#666;}}
+#pwa-splash.hiding{animation:__pwa_out .25s ease-out forwards!important;}
+@keyframes __pwa_appear{to{opacity:1;}}
+@keyframes __pwa_out{to{opacity:0;}}
+@keyframes __pwa_bounce{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-18px) rotate(20deg);}}
+#pwa-splash-ball{animation:__pwa_bounce .9s ease-in-out infinite;}
+`,
           }}
         />
         {/* Captures beforeinstallprompt synchronously — must run before React hydrates
@@ -183,6 +202,25 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-dvh flex flex-col">
+        {/* PWA cold-start loading screen. Rendered server-side so it is immediately
+            visible in the HTML before any JS executes. The 300 ms CSS animation delay
+            keeps it invisible on fast cached loads. PwaLoadingSplash removes it once
+            React mounts. Uses inline SVG so no extra network request is needed. */}
+        <div id="pwa-splash" aria-hidden="true">
+          <div id="pwa-splash-ball">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="56" height="56" aria-hidden="true">
+              <path d="M 2 32 A 30 30 0 0 0 62 32 Z" fill="var(--theme-primary,#E01B2E)" />
+              <path d="M 2 32 A 30 30 0 0 1 62 32 Z" fill="white" />
+              <circle cx="32" cy="32" r="30" fill="none" stroke="#1a1a1a" strokeWidth="2.5" />
+              <line x1="2" y1="32" x2="62" y2="32" stroke="#1a1a1a" strokeWidth="2.5" />
+              <circle cx="32" cy="32" r="9" fill="white" stroke="#1a1a1a" strokeWidth="2.5" />
+              <circle cx="32" cy="32" r="5" fill="#e0e0e0" />
+            </svg>
+          </div>
+          <span>Loading...</span>
+        </div>
+        {/* Removes #pwa-splash once React has hydrated */}
+        <PwaLoadingSplash />
         {/*
           LocaleProvider is wrapped in Suspense so the cookie read it performs
           (resolveLocale → cookies()) is isolated from the static shell.
