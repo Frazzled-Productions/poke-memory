@@ -182,7 +182,7 @@ export default function RootLayout({
         <style
           dangerouslySetInnerHTML={{
             __html: `
-#pwa-splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:#fafafa;color:#777;font-family:system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.06em;opacity:0;animation:__pwa_appear .2s ease-out .3s forwards;z-index:9999;}
+#pwa-splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:#fafafa;color:#777;font-family:system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.06em;opacity:0;pointer-events:none;animation:__pwa_appear .2s ease-out .3s forwards;z-index:9999;}
 @media(prefers-color-scheme:dark){#pwa-splash{background:#111113;color:#666;}}
 #pwa-splash.hiding{animation:__pwa_out .25s ease-out forwards!important;}
 @keyframes __pwa_appear{to{opacity:1;}}
