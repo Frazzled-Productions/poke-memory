@@ -5,6 +5,11 @@ allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, Agent, EnterWorktree, TaskC
 
 # Batch Issues
 
+> **Model guard.** The global default is now Sonnet (for cost). Batch orchestration must run on
+> **Opus**: the orchestrator owns verification, recovery, and taking over stalled agents, which need
+> Opus reliability. First step before anything else, if this session is not on Opus, tell the user to
+> run `/model opus` and wait for confirmation before proceeding.
+
 End-to-end workflow for draining the open issue backlog. Surveys open issues (ignoring `priority:later`), groups them into batches that minimize merge-conflict risk, implements them in parallel where safe and serially where not, opens PRs with an in-session `code-reviewer` pass on each, drains the PR queue into the `qa` staging branch, fires a `qa` preview deploy, and opens a draft `qa -> main` promotion PR for the maintainer to QA and merge.
 
 ## When to use
