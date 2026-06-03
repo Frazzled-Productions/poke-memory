@@ -39,7 +39,7 @@ Punch list using these four severities (sort in this order):
 - **Nit**: style / preference, optional
 - **Praise**: things done well
 
-Every bullet MUST start with a bold severity tag, an em dash, a bold **file:line** anchor, another em dash, then a one-sentence description and the *why*. The `Why:` clause is required for Blocker, Concern, and Nit; it is optional for Praise. Example:
+Every bullet MUST start with a bold severity tag, a hyphen, a bold **file:line** anchor, another hyphen, then a one-sentence description and the *why*. The `Why:` clause is required for Blocker, Concern, and Nit; it is optional for Praise. Example:
 
 - **Concern** - **app/api/srs/optimize/route.ts:179** - 429 response omits the standard Retry-After header. Why: needed for CDNs and generic clients to back off correctly.
 
