@@ -862,6 +862,12 @@
       "learningBody": "Learning: you've seen it and are building the memory.",
       "masteredBody": "Mastered: recalled correctly {reps} {reps, plural, one {time} other {times}} in a row with the next review at least 21 days out. That's when the scheduler is confident you've truly learnt it.",
       "introducedNote": "Introduced counts any Pokémon you've seen at least once, whether or not it's fully mastered yet."
+    },
+    "languageBreakdown": {
+      "heading": "Languages",
+      "masteredCount": "{count, plural, one {# mastered} other {# mastered}}",
+      "bestDay": "{count, plural, one {# review on best day} other {# reviews on best day}}",
+      "noBestDay": "No reviews yet"
     }
   },
   "error": {

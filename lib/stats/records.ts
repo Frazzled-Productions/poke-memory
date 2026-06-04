@@ -69,6 +69,16 @@ export function computeBestReviewDay(log: GradeLog): number {
 }
 
 /**
+ * Highest number of `GradeLog` entries on any single day, restricted to
+ * entries whose `locale` matches the given locale. Legacy entries without a
+ * `locale` field are treated as `"en"` (matching the grade_log column default).
+ */
+export function bestReviewDayForLocale(log: GradeLog, locale: AppLocale): number {
+  const filtered = log.filter((e) => (e.locale ?? "en") === locale);
+  return computeBestReviewDay(filtered);
+}
+
+/**
  * Pure: build `Records` from the FULL card array (all card types) plus the
  * grade log plus the streak-date list. All four metrics gracefully
  * degrade to zero / null when input is empty.
