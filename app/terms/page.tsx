@@ -57,7 +57,8 @@ export default async function TermsPage() {
               pokememory.com
             </a>{" "}
             (&ldquo;the Service&rdquo;). The Service is operated by Frazzled
-            Productions. By using the Service you agree to these Terms. If you
+            Productions Ltd (company no. 17258540), registered in England and
+            Wales. By using the Service you agree to these Terms. If you
             do not agree, please do not use the Service.
           </p>
           <p className="mt-3">
@@ -138,7 +139,7 @@ export default async function TermsPage() {
             4. Limitation of liability
           </h2>
           <p>
-            To the fullest extent permitted by law, Frazzled Productions shall
+            To the fullest extent permitted by law, Frazzled Productions Ltd shall
             not be liable for any indirect, incidental, special, consequential,
             or punitive damages arising from your use of, or inability to use,
             the Service, including but not limited to loss of data, loss of

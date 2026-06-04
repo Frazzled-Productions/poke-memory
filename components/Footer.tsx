@@ -35,7 +35,7 @@ export function Footer() {
   return (
     <footer className="border-t border-zinc-200 bg-background dark:border-zinc-800">
       <div className={`mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-3 gap-y-1 px-4 py-3 text-center ${mutedTextXs}`}>
-        <span>{year !== null ? `© ${year} Frazzled Productions` : " "}</span>
+        <span>{year !== null ? `© ${year} Frazzled Productions Ltd` : " "}</span>
         <span aria-hidden="true">·</span>
         <Link
           href="/whats-new"
