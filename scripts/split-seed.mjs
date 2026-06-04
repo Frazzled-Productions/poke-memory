@@ -107,12 +107,12 @@ const localeNamesRecords = records
       speciesId: p.speciesId,
       nameByLocale: {
         en: p.displayName ?? p.name,
-        ja: jaKana || p.displayName ?? p.name,
-        "zh-Hans": zhHans || p.displayName ?? p.name,
-        "zh-Hant": zhHant || p.displayName ?? p.name,
+        ja: jaKana || (p.displayName ?? p.name),
+        "zh-Hans": zhHans || (p.displayName ?? p.name),
+        "zh-Hant": zhHant || (p.displayName ?? p.name),
       },
       transliterationByLocale: {
-        ja: normaliseRomaji(jaRoma, jaKana) || p.displayName ?? p.name,
+        ja: normaliseRomaji(jaRoma, jaKana) || (p.displayName ?? p.name),
         "zh-Hans": zhHans ? generatePinyin(zhHans) : p.displayName ?? p.name,
         "zh-Hant": zhHant ? generatePinyin(zhHant) : p.displayName ?? p.name,
       },
