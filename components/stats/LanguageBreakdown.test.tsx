@@ -2,8 +2,8 @@
  * Component tests for stats/LanguageBreakdown (issue #1619).
  *
  * Covers:
- *   1. Gate: single locale ["en"] — heading absent.
- *   2. Gate: languagesEnabled false — heading absent even with multiple locales.
+ *   1. Gate: single locale ["en"] - heading absent.
+ *   2. Gate: languagesEnabled false - heading absent even with multiple locales.
  *   3. Multi-locale ["en","ja"]: heading renders, ja endonym has lang="ja", card count,
  *      mastery %, and last-review (or "Not yet reviewed") render per locale.
  *   4. ["en","zh-Hans"]: endonym with lang="zh-Hans".
@@ -154,7 +154,7 @@ beforeEach(() => {
 // Gate: single locale / flag off
 // ---------------------------------------------------------------------------
 
-describe("LanguageBreakdown — gate: single locale", () => {
+describe("LanguageBreakdown - gate: single locale", () => {
   it("does NOT render the heading when learningLocales has only ['en']", () => {
     mockLocaleCtx.learningLocales = ["en"];
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />);
@@ -173,7 +173,7 @@ describe("LanguageBreakdown — gate: single locale", () => {
 // Multi-locale ["en","ja"]
 // ---------------------------------------------------------------------------
 
-describe("LanguageBreakdown — multi-locale ['en','ja']", () => {
+describe("LanguageBreakdown - multi-locale ['en','ja']", () => {
   it("renders the Languages heading when enrolled in en + ja", () => {
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />);
     expect(screen.getByRole("heading", { name: "Languages" })).toBeInTheDocument();
@@ -252,7 +252,7 @@ describe("LanguageBreakdown — multi-locale ['en','ja']", () => {
 // ["en","zh-Hans"]
 // ---------------------------------------------------------------------------
 
-describe("LanguageBreakdown — ['en','zh-Hans']", () => {
+describe("LanguageBreakdown - ['en','zh-Hans']", () => {
   it("renders zh-Hans endonym with lang='zh-Hans'", () => {
     mockLocaleCtx.learningLocales = ["en", "zh-Hans"];
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />);
@@ -266,7 +266,7 @@ describe("LanguageBreakdown — ['en','zh-Hans']", () => {
 // ["en","zh-Hant"]
 // ---------------------------------------------------------------------------
 
-describe("LanguageBreakdown — ['en','zh-Hant']", () => {
+describe("LanguageBreakdown - ['en','zh-Hant']", () => {
   it("renders zh-Hant endonym with lang='zh-Hant'", () => {
     mockLocaleCtx.learningLocales = ["en", "zh-Hant"];
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />);
@@ -280,7 +280,7 @@ describe("LanguageBreakdown — ['en','zh-Hant']", () => {
 // All-four locales
 // ---------------------------------------------------------------------------
 
-describe("LanguageBreakdown — all four locales ['en','ja','zh-Hans','zh-Hant']", () => {
+describe("LanguageBreakdown - all four locales ['en','ja','zh-Hans','zh-Hant']", () => {
   it("renders all four rows with correct lang attributes", () => {
     mockLocaleCtx.learningLocales = ["en", "ja", "zh-Hans", "zh-Hant"];
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />);
@@ -293,7 +293,7 @@ describe("LanguageBreakdown — all four locales ['en','ja','zh-Hans','zh-Hant']
     // zh-Hant
     const zhHantSpan = document.querySelector('span[lang="zh-Hant"]');
     expect(zhHantSpan?.textContent).toBe("繁體中文");
-    // English (no lang attr needed — it's the document language)
+    // English (no lang attr needed - it's the document language)
     expect(screen.getByText("English")).toBeInTheDocument();
     // 4 rows → 4 "Not yet reviewed"
     const neverEls = screen.getAllByText("Not yet reviewed");
@@ -305,7 +305,7 @@ describe("LanguageBreakdown — all four locales ['en','ja','zh-Hans','zh-Hant']
 // pretendAllMastered superuser flag
 // ---------------------------------------------------------------------------
 
-describe("LanguageBreakdown — pretendAllMastered ON", () => {
+describe("LanguageBreakdown - pretendAllMastered ON", () => {
   it("shows 100% mastered per locale when forceAllMastered is on", () => {
     mockSuperuserValue.flags = { pretendAllMastered: true };
     mockSuperuserValue.anyFlagOn = true;
@@ -325,7 +325,7 @@ describe("LanguageBreakdown — pretendAllMastered ON", () => {
 // Empty cards state (0% mastery)
 // ---------------------------------------------------------------------------
 
-describe("LanguageBreakdown — empty cards state", () => {
+describe("LanguageBreakdown - empty cards state", () => {
   it("shows 0% mastered when there are no cards for a locale", () => {
     renderWithIntl(<LanguageBreakdown {...defaultProps({ cards: [] })} />);
     const zeroEls = screen.getAllByText("0% mastered");
@@ -337,7 +337,7 @@ describe("LanguageBreakdown — empty cards state", () => {
 // UI locale translations (heading)
 // ---------------------------------------------------------------------------
 
-describe("LanguageBreakdown — UI locale heading translations", () => {
+describe("LanguageBreakdown - UI locale heading translations", () => {
   it("renders the heading in Japanese UI locale", () => {
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />, { locale: "ja" });
     // ja: stats.languageBreakdown.heading = "言語"

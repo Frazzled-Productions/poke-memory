@@ -25,7 +25,7 @@ import type { AppLocale } from "@/i18n/locales";
  *
  * `speciesId` is the numeric Pokémon ID (matches the name card's `id`).
  * `masteredDate` is the YYYY-MM-DD `lastReview` date of whichever leg (name or
- * reverse) crossed the gate LAST — i.e. the date the species became fully mastered.
+ * reverse) crossed the gate LAST - i.e. the date the species became fully mastered.
  */
 export type SpeciesMasteryEvent = {
   speciesId: number;
@@ -41,7 +41,7 @@ export type SpeciesMasteryEvent = {
  * Derive a list of species-level mastery events from the FULL card array
  * (all card types). Only species whose BOTH name card AND paired reverse card
  * are mastered are included. The `masteredDate` is the later of the two
- * `lastReview` dates — i.e. when the SECOND leg crossed the gate.
+ * `lastReview` dates - i.e. when the SECOND leg crossed the gate.
  *
  * This is the shared helper for:
  *   - `computeMasteryOverTime` (mastery-over-time chart)
@@ -113,7 +113,7 @@ export function masteredSpeciesEvents(
 }
 
 // ---------------------------------------------------------------------------
-// nameCardsForLocale — extract name cards scoped to a locale
+// nameCardsForLocale - extract name cards scoped to a locale
 // ---------------------------------------------------------------------------
 
 /**
@@ -130,7 +130,7 @@ export function nameCardsForLocale(
 }
 
 // ---------------------------------------------------------------------------
-// lastReviewForLocale — most-recent review date for a given locale
+// lastReviewForLocale - most-recent review date for a given locale
 // ---------------------------------------------------------------------------
 
 /**

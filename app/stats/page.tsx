@@ -659,7 +659,7 @@ export default function StatsPage() {
               </section>
             )}
 
-            {/* Languages section — per-enrolled-locale mastery summary; hidden when single locale (#1619) */}
+            {/* Languages section - per-enrolled-locale mastery summary; hidden when single locale (#1619) */}
             {cards !== null && masteryRepetitions !== null && (
               <LanguageBreakdown
                 cards={cards}

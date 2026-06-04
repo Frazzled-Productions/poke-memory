@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * LanguageBreakdown — per-enrolled-language mastery summary on the Stats page.
+ * LanguageBreakdown - per-enrolled-language mastery summary on the Stats page.
  *
  * Renders a "Languages" card showing, for each enrolled learning locale
  * (when more than one is enrolled): the language endonym, total card count,
@@ -23,7 +23,7 @@ import { formatDate, type DateFormat } from "@/lib/utils/format-date";
 import { LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import type { ReviewableCard } from "@/lib/review/session";
 import { cn } from "@/lib/utils/cn";
-import { mutedText } from "@/lib/utils/class-names";
+import { mutedText, mutedTextXs } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -83,7 +83,7 @@ function LanguageRow({
       <span className="tabular-nums text-sm text-emerald-600 dark:text-emerald-400">
         {t("mastery", { pct: masteryPct })}
       </span>
-      <span className={cn("tabular-nums text-xs", mutedText)}>
+      <span className={cn("tabular-nums", mutedTextXs)}>
         {lastReviewText}
       </span>
     </div>
@@ -91,7 +91,7 @@ function LanguageRow({
 }
 
 // ---------------------------------------------------------------------------
-// Inner component — rendered only when the gate passes
+// Inner component - rendered only when the gate passes
 // ---------------------------------------------------------------------------
 
 type LanguageBreakdownInnerProps = LanguageBreakdownProps & {
@@ -170,7 +170,7 @@ function LanguageBreakdownInner({
 }
 
 // ---------------------------------------------------------------------------
-// Main component — applies the render gate
+// Main component - applies the render gate
 // ---------------------------------------------------------------------------
 
 export function LanguageBreakdown(props: LanguageBreakdownProps) {
