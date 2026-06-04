@@ -53,6 +53,7 @@ import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/s
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { computePerGameStats, type GameStats } from "@/lib/stats/per-game";
 import { GameBreakdown } from "@/components/stats/GameBreakdown";
+import { LanguageBreakdown } from "@/components/stats/LanguageBreakdown";
 import type { AppLocale } from "@/i18n/locales";
 import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
@@ -656,6 +657,17 @@ export default function StatsPage() {
                 </SectionHeading>
                 <GameBreakdown perGame={perGame} />
               </section>
+            )}
+
+            {/* Languages section — per-enrolled-locale mastery summary; hidden when single locale (#1619) */}
+            {cards !== null && masteryRepetitions !== null && (
+              <LanguageBreakdown
+                cards={cards}
+                today={todayString(new Date(), userTimezone)}
+                masteryRepetitions={masteryRepetitions}
+                dateFormat={userDateFormat}
+                timezone={userTimezone}
+              />
             )}
 
             {/* Scheduling section — full width on all breakpoints */}

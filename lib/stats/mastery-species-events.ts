@@ -128,3 +128,33 @@ export function nameCardsForLocale(
     (c): c is NameReviewCard => c.cardType === "name" && (c.locale ?? "en") === locale,
   );
 }
+
+// ---------------------------------------------------------------------------
+// lastReviewForLocale — most-recent review date for a given locale
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the lexicographically-greatest non-null `lastReview` ISO date string
+ * across all name cards for the given locale, or null when none of those cards
+ * have ever been reviewed.
+ *
+ * Cards with no explicit `locale` field are treated as "en" (legacy cards
+ * pre-dating multi-locale support).
+ *
+ * Used by the Stats page "Languages" card to show when each enrolled locale
+ * was last actively reviewed (#1619).
+ */
+export function lastReviewForLocale(
+  cards: readonly ReviewableCard[],
+  locale: AppLocale = "en",
+): string | null {
+  const localeCards = nameCardsForLocale(cards, locale);
+  let latest: string | null = null;
+  for (const card of localeCards) {
+    const lr = card.state.lastReview;
+    if (lr !== null && (latest === null || lr > latest)) {
+      latest = lr;
+    }
+  }
+  return latest;
+}

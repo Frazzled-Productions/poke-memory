@@ -15,6 +15,7 @@ import { describe, it, expect } from "vitest";
 import {
   masteredSpeciesEvents,
   nameCardsForLocale,
+  lastReviewForLocale,
 } from "./mastery-species-events";
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
 import {
@@ -381,5 +382,68 @@ describe("nameCardsForLocale", () => {
     const enName = makeNameCard(1, {}, "en");
     const result = nameCardsForLocale([enName], "zh-Hans");
     expect(result).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lastReviewForLocale
+// ---------------------------------------------------------------------------
+
+describe("lastReviewForLocale", () => {
+  it("returns null when the card array is empty", () => {
+    expect(lastReviewForLocale([], "en")).toBeNull();
+  });
+
+  it("returns null when no name cards for the locale have been reviewed", () => {
+    const card = makeNameCard(1, { lastReview: null }, "en");
+    expect(lastReviewForLocale([card], "en")).toBeNull();
+  });
+
+  it("returns the single reviewed card's lastReview date", () => {
+    const card = makeNameCard(1, { lastReview: "2026-05-01" }, "en");
+    expect(lastReviewForLocale([card], "en")).toBe("2026-05-01");
+  });
+
+  it("returns the lexicographically greatest date across multiple cards", () => {
+    const cards: ReviewableCard[] = [
+      makeNameCard(1, { lastReview: "2026-04-01" }, "en"),
+      makeNameCard(2, { lastReview: "2026-06-01" }, "en"),
+      makeNameCard(3, { lastReview: "2026-05-15" }, "en"),
+    ];
+    expect(lastReviewForLocale(cards, "en")).toBe("2026-06-01");
+  });
+
+  it("ignores cards from other locales", () => {
+    const enCard = makeNameCard(1, { lastReview: "2026-04-01" }, "en");
+    const jaCard = makeNameCard(2, { lastReview: "2026-06-15" }, "ja");
+    // Requesting "en" — should only see enCard's date.
+    expect(lastReviewForLocale([enCard, jaCard], "en")).toBe("2026-04-01");
+    // Requesting "ja" — should only see jaCard's date.
+    expect(lastReviewForLocale([enCard, jaCard], "ja")).toBe("2026-06-15");
+  });
+
+  it('treats cards with no explicit locale field as "en"', () => {
+    const cardNoLocale: NameReviewCard = {
+      ...makeNameCard(5, { lastReview: "2026-03-10" }),
+      locale: undefined,
+    };
+    expect(lastReviewForLocale([cardNoLocale], "en")).toBe("2026-03-10");
+    // Should NOT appear under "ja".
+    expect(lastReviewForLocale([cardNoLocale], "ja")).toBeNull();
+  });
+
+  it("ignores reverse cards even when their locale matches", () => {
+    // Reverse card has lastReview set, but lastReviewForLocale only scans name cards.
+    const rev = makeReverseCard(1, { lastReview: "2026-06-01" }, "en");
+    expect(lastReviewForLocale([rev], "en")).toBeNull();
+  });
+
+  it("skips null lastReview values and picks the max non-null date", () => {
+    const cards: ReviewableCard[] = [
+      makeNameCard(1, { lastReview: null }, "en"),
+      makeNameCard(2, { lastReview: "2026-05-10" }, "en"),
+      makeNameCard(3, { lastReview: null }, "en"),
+    ];
+    expect(lastReviewForLocale(cards, "en")).toBe("2026-05-10");
   });
 });
