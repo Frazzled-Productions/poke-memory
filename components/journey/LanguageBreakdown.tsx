@@ -12,7 +12,7 @@
  */
 
 import { useMemo } from "react";
-import { useTranslations, useFormatter } from "next-intl";
+import { useTranslations } from "next-intl";
 import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { computeStats } from "@/lib/stats/derive";
@@ -46,7 +46,6 @@ type LanguageRowProps = {
 
 function LanguageRow({ locale, masteredCount, bestDay }: LanguageRowProps) {
   const t = useTranslations("journey.languageBreakdown");
-  const format = useFormatter();
 
   const endonym = LOCALE_ENDONYMS[locale];
   const isEnglish = locale === "en";
@@ -65,7 +64,7 @@ function LanguageRow({ locale, masteredCount, bestDay }: LanguageRowProps) {
       </span>
       <span className={cn("tabular-nums text-sm", mutedText)}>
         {bestDay > 0
-          ? t("bestDay", { count: format.number(bestDay) })
+          ? t("bestDay", { count: bestDay })
           : t("noBestDay")}
       </span>
     </div>
