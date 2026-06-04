@@ -74,6 +74,7 @@ const SAMPLE: UserSettings = {
     offlineDownloadNudgeDismissed: false,
     slowSpriteLoadCount: 0,
     pastureLongPressHintDismissed: false,
+    higherOrLowerNudgeDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

@@ -469,6 +469,10 @@
       "title": "[Practising offline? Download for speed]",
       "body": "[Sprites loading slowly? Pre-fetch every sprite and cry (about 166 MB) so practice works instantly, even with no connection.]",
       "cta": "[Open offline download]"
+    },
+    "higherOrLowerNudge": {
+      "title": "[Finish your session for a bonus mini-game]",
+      "body": "[Once you have practised at least two Pokémon today, a Higher or Lower stat challenge unlocks below your session summary. Can you beat your best streak?]"
     }
   },
   "review": {

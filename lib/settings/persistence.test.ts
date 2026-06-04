@@ -618,6 +618,7 @@ describe('themeIntensity setting (#411)', () => {
           offlineDownloadNudgeDismissed: false,
           slowSpriteLoadCount: 0,
           pastureLongPressHintDismissed: false,
+          higherOrLowerNudgeDismissed: false,
         },
       });
       expect(loadSettings().onboarding).toEqual({
@@ -638,6 +639,7 @@ describe('themeIntensity setting (#411)', () => {
         offlineDownloadNudgeDismissed: false,
         slowSpriteLoadCount: 0,
         pastureLongPressHintDismissed: false,
+        higherOrLowerNudgeDismissed: false,
       });
     });
 
@@ -684,6 +686,7 @@ describe('themeIntensity setting (#411)', () => {
         offlineDownloadNudgeDismissed: false,
         slowSpriteLoadCount: 0,
         pastureLongPressHintDismissed: false,
+        higherOrLowerNudgeDismissed: false,
       });
     });
 

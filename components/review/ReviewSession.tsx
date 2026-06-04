@@ -1079,6 +1079,23 @@ export function ReviewSession() {
     [cards, alternateFormsEnabled, scope, incompleteChains],
   );
 
+  // Higher-or-Lower signpost nudge (#1573): one-shot hint teasing the
+  // post-session mini-game. Gate (in priority order):
+  //   1. seenPokemon.length < 1  -> suppress (no Pokémon seen yet; nothing to tease).
+  //   2. firstVisitDone false    -> suppress (first-visit modal still showing).
+  //   3. Otherwise: show.
+  // The OnboardingHint component handles the higherOrLowerNudgeDismissed flag.
+  const higherOrLowerNudge = (
+    seenPokemon.length < 1 ||
+    !firstVisitDone
+  ) ? null : (
+    <div className="mb-3">
+      <OnboardingHint id="higherOrLowerNudgeDismissed" title={t("higherOrLowerNudge.title")}>
+        <p>{t("higherOrLowerNudge.body")}</p>
+      </OnboardingHint>
+    </div>
+  );
+
   // Derive share parts/text unconditionally (hooks rule). Used only in the
   // end-of-session branch but must be called before any early return (#1520).
   const { shareParts, shareText } = useShareSheet(
@@ -2721,6 +2738,7 @@ export function ReviewSession() {
             <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
             {/* Cry card wraps ScopeControl in a max-width column for alignment. */}
             <div className="flex w-full max-w-xl flex-col gap-2">
+              {higherOrLowerNudge}
               {scopeNudge}
               {offlineNudge}
               <ScopeControl
@@ -2847,6 +2865,7 @@ export function ReviewSession() {
               <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />
             )}
             <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
+            {higherOrLowerNudge}
             {scopeNudge}
             {offlineNudge}
             <ScopeControl
@@ -2959,6 +2978,7 @@ export function ReviewSession() {
             <GradeErrorBanner message={gradeError} onDismiss={() => setGradeError(null)} />
           )}
           <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
+          {higherOrLowerNudge}
           {scopeNudge}
           {offlineNudge}
           <ScopeControl

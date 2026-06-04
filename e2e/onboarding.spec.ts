@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { practiceReadyLocator } from "./helpers/practiceCard";
+import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 
 const SETTINGS_KEY = "poke-memory:settings:v1";
 
@@ -630,5 +631,133 @@ test.describe("Offline download nudge (#1538)", () => {
     await expect(
       page.locator(`[role="note"]`, { hasText: /practising offline/i }),
     ).toHaveCount(0, { timeout: 20_000 });
+  });
+});
+
+// E2E smoke for #1573 "Higher or Lower signpost nudge".
+//
+// The nudge fires on the practice page when:
+//   - firstVisitOnboardingDismissed is true
+//   - seenPokemon.length >= 1 (at least one card has firstSeen set in session)
+//   - higherOrLowerNudgeDismissed is absent/false
+//
+// Tests cover the show-path, the dismiss interaction, and the primary
+// suppression path (nudge pre-dismissed).
+
+// Minimal session containing a Bulbasaur name card that has been seen (firstSeen
+// set), satisfying the seenPokemon.length >= 1 gate in ReviewSession.
+const SEEN_BULBASAUR_SESSION = {
+  cards: [
+    {
+      id: 1,
+      cardType: "name",
+      speciesId: 1,
+      name: "Bulbasaur",
+      spriteUrl: "/sprites/pokemon/1.png",
+      state: {
+        stability: 1,
+        difficulty: 5,
+        elapsedDays: 1,
+        scheduledDays: 1,
+        reps: 1,
+        lapses: 0,
+        fsrsState: "learning",
+        dueDate: "2026-06-04",
+        lastReview: "2026-06-03",
+        firstSeen: "2026-06-03",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    },
+  ],
+  limits: {
+    name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+    reverse: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+    cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+  },
+};
+
+test.describe("Higher-or-Lower signpost nudge (#1573)", () => {
+  test("nudge renders on practice page when seenPokemon >= 1 and flag is absent", async ({
+    page,
+  }) => {
+    // Seed settings: firstVisit done, higherOrLowerNudgeDismissed absent (resolves to false).
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            // higherOrLowerNudgeDismissed deliberately absent
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+    // Seed a session with one seen Pokémon to satisfy the seenPokemon gate.
+    await seedSessionIdb(page, SEEN_BULBASAUR_SESSION);
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    const nudge = page.locator(`[role="note"]`, { hasText: /finish your session for a bonus mini-game/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("nudge is absent when higherOrLowerNudgeDismissed is true", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            higherOrLowerNudgeDismissed: true,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/");
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /finish your session for a bonus mini-game/i }),
+    ).toHaveCount(0, { timeout: 20_000 });
+  });
+
+  test("nudge is dismissible and absent after dismissal", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            higherOrLowerNudgeDismissed: false,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+    await seedSessionIdb(page, SEEN_BULBASAUR_SESSION);
+
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    const nudge = page.locator(`[role="note"]`, { hasText: /finish your session for a bonus mini-game/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
+
+    await nudge.getByRole("button", { name: /dismiss hint/i }).click();
+    await expect(nudge).toHaveCount(0);
+
+    // Persisted to localStorage.
+    const stored = await page.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    }, SETTINGS_KEY);
+    expect(stored?.onboarding?.higherOrLowerNudgeDismissed).toBe(true);
   });
 });
