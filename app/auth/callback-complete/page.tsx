@@ -454,7 +454,7 @@ function SideCard({
   return (
     <div className="rounded-xl border border-zinc-200 bg-background p-6 dark:border-zinc-800">
       <h2 className="text-base font-semibold text-foreground">{heading}</h2>
-      <ul className="mt-2 space-y-1 text-sm text-zinc-500 dark:text-zinc-400">
+      <ul className={`mt-2 space-y-1 ${mutedText}`}>
         <li>
           {t("cardsReviewed", { count: cardCount })}
         </li>
