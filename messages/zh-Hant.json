@@ -306,7 +306,6 @@
     },
     "feedback": {
       "rowLabel": "傳送意見回饋",
-      "openButton": "開啟意見回饋表單",
       "rowDescription": "回報錯誤或請求新功能。",
       "dialogTitle": "傳送意見回饋",
       "categoryLabel": "類別",

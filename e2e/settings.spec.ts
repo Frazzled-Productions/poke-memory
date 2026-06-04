@@ -731,7 +731,7 @@ test.describe("Settings - Send feedback modal (#1622)", () => {
     await page.getByRole("button", { name: /account & data/i }).click();
 
     // The Send feedback row must be present.
-    const sendFeedbackBtn = page.getByRole("button", { name: /open feedback form/i });
+    const sendFeedbackBtn = page.getByRole("button", { name: /send feedback/i });
     await expect(sendFeedbackBtn).toBeVisible();
   });
 
@@ -742,7 +742,7 @@ test.describe("Settings - Send feedback modal (#1622)", () => {
     await page.getByRole("button", { name: /account & data/i }).click();
 
     // Open the modal.
-    await page.getByRole("button", { name: /open feedback form/i }).click();
+    await page.getByRole("button", { name: /send feedback/i }).click();
 
     // The dialog title must be visible.
     await expect(page.getByRole("heading", { name: /send feedback/i })).toBeVisible();
@@ -777,7 +777,7 @@ test.describe("Settings - Send feedback modal (#1622)", () => {
 
     await page.goto("/settings");
     await page.getByRole("button", { name: /account & data/i }).click();
-    await page.getByRole("button", { name: /open feedback form/i }).click();
+    await page.getByRole("button", { name: /send feedback/i }).click();
 
     // Select a category.
     await page.getByLabel(/category/i).selectOption({ label: "Bug report" });
@@ -810,7 +810,7 @@ test.describe("Settings - Send feedback modal (#1622)", () => {
 
     await page.goto("/settings");
     await page.getByRole("button", { name: /account & data/i }).click();
-    await page.getByRole("button", { name: /open feedback form/i }).click();
+    await page.getByRole("button", { name: /send feedback/i }).click();
 
     await page.getByLabel(/category/i).selectOption({ label: "Feature request" });
     await page.getByLabel(/message/i).fill("A feature I would like.");

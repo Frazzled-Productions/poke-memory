@@ -306,7 +306,6 @@
     },
     "feedback": {
       "rowLabel": "[Send feedback]",
-      "openButton": "[Open feedback form]",
       "rowDescription": "[Report a bug or request a feature.]",
       "dialogTitle": "[Send feedback]",
       "categoryLabel": "[Category]",

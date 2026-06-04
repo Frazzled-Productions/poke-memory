@@ -306,7 +306,6 @@
     },
     "feedback": {
       "rowLabel": "发送反馈",
-      "openButton": "打开反馈表单",
       "rowDescription": "报告错误或请求新功能。",
       "dialogTitle": "发送反馈",
       "categoryLabel": "类别",
