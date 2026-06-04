@@ -281,6 +281,8 @@ function getTileButtons(): HTMLElement[] {
     if (b.getAttribute("aria-controls") === "scope-panel") return false;
     if (/^Clear$/.test(b.textContent ?? "")) return false;
     if (/dismiss hint/i.test(b.getAttribute("aria-label") ?? "")) return false;
+    // InfoButton (#1574) — queue-state explanation affordance, not a tile.
+    if (b.getAttribute("aria-controls") === "queue-state-info") return false;
     return true;
   });
 }

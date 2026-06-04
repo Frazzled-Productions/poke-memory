@@ -20,6 +20,7 @@ import {
   renderJa,
   screen,
 } from "@/components/test-utils/renderWithIntl";
+import type { IntlRenderOptions } from "@/components/test-utils/renderWithIntl";
 import PokedexFilterBar from "@/components/pokedex/PokedexFilterBar";
 import type { PokedexFilters } from "@/lib/pokemon/filter";
 import type { PokedexSortOrder } from "@/lib/pokedex/sort";
@@ -51,6 +52,7 @@ function renderBar(
     onSortChange?: (sort: PokedexSortOrder) => void;
     superuserMasteryLocked?: boolean;
   } = {},
+  intlOptions: IntlRenderOptions = {},
 ) {
   const {
     onQueryChange = vi.fn(),
@@ -74,6 +76,7 @@ function renderBar(
       onSortChange={onSortChange}
       superuserMasteryLocked={superuserMasteryLocked}
     />,
+    intlOptions,
   );
 
   return {
@@ -144,6 +147,94 @@ describe("PokedexFilterBar — sort control", () => {
     const select = screen.getByLabelText("Sort by") as HTMLSelectElement;
     const options = Array.from(select.options).map((o) => o.value);
     expect(options).toEqual(["national", "alphabetical", "closest-to-mastery"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Closest-to-mastery InfoButton (#1574)
+// ---------------------------------------------------------------------------
+
+describe("PokedexFilterBar — closest-to-mastery InfoButton", () => {
+  it("InfoButton is not visible when sort is national", () => {
+    renderBar(defaultFilters(), "national");
+    expect(
+      screen.queryByRole("button", { name: "About Closest to mastery sort" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("InfoButton is not visible when sort is alphabetical", () => {
+    renderBar(defaultFilters(), "alphabetical");
+    expect(
+      screen.queryByRole("button", { name: "About Closest to mastery sort" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("InfoButton renders when sort is closest-to-mastery", () => {
+    renderBar(defaultFilters(), "closest-to-mastery");
+    expect(
+      screen.getByRole("button", { name: "About Closest to mastery sort" }),
+    ).toBeInTheDocument();
+  });
+
+  it("clicking the InfoButton opens the explanation panel", async () => {
+    const user = userEvent.setup();
+    renderBar(defaultFilters(), "closest-to-mastery");
+    const infoBtn = screen.getByRole("button", { name: "About Closest to mastery sort" });
+    await user.click(infoBtn);
+    expect(screen.getByText(/Puts Pokémon you are closest to mastering/)).toBeInTheDocument();
+  });
+
+  it("InfoButton has aria-expanded=false initially", () => {
+    renderBar(defaultFilters(), "closest-to-mastery");
+    const infoBtn = screen.getByRole("button", { name: "About Closest to mastery sort" });
+    expect(infoBtn).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("InfoButton has aria-expanded=true when panel is open", async () => {
+    const user = userEvent.setup();
+    renderBar(defaultFilters(), "closest-to-mastery");
+    const infoBtn = screen.getByRole("button", { name: "About Closest to mastery sort" });
+    await user.click(infoBtn);
+    expect(infoBtn).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("panel mentions superuser/pretend-all-mastered behaviour", async () => {
+    const user = userEvent.setup();
+    renderBar(defaultFilters(), "closest-to-mastery");
+    await user.click(screen.getByRole("button", { name: "About Closest to mastery sort" }));
+    expect(screen.getByText(/pretend-all-mastered/)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Closest-to-mastery InfoButton — locale coverage (#1574)
+// ---------------------------------------------------------------------------
+
+describe("PokedexFilterBar — closest-to-mastery InfoButton in Japanese", () => {
+  it("renders the InfoButton with a Japanese aria-label when sort is closest-to-mastery", () => {
+    renderBar(defaultFilters(), "closest-to-mastery", {}, { locale: "ja" });
+    // messages/ja.json pokedex.sortClosestToMasteryInfoAriaLabel
+    expect(
+      screen.getByRole("button", { name: "「習得に近い順」について" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("PokedexFilterBar — closest-to-mastery InfoButton in Simplified Chinese", () => {
+  it("renders the InfoButton with a Simplified Chinese aria-label when sort is closest-to-mastery", () => {
+    renderBar(defaultFilters(), "closest-to-mastery", {}, { locale: "zh-Hans" });
+    expect(
+      screen.getByRole("button", { name: "关于「最接近掌握」排序" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("PokedexFilterBar — closest-to-mastery InfoButton in Traditional Chinese", () => {
+  it("renders the InfoButton with a Traditional Chinese aria-label when sort is closest-to-mastery", () => {
+    renderBar(defaultFilters(), "closest-to-mastery", {}, { locale: "zh-Hant" });
+    expect(
+      screen.getByRole("button", { name: "關於「最接近掌握」排序" }),
+    ).toBeInTheDocument();
   });
 });
 
