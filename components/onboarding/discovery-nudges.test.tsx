@@ -1,10 +1,13 @@
 /**
- * Tests for the two contextual discovery nudges (#1443).
+ * Tests for contextual discovery nudges (#1443, #1573).
  *
  * 1. markWhatIKnowNudgeDismissed — shown on Settings > Practice near the
  *    Quickstart quiz, absent when dismissed.
  * 2. practiceScopeNudgeDismissed — shown on the practice screen (ReviewSession)
  *    above ScopeControl once the first-visit onboarding is done.
+ * 3. higherOrLowerNudgeDismissed — shown on the active-card practice screen
+ *    (ReviewSession, above ScopeControl) once the user has seen at least one
+ *    Pokémon and the first-visit onboarding is done (#1573).
  *
  * Covers:
  *  - State IN: nudge visible when flag is false.
@@ -15,7 +18,7 @@
  *    in ReviewSession state, which requires the full component to exercise.
  *  - Existing-user reach: validateOnboarding coerces absent key to false.
  *  - Locale coverage: all four supported locales (en/ja/zh-Hans/zh-Hant).
- *  - Both flags reset via DEFAULT_ONBOARDING (all false).
+ *  - All flags reset via DEFAULT_ONBOARDING (all false).
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -67,7 +70,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 function settingsWithFlag(
-  key: "markWhatIKnowNudgeDismissed" | "practiceScopeNudgeDismissed",
+  key: "markWhatIKnowNudgeDismissed" | "practiceScopeNudgeDismissed" | "higherOrLowerNudgeDismissed",
   value: boolean,
 ): UserSettings {
   return {
@@ -255,16 +258,86 @@ describe("validateOnboarding — absent keys resolve to false (existing-user rea
     });
     expect(result.scopeEverOpened).toBe(true);
   });
+
+  it("absent higherOrLowerNudgeDismissed coerces to false (#1573)", () => {
+    const result = validateOnboarding({
+      firstVisitOnboardingDismissed: true,
+      // higherOrLowerNudgeDismissed deliberately absent
+    });
+    expect(result.higherOrLowerNudgeDismissed).toBe(false);
+  });
+
+  it("non-boolean higherOrLowerNudgeDismissed coerces to false - === true guard (#1573)", () => {
+    const result = validateOnboarding({
+      higherOrLowerNudgeDismissed: 1 as unknown as boolean,
+    });
+    expect(result.higherOrLowerNudgeDismissed).toBe(false);
+  });
+
+  it("higherOrLowerNudgeDismissed: true is preserved (#1573)", () => {
+    const result = validateOnboarding({
+      higherOrLowerNudgeDismissed: true,
+    });
+    expect(result.higherOrLowerNudgeDismissed).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
-// Reset path — DEFAULT_ONBOARDING resets both flags to false
+// higherOrLowerNudgeDismissed (#1573)
+// ---------------------------------------------------------------------------
+
+describe("higherOrLowerNudgeDismissed flag", () => {
+  it("DEFAULT_ONBOARDING has higherOrLowerNudgeDismissed as false (nudge shows by default)", () => {
+    expect(DEFAULT_ONBOARDING.higherOrLowerNudgeDismissed).toBe(false);
+  });
+
+  it("nudge shows when flag is false", async () => {
+    currentSettings = settingsWithFlag("higherOrLowerNudgeDismissed", false);
+
+    renderWithIntl(
+      <OnboardingHint id="higherOrLowerNudgeDismissed" title="Finish your session for a bonus mini-game">
+        <p>Higher or Lower body</p>
+      </OnboardingHint>,
+    );
+    expect(await screen.findByText("Finish your session for a bonus mini-game")).toBeTruthy();
+  });
+
+  it("nudge is absent when flag is true", () => {
+    currentSettings = settingsWithFlag("higherOrLowerNudgeDismissed", true);
+
+    const { container } = renderWithIntl(
+      <OnboardingHint id="higherOrLowerNudgeDismissed" title="Finish your session for a bonus mini-game">
+        <p>Higher or Lower body</p>
+      </OnboardingHint>,
+    );
+    expect(container.textContent).toBe("");
+  });
+
+  it("dismissing the nudge sets higherOrLowerNudgeDismissed to true", async () => {
+    currentSettings = settingsWithFlag("higherOrLowerNudgeDismissed", false);
+
+    renderWithIntl(
+      <OnboardingHint id="higherOrLowerNudgeDismissed">
+        Higher or Lower nudge body.
+      </OnboardingHint>,
+    );
+    const btn = await screen.findByRole("button", { name: /dismiss hint/i });
+    await userEvent.click(btn);
+
+    expect(currentSettings.onboarding.higherOrLowerNudgeDismissed).toBe(true);
+    expect(screen.queryByText("Higher or Lower nudge body.")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reset path — DEFAULT_ONBOARDING resets all flags to false
 // ---------------------------------------------------------------------------
 
 describe("DEFAULT_ONBOARDING reset", () => {
-  it("DEFAULT_ONBOARDING sets both new flags to false (reset shows nudges again)", () => {
+  it("DEFAULT_ONBOARDING sets all nudge flags to false (reset shows nudges again)", () => {
     expect(DEFAULT_ONBOARDING.markWhatIKnowNudgeDismissed).toBe(false);
     expect(DEFAULT_ONBOARDING.practiceScopeNudgeDismissed).toBe(false);
+    expect(DEFAULT_ONBOARDING.higherOrLowerNudgeDismissed).toBe(false);
   });
 
   it("nudge reappears after SETTINGS_SAVED_EVENT resets the flag", async () => {
@@ -381,5 +454,50 @@ describe("locale coverage — message catalogue keys", () => {
       </OnboardingHint>,
     );
     expect(await screen.findByText(/按世代/)).toBeTruthy();
+  });
+
+  it("en: higherOrLowerNudge title renders", async () => {
+    currentSettings = settingsWithFlag("higherOrLowerNudgeDismissed", false);
+
+    renderWithIntl(
+      <OnboardingHint id="higherOrLowerNudgeDismissed" title="Finish your session for a bonus mini-game">
+        <p>Once you have practised at least two Pokémon today, a Higher or Lower stat challenge unlocks below your session summary.</p>
+      </OnboardingHint>,
+      { locale: "en" },
+    );
+    expect(await screen.findByText(/Finish your session for a bonus mini-game/)).toBeTruthy();
+  });
+
+  it("ja: higherOrLowerNudge title renders (non-English)", async () => {
+    currentSettings = settingsWithFlag("higherOrLowerNudgeDismissed", false);
+
+    renderJa(
+      <OnboardingHint id="higherOrLowerNudgeDismissed" title="セッションを完了してボーナスミニゲームをゲット">
+        <p>ミニゲーム本文</p>
+      </OnboardingHint>,
+    );
+    expect(await screen.findByText(/セッションを完了して/)).toBeTruthy();
+  });
+
+  it("zh-Hans: higherOrLowerNudge title renders (non-English)", async () => {
+    currentSettings = settingsWithFlag("higherOrLowerNudgeDismissed", false);
+
+    renderZhHans(
+      <OnboardingHint id="higherOrLowerNudgeDismissed" title="完成本轮练习，解锁额外小游戏">
+        <p>小游戏zh-hans内容</p>
+      </OnboardingHint>,
+    );
+    expect(await screen.findByText(/完成本轮练习/)).toBeTruthy();
+  });
+
+  it("zh-Hant: higherOrLowerNudge title renders (non-English)", async () => {
+    currentSettings = settingsWithFlag("higherOrLowerNudgeDismissed", false);
+
+    renderZhHant(
+      <OnboardingHint id="higherOrLowerNudgeDismissed" title="完成本輪練習，解鎖額外小遊戲">
+        <p>小遊戲zh-hant內容</p>
+      </OnboardingHint>,
+    );
+    expect(await screen.findByText(/完成本輪練習/)).toBeTruthy();
   });
 });

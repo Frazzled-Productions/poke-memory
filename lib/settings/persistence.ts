@@ -147,6 +147,17 @@ export type OnboardingFlags = {
    * → every existing user sees the hint once on their next Pasture visit.
    */
   pastureLongPressHintDismissed: boolean;
+  /**
+   * One-shot hint for the Higher-or-Lower mini-game (#1573). Shown on the
+   * active-card practice screen (above ScopeControl) once the user has seen
+   * at least one Pokémon in the current session and the first-visit onboarding
+   * is complete. Teases the post-session bonus mini-game. `true` = user
+   * dismissed it.
+   *
+   * `=== true` coercion: absent key in pre-#1573 blobs resolves to `false`
+   * → every existing user sees the hint once on their next practice session.
+   */
+  higherOrLowerNudgeDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -179,6 +190,9 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   // Default false: absent in pre-#1572 blobs resolves to false (not dismissed;
   // hint shows on next Pasture visit for every existing user).
   pastureLongPressHintDismissed: false,
+  // Default false: absent in pre-#1573 blobs resolves to false (not dismissed;
+  // hint shows on next active-practice session for every existing user).
+  higherOrLowerNudgeDismissed: false,
 };
 
 /**
@@ -820,6 +834,8 @@ export function validateOnboarding(value: unknown): OnboardingFlags {
         : 0,
     // === true coercion: absent key in pre-#1572 blobs resolves to false (hint shows).
     pastureLongPressHintDismissed: v.pastureLongPressHintDismissed === true,
+    // === true coercion: absent key in pre-#1573 blobs resolves to false (hint shows).
+    higherOrLowerNudgeDismissed: v.higherOrLowerNudgeDismissed === true,
   };
 }
 
