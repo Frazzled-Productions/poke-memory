@@ -1,19 +1,19 @@
 /**
- * DismissableBanner — a dismissable alert banner with colour variants.
+ * DismissibleBanner: a dismissible alert banner with colour variants.
  *
  * Encapsulates the `role="alert"` wrapper, message span, and dismiss button
  * so a11y or styling changes propagate from one place (DRY per AGENTS.md
  * "Single source of truth for shared concepts").
  *
  * Usage:
- *   <DismissableBanner
+ *   <DismissibleBanner
  *     variant="red"
  *     message={someMessage}
  *     dismissLabel={t("dismissError")}
  *     onDismiss={handleDismiss}
  *   />
  *
- * Consumers are responsible for translating dismissLabel — this component
+ * Consumers are responsible for translating dismissLabel: this component
  * accepts the already-translated string so each consumer can use its own
  * i18n namespace and key.
  */
@@ -57,7 +57,7 @@ const BUTTON_CLASSES: Record<Variant, string> = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function DismissableBanner({ variant, message, dismissLabel, onDismiss }: Props) {
+export function DismissibleBanner({ variant, message, dismissLabel, onDismiss }: Props) {
   return (
     <div role="alert" className={WRAPPER_CLASSES[variant]}>
       <span>{message}</span>

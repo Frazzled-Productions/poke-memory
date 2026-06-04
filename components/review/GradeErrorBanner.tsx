@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { DismissableBanner } from "@/components/ui/DismissableBanner";
+import { DismissibleBanner } from "@/components/ui/DismissibleBanner";
 
 type Props = {
   message: string;
@@ -11,7 +11,7 @@ type Props = {
 export function GradeErrorBanner({ message, onDismiss }: Props) {
   const t = useTranslations("practice");
   return (
-    <DismissableBanner
+    <DismissibleBanner
       variant="red"
       message={message}
       dismissLabel={t("dismissError")}

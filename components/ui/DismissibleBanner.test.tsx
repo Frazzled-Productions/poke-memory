@@ -1,5 +1,5 @@
 /**
- * DismissableBanner component tests.
+ * DismissibleBanner component tests.
  *
  * State coverage: both "red" and "amber" variants, message rendering, dismiss
  * button fires onDismiss, aria-label present on the dismiss button.
@@ -8,20 +8,20 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { DismissableBanner } from "@/components/ui/DismissableBanner";
+import { DismissibleBanner } from "@/components/ui/DismissibleBanner";
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("DismissableBanner", () => {
+describe("DismissibleBanner", () => {
   // -------------------------------------------------------------------------
   // Rendering
   // -------------------------------------------------------------------------
 
   it("renders the message text", () => {
     render(
-      <DismissableBanner
+      <DismissibleBanner
         variant="red"
         message="Something went wrong"
         dismissLabel="Dismiss error"
@@ -33,7 +33,7 @@ describe("DismissableBanner", () => {
 
   it("renders a dismiss button with the provided aria-label", () => {
     render(
-      <DismissableBanner
+      <DismissibleBanner
         variant="red"
         message="Something went wrong"
         dismissLabel="Dismiss error"
@@ -45,7 +45,7 @@ describe("DismissableBanner", () => {
 
   it("has role=alert on the wrapper", () => {
     render(
-      <DismissableBanner
+      <DismissibleBanner
         variant="amber"
         message="Storage is full"
         dismissLabel="Dismiss warning"
@@ -62,7 +62,7 @@ describe("DismissableBanner", () => {
   it("calls onDismiss when the dismiss button is clicked", async () => {
     const handleDismiss = vi.fn();
     render(
-      <DismissableBanner
+      <DismissibleBanner
         variant="red"
         message="Something went wrong"
         dismissLabel="Dismiss error"
@@ -79,7 +79,7 @@ describe("DismissableBanner", () => {
 
   it("applies red colour classes on the wrapper when variant=red", () => {
     render(
-      <DismissableBanner
+      <DismissibleBanner
         variant="red"
         message="Error"
         dismissLabel="Dismiss"
@@ -94,7 +94,7 @@ describe("DismissableBanner", () => {
 
   it("applies red colour classes on the dismiss button when variant=red", () => {
     render(
-      <DismissableBanner
+      <DismissibleBanner
         variant="red"
         message="Error"
         dismissLabel="Dismiss error"
@@ -109,7 +109,7 @@ describe("DismissableBanner", () => {
 
   it("applies amber colour classes on the wrapper when variant=amber", () => {
     render(
-      <DismissableBanner
+      <DismissibleBanner
         variant="amber"
         message="Storage warning"
         dismissLabel="Dismiss"
@@ -124,7 +124,7 @@ describe("DismissableBanner", () => {
 
   it("applies amber colour classes on the dismiss button when variant=amber", () => {
     render(
-      <DismissableBanner
+      <DismissibleBanner
         variant="amber"
         message="Storage warning"
         dismissLabel="Dismiss warning"
@@ -139,7 +139,7 @@ describe("DismissableBanner", () => {
 
   it("does not apply red classes when variant=amber", () => {
     render(
-      <DismissableBanner
+      <DismissibleBanner
         variant="amber"
         message="Storage warning"
         dismissLabel="Dismiss"
@@ -152,7 +152,7 @@ describe("DismissableBanner", () => {
 
   it("does not apply amber classes when variant=red", () => {
     render(
-      <DismissableBanner
+      <DismissibleBanner
         variant="red"
         message="Error"
         dismissLabel="Dismiss"

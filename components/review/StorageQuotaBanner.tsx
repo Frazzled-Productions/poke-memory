@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { DismissableBanner } from "@/components/ui/DismissableBanner";
+import { DismissibleBanner } from "@/components/ui/DismissibleBanner";
 
 type Props = {
   onDismiss: () => void;
@@ -10,7 +10,7 @@ type Props = {
 export function StorageQuotaBanner({ onDismiss }: Props) {
   const t = useTranslations("review");
   return (
-    <DismissableBanner
+    <DismissibleBanner
       variant="amber"
       message={t("storageFullBanner")}
       dismissLabel={t("storageFullDismiss")}
