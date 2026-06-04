@@ -1,5 +1,5 @@
 /**
- * Component tests for Footer (issue #1369 i18n wiring).
+ * Component tests for Footer (issue #1369 i18n wiring; #1565 Part A statutory disclosure).
  *
  * Covers:
  *   - The footer renders nav links with translated labels (en: What's new, Privacy, Terms).
@@ -7,6 +7,8 @@
  *   - The footer is hidden when mobileNav is "bottom" (after mount effect fires).
  *   - The footer is visible when mobileNav is "hamburger".
  *   - SETTINGS_SAVED_EVENT triggers re-derivation of visibility.
+ *   - The statutory trading disclosure (company number + registered office) renders
+ *     when the footer is visible (#1565 Part A).
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -151,6 +153,35 @@ describe("Footer - Japanese locale", () => {
       expect(screen.getByRole("link", { name: "新機能" })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "プライバシー" })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "利用規約" })).toBeInTheDocument();
+    });
+  });
+});
+
+describe("Footer - statutory trading disclosure (#1565 Part A)", () => {
+  it("renders the company number in hamburger mode", async () => {
+    mockLoadSettings.mockReturnValue({ mobileNav: "hamburger", masteryRepetitions: 3 });
+    renderWithIntl(<Footer />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/17258540/)).toBeInTheDocument();
+    });
+  });
+
+  it("renders the registered office address in hamburger mode", async () => {
+    mockLoadSettings.mockReturnValue({ mobileNav: "hamburger", masteryRepetitions: 3 });
+    renderWithIntl(<Footer />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Shelton Street/)).toBeInTheDocument();
+    });
+  });
+
+  it("does not render the disclosure when the footer is hidden (bottom-nav mode)", async () => {
+    mockLoadSettings.mockReturnValue({ mobileNav: "bottom", masteryRepetitions: 3 });
+    renderWithIntl(<Footer />);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/17258540/)).toBeNull();
     });
   });
 });

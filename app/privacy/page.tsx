@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import ChildFriendlySummary from "@/components/privacy/ChildFriendlySummary";
 import { resolveLocale } from "@/i18n/request";
 import { inlineLink } from "@/lib/utils/class-names";
+import { CompanyDisclosure } from "@/components/CompanyDisclosure";
 
 export const metadata: Metadata = {
   title: "Privacy Notice - Poké Memory",
@@ -62,6 +63,7 @@ export default async function PrivacyPage() {
             </a>
             .
           </p>
+          <CompanyDisclosure className="mt-2" />
         </section>
 
         {/* 2. Two paths */}
