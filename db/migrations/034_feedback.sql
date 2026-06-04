@@ -31,7 +31,9 @@ ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 -- 12-month retention purge via pg_cron (version 1.6.4, confirmed installed).
 -- The DO block is idempotent: it unschedules any existing job by name before
 -- scheduling, tolerating both first-apply and re-apply safely.
-DO $$
+-- Distinct dollar-quote tags ($do$ / $cmd$) so the inner command string does
+-- not prematurely terminate the outer DO block.
+DO $do$
 BEGIN
   -- Unschedule if the job already exists (idempotent re-apply guard).
   PERFORM cron.unschedule('feedback-retention-purge')
@@ -43,7 +45,7 @@ BEGIN
   PERFORM cron.schedule(
     'feedback-retention-purge',
     '0 3 * * *',
-    $$DELETE FROM feedback WHERE created_at < now() - interval '12 months'$$
+    $cmd$DELETE FROM feedback WHERE created_at < now() - interval '12 months'$cmd$
   );
 END;
-$$;
+$do$;
