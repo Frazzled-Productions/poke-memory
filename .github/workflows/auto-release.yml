@@ -161,3 +161,51 @@ jobs:
           set -euo pipefail
           git push origin "+HEAD:refs/heads/qa"
           echo "Reset qa to main ($(git rev-parse --short HEAD))."
+
+  backmerge-hotfix:
+    name: Backmerge main into qa after hotfix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Runs when a non-qa branch merges directly to main (i.e. a hotfix).
+    # The `release` job handles the qa -> main direction; this job handles
+    # the reverse so qa never silently falls behind main after a hotfix,
+    # which previously caused the next qa -> main PR to fail the
+    # "branch must be up to date" gate and block auto-merge.
+    # Uses merge (not force-reset) to preserve any in-progress batch work on qa.
+    # If the merge has conflicts the job fails visibly, requiring manual resolution.
+    # Requires poke-memory-bot to be a bypass actor on the `qa-staging` ruleset.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref != 'qa'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          ref: qa
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "poke-memory-bot[bot]"
+          git config user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
+
+      - name: Merge main into qa
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge --no-ff origin/main -m "chore: backmerge main into qa after hotfix (#${PR_NUMBER})"
+          git push origin qa
+          echo "Merged main ($(git rev-parse --short origin/main)) into qa."
