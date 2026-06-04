@@ -582,7 +582,8 @@
       "heading": "Next arrivals",
       "upcomingAriaLabel": "Upcoming Pasture species",
       "allCaughtUp": "All reviewed Pokémon are already in your Pasture."
-    }
+    },
+    "longPressHint": "Press and hold any Pokémon to see its name, mastery date, and review interval."
   },
   "stats": {
     "title": "Stats",

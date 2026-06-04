@@ -822,6 +822,133 @@ function reviewedCard(id: number, name: string, habitat: string) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Long-press discovery hint (#1572)
+// ---------------------------------------------------------------------------
+
+test.describe("Pasture page — long-press discovery hint (#1572)", () => {
+  test("hint renders on first Pasture visit (empty state, fresh session)", async ({
+    page,
+  }) => {
+    // Fresh session — no mastered cards. Hint flag is absent → hint shows.
+    await seedSessionIdb(page, {
+      cards: [],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    // The hint body text must be visible. OnboardingHint uses role="note".
+    await expect(
+      page.getByRole("note"),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/press and hold any pokémon/i),
+    ).toBeVisible();
+  });
+
+  test("hint renders on first Pasture visit (populated state)", async ({
+    page,
+  }) => {
+    await seedSessionIdb(page, buildSession([
+      masteredCard(10, "Caterpie", "forest"),
+      masteredReverseCard(10),
+    ]));
+
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    await expect(
+      page.getByText(/press and hold any pokémon/i),
+    ).toBeVisible();
+  });
+
+  test("hint is hidden after dismissal", async ({ page }) => {
+    // Pre-dismiss the hint via localStorage before the page loads.
+    await page.addInitScript(() => {
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const existing = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Record<string, unknown>;
+        const onboarding = (typeof existing.onboarding === "object" && existing.onboarding !== null
+          ? existing.onboarding
+          : {}) as Record<string, unknown>;
+        existing.onboarding = { ...onboarding, pastureLongPressHintDismissed: true };
+        localStorage.setItem(KEY, JSON.stringify(existing));
+      } catch {
+        /* ignore */
+      }
+    });
+
+    await seedSessionIdb(page, {
+      cards: [],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    // Empty state renders without the hint.
+    await expect(
+      page.getByText(/master your first pokémon/i),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/press and hold any pokémon/i),
+    ).not.toBeVisible();
+  });
+
+  test("dismiss button persists the flag and hides the hint", async ({ page }) => {
+    // Fresh session — hint shows; user taps the dismiss (×) button.
+    await seedSessionIdb(page, {
+      cards: [],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    const hint = page.getByRole("note");
+    await expect(hint).toBeVisible();
+
+    // Click the dismiss button (aria-label "Dismiss hint").
+    await hint.getByRole("button", { name: "Dismiss hint" }).click();
+
+    // Hint should disappear.
+    await expect(
+      page.getByText(/press and hold any pokémon/i),
+    ).not.toBeVisible({ timeout: 5_000 });
+
+    // The persisted flag should now be true in localStorage.
+    const flagValue = await page.evaluate((): boolean => {
+      try {
+        const raw = localStorage.getItem("poke-memory:settings:v1");
+        if (!raw) return false;
+        const parsed = JSON.parse(raw) as { onboarding?: { pastureLongPressHintDismissed?: boolean } };
+        return parsed.onboarding?.pastureLongPressHintDismissed === true;
+      } catch {
+        return false;
+      }
+    });
+
+    expect(flagValue).toBe(true);
+  });
+});
+
 test.describe("Pasture page — Next arrivals strip (#1316)", () => {
   test("strip renders with species that are reviewed but not yet mastered", async ({
     page,

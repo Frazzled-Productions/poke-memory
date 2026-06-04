@@ -582,7 +582,8 @@
       "heading": "即將到來",
       "upcomingAriaLabel": "即將加入牧場的寶可夢",
       "allCaughtUp": "所有已複習的寶可夢都已在您的牧場中。"
-    }
+    },
+    "longPressHint": "長按任意寶可夢，查看其名稱、掌握日期和複習間隔。"
   },
   "stats": {
     "title": "記錄",

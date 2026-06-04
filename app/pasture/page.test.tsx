@@ -167,6 +167,7 @@ import { hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { saveSession } from "@/lib/review/persistence";
+import { loadSettings } from "@/lib/settings/persistence";
 
 // ---------------------------------------------------------------------------
 // Fixtures for the hydrate→filter→count regression test
@@ -482,6 +483,175 @@ describe("PasturePage — empty state copy (#1440)", () => {
     await waitFor(() => {
       expect(
         screen.getByText(/牧場是你已掌握寶可夢的收藏/),
+      ).toBeInTheDocument();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Long-press discovery hint (#1572)
+//
+// Verifies that the OnboardingHint for the Pasture long-press popover renders
+// on first Pasture visit (flag absent / false) and is hidden when dismissed
+// (flag true). Covers both the populated path and the empty-state branch.
+// ---------------------------------------------------------------------------
+
+describe("PasturePage — long-press discovery hint (#1572)", () => {
+  /**
+   * Returns a loadSettings mock value with the given pastureLongPressHintDismissed flag.
+   * The onboarding field only needs the one flag for this test suite.
+   */
+  function makeSettings(dismissed: boolean) {
+    return {
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      reverseCardsEnabled: false,
+      maxNewReversePerDay: 10,
+      maxReviewsReversePerDay: 100,
+      nameCardsEnabled: true,
+      evolutionCardsEnabled: true,
+      cryCardsEnabled: false,
+      reverseEvolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: [] },
+      earnedBadges: [],
+      retentionTarget: 0.9,
+      pokemonNameLocale: "en" as const,
+      onboarding: {
+        pastureLongPressHintDismissed: dismissed,
+      },
+    };
+  }
+
+  // Empty-state branch: flag absent/false → hint renders.
+  it("hint renders in empty-state branch when flag is absent (fresh session)", async () => {
+    // Default mock has no onboarding key — absent resolves to false.
+    mockLoadSession.mockResolvedValue(null);
+
+    renderWithIntl(<PasturePage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/press and hold any pokémon/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // Empty-state branch: flag = false → hint renders.
+  it("hint renders in empty-state branch when flag is false", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    vi.mocked(loadSettings).mockReturnValue(
+      makeSettings(false) as unknown as ReturnType<typeof loadSettings>,
+    );
+
+    renderWithIntl(<PasturePage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/press and hold any pokémon/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // Empty-state branch: flag = true → hint is hidden.
+  it("hint is hidden in empty-state branch when flag is true (dismissed)", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    vi.mocked(loadSettings).mockReturnValue(
+      makeSettings(true) as unknown as ReturnType<typeof loadSettings>,
+    );
+
+    renderWithIntl(<PasturePage />);
+
+    await waitFor(() => {
+      // Empty state body text must still be present to confirm the branch rendered.
+      expect(
+        screen.getByText(/master your first pokémon/i),
+      ).toBeInTheDocument();
+    });
+
+    // Hint body text must be absent.
+    expect(screen.queryByText(/press and hold any pokémon/i)).toBeNull();
+  });
+
+  // Existing-user reach test: settings blob predating #1572 has no
+  // pastureLongPressHintDismissed key; absent resolves to false → hint shows.
+  it("existing-user reach: settings without pastureLongPressHintDismissed still shows hint", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    // Default mock (set in beforeEach) has no onboarding key at all,
+    // which exercises the absent-key-resolves-to-false path in OnboardingHint.
+    vi.mocked(loadSettings).mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      practiceScope: { gens: [], types: [], presets: [] },
+      pokemonNameLocale: "en" as const,
+      // Intentionally omitting onboarding entirely — simulates a pre-#1572 blob.
+    } as unknown as ReturnType<typeof loadSettings>);
+
+    renderWithIntl(<PasturePage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/press and hold any pokémon/i),
+      ).toBeInTheDocument();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Long-press hint locale coverage (#1572)
+//
+// The hint copy flows through the message catalogue. Verify it renders in all
+// four supported locales on the empty-state branch (which always shows on a
+// fresh session without needing mastered-card fixtures).
+// ---------------------------------------------------------------------------
+
+describe("PasturePage — long-press hint locale coverage (#1572)", () => {
+  it("en: hint copy renders in English", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    renderWithIntl(<PasturePage />, { locale: "en" });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/press and hold any pokémon/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("ja: hint copy renders in Japanese", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    renderWithIntl(<PasturePage />, { locale: "ja" });
+
+    await waitFor(() => {
+      // ja longPressHint contains "長押しすると"
+      expect(
+        screen.getByText(/長押しすると/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("zh-Hans: hint copy renders in Simplified Chinese", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    renderWithIntl(<PasturePage />, { locale: "zh-Hans" });
+
+    await waitFor(() => {
+      // zh-Hans longPressHint contains "长按任意宝可梦"
+      expect(
+        screen.getByText(/长按任意宝可梦/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("zh-Hant: hint copy renders in Traditional Chinese", async () => {
+    mockLoadSession.mockResolvedValue(null);
+    renderWithIntl(<PasturePage />, { locale: "zh-Hant" });
+
+    await waitFor(() => {
+      // zh-Hant longPressHint contains "長按任意寶可夢"
+      expect(
+        screen.getByText(/長按任意寶可夢/),
       ).toBeInTheDocument();
     });
   });
