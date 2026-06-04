@@ -64,6 +64,7 @@ Poké Memory is a hobby and fan project operated by Frazzled Productions Ltd (co
 1. Deliver the cross-device spaced-repetition service (synchronise review history, settings, streak).
 2. Optimise FSRS scheduler weights for each user's individual retention target, using that user's own grade-event log.
 3. Understand aggregate usage patterns via anonymous, cookieless analytics.
+4. Receive and act on voluntarily submitted feedback to improve the service and resolve reported issues.
 
 ### Data categories
 
@@ -77,8 +78,9 @@ All of the following apply to **authenticated users only** unless stated otherwi
 | User settings | Daily review limits, practice scope, theme, timezone | `user_settings` |
 | Auth account record (held by Supabase Auth, not our own tables) | Email and display name returned by the OAuth provider; used only for authentication | Supabase Auth schema |
 | Aggregate analytics (all users) | Page path, referrer, country, device type, Core Web Vitals - no per-user identifier, no cookie | Vercel infrastructure |
+| Feedback submissions | Category label, free-text message (up to 2,000 chars), page pathname, app version. user_id nullable (null for guest submissions). May contain personal data typed by the user. | `feedback` |
 
-No special-category data (Article 9) is collected. No name or email address is written into our own tables - our four tables are keyed only by the opaque UUID issued by Supabase Auth.
+No special-category data (Article 9) is collected. No name or email address is written into our own tables - our five tables are keyed only by the opaque UUID issued by Supabase Auth (the `feedback` table's user_id is nullable for guests).
 
 As of #1369, the app UI renders in the user's chosen locale (`en` / `ja` / `zh-Hans` / `zh-Hant`), selected via the `poke-memory:locale` cookie. **This applies to all users - guest and authenticated** - since the locale cookie is set on explicit locale selection regardless of sign-in state. The chosen locale is a display preference only - it is **not personal data**: it carries no tracking payload, does not identify the individual, and is set only on an explicit user selection. It is recorded in the PECR storage inventory (`docs/cookies-pecr.md`) as a strictly-necessary functional-preference cookie, on the same footing as theme and timezone.
 
@@ -93,7 +95,9 @@ GitHub and Google act as **independent controllers** for the OAuth authenticatio
 
 ### Retention
 
-Authenticated-path data is retained for the lifetime of the account. Account deletion triggers a cascading delete on all rows associated with the user's UUID across `card_reviews`, `streak_days`, `grade_log`, and `user_settings`. The self-service "Reset all progress" action deletes review history immediately. There is currently no point-in-time backup (issue #298), so deletion is permanent and immediate.
+Authenticated-path data is retained for the lifetime of the account. Account deletion triggers a cascading delete on all rows associated with the user's UUID across `card_reviews`, `streak_days`, `grade_log`, `user_settings`, and `feedback`. The self-service "Reset all progress" action deletes review history immediately. There is currently no point-in-time backup (issue #298), so deletion is permanent and immediate.
+
+Feedback rows are retained for 12 months from `created_at` and are then automatically deleted by a scheduled database function. For authenticated users, feedback rows are also deleted by cascade on account deletion.
 
 ---
 
@@ -105,7 +109,7 @@ As a sole-operator service with no staff and no DPO (see Step 7), the consultati
 
 2. **Processor agreements reviewed.** The Supabase standard Data Processing Addendum and the Vercel Data Processing Agreement were reviewed. No material gap between the processing described in those agreements and the processing carried out by the app was identified.
 
-3. **Codebase review.** The sync layer (`lib/sync/`), the Supabase schema and Row-Level Security policies (`db/migrations/`), the regression trigger (`card_reviews_reject_regression_trigger`), and the integration test suite (`lib/sync/integration/`) were reviewed to verify that the described technical controls are in place and functioning.
+3. **Codebase review.** The sync layer (`lib/sync/`), the Supabase schema and Row-Level Security policies (`db/migrations/`), the regression trigger (`card_reviews_reject_regression_trigger`), the feedback table schema and RLS policies, and the integration test suite (`lib/sync/integration/`) were reviewed to verify that the described technical controls are in place and functioning.
 
 No external consultation (users, children's rights organisations, or supervisory authority pre-consultation) was sought, because no high-risk processing requiring pre-consultation under UK GDPR Article 36 was identified.
 
@@ -123,6 +127,7 @@ Each data category is assessed against the purposes stated in Step 2:
 - **Settings** (`user_settings`): The cross-device service requires that the user's preferences (daily limits, practice scope, timezone, theme) are available on all devices. Necessary.
 - **Auth account record** (Supabase Auth): Supabase Auth requires a profile record to identify the user on subsequent sign-ins. We do not control this - it is a function of the Supabase Auth service the user explicitly invoked. Necessary for authentication.
 - **Aggregate analytics** (Vercel): Anonymous, cookieless usage data enables the controller to understand whether the service is reaching users and identify performance regressions. No individual is identified. Proportionate.
+- **Feedback submissions** (`feedback`): Category, message, and pathname are consumed for issue investigation and service improvement. App version is included to contextualise reports against a specific release. user_id is included where present (authenticated users) to enable follow-up with the submitter if needed; it is nullable so guests can submit without being identified. The 2,000-character message limit prevents excessive data collection. Necessary.
 
 **Conclusion:** Every data category collected is necessary for its stated purpose. No data is collected for speculative future use.
 
@@ -138,6 +143,7 @@ Per the privacy notice (§5):
 
 - **Cross-device sync and scheduler optimisation:** Contract performance - the user explicitly requests this service by choosing to sign in.
 - **Aggregate analytics:** Legitimate interest - cookieless, no individual tracking, no cookie consent required (see `docs/cookies-pecr.md`).
+- **Feedback submissions:** Legitimate interest in improving the service and resolving reported issues. Feedback is voluntarily submitted; it is not used for profiling, marketing, or any purpose other than service improvement and issue resolution.
 
 ### Children's Code compatibility
 
@@ -161,6 +167,7 @@ Risks are rated on a two-axis grid: **Likelihood** (Very Low / Low / Medium / Hi
 | R4 | A child under 13 signs in and has personal data stored in Supabase | Low | Low | Low |
 | R5 | Data retained beyond its useful life after account deletion | Low | Low | Low |
 | R6 | Anonymous analytics data re-identified and linked to an individual | Very Low | Low | Very Low |
+| R7 | User types personal or sensitive data into the free-text feedback field | Low | Low | Low |
 
 See Step 6 for the mitigation and residual-risk assessment for each row.
 
@@ -255,6 +262,22 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 
 ---
 
+### R7 - User types personal or sensitive data into the free-text feedback field
+
+**Existing controls:**
+
+- The feedback form displays an inline notice discouraging users from including personal information (name, email address, etc.) in their message.
+- A server-side 2,000-character limit prevents large volumes of personal data being submitted inadvertently.
+- Feedback rows are automatically deleted after 12 months by a scheduled database function.
+- For authenticated users, feedback rows are deleted by cascade on account deletion.
+- Feedback data is not shared with any third party and is not used for profiling or marketing.
+
+**Residual risk:** Low. Users may still include personal data despite the inline notice; the server-side truncation and automatic deletion schedule bound both the quantity and retention of any such data.
+
+**Acceptable:** Yes.
+
+---
+
 ### Overall conclusion
 
 No residual risk identified in this assessment is rated as unacceptable. No further technical or organisational measures are currently required. The processing described in this DPIA is proportionate and appropriate for the service.
@@ -284,8 +307,8 @@ None of these conditions apply to Poké Memory:
 | Field | Value |
 |---|---|
 | Approved by | Frazzled Productions Ltd (company no. 17258540) - privacy@pokememory.com |
-| Date | May 2026 |
-| Reference | Issue #721 |
+| Date | June 2026 |
+| Reference | Issues #721, #1623 |
 | Outcome | All residual risks assessed as Low or Very Low. No unacceptable risks identified. No ICO pre-consultation required. |
 
 ### Review triggers

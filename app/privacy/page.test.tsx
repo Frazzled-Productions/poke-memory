@@ -98,6 +98,54 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
+    it("renders the feedback submissions section added for #1623", async () => {
+      await renderPage();
+      // The new sub-heading describing feedback data collection.
+      expect(
+        screen.getByRole("heading", {
+          level: 3,
+          name: /feedback submissions/i,
+        }),
+      ).toBeTruthy();
+      // Guest feedback is not linked to an identifiable account.
+      expect(
+        screen.getByText(/not linked to any identifiable account/i),
+      ).toBeTruthy();
+      // Feedback is not used for profiling or marketing.
+      expect(
+        screen.getByText(/not used for profiling or marketing/i),
+      ).toBeTruthy();
+    });
+
+    it("renders the feedback retention statement in section 8 (#1623)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/feedback submissions are retained for 12 months/i),
+      ).toBeTruthy();
+    });
+
+    it("renders the feedback lawful basis row in section 5 (#1623)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/receive and act on feedback you submit voluntarily/i),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(/legitimate interest in improving the service and resolving/i),
+      ).toBeTruthy();
+    });
+
+    it("mentions feedback cascade deletion in the erasure rights bullet (#1623)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/also permanently deletes any feedback submissions linked to it/i),
+      ).toBeTruthy();
+    });
+
+    it("shows the last updated date as 4 June 2026 (#1623)", async () => {
+      await renderPage();
+      expect(screen.getByText(/4 june 2026/i)).toBeTruthy();
+    });
+
     it("does NOT show the English-only notice in the English locale", async () => {
       vi.mocked(resolveLocale).mockResolvedValueOnce("en");
       await renderPage();

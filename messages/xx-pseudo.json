@@ -1017,7 +1017,8 @@
       "item2": "[<s>Signing in.</s> If you sign in with a GitHub or Google account, we save your card progress to a secure database so you can keep it across different devices. You need to be 13 or older to have a GitHub or Google account.]",
       "item3": "[<s>What we save.</s> We only save which Pokémon cards you've practised, how well you know them, and when you last practised, and nothing else. We don't know your name, your address, or anything about you as a person.]",
       "item4": "[<s>Who else can see it.</s> Nobody else can see your progress. Only you can see your own cards. We never share your progress with anyone else or use it to show you adverts.]",
-      "item5": "[<s>You're in control.</s> You can <export>export your progress</export> or <reset>reset all progress</reset> at any time from the Settings page. You don't need to ask us; you can do it yourself, right now.]"
+      "item5": "[<s>You're in control.</s> You can <export>export your progress</export> or <reset>reset all progress</reset> at any time from the Settings page. You don't need to ask us; you can do it yourself, right now.]",
+      "item6": "[<s>Feedback.</s> If you send us feedback, we keep your message for up to 12 months to help us fix things, and then it is automatically deleted.]"
     }
   }
 }

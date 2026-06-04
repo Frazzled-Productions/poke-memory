@@ -34,7 +34,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          Last updated: 3 June 2026
+          Last updated: 4 June 2026
         </p>
       </header>
 
@@ -220,6 +220,34 @@ export default async function PrivacyPage() {
             function; it is not used for tracking or advertising, and it is not
             set in guest mode. See §4 below for our PECR position on this cookie.
           </p>
+
+          <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
+            Feedback submissions (all users)
+          </h3>
+          <p className="mb-2">
+            If you use the in-app feedback form, we collect:
+          </p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Feedback category (e.g. bug report, suggestion)</li>
+            <li>
+              Free-text message (up to 2,000 characters). This message may
+              contain personal data you choose to include; please do not include
+              your name, email address, or other personal information in your
+              message.
+            </li>
+            <li>The page pathname from which the feedback was submitted</li>
+            <li>App version at the time of submission</li>
+            <li>
+              If you are signed in: an opaque user identifier (UUID) so we can
+              follow up if needed. If you are a guest, no user identifier is
+              included and your feedback is not linked to any identifiable account.
+            </li>
+          </ul>
+          <p className="mt-2">
+            Feedback is used only to improve the service and to investigate
+            reported issues. It is not shared with third parties, and it is not
+            used for profiling or marketing.
+          </p>
         </section>
 
         {/* 4. Cookies and similar technologies (PECR) */}
@@ -333,6 +361,15 @@ export default async function PrivacyPage() {
                   <td className="py-2">
                     Legitimate interest in understanding usage patterns (no
                     cookie, no individual tracking)
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4">
+                    Receive and act on feedback you submit voluntarily
+                  </td>
+                  <td className="py-2">
+                    Legitimate interest in improving the service and resolving
+                    reported issues
                   </td>
                 </tr>
               </tbody>
@@ -526,6 +563,11 @@ export default async function PrivacyPage() {
             separate point-in-time backup retained for this project, so deletion
             is effectively immediate and permanent.
           </p>
+          <p className="mt-3">
+            Feedback submissions are retained for 12 months from the date of
+            submission and then automatically deleted, regardless of account
+            status.
+          </p>
         </section>
 
         {/* 9. Data-subject rights */}
@@ -555,7 +597,8 @@ export default async function PrivacyPage() {
               Settings page: <em>Reset all progress</em> deletes your review
               history immediately, and <em>Delete account</em> permanently
               erases your account, all cloud data, and your sign-in identity,
-              with no email request needed.
+              with no email request needed. Deleting your account also
+              permanently deletes any feedback submissions linked to it.
             </li>
             <li>
               <strong>Data portability</strong>: receive your data in a
