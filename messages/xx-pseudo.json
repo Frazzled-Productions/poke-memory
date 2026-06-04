@@ -37,7 +37,11 @@
     "chooseProvider": "[Choose a sign-in provider]",
     "cardsReviewed": "[{count, plural, one {# card reviewed} other {# cards reviewed}}]",
     "streakDaysCount": "[{count, plural, one {# streak day} other {# streak days}}]",
-    "gradesLogged": "[{count, plural, one {# grade logged} other {# grades logged}}]"
+    "gradesLogged": "[{count, plural, one {# grade logged} other {# grades logged}}]",
+    "connectProviderAriaLabel": "[Connect {provider}]",
+    "connectedProvidersAriaLabel": "[Connected providers]",
+    "providerConnectedAriaLabel": "[{provider} connected]",
+    "checkingSyncStatusAriaLabel": "[Checking sync status]"
   },
   "settings": {
     "heading": "[Settings]",
@@ -366,7 +370,17 @@
       "themeAudit": "[Theme audit →]",
       "themeAuditDescription": "[Side-by-side preview of every mascot × intensity × colour scheme. Use when tweaking globals.css to spot combos where the grade buttons blend into the surface.]"
     },
-    "loadingAriaLabel": "[Loading settings]"
+    "loadingAriaLabel": "[Loading settings]",
+    "pushOptIn": {
+      "ariaLabel": "[Daily review reminder]"
+    },
+    "qaSeed": {
+      "applyAriaLabel": "[Apply QA seed: {scenario}]",
+      "clearAriaLabel": "[Clear QA seed data]"
+    },
+    "deleteAccount": {
+      "inputAriaLabel": "[Type DELETE to confirm account deletion]"
+    }
   },
   "practice": {
     "title": "[Poké Memory - Learn every Pokémon]",
@@ -515,7 +529,18 @@
     "tokenEarnedAndSpent": "[Streak protection token earned and used - your {count}-day streak is safe.]",
     "tokenToastDismiss": "[Dismiss token notice]",
     "tokenEarnedHeading": "[Token earned]",
-    "tokenSpentHeading": "[Streak protected]"
+    "tokenSpentHeading": "[Streak protected]",
+    "multipleChoice": {
+      "groupAriaLabel": "[Choose the Pokémon name]",
+      "correctSuffix": "[ (correct)]",
+      "incorrectSuffix": "[ (incorrect)]"
+    },
+    "higherOrLower": {
+      "sectionAriaLabel": "[Higher or Lower mini-game]"
+    },
+    "typedEntry": {
+      "inputAriaLabel": "[Type the Pokémon name]"
+    }
   },
   "pokedex": {
     "title": "[Pokédex]",
@@ -565,7 +590,10 @@
     "statSpAtk": "[Sp. Atk]",
     "statSpDef": "[Sp. Def]",
     "statSpeed": "[Speed]",
-    "lockedSectionHint": "[Unlocks when you master this Pokémon.]"
+    "lockedSectionHint": "[Unlocks when you master this Pokémon.]",
+    "loadingAriaLabel": "[Loading Pokédex]",
+    "allPokemonAriaLabel": "[Pokémon]",
+    "generationPokemonAriaLabel": "[{name} Pokémon]"
   },
   "pasture": {
     "title": "[Pasture]",
@@ -605,8 +633,12 @@
     "biome": {
       "backLabel": "[Pasture]",
       "backAriaLabel": "[Back to Pasture]",
-      "emptyState": "[No mastered Pokémon in this biome yet. Keep practising!]"
+      "emptyState": "[No mastered Pokémon in this biome yet. Keep practising!]",
+      "statsAriaLabel": "[Biome statistics]"
     },
+    "closeDetailsAriaLabel": "[Close details]",
+    "pokemonDetailsAriaLabel": "[{name} details]",
+    "newArrivalSuffix": "[ (new arrival)]",
     "nextArrivals": {
       "ariaLabel": "[Next arrivals]",
       "heading": "[Next arrivals]",
@@ -925,6 +957,13 @@
   "onboarding": {
     "welcomeHeading": "[Welcome to Poké Memory]",
     "closeAriaLabel": "[Close welcome guide]",
+    "dismissHintAriaLabel": "[Dismiss hint]",
+    "hintAriaLabel": "[Onboarding hint]",
+    "knownQuiz": {
+      "chooseGenerationAriaLabel": "[Choose a generation]",
+      "iAlreadyKnowAriaLabel": "[I already know {name}]",
+      "generationSpritesAriaLabel": "[{name} sprites]"
+    },
     "intro": "[Learn every Pokémon name and evolution. New cards appear each day, and the app shows you each card again just before you are likely to forget it. The more you remember, the longer the gap before it comes back.]",
     "howToGrade": {
       "heading": "[How to grade]",
@@ -1024,6 +1063,9 @@
     "rock": "[Rock]",
     "steel": "[Steel]",
     "water": "[Water]"
+  },
+  "badges": {
+    "dismissToastAriaLabel": "[Dismiss new badge: {name}]"
   },
   "pushDaily": {
     "title": "[Time to practise]",

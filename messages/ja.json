@@ -37,7 +37,11 @@
     "chooseProvider": "サインインプロバイダーを選択",
     "cardsReviewed": "{count, plural, other {# 枚のカードをレビューしました}}",
     "streakDaysCount": "{count, plural, other {# 日連続}}",
-    "gradesLogged": "{count, plural, other {# 件の採点を記録しました}}"
+    "gradesLogged": "{count, plural, other {# 件の採点を記録しました}}",
+    "connectProviderAriaLabel": "{provider} に接続",
+    "connectedProvidersAriaLabel": "連携済みプロバイダー",
+    "providerConnectedAriaLabel": "{provider} 連携済み",
+    "checkingSyncStatusAriaLabel": "同期状態を確認中"
   },
   "settings": {
     "heading": "設定",
@@ -366,7 +370,17 @@
       "themeAudit": "テーマ監査 →",
       "themeAuditDescription": "すべてのマスコット × 強度 × カラースキームの並列プレビューです。globals.css を調整する際に、採点ボタンが背景に溶け込む組み合わせを見つけるために使用します。"
     },
-    "loadingAriaLabel": "設定を読み込み中"
+    "loadingAriaLabel": "設定を読み込み中",
+    "pushOptIn": {
+      "ariaLabel": "毎日のレビューリマインダー"
+    },
+    "qaSeed": {
+      "applyAriaLabel": "QA シードを適用: {scenario}",
+      "clearAriaLabel": "QA シードデータをクリア"
+    },
+    "deleteAccount": {
+      "inputAriaLabel": "DELETE と入力してアカウント削除を確認"
+    }
   },
   "practice": {
     "title": "Poké Memory - すべての Pokémon を覚えよう",
@@ -515,7 +529,18 @@
     "tokenEarnedAndSpent": "連続ストリーク保護トークンを獲得して使用しました。{count}日連続は安全です。",
     "tokenToastDismiss": "通知を閉じる",
     "tokenEarnedHeading": "トークン獲得",
-    "tokenSpentHeading": "ストリーク保護"
+    "tokenSpentHeading": "ストリーク保護",
+    "multipleChoice": {
+      "groupAriaLabel": "ポケモンの名前を選んでください",
+      "correctSuffix": "（正解）",
+      "incorrectSuffix": "（不正解）"
+    },
+    "higherOrLower": {
+      "sectionAriaLabel": "高い or 低いミニゲーム"
+    },
+    "typedEntry": {
+      "inputAriaLabel": "ポケモンの名前を入力"
+    }
   },
   "pokedex": {
     "title": "Pokédex",
@@ -565,7 +590,10 @@
     "statSpAtk": "特攻",
     "statSpDef": "特防",
     "statSpeed": "素早さ",
-    "lockedSectionHint": "この Pokémon を習得すると解放されます。"
+    "lockedSectionHint": "この Pokémon を習得すると解放されます。",
+    "loadingAriaLabel": "Pokédex を読み込み中",
+    "allPokemonAriaLabel": "ポケモン一覧",
+    "generationPokemonAriaLabel": "{name} のポケモン"
   },
   "pasture": {
     "title": "牧場",
@@ -605,8 +633,12 @@
     "biome": {
       "backLabel": "牧場",
       "backAriaLabel": "牧場に戻る",
-      "emptyState": "このバイオームにはまだ習得済みの Pokémon がいません。練習を続けましょう！"
+      "emptyState": "このバイオームにはまだ習得済みの Pokémon がいません。練習を続けましょう！",
+      "statsAriaLabel": "バイオームの統計"
     },
+    "closeDetailsAriaLabel": "詳細を閉じる",
+    "pokemonDetailsAriaLabel": "{name} の詳細",
+    "newArrivalSuffix": "（新着）",
     "nextArrivals": {
       "ariaLabel": "次の到着",
       "heading": "次の到着",
@@ -925,6 +957,13 @@
   "onboarding": {
     "welcomeHeading": "Poké Memory へようこそ",
     "closeAriaLabel": "このガイドを閉じる",
+    "dismissHintAriaLabel": "ヒントを閉じる",
+    "hintAriaLabel": "オンボーディングヒント",
+    "knownQuiz": {
+      "chooseGenerationAriaLabel": "世代を選択",
+      "iAlreadyKnowAriaLabel": "{name} はすでに知っている",
+      "generationSpritesAriaLabel": "{name} のスプライト"
+    },
     "intro": "すべての Pokémon の名前と進化を覚えましょう。新しいカードが毎日届き、アプリが忘れる直前にそのカードをもう一度表示します。覚えれば覚えるほど、次に表示されるまでの間隔が長くなります。",
     "howToGrade": {
       "heading": "ボタンの使い方",
@@ -1024,6 +1063,9 @@
     "rock": "いわ",
     "steel": "はがね",
     "water": "みず"
+  },
+  "badges": {
+    "dismissToastAriaLabel": "新しいバッジを閉じる: {name}"
   },
   "pushDaily": {
     "title": "Time to practise",

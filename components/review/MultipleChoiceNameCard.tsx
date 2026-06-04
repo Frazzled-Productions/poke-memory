@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { PRACTICE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import type { Grade } from "@/lib/review/session";
@@ -51,6 +52,7 @@ function NameOptionButton({
   grading,
   onChoose,
 }: NameOptionButtonProps) {
+  const t = useTranslations("review");
   const { name: localeName } = useLocalePokemonName(
     option.pokemon.speciesId,
     // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
@@ -78,7 +80,7 @@ function NameOptionButton({
       disabled={grading || submitted}
       onClick={() => onChoose(index, option.isCorrect)}
       aria-pressed={wasChosen ? true : undefined}
-      aria-label={`${localeName}${isTheCorrectOne && submitted ? " (correct)" : ""}${wasChosen && !isTheCorrectOne ? " (incorrect)" : ""}`}
+      aria-label={`${localeName}${isTheCorrectOne && submitted ? t("multipleChoice.correctSuffix") : ""}${wasChosen && !isTheCorrectOne ? t("multipleChoice.incorrectSuffix") : ""}`}
       className={`min-h-[44px] rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed ${buttonStyle}`}
     >
       {localeName}
@@ -118,6 +120,7 @@ export function MultipleChoiceNameCard({
   onGrade,
   grading = false,
 }: Props) {
+  const t = useTranslations("review");
   const [chosenIndex, setChosenIndex] = useState<number | null>(null);
   // Tracks whether onGrade has already been called so we never double-fire.
   const gradedRef = useRef(false);
@@ -200,7 +203,7 @@ export function MultipleChoiceNameCard({
       <div
         className="grid grid-cols-2 gap-2 w-full max-w-xs"
         role="group"
-        aria-label="Choose the Pokémon name"
+        aria-label={t("multipleChoice.groupAriaLabel")}
       >
         {options.map((option, idx) => (
           <NameOptionButton

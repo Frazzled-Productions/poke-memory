@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderWithIntl as render, screen, fireEvent, act } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl as render, renderJa, screen, fireEvent, act } from "@/components/test-utils/renderWithIntl";
 import { MultipleChoiceNameCard, FEEDBACK_HOLD_MS } from "./MultipleChoiceNameCard";
 import type { Grade } from "@/lib/review/session";
 
@@ -178,6 +178,74 @@ describe("MultipleChoiceNameCard", () => {
     expect(onGrade).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(1); });
     expect(onGrade).toHaveBeenCalledWith(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Localised aria-labels (#1607)
+// ---------------------------------------------------------------------------
+
+describe("MultipleChoiceNameCard — localised aria-labels", () => {
+  it("group aria-label is localised in Japanese", () => {
+    const { container } = renderJa(
+      <MultipleChoiceNameCard
+        spriteUrl="/sprites/1.png"
+        canonicalName="Bulbasaur"
+        options={DEFAULT_OPTIONS}
+        id={1}
+        onGrade={vi.fn()}
+      />,
+    );
+    const group = container.querySelector('[role="group"]');
+    expect(group?.getAttribute("aria-label")).toBe("ポケモンの名前を選んでください");
+  });
+
+  it("correct button aria-label includes the Japanese correct suffix after a correct pick", () => {
+    vi.useFakeTimers();
+    try {
+      renderJa(
+        <MultipleChoiceNameCard
+          spriteUrl="/sprites/1.png"
+          canonicalName="Bulbasaur"
+          options={DEFAULT_OPTIONS}
+          id={1}
+          onGrade={vi.fn()}
+        />,
+      );
+      // Click the correct option (Bulbasaur, index 0).
+      fireEvent.click(screen.getByText("Bulbasaur"));
+      // The correct button's aria-label should now include the Japanese suffix.
+      const correctBtn = screen.getByRole("button", {
+        name: /Bulbasaur（正解）/,
+      });
+      expect(correctBtn).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("incorrect button aria-label includes the Japanese incorrect suffix after a wrong pick", () => {
+    vi.useFakeTimers();
+    try {
+      renderJa(
+        <MultipleChoiceNameCard
+          spriteUrl="/sprites/1.png"
+          canonicalName="Bulbasaur"
+          options={DEFAULT_OPTIONS}
+          id={1}
+          onGrade={vi.fn()}
+        />,
+      );
+      // Click a wrong option (Charmander, index 1).
+      fireEvent.click(screen.getByText("Charmander"));
+      // The wrong button's aria-label should include the Japanese incorrect suffix.
+      const wrongBtn = screen.getByRole("button", {
+        name: /Charmander（不正解）/,
+      });
+      expect(wrongBtn).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

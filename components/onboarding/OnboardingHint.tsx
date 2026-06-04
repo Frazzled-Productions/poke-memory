@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   DEFAULT_ONBOARDING,
   SETTINGS_SAVED_EVENT,
@@ -57,6 +58,7 @@ export function OnboardingHint({
   // `null` until we've read localStorage. Rendering `null` during the first
   // paint avoids a flash of the hint on dismissed surfaces; the brief delay
   // is only the time it takes for `useEffect` to run after hydration.
+  const t = useTranslations("onboarding");
   const [dismissed, setDismissed] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -102,13 +104,13 @@ export function OnboardingHint({
   return (
     <div
       role="note"
-      aria-label={title ?? "Onboarding hint"}
+      aria-label={title ?? t("hintAriaLabel")}
       className={`relative w-full rounded-xl border ${padding} ${TONE_CLASSES[tone]}`}
     >
       <button
         type="button"
         onClick={handleDismiss}
-        aria-label="Dismiss hint"
+        aria-label={t("dismissHintAriaLabel")}
         className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-200 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
       >
         <span aria-hidden="true">×</span>

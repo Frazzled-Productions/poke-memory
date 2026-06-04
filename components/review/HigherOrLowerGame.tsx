@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import {
   pickPair,
   shufflePair,
@@ -89,6 +90,7 @@ type Props = {
 };
 
 export function HigherOrLowerGame({ seenPokemon }: Props) {
+  const t = useTranslations("review");
   const [pair, setPair] = useState<Pair | null>(null);
   const [phase, setPhase] = useState<Phase>("picking");
   const [streak, setStreak] = useState(0);
@@ -210,7 +212,7 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
 
   return (
     <section
-      aria-label="Higher or Lower mini-game"
+      aria-label={t("higherOrLower.sectionAriaLabel")}
       className="flex flex-col items-center gap-4 w-full max-w-sm mx-auto pt-6 border-t border-zinc-200 dark:border-zinc-800"
     >
       <div className={`flex justify-between w-full ${mutedTextXs} tabular-nums`}>

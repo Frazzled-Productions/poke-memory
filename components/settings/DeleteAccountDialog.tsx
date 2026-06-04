@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { dialogPanel, mutedText } from "@/lib/utils/class-names";
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
  * type-to-confirm gate is the deliberate friction.
  */
 export function DeleteAccountDialog({ open, onClose, onConfirm }: Props) {
+  const t = useTranslations("settings.deleteAccount");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
@@ -89,7 +91,7 @@ export function DeleteAccountDialog({ open, onClose, onConfirm }: Props) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Type DELETE to confirm"
-        aria-label="Type DELETE to confirm account deletion"
+        aria-label={t("inputAriaLabel")}
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}
