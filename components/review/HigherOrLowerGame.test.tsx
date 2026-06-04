@@ -1,5 +1,5 @@
 import { screen } from "@testing-library/react";
-import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
@@ -254,6 +254,12 @@ describe("HigherOrLowerGame", () => {
   it("returns null when fewer than 2 Pokémon are provided", () => {
     const { container } = renderWithIntl(<HigherOrLowerGame seenPokemon={[BULBASAUR]} />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it("section aria-label is localised in Japanese", () => {
+    const { container } = renderJa(<HigherOrLowerGame seenPokemon={SEEN} />);
+    const section = container.querySelector("section");
+    expect(section?.getAttribute("aria-label")).toBe("高い or 低いミニゲーム");
   });
 
   describe("idempotent initialisation (#887 — re-show does not clobber game state)", () => {
