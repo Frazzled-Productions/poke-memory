@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
+import { useLatestRef } from "@/lib/hooks/useLatestRef";
 
 type Props = {
   badgeName: string;
@@ -24,8 +25,7 @@ const DISMISS_AFTER_MS = 4500;
  * does not restart the dismiss timer.
  */
 export function BadgeToast({ badgeName, badgeDescription, onDismiss }: Props) {
-  const onDismissRef = useRef(onDismiss);
-  onDismissRef.current = onDismiss;
+  const onDismissRef = useLatestRef(onDismiss);
 
   useEffect(() => {
     const t = setTimeout(() => onDismissRef.current(), DISMISS_AFTER_MS);
