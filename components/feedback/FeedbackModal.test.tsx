@@ -196,9 +196,33 @@ describe("FeedbackModal - submit payload", () => {
     expect(body.category).toBe("feature");
     expect(body.message).toBe("Add dark mode");
     expect(typeof body.page).toBe("string");
-    // appVersion comes from process.env.NEXT_PUBLIC_APP_VERSION (may be undefined in test)
-    // but the key must be present when the env var is set; in test env it may be absent
-    expect("appVersion" in body || body.appVersion === undefined).toBe(true);
+  });
+
+  it("includes appVersion in POST payload when env var is set", async () => {
+    const original = process.env.NEXT_PUBLIC_APP_VERSION;
+    process.env.NEXT_PUBLIC_APP_VERSION = "1.2.3";
+    try {
+      mockFetchOk();
+      renderOpen();
+
+      fireEvent.change(screen.getByLabelText(/category/i), {
+        target: { value: "bug" },
+      });
+      fireEvent.change(screen.getByLabelText(/message/i), {
+        target: { value: "Test version" },
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+      });
+
+      expect(fetch).toHaveBeenCalledOnce();
+      const [, options] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+      const body = JSON.parse(options.body as string) as { appVersion?: string };
+      expect(body.appVersion).toBe("1.2.3");
+    } finally {
+      process.env.NEXT_PUBLIC_APP_VERSION = original;
+    }
   });
 });
 

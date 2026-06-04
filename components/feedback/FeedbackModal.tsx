@@ -84,7 +84,7 @@ export function FeedbackModal({ open, onClose }: Props) {
           category,
           message: message.slice(0, MESSAGE_MAX_LENGTH),
           page: window.location.pathname,
-          appVersion: process.env.NEXT_PUBLIC_APP_VERSION ?? undefined,
+          appVersion: process.env.NEXT_PUBLIC_APP_VERSION,
         }),
       });
       if (res.ok) {

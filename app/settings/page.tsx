@@ -1955,7 +1955,7 @@ export default function SettingsPage() {
 
                   <hr className="border-zinc-200 dark:border-zinc-800" />
 
-                  {/* Send feedback — available to all users (guest and signed-in) */}
+                  {/* Send feedback - available to all users (guest and signed-in) */}
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground">
@@ -1968,6 +1968,7 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => setFeedbackOpen(true)}
+                      aria-label={t("settings.feedback.openButton")}
                       className="min-h-[36px] shrink-0 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
                     >
                       {t("settings.feedback.rowLabel")}

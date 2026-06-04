@@ -306,6 +306,7 @@
     },
     "feedback": {
       "rowLabel": "フィードバックを送る",
+      "openButton": "フィードバックフォームを開く",
       "rowDescription": "バグの報告や機能のリクエストをお送りください。",
       "dialogTitle": "フィードバックを送る",
       "categoryLabel": "カテゴリ",
