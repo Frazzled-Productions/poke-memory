@@ -79,7 +79,7 @@ function renderOpen() {
 
 // --- Basic render ------------------------------------------------------------
 
-describe("FeedbackModal — renders correctly", () => {
+describe("FeedbackModal - renders correctly", () => {
   it("renders the category selector with all three options", () => {
     renderOpen();
     expect(screen.getByLabelText(/category/i)).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe("FeedbackModal — renders correctly", () => {
 
 // --- Category required -------------------------------------------------------
 
-describe("FeedbackModal — category required", () => {
+describe("FeedbackModal - category required", () => {
   it("Submit button is disabled when no category is selected", () => {
     renderOpen();
     const submitBtn = screen.getByRole("button", { name: /^send$/i });
@@ -145,7 +145,7 @@ describe("FeedbackModal — category required", () => {
 
 // --- Character counter -------------------------------------------------------
 
-describe("FeedbackModal — character counter", () => {
+describe("FeedbackModal - character counter", () => {
   it("updates as the user types", () => {
     renderOpen();
     const textarea = screen.getByLabelText(/message/i);
@@ -167,7 +167,7 @@ describe("FeedbackModal — character counter", () => {
 
 // --- Submit calls API with correct payload -----------------------------------
 
-describe("FeedbackModal — submit payload", () => {
+describe("FeedbackModal - submit payload", () => {
   it("POSTs the correct payload on submit", async () => {
     mockFetchOk();
     renderOpen();
@@ -204,7 +204,7 @@ describe("FeedbackModal — submit payload", () => {
 
 // --- Success state -----------------------------------------------------------
 
-describe("FeedbackModal — success state", () => {
+describe("FeedbackModal - success state", () => {
   it("shows confirmation message and hides form on 200 response", async () => {
     mockFetchOk();
     renderOpen();
@@ -232,7 +232,7 @@ describe("FeedbackModal — success state", () => {
 
 // --- Error state -------------------------------------------------------------
 
-describe("FeedbackModal — error state", () => {
+describe("FeedbackModal - error state", () => {
   it("shows inline error and keeps form open on 500 response", async () => {
     mockFetchFail();
     renderOpen();
@@ -283,7 +283,7 @@ describe("FeedbackModal — error state", () => {
 
 // --- Cmd/Ctrl+Enter submits --------------------------------------------------
 
-describe("FeedbackModal — keyboard submit", () => {
+describe("FeedbackModal - keyboard submit", () => {
   it("submits the form on Cmd+Enter from the textarea", async () => {
     mockFetchOk();
     renderOpen();
@@ -327,10 +327,10 @@ describe("FeedbackModal — keyboard submit", () => {
 
 // --- Guest / auth agnostic ---------------------------------------------------
 
-describe("FeedbackModal — guest and auth agnostic", () => {
+describe("FeedbackModal - guest and auth agnostic", () => {
   it("renders and submits without any auth context (guest mode)", async () => {
     mockFetchOk();
-    // No auth provider needed — the component only calls fetch.
+    // No auth provider needed; the component only calls fetch.
     renderWithIntl(<FeedbackModal open={true} onClose={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText(/category/i), {
@@ -352,7 +352,7 @@ describe("FeedbackModal — guest and auth agnostic", () => {
 
 // --- Locale coverage ---------------------------------------------------------
 
-describe("FeedbackModal — locale coverage", () => {
+describe("FeedbackModal - locale coverage", () => {
   it("renders in Japanese (ja) with localised labels", () => {
     renderJa(<FeedbackModal open={true} onClose={vi.fn()} />);
     // Japanese submit button text.
