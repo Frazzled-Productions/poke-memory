@@ -493,10 +493,11 @@ describe("PasturePage — empty state copy (#1440)", () => {
 //
 // Verifies that the OnboardingHint for the Pasture long-press popover renders
 // on first Pasture visit (flag absent / false) and is hidden when dismissed
-// (flag true). Covers both the populated path and the empty-state branch.
+// (flag true). Unit tests cover the empty-state branch; the populated path is
+// covered by e2e/pasture.spec.ts.
 // ---------------------------------------------------------------------------
 
-describe("PasturePage — long-press discovery hint (#1572)", () => {
+describe("PasturePage - long-press discovery hint (#1572)", () => {
   /**
    * Returns a loadSettings mock value with the given pastureLongPressHintDismissed flag.
    * The onboarding field only needs the one flag for this test suite.
@@ -528,7 +529,7 @@ describe("PasturePage — long-press discovery hint (#1572)", () => {
 
   // Empty-state branch: flag absent/false → hint renders.
   it("hint renders in empty-state branch when flag is absent (fresh session)", async () => {
-    // Default mock has no onboarding key — absent resolves to false.
+    // Default mock has no onboarding key - absent resolves to false.
     mockLoadSession.mockResolvedValue(null);
 
     renderWithIntl(<PasturePage />);
@@ -587,7 +588,7 @@ describe("PasturePage — long-press discovery hint (#1572)", () => {
       maxNewPerDay: 10,
       practiceScope: { gens: [], types: [], presets: [] },
       pokemonNameLocale: "en" as const,
-      // Intentionally omitting onboarding entirely — simulates a pre-#1572 blob.
+      // Intentionally omitting onboarding entirely - simulates a pre-#1572 blob.
     } as unknown as ReturnType<typeof loadSettings>);
 
     renderWithIntl(<PasturePage />);
@@ -608,7 +609,7 @@ describe("PasturePage — long-press discovery hint (#1572)", () => {
 // fresh session without needing mastered-card fixtures).
 // ---------------------------------------------------------------------------
 
-describe("PasturePage — long-press hint locale coverage (#1572)", () => {
+describe("PasturePage - long-press hint locale coverage (#1572)", () => {
   it("en: hint copy renders in English", async () => {
     mockLoadSession.mockResolvedValue(null);
     renderWithIntl(<PasturePage />, { locale: "en" });
