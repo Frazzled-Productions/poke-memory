@@ -125,7 +125,7 @@ nvm use       # picks up .nvmrc automatically
 # major, your ~/.nvm/versions/node directory may be empty (common when Node
 # was installed via Homebrew rather than nvm). Run nvm install first.
 
-# With Homebrew (no nvm needed) — replace 24 with the major in .nvmrc:
+# With Homebrew (no nvm needed) - ensure the major below matches .nvmrc:
 export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
 ```
 

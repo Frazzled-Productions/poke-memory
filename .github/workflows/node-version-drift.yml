@@ -7,7 +7,7 @@ name: Node version drift check
 # from .nvmrc. Mirrors the pseudo-locale-drift.yml / scope-lookup-drift.yml model.
 #
 # scripts/check-node-version-drift.mjs imports only Node built-ins, so there is
-# no `npm ci` step — plain `node` suffices and keeps the job fast.
+# no `npm ci` step - plain `node` suffices and keeps the job fast.
 
 on:
   pull_request:
@@ -15,6 +15,7 @@ on:
       - ".nvmrc"
       - ".github/workflows/**"
       - "README.md"
+      - "AGENTS.md"
       - "scripts/check-node-version-drift.mjs"
 
 concurrency:

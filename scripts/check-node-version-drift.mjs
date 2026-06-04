@@ -16,10 +16,17 @@
  *    guards against re-introduction. Any found must equal the .nvmrc major.
  *  - README.md: the Homebrew `node@N` example and any "Node N" prose major must
  *    equal the .nvmrc major.
+ *  - AGENTS.md: the Homebrew `node@N` literal must equal the .nvmrc major. Only
+ *    the `node@N` literal is scanned here, NOT prose.
  *
  * Deliberate exemptions (NOT checked):
  *  - package.json `engines.node` ("24.x"): a deliberately looser floor than the
  *    exact .nvmrc pin (see AGENTS.md), so it is excluded by design.
+ *  - AGENTS.md PROSE is deliberately NOT prose-scanned (the `\bNode N\b` form):
+ *    AGENTS.md intentionally references "Node 26" as the WRONG/bad version (the
+ *    failure mode it documents), so a generic prose scan would false-positive.
+ *    Only README prose carries the canonical "Node N" statement, so prose stays
+ *    README-only.
  *  - The Playwright container image tag (`mcr.microsoft.com/playwright:vX-noble`)
  *    bakes its own Node; that image's Node is a SEPARATE manual-bump invariant
  *    and is intentionally not tied to .nvmrc here.
@@ -83,20 +90,33 @@ for (const file of workflowFiles) {
   });
 }
 
-// --- 2. README.md: Homebrew `node@N` example + "Node N" prose major.
+// --- 2. Homebrew `node@N` literal: scanned in BOTH README.md and AGENTS.md.
+// AGENTS.md prose is deliberately NOT scanned (it references "Node 26" as the
+// bad version), so only the `node@N` literal is checked there. README.md
+// additionally carries the canonical "Node N" prose, which IS scanned.
+const literalFiles = ["README.md", "AGENTS.md"];
+for (const file of literalFiles) {
+  const filePath = resolve(repoRoot, file);
+  const fileLines = readFileSync(filePath, "utf8").split("\n");
+  fileLines.forEach((line, idx) => {
+    // Homebrew example: node@24
+    for (const m of line.matchAll(/node@(\d+)/g)) {
+      const major = parseInt(m[1], 10);
+      if (major !== requiredMajor) {
+        errors.push(
+          `${file}:${idx + 1} references node@${major}, but .nvmrc requires ${requiredMajor}.`,
+        );
+      }
+    }
+  });
+}
+
+// --- 3. README.md prose only: "Node 24" (case-insensitive boundary so
+// "Node 24.x" still matches the major). README is the only file whose prose
+// states the canonical Node major; AGENTS.md prose is exempt (see header).
 const readmePath = resolve(repoRoot, "README.md");
 const readmeLines = readFileSync(readmePath, "utf8").split("\n");
 readmeLines.forEach((line, idx) => {
-  // Homebrew example: node@24
-  for (const m of line.matchAll(/node@(\d+)/g)) {
-    const major = parseInt(m[1], 10);
-    if (major !== requiredMajor) {
-      errors.push(
-        `README.md:${idx + 1} references node@${major}, but .nvmrc requires ${requiredMajor}.`,
-      );
-    }
-  }
-  // Prose: "Node 24" (case-insensitive, word boundary so "Node 24.x" still matches the major).
   for (const m of line.matchAll(/\bNode (\d+)\b/g)) {
     const major = parseInt(m[1], 10);
     if (major !== requiredMajor) {
@@ -120,5 +140,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-  `check-node-version-drift: OK — no Node-major drift from .nvmrc (${requiredMajor}).`,
+  `check-node-version-drift: OK - no Node-major drift from .nvmrc (${requiredMajor}).`,
 );
