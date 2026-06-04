@@ -46,6 +46,9 @@ export default async function ChildFriendlySummary() {
             ),
           })}
         </li>
+        <li>
+          {t.rich("item6", { s: strong })}
+        </li>
       </ol>
     </section>
   );
