@@ -168,6 +168,11 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
       "github",
       "google",
       "identity",
+      "send feedback",
+      "feedback",
+      "bug report",
+      "feature request",
+      "report a bug",
     ],
   },
   {

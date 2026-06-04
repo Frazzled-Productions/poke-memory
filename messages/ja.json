@@ -304,6 +304,26 @@
       "privacy": "プライバシー",
       "terms": "利用規約"
     },
+    "feedback": {
+      "rowLabel": "フィードバックを送る",
+      "rowDescription": "バグの報告や機能のリクエストをお送りください。",
+      "dialogTitle": "フィードバックを送る",
+      "categoryLabel": "カテゴリ",
+      "categoryBug": "バグ報告",
+      "categoryFeature": "機能リクエスト",
+      "categoryOther": "その他",
+      "messageLabel": "メッセージ",
+      "messagePlaceholder": "問題や提案を記入してください...",
+      "characterCount": "{count, number}/{max, number}",
+      "privacyNotice": "名前やメールアドレスなどの個人情報をメッセージに含めないでください。",
+      "submit": "送信",
+      "submitting": "送信中...",
+      "successHeading": "ありがとうございます！",
+      "successBody": "フィードバックを受け付けました。",
+      "errorMessage": "エラーが発生しました。もう一度お試しください。",
+      "cancel": "キャンセル",
+      "close": "閉じる"
+    },
     "dangerZone": {
       "heading": "危険な操作",
       "resetAllProgress": "すべての進捗を削除",
