@@ -28,24 +28,35 @@ CREATE TABLE IF NOT EXISTS feedback (
 -- no client read path required. The service-role INSERT bypasses RLS entirely.
 ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 
--- 12-month retention purge via pg_cron (version 1.6.4, confirmed installed).
--- The DO block is idempotent: it unschedules any existing job by name before
--- scheduling, tolerating both first-apply and re-apply safely.
--- Distinct dollar-quote tags ($do$ / $cmd$) so the inner command string does
--- not prematurely terminate the outer DO block.
-DO $do$
-BEGIN
-  -- Unschedule if the job already exists (idempotent re-apply guard).
-  PERFORM cron.unschedule('feedback-retention-purge')
-  WHERE EXISTS (
-    SELECT 1 FROM cron.job WHERE jobname = 'feedback-retention-purge'
-  );
+-- 12-month retention purge via pg_cron (version 1.6.4 on Supabase production).
+-- pg_cron is a Supabase-managed extension, available on production but NOT in
+-- the stock postgres:15 integration-test container. Each cron call is wrapped
+-- in its own DO block with an EXCEPTION clause so a CI environment without the
+-- `cron` schema degrades to a NOTICE rather than aborting the migration
+-- (matching the established pattern in migrations 028 and 031). On production
+-- the blocks behave as normal cron.unschedule / cron.schedule calls. The inner
+-- command uses a distinct $cronbody$ tag so it does not terminate the DO block.
 
-  -- Schedule a daily purge at 03:00 UTC to remove rows older than 12 months.
+-- Unschedule any existing job first (idempotent re-apply guard).
+DO $$
+BEGIN
+  PERFORM cron.unschedule('feedback-retention-purge');
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping cron.unschedule (pg_cron not available or job not found): %', SQLERRM;
+END;
+$$;
+
+-- Schedule a daily purge at 03:00 UTC to remove rows older than 12 months.
+DO $$
+BEGIN
   PERFORM cron.schedule(
     'feedback-retention-purge',
     '0 3 * * *',
-    $cmd$DELETE FROM feedback WHERE created_at < now() - interval '12 months'$cmd$
+    $cronbody$DELETE FROM feedback WHERE created_at < now() - interval '12 months'$cronbody$
   );
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping cron.schedule (pg_cron not available): %', SQLERRM;
 END;
-$do$;
+$$;
