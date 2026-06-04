@@ -862,6 +862,12 @@
       "learningBody": "学習中: すでに見たことがあり、記憶を定着させています。",
       "masteredBody": "{reps}回連続して正しく思い出し、次のレビューが21日以上先に設定されると習得済みになります。スケジューラーが本当に覚えたと判断した時点です。",
       "introducedNote": "表示済みは、完全に習得したかどうかに関わらず、少なくとも1回見たことのあるポケモンの数です。"
+    },
+    "languageBreakdown": {
+      "heading": "言語",
+      "masteredCount": "{count, plural, other {# 習得済み}}",
+      "bestDay": "{count, plural, other {ベストデイ # レビュー}}",
+      "noBestDay": "まだレビューなし"
     }
   },
   "error": {

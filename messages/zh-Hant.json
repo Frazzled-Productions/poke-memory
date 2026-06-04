@@ -862,6 +862,12 @@
       "learningBody": "學習中：您已見過它，正在鞏固記憶。",
       "masteredBody": "已掌握：連續答對 {reps} 次且下次複習間隔至少 21 天。這是排程器確認您真正學會的時間點。",
       "introducedNote": "已引入統計您至少見過一次的寶可夢，無論是否已完全掌握。"
+    },
+    "languageBreakdown": {
+      "heading": "語言",
+      "masteredCount": "{count, plural, other {# 已掌握}}",
+      "bestDay": "{count, plural, other {最佳日 # 次複習}}",
+      "noBestDay": "尚無複習記錄"
     }
   },
   "error": {
