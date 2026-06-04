@@ -478,7 +478,11 @@
       "new": "新規",
       "learning": "学習中",
       "review": "復習",
-      "ariaLabel": "キュー数"
+      "ariaLabel": "キュー数",
+      "infoAriaLabel": "キュー状態について",
+      "infoNew": "新規: このカードはまだ復習されていません。",
+      "infoLearning": "学習中: カードは短い間隔の学習ステップにあります。長期復習に入るまで、短い間隔で何度か表示されます。",
+      "infoReview": "復習: カードは長期復習に卒業しました。スケジューラーがあなたの記憶に基づいて、数日から数週間の間隔で復習を設定します。"
     },
     "storageFullBanner": "ストレージが満杯のため進捗の保存が無効になっています。",
     "storageFullDismiss": "閉じる",
@@ -507,6 +511,8 @@
     "sortNational": "全国図鑑番号順",
     "sortAlphabetical": "名前順",
     "sortClosestToMastery": "習得に近い順",
+    "sortClosestToMasteryInfoAriaLabel": "「習得に近い順」について",
+    "sortClosestToMasteryInfoPanel": "習得に最も近いポケモンを上位に表示します。習得済み、次に学習中（復習回数と間隔順）、最後に未開始の順です。スーパーユーザーモードで全て習得済みを装うが有効の場合、全国図鑑番号順になります。",
     "masteryAll": "すべて",
     "masteryMastered": "習得済み",
     "masteryNotYet": "未習得",

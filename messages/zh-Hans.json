@@ -478,7 +478,11 @@
       "new": "新卡",
       "learning": "学习中",
       "review": "复习",
-      "ariaLabel": "队列数量"
+      "ariaLabel": "队列数量",
+      "infoAriaLabel": "关于队列状态",
+      "infoNew": "新卡：你还没有复习过这张卡片。",
+      "infoLearning": "学习中：卡片处于短间隔学习步骤中。在进入长期复习之前，它将以较短的间隔多次出现。",
+      "infoReview": "复习：卡片已进入长期复习阶段。调度器会根据你的记忆情况，将复习间隔设置为数天或数周。"
     },
     "storageFullBanner": "存储空间已满，进度无法保存。",
     "storageFullDismiss": "关闭",
@@ -507,6 +511,8 @@
     "sortNational": "全国图鉴编号",
     "sortAlphabetical": "字母顺序",
     "sortClosestToMastery": "最接近掌握",
+    "sortClosestToMasteryInfoAriaLabel": "关于「最接近掌握」排序",
+    "sortClosestToMasteryInfoPanel": "将你最接近掌握的宝可梦排在最前面：已掌握的在最前，其次是学习中的（按复习次数和间隔排序），最后是未开始的。在超级用户模式下开启假设全部已掌握时，排序将退化为全国图鉴编号顺序。",
     "masteryAll": "全部",
     "masteryMastered": "已掌握",
     "masteryNotYet": "未掌握",

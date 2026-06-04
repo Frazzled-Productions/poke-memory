@@ -478,7 +478,11 @@
       "new": "新卡",
       "learning": "學習中",
       "review": "複習",
-      "ariaLabel": "佇列數量"
+      "ariaLabel": "佇列數量",
+      "infoAriaLabel": "關於佇列狀態",
+      "infoNew": "新卡：你還未複習過這張卡片。",
+      "infoLearning": "學習中：卡片正處於短間隔學習步驟中。在進入長期複習之前，它將以較短的間隔多次出現。",
+      "infoReview": "複習：卡片已進入長期複習階段。排程器會根據你的記憶情況，將複習間隔設定為數天或數週。"
     },
     "storageFullBanner": "儲存空間已滿，進度無法儲存。",
     "storageFullDismiss": "關閉",
@@ -507,6 +511,8 @@
     "sortNational": "全國圖鑑編號",
     "sortAlphabetical": "字母順序",
     "sortClosestToMastery": "最接近掌握",
+    "sortClosestToMasteryInfoAriaLabel": "關於「最接近掌握」排序",
+    "sortClosestToMasteryInfoPanel": "將你最接近掌握的寶可夢排在最前面：已掌握的在最前，其次是學習中的（按複習次數和間隔排序），最後是未開始的。在超級使用者模式下開啟假設全部已掌握時，排序將退化為全國圖鑑編號順序。",
     "masteryAll": "全部",
     "masteryMastered": "已掌握",
     "masteryNotYet": "未掌握",

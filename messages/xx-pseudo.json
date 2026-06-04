@@ -478,7 +478,11 @@
       "new": "[New]",
       "learning": "[Learning]",
       "review": "[Review]",
-      "ariaLabel": "[Queue counts]"
+      "ariaLabel": "[Queue counts]",
+      "infoAriaLabel": "[About queue states]",
+      "infoNew": "[New: you have not reviewed this card yet.]",
+      "infoLearning": "[Learning: the card is in short-interval learning steps. You will see it several times in quick succession before it enters long-term review.]",
+      "infoReview": "[Review: the card has graduated into long-term review. The scheduler spaces out repetitions over days or weeks based on your recall.]"
     },
     "storageFullBanner": "[Progress saving is disabled: storage is full.]",
     "storageFullDismiss": "[Dismiss]",
@@ -507,6 +511,8 @@
     "sortNational": "[National Number]",
     "sortAlphabetical": "[Alphabetical]",
     "sortClosestToMastery": "[Closest to mastery]",
+    "sortClosestToMasteryInfoAriaLabel": "[About Closest to mastery sort]",
+    "sortClosestToMasteryInfoPanel": "[Puts Pokémon you are closest to mastering at the top: mastered first, then those you are learning (by review count and interval), then those not yet started. When pretend-all-mastered is on in superuser mode, the sort degenerates to national order.]",
     "masteryAll": "[All]",
     "masteryMastered": "[Mastered]",
     "masteryNotYet": "[Not yet mastered]",
