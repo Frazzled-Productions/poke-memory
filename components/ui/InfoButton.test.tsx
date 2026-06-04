@@ -4,7 +4,6 @@
  * Verifies WAI-ARIA disclosure-button pattern:
  *   - Toggles panel open/closed on click.
  *   - aria-expanded reflects open/closed state.
- *   - Enter/Space opens the panel.
  *   - Escape closes the panel.
  *   - Outside-click closes the panel.
  *   - Panel content is present when open and absent when closed.

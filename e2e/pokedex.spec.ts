@@ -1214,10 +1214,10 @@ test.describe("Pokédex detail — locked-state signposts (#1440)", () => {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Pokédex sort — InfoButton for "Closest to mastery" (#1574)
+// Pokédex sort - InfoButton for "Closest to mastery" (#1574)
 // ---------------------------------------------------------------------------
 
-test.describe("Pokédex sort — Closest to mastery InfoButton (#1574)", () => {
+test.describe("Pokédex sort - Closest to mastery InfoButton (#1574)", () => {
   test("InfoButton appears when Closest to mastery sort is selected and opens its panel on click", async ({
     page,
   }) => {

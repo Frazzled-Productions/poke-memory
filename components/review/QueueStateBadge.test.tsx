@@ -94,10 +94,10 @@ describe("QueueStateBadge", () => {
 });
 
 // ---------------------------------------------------------------------------
-// QueueStateBadge — InfoButton (#1574)
+// QueueStateBadge - InfoButton (#1574)
 // ---------------------------------------------------------------------------
 
-describe("QueueStateBadge — InfoButton", () => {
+describe("QueueStateBadge - InfoButton", () => {
   it("renders an InfoButton alongside the queue badge", () => {
     renderWithIntl(<QueueStateBadge state={makeState({})} />);
     expect(
@@ -119,7 +119,7 @@ describe("QueueStateBadge — InfoButton", () => {
     // Panel lists all three queue-state explanations.
     expect(screen.getByText(/you have not reviewed this card yet/i)).toBeInTheDocument();
     expect(screen.getByText(/short-interval learning steps/i)).toBeInTheDocument();
-    // "infoReview" mentions "graduated into long-term review" — distinct from the learning text.
+    // "infoReview" mentions "graduated into long-term review" - distinct from the learning text.
     expect(screen.getByText(/graduated into long-term review/i)).toBeInTheDocument();
   });
 
@@ -136,10 +136,10 @@ describe("QueueStateBadge — InfoButton", () => {
 });
 
 // ---------------------------------------------------------------------------
-// QueueStateBadge — InfoButton locale coverage (#1574)
+// QueueStateBadge - InfoButton locale coverage (#1574)
 // ---------------------------------------------------------------------------
 
-describe("QueueStateBadge — InfoButton in Japanese", () => {
+describe("QueueStateBadge - InfoButton in Japanese", () => {
   it("renders InfoButton with Japanese aria-label", () => {
     renderJa(<QueueStateBadge state={makeState({})} />);
     // messages/ja.json review.queue.infoAriaLabel = "キュー状態について"
@@ -149,7 +149,7 @@ describe("QueueStateBadge — InfoButton in Japanese", () => {
   });
 });
 
-describe("QueueStateBadge — InfoButton in Simplified Chinese", () => {
+describe("QueueStateBadge - InfoButton in Simplified Chinese", () => {
   it("renders InfoButton with Simplified Chinese aria-label", () => {
     renderZhHans(<QueueStateBadge state={makeState({})} />);
     // messages/zh-Hans.json review.queue.infoAriaLabel = "关于队列状态"
@@ -159,7 +159,7 @@ describe("QueueStateBadge — InfoButton in Simplified Chinese", () => {
   });
 });
 
-describe("QueueStateBadge — InfoButton in Traditional Chinese", () => {
+describe("QueueStateBadge - InfoButton in Traditional Chinese", () => {
   it("renders InfoButton with Traditional Chinese aria-label", () => {
     renderZhHant(<QueueStateBadge state={makeState({})} />);
     // messages/zh-Hant.json review.queue.infoAriaLabel = "關於佇列狀態"

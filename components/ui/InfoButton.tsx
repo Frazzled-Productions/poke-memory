@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * InfoButton — a small accessible disclosure button (circle-i icon) that
+ * InfoButton - a small accessible disclosure button (circle-i icon) that
  * toggles an explanatory panel open/closed.
  *
  * Follows WAI-ARIA disclosure-button pattern:
@@ -50,7 +50,6 @@ export function InfoButton({
 }: InfoButtonProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Close on outside click.
   const handleOutsideClick = useCallback((e: MouseEvent) => {
@@ -87,7 +86,6 @@ export function InfoButton({
   return (
     <div ref={containerRef} className="relative inline-block">
       <button
-        ref={buttonRef}
         type="button"
         aria-label={ariaLabel}
         aria-expanded={open}
@@ -96,7 +94,7 @@ export function InfoButton({
         onKeyDown={handleKeyDown}
         className="inline-flex h-5 w-5 items-center justify-center rounded-full text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1 transition-colors"
       >
-        {/* Circle-i SVG — aria-hidden because the button carries the aria-label. */}
+        {/* Circle-i SVG - aria-hidden because the button carries the aria-label. */}
         <svg
           viewBox="0 0 16 16"
           fill="none"

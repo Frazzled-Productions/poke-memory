@@ -154,7 +154,7 @@ describe("PokedexFilterBar — sort control", () => {
 // Closest-to-mastery InfoButton (#1574)
 // ---------------------------------------------------------------------------
 
-describe("PokedexFilterBar — closest-to-mastery InfoButton", () => {
+describe("PokedexFilterBar - closest-to-mastery InfoButton", () => {
   it("InfoButton is not visible when sort is national", () => {
     renderBar(defaultFilters(), "national");
     expect(
@@ -207,10 +207,10 @@ describe("PokedexFilterBar — closest-to-mastery InfoButton", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Closest-to-mastery InfoButton — locale coverage (#1574)
+// Closest-to-mastery InfoButton - locale coverage (#1574)
 // ---------------------------------------------------------------------------
 
-describe("PokedexFilterBar — closest-to-mastery InfoButton in Japanese", () => {
+describe("PokedexFilterBar - closest-to-mastery InfoButton in Japanese", () => {
   it("renders the InfoButton with a Japanese aria-label when sort is closest-to-mastery", () => {
     renderBar(defaultFilters(), "closest-to-mastery", {}, { locale: "ja" });
     // messages/ja.json pokedex.sortClosestToMasteryInfoAriaLabel
@@ -220,7 +220,7 @@ describe("PokedexFilterBar — closest-to-mastery InfoButton in Japanese", () =>
   });
 });
 
-describe("PokedexFilterBar — closest-to-mastery InfoButton in Simplified Chinese", () => {
+describe("PokedexFilterBar - closest-to-mastery InfoButton in Simplified Chinese", () => {
   it("renders the InfoButton with a Simplified Chinese aria-label when sort is closest-to-mastery", () => {
     renderBar(defaultFilters(), "closest-to-mastery", {}, { locale: "zh-Hans" });
     expect(
@@ -229,7 +229,7 @@ describe("PokedexFilterBar — closest-to-mastery InfoButton in Simplified Chine
   });
 });
 
-describe("PokedexFilterBar — closest-to-mastery InfoButton in Traditional Chinese", () => {
+describe("PokedexFilterBar - closest-to-mastery InfoButton in Traditional Chinese", () => {
   it("renders the InfoButton with a Traditional Chinese aria-label when sort is closest-to-mastery", () => {
     renderBar(defaultFilters(), "closest-to-mastery", {}, { locale: "zh-Hant" });
     expect(
