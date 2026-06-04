@@ -119,7 +119,7 @@ export default function PokedexFilterBar({
             id="pokedex-sort"
             value={sort}
             onChange={(e) => onSortChange(e.target.value as PokedexSortOrder)}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900"
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900 sm:w-auto"
           >
             {SORT_OPTIONS.map(({ value, label }) => (
               <option key={value} value={value}>

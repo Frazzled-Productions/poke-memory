@@ -126,7 +126,6 @@ export function InfoButton({
       {open && (
         <div
           id={panelId}
-          role="tooltip"
           className={[
             "absolute z-10 mt-1 w-72 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600 shadow-md dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300",
             panelClassName,
