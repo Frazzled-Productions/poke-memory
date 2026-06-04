@@ -79,12 +79,13 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      # Node 24 to match engines.node ("24.x") + engine-strict (#1512); without
-      # this the runner defaults to Node 22 and `npm install` below fails EBADENGINE,
-      # which broke the release job (#210). Pin matches ci.yml / .nvmrc.
+      # Node major read from .nvmrc (single source of truth) to match
+      # engines.node ("24.x") + engine-strict (#1512); without a pin the runner
+      # defaults to an older major and `npm install` below fails EBADENGINE,
+      # which broke the release job (#210).
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
 
       - name: Configure git identity
         run: |
