@@ -37,7 +37,11 @@
     "chooseProvider": "選擇登入方式",
     "cardsReviewed": "{count, plural, other {已複習 # 張卡片}}",
     "streakDaysCount": "{count, plural, other {# 天連續}}",
-    "gradesLogged": "{count, plural, other {已記錄 # 次評分}}"
+    "gradesLogged": "{count, plural, other {已記錄 # 次評分}}",
+    "connectProviderAriaLabel": "連結 {provider}",
+    "connectedProvidersAriaLabel": "已連結的登入方式",
+    "providerConnectedAriaLabel": "{provider} 已連結",
+    "checkingSyncStatusAriaLabel": "正在檢查同步狀態"
   },
   "settings": {
     "heading": "設定",
@@ -366,7 +370,17 @@
       "themeAudit": "主題稽核 →",
       "themeAuditDescription": "所有吉祥物 × 強度 × 配色方案的並排預覽。在調整 globals.css 時使用，以找出評分按鈕與背景融合的組合。"
     },
-    "loadingAriaLabel": "載入設定中"
+    "loadingAriaLabel": "載入設定中",
+    "pushOptIn": {
+      "ariaLabel": "每日複習提醒"
+    },
+    "qaSeed": {
+      "applyAriaLabel": "套用 QA 種子：{scenario}",
+      "clearAriaLabel": "清除 QA 種子資料"
+    },
+    "deleteAccount": {
+      "inputAriaLabel": "輸入 DELETE 以確認刪除帳戶"
+    }
   },
   "practice": {
     "title": "Poké Memory - 記住每一隻寶可夢",
@@ -515,7 +529,18 @@
     "tokenEarnedAndSpent": "已獲得並使用連續保護令牌，你的 {count} 天連續記錄安全了。",
     "tokenToastDismiss": "關閉提示",
     "tokenEarnedHeading": "獲得令牌",
-    "tokenSpentHeading": "連續記錄已保護"
+    "tokenSpentHeading": "連續記錄已保護",
+    "multipleChoice": {
+      "groupAriaLabel": "請選擇寶可夢的名字",
+      "correctSuffix": "（正確）",
+      "incorrectSuffix": "（錯誤）"
+    },
+    "higherOrLower": {
+      "sectionAriaLabel": "高還是低小遊戲"
+    },
+    "typedEntry": {
+      "inputAriaLabel": "輸入寶可夢的名字"
+    }
   },
   "pokedex": {
     "title": "Pokédex",
@@ -565,7 +590,10 @@
     "statSpAtk": "特攻",
     "statSpDef": "特防",
     "statSpeed": "速度",
-    "lockedSectionHint": "掌握這隻寶可夢後解鎖。"
+    "lockedSectionHint": "掌握這隻寶可夢後解鎖。",
+    "loadingAriaLabel": "正在載入 Pokédex",
+    "allPokemonAriaLabel": "寶可夢列表",
+    "generationPokemonAriaLabel": "{name}的寶可夢"
   },
   "pasture": {
     "title": "牧場",
@@ -605,8 +633,12 @@
     "biome": {
       "backLabel": "牧場",
       "backAriaLabel": "返回牧場",
-      "emptyState": "此生物群系中還沒有掌握的寶可夢。繼續練習吧！"
+      "emptyState": "此生物群系中還沒有掌握的寶可夢。繼續練習吧！",
+      "statsAriaLabel": "生物群系統計"
     },
+    "closeDetailsAriaLabel": "關閉詳情",
+    "pokemonDetailsAriaLabel": "{name}的詳情",
+    "newArrivalSuffix": "（新到來）",
     "nextArrivals": {
       "ariaLabel": "即將到來",
       "heading": "即將到來",
@@ -925,6 +957,13 @@
   "onboarding": {
     "welcomeHeading": "歡迎使用 Poké Memory",
     "closeAriaLabel": "關閉歡迎指南",
+    "dismissHintAriaLabel": "關閉提示",
+    "hintAriaLabel": "新手引導提示",
+    "knownQuiz": {
+      "chooseGenerationAriaLabel": "選擇世代",
+      "iAlreadyKnowAriaLabel": "我已認識{name}",
+      "generationSpritesAriaLabel": "{name}的精靈圖"
+    },
     "intro": "學習每隻寶可夢的名字和進化。每天都會有新卡片出現，當你快要忘記一張卡時，應用程式會再次顯示它。你記得越多，下次出現的間隔就越長。",
     "howToGrade": {
       "heading": "如何評分",
@@ -1024,6 +1063,9 @@
     "rock": "岩石",
     "steel": "鋼",
     "water": "水"
+  },
+  "badges": {
+    "dismissToastAriaLabel": "關閉新徽章通知：{name}"
   },
   "pushDaily": {
     "title": "Time to practise",

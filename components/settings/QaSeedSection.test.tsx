@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithIntl as render, screen } from "@/components/test-utils/renderWithIntl";
+import { waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { QaSeedSection } from "@/components/settings/QaSeedSection";

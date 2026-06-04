@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   LAST_SEEN_VERSION_KEY,
   readLastSeenVersion,
@@ -19,6 +20,7 @@ const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
 // they ever loaded the app.
 export function WhatsNewIndicator() {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   const [hasUnseen, setHasUnseen] = useState(false);
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export function WhatsNewIndicator() {
   return (
     <Link
       href="/whats-new"
-      aria-label="What's new"
+      aria-label={t("whatsNew")}
       className="inline-flex items-center gap-1.5 rounded-full bg-theme-fg-on-primary px-3 py-1 text-xs font-semibold text-theme-primary shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
     >
       <span

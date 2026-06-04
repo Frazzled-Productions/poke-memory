@@ -182,7 +182,7 @@ function GenerationSection({
       <ul
         className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10"
         role="list"
-        aria-label={`${name} Pokémon`}
+        aria-label={t("generationPokemonAriaLabel", { name })}
       >
         {pokemon.map((p) => (
           <PokemonCell
@@ -201,11 +201,12 @@ function GenerationSection({
 // ---------------------------------------------------------------------------
 
 export function LoadingSkeleton() {
+  const t = useTranslations("pokedex");
   return (
     <div
       className="flex flex-col gap-10"
       aria-busy="true"
-      aria-label="Loading Pokédex"
+      aria-label={t("loadingAriaLabel")}
     >
       {GEN_RANGES.map((range) => (
         <div key={range.gen} className="flex flex-col gap-3">
@@ -261,6 +262,7 @@ type PokedexGridProps = {
 // ---------------------------------------------------------------------------
 
 export default function PokedexGrid({ pokemon, activeGen, flatList = false, localeNames }: PokedexGridProps) {
+  const t = useTranslations("pokedex");
   if (pokemon.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
@@ -283,7 +285,7 @@ export default function PokedexGrid({ pokemon, activeGen, flatList = false, loca
       <ul
         className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10"
         role="list"
-        aria-label="Pokémon"
+        aria-label={t("allPokemonAriaLabel")}
       >
         {pokemon.map((p) => (
           <PokemonCell

@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { gradeTypedAnswer } from "@/lib/srs/typedEntryGrade";
 import { PRACTICE_SPRITE_SIZE } from "@/lib/sprites/sizes";
@@ -54,6 +55,7 @@ export function TypedEntryNameCard({
   onGrade,
   grading = false,
 }: Props) {
+  const t = useTranslations("review");
   const [inputValue, setInputValue] = useState("");
   // "submitted" tracks whether the user has pressed Submit or I don't know.
   // Once submitted we reveal the feedback so it is visible before the parent
@@ -173,7 +175,7 @@ export function TypedEntryNameCard({
               spellCheck={false}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              aria-label="Type the Pokémon name"
+              aria-label={t("typedEntry.inputAriaLabel")}
               placeholder="Type the name..."
               disabled={grading}
               className="w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground placeholder-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:placeholder-zinc-500 disabled:opacity-60"

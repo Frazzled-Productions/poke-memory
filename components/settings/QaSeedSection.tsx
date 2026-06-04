@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { cardPanelPadded, colStack, mutedTextXs } from "@/lib/utils/class-names";
 import { cn } from "@/lib/utils/cn";
 import { SCENARIOS, SCENARIO_BY_SLUG } from "@/lib/qa-seed/scenarios";
@@ -27,6 +28,7 @@ type ApplyStatus =
  * button removes the session and grade-log from IDB.
  */
 export function QaSeedSection() {
+  const t = useTranslations("settings.qaSeed");
   const [selectedSlug, setSelectedSlug] = useState<string>(SCENARIOS[0]?.slug ?? "");
   const [status, setStatus] = useState<ApplyStatus>({ kind: "idle" });
   // Slug of the currently active scenario, persisted in localStorage (not IDB) and restored on mount.
@@ -159,7 +161,7 @@ export function QaSeedSection() {
           onClick={() => { void handleApply(); }}
           disabled={status.kind === "applying" || !selectedScenario}
           className="min-h-[36px] rounded-md border border-amber-400 bg-amber-50 px-4 py-1.5 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900"
-          aria-label={`Apply QA seed: ${selectedScenario?.label ?? "no scenario selected"}`}
+          aria-label={t("applyAriaLabel", { scenario: selectedScenario?.label ?? "no scenario selected" })}
         >
           {status.kind === "applying" ? "Applying..." : "Apply seed"}
         </button>
@@ -169,7 +171,7 @@ export function QaSeedSection() {
           onClick={() => { void handleClear(); }}
           disabled={status.kind === "applying"}
           className="min-h-[36px] rounded-md border border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
-          aria-label="Clear QA seed data"
+          aria-label={t("clearAriaLabel")}
         >
           Clear seed
         </button>

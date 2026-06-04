@@ -14,7 +14,8 @@
  * project picks it up (per AGENTS.md "Testing").
  */
 
-import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { renderWithIntl as render, screen } from "@/components/test-utils/renderWithIntl";
+import { waitFor, fireEvent, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 

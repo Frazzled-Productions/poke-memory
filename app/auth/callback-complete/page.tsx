@@ -86,6 +86,7 @@ function summariseCloudCards(rows: CloudRow[]) {
 export default function CallbackCompletePage() {
   const router = useRouter();
   const { user, loading, supabase } = useAuth();
+  const tAuth = useTranslations("auth");
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [pending, setPending] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -352,7 +353,7 @@ export default function CallbackCompletePage() {
 
   if (status.kind === "loading") {
     return (
-      <div className="flex flex-1 items-center justify-center" aria-busy="true" aria-label="Checking sync status">
+      <div className="flex flex-1 items-center justify-center" aria-busy="true" aria-label={tAuth("checkingSyncStatusAriaLabel")}>
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-foreground" />
           <p className={mutedText}>Checking sync status…</p>

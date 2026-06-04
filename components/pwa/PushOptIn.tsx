@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import {
   hasLocalSubscription,
@@ -53,6 +54,7 @@ export function PushOptIn({
   user: User;
   supabase: SupabaseClient;
 }) {
+  const t = useTranslations("settings.pushOptIn");
   const { anyFlagOn } = useSuperuser();
   const [visible, setVisible] = useState<boolean>(false);
   const [permission, setPermission] = useState<NotificationPermission>("default");
@@ -152,7 +154,7 @@ export function PushOptIn({
             type="button"
             role="switch"
             aria-checked={subscribed}
-            aria-label="Daily review reminder"
+            aria-label={t("ariaLabel")}
             disabled={busy || permissionDenied}
             data-testid="push-optin-button"
             onClick={() => {

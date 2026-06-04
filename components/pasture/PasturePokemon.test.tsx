@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { renderWithIntl as render, screen } from "@/components/test-utils/renderWithIntl";
 import { describe, it, expect, vi } from "vitest";
 
 // ---------------------------------------------------------------------------

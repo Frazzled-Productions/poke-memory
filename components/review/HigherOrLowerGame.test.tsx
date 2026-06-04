@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
@@ -114,7 +115,7 @@ beforeEach(() => {
 
 describe("HigherOrLowerGame", () => {
   it("renders both Pokémon names and the stat prompt", () => {
-    render(<HigherOrLowerGame seenPokemon={SEEN} />);
+    renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
     expect(screen.getByRole("button", { name: "Bulbasaur" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ivysaur" })).toBeInTheDocument();
@@ -124,7 +125,7 @@ describe("HigherOrLowerGame", () => {
 
   it("increments streak to 1 and shows result banner after clicking the higher-stat button", async () => {
     const user = userEvent.setup();
-    render(<HigherOrLowerGame seenPokemon={SEEN} />);
+    renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
     // Ivysaur has the higher attack — clicking it is the correct choice.
     await user.click(screen.getByRole("button", { name: "Ivysaur" }));
@@ -139,7 +140,7 @@ describe("HigherOrLowerGame", () => {
 
   it("shows Game over message and resets streak after clicking the lower-stat button", async () => {
     const user = userEvent.setup();
-    render(<HigherOrLowerGame seenPokemon={SEEN} />);
+    renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
     // Bulbasaur has the lower attack — clicking it is wrong.
     await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
@@ -159,7 +160,7 @@ describe("HigherOrLowerGame", () => {
 
   it("persists new best immediately on the correct guess that sets it — not deferred to Play again", async () => {
     const user = userEvent.setup();
-    render(<HigherOrLowerGame seenPokemon={SEEN} />);
+    renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
     // Correct pick: streak becomes 1, which beats bestScore of 0.
     await user.click(screen.getByRole("button", { name: "Ivysaur" }));
@@ -176,7 +177,7 @@ describe("HigherOrLowerGame", () => {
 
   it("persists new best on correct guess and preserves it after Play again resets streak", async () => {
     const user = userEvent.setup();
-    render(<HigherOrLowerGame seenPokemon={SEEN} />);
+    renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
     // Build a streak of 1.
     await user.click(screen.getByRole("button", { name: "Ivysaur" }));
@@ -207,7 +208,7 @@ describe("HigherOrLowerGame", () => {
   it("does not call saveSettings when a correct guess does not beat the existing best", async () => {
     mockLoadSettings.mockReturnValue({ miniGameBestScore: 5 });
     const user = userEvent.setup();
-    render(<HigherOrLowerGame seenPokemon={SEEN} />);
+    renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
     // Correct pick: streak becomes 1, which is less than bestScore of 5.
     await user.click(screen.getByRole("button", { name: "Ivysaur" }));
@@ -218,7 +219,7 @@ describe("HigherOrLowerGame", () => {
   it("does not call saveSettings on a wrong answer that does not surpass the best", async () => {
     mockLoadSettings.mockReturnValue({ miniGameBestScore: 5 });
     const user = userEvent.setup();
-    render(<HigherOrLowerGame seenPokemon={SEEN} />);
+    renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
     // Immediately pick wrong — streak of 0 never beats bestScore of 5.
     await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
@@ -239,7 +240,7 @@ describe("HigherOrLowerGame", () => {
     mockPickPair.mockReturnValue({ left: BULBASAUR, right: tied, stat: "attack" as const });
 
     const user = userEvent.setup();
-    render(<HigherOrLowerGame seenPokemon={[BULBASAUR, tied]} />);
+    renderWithIntl(<HigherOrLowerGame seenPokemon={[BULBASAUR, tied]} />);
 
     await user.click(screen.getByRole("button", { name: "Tieface" }));
 
@@ -251,7 +252,7 @@ describe("HigherOrLowerGame", () => {
   });
 
   it("returns null when fewer than 2 Pokémon are provided", () => {
-    const { container } = render(<HigherOrLowerGame seenPokemon={[BULBASAUR]} />);
+    const { container } = renderWithIntl(<HigherOrLowerGame seenPokemon={[BULBASAUR]} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -269,7 +270,7 @@ describe("HigherOrLowerGame", () => {
     // with unchanged props does not re-trigger a [pair] effect.
 
     it("calls pickPair and shufflePair exactly once on mount even though the [pair] effect fires twice", async () => {
-      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
       // Wait for the pair to render — confirms both effect runs have completed.
       expect(await screen.findByRole("button", { name: "Bulbasaur" })).toBeInTheDocument();
@@ -282,7 +283,7 @@ describe("HigherOrLowerGame", () => {
 
     it("keeps game-over phase intact when the pair-seeding effect re-runs after a loss", async () => {
       const user = userEvent.setup();
-      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
       // Wait for pair to render (both effect runs have settled), then pick wrong.
       expect(await screen.findByRole("button", { name: "Bulbasaur" })).toBeInTheDocument();
@@ -304,7 +305,7 @@ describe("HigherOrLowerGame", () => {
       // The stored best starts at 0.
       mockLoadSettings.mockReturnValue({ miniGameBestScore: 0 });
       const user = userEvent.setup();
-      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
       // Wait for pair to render (both effect runs have settled).
       expect(await screen.findByRole("button", { name: "Ivysaur" })).toBeInTheDocument();
@@ -358,7 +359,7 @@ describe("HigherOrLowerGame", () => {
 
     it("does not swap the pair until sprite decode resolves", async () => {
       const user = userEvent.setup();
-      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
       // Make a correct pick to reveal the result and show "Next pair".
       await user.click(screen.getByRole("button", { name: "Ivysaur" }));
@@ -387,7 +388,7 @@ describe("HigherOrLowerGame", () => {
 
     it("keeps the correct streak value in the game-over banner while Play again decode is in-flight", async () => {
       const user = userEvent.setup();
-      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
       // Build a streak of 1 with a correct pick, then advance to the next pair.
       await user.click(screen.getByRole("button", { name: "Ivysaur" }));
@@ -464,7 +465,7 @@ describe("HigherOrLowerGame", () => {
 
     it("calls scrollIntoView on the result block after a correct guess", async () => {
       const user = userEvent.setup();
-      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
       // No scroll before the user picks — still in picking phase.
       expect(scrollIntoViewCalls).toHaveLength(0);
@@ -485,7 +486,7 @@ describe("HigherOrLowerGame", () => {
 
     it("calls scrollIntoView after a wrong guess (Play again state)", async () => {
       const user = userEvent.setup();
-      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
       // Wrong pick: Bulbasaur has the lower attack.
       await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
@@ -507,7 +508,7 @@ describe("HigherOrLowerGame", () => {
       mockPickPair.mockReturnValue({ left: BULBASAUR, right: tied, stat: "attack" as const });
 
       const user = userEvent.setup();
-      render(<HigherOrLowerGame seenPokemon={[BULBASAUR, tied]} />);
+      renderWithIntl(<HigherOrLowerGame seenPokemon={[BULBASAUR, tied]} />);
 
       await user.click(screen.getByRole("button", { name: "Tieface" }));
 
@@ -518,7 +519,7 @@ describe("HigherOrLowerGame", () => {
     });
 
     it("does NOT call scrollIntoView before a guess is made (picking phase)", () => {
-      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
       // Still in picking phase — no scroll should have fired.
       expect(scrollIntoViewCalls).toHaveLength(0);
       // Both tile buttons are present and the result block is absent.
@@ -542,7 +543,7 @@ describe("HigherOrLowerGame", () => {
       }));
 
       const user = userEvent.setup();
-      render(<HigherOrLowerGame seenPokemon={SEEN} />);
+      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
       await user.click(screen.getByRole("button", { name: "Ivysaur" }));
 
       expect(scrollIntoViewCalls).toHaveLength(1);

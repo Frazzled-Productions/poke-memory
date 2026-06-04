@@ -260,7 +260,7 @@ export default function BiomeLandscapePage({
           {/* Richer stats panel — shown below the heading row */}
           <dl
             className={`mt-1 flex flex-wrap gap-x-4 gap-y-0.5 ${mutedTextXs}`}
-            aria-label="Biome statistics"
+            aria-label={t("biome.statsAriaLabel")}
           >
             <div>
               <dt className="sr-only">Species mastered</dt>
