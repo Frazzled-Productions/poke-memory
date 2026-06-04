@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import ChildFriendlySummary from "@/components/privacy/ChildFriendlySummary";
 import { resolveLocale } from "@/i18n/request";
-import { inlineLink } from "@/lib/utils/class-names";
+import { inlineLink, mutedText } from "@/lib/utils/class-names";
 import { CompanyDisclosure, COMPANY_NUMBER } from "@/components/CompanyDisclosure";
 
 export const metadata: Metadata = {
@@ -34,7 +34,7 @@ export default async function PrivacyPage() {
       )}
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={`mt-2 ${mutedText}`}>
           Last updated: 4 June 2026
         </p>
       </header>

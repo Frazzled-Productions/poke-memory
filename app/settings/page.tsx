@@ -58,7 +58,7 @@ import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
 import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
-import { cardPanelPadded, colStackLg, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 import { CompanyDisclosure } from "@/components/CompanyDisclosure";
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
@@ -214,7 +214,7 @@ function FavouritePicker({
         >
           {t("settings.appearance.theme.lockedHeading")}
         </h3>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={`mt-1 ${mutedText}`}>
           {t("settings.appearance.theme.lockedBody")}
         </p>
         <Link
@@ -868,7 +868,7 @@ export default function SettingsPage() {
               {isFiltering && visibleSectionIds.size === 0 && (
                 <p
                   role="status"
-                  className="mt-4 text-sm text-zinc-500 dark:text-zinc-400"
+                  className={`mt-4 ${mutedText}`}
                   aria-live="polite"
                 >
                   {t("settings.search.noMatch", { query: searchQuery })}
@@ -1817,7 +1817,7 @@ export default function SettingsPage() {
                     <p className={`mt-1 ${mutedTextXs}`}>
                       {t("settings.regional.dateFormat.description")}
                     </p>
-                    <fieldset className="mt-3 flex flex-col gap-2">
+                    <fieldset className={`mt-3 ${colStack}`}>
                       <legend className="sr-only">{t("settings.regional.dateFormat.legendAriaLabel")}</legend>
                       {(() => {
                         // Hoist outside the per-option map so it is computed once.
@@ -2056,7 +2056,7 @@ export default function SettingsPage() {
                             Two independent selectors: one for the app UI, one
                             for Pokémon names (#1260). */}
                         {key === "languages" && (settings.labsFlags[key] ?? false) && (
-                          <div className="mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800 flex flex-col gap-4">
+                          <div className={`mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800 ${colStackLg}`}>
                             {/* App language — writes the locale cookie */}
                             <div>
                               <label
