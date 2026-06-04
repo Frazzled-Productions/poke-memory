@@ -48,6 +48,17 @@ describe("Terms of Use page", () => {
       ).toBeTruthy();
     });
 
+    it("names the incorporated operator and company number (#1565)", async () => {
+      await renderPage();
+      // Section 1 and section 4 both name the entity; use getAllByText to
+      // tolerate multiple matches and confirm at least one is present.
+      const nameMatches = screen.getAllByText(/frazzled productions ltd/i);
+      expect(nameMatches.length).toBeGreaterThan(0);
+      // Company number appears in section 1.
+      const numberMatches = screen.getAllByText(/17258540/i);
+      expect(numberMatches.length).toBeGreaterThan(0);
+    });
+
     it("does NOT show the English-only notice in the English locale", async () => {
       vi.mocked(resolveLocale).mockResolvedValueOnce("en");
       await renderPage();
