@@ -5,7 +5,7 @@
  *    Quickstart quiz, absent when dismissed.
  * 2. practiceScopeNudgeDismissed — shown on the practice screen (ReviewSession)
  *    above ScopeControl once the first-visit onboarding is done.
- * 3. higherOrLowerNudgeDismissed — shown on the active-card practice screen
+ * 3. higherOrLowerNudgeDismissed - shown on the active-card practice screen
  *    (ReviewSession, above ScopeControl) once the user has seen at least one
  *    Pokémon and the first-visit onboarding is done (#1573).
  *
