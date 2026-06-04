@@ -770,6 +770,14 @@
     "typeBreakdown": {
       "heading": "按屬性",
       "meterAriaLabel": "{masteredPct}% 的 {typeName} 屬性 Pokémon 已掌握"
+    },
+    "languageBreakdown": {
+      "heading": "語言",
+      "cardCount": "{count, plural, other {# 張}}",
+      "mastery": "{pct}% 已掌握",
+      "lastReview": "最近複習: {date}",
+      "neverReviewed": "尚未複習",
+      "listAriaLabel": "按語言劃分的掌握情況"
     }
   },
   "journey": {

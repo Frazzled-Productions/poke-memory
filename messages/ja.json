@@ -770,6 +770,14 @@
     "typeBreakdown": {
       "heading": "タイプ別",
       "meterAriaLabel": "{typeName}タイプの Pokémon の {masteredPct}% を習得"
+    },
+    "languageBreakdown": {
+      "heading": "言語",
+      "cardCount": "{count, plural, other {# 枚}}",
+      "mastery": "{pct}% 習得済み",
+      "lastReview": "最終復習: {date}",
+      "neverReviewed": "まだ復習なし",
+      "listAriaLabel": "言語別の習得状況"
     }
   },
   "journey": {

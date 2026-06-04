@@ -770,6 +770,14 @@
     "typeBreakdown": {
       "heading": "[By type]",
       "meterAriaLabel": "[{masteredPct}% of {typeName}-type Pokémon mastered]"
+    },
+    "languageBreakdown": {
+      "heading": "[Languages]",
+      "cardCount": "[{count, plural, one {# card} other {# cards}}]",
+      "mastery": "[{pct}% mastered]",
+      "lastReview": "[Last reviewed {date}]",
+      "neverReviewed": "[Not yet reviewed]",
+      "listAriaLabel": "[Mastery by language]"
     }
   },
   "journey": {
