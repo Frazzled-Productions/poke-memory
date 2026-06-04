@@ -1,0 +1,36 @@
+name: Node version drift check
+
+# Asserts the required Node major stays derived from .nvmrc (the single source of
+# truth). The setup-node steps were migrated to `node-version-file: .nvmrc`
+# (#1575); this check fails CI if a hardcoded `node-version:` literal is
+# re-introduced into any workflow, or if the README's stated Node major drifts
+# from .nvmrc. Mirrors the pseudo-locale-drift.yml / scope-lookup-drift.yml model.
+#
+# scripts/check-node-version-drift.mjs imports only Node built-ins, so there is
+# no `npm ci` step — plain `node` suffices and keeps the job fast.
+
+on:
+  pull_request:
+    paths:
+      - ".nvmrc"
+      - ".github/workflows/**"
+      - "README.md"
+      - "scripts/check-node-version-drift.mjs"
+
+concurrency:
+  group: node-version-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - name: Assert Node major is derived from .nvmrc (no drift)
+        run: node scripts/check-node-version-drift.mjs

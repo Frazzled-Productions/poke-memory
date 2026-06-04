@@ -146,10 +146,11 @@ jobs:
       - uses: actions/setup-node@v6
         if: steps.preflight.outputs.skip == 'false'
         with:
-          # Must match .nvmrc / the ci.yml + coverage.yml + integration-tests.yml
-          # workflows. Drifting to Node 20 here fails `npm ci` with a missing
-          # @swc/helpers transitive — see #1274.
-          node-version: '24'
+          # Node major is read from .nvmrc (single source of truth). Drifting to
+          # an older major here fails `npm ci` with a missing @swc/helpers
+          # transitive (see #1274); node-version-drift.yml guards against
+          # re-introducing a hardcoded literal (#1575).
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies
