@@ -82,12 +82,9 @@ vi.mock("@/lib/settings/persistence", () => ({
   ),
 }));
 
-// Real streak + mastered-count helpers backed by our localStorage stub.
+// Real streak helpers backed by our localStorage stub so we can assert what
+// dates were saved without breaking the actual write path.
 const { saveStreakData: realSaveStreakData } =
-  await vi.importActual<typeof import("@/lib/streak/persistence")>(
-    "@/lib/streak/persistence",
-  );
-const { loadStreakData: realLoadStreakData } =
   await vi.importActual<typeof import("@/lib/streak/persistence")>(
     "@/lib/streak/persistence",
   );
@@ -96,11 +93,6 @@ vi.mock("@/lib/streak/persistence", () => ({
   saveStreakData: vi.fn((...args: unknown[]) =>
     (realSaveStreakData as (...a: unknown[]) => unknown)(...args),
   ),
-  DEFAULT_STREAK_PROTECTION: {
-    balance: 0,
-    lastEarnedAt: null,
-    totalEarned: 0,
-  },
 }));
 
 const {
