@@ -304,6 +304,26 @@
       "privacy": "隱私",
       "terms": "條款"
     },
+    "feedback": {
+      "rowLabel": "傳送意見回饋",
+      "rowDescription": "回報錯誤或請求新功能。",
+      "dialogTitle": "傳送意見回饋",
+      "categoryLabel": "類別",
+      "categoryBug": "錯誤報告",
+      "categoryFeature": "功能請求",
+      "categoryOther": "其他",
+      "messageLabel": "訊息",
+      "messagePlaceholder": "請描述問題或您的想法...",
+      "characterCount": "{count, number}/{max, number}",
+      "privacyNotice": "請勿在訊息中包含您的姓名或電子郵件地址等個人資訊。",
+      "submit": "傳送",
+      "submitting": "傳送中...",
+      "successHeading": "感謝您！",
+      "successBody": "您的意見回饋已收到。",
+      "errorMessage": "發生錯誤，請重試。",
+      "cancel": "取消",
+      "close": "關閉"
+    },
     "dangerZone": {
       "heading": "危險操作",
       "resetAllProgress": "重置所有進度",

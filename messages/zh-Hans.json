@@ -304,6 +304,26 @@
       "privacy": "隐私",
       "terms": "条款"
     },
+    "feedback": {
+      "rowLabel": "发送反馈",
+      "rowDescription": "报告错误或请求新功能。",
+      "dialogTitle": "发送反馈",
+      "categoryLabel": "类别",
+      "categoryBug": "错误报告",
+      "categoryFeature": "功能请求",
+      "categoryOther": "其他",
+      "messageLabel": "消息",
+      "messagePlaceholder": "请描述问题或您的想法...",
+      "characterCount": "{count, number}/{max, number}",
+      "privacyNotice": "请勿在消息中包含您的姓名或电子邮件地址等个人信息。",
+      "submit": "发送",
+      "submitting": "发送中...",
+      "successHeading": "感谢您！",
+      "successBody": "您的反馈已收到。",
+      "errorMessage": "出现错误，请重试。",
+      "cancel": "取消",
+      "close": "关闭"
+    },
     "dangerZone": {
       "heading": "危险操作",
       "resetAllProgress": "重置所有进度",

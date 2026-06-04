@@ -719,6 +719,114 @@ test.describe("Settings — Labs section (#1258)", () => {
 
 // ─── #1315: push notification hour picker ────────────────────────────────────
 
+// ─── #1622: Feedback modal ───────────────────────────────────────────────────
+
+test.describe("Settings — Send feedback modal (#1622)", () => {
+  test("'Send feedback' row is visible in Account & Data section", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+
+    // Expand the Account & Data section.
+    await page.getByRole("button", { name: /account & data/i }).click();
+
+    // The Send feedback row must be present.
+    const sendFeedbackBtn = page.getByRole("button", { name: /send feedback/i });
+    await expect(sendFeedbackBtn).toBeVisible();
+  });
+
+  test("clicking Send feedback opens the modal with form fields and privacy notice", async ({
+    page,
+  }) => {
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /account & data/i }).click();
+
+    // Open the modal.
+    await page.getByRole("button", { name: /send feedback/i }).click();
+
+    // The dialog title must be visible.
+    await expect(page.getByRole("heading", { name: /send feedback/i })).toBeVisible();
+
+    // The category select must be present.
+    await expect(page.getByLabel(/category/i)).toBeVisible();
+
+    // The message textarea must be present.
+    await expect(page.getByLabel(/message/i)).toBeVisible();
+
+    // The privacy notice must be present.
+    await expect(
+      page.getByText(/please do not include personal information/i),
+    ).toBeVisible();
+
+    // The Submit and Cancel buttons must be present.
+    await expect(page.getByRole("button", { name: /^send$/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /cancel/i })).toBeVisible();
+  });
+
+  test("form is interactable: fills in and shows success state (stubbed API)", async ({
+    page,
+  }) => {
+    // Stub /api/feedback so we never POST to the live API.
+    await page.route("**/api/feedback", (route) => {
+      void route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    });
+
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /account & data/i }).click();
+    await page.getByRole("button", { name: /send feedback/i }).click();
+
+    // Select a category.
+    await page.getByLabel(/category/i).selectOption({ label: "Bug report" });
+
+    // Fill the message.
+    await page.getByLabel(/message/i).fill("This is a test bug report from e2e.");
+
+    // Click the send button.
+    await page.getByRole("button", { name: /^send$/i }).click();
+
+    // The success state must replace the form.
+    await expect(page.getByText(/thank you/i)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/feedback has been received/i)).toBeVisible();
+
+    // The form fields must be gone.
+    await expect(page.getByLabel(/category/i)).not.toBeVisible();
+  });
+
+  test("error state shows inline error and keeps modal open (stubbed 500)", async ({
+    page,
+  }) => {
+    // Stub /api/feedback to return 500.
+    await page.route("**/api/feedback", (route) => {
+      void route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false }),
+      });
+    });
+
+    await page.goto("/settings");
+    await page.getByRole("button", { name: /account & data/i }).click();
+    await page.getByRole("button", { name: /send feedback/i }).click();
+
+    await page.getByLabel(/category/i).selectOption({ label: "Feature request" });
+    await page.getByLabel(/message/i).fill("A feature I would like.");
+    await page.getByRole("button", { name: /^send$/i }).click();
+
+    // Inline error must appear.
+    await expect(
+      page.getByText(/something went wrong/i),
+    ).toBeVisible({ timeout: 5_000 });
+
+    // Form must still be visible (modal stayed open, user can retry).
+    await expect(page.getByLabel(/category/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /^send$/i })).toBeVisible();
+  });
+});
+
 test.describe("Settings — push notification hour picker (#1315)", () => {
   test("hour picker renders in Account & Data > Regional section and can be set", async ({
     page,

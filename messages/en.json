@@ -304,6 +304,26 @@
       "privacy": "Privacy",
       "terms": "Terms"
     },
+    "feedback": {
+      "rowLabel": "Send feedback",
+      "rowDescription": "Report a bug or request a feature.",
+      "dialogTitle": "Send feedback",
+      "categoryLabel": "Category",
+      "categoryBug": "Bug report",
+      "categoryFeature": "Feature request",
+      "categoryOther": "Other",
+      "messageLabel": "Message",
+      "messagePlaceholder": "Describe the issue or your idea...",
+      "characterCount": "{count, number}/{max, number}",
+      "privacyNotice": "Please do not include personal information such as your name or email address in your message.",
+      "submit": "Send",
+      "submitting": "Sending...",
+      "successHeading": "Thank you!",
+      "successBody": "Your feedback has been received.",
+      "errorMessage": "Something went wrong. Please try again.",
+      "cancel": "Cancel",
+      "close": "Close"
+    },
     "dangerZone": {
       "heading": "Danger zone",
       "resetAllProgress": "Reset all progress",
