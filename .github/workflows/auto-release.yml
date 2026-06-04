@@ -206,6 +206,6 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main
-          git merge origin/main --no-edit -m "chore: backmerge main into qa after hotfix (#${PR_NUMBER})"
-          git push origin "+HEAD:refs/heads/qa"
+          git merge --no-ff origin/main -m "chore: backmerge main into qa after hotfix (#${PR_NUMBER})"
+          git push origin qa
           echo "Merged main ($(git rev-parse --short origin/main)) into qa."
