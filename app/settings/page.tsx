@@ -59,6 +59,7 @@ import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStackLg, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { CompanyDisclosure } from "@/components/CompanyDisclosure";
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
@@ -1952,6 +1953,7 @@ export default function SettingsPage() {
                       {t("settings.about.terms")}
                     </Link>
                   </div>
+                  <CompanyDisclosure />
 
                   <hr className="border-zinc-200 dark:border-zinc-800" />
 

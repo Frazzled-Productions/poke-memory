@@ -98,6 +98,24 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
+    it("names the incorporated controller in section 1 (#1565)", async () => {
+      await renderPage();
+      // The controller section must identify the legal entity and company number
+      // so users can exercise their UK-GDPR rights against the correct entity.
+      const nameMatches = screen.getAllByText(/frazzled productions ltd/i);
+      expect(nameMatches.length).toBeGreaterThan(0);
+      const numberMatches = screen.getAllByText(/17258540/i);
+      expect(numberMatches.length).toBeGreaterThan(0);
+    });
+
+    it("renders the registered office address in section 1 (#1565 Part A)", async () => {
+      await renderPage();
+      // The statutory trading disclosure must include the registered office
+      // so data subjects can correspond with the correct legal address.
+      const officeMatches = screen.getAllByText(/Shelton Street/i);
+      expect(officeMatches.length).toBeGreaterThan(0);
+    });
+
     it("renders the feedback submissions section added for #1623", async () => {
       await renderPage();
       // The new sub-heading describing feedback data collection.
