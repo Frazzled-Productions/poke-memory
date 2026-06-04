@@ -70,7 +70,7 @@ export function ProfileStatusBar() {
     return (
       <div
         aria-hidden="true"
-        className={`${BAR_HEIGHT_CLASS} w-full border-b border-zinc-100 bg-background dark:border-zinc-900 ${isPracticePage ? "hidden md:block" : ""}`}
+        className={`${BAR_HEIGHT_CLASS} w-full bg-background ${isPracticePage ? "hidden md:block" : ""}`}
       />
     );
   }
@@ -85,7 +85,7 @@ export function ProfileStatusBar() {
       role="region"
       aria-label={barAriaLabel}
       // Mobile Practice: hide. Desktop: always visible.
-      className={`w-full border-b border-zinc-100 bg-background dark:border-zinc-900 ${isPracticePage ? "hidden md:block" : ""}`}
+      className={`w-full bg-background ${isPracticePage ? "hidden md:block" : ""}`}
     >
       <div
         className={`mx-auto flex ${BAR_HEIGHT_CLASS} max-w-5xl items-center justify-center gap-3 px-4`}
