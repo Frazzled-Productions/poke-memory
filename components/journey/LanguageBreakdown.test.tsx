@@ -219,6 +219,16 @@ describe("LanguageBreakdown — third locale ['en','zh-Hans']", () => {
   });
 });
 
+describe("LanguageBreakdown — fourth locale ['en','zh-Hant']", () => {
+  it("renders 'zh-Hant' endonym with lang='zh-Hant'", () => {
+    mockLocaleCtx.learningLocales = ["en", "zh-Hant"];
+    renderWithIntl(<LanguageBreakdown {...defaultProps()} />);
+    const zhSpan = document.querySelector('span[lang="zh-Hant"]');
+    expect(zhSpan).not.toBeNull();
+    expect(zhSpan?.textContent).toBe("繁體中文");
+  });
+});
+
 describe("LanguageBreakdown — pretendAllMastered superuser flag", () => {
   it("shows all cards mastered per locale when forceAllMastered is on", () => {
     mockSuperuserValue.flags = { pretendAllMastered: true };
