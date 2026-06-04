@@ -12,6 +12,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { AuthProvider } from "@/lib/auth/types";
 import { cn } from "@/lib/utils/cn";
@@ -88,13 +89,14 @@ function LinkProviderRow({
   onLink: () => void;
   disabled: boolean;
 }) {
+  const t = useTranslations("auth");
   return (
     <button
       type="button"
       onClick={onLink}
       disabled={disabled}
       className="min-h-[44px] w-full rounded-lg border border-zinc-300 bg-background px-4 py-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
-      aria-label={`Connect ${PROVIDER_LABELS[provider]}`}
+      aria-label={t("connectProviderAriaLabel", { provider: PROVIDER_LABELS[provider] })}
     >
       Connect {PROVIDER_LABELS[provider]}
     </button>
@@ -108,6 +110,7 @@ function LinkProviderRow({
  * Only rendered when the user is signed in (the caller gates on this).
  */
 export function LinkIdentitiesSection({ user, supabase }: Props) {
+  const t = useTranslations("auth");
   const [linkState, setLinkState] = useState<LinkState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [pendingProvider, setPendingProvider] = useState<AuthProvider | null>(null);
@@ -164,14 +167,14 @@ export function LinkIdentitiesSection({ user, supabase }: Props) {
       {/* Currently linked providers */}
       {linked.size > 0 && (
         <ul
-          aria-label="Connected providers"
+          aria-label={t("connectedProvidersAriaLabel")}
           className="mt-3 flex flex-wrap gap-2"
         >
           {Array.from(linked).map((p) => (
             <li
               key={p}
               className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-              aria-label={`${PROVIDER_LABELS[p]} connected`}
+              aria-label={t("providerConnectedAriaLabel", { provider: PROVIDER_LABELS[p] })}
             >
               {PROVIDER_LABELS[p]} connected
             </li>

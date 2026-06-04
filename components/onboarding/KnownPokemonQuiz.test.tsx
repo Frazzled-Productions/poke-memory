@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithIntl as render, screen } from "@/components/test-utils/renderWithIntl";
+import { waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NameReviewCard, ReviewableCard } from "@/lib/review/session";

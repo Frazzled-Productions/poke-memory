@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import type { NameReviewCard } from "@/lib/review/session";
 import { ArrivalSparkle } from "./ArrivalSparkle";
 import styles from "./Pasture.module.css";
@@ -28,6 +29,7 @@ const HOP_DURATION_MS = 600;
  *   scheduledDays. Tap-outside or Escape dismisses.
  */
 export function PasturePokemon({ card, onMarkSeen }: Props) {
+  const t = useTranslations("pasture");
   // Stable per-sprite animation delay so sprites bob asynchronously.
   // No hydration mismatch because PasturePage returns null until `loaded=true`
   // (set in a useEffect), so this component never renders on the server.
@@ -169,7 +171,7 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
-        aria-label={`${card.name}${!card.state.seenInPasture ? " (new arrival)" : ""}`}
+        aria-label={`${card.name}${!card.state.seenInPasture ? t("newArrivalSuffix") : ""}`}
         className="relative flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
         style={{ touchAction: "manipulation" }}
       >
@@ -192,7 +194,7 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
         <div
           role="dialog"
           aria-modal="false"
-          aria-label={`${card.name} details`}
+          aria-label={t("pokemonDetailsAriaLabel", { name: card.name })}
           className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 w-44 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
         >
           <p className="text-center text-sm font-semibold text-foreground">
@@ -212,7 +214,7 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
             type="button"
             onClick={() => setShowPopover(false)}
             className="mt-2 w-full rounded-md bg-zinc-100 py-0.5 text-xs text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-            aria-label="Close details"
+            aria-label={t("closeDetailsAriaLabel")}
           >
             Close
           </button>

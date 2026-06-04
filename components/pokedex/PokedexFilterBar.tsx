@@ -6,6 +6,7 @@ import type { PokedexSortOrder } from "@/lib/pokedex/sort";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
 import { getTypeName, type TypeTranslations } from "@/lib/i18n/typeNames";
 import { FilterChip } from "@/components/ui/FilterChip";
+import { InfoButton } from "@/components/ui/InfoButton";
 
 // ---------------------------------------------------------------------------
 // Roman numeral map for generation pills
@@ -113,18 +114,30 @@ export default function PokedexFilterBar({
         >
           {t("sortBy")}
         </label>
-        <select
-          id="pokedex-sort"
-          value={sort}
-          onChange={(e) => onSortChange(e.target.value as PokedexSortOrder)}
-          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900 sm:w-auto"
-        >
-          {SORT_OPTIONS.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            id="pokedex-sort"
+            value={sort}
+            onChange={(e) => onSortChange(e.target.value as PokedexSortOrder)}
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)] dark:border-zinc-700 dark:bg-zinc-900 sm:w-auto"
+          >
+            {SORT_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          {sort === "closest-to-mastery" && (
+            <InfoButton
+              ariaLabel={t("sortClosestToMasteryInfoAriaLabel")}
+              panelId="sort-closest-to-mastery-info"
+              panelContent={
+                <p>{t("sortClosestToMasteryInfoPanel")}</p>
+              }
+              panelClassName="left-0"
+            />
+          )}
+        </div>
       </div>
 
       {/* Type chips */}

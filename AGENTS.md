@@ -202,7 +202,7 @@ Generic testing discipline (test in/out of every state, verify by running the ap
 **E2E (Playwright).** Smoke tests in `e2e/` run against Vercel previews via `e2e.yml`; config in `playwright.config.ts`.
 
 - **Scope**: guest-mode only. **Projects**: `chromium` + `mobile-safari` (Webkit, iPhone 14 viewport). **Base URL**: `PLAYWRIGHT_BASE_URL`. **Run locally**: `npm run test:e2e` (after `npx playwright install`).
-- **Node version must match CI** (Node 24, baked into `mcr.microsoft.com/playwright:v1.60.0-noble`). Run `nvm use` (`.nvmrc` pins the recommended e2e Node 24; `package.json` `engines.node` is a deliberately looser `>=20` floor). Running under Node 26 produces local-only failures (#657 / #614).
+- **Node version must match CI** (the major baked into `mcr.microsoft.com/playwright:v1.60.0-noble`). Run `nvm use` (`.nvmrc` pins the recommended e2e Node major; `package.json` `engines.node` is a deliberately looser `>=20` floor). Running under Node 26 produces local-only failures (#657 / #614).
 - **Selectors**: prefer `getByRole` / `getByText` / `getByLabel` over CSS or test IDs; match the accessible names in the markup.
 - **When to add**: any new page, new interactive flow, or change to an existing user-facing flow. Bar is smoke-level happy path. An absence-only suite (asserting the feature is hidden/disabled/absent) is **not** sufficient - at least one test must assert the feature renders and its core interaction succeeds. One spec file per feature area.
 
@@ -216,7 +216,7 @@ Generic testing discipline (test in/out of every state, verify by running the ap
 
 `localhost:3000` and `pokememory.com` are different origins → independent `localStorage`; state does not flow between them. When behaviour differs between local dev and the deployed app, suspect localStorage drift first - clear the `poke-memory:*` keys and reload, or QA against the latest preview URL.
 
-**Build needs Node 24.** The repo pins Node 24 (`.nvmrc`); `.npmrc` `engine-strict` + a `prebuild` guard fail-fast on the wrong major (#1493). A different machine-default major (e.g. Node 26, which breaks the esbuild-wasm/Turbopack build) silently runs the wrong version unless `.nvmrc` is honoured. Use the pinned 24 for every `npm run build`/test - `nvm use`, or a Homebrew `node@24` on `PATH` - and brief sub-agents the same (they inherit the machine default, not `.nvmrc`).
+**Build needs the pinned Node major.** The repo pins the Node major in `.nvmrc`; `.npmrc` `engine-strict` + a `prebuild` guard fail-fast on the wrong major (#1493). A different machine-default major (e.g. Node 26, which breaks the esbuild-wasm/Turbopack build) silently runs the wrong version unless `.nvmrc` is honoured. Use the pinned major for every `npm run build`/test - `nvm use`, or a Homebrew `node@24` on `PATH` - and brief sub-agents the same (they inherit the machine default, not `.nvmrc`).
 
 Two card-mix shapes look "broken" on a fresh dev session but aren't:
 

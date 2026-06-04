@@ -37,7 +37,11 @@
     "chooseProvider": "[Choose a sign-in provider]",
     "cardsReviewed": "[{count, plural, one {# card reviewed} other {# cards reviewed}}]",
     "streakDaysCount": "[{count, plural, one {# streak day} other {# streak days}}]",
-    "gradesLogged": "[{count, plural, one {# grade logged} other {# grades logged}}]"
+    "gradesLogged": "[{count, plural, one {# grade logged} other {# grades logged}}]",
+    "connectProviderAriaLabel": "[Connect {provider}]",
+    "connectedProvidersAriaLabel": "[Connected providers]",
+    "providerConnectedAriaLabel": "[{provider} connected]",
+    "checkingSyncStatusAriaLabel": "[Checking sync status]"
   },
   "settings": {
     "heading": "[Settings]",
@@ -304,6 +308,26 @@
       "privacy": "[Privacy]",
       "terms": "[Terms]"
     },
+    "feedback": {
+      "rowLabel": "[Send feedback]",
+      "rowDescription": "[Report a bug or request a feature.]",
+      "dialogTitle": "[Send feedback]",
+      "categoryLabel": "[Category]",
+      "categoryBug": "[Bug report]",
+      "categoryFeature": "[Feature request]",
+      "categoryOther": "[Other]",
+      "messageLabel": "[Message]",
+      "messagePlaceholder": "[Describe the issue or your idea...]",
+      "characterCount": "[{count, number}/{max, number}]",
+      "privacyNotice": "[Please do not include personal information such as your name or email address in your message.]",
+      "submit": "[Send]",
+      "submitting": "[Sending...]",
+      "successHeading": "[Thank you!]",
+      "successBody": "[Your feedback has been received.]",
+      "errorMessage": "[Something went wrong. Please try again.]",
+      "cancel": "[Cancel]",
+      "close": "[Close]"
+    },
     "dangerZone": {
       "heading": "[Danger zone]",
       "resetAllProgress": "[Reset all progress]",
@@ -346,7 +370,17 @@
       "themeAudit": "[Theme audit →]",
       "themeAuditDescription": "[Side-by-side preview of every mascot × intensity × colour scheme. Use when tweaking globals.css to spot combos where the grade buttons blend into the surface.]"
     },
-    "loadingAriaLabel": "[Loading settings]"
+    "loadingAriaLabel": "[Loading settings]",
+    "pushOptIn": {
+      "ariaLabel": "[Daily review reminder]"
+    },
+    "qaSeed": {
+      "applyAriaLabel": "[Apply QA seed: {scenario}]",
+      "clearAriaLabel": "[Clear QA seed data]"
+    },
+    "deleteAccount": {
+      "inputAriaLabel": "[Type DELETE to confirm account deletion]"
+    }
   },
   "practice": {
     "title": "[Poké Memory - Learn every Pokémon]",
@@ -469,6 +503,10 @@
       "title": "[Practising offline? Download for speed]",
       "body": "[Sprites loading slowly? Pre-fetch every sprite and cry (about 166 MB) so practice works instantly, even with no connection.]",
       "cta": "[Open offline download]"
+    },
+    "higherOrLowerNudge": {
+      "title": "[Finish your session for a bonus mini-game]",
+      "body": "[Once you have practised at least two Pokémon today, a Higher or Lower stat challenge unlocks below your session summary. Can you beat your best streak?]"
     }
   },
   "review": {
@@ -478,7 +516,11 @@
       "new": "[New]",
       "learning": "[Learning]",
       "review": "[Review]",
-      "ariaLabel": "[Queue counts]"
+      "ariaLabel": "[Queue counts]",
+      "infoAriaLabel": "[About queue states]",
+      "infoNew": "[New: you have not reviewed this card yet.]",
+      "infoLearning": "[Learning: the card is in short-interval learning steps. You will see it several times in quick succession before it enters long-term review.]",
+      "infoReview": "[Review: the card has graduated into long-term review. The scheduler spaces out repetitions over days or weeks based on your recall.]"
     },
     "storageFullBanner": "[Progress saving is disabled: storage is full.]",
     "storageFullDismiss": "[Dismiss]",
@@ -487,7 +529,18 @@
     "tokenEarnedAndSpent": "[Streak protection token earned and used - your {count}-day streak is safe.]",
     "tokenToastDismiss": "[Dismiss token notice]",
     "tokenEarnedHeading": "[Token earned]",
-    "tokenSpentHeading": "[Streak protected]"
+    "tokenSpentHeading": "[Streak protected]",
+    "multipleChoice": {
+      "groupAriaLabel": "[Choose the Pokémon name]",
+      "correctSuffix": "[ (correct)]",
+      "incorrectSuffix": "[ (incorrect)]"
+    },
+    "higherOrLower": {
+      "sectionAriaLabel": "[Higher or Lower mini-game]"
+    },
+    "typedEntry": {
+      "inputAriaLabel": "[Type the Pokémon name]"
+    }
   },
   "pokedex": {
     "title": "[Pokédex]",
@@ -507,6 +560,8 @@
     "sortNational": "[National Number]",
     "sortAlphabetical": "[Alphabetical]",
     "sortClosestToMastery": "[Closest to mastery]",
+    "sortClosestToMasteryInfoAriaLabel": "[About Closest to mastery sort]",
+    "sortClosestToMasteryInfoPanel": "[Puts Pokémon you are closest to mastering at the top: mastered first, then those you are learning (by review count and interval), then those not yet started. When pretend-all-mastered is on in superuser mode, the sort degenerates to national order.]",
     "masteryAll": "[All]",
     "masteryMastered": "[Mastered]",
     "masteryNotYet": "[Not yet mastered]",
@@ -535,7 +590,10 @@
     "statSpAtk": "[Sp. Atk]",
     "statSpDef": "[Sp. Def]",
     "statSpeed": "[Speed]",
-    "lockedSectionHint": "[Unlocks when you master this Pokémon.]"
+    "lockedSectionHint": "[Unlocks when you master this Pokémon.]",
+    "loadingAriaLabel": "[Loading Pokédex]",
+    "allPokemonAriaLabel": "[Pokémon]",
+    "generationPokemonAriaLabel": "[{name} Pokémon]"
   },
   "pasture": {
     "title": "[Pasture]",
@@ -575,14 +633,19 @@
     "biome": {
       "backLabel": "[Pasture]",
       "backAriaLabel": "[Back to Pasture]",
-      "emptyState": "[No mastered Pokémon in this biome yet. Keep practising!]"
+      "emptyState": "[No mastered Pokémon in this biome yet. Keep practising!]",
+      "statsAriaLabel": "[Biome statistics]"
     },
+    "closeDetailsAriaLabel": "[Close details]",
+    "pokemonDetailsAriaLabel": "[{name} details]",
+    "newArrivalSuffix": "[ (new arrival)]",
     "nextArrivals": {
       "ariaLabel": "[Next arrivals]",
       "heading": "[Next arrivals]",
       "upcomingAriaLabel": "[Upcoming Pasture species]",
       "allCaughtUp": "[All reviewed Pokémon are already in your Pasture.]"
-    }
+    },
+    "longPressHint": "[Press and hold any Pokémon to see its name, mastery date, and review interval.]"
   },
   "stats": {
     "title": "[Stats]",
@@ -763,6 +826,14 @@
     "typeBreakdown": {
       "heading": "[By type]",
       "meterAriaLabel": "[{masteredPct}% of {typeName}-type Pokémon mastered]"
+    },
+    "languageBreakdown": {
+      "heading": "[Languages]",
+      "cardCount": "[{count, plural, one {# card} other {# cards}}]",
+      "mastery": "[{pct}% mastered]",
+      "lastReview": "[Last reviewed {date}]",
+      "neverReviewed": "[Not yet reviewed]",
+      "listAriaLabel": "[Mastery by language]"
     }
   },
   "journey": {
@@ -862,6 +933,12 @@
       "learningBody": "[Learning: you've seen it and are building the memory.]",
       "masteredBody": "[Mastered: recalled correctly {reps} {reps, plural, one {time} other {times}} in a row with the next review at least 21 days out. That's when the scheduler is confident you've truly learnt it.]",
       "introducedNote": "[Introduced counts any Pokémon you've seen at least once, whether or not it's fully mastered yet.]"
+    },
+    "languageBreakdown": {
+      "heading": "[Languages]",
+      "masteredCount": "[{count, plural, one {# mastered} other {# mastered}}]",
+      "bestDay": "[{count, plural, one {# review on best day} other {# reviews on best day}}]",
+      "noBestDay": "[No reviews yet]"
     }
   },
   "error": {
@@ -880,6 +957,13 @@
   "onboarding": {
     "welcomeHeading": "[Welcome to Poké Memory]",
     "closeAriaLabel": "[Close welcome guide]",
+    "dismissHintAriaLabel": "[Dismiss hint]",
+    "hintAriaLabel": "[Onboarding hint]",
+    "knownQuiz": {
+      "chooseGenerationAriaLabel": "[Choose a generation]",
+      "iAlreadyKnowAriaLabel": "[I already know {name}]",
+      "generationSpritesAriaLabel": "[{name} sprites]"
+    },
     "intro": "[Learn every Pokémon name and evolution. New cards appear each day, and the app shows you each card again just before you are likely to forget it. The more you remember, the longer the gap before it comes back.]",
     "howToGrade": {
       "heading": "[How to grade]",
@@ -980,6 +1064,9 @@
     "steel": "[Steel]",
     "water": "[Water]"
   },
+  "badges": {
+    "dismissToastAriaLabel": "[Dismiss new badge: {name}]"
+  },
   "pushDaily": {
     "title": "[Time to practise]",
     "newOnly": "[{newEstimate, plural, one {# new card} other {# new cards}} ready to practise.]",
@@ -996,7 +1083,8 @@
       "item2": "[<s>Signing in.</s> If you sign in with a GitHub or Google account, we save your card progress to a secure database so you can keep it across different devices. You need to be 13 or older to have a GitHub or Google account.]",
       "item3": "[<s>What we save.</s> We only save which Pokémon cards you've practised, how well you know them, and when you last practised, and nothing else. We don't know your name, your address, or anything about you as a person.]",
       "item4": "[<s>Who else can see it.</s> Nobody else can see your progress. Only you can see your own cards. We never share your progress with anyone else or use it to show you adverts.]",
-      "item5": "[<s>You're in control.</s> You can <export>export your progress</export> or <reset>reset all progress</reset> at any time from the Settings page. You don't need to ask us; you can do it yourself, right now.]"
+      "item5": "[<s>You're in control.</s> You can <export>export your progress</export> or <reset>reset all progress</reset> at any time from the Settings page. You don't need to ask us; you can do it yourself, right now.]",
+      "item6": "[<s>Feedback.</s> If you send us feedback, we keep your message for up to 12 months to help us fix things, and then it is automatically deleted.]"
     }
   }
 }

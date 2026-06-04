@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import type { ReviewState } from "@/lib/srs/scheduler";
+import { InfoButton } from "@/components/ui/InfoButton";
 
 type QueueState = "new" | "learning" | "review";
 
@@ -32,12 +33,26 @@ export function QueueStateBadge({ state, forceCardsGraduated = false }: Props) {
   const queue = deriveQueueState(state, forceCardsGraduated);
   const label = t(queue);
   return (
-    <span
-      role="status"
-      aria-label={`Card queue state: ${label}`}
-      className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${COLOURS[queue]}`}
-    >
-      {label}
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        role="status"
+        aria-label={`Card queue state: ${label}`}
+        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${COLOURS[queue]}`}
+      >
+        {label}
+      </span>
+      <InfoButton
+        ariaLabel={t("infoAriaLabel")}
+        panelId="queue-state-info"
+        panelContent={
+          <ul className="space-y-1.5 list-none m-0 p-0">
+            <li>{t("infoNew")}</li>
+            <li>{t("infoLearning")}</li>
+            <li>{t("infoReview")}</li>
+          </ul>
+        }
+        panelClassName="right-0"
+      />
     </span>
   );
 }

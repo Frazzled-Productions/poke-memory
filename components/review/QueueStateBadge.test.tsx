@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
+import userEvent from "@testing-library/user-event";
+import { renderWithIntl, renderJa, renderZhHans, renderZhHant, screen } from "@/components/test-utils/renderWithIntl";
 import { QueueStateBadge } from "@/components/review/QueueStateBadge";
 import type { ReviewState } from "@/lib/srs/scheduler";
 
@@ -89,5 +90,81 @@ describe("QueueStateBadge", () => {
       />,
     );
     expect(screen.getByText("Learning")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QueueStateBadge - InfoButton (#1574)
+// ---------------------------------------------------------------------------
+
+describe("QueueStateBadge - InfoButton", () => {
+  it("renders an InfoButton alongside the queue badge", () => {
+    renderWithIntl(<QueueStateBadge state={makeState({})} />);
+    expect(
+      screen.getByRole("button", { name: "About queue states" }),
+    ).toBeInTheDocument();
+  });
+
+  it("InfoButton starts with aria-expanded=false and panel hidden", () => {
+    renderWithIntl(<QueueStateBadge state={makeState({})} />);
+    const btn = screen.getByRole("button", { name: "About queue states" });
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/you have not reviewed this card yet/i)).not.toBeInTheDocument();
+  });
+
+  it("clicking InfoButton opens the explanation panel", async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<QueueStateBadge state={makeState({})} />);
+    await user.click(screen.getByRole("button", { name: "About queue states" }));
+    // Panel lists all three queue-state explanations.
+    expect(screen.getByText(/you have not reviewed this card yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/short-interval learning steps/i)).toBeInTheDocument();
+    // "infoReview" mentions "graduated into long-term review" - distinct from the learning text.
+    expect(screen.getByText(/graduated into long-term review/i)).toBeInTheDocument();
+  });
+
+  it("panel closes on second click", async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<QueueStateBadge state={makeState({})} />);
+    const btn = screen.getByRole("button", { name: "About queue states" });
+    await user.click(btn);
+    await user.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/you have not reviewed this card yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/short-interval learning steps/i)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QueueStateBadge - InfoButton locale coverage (#1574)
+// ---------------------------------------------------------------------------
+
+describe("QueueStateBadge - InfoButton in Japanese", () => {
+  it("renders InfoButton with Japanese aria-label", () => {
+    renderJa(<QueueStateBadge state={makeState({})} />);
+    // messages/ja.json review.queue.infoAriaLabel = "キュー状態について"
+    expect(
+      screen.getByRole("button", { name: "キュー状態について" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("QueueStateBadge - InfoButton in Simplified Chinese", () => {
+  it("renders InfoButton with Simplified Chinese aria-label", () => {
+    renderZhHans(<QueueStateBadge state={makeState({})} />);
+    // messages/zh-Hans.json review.queue.infoAriaLabel = "关于队列状态"
+    expect(
+      screen.getByRole("button", { name: "关于队列状态" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("QueueStateBadge - InfoButton in Traditional Chinese", () => {
+  it("renders InfoButton with Traditional Chinese aria-label", () => {
+    renderZhHant(<QueueStateBadge state={makeState({})} />);
+    // messages/zh-Hant.json review.queue.infoAriaLabel = "關於佇列狀態"
+    expect(
+      screen.getByRole("button", { name: "關於佇列狀態" }),
+    ).toBeInTheDocument();
   });
 });

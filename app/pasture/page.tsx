@@ -28,6 +28,7 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { generationOf } from "@/lib/stats/derive";
+import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 
 type Placement = {
   card: NameReviewCard;
@@ -315,6 +316,11 @@ export default function PasturePage() {
         <p className="mt-4 text-zinc-500 dark:text-zinc-400">
           {t("emptyBody")}
         </p>
+        <div className="mt-4">
+          <OnboardingHint id="pastureLongPressHintDismissed" tone="hint">
+            <p>{t("longPressHint")}</p>
+          </OnboardingHint>
+        </div>
         <NextArrivalsStrip arrivals={arrivals} />
       </main>
     );
@@ -345,6 +351,12 @@ export default function PasturePage() {
         onTypeToggle={handleTypeToggle}
         onGenChange={handleGenChange}
       />
+
+      <div className="mt-4">
+        <OnboardingHint id="pastureLongPressHintDismissed" tone="hint">
+          <p>{t("longPressHint")}</p>
+        </OnboardingHint>
+      </div>
 
       {zones.length === 0 && filtered ? (
         <p className="mt-4 text-zinc-500 dark:text-zinc-400">

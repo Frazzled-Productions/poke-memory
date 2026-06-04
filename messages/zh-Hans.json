@@ -37,7 +37,11 @@
     "chooseProvider": "选择登录方式",
     "cardsReviewed": "{count, plural, other {已复习 # 张卡片}}",
     "streakDaysCount": "{count, plural, other {# 天连续}}",
-    "gradesLogged": "{count, plural, other {已记录 # 次评分}}"
+    "gradesLogged": "{count, plural, other {已记录 # 次评分}}",
+    "connectProviderAriaLabel": "连接 {provider}",
+    "connectedProvidersAriaLabel": "已连接的登录方式",
+    "providerConnectedAriaLabel": "{provider} 已连接",
+    "checkingSyncStatusAriaLabel": "正在检查同步状态"
   },
   "settings": {
     "heading": "设置",
@@ -304,6 +308,26 @@
       "privacy": "隐私",
       "terms": "条款"
     },
+    "feedback": {
+      "rowLabel": "发送反馈",
+      "rowDescription": "报告错误或请求新功能。",
+      "dialogTitle": "发送反馈",
+      "categoryLabel": "类别",
+      "categoryBug": "错误报告",
+      "categoryFeature": "功能请求",
+      "categoryOther": "其他",
+      "messageLabel": "消息",
+      "messagePlaceholder": "请描述问题或您的想法...",
+      "characterCount": "{count, number}/{max, number}",
+      "privacyNotice": "请勿在消息中包含您的姓名或电子邮件地址等个人信息。",
+      "submit": "发送",
+      "submitting": "发送中...",
+      "successHeading": "感谢您！",
+      "successBody": "您的反馈已收到。",
+      "errorMessage": "出现错误，请重试。",
+      "cancel": "取消",
+      "close": "关闭"
+    },
     "dangerZone": {
       "heading": "危险操作",
       "resetAllProgress": "重置所有进度",
@@ -346,7 +370,17 @@
       "themeAudit": "主题审核 →",
       "themeAuditDescription": "所有吉祥物 × 强度 × 配色方案的并排预览。在调整 globals.css 时使用，以找出评分按钮与背景融合的组合。"
     },
-    "loadingAriaLabel": "加载设置中"
+    "loadingAriaLabel": "加载设置中",
+    "pushOptIn": {
+      "ariaLabel": "每日复习提醒"
+    },
+    "qaSeed": {
+      "applyAriaLabel": "应用 QA 种子：{scenario}",
+      "clearAriaLabel": "清除 QA 种子数据"
+    },
+    "deleteAccount": {
+      "inputAriaLabel": "输入 DELETE 以确认删除账户"
+    }
   },
   "practice": {
     "title": "Poké Memory - 记住每一只 Pokémon",
@@ -469,6 +503,10 @@
       "title": "离线练习？下载以提升速度",
       "body": "精灵图加载缓慢？预先获取所有精灵图和叫声（约 166 MB），即使没有网络也能即时练习。",
       "cta": "打开离线下载"
+    },
+    "higherOrLowerNudge": {
+      "title": "完成本轮练习，解锁额外小游戏",
+      "body": "今天练习至少两只宝可梦后，会话摘要下方将解锁「高低」属性挑战。看看能否打破你的最佳连击纪录？"
     }
   },
   "review": {
@@ -478,7 +516,11 @@
       "new": "新卡",
       "learning": "学习中",
       "review": "复习",
-      "ariaLabel": "队列数量"
+      "ariaLabel": "队列数量",
+      "infoAriaLabel": "关于队列状态",
+      "infoNew": "新卡：你还没有复习过这张卡片。",
+      "infoLearning": "学习中：卡片处于短间隔学习步骤中。在进入长期复习之前，它将以较短的间隔多次出现。",
+      "infoReview": "复习：卡片已进入长期复习阶段。调度器会根据你的记忆情况，将复习间隔设置为数天或数周。"
     },
     "storageFullBanner": "存储空间已满，进度无法保存。",
     "storageFullDismiss": "关闭",
@@ -487,7 +529,18 @@
     "tokenEarnedAndSpent": "已获得并使用连续保护令牌，你的 {count} 天连续记录安全了。",
     "tokenToastDismiss": "关闭提示",
     "tokenEarnedHeading": "获得令牌",
-    "tokenSpentHeading": "连续记录已保护"
+    "tokenSpentHeading": "连续记录已保护",
+    "multipleChoice": {
+      "groupAriaLabel": "请选择宝可梦的名字",
+      "correctSuffix": "（正确）",
+      "incorrectSuffix": "（错误）"
+    },
+    "higherOrLower": {
+      "sectionAriaLabel": "高还是低小游戏"
+    },
+    "typedEntry": {
+      "inputAriaLabel": "输入宝可梦的名字"
+    }
   },
   "pokedex": {
     "title": "Pokédex",
@@ -507,6 +560,8 @@
     "sortNational": "全国图鉴编号",
     "sortAlphabetical": "字母顺序",
     "sortClosestToMastery": "最接近掌握",
+    "sortClosestToMasteryInfoAriaLabel": "关于「最接近掌握」排序",
+    "sortClosestToMasteryInfoPanel": "将你最接近掌握的宝可梦排在最前面：已掌握的在最前，其次是学习中的（按复习次数和间隔排序），最后是未开始的。在超级用户模式下开启假设全部已掌握时，排序将退化为全国图鉴编号顺序。",
     "masteryAll": "全部",
     "masteryMastered": "已掌握",
     "masteryNotYet": "未掌握",
@@ -535,7 +590,10 @@
     "statSpAtk": "特攻",
     "statSpDef": "特防",
     "statSpeed": "速度",
-    "lockedSectionHint": "掌握这只宝可梦后解锁。"
+    "lockedSectionHint": "掌握这只宝可梦后解锁。",
+    "loadingAriaLabel": "正在加载 Pokédex",
+    "allPokemonAriaLabel": "宝可梦列表",
+    "generationPokemonAriaLabel": "{name}的宝可梦"
   },
   "pasture": {
     "title": "牧场",
@@ -575,14 +633,19 @@
     "biome": {
       "backLabel": "牧场",
       "backAriaLabel": "返回牧场",
-      "emptyState": "此生物群系中还没有掌握的宝可梦。继续练习吧！"
+      "emptyState": "此生物群系中还没有掌握的宝可梦。继续练习吧！",
+      "statsAriaLabel": "生物群系统计"
     },
+    "closeDetailsAriaLabel": "关闭详情",
+    "pokemonDetailsAriaLabel": "{name}的详情",
+    "newArrivalSuffix": "（新到来）",
     "nextArrivals": {
       "ariaLabel": "即将到来",
       "heading": "即将到来",
       "upcomingAriaLabel": "即将加入牧场的宝可梦",
       "allCaughtUp": "所有已复习的宝可梦都已在您的牧场中。"
-    }
+    },
+    "longPressHint": "长按任意宝可梦，查看其名称、掌握日期和复习间隔。"
   },
   "stats": {
     "title": "统计",
@@ -763,6 +826,14 @@
     "typeBreakdown": {
       "heading": "按属性",
       "meterAriaLabel": "{masteredPct}% 的 {typeName} 属性 Pokémon 已掌握"
+    },
+    "languageBreakdown": {
+      "heading": "语言",
+      "cardCount": "{count, plural, other {# 张}}",
+      "mastery": "{pct}% 已掌握",
+      "lastReview": "最近复习: {date}",
+      "neverReviewed": "尚未复习",
+      "listAriaLabel": "按语言划分的掌握情况"
     }
   },
   "journey": {
@@ -862,6 +933,12 @@
       "learningBody": "学习中：您已见过它，正在巩固记忆。",
       "masteredBody": "已掌握：连续答对 {reps} 次且下次复习间隔至少 21 天。这是调度器确认您真正学会的时间点。",
       "introducedNote": "已引入统计您至少见过一次的宝可梦，无论是否已完全掌握。"
+    },
+    "languageBreakdown": {
+      "heading": "语言",
+      "masteredCount": "{count, plural, other {# 已掌握}}",
+      "bestDay": "{count, plural, other {最佳日 # 次复习}}",
+      "noBestDay": "暂无复习记录"
     }
   },
   "error": {
@@ -880,6 +957,13 @@
   "onboarding": {
     "welcomeHeading": "欢迎使用 Poké Memory",
     "closeAriaLabel": "关闭欢迎指南",
+    "dismissHintAriaLabel": "关闭提示",
+    "hintAriaLabel": "新手引导提示",
+    "knownQuiz": {
+      "chooseGenerationAriaLabel": "选择世代",
+      "iAlreadyKnowAriaLabel": "我已认识{name}",
+      "generationSpritesAriaLabel": "{name}的精灵图"
+    },
     "intro": "学习每只宝可梦的名字和进化。每天都会有新卡片出现，当你快要忘记一张卡时，应用会再次显示它。你记得越多，下次出现的间隔就越长。",
     "howToGrade": {
       "heading": "如何评分",
@@ -980,6 +1064,9 @@
     "steel": "钢",
     "water": "水"
   },
+  "badges": {
+    "dismissToastAriaLabel": "关闭新徽章通知：{name}"
+  },
   "pushDaily": {
     "title": "Time to practise",
     "newOnly": "{newEstimate, plural, one {# new card} other {# new cards}} ready to practise.",
@@ -996,7 +1083,8 @@
       "item2": "<s>关于登录。</s> 如果你用 GitHub 或 Google 账号登录，我们会将你的卡片进度保存到安全的数据库，方便你在不同设备上继续使用。注册 GitHub 或 Google 账号需要年满 13 岁。",
       "item3": "<s>我们保存的内容。</s> 我们只保存你练习过的宝可梦卡片、你对它们的熟悉程度，以及上次练习的时间，不保存其他任何信息。我们不知道你的姓名、地址或任何个人信息。",
       "item4": "<s>其他人能看到吗？</s> 没有人能看到你的进度。只有你自己能看到自己的卡片。我们绝不会与他人共享你的进度，也不会用它来向你展示广告。",
-      "item5": "<s>你可以自己掌控。</s> 你可以随时在设置页面<export>导出进度</export>或<reset>重置所有进度</reset>，无需征得我们的同意，现在就可以自己操作。"
+      "item5": "<s>你可以自己掌控。</s> 你可以随时在设置页面<export>导出进度</export>或<reset>重置所有进度</reset>，无需征得我们的同意，现在就可以自己操作。",
+      "item6": "<s>反馈。</s> 如果你发送反馈，我们会将你的消息保存最多12个月以帮助我们修复问题，之后将自动删除。"
     }
   }
 }

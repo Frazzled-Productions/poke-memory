@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
+import { useLatestRef } from "@/lib/hooks/useLatestRef";
 import { useTranslations } from "next-intl";
 import {
   cardPanel,
@@ -35,8 +36,7 @@ const DISMISS_AFTER_MS = 5000;
 export function ProtectionToast({ kind, streakCount, onDismiss }: Props) {
   const t = useTranslations("review");
 
-  const onDismissRef = useRef(onDismiss);
-  onDismissRef.current = onDismiss;
+  const onDismissRef = useLatestRef(onDismiss);
 
   useEffect(() => {
     const timer = setTimeout(() => onDismissRef.current(), DISMISS_AFTER_MS);

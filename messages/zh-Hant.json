@@ -37,7 +37,11 @@
     "chooseProvider": "選擇登入方式",
     "cardsReviewed": "{count, plural, other {已複習 # 張卡片}}",
     "streakDaysCount": "{count, plural, other {# 天連續}}",
-    "gradesLogged": "{count, plural, other {已記錄 # 次評分}}"
+    "gradesLogged": "{count, plural, other {已記錄 # 次評分}}",
+    "connectProviderAriaLabel": "連結 {provider}",
+    "connectedProvidersAriaLabel": "已連結的登入方式",
+    "providerConnectedAriaLabel": "{provider} 已連結",
+    "checkingSyncStatusAriaLabel": "正在檢查同步狀態"
   },
   "settings": {
     "heading": "設定",
@@ -304,6 +308,26 @@
       "privacy": "隱私",
       "terms": "條款"
     },
+    "feedback": {
+      "rowLabel": "傳送意見回饋",
+      "rowDescription": "回報錯誤或請求新功能。",
+      "dialogTitle": "傳送意見回饋",
+      "categoryLabel": "類別",
+      "categoryBug": "錯誤報告",
+      "categoryFeature": "功能請求",
+      "categoryOther": "其他",
+      "messageLabel": "訊息",
+      "messagePlaceholder": "請描述問題或您的想法...",
+      "characterCount": "{count, number}/{max, number}",
+      "privacyNotice": "請勿在訊息中包含您的姓名或電子郵件地址等個人資訊。",
+      "submit": "傳送",
+      "submitting": "傳送中...",
+      "successHeading": "感謝您！",
+      "successBody": "您的意見回饋已收到。",
+      "errorMessage": "發生錯誤，請重試。",
+      "cancel": "取消",
+      "close": "關閉"
+    },
     "dangerZone": {
       "heading": "危險操作",
       "resetAllProgress": "重置所有進度",
@@ -346,7 +370,17 @@
       "themeAudit": "主題稽核 →",
       "themeAuditDescription": "所有吉祥物 × 強度 × 配色方案的並排預覽。在調整 globals.css 時使用，以找出評分按鈕與背景融合的組合。"
     },
-    "loadingAriaLabel": "載入設定中"
+    "loadingAriaLabel": "載入設定中",
+    "pushOptIn": {
+      "ariaLabel": "每日複習提醒"
+    },
+    "qaSeed": {
+      "applyAriaLabel": "套用 QA 種子：{scenario}",
+      "clearAriaLabel": "清除 QA 種子資料"
+    },
+    "deleteAccount": {
+      "inputAriaLabel": "輸入 DELETE 以確認刪除帳戶"
+    }
   },
   "practice": {
     "title": "Poké Memory - 記住每一隻寶可夢",
@@ -469,6 +503,10 @@
       "title": "離線練習？下載以提升速度",
       "body": "精靈圖載入緩慢？預先擷取所有精靈圖和叫聲（約 166 MB），即使沒有網路也能即時練習。",
       "cta": "開啟離線下載"
+    },
+    "higherOrLowerNudge": {
+      "title": "完成本輪練習，解鎖額外小遊戲",
+      "body": "今天練習至少兩隻寶可夢後，會話摘要下方將解鎖「高低」屬性挑戰。看看能否打破你的最佳連擊紀錄？"
     }
   },
   "review": {
@@ -478,7 +516,11 @@
       "new": "新卡",
       "learning": "學習中",
       "review": "複習",
-      "ariaLabel": "佇列數量"
+      "ariaLabel": "佇列數量",
+      "infoAriaLabel": "關於佇列狀態",
+      "infoNew": "新卡：你還未複習過這張卡片。",
+      "infoLearning": "學習中：卡片正處於短間隔學習步驟中。在進入長期複習之前，它將以較短的間隔多次出現。",
+      "infoReview": "複習：卡片已進入長期複習階段。排程器會根據你的記憶情況，將複習間隔設定為數天或數週。"
     },
     "storageFullBanner": "儲存空間已滿，進度無法儲存。",
     "storageFullDismiss": "關閉",
@@ -487,7 +529,18 @@
     "tokenEarnedAndSpent": "已獲得並使用連續保護令牌，你的 {count} 天連續記錄安全了。",
     "tokenToastDismiss": "關閉提示",
     "tokenEarnedHeading": "獲得令牌",
-    "tokenSpentHeading": "連續記錄已保護"
+    "tokenSpentHeading": "連續記錄已保護",
+    "multipleChoice": {
+      "groupAriaLabel": "請選擇寶可夢的名字",
+      "correctSuffix": "（正確）",
+      "incorrectSuffix": "（錯誤）"
+    },
+    "higherOrLower": {
+      "sectionAriaLabel": "高還是低小遊戲"
+    },
+    "typedEntry": {
+      "inputAriaLabel": "輸入寶可夢的名字"
+    }
   },
   "pokedex": {
     "title": "Pokédex",
@@ -507,6 +560,8 @@
     "sortNational": "全國圖鑑編號",
     "sortAlphabetical": "字母順序",
     "sortClosestToMastery": "最接近掌握",
+    "sortClosestToMasteryInfoAriaLabel": "關於「最接近掌握」排序",
+    "sortClosestToMasteryInfoPanel": "將你最接近掌握的寶可夢排在最前面：已掌握的在最前，其次是學習中的（按複習次數和間隔排序），最後是未開始的。在超級使用者模式下開啟假設全部已掌握時，排序將退化為全國圖鑑編號順序。",
     "masteryAll": "全部",
     "masteryMastered": "已掌握",
     "masteryNotYet": "未掌握",
@@ -535,7 +590,10 @@
     "statSpAtk": "特攻",
     "statSpDef": "特防",
     "statSpeed": "速度",
-    "lockedSectionHint": "掌握這隻寶可夢後解鎖。"
+    "lockedSectionHint": "掌握這隻寶可夢後解鎖。",
+    "loadingAriaLabel": "正在載入 Pokédex",
+    "allPokemonAriaLabel": "寶可夢列表",
+    "generationPokemonAriaLabel": "{name}的寶可夢"
   },
   "pasture": {
     "title": "牧場",
@@ -575,14 +633,19 @@
     "biome": {
       "backLabel": "牧場",
       "backAriaLabel": "返回牧場",
-      "emptyState": "此生物群系中還沒有掌握的寶可夢。繼續練習吧！"
+      "emptyState": "此生物群系中還沒有掌握的寶可夢。繼續練習吧！",
+      "statsAriaLabel": "生物群系統計"
     },
+    "closeDetailsAriaLabel": "關閉詳情",
+    "pokemonDetailsAriaLabel": "{name}的詳情",
+    "newArrivalSuffix": "（新到來）",
     "nextArrivals": {
       "ariaLabel": "即將到來",
       "heading": "即將到來",
       "upcomingAriaLabel": "即將加入牧場的寶可夢",
       "allCaughtUp": "所有已複習的寶可夢都已在您的牧場中。"
-    }
+    },
+    "longPressHint": "長按任意寶可夢，查看其名稱、掌握日期和複習間隔。"
   },
   "stats": {
     "title": "記錄",
@@ -763,6 +826,14 @@
     "typeBreakdown": {
       "heading": "按屬性",
       "meterAriaLabel": "{masteredPct}% 的 {typeName} 屬性 Pokémon 已掌握"
+    },
+    "languageBreakdown": {
+      "heading": "語言",
+      "cardCount": "{count, plural, other {# 張}}",
+      "mastery": "{pct}% 已掌握",
+      "lastReview": "最近複習: {date}",
+      "neverReviewed": "尚未複習",
+      "listAriaLabel": "按語言劃分的掌握情況"
     }
   },
   "journey": {
@@ -862,6 +933,12 @@
       "learningBody": "學習中：您已見過它，正在鞏固記憶。",
       "masteredBody": "已掌握：連續答對 {reps} 次且下次複習間隔至少 21 天。這是排程器確認您真正學會的時間點。",
       "introducedNote": "已引入統計您至少見過一次的寶可夢，無論是否已完全掌握。"
+    },
+    "languageBreakdown": {
+      "heading": "語言",
+      "masteredCount": "{count, plural, other {# 已掌握}}",
+      "bestDay": "{count, plural, other {最佳日 # 次複習}}",
+      "noBestDay": "尚無複習記錄"
     }
   },
   "error": {
@@ -880,6 +957,13 @@
   "onboarding": {
     "welcomeHeading": "歡迎使用 Poké Memory",
     "closeAriaLabel": "關閉歡迎指南",
+    "dismissHintAriaLabel": "關閉提示",
+    "hintAriaLabel": "新手引導提示",
+    "knownQuiz": {
+      "chooseGenerationAriaLabel": "選擇世代",
+      "iAlreadyKnowAriaLabel": "我已認識{name}",
+      "generationSpritesAriaLabel": "{name}的精靈圖"
+    },
     "intro": "學習每隻寶可夢的名字和進化。每天都會有新卡片出現，當你快要忘記一張卡時，應用程式會再次顯示它。你記得越多，下次出現的間隔就越長。",
     "howToGrade": {
       "heading": "如何評分",
@@ -980,6 +1064,9 @@
     "steel": "鋼",
     "water": "水"
   },
+  "badges": {
+    "dismissToastAriaLabel": "關閉新徽章通知：{name}"
+  },
   "pushDaily": {
     "title": "Time to practise",
     "newOnly": "{newEstimate, plural, one {# new card} other {# new cards}} ready to practise.",
@@ -996,7 +1083,8 @@
       "item2": "<s>關於登入。</s> 如果你用 GitHub 或 Google 帳號登入，我們會將你的卡片進度儲存到安全的資料庫，方便你在不同裝置上繼續使用。申請 GitHub 或 Google 帳號需要年滿 13 歲。",
       "item3": "<s>我們儲存的內容。</s> 我們只儲存你練習過的寶可夢卡片、你對它們的熟悉程度，以及上次練習的時間，不儲存其他任何資訊。我們不知道你的姓名、地址或任何個人資訊。",
       "item4": "<s>其他人能看到嗎？</s> 沒有人能看到你的進度。只有你自己能看到自己的卡片。我們絕不會與他人分享你的進度，也不會用它來向你展示廣告。",
-      "item5": "<s>你可以自己掌控。</s> 你可以隨時在設定頁面<export>匯出進度</export>或<reset>重置所有進度</reset>，無需徵得我們的同意，現在就可以自己操作。"
+      "item5": "<s>你可以自己掌控。</s> 你可以隨時在設定頁面<export>匯出進度</export>或<reset>重置所有進度</reset>，無需徵得我們的同意，現在就可以自己操作。",
+      "item6": "<s>意見回饋。</s> 如果你發送意見回饋，我們會將你的訊息保存最多12個月以幫助我們修復問題，之後將自動刪除。"
     }
   }
 }

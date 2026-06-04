@@ -25,7 +25,7 @@ import type { AppLocale } from "@/i18n/locales";
  *
  * `speciesId` is the numeric Pokémon ID (matches the name card's `id`).
  * `masteredDate` is the YYYY-MM-DD `lastReview` date of whichever leg (name or
- * reverse) crossed the gate LAST — i.e. the date the species became fully mastered.
+ * reverse) crossed the gate LAST - i.e. the date the species became fully mastered.
  */
 export type SpeciesMasteryEvent = {
   speciesId: number;
@@ -41,7 +41,7 @@ export type SpeciesMasteryEvent = {
  * Derive a list of species-level mastery events from the FULL card array
  * (all card types). Only species whose BOTH name card AND paired reverse card
  * are mastered are included. The `masteredDate` is the later of the two
- * `lastReview` dates — i.e. when the SECOND leg crossed the gate.
+ * `lastReview` dates - i.e. when the SECOND leg crossed the gate.
  *
  * This is the shared helper for:
  *   - `computeMasteryOverTime` (mastery-over-time chart)
@@ -113,7 +113,7 @@ export function masteredSpeciesEvents(
 }
 
 // ---------------------------------------------------------------------------
-// nameCardsForLocale — extract name cards scoped to a locale
+// nameCardsForLocale - extract name cards scoped to a locale
 // ---------------------------------------------------------------------------
 
 /**
@@ -127,4 +127,34 @@ export function nameCardsForLocale(
   return cards.filter(
     (c): c is NameReviewCard => c.cardType === "name" && (c.locale ?? "en") === locale,
   );
+}
+
+// ---------------------------------------------------------------------------
+// lastReviewForLocale - most-recent review date for a given locale
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the lexicographically-greatest non-null `lastReview` ISO date string
+ * across all name cards for the given locale, or null when none of those cards
+ * have ever been reviewed.
+ *
+ * Cards with no explicit `locale` field are treated as "en" (legacy cards
+ * pre-dating multi-locale support).
+ *
+ * Used by the Stats page "Languages" card to show when each enrolled locale
+ * was last actively reviewed (#1619).
+ */
+export function lastReviewForLocale(
+  cards: readonly ReviewableCard[],
+  locale: AppLocale = "en",
+): string | null {
+  const localeCards = nameCardsForLocale(cards, locale);
+  let latest: string | null = null;
+  for (const card of localeCards) {
+    const lr = card.state.lastReview;
+    if (lr !== null && (latest === null || lr > latest)) {
+      latest = lr;
+    }
+  }
+  return latest;
 }

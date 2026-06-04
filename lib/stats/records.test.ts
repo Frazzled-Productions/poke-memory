@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   computeLongestStreak,
   computeBestReviewDay,
+  bestReviewDayForLocale,
   computeRecords,
 } from "./records";
 import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS } from "./derive";
@@ -269,5 +270,62 @@ describe("computeRecords — species-level mastery (both legs, #1448)", () => {
       expect(r.avgDaysToMastery).toBeNull();
       expect(r.mostMasteredIn7d).toBeNull();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// bestReviewDayForLocale — per-locale grade-log filtering (#1620)
+// ---------------------------------------------------------------------------
+
+describe("bestReviewDayForLocale", () => {
+  it("returns 0 for empty log", () => {
+    expect(bestReviewDayForLocale([], "en")).toBe(0);
+  });
+
+  it("returns 0 for empty log for non-English locale", () => {
+    expect(bestReviewDayForLocale([], "ja")).toBe(0);
+  });
+
+  it("counts only entries whose locale matches", () => {
+    const log: GradeLog = [
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 1, locale: "en" },
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 2, locale: "en" },
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 3, locale: "ja" },
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 4, locale: "ja" },
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 5, locale: "ja" },
+      { date: "2026-05-11", grade: 4, cardType: "name", occurredAt: 6, locale: "en" },
+    ];
+    // en best day: 2026-05-12 with 2 entries.
+    expect(bestReviewDayForLocale(log, "en")).toBe(2);
+    // ja best day: 2026-05-12 with 3 entries.
+    expect(bestReviewDayForLocale(log, "ja")).toBe(3);
+  });
+
+  it("treats legacy entries without a locale field as 'en'", () => {
+    const log: GradeLog = [
+      // No locale field — legacy entry, treated as "en".
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 1 },
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 2 },
+    ];
+    expect(bestReviewDayForLocale(log, "en")).toBe(2);
+    expect(bestReviewDayForLocale(log, "ja")).toBe(0);
+  });
+
+  it("returns 0 when no entries match the requested locale", () => {
+    const log: GradeLog = [
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 1, locale: "en" },
+    ];
+    expect(bestReviewDayForLocale(log, "zh-Hans")).toBe(0);
+  });
+
+  it("finds the best day across multiple dates for a locale", () => {
+    const log: GradeLog = [
+      // ja: 1 on May 10, 3 on May 12 → best = 3.
+      { date: "2026-05-10", grade: 4, cardType: "name", occurredAt: 1, locale: "ja" },
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 2, locale: "ja" },
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 3, locale: "ja" },
+      { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 4, locale: "ja" },
+    ];
+    expect(bestReviewDayForLocale(log, "ja")).toBe(3);
   });
 });

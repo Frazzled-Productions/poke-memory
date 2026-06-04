@@ -184,6 +184,12 @@ async function writeSeedToPage(page, seed) {
         audioHintDismissed: true,
         cardTypesHintDismissed: true,
         pwaInstallDismissed: true,
+        // Dismiss the Pasture long-press hint (#1572) so it does not
+        // appear in the screenshot and pollute the captured image.
+        pastureLongPressHintDismissed: true,
+        // Dismiss the Higher-or-Lower signpost nudge (#1573) so it does not
+        // appear in the practice screenshot and pollute the captured image.
+        higherOrLowerNudgeDismissed: true,
       },
     }));
 

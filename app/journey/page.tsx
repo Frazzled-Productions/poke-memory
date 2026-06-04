@@ -34,6 +34,7 @@ import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { detectTopMilestone } from "@/lib/journey/milestones";
 import { deriveCloseToMastery, type CloseToMasteryEntry } from "@/lib/journey/closeToMastery";
 import { CloseToMastery } from "@/components/journey/CloseToMastery";
+import { LanguageBreakdown } from "@/components/journey/LanguageBreakdown";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
@@ -749,6 +750,16 @@ export default function JourneyPage() {
 
             {/* Type breakdown */}
             <TypeBreakdown perType={masterySnapshot.perType} />
+
+            {/* Language breakdown — only renders when >1 locale enrolled */}
+            {cards !== null && masteryRepetitions !== null ? (
+              <LanguageBreakdown
+                cards={cards}
+                gradeLog={gradeLog}
+                today={todayString(new Date())}
+                masteryRepetitions={masteryRepetitions}
+              />
+            ) : null}
           </div>
         )}
       </div>

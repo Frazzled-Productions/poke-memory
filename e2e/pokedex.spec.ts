@@ -1213,6 +1213,74 @@ test.describe("Pokédex detail — locked-state signposts (#1440)", () => {
 // Pokédex detail — game-label facts (#1559)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Pokédex sort - InfoButton for "Closest to mastery" (#1574)
+// ---------------------------------------------------------------------------
+
+test.describe("Pokédex sort - Closest to mastery InfoButton (#1574)", () => {
+  test("InfoButton appears when Closest to mastery sort is selected and opens its panel on click", async ({
+    page,
+  }) => {
+    await page.goto("/pokedex");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    // Expand filters first.
+    await expandFilters(page);
+
+    // The InfoButton should not be present with the default national sort.
+    await expect(
+      page.getByRole("button", { name: "About Closest to mastery sort" }),
+    ).not.toBeVisible();
+
+    // Switch sort to Closest to mastery.
+    const sortSelect = page.getByLabel("Sort by");
+    await sortSelect.selectOption("closest-to-mastery");
+    await page.waitForURL(/sort=closest-to-mastery/, { timeout: 5_000 });
+
+    // InfoButton should now be visible.
+    const infoBtn = page.getByRole("button", {
+      name: "About Closest to mastery sort",
+    });
+    await expect(infoBtn).toBeVisible();
+    expect(await infoBtn.getAttribute("aria-expanded")).toBe("false");
+
+    // Click the button to open the panel.
+    await infoBtn.click();
+    expect(await infoBtn.getAttribute("aria-expanded")).toBe("true");
+
+    // Panel copy is visible.
+    await expect(
+      page.getByText(/Puts Pokémon you are closest to mastering/),
+    ).toBeVisible();
+  });
+
+  test("InfoButton panel closes on second click", async ({ page }) => {
+    await page.goto("/pokedex?sort=closest-to-mastery");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Pokédex" }),
+    ).toBeVisible();
+
+    await expandFilters(page);
+
+    const infoBtn = page.getByRole("button", {
+      name: "About Closest to mastery sort",
+    });
+    await expect(infoBtn).toBeVisible();
+
+    await infoBtn.click();
+    await expect(
+      page.getByText(/Puts Pokémon you are closest to mastering/),
+    ).toBeVisible();
+
+    await infoBtn.click();
+    await expect(
+      page.getByText(/Puts Pokémon you are closest to mastering/),
+    ).not.toBeVisible();
+  });
+});
+
 test.describe("Pokédex detail — game-label facts (#1559)", () => {
   test("facts section shows source game names instead of 'Pokédex entry' for a mastered Pokémon", async ({
     page,

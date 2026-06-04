@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, act, fireEvent } from "@testing-library/react";
+import { screen, act, fireEvent } from "@testing-library/react";
+import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 import { BadgeToast } from "./BadgeToast";
 
 beforeEach(() => {
@@ -11,7 +12,7 @@ afterEach(() => {
 
 describe("BadgeToast", () => {
   it("renders the badge name and description", () => {
-    render(
+    renderWithIntl(
       <BadgeToast
         badgeName="Cascade Badge"
         badgeDescription="You've mastered Misty's roster."
@@ -27,7 +28,7 @@ describe("BadgeToast", () => {
 
   it("auto-dismisses after the timeout", () => {
     const onDismiss = vi.fn();
-    render(
+    renderWithIntl(
       <BadgeToast
         badgeName="Cascade Badge"
         badgeDescription="x"
@@ -43,7 +44,7 @@ describe("BadgeToast", () => {
 
   it("dismisses on user click", () => {
     const onDismiss = vi.fn();
-    render(
+    renderWithIntl(
       <BadgeToast
         badgeName="Cascade Badge"
         badgeDescription="x"
@@ -57,7 +58,7 @@ describe("BadgeToast", () => {
   });
 
   it("has role=status for screen-reader announcement", () => {
-    const { container } = render(
+    const { container } = renderWithIntl(
       <BadgeToast
         badgeName="Cascade Badge"
         badgeDescription="x"
@@ -65,5 +66,18 @@ describe("BadgeToast", () => {
       />,
     );
     expect(container.querySelector('[role="status"]')).not.toBeNull();
+  });
+
+  it("dismiss button aria-label is localised in Japanese", () => {
+    renderJa(
+      <BadgeToast
+        badgeName="Cascade Badge"
+        badgeDescription="x"
+        onDismiss={() => {}}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "新しいバッジを閉じる: Cascade Badge" }),
+    ).toBeInTheDocument();
   });
 });

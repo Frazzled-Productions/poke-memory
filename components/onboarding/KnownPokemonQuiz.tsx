@@ -37,6 +37,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { loadSettings } from "@/lib/settings/persistence";
@@ -69,6 +70,7 @@ type KnownPokemonCardProps = {
 };
 
 function KnownPokemonCard({ card, selected, onToggle }: KnownPokemonCardProps) {
+  const tQuiz = useTranslations("onboarding.knownQuiz");
   // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
   const { name: localeName } = useLocalePokemonName(card.speciesId, card.displayName);
   return (
@@ -77,7 +79,7 @@ function KnownPokemonCard({ card, selected, onToggle }: KnownPokemonCardProps) {
         type="button"
         role="checkbox"
         aria-checked={selected}
-        aria-label={`I already know ${localeName}`}
+        aria-label={tQuiz("iAlreadyKnowAriaLabel", { name: localeName })}
         onClick={() => onToggle(card.id)}
         className={`flex w-full flex-col items-center gap-1 rounded-lg border p-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 ${
           selected
@@ -133,6 +135,7 @@ type Status =
 const DEFAULT_GEN = 1;
 
 export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }: Props) {
+  const tQuiz = useTranslations("onboarding.knownQuiz");
   // The quiz only writes when the user clicks Apply, so a single snapshot of
   // the session at mount is enough. Re-loading on every render would risk
   // stamping over a concurrent grade from a different tab.
@@ -358,7 +361,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         <legend className={sectionLabel}>
           Generation
         </legend>
-        <div role="tablist" aria-label="Choose a generation" className="flex flex-wrap gap-2">
+        <div role="tablist" aria-label={tQuiz("chooseGenerationAriaLabel")} className="flex flex-wrap gap-2">
           {GEN_RANGES.map((range) => {
             const count = cardsByGen.get(range.gen)?.length ?? 0;
             const isActive = range.gen === activeGen;
@@ -414,7 +417,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
       <ul
         id={`known-quiz-grid-${activeGen}`}
         role="tabpanel"
-        aria-label={`${GEN_RANGES.find((r) => r.gen === activeGen)?.name ?? ""} sprites`}
+        aria-label={tQuiz("generationSpritesAriaLabel", { name: GEN_RANGES.find((r) => r.gen === activeGen)?.name ?? "" })}
         className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6"
       >
         {activeCards.map((card) => (

@@ -13,6 +13,7 @@
  *   4. Traditional Chinese: heading renders in Traditional Chinese.
  *   5. Both Settings links are present in the English render.
  *   6. <strong> labels are rendered (bold intro text preserved via t.rich).
+ *   7. #1623: item6 (feedback) renders in all four locales; list length is 6.
  */
 
 import React from "react";
@@ -209,10 +210,16 @@ describe("ChildFriendlySummary", () => {
     expect(resetLink).toHaveAttribute("href", "/settings#danger-zone-heading");
   });
 
-  it("renders the list with five items", async () => {
+  it("renders the list with six items (item6 added for #1623)", async () => {
     render(await ChildFriendlySummary());
     const items = screen.getAllByRole("listitem");
-    expect(items).toHaveLength(5);
+    expect(items).toHaveLength(6);
+  });
+
+  it("renders the feedback item (item6) with text about 12-month retention (#1623)", async () => {
+    render(await ChildFriendlySummary());
+    // The feedback item mentions 12 months retention.
+    expect(screen.getByText(/12 months/i)).toBeTruthy();
   });
 
   describe("Japanese locale", () => {

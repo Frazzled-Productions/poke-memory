@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { mutedTextXs } from "@/lib/utils/class-names";
+import { CompanyDisclosure } from "@/components/CompanyDisclosure";
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
 
@@ -60,7 +61,7 @@ export function Footer() {
         <span aria-hidden="true">·</span>
         <span className="font-mono">v{APP_VERSION}</span>
       </div>
-      <p className="mx-auto max-w-5xl px-4 pb-3 text-center text-xs text-zinc-400 dark:text-zinc-500">
+      <p className="mx-auto max-w-5xl px-4 pb-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
         Unofficial fan project, not affiliated with or endorsed by Nintendo,
         Game Freak, or The Pokémon Company. Pokémon and all related names,
         sprites, and cries are the property of their respective owners.
@@ -75,6 +76,7 @@ export function Footer() {
         </a>
         .
       </p>
+      <CompanyDisclosure className="mx-auto max-w-5xl px-4 pb-3 text-center" />
     </footer>
   );
 }

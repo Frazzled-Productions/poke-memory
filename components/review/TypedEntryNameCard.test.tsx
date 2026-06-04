@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderWithIntl as render, screen, fireEvent, act } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl as render, renderJa, screen, fireEvent, act } from "@/components/test-utils/renderWithIntl";
 import { TypedEntryNameCard } from "./TypedEntryNameCard";
 import type { Grade } from "@/lib/review/session";
 
@@ -156,6 +156,26 @@ describe("TypedEntryNameCard", () => {
     renderCard({ grading: true });
     expect(screen.getByRole("button", { name: /submit/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /i don.t know/i })).toBeDisabled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Localised input aria-label (#1607)
+// ---------------------------------------------------------------------------
+
+describe("TypedEntryNameCard — localised input aria-label", () => {
+  it("input aria-label is localised in Japanese", () => {
+    renderJa(
+      <TypedEntryNameCard
+        spriteUrl="/sprites/pokemon/webp/320/25.webp"
+        canonicalName="Pikachu"
+        id={25}
+        onGrade={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("textbox", { name: "ポケモンの名前を入力" }),
+    ).toBeInTheDocument();
   });
 });
 

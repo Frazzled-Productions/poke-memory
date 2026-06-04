@@ -19,6 +19,7 @@ import { clearLocalProgress } from "@/lib/storage/reset";
 import { resetAllProgressEverywhere } from "@/lib/sync/reset";
 import { ResetProgressDialog } from "@/components/settings/ResetProgressDialog";
 import { DeleteAccountDialog } from "@/components/settings/DeleteAccountDialog";
+import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 import { ReenableCardTypeDialog, type ReenableChoice } from "@/components/settings/ReenableCardTypeDialog";
 import { deleteAccountEverywhere } from "@/lib/sync/deleteAccount";
 import { signOut } from "@/lib/auth/actions";
@@ -58,6 +59,7 @@ import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStackLg, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { CompanyDisclosure } from "@/components/CompanyDisclosure";
 import { LABS_FLAGS, type LabsFlagKey } from "@/lib/labs/flags";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
@@ -483,6 +485,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   // Re-enable dialog: set when toggling a card type from disabled → enabled.
   // Holds the settings key being re-enabled so the dialog knows what to label.
   const [reenableKey, setReenableKey] = useState<keyof UserSettings | null>(null);
@@ -1950,6 +1953,28 @@ export default function SettingsPage() {
                       {t("settings.about.terms")}
                     </Link>
                   </div>
+                  <CompanyDisclosure />
+
+                  <hr className="border-zinc-200 dark:border-zinc-800" />
+
+                  {/* Send feedback - available to all users (guest and signed-in) */}
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {t("settings.feedback.rowLabel")}
+                      </p>
+                      <p className={`mt-1 ${mutedTextXs}`}>
+                        {t("settings.feedback.rowDescription")}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackOpen(true)}
+                      className="min-h-[36px] shrink-0 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+                    >
+                      {t("settings.feedback.rowLabel")}
+                    </button>
+                  </div>
 
                   <p className="text-xs text-zinc-400 dark:text-zinc-500">
                     Unofficial fan project, not affiliated with or endorsed by Nintendo,
@@ -2611,6 +2636,10 @@ export default function SettingsPage() {
               cardTypeName={CARD_TYPE_DISPLAY_NAMES[reenableKey ?? "evolutionCardsEnabled"] ?? "this card type"}
               onClose={() => setReenableKey(null)}
               onChoose={(choice) => { void handleReenableChoice(choice); }}
+            />
+            <FeedbackModal
+              open={feedbackOpen}
+              onClose={() => setFeedbackOpen(false)}
             />
           </>
         )}

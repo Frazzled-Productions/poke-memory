@@ -1549,3 +1549,21 @@ describe("SettingsPage — enrolment maintains removedLocales tombstone (#1568)"
     expect(calledWith.removedLocales).not.toContain("en");
   });
 });
+
+describe("SettingsPage - statutory trading disclosure in About section (#1565 Part A)", () => {
+  it("renders the company number 17258540 in the About section", async () => {
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/17258540/)).toBeInTheDocument();
+    });
+  });
+
+  it("renders the registered office (Shelton Street) in the About section", async () => {
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Shelton Street/)).toBeInTheDocument();
+    });
+  });
+});

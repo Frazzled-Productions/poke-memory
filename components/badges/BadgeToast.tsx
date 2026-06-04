@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
+import { useTranslations } from "next-intl";
+import { useLatestRef } from "@/lib/hooks/useLatestRef";
 
 type Props = {
   badgeName: string;
@@ -24,8 +26,8 @@ const DISMISS_AFTER_MS = 4500;
  * does not restart the dismiss timer.
  */
 export function BadgeToast({ badgeName, badgeDescription, onDismiss }: Props) {
-  const onDismissRef = useRef(onDismiss);
-  onDismissRef.current = onDismiss;
+  const t = useTranslations("badges");
+  const onDismissRef = useLatestRef(onDismiss);
 
   useEffect(() => {
     const t = setTimeout(() => onDismissRef.current(), DISMISS_AFTER_MS);
@@ -40,7 +42,7 @@ export function BadgeToast({ badgeName, badgeDescription, onDismiss }: Props) {
       <button
         type="button"
         onClick={onDismiss}
-        aria-label={`Dismiss new badge: ${badgeName}`}
+        aria-label={t("dismissToastAriaLabel", { name: badgeName })}
         className="pointer-events-auto flex max-w-md items-start gap-3 rounded-xl border border-amber-300 bg-gradient-to-br from-amber-100 via-amber-50 to-rose-50 px-4 py-3 text-left shadow-lg ring-1 ring-amber-200/60 transition-transform hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-700 dark:from-amber-900/80 dark:via-amber-950/80 dark:to-rose-950/80 dark:ring-amber-800/60"
       >
         <span

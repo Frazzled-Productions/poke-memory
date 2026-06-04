@@ -98,6 +98,72 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
+    it("names the incorporated controller in section 1 (#1565)", async () => {
+      await renderPage();
+      // The controller section must identify the legal entity and company number
+      // so users can exercise their UK-GDPR rights against the correct entity.
+      const nameMatches = screen.getAllByText(/frazzled productions ltd/i);
+      expect(nameMatches.length).toBeGreaterThan(0);
+      const numberMatches = screen.getAllByText(/17258540/i);
+      expect(numberMatches.length).toBeGreaterThan(0);
+    });
+
+    it("renders the registered office address in section 1 (#1565 Part A)", async () => {
+      await renderPage();
+      // The statutory trading disclosure must include the registered office
+      // so data subjects can correspond with the correct legal address.
+      const officeMatches = screen.getAllByText(/Shelton Street/i);
+      expect(officeMatches.length).toBeGreaterThan(0);
+    });
+
+    it("renders the feedback submissions section added for #1623", async () => {
+      await renderPage();
+      // The new sub-heading describing feedback data collection.
+      expect(
+        screen.getByRole("heading", {
+          level: 3,
+          name: /feedback submissions/i,
+        }),
+      ).toBeTruthy();
+      // Guest feedback is not linked to an identifiable account.
+      expect(
+        screen.getByText(/not linked to any identifiable account/i),
+      ).toBeTruthy();
+      // Feedback is not used for profiling or marketing.
+      expect(
+        screen.getByText(/not used for profiling or marketing/i),
+      ).toBeTruthy();
+    });
+
+    it("renders the feedback retention statement in section 8 (#1623)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/feedback submissions are retained for 12 months/i),
+      ).toBeTruthy();
+    });
+
+    it("renders the feedback lawful basis row in section 5 (#1623)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/receive and act on feedback you submit voluntarily/i),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(/legitimate interest in improving the service and resolving/i),
+      ).toBeTruthy();
+    });
+
+    it("mentions feedback cascade deletion in the erasure rights bullet (#1623)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/also permanently deletes any feedback submissions linked to it/i),
+      ).toBeTruthy();
+    });
+
+    it("shows the last updated date as 4 June 2026 (#1623)", async () => {
+      await renderPage();
+      expect(screen.getByText(/4 june 2026/i)).toBeTruthy();
+    });
+
     it("does NOT show the English-only notice in the English locale", async () => {
       vi.mocked(resolveLocale).mockResolvedValueOnce("en");
       await renderPage();

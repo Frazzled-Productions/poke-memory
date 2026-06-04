@@ -112,13 +112,12 @@ jobs:
       - uses: actions/setup-node@v6
         if: steps.idem.outputs.skip == 'false'
         with:
-          # Must match the Node version used by the other `npm ci` workflows
-          # (ci.yml, coverage.yml, integration-tests.yml all use Node 24, per
-          # .nvmrc). Drifting to Node 20 here fails `npm ci` with a missing
-          # @swc/helpers transitive — the lock file was resolved under Node 24's
-          # newer npm and Node 20's older npm resolves peer deps differently.
-          # See #1274.
-          node-version: '24'
+          # Node major is read from .nvmrc (single source of truth), matching the
+          # other `npm ci` workflows. Drifting to an older major here fails
+          # `npm ci` with a missing @swc/helpers transitive (the lock file was
+          # resolved under the newer npm; an older npm resolves peer deps
+          # differently). See #1274; node-version-drift.yml guards re-drift (#1575).
+          node-version-file: .nvmrc
           cache: 'npm'
 
       - name: Install dependencies

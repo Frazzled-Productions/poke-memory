@@ -1,4 +1,5 @@
-import { render, screen, act } from "@testing-library/react";
+import { screen, act } from "@testing-library/react";
+import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
@@ -35,7 +36,7 @@ beforeEach(() => {
 
 describe("OnboardingHint", () => {
   it("renders its children when the flag is not dismissed", async () => {
-    render(<OnboardingHint id="welcomeDismissed">Hello there.</OnboardingHint>);
+    renderWithIntl(<OnboardingHint id="welcomeDismissed">Hello there.</OnboardingHint>);
     expect(await screen.findByText(/Hello there\./)).toBeTruthy();
   });
 
@@ -44,14 +45,14 @@ describe("OnboardingHint", () => {
       ...DEFAULT_SETTINGS,
       onboarding: { ...DEFAULT_SETTINGS.onboarding, welcomeDismissed: true },
     };
-    const { container } = render(
+    const { container } = renderWithIntl(
       <OnboardingHint id="welcomeDismissed">Hello there.</OnboardingHint>,
     );
     expect(container.textContent).toBe("");
   });
 
   it("dismiss button persists the flag and hides the hint", async () => {
-    render(<OnboardingHint id="practiceHintDismissed">Tip.</OnboardingHint>);
+    renderWithIntl(<OnboardingHint id="practiceHintDismissed">Tip.</OnboardingHint>);
     const dismiss = await screen.findByRole("button", { name: /dismiss hint/i });
     await userEvent.click(dismiss);
 
@@ -60,7 +61,7 @@ describe("OnboardingHint", () => {
   });
 
   it("renders the CTA link when ctaHref + ctaLabel are provided", async () => {
-    render(
+    renderWithIntl(
       <OnboardingHint
         id="welcomeDismissed"
         tone="callout"
@@ -76,7 +77,7 @@ describe("OnboardingHint", () => {
 
   it("renders a CTA button and invokes ctaOnClick when ctaOnClick + ctaLabel are provided", async () => {
     const onClick = vi.fn();
-    render(
+    renderWithIntl(
       <OnboardingHint id="welcomeDismissed" ctaLabel="Open it" ctaOnClick={onClick}>
         Body.
       </OnboardingHint>,
@@ -93,7 +94,7 @@ describe("OnboardingHint", () => {
       ...DEFAULT_SETTINGS,
       onboarding: { ...DEFAULT_SETTINGS.onboarding, statsHintDismissed: true },
     };
-    render(<OnboardingHint id="statsHintDismissed">Body.</OnboardingHint>);
+    renderWithIntl(<OnboardingHint id="statsHintDismissed">Body.</OnboardingHint>);
     expect(screen.queryByText("Body.")).toBeNull();
 
     act(() => {
@@ -111,7 +112,7 @@ describe("OnboardingHint", () => {
   });
 
   it("dismissing the audio hint persists audioHintDismissed (#702)", async () => {
-    render(
+    renderWithIntl(
       <OnboardingHint id="audioHintDismissed">Turn on audio.</OnboardingHint>,
     );
     const dismiss = await screen.findByRole("button", {
@@ -124,7 +125,7 @@ describe("OnboardingHint", () => {
   });
 
   it("dismissing the card-types hint persists cardTypesHintDismissed (#702)", async () => {
-    render(
+    renderWithIntl(
       <OnboardingHint id="cardTypesHintDismissed">More variety.</OnboardingHint>,
     );
     const dismiss = await screen.findByRole("button", {
@@ -144,7 +145,7 @@ describe("OnboardingHint", () => {
     delete (partial as { onboarding?: unknown }).onboarding;
     currentSettings = partial as UserSettings;
 
-    render(
+    renderWithIntl(
       <OnboardingHint id="audioHintDismissed">Turn on audio.</OnboardingHint>,
     );
     const dismiss = await screen.findByRole("button", {
@@ -165,7 +166,15 @@ describe("OnboardingHint", () => {
     delete (partial as { onboarding?: unknown }).onboarding;
     currentSettings = partial as UserSettings;
 
-    render(<OnboardingHint id="welcomeDismissed">Hello.</OnboardingHint>);
+    renderWithIntl(<OnboardingHint id="welcomeDismissed">Hello.</OnboardingHint>);
     expect(await screen.findByText("Hello.")).toBeTruthy();
+  });
+
+  it("dismiss button aria-label is localised in Japanese", async () => {
+    renderJa(<OnboardingHint id="welcomeDismissed">Hello.</OnboardingHint>);
+    const dismiss = await screen.findByRole("button", {
+      name: "ヒントを閉じる",
+    });
+    expect(dismiss).toBeInTheDocument();
   });
 });

@@ -37,7 +37,11 @@
     "chooseProvider": "サインインプロバイダーを選択",
     "cardsReviewed": "{count, plural, other {# 枚のカードをレビューしました}}",
     "streakDaysCount": "{count, plural, other {# 日連続}}",
-    "gradesLogged": "{count, plural, other {# 件の採点を記録しました}}"
+    "gradesLogged": "{count, plural, other {# 件の採点を記録しました}}",
+    "connectProviderAriaLabel": "{provider} に接続",
+    "connectedProvidersAriaLabel": "連携済みプロバイダー",
+    "providerConnectedAriaLabel": "{provider} 連携済み",
+    "checkingSyncStatusAriaLabel": "同期状態を確認中"
   },
   "settings": {
     "heading": "設定",
@@ -304,6 +308,26 @@
       "privacy": "プライバシー",
       "terms": "利用規約"
     },
+    "feedback": {
+      "rowLabel": "フィードバックを送る",
+      "rowDescription": "バグの報告や機能のリクエストをお送りください。",
+      "dialogTitle": "フィードバックを送る",
+      "categoryLabel": "カテゴリ",
+      "categoryBug": "バグ報告",
+      "categoryFeature": "機能リクエスト",
+      "categoryOther": "その他",
+      "messageLabel": "メッセージ",
+      "messagePlaceholder": "問題や提案を記入してください...",
+      "characterCount": "{count, number}/{max, number}",
+      "privacyNotice": "名前やメールアドレスなどの個人情報をメッセージに含めないでください。",
+      "submit": "送信",
+      "submitting": "送信中...",
+      "successHeading": "ありがとうございます！",
+      "successBody": "フィードバックを受け付けました。",
+      "errorMessage": "エラーが発生しました。もう一度お試しください。",
+      "cancel": "キャンセル",
+      "close": "閉じる"
+    },
     "dangerZone": {
       "heading": "危険な操作",
       "resetAllProgress": "すべての進捗を削除",
@@ -346,7 +370,17 @@
       "themeAudit": "テーマ監査 →",
       "themeAuditDescription": "すべてのマスコット × 強度 × カラースキームの並列プレビューです。globals.css を調整する際に、採点ボタンが背景に溶け込む組み合わせを見つけるために使用します。"
     },
-    "loadingAriaLabel": "設定を読み込み中"
+    "loadingAriaLabel": "設定を読み込み中",
+    "pushOptIn": {
+      "ariaLabel": "毎日のレビューリマインダー"
+    },
+    "qaSeed": {
+      "applyAriaLabel": "QA シードを適用: {scenario}",
+      "clearAriaLabel": "QA シードデータをクリア"
+    },
+    "deleteAccount": {
+      "inputAriaLabel": "DELETE と入力してアカウント削除を確認"
+    }
   },
   "practice": {
     "title": "Poké Memory - すべての Pokémon を覚えよう",
@@ -469,6 +503,10 @@
       "title": "オフライン練習？高速化のためにダウンロードを",
       "body": "スプライトの読み込みが遅い場合、全スプライトと鳴き声（約166MB）をあらかじめダウンロードすると、接続なしでも瞬時に練習できます。",
       "cta": "オフラインダウンロードを開く"
+    },
+    "higherOrLowerNudge": {
+      "title": "セッションを完了してボーナスミニゲームをゲット",
+      "body": "今日2体以上のポケモンを練習すると、セッション結果の下に「大きい・小さい」ステータスチャレンジが解放されます。自己記録を更新できるかな？"
     }
   },
   "review": {
@@ -478,7 +516,11 @@
       "new": "新規",
       "learning": "学習中",
       "review": "復習",
-      "ariaLabel": "キュー数"
+      "ariaLabel": "キュー数",
+      "infoAriaLabel": "キュー状態について",
+      "infoNew": "新規: このカードはまだ復習されていません。",
+      "infoLearning": "学習中: カードは短い間隔の学習ステップにあります。長期復習に入るまで、短い間隔で何度か表示されます。",
+      "infoReview": "復習: カードは長期復習に卒業しました。スケジューラーがあなたの記憶に基づいて、数日から数週間の間隔で復習を設定します。"
     },
     "storageFullBanner": "ストレージが満杯のため進捗の保存が無効になっています。",
     "storageFullDismiss": "閉じる",
@@ -487,7 +529,18 @@
     "tokenEarnedAndSpent": "連続ストリーク保護トークンを獲得して使用しました。{count}日連続は安全です。",
     "tokenToastDismiss": "通知を閉じる",
     "tokenEarnedHeading": "トークン獲得",
-    "tokenSpentHeading": "ストリーク保護"
+    "tokenSpentHeading": "ストリーク保護",
+    "multipleChoice": {
+      "groupAriaLabel": "ポケモンの名前を選んでください",
+      "correctSuffix": "（正解）",
+      "incorrectSuffix": "（不正解）"
+    },
+    "higherOrLower": {
+      "sectionAriaLabel": "高い or 低いミニゲーム"
+    },
+    "typedEntry": {
+      "inputAriaLabel": "ポケモンの名前を入力"
+    }
   },
   "pokedex": {
     "title": "Pokédex",
@@ -507,6 +560,8 @@
     "sortNational": "全国図鑑番号順",
     "sortAlphabetical": "名前順",
     "sortClosestToMastery": "習得に近い順",
+    "sortClosestToMasteryInfoAriaLabel": "「習得に近い順」について",
+    "sortClosestToMasteryInfoPanel": "習得に最も近いポケモンを上位に表示します。習得済み、次に学習中（復習回数と間隔順）、最後に未開始の順です。スーパーユーザーモードで全て習得済みを装うが有効の場合、全国図鑑番号順になります。",
     "masteryAll": "すべて",
     "masteryMastered": "習得済み",
     "masteryNotYet": "未習得",
@@ -535,7 +590,10 @@
     "statSpAtk": "特攻",
     "statSpDef": "特防",
     "statSpeed": "素早さ",
-    "lockedSectionHint": "この Pokémon を習得すると解放されます。"
+    "lockedSectionHint": "この Pokémon を習得すると解放されます。",
+    "loadingAriaLabel": "Pokédex を読み込み中",
+    "allPokemonAriaLabel": "ポケモン一覧",
+    "generationPokemonAriaLabel": "{name} のポケモン"
   },
   "pasture": {
     "title": "牧場",
@@ -575,14 +633,19 @@
     "biome": {
       "backLabel": "牧場",
       "backAriaLabel": "牧場に戻る",
-      "emptyState": "このバイオームにはまだ習得済みの Pokémon がいません。練習を続けましょう！"
+      "emptyState": "このバイオームにはまだ習得済みの Pokémon がいません。練習を続けましょう！",
+      "statsAriaLabel": "バイオームの統計"
     },
+    "closeDetailsAriaLabel": "詳細を閉じる",
+    "pokemonDetailsAriaLabel": "{name} の詳細",
+    "newArrivalSuffix": "（新着）",
     "nextArrivals": {
       "ariaLabel": "次の到着",
       "heading": "次の到着",
       "upcomingAriaLabel": "牧場に来る予定のポケモン",
       "allCaughtUp": "レビュー済みのポケモンはすでにすべて牧場にいます。"
-    }
+    },
+    "longPressHint": "いずれかの Pokémon を長押しすると、名前、習得日、次回レビュー間隔が表示されます。"
   },
   "stats": {
     "title": "記録",
@@ -763,6 +826,14 @@
     "typeBreakdown": {
       "heading": "タイプ別",
       "meterAriaLabel": "{typeName}タイプの Pokémon の {masteredPct}% を習得"
+    },
+    "languageBreakdown": {
+      "heading": "言語",
+      "cardCount": "{count, plural, other {# 枚}}",
+      "mastery": "{pct}% 習得済み",
+      "lastReview": "最終復習: {date}",
+      "neverReviewed": "まだ復習なし",
+      "listAriaLabel": "言語別の習得状況"
     }
   },
   "journey": {
@@ -862,6 +933,12 @@
       "learningBody": "学習中: すでに見たことがあり、記憶を定着させています。",
       "masteredBody": "{reps}回連続して正しく思い出し、次のレビューが21日以上先に設定されると習得済みになります。スケジューラーが本当に覚えたと判断した時点です。",
       "introducedNote": "表示済みは、完全に習得したかどうかに関わらず、少なくとも1回見たことのあるポケモンの数です。"
+    },
+    "languageBreakdown": {
+      "heading": "言語",
+      "masteredCount": "{count, plural, other {# 習得済み}}",
+      "bestDay": "{count, plural, other {ベストデイ # レビュー}}",
+      "noBestDay": "まだレビューなし"
     }
   },
   "error": {
@@ -880,6 +957,13 @@
   "onboarding": {
     "welcomeHeading": "Poké Memory へようこそ",
     "closeAriaLabel": "このガイドを閉じる",
+    "dismissHintAriaLabel": "ヒントを閉じる",
+    "hintAriaLabel": "オンボーディングヒント",
+    "knownQuiz": {
+      "chooseGenerationAriaLabel": "世代を選択",
+      "iAlreadyKnowAriaLabel": "{name} はすでに知っている",
+      "generationSpritesAriaLabel": "{name} のスプライト"
+    },
     "intro": "すべての Pokémon の名前と進化を覚えましょう。新しいカードが毎日届き、アプリが忘れる直前にそのカードをもう一度表示します。覚えれば覚えるほど、次に表示されるまでの間隔が長くなります。",
     "howToGrade": {
       "heading": "ボタンの使い方",
@@ -980,6 +1064,9 @@
     "steel": "はがね",
     "water": "みず"
   },
+  "badges": {
+    "dismissToastAriaLabel": "新しいバッジを閉じる: {name}"
+  },
   "pushDaily": {
     "title": "Time to practise",
     "newOnly": "{newEstimate, plural, one {# new card} other {# new cards}} ready to practise.",
@@ -996,7 +1083,8 @@
       "item2": "<s>サインインについて。</s> GitHubまたはGoogleアカウントでサインインすると、カードの進捗をデータベースに安全に保存でき、別のデバイスでも引き継げます。GitHubやGoogleのアカウントを持つには13歳以上である必要があります。",
       "item3": "<s>保存する情報。</s> 保存するのは、練習したポケモンカード、その習熟度、最後に練習した日時のみです。あなたの名前・住所など、個人に関する情報は一切保存しません。",
       "item4": "<s>他の人は見られる?</s> あなたの進捗を見られるのはあなただけです。進捗を他者と共有したり、広告に利用したりすることはありません。",
-      "item5": "<s>自分でコントロールできます。</s> 設定ページからいつでも<export>進捗をエクスポート</export>したり<reset>進捗をリセット</reset>したりできます。私たちに許可を求める必要はありません。今すぐ自分で行えます。"
+      "item5": "<s>自分でコントロールできます。</s> 設定ページからいつでも<export>進捗をエクスポート</export>したり<reset>進捗をリセット</reset>したりできます。私たちに許可を求める必要はありません。今すぐ自分で行えます。",
+      "item6": "<s>フィードバック。</s> フィードバックを送信した場合、メッセージは問題の修正に役立てるため最大12か月間保存され、その後自動的に削除されます。"
     }
   }
 }

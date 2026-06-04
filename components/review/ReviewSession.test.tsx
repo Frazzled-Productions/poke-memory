@@ -281,6 +281,8 @@ function getTileButtons(): HTMLElement[] {
     if (b.getAttribute("aria-controls") === "scope-panel") return false;
     if (/^Clear$/.test(b.textContent ?? "")) return false;
     if (/dismiss hint/i.test(b.getAttribute("aria-label") ?? "")) return false;
+    // InfoButton (#1574) - queue-state explanation affordance, not a tile.
+    if (b.getAttribute("aria-controls") === "queue-state-info") return false;
     return true;
   });
 }
@@ -4410,5 +4412,75 @@ describe("ReviewSession offline-download nudge (#1538)", () => {
 
     const cta = screen.getByRole("link", { name: /open offline download/i });
     expect(cta).toHaveAttribute("href", "/settings#offline-download-heading");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Higher-or-Lower signpost nudge seenPokemon gate (#1573)
+// ---------------------------------------------------------------------------
+
+describe("ReviewSession higher-or-lower nudge seenPokemon gate (#1573)", () => {
+  /** Minimal settings that allow the nudge to show: firstVisit done, flag not dismissed. */
+  const higherOrLowerNudgeSettings: Partial<import("@/lib/settings/persistence").UserSettings> = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 100,
+    evolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    practiceScope: { gens: [], types: [], presets: [] },
+    earnedBadges: [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onboarding: {
+      firstVisitOnboardingDismissed: true,
+      higherOrLowerNudgeDismissed: false,
+    } as import("@/lib/settings/persistence").UserSettings["onboarding"],
+  };
+
+  it("nudge is absent when seenPokemon.length === 0 (no card has firstSeen set)", async () => {
+    // Default fixture: FIXTURE_CARD has firstSeen: null, so seenPokemon is empty.
+    // The gate suppresses the nudge even though firstVisitDone is true.
+    mockLoadSettings.mockReturnValue(higherOrLowerNudgeSettings);
+
+    renderWithIntl(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    expect(
+      screen.queryByText(/finish your session for a bonus mini-game/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("nudge is visible when seenPokemon.length >= 1 and firstVisitDone is true", async () => {
+    // Seed a saved session where the Bulbasaur name card has firstSeen set — this
+    // makes getSeenPokemon return [Bulbasaur], satisfying the seenPokemon.length >= 1 gate.
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [
+        {
+          ...FIXTURE_CARD,
+          state: {
+            ...FIXTURE_CARD.state,
+            firstSeen: "2026-01-01",
+            lastReview: "2026-01-01",
+            reps: 1,
+            fsrsState: "learning" as const,
+          },
+        },
+        GRADUATED_REVERSE_CARD,
+      ],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue(higherOrLowerNudgeSettings);
+
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/finish your session for a bonus mini-game/i),
+      ).toBeInTheDocument();
+    }, { timeout: 5000 });
   });
 });
