@@ -30,7 +30,7 @@ vi.mock("next/navigation", () => ({
 const { mockReadLastSeenVersion, mockWriteLastSeenVersion, MOCK_LAST_SEEN_VERSION_KEY } =
   vi.hoisted(() => ({
     mockReadLastSeenVersion: vi.fn<() => string | null>(),
-    mockWriteLastSeenVersion: vi.fn<() => void>(),
+    mockWriteLastSeenVersion: vi.fn<(v: string) => void>(),
     MOCK_LAST_SEEN_VERSION_KEY: "poke-memory:last-seen-version",
   }));
 
