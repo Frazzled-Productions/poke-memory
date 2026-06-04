@@ -8,6 +8,7 @@
  */
 
 import { mutedTextXs } from "@/lib/utils/class-names";
+import { cn } from "@/lib/utils/cn";
 
 /**
  * Company number as a constant so tests can import it without coupling to the
@@ -21,7 +22,7 @@ export const COMPANY_NUMBER = "17258540";
  */
 export function CompanyDisclosure({ className }: { className?: string }) {
   return (
-    <p className={`${mutedTextXs}${className ? ` ${className}` : ""}`}>
+    <p className={cn(mutedTextXs, className)}>
       Frazzled Productions Ltd, a company registered in England and Wales
       (company number {COMPANY_NUMBER}). Registered office: 71-75 Shelton
       Street, Covent Garden, London, WC2H 9JQ.

@@ -1550,7 +1550,7 @@ describe("SettingsPage — enrolment maintains removedLocales tombstone (#1568)"
   });
 });
 
-describe("SettingsPage — statutory trading disclosure in About section (#1565 Part A)", () => {
+describe("SettingsPage - statutory trading disclosure in About section (#1565 Part A)", () => {
   it("renders the company number 17258540 in the About section", async () => {
     render(<SettingsPage />);
 

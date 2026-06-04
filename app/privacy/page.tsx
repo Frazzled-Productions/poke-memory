@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ChildFriendlySummary from "@/components/privacy/ChildFriendlySummary";
 import { resolveLocale } from "@/i18n/request";
 import { inlineLink } from "@/lib/utils/class-names";
-import { CompanyDisclosure } from "@/components/CompanyDisclosure";
+import { CompanyDisclosure, COMPANY_NUMBER } from "@/components/CompanyDisclosure";
 
 export const metadata: Metadata = {
   title: "Privacy Notice - Poké Memory",
@@ -52,9 +52,9 @@ export default async function PrivacyPage() {
             1. Who is the data controller?
           </h2>
           <p>
-            Poké Memory is operated by Frazzled Productions Ltd (company number
-            17258540), registered in England and Wales. For questions about this
-            notice or your personal data, contact{" "}
+            Poké Memory is operated by Frazzled Productions Ltd (company number{" "}
+            {COMPANY_NUMBER}), registered in England and Wales. For questions
+            about this notice or your personal data, contact{" "}
             <a
               href="mailto:privacy@pokememory.com"
               className={inlineLink}

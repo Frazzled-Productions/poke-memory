@@ -167,6 +167,15 @@ describe("Footer - statutory trading disclosure (#1565 Part A)", () => {
     });
   });
 
+  it("renders copyright as 'Frazzled Productions Ltd' in hamburger mode", async () => {
+    mockLoadSettings.mockReturnValue({ mobileNav: "hamburger", masteryRepetitions: 3 });
+    renderWithIntl(<Footer />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/© \d{4} Frazzled Productions Ltd/)).toBeInTheDocument();
+    });
+  });
+
   it("renders the registered office address in hamburger mode", async () => {
     mockLoadSettings.mockReturnValue({ mobileNav: "hamburger", masteryRepetitions: 3 });
     renderWithIntl(<Footer />);
