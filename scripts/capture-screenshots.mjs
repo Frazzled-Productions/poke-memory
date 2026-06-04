@@ -184,6 +184,9 @@ async function writeSeedToPage(page, seed) {
         audioHintDismissed: true,
         cardTypesHintDismissed: true,
         pwaInstallDismissed: true,
+        // Dismiss the Pasture long-press hint (#1572) so it does not
+        // appear in the screenshot and pollute the captured image.
+        pastureLongPressHintDismissed: true,
       },
     }));
 

@@ -582,7 +582,8 @@
       "heading": "次の到着",
       "upcomingAriaLabel": "牧場に来る予定のポケモン",
       "allCaughtUp": "レビュー済みのポケモンはすでにすべて牧場にいます。"
-    }
+    },
+    "longPressHint": "いずれかの Pokémon を長押しすると、名前、習得日、次回レビュー間隔が表示されます。"
   },
   "stats": {
     "title": "記録",

@@ -84,6 +84,7 @@ const VALID_SETTINGS: UserSettings = {
     practiceSessionsCount: 0,
     offlineDownloadNudgeDismissed: false,
     slowSpriteLoadCount: 0,
+    pastureLongPressHintDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

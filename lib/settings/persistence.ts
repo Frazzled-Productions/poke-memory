@@ -137,6 +137,16 @@ export type OnboardingFlags = {
    * have been counted).
    */
   slowSpriteLoadCount: number;
+  /**
+   * One-time dismissal flag for the Pasture long-press popover discovery hint
+   * (#1572). Shown on first Pasture visit (both populated and empty states) to
+   * signal that pressing and holding any Pokémon sprite reveals its name,
+   * mastery date, and review interval. `true` = user dismissed it.
+   *
+   * `=== true` coercion: absent key in pre-#1572 blobs resolves to `false`
+   * → every existing user sees the hint once on their next Pasture visit.
+   */
+  pastureLongPressHintDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -166,6 +176,9 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   // Default 0: absent in pre-#1538 blobs resolves to 0 (below threshold; nudge
   // does not show on slow-load signal alone until 3 events have been counted).
   slowSpriteLoadCount: 0,
+  // Default false: absent in pre-#1572 blobs resolves to false (not dismissed;
+  // hint shows on next Pasture visit for every existing user).
+  pastureLongPressHintDismissed: false,
 };
 
 /**
@@ -805,6 +818,8 @@ export function validateOnboarding(value: unknown): OnboardingFlags {
       v.slowSpriteLoadCount >= 0
         ? v.slowSpriteLoadCount
         : 0,
+    // === true coercion: absent key in pre-#1572 blobs resolves to false (hint shows).
+    pastureLongPressHintDismissed: v.pastureLongPressHintDismissed === true,
   };
 }
 
