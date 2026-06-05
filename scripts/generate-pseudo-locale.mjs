@@ -29,6 +29,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// `--check` regenerates in memory and fails (exit 1) if the on-disk
+// messages/xx-pseudo.json is stale, WITHOUT writing - so the drift CI's
+// `check` job enforces (a catalogue change that skipped the regen) is caught
+// in the local `lint` gate before push. #1649 / #1654: the drift is otherwise
+// invisible locally and only surfaces in CI.
+const CHECK_ONLY = process.argv.includes("--check");
+
 const REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const EN_PATH = join(REPO_ROOT, "messages", "en.json");
 const OUT_PATH = join(REPO_ROOT, "messages", "xx-pseudo.json");
@@ -63,5 +70,23 @@ const raw = readFileSync(EN_PATH, "utf8");
 const en = JSON.parse(raw);
 const pseudo = wrapLeaves(en);
 const output = JSON.stringify(pseudo, null, 2) + "\n";
-writeFileSync(OUT_PATH, output, "utf8");
-console.log(`generate-pseudo-locale: wrote ${OUT_PATH}`);
+
+if (CHECK_ONLY) {
+  let current = "";
+  try {
+    current = readFileSync(OUT_PATH, "utf8");
+  } catch {
+    current = "";
+  }
+  if (current !== output) {
+    console.error(
+      `lint:pseudo-locale: ${OUT_PATH} is out of date with messages/en.json. ` +
+        `Run 'npm run generate:pseudo-locale' and commit the result.`,
+    );
+    process.exit(1);
+  }
+  console.log("lint:pseudo-locale: OK (xx-pseudo.json matches en.json).");
+} else {
+  writeFileSync(OUT_PATH, output, "utf8");
+  console.log(`generate-pseudo-locale: wrote ${OUT_PATH}`);
+}

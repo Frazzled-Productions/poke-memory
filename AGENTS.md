@@ -108,6 +108,8 @@ Declare-a-discovery-path, reach-existing-users, and mock-up-on-visual-surface-pr
 
 `scripts/lint-i18n.mjs` (`npm run lint:i18n`, part of the `lint` chain) diffs every non-English catalogue (`messages/{ja,zh-Hans,zh-Hant}.json`) against `messages/en.json` and fails on any **missing** or **extra** key in either direction (extra keys are dead-code drift). When adding/renaming a key: add it to `messages/en.json` first, then propagate the same structural change to the three non-English files before committing.
 
+`npm run lint:pseudo-locale` (`generate-pseudo-locale.mjs --check`, also in the `lint` chain - #1649) fails if `messages/xx-pseudo.json` is stale vs `messages/en.json`. After any `messages/en.json` change run `npm run generate:pseudo-locale` and commit the regenerated `xx-pseudo.json`; the local `lint` gate now catches the drift that previously only surfaced in CI's `check` job (#1654).
+
 ### Caching
 
 - **Cache Components is enabled** (`cacheComponents: true` in `next.config.ts`). All cache APIs assume this model.
