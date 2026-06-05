@@ -47,7 +47,10 @@ import {
   hasPriorLocalProgress,
   FunnelTracker,
 } from "./FunnelTracker";
-import { KEY_MASTERED_COUNT_BY_LOCALE } from "@/lib/storage/keys";
+import {
+  KEY_LAST_SEEN_VERSION,
+  KEY_MASTERED_COUNT_BY_LOCALE,
+} from "@/lib/storage/keys";
 
 // -----------------------------------------------------------------
 // Helpers
@@ -121,14 +124,39 @@ describe("readTotalMasteredCount", () => {
     expect(readTotalMasteredCount()).toBe(0);
   });
 
-  it("sums all locale counts", () => {
+  it("returns 0 when readMasteredCountCache returns its zero-object (absent-key / not-yet-populated path)", () => {
+    // readMasteredCountCache documents that callers must treat the all-zero
+    // object as "not yet populated". This test pins the assumption that
+    // readTotalMasteredCount() correctly returns 0 in that case.
+    mockReadMasteredCountCache.mockReturnValue({
+      en: 0,
+      ja: 0,
+      "zh-Hans": 0,
+      "zh-Hant": 0,
+    });
+    expect(readTotalMasteredCount()).toBe(0);
+  });
+
+  it("returns the maximum single-locale count (not sum) across locales", () => {
     mockReadMasteredCountCache.mockReturnValue({
       en: 10,
       ja: 5,
       "zh-Hans": 3,
       "zh-Hant": 2,
     });
-    expect(readTotalMasteredCount()).toBe(20);
+    expect(readTotalMasteredCount()).toBe(10);
+  });
+
+  it("does not double-count species mastered in multiple locales", () => {
+    // A user who has mastered 42 species in both English and Japanese has
+    // not mastered 84 unique species — the peak locale count is the correct proxy.
+    mockReadMasteredCountCache.mockReturnValue({
+      en: 42,
+      ja: 42,
+      "zh-Hans": 0,
+      "zh-Hant": 0,
+    });
+    expect(readTotalMasteredCount()).toBe(42);
   });
 
   it("handles a cache with only English counts", () => {
@@ -161,6 +189,11 @@ describe("hasPriorLocalProgress", () => {
 
   it("returns false when only a superuser flags key is present", () => {
     setLocalStorageKeys(["poke-memory:superuser:flags:v1"]);
+    expect(hasPriorLocalProgress()).toBe(false);
+  });
+
+  it("returns false when only the last-seen-version key is present (written by WhatsNewIndicator on first visit)", () => {
+    setLocalStorageKeys([KEY_LAST_SEEN_VERSION]);
     expect(hasPriorLocalProgress()).toBe(false);
   });
 
@@ -268,10 +301,10 @@ describe("FunnelTracker component", () => {
     );
   });
 
-  it("uses progressBucket='11-50' when total mastered is 25", async () => {
+  it("uses progressBucket='11-50' when peak locale mastered is 25", async () => {
     renderTracker({
       user: null,
-      masteredCounts: { en: 10, ja: 8, "zh-Hans": 5, "zh-Hant": 2 },
+      masteredCounts: { en: 25, ja: 0, "zh-Hans": 0, "zh-Hant": 0 },
     });
     await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
     expect(mockTrack).toHaveBeenCalledWith(

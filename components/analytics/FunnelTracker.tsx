@@ -17,10 +17,10 @@
  *   - "new" when neither condition holds.
  *
  * `progressBucket` is derived from the mastered-species count cache
- * (`KEY_MASTERED_COUNT_BY_LOCALE`), the total across all locales. This is
- * a fast localStorage read with no card-array parse, consistent with the
+ * (`KEY_MASTERED_COUNT_BY_LOCALE`), the peak count across all locales. This
+ * is a fast localStorage read with no card-array parse, consistent with the
  * approach used by `useProfileStatus`. Returns "0" when the cache is absent
- * or the total is zero, which is the correct value for a truly new user.
+ * or the maximum is zero, which is the correct value for a truly new user.
  *
  * The event fires once, after auth loading completes, and is not repeated on
  * subsequent renders. The component renders nothing.
@@ -61,25 +61,32 @@ export function toProgressBucket(total: number): ProgressBucket {
 }
 
 /**
- * Read the total mastered-species count (sum across all locales) from the
+ * Read the peak mastered-species count (maximum across all locales) from the
  * localStorage cache. Returns 0 when the cache is absent or malformed.
+ *
+ * Uses `Math.max` rather than a sum to avoid double-counting: a user who has
+ * mastered the same 42 species in two locales has not mastered 84 unique
+ * species. The highest single-locale count is the correct proxy for bucket
+ * classification.
  *
  * Re-uses the existing `readMasteredCountCache` single-source helper; does
  * not re-derive mastery from the card array.
  */
 export function readTotalMasteredCount(): number {
-  if (typeof window === "undefined") return 0;
   const counts = readMasteredCountCache();
-  return counts.en + counts.ja + counts["zh-Hans"] + counts["zh-Hant"];
+  return Math.max(counts.en, counts.ja, counts["zh-Hans"], counts["zh-Hant"]);
 }
 
 /**
  * Detect whether the current browser has any prior `poke-memory:` progress
- * in localStorage. A single key with a `poke-memory:` prefix that is not the
- * superuser key is treated as evidence of prior usage.
+ * in localStorage. A single key with a `poke-memory:` prefix that is not an
+ * infrastructure-only key is treated as evidence of prior usage.
  *
- * We intentionally exclude the superuser key (`poke-memory:superuser`) to
- * avoid false-positives for users who have only unlocked the developer panel.
+ * Excluded keys (do not represent review progress):
+ *   - `poke-memory:superuser` / `poke-memory:superuser:*` — developer panel.
+ *   - `poke-memory:last-seen-version:*` — written by `WhatsNewIndicator` on
+ *     every first visit before auth resolves, so it would otherwise make every
+ *     brand-new user appear as a returning guest.
  *
  * Uses a prefix scan rather than checking a fixed key so new progress keys
  * added in future are automatically included.
@@ -93,9 +100,9 @@ export function hasPriorLocalProgress(): boolean {
       if (
         key !== null &&
         key.startsWith("poke-memory:") &&
-        // Exclude the superuser keys; those do not represent review progress.
         key !== "poke-memory:superuser" &&
-        !key.startsWith("poke-memory:superuser:")
+        !key.startsWith("poke-memory:superuser:") &&
+        !key.startsWith("poke-memory:last-seen-version:")
       ) {
         return true;
       }
