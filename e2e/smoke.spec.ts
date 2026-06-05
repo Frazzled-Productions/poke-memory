@@ -824,10 +824,6 @@ test.describe("Sign-in sheet (#1669)", () => {
     await expect(
       dialog.getByRole("button", { name: "Continue with Google" }),
     ).toBeVisible();
-    // Returning-user affordance
-    await expect(
-      dialog.getByText(/Already have an account/i),
-    ).toBeVisible();
   });
 
   test("SignInSheet closes when Escape is pressed", async ({ page, browserName }) => {

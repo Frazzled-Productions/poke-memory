@@ -45,7 +45,6 @@
     "signInSheet": {
       "heading": "Keep your progress safe",
       "body": "Sign in once to back up your data across all your devices. Free, no spam.",
-      "signInInstead": "Already have an account? Sign in instead.",
       "closeAriaLabel": "Close sign-in sheet"
     }
   },

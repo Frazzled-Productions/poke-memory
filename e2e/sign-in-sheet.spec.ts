@@ -75,24 +75,6 @@ test.describe("SignInSheet - from nav trigger (#1669)", () => {
     await expect(googleBtn).toBeEnabled();
   });
 
-  test("SignInSheet shows returning-user sign-in-instead text", async ({
-    page,
-  }) => {
-    await page.goto("/");
-
-    const signIn = page.getByRole("button", { name: "Sign in" }).first();
-    if (!(await signIn.isVisible().catch(() => false))) {
-      test.skip();
-      return;
-    }
-
-    await signIn.click();
-
-    const dialog = page.getByRole("dialog", { name: /keep your progress safe/i });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/already have an account/i)).toBeVisible();
-  });
-
   test("SignInSheet closes when the close button is clicked", async ({
     page,
   }) => {

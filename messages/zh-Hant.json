@@ -45,7 +45,6 @@
     "signInSheet": {
       "heading": "保護你的學習進度",
       "body": "登入一次，即可在所有裝置上備份資料。免費，無垃圾郵件。",
-      "signInInstead": "已有帳號？直接登入。",
       "closeAriaLabel": "關閉登入面板"
     }
   },
