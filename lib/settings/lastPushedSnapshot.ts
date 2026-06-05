@@ -1,4 +1,4 @@
-import type { UserSettings } from "./persistence";
+import { DEFAULT_SETTINGS, type UserSettings } from "./persistence";
 import { KEY_SETTINGS_LAST_PUSHED } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { writeLocalStorage } from "@/lib/storage/writeLocalStorage";
@@ -65,9 +65,15 @@ export function preserveDeviceLocalKeys(
  *      always replaces the whole sub-object, not individual keys inside it.
  *
  * Returns the full `next` (minus device-local keys) when `prev` is null
- * (first push from this device). Otherwise returns an object containing only
- * the top-level keys whose JSON-serialised value differs, again excluding
- * device-local keys.
+ * (first push from this device), with an additional default-prune: any
+ * top-level key whose value deep-equals `DEFAULT_SETTINGS[key]` is dropped.
+ * This prevents a fresh or stale device from first-pushing a default sub-object
+ * that would shallow-overwrite a richer cloud value via the `||` JSONB merge
+ * (#1682). The prune applies ONLY when `prev === null`; once a snapshot exists,
+ * any change - even back to a default - is a legitimate user action and is sent.
+ *
+ * Otherwise returns an object containing only the top-level keys whose
+ * JSON-serialised value differs, again excluding device-local keys.
  */
 export function diffSettings(
   prev: UserSettings | null,
@@ -77,6 +83,10 @@ export function diffSettings(
   if (prev === null) {
     for (const key of Object.keys(next) as Array<keyof UserSettings>) {
       if (DEVICE_LOCAL_KEYS.has(key)) continue;
+      // Default-prune on first push: skip keys that are unchanged from the
+      // DEFAULT_SETTINGS baseline. A device that has never customised a field
+      // must not clobber a richer value that another device has already pushed.
+      if (JSON.stringify(next[key]) === JSON.stringify(DEFAULT_SETTINGS[key])) continue;
       patch[key as string] = next[key];
     }
     return patch as Partial<UserSettings>;

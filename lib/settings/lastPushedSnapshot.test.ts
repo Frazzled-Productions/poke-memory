@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { diffSettings, preserveDeviceLocalKeys, DEVICE_LOCAL_KEYS } from "./lastPushedSnapshot";
-import type { UserSettings } from "./persistence";
+import { DEFAULT_SETTINGS, type UserSettings } from "./persistence";
 
 function s(overrides: Partial<UserSettings>): UserSettings {
   return {
@@ -14,9 +14,21 @@ function s(overrides: Partial<UserSettings>): UserSettings {
 }
 
 describe("diffSettings", () => {
-  it("returns the full object when the snapshot is null (first push)", () => {
+  it("returns only non-default keys when the snapshot is null (first push default-prune)", () => {
+    // themeIntensity "tinted" is non-default (DEFAULT is "accents"); it must appear.
+    // masteryRepetitions 3 equals DEFAULT_SETTINGS.masteryRepetitions; it must be pruned.
     const next = s({ themeIntensity: "tinted" });
-    expect(diffSettings(null, next)).toEqual(next);
+    const patch = diffSettings(null, next);
+    expect(patch).toHaveProperty("themeIntensity", "tinted");
+    expect(patch).not.toHaveProperty("masteryRepetitions");
+    expect(patch).not.toHaveProperty("maxNewPerDay");
+  });
+
+  it("sends the full non-default blob when prev is null and all fields are customised", () => {
+    const next = s({ themeIntensity: "tinted", masteryRepetitions: 5 });
+    const patch = diffSettings(null, next);
+    expect(patch).toHaveProperty("themeIntensity", "tinted");
+    expect(patch).toHaveProperty("masteryRepetitions", 5);
   });
 
   it("returns only the changed top-level keys", () => {
@@ -62,6 +74,57 @@ describe("diffSettings", () => {
     const prev = s({ appVisitCount: 1 });
     const next = s({ appVisitCount: 99 });
     expect(diffSettings(prev, next)).toEqual({});
+  });
+
+  // ─── Forcing-function: first-push default-prune (#1682) ────────────────────
+
+  it("default-prune: a fully-default first-push produces an empty patch (no cloud clobber)", () => {
+    // A stale/fresh device with all defaults must send nothing to cloud.
+    const patch = diffSettings(null, { ...DEFAULT_SETTINGS });
+    // Device-local keys are already excluded; all remaining keys are default-valued
+    // and should be pruned. The result must be empty.
+    for (const key of Object.keys(patch)) {
+      expect(patch).not.toHaveProperty(key);
+    }
+    expect(Object.keys(patch)).toHaveLength(0);
+  });
+
+  it("default-prune: does NOT prune non-default values on first push", () => {
+    const next: UserSettings = {
+      ...DEFAULT_SETTINGS,
+      masteryRepetitions: 5,      // non-default
+      onboarding: {
+        ...DEFAULT_SETTINGS.onboarding,
+        firstVisitOnboardingDismissed: true,  // non-default
+      },
+    };
+    const patch = diffSettings(null, next);
+    expect(patch).toHaveProperty("masteryRepetitions", 5);
+    expect(patch).toHaveProperty("onboarding");
+    expect((patch.onboarding as typeof next.onboarding)?.firstVisitOnboardingDismissed).toBe(true);
+  });
+
+  it("default-prune: once a snapshot exists, sending a value back to default IS included in the diff", () => {
+    // After the first push, if the user resets a setting to its default, that is a
+    // deliberate action and must be sent (snapshot → next diff, not default-pruned).
+    const prev: UserSettings = { ...DEFAULT_SETTINGS, masteryRepetitions: 5 };
+    const next: UserSettings = { ...DEFAULT_SETTINGS, masteryRepetitions: 3 }; // reset to default
+    const patch = diffSettings(prev, next);
+    expect(patch).toHaveProperty("masteryRepetitions", 3);
+  });
+
+  it("default-prune: does not allow a default-bearing first push to shrink the key set cloud holds", () => {
+    // Simulate a cloud that already has earnedBadges (a non-default richer value).
+    // A fresh device with default earnedBadges=[] must NOT include earnedBadges in
+    // its first push, because the `||` JSONB overlay would replace the cloud value.
+    const freshDevice: UserSettings = { ...DEFAULT_SETTINGS }; // earnedBadges: []
+    const patch = diffSettings(null, freshDevice);
+    // earnedBadges default is []; after pruning it must be absent from the patch.
+    expect(patch).not.toHaveProperty("earnedBadges");
+    // onboarding default matches DEFAULT_ONBOARDING; after pruning it must be absent.
+    expect(patch).not.toHaveProperty("onboarding");
+    // streakProtection default matches DEFAULT_STREAK_PROTECTION; must be absent.
+    expect(patch).not.toHaveProperty("streakProtection");
   });
 });
 

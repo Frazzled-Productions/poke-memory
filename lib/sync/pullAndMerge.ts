@@ -231,20 +231,28 @@ export async function pullAndMerge(
         // above) so the locale merge step below still sees the correct original state.
         const { learningLocales: _learningLocales, removedLocales: _removedLocales, ...cloudSettingsWithoutLocales } =
           (pulledRow.settings ?? {}) as Partial<typeof DEFAULT_SETTINGS>;
-        saveSettings(
-          preserveDeviceLocalKeys(
-            {
-              ...DEFAULT_SETTINGS,
-              ...cloudSettingsWithoutLocales,
-              // Re-inject pre-LWW locale fields so saveSettings does not reset
-              // them to DEFAULT_SETTINGS defaults. The locale merge step below
-              // will compute and write the final merged values.
-              learningLocales: preLocalSettings.learningLocales,
-              removedLocales: preLocalSettings.removedLocales,
-            },
-            preLocalSettings,
-          ),
+        const lwwBlob = preserveDeviceLocalKeys(
+          {
+            ...DEFAULT_SETTINGS,
+            ...cloudSettingsWithoutLocales,
+            // Re-inject pre-LWW locale fields so saveSettings does not reset
+            // them to DEFAULT_SETTINGS defaults. The locale merge step below
+            // will compute and write the final merged values.
+            learningLocales: preLocalSettings.learningLocales,
+            removedLocales: preLocalSettings.removedLocales,
+          },
+          preLocalSettings,
         );
+        // Snapshot the blob BEFORE saveSettings fires SETTINGS_SAVED_EVENT so the
+        // AutoSyncOnChange listener sees a zero-key diff and does not re-push
+        // cloud-pulled sub-objects back (CC-1, #1682). saveSettings mirrors
+        // pokemonNameLocale from activePokemonNameLocale in the written object, so
+        // we must do the same here to keep the snapshot and the event detail in sync.
+        saveLastPushedSettings({
+          ...lwwBlob,
+          pokemonNameLocale: lwwBlob.activePokemonNameLocale,
+        });
+        saveSettings(lwwBlob);
       }
 
       // Write-through for MT-banner dismissals (#1387, AC2). Union the cloud
