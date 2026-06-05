@@ -130,7 +130,7 @@ Batch PRs ─▶ qa ─▶ (preview deploy + maintainer QA) ─▶ qa→main PR 
 **Batch-drain pre-flight: aggregate coverage check.** Diff coverage is gated per-PR, but a set of PRs that each clear the 90% patch bar individually can still leave the *aggregate* `qa -> main` diff below the bar - a UI-heavy PR with E2E but thin unit coverage is the usual culprit. This surfaces as a failed `qa -> main` promotion needing a dedicated catch-up PR. To catch it before the drain rather than after, run the diff-coverage gate against the whole `qa`-vs-`main` diff before initiating a batch drain:
 
 1. Run `npm run test:coverage` once to produce `coverage/coverage-final.json` (the `json` reporter). The script reads this file; it does not run the suite itself.
-2. Pipe the aggregate diff into the gate: `git diff origin/main...origin/qa | node scripts/diff-coverage.mjs`. The script reads a unified diff on **stdin** - it has no diff-range argument. (`npm run coverage:diff` is the per-PR shortcut and hard-codes `origin/qa...HEAD`, so it is not the right invocation for the aggregate check.)
+2. Pipe the aggregate diff into the gate: `git diff origin/main...origin/qa | node scripts/diff-coverage.mjs`. The script reads a unified diff on **stdin** - it has no diff-range argument. (`npm run test:diff-coverage` is the per-PR shortcut and defaults to `origin/qa...HEAD` - override the base with `DIFF_COVERAGE_BASE` - so it is not the right invocation for this `main...qa` aggregate check.)
 
 A non-zero exit means the aggregate patch coverage is below the 90% bar; fold the gap into the batch as an extra test-only change. Do this at drain start, not at promotion time.
 
