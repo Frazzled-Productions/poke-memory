@@ -233,7 +233,7 @@ describe("LinkIdentitiesSection", () => {
     it("disables the button while a link is pending", async () => {
       const ue = userEvent.setup();
       const user = makeUser(["github"]);
-      // Never resolves during the test — simulates a pending state.
+      // Never resolves during the test - simulates a pending state.
       const supabase = {
         auth: {
           linkIdentity: vi.fn().mockImplementation(() => new Promise(() => {})),

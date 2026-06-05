@@ -1,7 +1,7 @@
 /**
  * Smoke tests for the Pokédex page (#923).
  *
- * Covers line 19 in app/pokedex/page.tsx — the useLocalStorageKey call that
+ * Covers line 19 in app/pokedex/page.tsx - the useLocalStorageKey call that
  * was previously uninstrumented and was failing the diff-coverage gate.
  */
 
@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithIntl, screen, waitFor } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
-// Mocks — all declared before the component import.
+// Mocks - all declared before the component import.
 // ---------------------------------------------------------------------------
 
 vi.mock("next/navigation", () => ({

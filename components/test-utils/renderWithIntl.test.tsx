@@ -11,10 +11,10 @@
  *  - Each locale produces a DISTINCT value, so a mis-wired MESSAGES map
  *    (e.g. zh-Hant pointing at jaMessages) fails the test.
  *
- * The component under test is a minimal stub defined inline — this file
+ * The component under test is a minimal stub defined inline - this file
  * tests the helper infrastructure, not any production component.
  *
- * Key choice — `nav.brand` as the assertion key:
+ * Key choice - `nav.brand` as the assertion key:
  *   en       → "poke-memory"
  *   ja       → "ポケメモリー"
  *   zh-Hans  → "宝可记忆"
@@ -29,7 +29,7 @@ import { useTranslations } from "next-intl";
 import { renderWithIntl, renderJa, screen } from "./renderWithIntl";
 
 // ---------------------------------------------------------------------------
-// Minimal test component — calls useTranslations and renders the value.
+// Minimal test component - calls useTranslations and renders the value.
 // ---------------------------------------------------------------------------
 
 function NavBrandLabel() {
@@ -43,7 +43,7 @@ function NavBrandLabel() {
 
 describe("renderWithIntl helper", () => {
   it("renders without throwing when a component calls useTranslations()", () => {
-    // No NextIntlClientProvider mock needed — the helper provides the real one.
+    // No NextIntlClientProvider mock needed - the helper provides the real one.
     expect(() => renderWithIntl(<NavBrandLabel />)).not.toThrow();
   });
 
@@ -81,12 +81,12 @@ describe("renderWithIntl helper", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Verify distinct values guard — every locale produces a unique string.
+// Verify distinct values guard - every locale produces a unique string.
 // A mis-wired MESSAGES map (e.g. two locales pointing at the same catalogue)
 // is caught because only one value can appear in the document at a time.
 // ---------------------------------------------------------------------------
 
-describe("renderWithIntl — locale switching produces distinct output", () => {
+describe("renderWithIntl - locale switching produces distinct output", () => {
   it("all four locales render different brand text", () => {
     const locales: Array<{
       locale: "en" | "ja" | "zh-Hans" | "zh-Hant";

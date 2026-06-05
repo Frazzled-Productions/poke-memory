@@ -10,7 +10,7 @@ let _flavorLoadPromise: Promise<Map<number, FlavorTextEntry[]>> | null = null;
 /**
  * Shape stored in `generated-flavor.json` (post-#1559).
  * Each entry carries the normalised text and the PokéAPI version slugs that
- * used it. Older payloads used plain `string` — `normaliseFlavorEntry` handles
+ * used it. Older payloads used plain `string` - `normaliseFlavorEntry` handles
  * both forms.
  */
 type FlavorJsonEntry = {
@@ -43,7 +43,7 @@ export async function loadFlavorTexts(): Promise<Map<number, FlavorTextEntry[]>>
       _flavorCache = map;
       return map;
     } catch {
-      // Non-fatal — facts panel renders without Pokédex entries.
+      // Non-fatal - facts panel renders without Pokédex entries.
       _flavorCache = new Map();
       return _flavorCache;
     }
@@ -113,7 +113,7 @@ function heightComparison(dm: number): string {
     m < 8.0 ? "about the height of a double-decker bus" :
     m < 15.0 ? "taller than a four-storey building" :
     "taller than a six-storey building";
-  return `${m.toFixed(1)} m — ${label}`;
+  return `${m.toFixed(1)} m - ${label}`;
 }
 
 function weightComparison(hg: number): string {
@@ -129,7 +129,7 @@ function weightComparison(hg: number): string {
     kg < 350 ? "about as heavy as a large grizzly bear" :
     kg < 500 ? "about as heavy as a large horse" :
     "heavier than a small car";
-  return `${kg.toFixed(1)} kg — ${label}`;
+  return `${kg.toFixed(1)} kg - ${label}`;
 }
 
 function happinessTier(n: number): string {

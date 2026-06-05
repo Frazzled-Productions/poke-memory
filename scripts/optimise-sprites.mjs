@@ -7,11 +7,11 @@
  * `public/sprites/pokemon/webp/<id>/<width>.webp`.
  *
  * The generated files are committed to the repository so the build never
- * needs to run this script — they are static assets served directly without
+ * needs to run this script - they are static assets served directly without
  * any Vercel Image Optimisation transformation.
  *
  * `sharp` is used for conversion. It is a Next.js transitive dependency and
- * is NOT listed in package.json — do not add it. If `sharp` cannot be
+ * is NOT listed in package.json - do not add it. If `sharp` cannot be
  * resolved, the script exits with an error explaining that it must be run
  * after `npm ci` (or `npm install`) has resolved the Next.js dependency tree.
  *
@@ -28,7 +28,7 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = join(__dirname, '..');
 
 // ---------------------------------------------------------------------------
-// Resolve `sharp` as a Next.js transitive dep — do NOT add to package.json.
+// Resolve `sharp` as a Next.js transitive dep - do NOT add to package.json.
 // ---------------------------------------------------------------------------
 let sharp;
 try {
@@ -43,7 +43,7 @@ try {
 }
 
 // ---------------------------------------------------------------------------
-// Width set — mirrors lib/sprites/imageLoaderHelpers.ts GENERATED_SPRITE_WIDTHS.
+// Width set - mirrors lib/sprites/imageLoaderHelpers.ts GENERATED_SPRITE_WIDTHS.
 // Keep in sync manually; this script is intentionally framework-free so it
 // does not import TypeScript source directly.
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ async function convertSprite(pngPath, id) {
     sourceWidth = meta.width ?? SOURCE_RESOLUTION_CAP;
   } catch (err) {
     console.error(`  [${id}] Failed to read metadata: ${err.message}`);
-    // Treat every width as failed — we cannot determine the source size.
+    // Treat every width as failed - we cannot determine the source size.
     failed += GENERATED_WIDTHS.length;
     return { id, generated, skipped, failed };
   }
@@ -117,7 +117,7 @@ async function convertSprite(pngPath, id) {
   await mkdir(outDir, { recursive: true });
 
   for (const width of GENERATED_WIDTHS) {
-    // Cap at source resolution — do not upscale.
+    // Cap at source resolution - do not upscale.
     const targetWidth = Math.min(width, sourceWidth);
     const outPath = join(outDir, `${width}.webp`);
 
@@ -190,6 +190,6 @@ console.log(
 );
 
 if (totalFailed > 0) {
-  console.error(`${totalFailed} conversion(s) failed — see errors above.`);
+  console.error(`${totalFailed} conversion(s) failed - see errors above.`);
   process.exit(1);
 }

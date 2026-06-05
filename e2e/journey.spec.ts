@@ -24,7 +24,7 @@ async function seedSuperuser(
   }, opts);
 }
 
-test.describe("Journey page — basic load", () => {
+test.describe("Journey page - basic load", () => {
   test("loads with the Journey heading", async ({ page }) => {
     await page.goto("/journey");
     await expect(
@@ -57,7 +57,7 @@ test.describe("Journey page — basic load", () => {
   });
 });
 
-test.describe("Journey page — badge gallery", () => {
+test.describe("Journey page - badge gallery", () => {
   test("badge gallery section is visible", async ({ page }) => {
     await page.goto("/journey");
     await expect(
@@ -72,7 +72,7 @@ test.describe("Journey page — badge gallery", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
-    // A fresh guest has no earned badges — locked tiles must not be visible yet.
+    // A fresh guest has no earned badges - locked tiles must not be visible yet.
     await expect(
       page.getByLabel(/Boulder Badge \(locked\):/i).first(),
     ).not.toBeVisible();
@@ -104,7 +104,7 @@ test.describe("Journey page — badge gallery", () => {
   });
 });
 
-test.describe("Journey page — superuser flag", () => {
+test.describe("Journey page - superuser flag", () => {
   test("pretendAllMastered shows a non-zero mastered count in MasteryRings", async ({
     page,
   }) => {
@@ -114,7 +114,7 @@ test.describe("Journey page — superuser flag", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Mastery distribution" }),
     ).toBeVisible({ timeout: 15_000 });
-    // Under the flag every species is mastered — the "Mastered" ring label
+    // Under the flag every species is mastered - the "Mastered" ring label
     // should show a non-zero count. The exact count is the full species count;
     // we just verify the zero-state label is absent.
     await expect(
@@ -129,7 +129,7 @@ test.describe("Journey page — superuser flag", () => {
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
-    // No earned badges on a fresh guest — the badge list on the trainer card
+    // No earned badges on a fresh guest - the badge list on the trainer card
     // must not be visible.
     await expect(
       page.getByRole("list", { name: "Gym badges earned" }),
@@ -140,7 +140,7 @@ test.describe("Journey page — superuser flag", () => {
   });
 });
 
-test.describe("Journey page — collection timeline scrubber", () => {
+test.describe("Journey page - collection timeline scrubber", () => {
   test("timeline section heading is visible", async ({ page }) => {
     await page.goto("/journey");
     await expect(
@@ -203,7 +203,7 @@ test.describe("Journey page — collection timeline scrubber", () => {
   });
 });
 
-test.describe("Journey page — evolution wall", () => {
+test.describe("Journey page - evolution wall", () => {
   test("evolution wall section heading is visible", async ({ page }) => {
     await page.goto("/journey");
     await expect(
@@ -253,7 +253,7 @@ test.describe("Journey page — evolution wall", () => {
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
-    // Expand the wall first — locate by aria-expanded so the selector is stable
+    // Expand the wall first - locate by aria-expanded so the selector is stable
     // regardless of whether the button currently reads "Expand" or "Collapse".
     await page.locator('button[aria-expanded]').filter({ hasText: /Expand|Collapse/i }).click();
     // All three filter tabs present.
@@ -276,9 +276,9 @@ test.describe("Journey page — evolution wall", () => {
     // The summary line is visible without expanding.
     const headline = page.getByText(/Families completed:/i);
     await expect(headline).toBeVisible();
-    // Expand the wall to access the filter tabs and gallery — stable selector.
+    // Expand the wall to access the filter tabs and gallery - stable selector.
     await page.locator('button[aria-expanded]').filter({ hasText: /Expand|Collapse/i }).click();
-    // Switch to "Completed" filter — gallery should be non-empty.
+    // Switch to "Completed" filter - gallery should be non-empty.
     await page.getByRole("tab", { name: "Completed" }).click();
     await expect(
       page.getByRole("list", { name: "Evolution families" }),
@@ -292,9 +292,9 @@ test.describe("Journey page — evolution wall", () => {
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
-    // Expand the wall first — stable selector.
+    // Expand the wall first - stable selector.
     await page.locator('button[aria-expanded]').filter({ hasText: /Expand|Collapse/i }).click();
-    // Switch to "In progress" — fresh guest has no mastered edges.
+    // Switch to "In progress" - fresh guest has no mastered edges.
     await page.getByRole("tab", { name: "In progress" }).click();
     await expect(
       page.getByText(/No families in progress yet/i),
@@ -302,7 +302,7 @@ test.describe("Journey page — evolution wall", () => {
   });
 });
 
-test.describe("Journey page — milestone share card", () => {
+test.describe("Journey page - milestone share card", () => {
   test("banner is absent on a fresh guest session (no mastered Pokémon)", async ({
     page,
   }) => {
@@ -310,7 +310,7 @@ test.describe("Journey page — milestone share card", () => {
     await expect(
       page.getByRole("region", { name: "Trainer card" }),
     ).toBeVisible({ timeout: 15_000 });
-    // No mastered Pokémon on a fresh guest — banner must not be present.
+    // No mastered Pokémon on a fresh guest - banner must not be present.
     await expect(
       page.getByTestId("milestone-share-banner"),
     ).toHaveCount(0);
@@ -403,7 +403,7 @@ test.describe("Journey page — milestone share card", () => {
   });
 });
 
-test.describe("Journey page — next badge proximity hint", () => {
+test.describe("Journey page - next badge proximity hint", () => {
   test("hint is present on a fresh guest session and targets the nearest badge", async ({
     page,
   }) => {
@@ -425,8 +425,8 @@ test.describe("Journey page — next badge proximity hint", () => {
   test("hint renders and shows the nearest badge when some Pokémon are mastered", async ({
     page,
   }) => {
-    // Seed one mastered species (74 = Geodude) — both name AND reverse cards.
-    // Boulder Badge requires species 74 and 95 — so 1 remaining after Geodude
+    // Seed one mastered species (74 = Geodude) - both name AND reverse cards.
+    // Boulder Badge requires species 74 and 95 - so 1 remaining after Geodude
     // is mastered, which is the smallest gap across all badges and therefore
     // Boulder Badge becomes the hint target.
     // Since #1234, mastery requires both the name card and the paired reverse
@@ -504,7 +504,7 @@ test.describe("Journey page — next badge proximity hint", () => {
   });
 });
 
-test.describe("Journey page — close to mastery section", () => {
+test.describe("Journey page - close to mastery section", () => {
   test("section heading is visible after hydration on a fresh guest session", async ({
     page,
   }) => {
@@ -603,13 +603,13 @@ test.describe("Journey page — close to mastery section", () => {
   });
 });
 
-test.describe("Journey page — navigation", () => {
+test.describe("Journey page - navigation", () => {
   test("Journey link in the desktop nav navigates to /journey", async ({
     page,
   }, testInfo) => {
     test.skip(
       isMobileProject(testInfo),
-      "desktop nav only — mobile uses bottom tab bar",
+      "desktop nav only - mobile uses bottom tab bar",
     );
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "Main navigation" });
@@ -637,7 +637,7 @@ test.describe("Journey page — navigation", () => {
   });
 });
 
-test.describe("Journey page — mastery explainer hint (#1441)", () => {
+test.describe("Journey page - mastery explainer hint (#1441)", () => {
   test("explainer hint renders on the Journey page for a fresh guest session", async ({
     page,
   }) => {

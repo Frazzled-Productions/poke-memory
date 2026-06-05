@@ -38,7 +38,7 @@ function input(cardType: string, subjectKey: string): EligibilityInput {
 // Card-type gate
 // ---------------------------------------------------------------------------
 
-describe("isCardEligible — card-type gate", () => {
+describe("isCardEligible - card-type gate", () => {
   // Name and reverse are always on since #1234.
   it("passes name cards unconditionally", () => {
     expect(isCardEligible(input("name", "25"), ALL_ON)).toBe(true);
@@ -77,10 +77,10 @@ describe("isCardEligible — card-type gate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Alt-forms gate — name / reverse / cry (integer subjectKey)
+// Alt-forms gate - name / reverse / cry (integer subjectKey)
 // ---------------------------------------------------------------------------
 
-describe("isCardEligible — alt-forms gate for name/reverse/cry cards", () => {
+describe("isCardEligible - alt-forms gate for name/reverse/cry cards", () => {
   const BELOW = String(ALT_FORM_ID_THRESHOLD - 1); // "9999"
   const AT    = String(ALT_FORM_ID_THRESHOLD);      // "10000"
   const ABOVE = String(ALT_FORM_ID_THRESHOLD + 99); // "10099"
@@ -120,7 +120,7 @@ describe("isCardEligible — alt-forms gate for name/reverse/cry cards", () => {
           };
           expect(isCardEligible(input(cardType, "25"), settings)).toBe(false);
         } else {
-          // Name and reverse are always on (#1234) — no gate to turn off.
+          // Name and reverse are always on (#1234) - no gate to turn off.
           // The alt-forms gate still applies, but a default-form species (id=25) passes.
           expect(isCardEligible(input(cardType, "25"), settingsAltOff)).toBe(true);
         }
@@ -130,10 +130,10 @@ describe("isCardEligible — alt-forms gate for name/reverse/cry cards", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Alt-forms gate — evolution-edge / reverse-evolution-edge (>>> subjectKey)
+// Alt-forms gate - evolution-edge / reverse-evolution-edge (>>> subjectKey)
 // ---------------------------------------------------------------------------
 
-describe("isCardEligible — alt-forms gate for edge cards", () => {
+describe("isCardEligible - alt-forms gate for edge cards", () => {
   const settingsAltOff: CardEligibilitySettings = {
     ...ALL_ON,
     alternateFormsEnabled: false,
@@ -176,7 +176,7 @@ describe("isCardEligible — alt-forms gate for edge cards", () => {
 // Consistency: client adapter == server adapter
 // ---------------------------------------------------------------------------
 
-describe("isCardEligible — representative client/server parity inputs", () => {
+describe("isCardEligible - representative client/server parity inputs", () => {
   /**
    * Verify that the same logical card produces the same eligibility result
    * when addressed via the server row shape (DB card_type + subjectKey) and
@@ -207,7 +207,7 @@ describe("isCardEligible — representative client/server parity inputs", () => 
   });
 
   it("reverse card for Pikachu passes (reverse is always on since #1234)", () => {
-    // Reverse is always on — no toggle to disable it.
+    // Reverse is always on - no toggle to disable it.
     expect(isCardEligible({ cardType: "reverse", subjectKey: "25" }, settingsAltOff)).toBe(true);
   });
 

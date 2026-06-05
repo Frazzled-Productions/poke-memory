@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * CloseToMastery — "Focus here next" section on the Journey page.
+ * CloseToMastery - "Focus here next" section on the Journey page.
  *
  * Shows species where the name card has cleared the mastery gate
  * (scheduledDays >= 21 AND reps >= masteryRepetitions) but the paired

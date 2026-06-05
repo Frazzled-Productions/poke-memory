@@ -3,7 +3,7 @@ import { BiomeSky } from "./BiomeSky";
 import { BiomeFloor } from "./BiomeFloor";
 
 /**
- * Wildlands (null-habitat) backdrop — a wide sunset panorama with many
+ * Wildlands (null-habitat) backdrop - a wide sunset panorama with many
  * layered hill silhouettes, a winding river, and mixed scrubland in
  * front. Sized to host the ~639-species fallback bucket, so the slot
  * grid in lib/pasture/zones.ts packs 7 tightly-stacked ground bands.
@@ -44,7 +44,7 @@ export function WildlandsBiome() {
         <ellipse cx="800" cy="345" rx="60" ry="2" />
       </g>
 
-      {/* Distant hill layer 1 — palest, far back */}
+      {/* Distant hill layer 1 - palest, far back */}
       <path
         d="M0,330 C150,300 320,318 500,308 C700,295 900,318 1100,300 C1300,285 1450,310 1600,300 L1600,360 L0,360 Z"
         fill="#9c80a0" opacity="0.85"
@@ -137,7 +137,7 @@ export function WildlandsBiome() {
         ))}
       </g>
 
-      {/* Wildflowers — small dots, multi-color */}
+      {/* Wildflowers - small dots, multi-color */}
       <g>
         {[
           { x: 260,  c: "#e64a3c" }, { x: 500,  c: "#ffd060" }, { x: 700,  c: "#ff6ea8" },

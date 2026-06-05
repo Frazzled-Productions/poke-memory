@@ -52,7 +52,7 @@ const BASE_PROPS = {
   revealed: false,
 };
 
-describe("EvolutionCardLayout — hiddenSide='post' (forward evolution)", () => {
+describe("EvolutionCardLayout - hiddenSide='post' (forward evolution)", () => {
   it("shows the pre-evo sprite and a ? placeholder before reveal", () => {
     render(<EvolutionCardLayout {...BASE_PROPS} hiddenSide="post" />);
     expect(screen.getByAltText("charmander")).toHaveAttribute("src", PRE_SPRITE);
@@ -76,7 +76,7 @@ describe("EvolutionCardLayout — hiddenSide='post' (forward evolution)", () => 
   });
 });
 
-describe("EvolutionCardLayout — hiddenSide='pre' (reverse evolution)", () => {
+describe("EvolutionCardLayout - hiddenSide='pre' (reverse evolution)", () => {
   const REVERSE_PROPS = {
     ...BASE_PROPS,
     direction: "reverse-evolution" as const,
@@ -106,7 +106,7 @@ describe("EvolutionCardLayout — hiddenSide='pre' (reverse evolution)", () => {
   });
 });
 
-describe("EvolutionCardLayout — direction badge", () => {
+describe("EvolutionCardLayout - direction badge", () => {
   it('shows the Evolution badge for direction="evolution"', () => {
     render(<EvolutionCardLayout {...BASE_PROPS} hiddenSide="post" />);
     expect(screen.getByText("Evolution")).toBeInTheDocument();
@@ -124,7 +124,7 @@ describe("EvolutionCardLayout — direction badge", () => {
   });
 });
 
-describe("EvolutionCardLayout — fact block", () => {
+describe("EvolutionCardLayout - fact block", () => {
   it("renders fact label and value when fact is provided and revealed", () => {
     render(
       <EvolutionCardLayout
@@ -157,7 +157,7 @@ describe("EvolutionCardLayout — fact block", () => {
   });
 });
 
-describe("EvolutionCardLayout — prompt", () => {
+describe("EvolutionCardLayout - prompt", () => {
   it("renders the prompt node passed as a prop", () => {
     render(
       <EvolutionCardLayout
@@ -170,7 +170,7 @@ describe("EvolutionCardLayout — prompt", () => {
   });
 });
 
-describe("EvolutionCardLayout — sprites at intrinsic 320px", () => {
+describe("EvolutionCardLayout - sprites at intrinsic 320px", () => {
   it("renders both sprites at width/height 320 after reveal", () => {
     render(<EvolutionCardLayout {...BASE_PROPS} hiddenSide="post" revealed={true} />);
     expect(screen.getByAltText("charmander")).toHaveAttribute("width", "320");
@@ -178,7 +178,7 @@ describe("EvolutionCardLayout — sprites at intrinsic 320px", () => {
   });
 });
 
-describe("EvolutionCardLayout — locale-aware name rendering (#1260)", () => {
+describe("EvolutionCardLayout - locale-aware name rendering (#1260)", () => {
   it("uses the locale-resolved name for alt text and revealed answer when IDs are provided", () => {
     // Override the mock to return Japanese names for this test.
     mockUseLocalePokemonName.mockImplementation((_id, englishName) => {

@@ -1,5 +1,5 @@
 /**
- * renderWithIntl — shared test helper for components that call useTranslations().
+ * renderWithIntl - shared test helper for components that call useTranslations().
  *
  * Any component that calls `useTranslations()` requires a
  * `<NextIntlClientProvider>` ancestor. Without one it throws during render.
@@ -92,7 +92,7 @@ export function renderWithIntl(
 }
 
 /**
- * Convenience shorthand — renders `ui` in the Japanese locale.
+ * Convenience shorthand - renders `ui` in the Japanese locale.
  * Satisfies the mandatory non-English locale test requirement.
  */
 export function renderJa(ui: React.ReactElement): RenderResult {
@@ -100,7 +100,7 @@ export function renderJa(ui: React.ReactElement): RenderResult {
 }
 
 /**
- * Convenience shorthand — renders `ui` in the Simplified Chinese locale.
+ * Convenience shorthand - renders `ui` in the Simplified Chinese locale.
  * Satisfies the mandatory non-English locale test requirement.
  */
 export function renderZhHans(ui: React.ReactElement): RenderResult {
@@ -108,7 +108,7 @@ export function renderZhHans(ui: React.ReactElement): RenderResult {
 }
 
 /**
- * Convenience shorthand — renders `ui` in the Traditional Chinese locale.
+ * Convenience shorthand - renders `ui` in the Traditional Chinese locale.
  * Satisfies the mandatory non-English locale test requirement.
  */
 export function renderZhHant(ui: React.ReactElement): RenderResult {
@@ -116,7 +116,7 @@ export function renderZhHant(ui: React.ReactElement): RenderResult {
 }
 
 /**
- * Convenience shorthand — renders `ui` in the pseudo-locale ("xx-pseudo").
+ * Convenience shorthand - renders `ui` in the pseudo-locale ("xx-pseudo").
  *
  * Use in *.i18n-leak.test.tsx files to verify that all visible text nodes
  * are routed through the message catalogue (sentinel "[...]" wrapping) rather
@@ -135,7 +135,7 @@ export function renderPseudo(ui: React.ReactElement): RenderResult {
 //
 //   import { render } from "@/components/test-utils/renderWithIntl";
 //
-// and silently get the unwrapped, provider-free render — the footgun this
+// and silently get the unwrapped, provider-free render - the footgun this
 // helper exists to prevent. Use `renderWithIntl` or `renderJa` instead.
 // ---------------------------------------------------------------------------
 
@@ -148,7 +148,7 @@ export {
   act,
   cleanup,
   renderHook,
-  // Query helpers — exposed so callers can destructure from their own
+  // Query helpers - exposed so callers can destructure from their own
   // `renderWithIntl(...)` result and also use the bound queries off `screen`.
   getByRole,
   getByText,

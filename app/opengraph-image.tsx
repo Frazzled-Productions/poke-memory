@@ -26,7 +26,7 @@ export default function Image() {
           padding: "0 80px",
         }}
       >
-        {/* Pokédex lens icon — mirrors the apple-icon design */}
+        {/* Pokédex lens icon - mirrors the apple-icon design */}
         <div
           style={{
             display: "flex",
@@ -50,7 +50,7 @@ export default function Image() {
               justifyContent: "flex-start",
             }}
           >
-            {/* Highlight reflection — upper-left */}
+            {/* Highlight reflection - upper-left */}
             <div
               style={{
                 width: 48,

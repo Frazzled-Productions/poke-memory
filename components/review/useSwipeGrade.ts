@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * useSwipeGrade — pointer-event swipe-to-grade hook (#1052).
+ * useSwipeGrade - pointer-event swipe-to-grade hook (#1052).
  *
  * Attaches `pointerdown` / `pointermove` / `pointerup` / `pointercancel`
  * listeners to the element referenced by `targetRef`. While the user is
@@ -65,7 +65,7 @@ type Options = {
   targetRef: React.RefObject<HTMLElement | null>;
   /** Called with a grade value when a committed swipe is released. */
   onGrade: (grade: Grade) => void;
-  /** Swipe grading is gated on card reveal — pass `revealed` here. */
+  /** Swipe grading is gated on card reveal - pass `revealed` here. */
   enabled: boolean;
   /** Inhibit during async grade commit. */
   grading: boolean;
@@ -97,11 +97,11 @@ export function useSwipeGrade({
   const originRef = useRef<{ x: number; y: number } | null>(null);
   const pointerId = useRef<number | null>(null);
 
-  // Snap-back timeout ref — cleared when a new gesture starts so an orphaned
+  // Snap-back timeout ref - cleared when a new gesture starts so an orphaned
   // timeout from a previous gesture cannot clobber the next one.
   const snapBackTidRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // `prefers-reduced-motion` — sampled reactively so a mid-session OS change
+  // `prefers-reduced-motion` - sampled reactively so a mid-session OS change
   // is honoured. Stored in a ref (not state) so pointer handlers always see
   // the current value without triggering re-renders or effect reruns.
   const reducedMotionRef = useRef(false);
@@ -175,7 +175,7 @@ export function useSwipeGrade({
         el.style.touchAction = "";
       };
     }
-    // Not enabled — ensure touchAction is clear (it may have been set by a
+    // Not enabled - ensure touchAction is clear (it may have been set by a
     // previous render cycle where enabled was true).
     el.style.touchAction = "";
   }, [targetRef, enabled]);
@@ -204,12 +204,12 @@ export function useSwipeGrade({
       // setPointerCapture routes future move/up events to this element even
       // when the pointer leaves its bounds. It may throw for synthetic pointer
       // events (e.g. from Playwright dispatchEvent) whose pointer ID is not
-      // tracked by the browser — that is fine, since synthetic tests dispatch
+      // tracked by the browser - that is fine, since synthetic tests dispatch
       // all events directly on the element anyway.
       try {
         el!.setPointerCapture(e.pointerId);
       } catch {
-        // Ignore — gesture tracking proceeds via originRef/pointerId refs.
+        // Ignore - gesture tracking proceeds via originRef/pointerId refs.
       }
     }
 
@@ -222,7 +222,7 @@ export function useSwipeGrade({
 
       const resolved = resolveSwipe(dx, dy);
 
-      // Visual feedback — clamp so the card does not drift off-screen.
+      // Visual feedback - clamp so the card does not drift off-screen.
       const clampedX = clampOffset(dx, MAX_VISUAL_OFFSET_PX);
       const clampedY = clampOffset(dy, MAX_VISUAL_OFFSET_PX);
 
@@ -292,7 +292,7 @@ export function useSwipeGrade({
     };
   }, [targetRef, applyTransform, resetTransform, enabled]);
   // `grading` is read via a stable ref (updated every render) so it does not
-  // need to be in the deps — the handler reads the current value at call time.
+  // need to be in the deps - the handler reads the current value at call time.
   //
   // `enabled` IS in the deps even though it is also read via ref. The reason:
   // the ReviewSession component renders a loading skeleton (no card element)

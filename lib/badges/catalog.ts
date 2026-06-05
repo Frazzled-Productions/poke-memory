@@ -1,10 +1,10 @@
 /**
  * Gym badges (#420). Awarded when a user has mastered every species in
- * the badge's `speciesIds` list. Secret until earned — there is no UI
+ * the badge's `speciesIds` list. Secret until earned - there is no UI
  * surface that hints at any badge before it is unlocked.
  *
  * The catalog ships as code (not data fetched at runtime). IDs are
- * immutable once shipped — changing an existing id re-awards the badge
+ * immutable once shipped - changing an existing id re-awards the badge
  * to existing earners on their next badge check. New badges are added
  * by appending entries; users earn them the moment they meet the
  * criterion after the new build deploys.
@@ -24,7 +24,7 @@ export type BadgeDefinition = {
   name: string;
   description: string;
   /**
-   * Short teaser shown when the badge is locked. Evocative but non-spoiler —
+   * Short teaser shown when the badge is locked. Evocative but non-spoiler - 
    * hints at the theme without revealing the exact mastery criterion.
    */
   lockedHint: string;
@@ -32,7 +32,7 @@ export type BadgeDefinition = {
 };
 
 export const BADGE_CATALOG: readonly BadgeDefinition[] = [
-  // Kanto gym leader rosters — anime-iconic pairs rather than full
+  // Kanto gym leader rosters - anime-iconic pairs rather than full
   // game-canon 6-Pokémon teams. Two Pokémon is enough for a satisfying
   // reveal and keeps the early badges achievable.
   {
@@ -92,7 +92,7 @@ export const BADGE_CATALOG: readonly BadgeDefinition[] = [
     criterion: { kind: "all-mastered", speciesIds: [76, 112] },
   },
 
-  // Themed groupings — fan-favourites that span generations.
+  // Themed groupings - fan-favourites that span generations.
   {
     id: "kanto-starters",
     name: "Kanto Starters",
@@ -157,7 +157,7 @@ export const BADGE_CATALOG: readonly BadgeDefinition[] = [
   {
     id: "lake-trio",
     name: "Lake Trio",
-    description: "Uxie, Mesprit, and Azelf — the lake guardians of Sinnoh.",
+    description: "Uxie, Mesprit, and Azelf - the lake guardians of Sinnoh.",
     lockedHint: "Three spirits dwell in Sinnoh's still waters…",
     criterion: { kind: "all-mastered", speciesIds: [480, 481, 482] },
   },

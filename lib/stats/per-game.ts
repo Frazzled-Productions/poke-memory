@@ -13,7 +13,7 @@
  * a species that has alternate forms (e.g. Raichu and Alolan Raichu both
  * appear in the seed but map to the same species).
  *
- * Pure — no I/O, no DOM access, no hooks.
+ * Pure - no I/O, no DOM access, no hooks.
  */
 
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
@@ -44,11 +44,11 @@ export type GameStats = {
  *
  * @param cards              Full mixed card array (name + reverse + others).
  * @param seed               `SEED_POKEMON` (provides versionGroups per species).
- * @param masteryRepetitions Mastery threshold — defaults to MASTERY_REPETITIONS (3).
+ * @param masteryRepetitions Mastery threshold - defaults to MASTERY_REPETITIONS (3).
  * @param forceAllMastered   Superuser flag: treats every species as mastered.
  * @returns                  One entry per version-group slug that appears in
  *                           at least one seed entry, in seed-insertion order
- *                           (i.e. no guaranteed sort — callers should sort via
+ *                           (i.e. no guaranteed sort - callers should sort via
  *                           VERSION_GROUP_ORDER for display).
  */
 export function computePerGameStats(
@@ -84,7 +84,7 @@ export function computePerGameStats(
   const slugTotals = new Map<string, { total: number; introduced: number; mastered: number }>();
 
   for (const pokemon of seed) {
-    // Only default forms — alternate forms would double-count a species.
+    // Only default forms - alternate forms would double-count a species.
     if (!pokemon.isDefaultForm) continue;
 
     const slugs = pokemon.versionGroups ?? [];

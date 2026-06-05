@@ -6,9 +6,9 @@
 // duplicating 15+ lines of identical field-narrowing logic.
 //
 // Callers:
-//   - lib/review/persistence.ts  — isReviewCardShaped (stricter: requires
+//   - lib/review/persistence.ts - isReviewCardShaped (stricter: requires
 //     name/spriteUrl on non-evolution cards, validates reverse-evolution shape)
-//   - lib/backup/schema.ts        — isMinimalCardShaped (more lenient: skips
+//   - lib/backup/schema.ts - isMinimalCardShaped (more lenient: skips
 //     those extra checks because hydrateSession refreshes them from seed)
 
 /** The set of recognised `cardType` discriminant values. */
@@ -89,7 +89,7 @@ export function isEvolutionCardShaped(v: Record<string, unknown>): boolean {
 /**
  * Core card-shape predicate shared by both persistence and backup validators.
  *
- * Validates the fields that every card — regardless of strictness level —
+ * Validates the fields that every card - regardless of strictness level - 
  * must carry:
  *   - `id`: number
  *   - `state.dueDate`: string
@@ -97,11 +97,11 @@ export function isEvolutionCardShaped(v: Record<string, unknown>): boolean {
  *   - evolution cards: one of the three recognised shapes (see isEvolutionCardShaped)
  *
  * Does NOT validate:
- *   - `reverse-evolution` edge fields (`preEvoId`, `postEvoId`) — the stricter
+ *   - `reverse-evolution` edge fields (`preEvoId`, `postEvoId`) - the stricter
  *     persistence validator adds that check.
- *   - `name` and `spriteUrl` on non-evolution cards — the stricter persistence
+ *   - `name` and `spriteUrl` on non-evolution cards - the stricter persistence
  *     validator adds those checks too.
- *   - Backup-specific fields — schema.ts adds nothing here; it deliberately
+ *   - Backup-specific fields - schema.ts adds nothing here; it deliberately
  *     omits those checks because hydrateSession refreshes them from seed.
  *
  * Returns true when all shared invariants hold.
@@ -113,7 +113,7 @@ export function isBaseCardShaped(value: unknown): value is Record<string, unknow
   if (typeof v.id !== "number") return false;
   if (!isNonNullObject(v.state)) return false;
   // TS does not narrow index-access properties (v.state) outside the if-guard
-  // expression itself, so the cast below is load-bearing — not redundant.
+  // expression itself, so the cast below is load-bearing - not redundant.
   if (typeof (v.state as Record<string, unknown>).dueDate !== "string") return false;
 
   if (!isKnownCardType(v.cardType)) return false;

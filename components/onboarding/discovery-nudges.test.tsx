@@ -1,9 +1,9 @@
 /**
  * Tests for contextual discovery nudges (#1443, #1573).
  *
- * 1. markWhatIKnowNudgeDismissed — shown on Settings > Practice near the
+ * 1. markWhatIKnowNudgeDismissed - shown on Settings > Practice near the
  *    Quickstart quiz, absent when dismissed.
- * 2. practiceScopeNudgeDismissed — shown on the practice screen (ReviewSession)
+ * 2. practiceScopeNudgeDismissed - shown on the practice screen (ReviewSession)
  *    above ScopeControl once the first-visit onboarding is done.
  * 3. higherOrLowerNudgeDismissed - shown on the active-card practice screen
  *    (ReviewSession, above ScopeControl) once the user has seen at least one
@@ -13,7 +13,7 @@
  *  - State IN: nudge visible when flag is false.
  *  - State OUT: nudge absent when flag is true.
  *  - State OUT (gate): scope nudge absent when firstVisitOnboardingDismissed is
- *    false — covered at e2e level in e2e/onboarding.spec.ts ("practiceScope nudge
+ *    false - covered at e2e level in e2e/onboarding.spec.ts ("practiceScope nudge
  *    is absent when first-visit onboarding not yet done") because the gate lives
  *    in ReviewSession state, which requires the full component to exercise.
  *  - Existing-user reach: validateOnboarding coerces absent key to false.
@@ -40,7 +40,7 @@ import {
 import type { UserSettings } from "@/lib/settings/persistence";
 
 // ---------------------------------------------------------------------------
-// Settings stub — same pattern as OnboardingHint.test.tsx
+// Settings stub - same pattern as OnboardingHint.test.tsx
 // ---------------------------------------------------------------------------
 
 let currentSettings: UserSettings;
@@ -174,10 +174,10 @@ describe("practiceScopeNudgeDismissed flag", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Existing-user reach — validateOnboarding coercion
+// Existing-user reach - validateOnboarding coercion
 // ---------------------------------------------------------------------------
 
-describe("validateOnboarding — absent keys resolve to false (existing-user reach)", () => {
+describe("validateOnboarding - absent keys resolve to false (existing-user reach)", () => {
   it("absent markWhatIKnowNudgeDismissed coerces to false", () => {
     const result = validateOnboarding({
       firstVisitOnboardingDismissed: true,
@@ -231,7 +231,7 @@ describe("validateOnboarding — absent keys resolve to false (existing-user rea
     expect(result.practiceSessionsCount).toBe(0);
   });
 
-  it("non-boolean scopeEverOpened coerces to false — === true guard (#1482)", () => {
+  it("non-boolean scopeEverOpened coerces to false - === true guard (#1482)", () => {
     const result = validateOnboarding({
       scopeEverOpened: 1 as unknown as boolean,
     });
@@ -330,7 +330,7 @@ describe("higherOrLowerNudgeDismissed flag", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Reset path — DEFAULT_ONBOARDING resets all flags to false
+// Reset path - DEFAULT_ONBOARDING resets all flags to false
 // ---------------------------------------------------------------------------
 
 describe("DEFAULT_ONBOARDING reset", () => {
@@ -362,10 +362,10 @@ describe("DEFAULT_ONBOARDING reset", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Locale coverage — verify catalogue copy renders in all four locales
+// Locale coverage - verify catalogue copy renders in all four locales
 // ---------------------------------------------------------------------------
 
-describe("locale coverage — message catalogue keys", () => {
+describe("locale coverage - message catalogue keys", () => {
   it("en: markWhatIKnowNudge title and body render", async () => {
     currentSettings = settingsWithFlag("markWhatIKnowNudgeDismissed", false);
 

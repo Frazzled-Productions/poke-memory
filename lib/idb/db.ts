@@ -79,7 +79,7 @@ export async function idbDelete(key: string): Promise<void> {
 
 /**
  * Closes the open DB connection and resets the module-level state.
- * Only call from tests — not for production use.
+ * Only call from tests - not for production use.
  */
 export async function __resetForTests(): Promise<void> {
   if (dbPromise) {

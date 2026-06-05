@@ -145,7 +145,7 @@ export default function CallbackCompletePage() {
       }
       if (!hasLocal && cloudHasData) {
         // Brand-new device with cloud-only data. Pull everything cloud has
-        // and apply it as the truth — no conflict to resolve.
+        // and apply it as the truth - no conflict to resolve.
         const [settingsRow, cloudStreak, cloudGradeLog, cloudPrefs] = await Promise.all([
           pullUserSettingsRow(supabase, user.id).catch(() => null),
           pullStreak(supabase, user.id).catch(() => null),
@@ -165,7 +165,7 @@ export default function CallbackCompletePage() {
         if (!cancelled) router.replace("/");
         return;
       }
-      // Both sides have card data — collect everything needed for the picker
+      // Both sides have card data - collect everything needed for the picker
       // before transitioning so neither branch needs another round-trip.
       try {
         const [settingsRow, cloudStreak, cloudGradeLog, cloudPrefs, localStreak, localGradeLog] = await Promise.all([

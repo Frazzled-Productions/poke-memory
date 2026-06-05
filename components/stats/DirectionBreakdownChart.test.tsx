@@ -21,7 +21,7 @@ import { DirectionBreakdownChart } from "@/components/stats/DirectionBreakdownCh
 import type { DirectionBreakdownRow } from "@/lib/stats/direction-breakdown";
 
 // ---------------------------------------------------------------------------
-// Recharts mock — lightweight stubs so the component can render in jsdom.
+// Recharts mock - lightweight stubs so the component can render in jsdom.
 // Two Tooltip variants: one fires with populated payload, one with an empty
 // array to exercise the #1521 length-guard path.
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ describe("DirectionBreakdownChart", () => {
     expect(screen.getByText(/accuracy: 85%/i)).toBeInTheDocument();
   });
 
-  // #1521: guard against empty payload array — Recharts passes [] during
+  // #1521: guard against empty payload array - Recharts passes [] during
   // chart transitions, which would previously crash with a TypeError.
   it("renders null without throwing when the Tooltip receives an empty payload", () => {
     tooltipPayload = [];

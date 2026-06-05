@@ -3,7 +3,7 @@ import { BiomeSky } from "./BiomeSky";
 import { BiomeFloor } from "./BiomeFloor";
 
 /**
- * Forest habitat backdrop — dappled canopy overhead, receding tree trunks,
+ * Forest habitat backdrop - dappled canopy overhead, receding tree trunks,
  * undergrowth with ferns, mushrooms, and a fallen log in front. Anchor bands
  * in lib/pasture/zones.ts cluster sprites along the forest floor; the
  * deepest band falls in the shadow under the canopy.
@@ -36,7 +36,7 @@ export function ForestBiome() {
       <ellipse cx="400" cy="0"  rx="200" ry="400" fill="url(#forest-godray)" />
       <ellipse cx="1100" cy="0" rx="240" ry="450" fill="url(#forest-godray)" />
 
-      {/* Canopy mass — dark interlocking leaves */}
+      {/* Canopy mass - dark interlocking leaves */}
       <g fill="#1d4a30">
         <circle cx="80"   cy="80"  r="120" />
         <circle cx="240"  cy="50"  r="110" />
@@ -102,7 +102,7 @@ export function ForestBiome() {
         <ellipse cx="1240" cy="540" rx="100" ry="14" />
       </g>
 
-      {/* Fallen log — diagonal across mid-front */}
+      {/* Fallen log - diagonal across mid-front */}
       <g>
         <ellipse cx="780" cy="538" rx="160" ry="14" fill="#1f140a" opacity="0.45" />
         <rect x="620" y="510" width="320" height="32" rx="14" fill="#7a4a22" />
@@ -120,7 +120,7 @@ export function ForestBiome() {
         <ellipse cx="860" cy="510" rx="26" ry="5" fill="#3a8c4a" />
       </g>
 
-      {/* Mushrooms — front-left cluster */}
+      {/* Mushrooms - front-left cluster */}
       <g>
         <ellipse cx="200" cy="572" rx="14" ry="4" fill="#1f140a" opacity="0.5" />
         <rect x="194" y="558" width="12" height="14" fill="#f0e3c5" />
@@ -135,7 +135,7 @@ export function ForestBiome() {
         <circle cx="225" cy="565" r="1.6" fill="#f0e3c5" />
       </g>
 
-      {/* Mushrooms — right cluster */}
+      {/* Mushrooms - right cluster */}
       <g>
         <ellipse cx="1380" cy="582" rx="16" ry="4" fill="#1f140a" opacity="0.5" />
         <rect x="1374" y="566" width="13" height="16" fill="#f0e3c5" />

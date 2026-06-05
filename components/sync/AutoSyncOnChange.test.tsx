@@ -399,14 +399,14 @@ describe("AutoSyncOnChange", () => {
 // ─── Superuser write-guard (#754) ─────────────────────────────────────────────
 //
 // When any superuser flag is active, AutoSyncOnChange must treat the user as
-// signed out — client and userId are nulled out — so no cloud writes occur even
+// signed out - client and userId are nulled out - so no cloud writes occur even
 // though auth credentials are present. This mirrors the guard in
 // ReviewSession.tsx that passes null to usePerGradeSync / useSyncOnUnload.
 
-describe("AutoSyncOnChange — superuser write-guard", () => {
+describe("AutoSyncOnChange - superuser write-guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Signed-in user — credentials are valid. The guard must kick in despite this.
+    // Signed-in user - credentials are valid. The guard must kick in despite this.
     vi.mocked(useAuth).mockReturnValue({
       user: FAKE_USER as unknown as ReturnType<typeof useAuth>["user"],
       supabase: FAKE_CLIENT,

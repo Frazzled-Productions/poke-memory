@@ -100,7 +100,7 @@ export function PokemonLocaleProvider({ children }: { children: React.ReactNode 
       setState(readLocaleState());
     }
     // `useState(readLocaleState)` already produced the correct initial value
-    // on mount — only the listeners are needed here. (An extra `handleChange()`
+    // on mount - only the listeners are needed here. (An extra `handleChange()`
     // call would force a second render with a fresh object reference, defeating
     // the per-tree overhead reduction this Provider exists to deliver.)
     window.addEventListener(SETTINGS_SAVED_EVENT, handleChange);
@@ -137,7 +137,7 @@ export function PokemonLocaleProvider({ children }: { children: React.ReactNode 
  * Returns the active Pokémon-name locale and languages-flag state from the
  * nearest `<PokemonLocaleProvider>`.
  *
- * Renders are O(1) — only re-runs when the locale or flag value changes,
+ * Renders are O(1) - only re-runs when the locale or flag value changes,
  * regardless of the number of call sites on screen.
  */
 export function usePokemonLocaleContext(): PokemonLocaleContextValue {

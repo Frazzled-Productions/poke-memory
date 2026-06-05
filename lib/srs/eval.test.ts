@@ -15,7 +15,7 @@ describe("fixture snapshots", () => {
     it(`${fixture.name} trace is stable`, () => {
       const { trace } = simulate(fixture.steps);
       // One snapshot per fixture. Intentional scheduler changes will surface
-      // here as a diff — review the change, then `vitest -u` to update.
+      // here as a diff - review the change, then `vitest -u` to update.
       expect(trace).toMatchSnapshot();
     });
   }

@@ -4,7 +4,7 @@
 // lib/pokemon/generated-locale-names.json (+ public/pokemon-data/ copy).
 //
 // Run with: node scripts/seed-locale-names.mjs
-// Node 20+ — uses global fetch.
+// Node 20+ - uses global fetch.
 //
 // This script is a targeted complement to the full seed-pokemon.mjs:
 // it only fetches /pokemon-species/{id} for locale name extraction and
@@ -26,7 +26,7 @@ import { toRomaji } from "wanakana";
 // Configuration
 // ---------------------------------------------------------------------------
 
-// Hardcoded PokéAPI base — species IDs from generated.json are appended as
+// Hardcoded PokéAPI base - species IDs from generated.json are appended as
 // integers only.  Explicit constant keeps CodeQL's taint-tracking clean.
 const POKEAPI_SPECIES_BASE = "https://pokeapi.co/api/v2/pokemon-species/";
 
@@ -60,7 +60,7 @@ async function writeFileAtomic(destPath, content) {
 }
 
 // Accept a speciesId (number) rather than a generic URL string so that the
-// fetch target is always POKEAPI_SPECIES_BASE + integer — CodeQL cannot follow
+// fetch target is always POKEAPI_SPECIES_BASE + integer - CodeQL cannot follow
 // a taint path from file data through a numeric parameter to fetch().
 async function fetchSpeciesWithRetry(speciesId) {
   const url = POKEAPI_SPECIES_BASE + String(speciesId);
@@ -131,7 +131,7 @@ const forceFlag = process.argv.includes("--force");
 
 // Read generated.json for the list of default-form species IDs.
 if (!existsSync(generatedPath)) {
-  process.stderr.write("[locale-seed] ERROR: lib/pokemon/generated.json not found — run npm run seed first\n");
+  process.stderr.write("[locale-seed] ERROR: lib/pokemon/generated.json not found - run npm run seed first\n");
   process.exit(1);
 }
 const allRecords = JSON.parse(await readFile(generatedPath, "utf-8"));
@@ -153,7 +153,7 @@ if (existsSync(sidecarPath) && !forceFlag) {
 }
 
 const toDo = defaultForms.filter((p) => !existingBySpeciesId[p.speciesId]);
-process.stderr.write(`[locale-seed] ${toDo.length} species to fetch (${defaultForms.length - toDo.length} skipped — already in sidecar)\n`);
+process.stderr.write(`[locale-seed] ${toDo.length} species to fetch (${defaultForms.length - toDo.length} skipped - already in sidecar)\n`);
 
 const results = { ...existingBySpeciesId };
 let done = 0;

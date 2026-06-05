@@ -31,7 +31,7 @@ export default function Icon2() {
             justifyContent: "flex-start",
           }}
         >
-          {/* Highlight reflection — upper-left */}
+          {/* Highlight reflection - upper-left */}
           <div
             style={{
               width: 24,

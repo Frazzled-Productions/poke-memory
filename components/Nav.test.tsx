@@ -39,7 +39,7 @@ vi.mock("next-intl/server", () => ({
   getMessages: vi.fn(async () => enMessages),
 }));
 
-// next/link — render as a plain anchor in jsdom
+// next/link - render as a plain anchor in jsdom
 vi.mock("next/link", () => ({
   default: ({
     href,
@@ -88,7 +88,7 @@ import * as nextIntlServer from "next-intl/server";
 
 describe("Nav", () => {
   it("renders the <header> element", async () => {
-    // Nav is an async Server Component — await it, then render the JSX result.
+    // Nav is an async Server Component - await it, then render the JSX result.
     const { container } = render(await Nav());
 
     const header = container.querySelector("header");

@@ -90,7 +90,7 @@ describe("classifyRequest", () => {
 
   it("routes a pre-generated WebP sprite URL to the sprites bucket", () => {
     // With the custom loader, sprites are served from static WebP files under
-    // /sprites/pokemon/webp/<id>/<width>.webp — they match the /sprites/ prefix
+    // /sprites/pokemon/webp/<id>/<width>.webp - they match the /sprites/ prefix
     // rule directly, no /_next/image indirection needed.
     const url = `${ORIGIN}/sprites/pokemon/webp/25/320.webp`;
     const result = classifyRequest(url, ORIGIN);

@@ -1,7 +1,7 @@
 /**
  * Single source of truth for sprite render sizes (CSS px) used across all
  * surfaces. Keeping them here ensures `SpritePreloader` and the corresponding
- * `next/image` consumer always request the same optimiser variant — a mismatch
+ * `next/image` consumer always request the same optimiser variant - a mismatch
  * would fetch a different variant and produce no cache benefit.
  *
  * Review-specific re-exports (`PRACTICE_SPRITE_SIZE`, `PICKER_SPRITE_SIZE`)
@@ -46,7 +46,7 @@ export const POKEDEX_NODE_SPRITE_SIZE = 40;
 /**
  * Full sprite size for alternate-form blocks inside the Pokédex detail
  * disclosure panel (120 px square). The element renders at `h-28 w-28`
- * (112 px), so 120 is the nearest optimiser bucket — using the 192-px
+ * (112 px), so 120 is the nearest optimiser bucket - using the 192-px
  * `POKEDEX_DETAIL_SPRITE_SIZE` constant here would fetch roughly double
  * the bytes for no visible benefit.
  */

@@ -34,23 +34,23 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 /**
  * Fires when `pullAndMerge` completes a cold-load merge that transitioned at
  * least one card's `lastReview` or `firstSeen`. "Cold load" means the device
- * had no user progress when the merge ran — either `localSession` was null
+ * had no user progress when the merge ran - either `localSession` was null
  * (brand-new device, or the tombstone path just wiped it), or it held only
  * pristine seed cards (the practice page raced ahead and saved a fresh
  * empty session before the network pull returned). Surfaces in
  * `ReviewSession` so the practice UI can refresh when the initial sign-in
  * pull arrives after the page has already mounted with pristine seed cards
- * — without this, cold-loading a PWA (or any tab whose local storage is
+ * - without this, cold-loading a PWA (or any tab whose local storage is
  * empty but whose user has cloud data) leaves the practice page stuck on
  * "all cards new" until the user navigates away and back (#608).
  *
  * Dispatched only when the pre-merge local state had no user progress, so
- * a mid-review pull — where any card carries `lastReview` or `firstSeen`
- * — does not trigger an unwanted reload that would discard in-flight
+ * a mid-review pull - where any card carries `lastReview` or `firstSeen`
+ * - does not trigger an unwanted reload that would discard in-flight
  * grades or interrupt a card the user is currently looking at.
  *
  * Same-tab `useLocalStorageKey` subscribers (Stats, Pasture, Pokédex,
- * NavLinks) already react to `saveSession`'s synthetic StorageEvent — this
+ * NavLinks) already react to `saveSession`'s synthetic StorageEvent - this
  * event is the targeted notification for the one surface that can't subscribe
  * to that channel without re-firing on every grade.
  */
@@ -69,7 +69,7 @@ const setsEqual = (a: string[], b: string[]): boolean => {
 };
 
 /**
- * True when no card in `cards` has been graded yet — every entry has both
+ * True when no card in `cards` has been graded yet - every entry has both
  * `lastReview` and `firstSeen` still null. A freshly-built `buildSession`
  * result satisfies this; a session with even one user grade does not.
  */
@@ -88,9 +88,9 @@ function isPristineSession(cards: readonly ReviewableCard[]): boolean {
  *
  * Compares by composite key `(card_type, subject_key, locale)` rather than
  * by array position, because `mergeCloudIntoLocalSilent`'s Pass 2 may now
- * append new cards — so the two arrays can differ in length and order.
+ * append new cards - so the two arrays can differ in length and order.
  *
- * Only `lastReview` and `firstSeen` are compared — other FSRS fields are
+ * Only `lastReview` and `firstSeen` are compared - other FSRS fields are
  * intentionally excluded because the caller only needs to know whether cloud
  * data populated a previously-empty seed card.
  */
@@ -112,7 +112,7 @@ function mergeAffectsProgress(
   for (const a of after) {
     const key = `${a.cardType}:${a.subjectKey}:${a.locale ?? "en"}`;
     const b = beforeByKey.get(key);
-    if (!b) return true; // card not present before — new insertion
+    if (!b) return true; // card not present before - new insertion
     if (a.state.lastReview !== b.state.lastReview) return true;
     if (a.state.firstSeen !== b.state.firstSeen) return true;
   }
@@ -125,9 +125,9 @@ function mergeAffectsProgress(
  * timestamp so subsequent pulls can distinguish new cloud writes from stale ones.
  *
  * Returns:
- *   "ok"      — merge completed and persisted.
- *   "error"   — pull failed (network/auth); local state unchanged.
- *   "skipped" — called without a client or userId (guest mode).
+ *   "ok" - merge completed and persisted.
+ *   "error" - pull failed (network/auth); local state unchanged.
+ *   "skipped" - called without a client or userId (guest mode).
  *
  * Never throws. Best-effort: errors are swallowed so a network hiccup never
  * breaks the local-first review flow.
@@ -138,7 +138,7 @@ export async function pullAndMerge(
   /**
    * When true, the push-back leg of the locale union-merge is suppressed.
    * Pulls (reads) remain enabled regardless. Pass `true` whenever any
-   * superuser flag is on — the same contract as every other cloud-write path
+   * superuser flag is on - the same contract as every other cloud-write path
    * (see AGENTS.md "Superuser mode").
    */
   superuserPaused = false,
@@ -164,7 +164,7 @@ export async function pullAndMerge(
 
     // Tombstone check (#576). If cloud's `last_reset_at` has advanced past
     // what this device has reconciled, the user has called
-    // reset_all_progress somewhere — wipe local before any merge runs, so
+    // reset_all_progress somewhere - wipe local before any merge runs, so
     // stale local rows do not survive into the merged session and get pushed
     // back on the next sync. The schema-level triggers (migration 022) catch
     // the resurrection if this app-layer check misses, but doing the wipe
@@ -185,7 +185,7 @@ export async function pullAndMerge(
     // Capture the pre-LWW local settings BEFORE any saveSettings call below.
     // The locale union-merge step later (after the card-merge block) must
     // read the ORIGINAL local learningLocales/removedLocales, not the
-    // post-LWW values — the LWW block deliberately excludes these two fields
+    // post-LWW values - the LWW block deliberately excludes these two fields
     // from the cloud blob, so the saveSettings spread fills them in from
     // DEFAULT_SETTINGS (["en"]/[]), clobbering any local-only enrolments or
     // tombstones that have not yet been pushed to cloud. Bug #1568-fix-1.
@@ -196,7 +196,7 @@ export async function pullAndMerge(
     // semantics: cloud wins so the base session below is built with the
     // right card-type opts (#391). For devices with stored settings, cloud
     // wins only when its server-side updated_at is strictly newer than the
-    // timestamp this device last applied — otherwise the local copy is the
+    // timestamp this device last applied - otherwise the local copy is the
     // freshest view.
     let nextLastSettingsPullAt = syncStatus.lastSettingsPullAt;
     if (pulledRow !== null && pulledRow.settings !== null) {
@@ -208,7 +208,7 @@ export async function pullAndMerge(
       // `user_settings.updated_at` is `NOT NULL DEFAULT now()` so this
       // branch is unreachable against real Supabase data. It exists for the
       // schema-drift case `pullUserSettingsRow` coerces with `?? null`
-      // (response missing the column entirely) — when that happens we still
+      // (response missing the column entirely) - when that happens we still
       // want to apply the blob once and then stamp the cursor so we don't
       // re-apply on every cycle.
       const legacyNeverApplied =
@@ -218,7 +218,7 @@ export async function pullAndMerge(
         // mobileNav) would store an incomplete object and trigger a two-load
         // inconsistency until the next loadSettings() call. Spreading over
         // DEFAULT_SETTINGS ensures the stored blob is always complete.
-        // preserveDeviceLocalKeys keeps this device's appVisitCount — a stale
+        // preserveDeviceLocalKeys keeps this device's appVisitCount - a stale
         // cloud value (legacy row, manual edit) must not reset the nudge
         // threshold, mirroring the push-side exclusion in diffSettings.
         //
@@ -328,7 +328,7 @@ export async function pullAndMerge(
       saveResult = await saveSession({ cards: merged, limits: DEFAULT_LIMITS });
     }
 
-    // If the write failed (e.g. storage quota exceeded), bail out — same-tab
+    // If the write failed (e.g. storage quota exceeded), bail out - same-tab
     // subscribers will not have received a synthetic StorageEvent because
     // saveSession only dispatches on success.
     if (!saveResult.ok) return "error";
@@ -365,7 +365,7 @@ export async function pullAndMerge(
     try {
       if (pulledRow !== null && pulledRow.settings !== null) {
         const cloudSettings = pulledRow.settings as Record<string, unknown>;
-        // Use pre-LWW local values — not a second loadSettings() call — so
+        // Use pre-LWW local values - not a second loadSettings() call - so
         // enrolments/tombstones not yet pushed to cloud are not lost when the
         // LWW saveSettings block ran with DEFAULT_SETTINGS as the locale filler.
         const cloudLearning = Array.isArray(cloudSettings.learningLocales)
@@ -394,7 +394,7 @@ export async function pullAndMerge(
 
         // Push back ONLY when cloud is missing the merged content (i.e. the merge
         // actually changes what cloud holds). activePokemonNameLocale is device-local
-        // and must NEVER drive a cloud push — exclude it from the push gate.
+        // and must NEVER drive a cloud push - exclude it from the push gate.
         const cloudLearningNeedsUpdate =
           !setsEqual(mergedLearning, cloudLearning ?? ["en"]);
         const cloudRemovedNeedsUpdate =
@@ -446,7 +446,7 @@ export async function pullAndMerge(
     }
 
     // Pull regional prefs (timezone + date_format + push_notification_hour
-    // scalar columns) — best-effort, runs on every pull so device B picks up
+    // scalar columns) - best-effort, runs on every pull so device B picks up
     // choices made on device A. Cloud non-null values win; null cloud values
     // leave local values untouched.
     try {
@@ -470,13 +470,13 @@ export async function pullAndMerge(
         }
       }
     } catch (e) {
-      // Best-effort — regional prefs failure must not flip sync into error.
+      // Best-effort - regional prefs failure must not flip sync into error.
       console.warn("[pullAndMerge] regional prefs pull failed (non-fatal)", e);
     }
 
     // Pull streak_days and union-merge with local (#574). Streak rows are
-    // monotonic — each date appears at most once and nothing is ever removed
-    // by sync — so a set-union always converges. Without this leg streak data
+    // monotonic - each date appears at most once and nothing is ever removed
+    // by sync - so a set-union always converges. Without this leg streak data
     // flows one direction only (push per device) and a Mac signing in after
     // graded days on a phone would show its own stale local streak.
     try {
@@ -505,12 +505,12 @@ export async function pullAndMerge(
         }
       }
     } catch (e) {
-      // Best-effort — streak pull failure must not flip sync into error.
+      // Best-effort - streak pull failure must not flip sync into error.
       console.warn("[pullAndMerge] streak pull failed (non-fatal)", e);
     }
 
     // Pull grade_log and union-merge with local (#575). Grade log entries are
-    // monotonic — keyed by `occurredAt` and never removed by sync — so
+    // monotonic - keyed by `occurredAt` and never removed by sync - so
     // mergeGradeLog (a set-union by `occurredAt`) always converges. Without
     // this leg the accuracy sparkline, grade-breakdown bar, heatmap, and
     // rolling-7-day on Stats are local-only and never see grades from another
@@ -519,8 +519,8 @@ export async function pullAndMerge(
     // Stats reads gradeLog inside an effect gated by `useLocalStorageKey`
     // (the SESSION_STORAGE_KEY of `poke-memory:review-session:v1`). To wake
     // an open Stats mount after the merge we dispatch a synthetic storage
-    // event for that key — the same channel `saveSession` already uses
-    // earlier in this function — so the effect re-runs and `loadGradeLog`
+    // event for that key - the same channel `saveSession` already uses
+    // earlier in this function - so the effect re-runs and `loadGradeLog`
     // returns the freshly-written log.
     try {
       const cloudLog = await pullGradeLog(client, userId);
@@ -529,7 +529,7 @@ export async function pullAndMerge(
         const mergedLog = mergeGradeLog(localLog, cloudLog);
         // Length-only check: mergeGradeLog is a set-union by `occurredAt`, and
         // the only way merged.length === local.length is "every cloud entry
-        // shares its occurredAt with a local entry" — which means cloud
+        // shares its occurredAt with a local entry" - which means cloud
         // contributes nothing new. Avoiding the write in that case skips a
         // useless IDB round-trip and the synthetic event below.
         if (mergedLog.length !== localLog.length) {
@@ -541,7 +541,7 @@ export async function pullAndMerge(
         }
       }
     } catch (e) {
-      // Best-effort — grade-log pull failure must not flip sync into error.
+      // Best-effort - grade-log pull failure must not flip sync into error.
       console.warn("[pullAndMerge] grade-log pull failed (non-fatal)", e);
     }
 

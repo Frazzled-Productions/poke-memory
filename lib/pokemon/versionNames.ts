@@ -13,7 +13,7 @@
 export type VersionMeta = {
   /** Marketed English title (e.g. "FireRed", "Brilliant Diamond"). */
   display: string;
-  /** Release ordinal for sorting — lower = earlier. */
+  /** Release ordinal for sorting - lower = earlier. */
   order: number;
 };
 

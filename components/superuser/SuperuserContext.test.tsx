@@ -1,5 +1,5 @@
 /**
- * Smoke test for the signed-in branch of `SuperuserProvider.exitCleanup` —
+ * Smoke test for the signed-in branch of `SuperuserProvider.exitCleanup` - 
  * the QA-repudiate path that runs when the last superuser flag flips off
  * while the user is authenticated. Confirms all five tables are pulled and
  * applied, mirroring the Force-pull-all shape from #573.
@@ -142,7 +142,7 @@ function Harness({ onReady }: { onReady: (api: ReturnType<typeof useSuperuser>) 
   );
 }
 
-describe("SuperuserProvider.exitCleanup — signed-in branch", () => {
+describe("SuperuserProvider.exitCleanup - signed-in branch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthValue.user = { id: "user-123", user_metadata: {} };
@@ -189,7 +189,7 @@ describe("SuperuserProvider.exitCleanup — signed-in branch", () => {
     const buttons = document.querySelectorAll("button");
     buttons[0].click();
 
-    // Flip the only flag off — triggers exitCleanup.
+    // Flip the only flag off - triggers exitCleanup.
     await act(async () => {
       await api.setFlag("pretendAllMastered", false);
     });

@@ -8,7 +8,7 @@ export const DECODE_TIMEOUT_MS = 500;
 
 /**
  * Tighter ceiling used on the grade critical path (#1191). The swap should
- * be bounded even on a cold sprite — 150 ms is enough to eliminate visible
+ * be bounded even on a cold sprite - 150 ms is enough to eliminate visible
  * pop-in on already-warmed assets while not noticeably delaying the swap.
  */
 export const DECODE_GRADE_TIMEOUT_MS = 150;
@@ -20,7 +20,7 @@ export const DECODE_GRADE_TIMEOUT_MS = 150;
  * This prevents the brief sprite pop-in that occurs when React advances to the
  * next card synchronously but the browser still needs to decode the image bytes
  * that were warmed into the network cache by `SpritePreloader`. A warmed fetch
- * is not a warmed decode — this call bridges that gap.
+ * is not a warmed decode - this call bridges that gap.
  *
  * A combined `Promise.race` with a timeout acts as a safety valve: if any
  * image is unexpectedly slow the UI advances anyway rather than blocking
@@ -45,11 +45,11 @@ export async function decodeSpriteUrls(
     const img = new window.Image();
     img.src = url;
     // `decode()` is a modern browser API; it may be absent in test environments
-    // (jsdom) or very old browsers. Fall back gracefully — the swap proceeds
+    // (jsdom) or very old browsers. Fall back gracefully - the swap proceeds
     // immediately rather than blocking.
     if (typeof img.decode !== "function") return Promise.resolve();
     return img.decode().catch(() => {
-      // Ignore per-image failures — better to show the next card with a brief
+      // Ignore per-image failures - better to show the next card with a brief
       // pop-in than to block the swap indefinitely.
     });
   });

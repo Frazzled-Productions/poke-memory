@@ -186,7 +186,7 @@ function makeEvolutionCard(
 }
 
 // ---------------------------------------------------------------------------
-// Unit tests — cardBelongsToSpecies
+// Unit tests - cardBelongsToSpecies
 // ---------------------------------------------------------------------------
 
 describe("cardBelongsToSpecies", () => {
@@ -211,7 +211,7 @@ describe("cardBelongsToSpecies", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Unit tests — computeNextReview
+// Unit tests - computeNextReview
 // ---------------------------------------------------------------------------
 
 describe("computeNextReview", () => {
@@ -311,7 +311,7 @@ describe("computeNextReview", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Hook tests — useNextReviewDate
+// Hook tests - useNextReviewDate
 // ---------------------------------------------------------------------------
 
 describe("useNextReviewDate", () => {

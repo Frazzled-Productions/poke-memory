@@ -6,7 +6,7 @@
 // without a server round-trip. Falls back to "en" when the cookie is absent
 // or holds an unsupported value.
 //
-// This is intentionally a simple cookie read — we do NOT call next-intl's
+// This is intentionally a simple cookie read - we do NOT call next-intl's
 // `useLocale()` from within Client Components that also load locale-aware
 // Pokémon name data, because that would require them to be wrapped in the
 // next-intl provider hierarchy. The cookie is the single source of truth.
@@ -28,7 +28,7 @@ function readLocaleCookie(): AppLocale {
 
 /**
  * Returns the currently-active app locale.
- * Reactive — updates when the cookie changes (e.g. after a locale switch).
+ * Reactive - updates when the cookie changes (e.g. after a locale switch).
  *
  * Note: a locale switch sets the cookie via a Server Action and then calls
  * `router.refresh()`, which causes Next.js to re-render the Server Component

@@ -1,7 +1,7 @@
 // lib/pokemon/transliteration.ts
 // Build-time transliteration helpers for multi-locale Pokemon names (#1259).
 //
-// This module is intentionally NOT imported at runtime — it is only used by
+// This module is intentionally NOT imported at runtime - it is only used by
 // the seed script (`scripts/seed-pokemon.mjs`) and `scripts/split-seed.mjs`.
 // All transliterations are baked into `generated-locale-names.json` at seed
 // time; the runtime never calls pinyin-pro or wanakana.
@@ -17,7 +17,7 @@
  * Pokemon name.  Tone marks are included (e.g. "miào wā zhǒng zǐ").
  *
  * `pinyin-pro` v3.28 handles both Simplified and Traditional characters
- * natively — the same call works for both scripts.
+ * natively - the same call works for both scripts.
  *
  * Callers should import pinyin-pro directly when possible; this wrapper is
  * provided for a cleaner interface and to centralise the options.
@@ -39,7 +39,7 @@ export function generatePinyin(
  * PokéAPI's rōmaji field is already in Hepburn romanisation; this function
  * applies light normalisation only (collapse multiple spaces, trim).
  *
- * If `jaRoma` is absent for a species (defensive — research shows Gen 1-9
+ * If `jaRoma` is absent for a species (defensive - research shows Gen 1-9
  * coverage is complete), `fallback` is used instead (wanakana conversion of
  * the `ja` kana field).
  */
@@ -61,7 +61,7 @@ export function normaliseRomaji(
  *
  * Pokemon names are typically proper nouns whose hanzi readings in context
  * may differ from the standard dictionary entry.  This map is intentionally
- * sparse — only entries that are verified to be wrong should be added here.
+ * sparse - only entries that are verified to be wrong should be added here.
  *
  * Format: chineseName → correctedPinyin
  *
@@ -69,7 +69,7 @@ export function normaliseRomaji(
  * for any name that yields suspiciously short or empty pinyin.
  */
 export const PINYIN_OVERRIDES: Record<string, string> = {
-  // No overrides identified in initial spot-check — maintained for future use.
+  // No overrides identified in initial spot-check - maintained for future use.
 };
 
 /**

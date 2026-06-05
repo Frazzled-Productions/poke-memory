@@ -24,7 +24,7 @@ import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
  *     response is observable, so a non-2xx is treated as a sync failure and
  *     the unsynced queue stays intact for the next retry.
  *   - pagehide: page being torn down, no time to await. Falls back to
- *     `navigator.sendBeacon` — fire-and-forget, response code invisible to
+ *     `navigator.sendBeacon` - fire-and-forget, response code invisible to
  *     the sender. Best-effort.
  *
  * Both paths are fire-and-forget from the caller's perspective: navigation
@@ -34,7 +34,7 @@ import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
  * the browser, or the fetch+keepalive path returned a non-2xx), this hook
  * registers the `poke-memory:grade-sync` Background Sync tag. On supporting
  * browsers (Chromium on Android), the service worker will replay the persisted
- * queue when connectivity returns — even if every app tab has been closed by
+ * queue when connectivity returns - even if every app tab has been closed by
  * then. On unsupported browsers this registration is a no-op; the existing
  * `useOnlineReconnectSync` on-reconnect path remains the fallback.
  */
@@ -78,7 +78,7 @@ export function useSyncOnUnload(
       // if the beacon fails AND the OS kills the page before the 500 ms
       // debounce or the React cleanup effect runs, the cards are available for
       // useOnlineReconnectSync and useRetryPush on the next app open (#1288).
-      // Only write when the queue is non-empty — clearPendingQueue is called
+      // Only write when the queue is non-empty - clearPendingQueue is called
       // after a successful push, so we must not overwrite that with stale data.
       savePendingQueue(unsynced);
 
@@ -87,7 +87,7 @@ export function useSyncOnUnload(
       if (event.type === "pagehide") {
         // Final shutdown: only sendBeacon survives. We can't observe the
         // server's response, so the client trusts the browser's "queued"
-        // boolean. A 502 from the server is invisible here — that is the
+        // boolean. A 502 from the server is invisible here - that is the
         // documented limitation of this path; the visibilitychange route is
         // the one that closes the loop on partial failures.
         const queued = navigator.sendBeacon("/api/sync", payload);
@@ -99,7 +99,7 @@ export function useSyncOnUnload(
           ...(queued && { lastPushAt: now }),
         });
         if (queued) {
-          // Beacon accepted by the browser — clear the IDB mirror so the SW
+          // Beacon accepted by the browser - clear the IDB mirror so the SW
           // does not re-push grades that already left this device (#1072 concern).
           // Best-effort: fire and forget. The IDB mirror is only a safety-net for
           // the all-tabs-closed path; the sendBeacon response is not observable,
@@ -145,7 +145,7 @@ export function useSyncOnUnload(
                 markStructuralSyncError(body.code);
               }
             } catch {
-              // Body parse failed — fall through to the generic failure path.
+              // Body parse failed - fall through to the generic failure path.
             }
           }
 
@@ -160,7 +160,7 @@ export function useSyncOnUnload(
             ...(ok && { lastPushAt: now }),
           });
           if (ok) {
-            // Successful fetch — clear the IDB mirror so the SW does not
+            // Successful fetch - clear the IDB mirror so the SW does not
             // re-push grades that are already in the cloud (#1072 concern).
             clearPendingQueue();
           } else {

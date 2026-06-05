@@ -13,7 +13,7 @@ import { describe, it, expect, vi } from "vitest";
 import TermsPage from "@/app/terms/page";
 
 // ---------------------------------------------------------------------------
-// Mock resolveLocale — default "en".
+// Mock resolveLocale - default "en".
 // ---------------------------------------------------------------------------
 
 vi.mock("@/i18n/request", async (importOriginal) => {

@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Module mocks — factories must not reference outer variables (hoisting rule).
+// Module mocks - factories must not reference outer variables (hoisting rule).
 // ---------------------------------------------------------------------------
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -52,7 +52,7 @@ function makeLargeGradeLog(count = 210) {
     entry_date: `2026-01-${String((i % 28) + 1).padStart(2, "0")}`,
     card_type: "name",
     grade: 4,
-    subject_key: String((i % 10) + 1), // ten distinct cards — subjectKey required to count
+    subject_key: String((i % 10) + 1), // ten distinct cards - subjectKey required to count
   }));
 }
 
@@ -109,7 +109,7 @@ function makeSupabaseMock(overrides: {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("POST /api/srs/optimize — persistWeights via RPC", () => {
+describe("POST /api/srs/optimize - persistWeights via RPC", () => {
   const USER_ID = "user-abc-123";
 
   beforeEach(() => {

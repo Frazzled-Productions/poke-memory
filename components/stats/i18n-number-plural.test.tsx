@@ -1,5 +1,5 @@
 /**
- * Locale-coverage tests for #1408 — number formatting and ICU pluralisation.
+ * Locale-coverage tests for #1408 - number formatting and ICU pluralisation.
  *
  * Verifies that the migrated components:
  *   - Render locale-aware numbers (not hardcoded en-GB) in ja / zh-Hans / zh-Hant.
@@ -146,7 +146,7 @@ const EMPTY_TIMELINE: CollectionTimeline = {
 // ReviewHeatmap
 // ---------------------------------------------------------------------------
 
-describe("ReviewHeatmap — locale coverage (#1408)", () => {
+describe("ReviewHeatmap - locale coverage (#1408)", () => {
   const LOCALES: AppLocale[] = ["en", "ja", "zh-Hans", "zh-Hant"];
 
   it("renders 0 reviews in all locales without throwing", () => {
@@ -155,7 +155,7 @@ describe("ReviewHeatmap — locale coverage (#1408)", () => {
         <ReviewHeatmap columns={makeHeatmapColumns(0)} />,
         { locale },
       );
-      // Heading is localised — just assert one heading exists.
+      // Heading is localised - just assert one heading exists.
       expect(screen.getByRole("heading")).toBeInTheDocument();
       unmount();
     }
@@ -184,7 +184,7 @@ describe("ReviewHeatmap — locale coverage (#1408)", () => {
 // DueForecast
 // ---------------------------------------------------------------------------
 
-describe("DueForecast — locale coverage (#1408)", () => {
+describe("DueForecast - locale coverage (#1408)", () => {
   it("en: count=1 renders singular '1 card over the next 14 days'", () => {
     renderWithIntl(<DueForecast forecast={makeForecast(1)} />);
     expect(screen.getByText(/1 card over the next 14 days/)).toBeInTheDocument();
@@ -205,10 +205,10 @@ describe("DueForecast — locale coverage (#1408)", () => {
 // RetentionIndicator
 // ---------------------------------------------------------------------------
 
-describe("RetentionIndicator — locale coverage (#1408)", () => {
+describe("RetentionIndicator - locale coverage (#1408)", () => {
   it("en: renders the review count with ICU plural (1234 reviews)", () => {
     renderWithIntl(<RetentionIndicator comparison={RETENTION_COMPARISON_MOCK} />);
-    // 1234 reviews — 'other' branch
+    // 1234 reviews - 'other' branch
     expect(screen.getByText(/1,234 reviews/i)).toBeInTheDocument();
   });
 
@@ -232,7 +232,7 @@ describe("RetentionIndicator — locale coverage (#1408)", () => {
 
   it("percent formatting is locale-aware (en: formatPct(0.9) contains %)", () => {
     renderWithIntl(<RetentionIndicator comparison={RETENTION_COMPARISON_MOCK} />);
-    // Target is 90% — should appear as "90%" in en
+    // Target is 90% - should appear as "90%" in en
     expect(screen.getAllByText(/90%/).length).toBeGreaterThan(0);
   });
 });
@@ -241,7 +241,7 @@ describe("RetentionIndicator — locale coverage (#1408)", () => {
 // StreakBadge
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — locale coverage (#1408)", () => {
+describe("StreakBadge - locale coverage (#1408)", () => {
   afterEach(() => {
     // Restore the default mock value (count=5) after each test in this block.
     vi.mocked(computeStreak).mockReturnValue(5);
@@ -268,7 +268,7 @@ describe("StreakBadge — locale coverage (#1408)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// FsrsOptimizerSection — cooldown message
+// FsrsOptimizerSection - cooldown message
 // ---------------------------------------------------------------------------
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -281,7 +281,7 @@ const defaultOptimizerProps = {
   onOptimized: vi.fn(),
 };
 
-describe("FsrsOptimizerSection — cooldown locale coverage (#1408)", () => {
+describe("FsrsOptimizerSection - cooldown locale coverage (#1408)", () => {
   it("en: 'Next optimisation in N days' uses ICU plural (count > 1)", () => {
     const optimizedAt = new Date(Date.now() - 2 * MS_PER_DAY).toISOString();
     renderWithIntl(
@@ -308,10 +308,10 @@ describe("FsrsOptimizerSection — cooldown locale coverage (#1408)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// DirectionBreakdownChart — per-direction review count list
+// DirectionBreakdownChart - per-direction review count list
 // ---------------------------------------------------------------------------
 
-describe("DirectionBreakdownChart — locale coverage (#1408)", () => {
+describe("DirectionBreakdownChart - locale coverage (#1408)", () => {
   it("en: count=42 renders plural '42 reviews'", () => {
     renderWithIntl(<DirectionBreakdownChart rows={DIRECTION_ROWS} />);
     expect(screen.getByText(/42 reviews/i)).toBeInTheDocument();
@@ -333,10 +333,10 @@ describe("DirectionBreakdownChart — locale coverage (#1408)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// CollectionTimeline — number-formatting in CountPill
+// CollectionTimeline - number-formatting in CountPill
 // ---------------------------------------------------------------------------
 
-describe("CollectionTimeline — locale coverage (#1408)", () => {
+describe("CollectionTimeline - locale coverage (#1408)", () => {
   it("renders without throwing in all supported locales", () => {
     const LOCALES: AppLocale[] = ["en", "ja", "zh-Hans", "zh-Hant"];
     for (const locale of LOCALES) {

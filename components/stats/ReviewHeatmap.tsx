@@ -37,7 +37,7 @@ const INTENSITY_HOVER_STROKES = [
 /** Build the tooltip date string.
  *  Routes through formatDate (lib/utils/format-date.ts) so raw Intl.DateTimeFormat
  *  and toLocaleDateString calls are banned from components by the #1456 lint rule.
- *  Uses "dmy-year" (en-GB ordering: "1 Jan 2026") — includes the year so
+ *  Uses "dmy-year" (en-GB ordering: "1 Jan 2026") - includes the year so
  *  January cells in a year-spanning heatmap are unambiguous. */
 function formatTooltipDate(cell: HeatmapCell): string {
   return formatDate(cell.date, "dmy-year", "UTC");
@@ -162,7 +162,7 @@ export function ReviewHeatmap({ columns }: Props) {
                     ry={2}
                     className={[
                       INTENSITY_FILLS[bucket],
-                      // Pointer cursor and highlight ring on hover — scoped to
+                      // Pointer cursor and highlight ring on hover - scoped to
                       // pointer devices so touch screens are unaffected.
                       "[@media(hover:hover)]:cursor-pointer",
                       isHovered
@@ -179,7 +179,7 @@ export function ReviewHeatmap({ columns }: Props) {
             )}
           </svg>
 
-          {/* Hover tooltip — visible only on pointer devices. Primary guard:
+          {/* Hover tooltip - visible only on pointer devices. Primary guard:
               React only sets `tooltip` state from `onMouseEnter`, which only
               fires on pointer devices. Defence-in-depth: the
               `[@media(hover:hover)]` class hides the element via CSS on touch

@@ -56,7 +56,7 @@ function renderSearchBar(
 // Search input
 // ---------------------------------------------------------------------------
 
-describe("PastureSearchBar — search input", () => {
+describe("PastureSearchBar - search input", () => {
   it("renders a labelled text input", () => {
     renderSearchBar();
     expect(
@@ -102,7 +102,7 @@ describe("PastureSearchBar — search input", () => {
 // Type chips
 // ---------------------------------------------------------------------------
 
-describe("PastureSearchBar — type chips", () => {
+describe("PastureSearchBar - type chips", () => {
   it("renders a 'Filter by type' group", () => {
     renderSearchBar();
     expect(
@@ -166,7 +166,7 @@ describe("PastureSearchBar — type chips", () => {
 // Generation pills
 // ---------------------------------------------------------------------------
 
-describe("PastureSearchBar — generation pills", () => {
+describe("PastureSearchBar - generation pills", () => {
   it("renders a 'Filter by generation' group", () => {
     renderSearchBar();
     expect(
@@ -253,10 +253,10 @@ describe("PastureSearchBar — generation pills", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Japanese locale — chrome strings render in Japanese (#1369)
+// Japanese locale - chrome strings render in Japanese (#1369)
 // ---------------------------------------------------------------------------
 
-describe("PastureSearchBar — Japanese locale", () => {
+describe("PastureSearchBar - Japanese locale", () => {
   it("renders the search label in Japanese", () => {
     renderJa(
       <PastureSearchBar
@@ -312,10 +312,10 @@ describe("PastureSearchBar — Japanese locale", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Type pill locale coverage (#1389) — type names must localise with appLocale
+// Type pill locale coverage (#1389) - type names must localise with appLocale
 // ---------------------------------------------------------------------------
 
-describe("PastureSearchBar — type pills in Japanese locale", () => {
+describe("PastureSearchBar - type pills in Japanese locale", () => {
   it("renders the Fire pill in Japanese as ほのお", () => {
     renderJa(
       <PastureSearchBar
@@ -343,7 +343,7 @@ describe("PastureSearchBar — type pills in Japanese locale", () => {
   });
 });
 
-describe("PastureSearchBar — type pills in Simplified Chinese locale", () => {
+describe("PastureSearchBar - type pills in Simplified Chinese locale", () => {
   it("renders the Dragon pill in Simplified Chinese as 龙", () => {
     renderWithIntl(
       <PastureSearchBar
@@ -363,7 +363,7 @@ describe("PastureSearchBar — type pills in Simplified Chinese locale", () => {
   });
 });
 
-describe("PastureSearchBar — type pills in Traditional Chinese locale", () => {
+describe("PastureSearchBar - type pills in Traditional Chinese locale", () => {
   it("renders the Bug pill in Traditional Chinese as 蟲", () => {
     renderWithIntl(
       <PastureSearchBar

@@ -7,7 +7,7 @@ import type { RetryState } from "@/lib/sync/useRetryPush";
 import { mutedText } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
-// Typed state — stores raw data so the render can format it via t().
+// Typed state - stores raw data so the render can format it via t().
 // ---------------------------------------------------------------------------
 
 type SyncStatusState =
@@ -20,7 +20,7 @@ type SyncStatusState =
       /**
        * Non-null when a structural (non-transient) error was recorded on the
        * card_reviews primary path (#1358). Retrying is pointless until a deploy
-       * fixes the schema mismatch — the Retry button is hidden in this state.
+       * fixes the schema mismatch - the Retry button is hidden in this state.
        */
       detail: string;
     };
@@ -45,7 +45,7 @@ export function SyncStatusLine({
     const status = loadSyncStatus();
 
     // Structural errors take priority over the generic failed state. The Retry
-    // button is hidden entirely — retrying is pointless until a deploy fixes
+    // button is hidden entirely - retrying is pointless until a deploy fixes
     // the mismatch.
     if (status.structuralSyncError !== null) {
       setState({ kind: "schemaError", detail: status.structuralSyncError });
@@ -76,7 +76,7 @@ export function SyncStatusLine({
 
   if (state === null) return null;
 
-  // Structural error — show a non-dismissable, NON-retryable message. The Retry
+  // Structural error - show a non-dismissable, NON-retryable message. The Retry
   // button is intentionally absent: 42P10 (and other structural codes) always
   // indicate a deploy/schema mismatch; retrying will always fail until the
   // server is fixed. Progress is safe locally.

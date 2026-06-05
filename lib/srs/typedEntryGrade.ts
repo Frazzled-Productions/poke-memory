@@ -18,7 +18,7 @@ import type { Grade } from "@/lib/review/session";
  *    etc.) AND spaces. This makes "Porygon-Z", "porygon z", and "porygonz" all
  *    collapse to the same normalised form, so a user who types the name with a
  *    space instead of a hyphen is not penalised. Only ASCII punctuation and
- *    spaces are stripped — accented characters in Pokémon names (e.g. "Flabébé")
+ *    spaces are stripped - accented characters in Pokémon names (e.g. "Flabébé")
  *    are preserved.
  */
 export function normaliseInput(input: string): string {
@@ -92,7 +92,7 @@ export function gradeTypedAnswer(
 ): { grade: Grade; distance: number } {
   const normInput = normaliseInput(input);
   const normCanonical = normaliseInput(canonicalName);
-  // Empty input (after normalisation) is treated as a skip — grade Again.
+  // Empty input (after normalisation) is treated as a skip - grade Again.
   if (normInput.length === 0) return { grade: 1, distance: normCanonical.length };
   const distance = levenshtein(normInput, normCanonical);
   return { grade: distanceToGrade(distance), distance };

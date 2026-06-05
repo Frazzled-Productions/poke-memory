@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { QueueCounterRow } from "@/components/review/QueueCounterRow";
 
 // ---------------------------------------------------------------------------
-// Undo button — extracted so each variant branch does not repeat the JSX
+// Undo button - extracted so each variant branch does not repeat the JSX
 // ---------------------------------------------------------------------------
 
 interface UndoButtonProps {
@@ -36,13 +36,13 @@ export interface ReviewCardLayoutProps {
   /**
    * Outer layout variant.
    *
-   * - "flip"     — name / evolution / reverse-evolution / cry cards.
+   * - "flip" - name / evolution / reverse-evolution / cry cards.
    *                Full-height flex column, gap-2 sm:gap-8, card region uses
    *                `overflow-hidden`.
-   * - "reverse"  — SpritePicker (multiple-choice). Same full-height flex column
+   * - "reverse" - SpritePicker (multiple-choice). Same full-height flex column
    *                but gap-2 sm:gap-4 and card region uses `overflow-y-auto` so
    *                very short viewports (e.g. iPhone SE) can scroll the tiles.
-   * - "countdown"  — No card; just queue counter + undo + countdown content.
+   * - "countdown" - No card; just queue counter + undo + countdown content.
    *                  Plain centred column, gap-6, no flex-1.
    */
   variant: "flip" | "reverse" | "countdown";
@@ -165,7 +165,7 @@ export function ReviewCardLayout({
     variant === "reverse" ? "overflow-y-auto" : "overflow-hidden";
 
   return (
-    /* Height-filling flex column — grade buttons stay on screen without
+    /* Height-filling flex column - grade buttons stay on screen without
        scrolling on mobile (#1087). flex-1 min-h-0 propagates from the page
        height chain. */
     <div
@@ -201,7 +201,7 @@ export function ReviewCardLayout({
         </div>
       )}
 
-      {/* Keyboard shortcuts overlay — rendered outside the
+      {/* Keyboard shortcuts overlay - rendered outside the
           revealed/unrevealed conditional so pressing `?` works at any
           point in the review cycle. */}
       {keyboardShortcutsOverlay}

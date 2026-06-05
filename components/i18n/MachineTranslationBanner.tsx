@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * MachineTranslationBanner — dismissible caution banner for non-English locales.
+ * MachineTranslationBanner - dismissible caution banner for non-English locales.
  *
  * Shown once per locale until the user dismisses it. Dismissal is persisted
  * in a standalone localStorage key per locale (for fast synchronous reads)
@@ -18,7 +18,7 @@
  * different locales before syncing, the last push wins and a banner may
  * re-show once on the other device. Acceptable for a cosmetic banner.
  *
- * The banner is intentionally NOT rendered in the English locale — the English
+ * The banner is intentionally NOT rendered in the English locale - the English
  * UI is the authoritative version and needs no machine-translation caveat.
  *
  * localStorage key format: `poke-memory:mt-banner-dismissed:<locale>`
@@ -45,14 +45,14 @@ export function MachineTranslationBanner() {
   useEffect(() => {
     // Read the per-locale dismissed flag after hydration so SSR and the first
     // paint are consistent. Without this guard the server renders the banner
-    // open (it has no localStorage), and the client immediately hides it —
+    // open (it has no localStorage), and the client immediately hides it - 
     // producing a visible flash.
     const stored = localStorage.getItem(mtBannerDismissedKey(locale));
     setDismissed(stored === "1");
   }, [locale]);
 
   function handleDismiss() {
-    // Write the standalone key (fast synchronous read path — component never
+    // Write the standalone key (fast synchronous read path - component never
     // changes its useEffect to read from settings directly).
     localStorage.setItem(mtBannerDismissedKey(locale), "1");
     setDismissed(true);
@@ -71,7 +71,7 @@ export function MachineTranslationBanner() {
     }
   }
 
-  // Do not render for English — the authoritative locale needs no disclaimer.
+  // Do not render for English - the authoritative locale needs no disclaimer.
   // Also skip while hydrating (dismissed === null) to avoid a layout shift.
   if (locale === "en" || dismissed !== false) return null;
 
@@ -84,7 +84,7 @@ export function MachineTranslationBanner() {
       className="w-full bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800"
     >
       <div className="mx-auto flex max-w-3xl items-start gap-3 px-4 py-3 sm:items-center">
-        {/* Warning icon — decorative, aria-hidden */}
+        {/* Warning icon - decorative, aria-hidden */}
         <span aria-hidden="true" className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400 sm:mt-0">
           &#9888;&#xFE0F;
         </span>

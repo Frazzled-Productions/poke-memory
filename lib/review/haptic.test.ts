@@ -7,7 +7,7 @@ import {
 } from "./haptic";
 
 // ---------------------------------------------------------------------------
-// Helpers — stub browser globals on globalThis for the node test environment.
+// Helpers - stub browser globals on globalThis for the node test environment.
 // ---------------------------------------------------------------------------
 
 function stubMatchMedia(reducedMotion: boolean) {
@@ -85,7 +85,7 @@ describe("supportsVibration", () => {
 
 describe("supportsSwitchHaptic", () => {
   it("returns false in the node environment (no document)", () => {
-    // In node, document is undefined — supportsSwitchHaptic must not throw.
+    // In node, document is undefined - supportsSwitchHaptic must not throw.
     expect(supportsSwitchHaptic()).toBe(false);
   });
 });

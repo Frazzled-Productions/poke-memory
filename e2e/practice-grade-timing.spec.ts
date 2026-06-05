@@ -26,7 +26,7 @@
  *     the remaining 5 steady-state samples makes the threshold meaningful
  *     without artificially loosening it. DO NOT re-tighten to 5 total
  *     samples or remove the warm-up discard without checking CI variance
- *     first — recent CI samples were [335,323,185,249,317] ms and
+ *     first - recent CI samples were [335,323,185,249,317] ms and
  *     [382,127,251,264,145] ms, where first samples were consistently
  *     slowest. (If the swap genuinely regresses by 200 ms on the steady
  *     path, the steady-state median will cross 250 ms and the test will
@@ -102,19 +102,19 @@ const SESSION_WITH_SIX_DUE_NAME_CARDS = {
 // ---------------------------------------------------------------------------
 // Settings written to localStorage before the page loads:
 //
-//   waitForAudioOnGrade: false  — opt into the fast swap path (#1191)
-//   playCryOnReveal: false      — no audio queued; nothing to wait for
+//   waitForAudioOnGrade: false - opt into the fast swap path (#1191)
+//   playCryOnReveal: false - no audio queued; nothing to wait for
 //   speakNameOnReveal: false
 //   playCryOnAnswer: false
 //   speakNameOnAnswer: false
 //   evolutionCardsEnabled: false
 //   cryCardsEnabled: false
-//   maxNewPerDay: 0             — no new cards introduced mid-session
-//   maxReviewsPerDay: 100       — high daily cap so session never stalls
-//   mobileNav: "bottom"         — avoids the hamburger-nav migration default
+//   maxNewPerDay: 0 - no new cards introduced mid-session
+//   maxReviewsPerDay: 100 - high daily cap so session never stalls
+//   mobileNav: "bottom" - avoids the hamburger-nav migration default
 //
 // nameCardsEnabled and reverseCardsEnabled were removed in #1234.
-// Name and reverse cards are now always on — omit these stale fields.
+// Name and reverse cards are now always on - omit these stale fields.
 // ---------------------------------------------------------------------------
 const TIMING_SETTINGS = {
   waitForAudioOnGrade: false,
@@ -148,7 +148,7 @@ function median(values: number[]): number {
 // ---------------------------------------------------------------------------
 
 test.describe("Grade→next-card swap timing (#1191)", () => {
-  // Chromium only — mobile-safari CI variance is too high for sub-second
+  // Chromium only - mobile-safari CI variance is too high for sub-second
   // assertions. This mirrors the pattern in keyboard-review.spec.ts.
   test.skip(({ browserName }) => browserName !== "chromium", "chromium only");
 
@@ -173,7 +173,7 @@ test.describe("Grade→next-card swap timing (#1191)", () => {
     await page.goto("/");
     await awaitSeedIdb(page);
 
-    // Wait for the first card to be ready — the Reveal button is the canonical
+    // Wait for the first card to be ready - the Reveal button is the canonical
     // "session active" indicator.
     const reveal = page.getByRole("button", { name: "Reveal" });
     await expect(reveal).toBeVisible({ timeout: 15_000 });
@@ -234,7 +234,7 @@ test.describe("Grade→next-card swap timing (#1191)", () => {
               reject(new Error("Timed out waiting for Reveal button after grade"));
               return;
             }
-            // ~16 ms polling — one animation frame without the overhead of
+            // ~16 ms polling - one animation frame without the overhead of
             // requestAnimationFrame, which is throttled in background tabs.
             setTimeout(check, 16);
           }
@@ -256,7 +256,7 @@ test.describe("Grade→next-card swap timing (#1191)", () => {
     const max = Math.max(...steadySamples);
 
     // Log all samples (including warm-up) so CI output is useful for
-    // debugging — label which were discarded.
+    // debugging - label which were discarded.
     console.log(
       `[grade-timing] all samples: [${allSamples.map((s) => s.toFixed(1)).join(", ")}] ms` +
         ` | warm-up (discarded): [${allSamples.slice(0, WARMUP_COUNT).map((s) => s.toFixed(1)).join(", ")}] ms` +
@@ -268,7 +268,7 @@ test.describe("Grade→next-card swap timing (#1191)", () => {
     // Median guard: catches a regression where the reorder is undone and the
     // swap reverts to the slow persistence-first path (typically 300-800 ms
     // extra per grade on a shared CI runner). 250 ms is ~2x the observed
-    // steady-state CI median (~24-124 ms) — tight enough to catch a 2x
+    // steady-state CI median (~24-124 ms) - tight enough to catch a 2x
     // regression on the steady path, loose enough to absorb runner variance.
     // The warm-up samples are intentionally excluded so normal JIT ramp-up
     // does not trigger a false failure.
@@ -284,7 +284,7 @@ test.describe("Grade→next-card swap timing (#1191)", () => {
 
     // Max guard: catches a single pathological outlier on the steady-state
     // path (e.g. the reorder regressed only for a specific card type or grade
-    // path). 600 ms is ~2x the observed CI max (280 ms) — enough headroom for
+    // path). 600 ms is ~2x the observed CI max (280 ms) - enough headroom for
     // cold-cache decode. Applied to steady-state samples only.
     expect(
       max,

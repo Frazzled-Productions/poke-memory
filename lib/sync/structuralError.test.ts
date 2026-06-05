@@ -186,7 +186,7 @@ describe("markStructuralSyncError", () => {
 
   it("does not throw even if the StorageEvent constructor is unavailable (non-browser env)", () => {
     // Node has no StorageEvent; patchSyncStatus catches that and continues.
-    // The important thing is the write still lands — no exception escapes.
+    // The important thing is the write still lands - no exception escapes.
     expect(() => markStructuralSyncError("42P10", "2026-05-30T12:00:00.000Z")).not.toThrow();
     const stored = JSON.parse(storage.getItem(KEY_SYNC_STATUS)!) as Record<string, unknown>;
     expect(stored.structuralSyncError).toBe("42P10");

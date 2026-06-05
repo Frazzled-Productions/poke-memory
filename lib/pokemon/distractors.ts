@@ -4,7 +4,7 @@ import { fnv1a, fnv1aUint32 } from "@/lib/utils/fnv1a";
 /**
  * Returns `count` deterministic distractors from `pool`, excluding `targetId`.
  *
- * Same `targetId` + same `seed` always produces the same result — stable
+ * Same `targetId` + same `seed` always produces the same result - stable
  * across re-renders for a given card. Pass a per-card unique value (e.g. the
  * card's composite ID as a string) so each card gets different distractors.
  *

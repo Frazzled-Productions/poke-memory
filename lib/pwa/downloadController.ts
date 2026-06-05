@@ -13,13 +13,13 @@
  * whose cleanest fix is a shared module outside the component tree.
  *
  * Public API:
- *   startDownload(ids)  — begins a precacheAll run; no-op if one is already
+ *   startDownload(ids) - begins a precacheAll run; no-op if one is already
  *                         in progress.
- *   stopDownload()      — explicitly aborts the active run.
- *   subscribe(listener) — registers a DownloadState listener; returns an
+ *   stopDownload() - explicitly aborts the active run.
+ *   subscribe(listener) - registers a DownloadState listener; returns an
  *                         unsubscribe function. Immediately calls the listener
  *                         with the current state.
- *   getState()          — returns the current DownloadState synchronously,
+ *   getState() - returns the current DownloadState synchronously,
  *                         seeding from localStorage on first call so that
  *                         useState(getState) reflects a prior download on the
  *                         very first render.
@@ -62,14 +62,14 @@ function setState(next: DownloadState): void {
 /**
  * Lazily seed the singleton from localStorage on first access.
  *
- * Called by both getState() and subscribe() so the first caller — whether
- * the useState initialiser or the subscribe effect — gets correct state.
+ * Called by both getState() and subscribe() so the first caller - whether
+ * the useState initialiser or the subscribe effect - gets correct state.
  *
  * The module may be imported in a server context (during SSR) where
  * `window` / `localStorage` are unavailable; the typeof guard ensures it
  * no-ops safely. Runs at most once per page load.
  *
- * Only mutates currentState when the phase is still "idle" — an active or
+ * Only mutates currentState when the phase is still "idle" - an active or
  * completed download from this session takes precedence.
  */
 function seedFromStorage(): void {
@@ -95,7 +95,7 @@ function seedFromStorage(): void {
 }
 
 /**
- * The manifest for the current asset set — computed once at module load.
+ * The manifest for the current asset set - computed once at module load.
  * Used as a fallback when a download timestamp exists but no persisted manifest
  * (e.g. a download predating #1539), and written to storage after each new
  * download. Exported so `OfflineSection` can compare without recomputing.
@@ -113,7 +113,7 @@ export const CURRENT_MANIFEST: OfflineManifest = {
 /**
  * Returns the current download state synchronously, seeding from localStorage
  * on the first call so that a returning user's prior-download timestamp is
- * reflected on the very first render — no "Download" → "Update" flash.
+ * reflected on the very first render - no "Download" → "Update" flash.
  *
  * Safe to use as a React `useState` initialiser:
  *   const [state, setState] = useState(getState);
@@ -176,7 +176,7 @@ export async function startDownload(ids: number[]): Promise<void> {
     });
 
     if (controller.signal.aborted) {
-      // Explicit user abort — return to idle so they can restart.
+      // Explicit user abort - return to idle so they can restart.
       setState({ phase: "idle" });
       abortController = null;
       return;
@@ -194,7 +194,7 @@ export async function startDownload(ids: number[]): Promise<void> {
     }
 
     const downloadedAt = new Date().toISOString();
-    // writeLocalStorageRaw swallows errors — download result is recorded
+    // writeLocalStorageRaw swallows errors - download result is recorded
     // best-effort; the UI still transitions to "done" even if storage fails.
     writeLocalStorageRaw(OFFLINE_DOWNLOADED_AT_KEY, downloadedAt);
 

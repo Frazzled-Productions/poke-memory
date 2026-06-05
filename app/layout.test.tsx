@@ -11,7 +11,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mocks — must be declared before any imports from the module under test so
+// Mocks - must be declared before any imports from the module under test so
 // that vi.mock hoisting applies before the module graph is evaluated.
 // ---------------------------------------------------------------------------
 
@@ -24,7 +24,7 @@ vi.mock("next/font/google", () => ({
 // CSS imports are handled by Next.js's bundler but throw in Vitest's Node runner.
 vi.mock("./globals.css", () => ({}));
 
-// Stub every component the layout imports — we're only testing the metadata
+// Stub every component the layout imports - we're only testing the metadata
 // export, so none of these need to do anything.
 vi.mock("@/components/Nav", () => ({ Nav: () => null }));
 vi.mock("@/components/BottomTabBar", () => ({ BottomTabBar: () => null }));
@@ -53,7 +53,7 @@ vi.mock("@/components/pwa/StoragePersistenceRequester", () => ({
 vi.mock("@/components/pwa/PwaBadge", () => ({ PwaBadge: () => null }));
 vi.mock("@/components/pwa/DocumentTitleBadge", () => ({ DocumentTitleBadge: () => null }));
 
-// next-intl server APIs are not available in jsdom — stub them out.
+// next-intl server APIs are not available in jsdom - stub them out.
 vi.mock("next-intl/server", () => ({
   setRequestLocale: () => undefined,
   getMessages: () => Promise.resolve({}),
@@ -68,7 +68,7 @@ vi.mock("@/i18n/request", () => ({
   LOCALE_COOKIE: "poke-memory:locale",
   DEFAULT_LOCALE: "en",
 }));
-// i18n/locales has no server-only imports — the real module can be used,
+// i18n/locales has no server-only imports - the real module can be used,
 // but explicitly mock it here for clarity and to ensure test isolation.
 vi.mock("@/i18n/locales", () => ({
   SUPPORTED_LOCALES: ["en", "ja", "zh-Hans", "zh-Hant"],
@@ -109,7 +109,7 @@ function findElement(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("Root layout — metadata export", () => {
+describe("Root layout - metadata export", () => {
   it("exports a metadata object with appleWebApp defined", () => {
     expect(metadata).toBeDefined();
     expect(metadata.appleWebApp).toBeDefined();
@@ -163,7 +163,7 @@ describe("Root layout — metadata export", () => {
   });
 });
 
-describe("Root layout — body structure (#1103)", () => {
+describe("Root layout - body structure (#1103)", () => {
   it("wraps persistent chrome in #app-root so FirstVisitOnboardingModal can toggle inert (#1103)", async () => {
     // Render the layout function to a React element tree. We don't mount it via
     // @testing-library because RTL can't render <html>/<body> in jsdom.

@@ -11,7 +11,7 @@ import { KEY_QA_SEED_ACTIVE } from "@/lib/storage/keys";
 // ---------------------------------------------------------------------------
 
 // jsdom on this Node version does not ship localStorage out of the box, so
-// install an in-memory stub — matching the pattern in CollapsibleSection.test.tsx.
+// install an in-memory stub - matching the pattern in CollapsibleSection.test.tsx.
 function makeLocalStorage(): Storage {
   const store = new Map<string, string>();
   return {

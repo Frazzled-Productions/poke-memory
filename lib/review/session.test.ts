@@ -198,7 +198,7 @@ describe('hydrateSession', () => {
       expect(secondHeal).toBe(false);
     });
 
-    it('does not heal a brand-new card (fsrsState:new, lastReview:null) — the guard excludes it', () => {
+    it('does not heal a brand-new card (fsrsState:new, lastReview:null) - the guard excludes it', () => {
       // A legitimately new card has stability:0 but must never be healed;
       // isFsrsInvalidState would flag it but the guard checks fsrsState+lastReview first.
       const saved = [makeCard(makeSeedPokemon(1))]; // initialReviewState: new, lastReview:null
@@ -291,7 +291,7 @@ describe('migrateReviewState (stepStartedAt backfill for learning-step cards)', 
       lastReview: null,
       firstSeen: '2026-05-11',
       learningStep: 0,
-      // stepStartedAt intentionally absent — simulates old persisted schema
+      // stepStartedAt intentionally absent - simulates old persisted schema
     };
     const before = Date.now();
     migrateReviewCard({ id: 1, name: 'bulbasaur', spriteUrl: '', state });
@@ -309,7 +309,7 @@ describe('migrateReviewState (stepStartedAt backfill for learning-step cards)', 
       lastReview: '2026-05-11',
       firstSeen: '2026-05-01',
       learningStep: null,
-      // stepStartedAt intentionally absent — graduated card, should stay null
+      // stepStartedAt intentionally absent - graduated card, should stay null
     };
     migrateReviewCard({ id: 1, name: 'bulbasaur', spriteUrl: '', state });
     expect(state.stepStartedAt).toBeNull();
@@ -611,13 +611,13 @@ describe('hydrateSession (name/evolution enabled flags)', () => {
   });
 
   it('hydrateSession does not add new name cards when nameEnabled: false', () => {
-    // saved is empty — no saved name cards, but seed has 2 pokemon
+    // saved is empty - no saved name cards, but seed has 2 pokemon
     const { cards: result } = hydrateSession([], seed, [], NOW, { nameEnabled: false });
     expect(result.filter((c) => c.cardType === 'name')).toHaveLength(0);
   });
 
   it('hydrateSession does not add new evolution cards when evolutionEnabled: false', () => {
-    // saved is empty — no saved evo cards, but evoSeed has 1 entry
+    // saved is empty - no saved evo cards, but evoSeed has 1 entry
     const { cards: result } = hydrateSession([], seed, evoSeed, NOW, { evolutionEnabled: false });
     expect(result.filter((c) => c.cardType === 'evolution')).toHaveLength(0);
   });
@@ -633,7 +633,7 @@ describe('hydrateSession (reverse card from slimmed stored shape)', () => {
       ],
     });
 
-    // Simulate loading a slimmed card from localStorage — no flavorTexts or evolutionChain
+    // Simulate loading a slimmed card from localStorage - no flavorTexts or evolutionChain
     const slimCard: ReverseReviewCard = {
       id: REVERSE_ID_OFFSET + 1,
       speciesId: 1,
@@ -725,7 +725,7 @@ describe('buildSessionQueues (per-type budgets)', () => {
 
   it('caps new name and new evolution cards independently', () => {
     const cards: ReviewableCard[] = [
-      // 5 fresh name cards, 3 fresh evolution cards — all eligible as new
+      // 5 fresh name cards, 3 fresh evolution cards - all eligible as new
       nameCard(1), nameCard(2), nameCard(3), nameCard(4), nameCard(5),
       evoCard(1_500_001), evoCard(1_500_002), evoCard(1_500_003),
     ];
@@ -913,7 +913,7 @@ describe('buildSessionQueues (per-type budgets)', () => {
       nameCard(1, { learningStep: 0, stepStartedAt: NOW.getTime() }),
       nameCard(2, { learningStep: 0, stepStartedAt: NOW.getTime() }),
     ];
-    const eligible = new Set<number>(); // empty scope — no eligible cards
+    const eligible = new Set<number>(); // empty scope - no eligible cards
     const queues = buildSessionQueues(cards, baseLimits, TODAY, eligible);
     expect(queues.outOfScopeLearningIds.sort()).toEqual([1, 2]);
   });
@@ -983,7 +983,7 @@ describe('buildSessionQueues (round-robin new-card balancing, #842)', () => {
     }, {});
     const nameCt  = byType['name']    ?? 0;
     const revCt   = byType['reverse'] ?? 0;
-    // All 5 of each should be present — both below their cap
+    // All 5 of each should be present - both below their cap
     expect(nameCt).toBe(5);
     expect(revCt).toBe(5);
   });
@@ -1033,7 +1033,7 @@ describe('buildSessionQueues (round-robin new-card balancing, #842)', () => {
     const nameCt = byType['name']    ?? 0;
     const revCt  = byType['reverse'] ?? 0;
     const cryCt  = byType['cry']     ?? 0;
-    // Each cap is 4 and there are 5 candidates — all 4 slots should be filled
+    // Each cap is 4 and there are 5 candidates - all 4 slots should be filled
     expect(nameCt).toBe(4);
     expect(revCt).toBe(4);
     expect(cryCt).toBe(4);
@@ -1043,14 +1043,14 @@ describe('buildSessionQueues (round-robin new-card balancing, #842)', () => {
     expect(Math.abs(revCt  - cryCt)).toBeLessThanOrEqual(1);
   });
 
-  it('handles one direction exhausted before another — remaining direction still fills its cap', () => {
+  it('handles one direction exhausted before another - remaining direction still fills its cap', () => {
     const limits: DailyLimits = {
       name:      { maxNewPerDay: 5, maxReviewsPerDay: 100 },
       evolution: { maxNewPerDay: 5, maxReviewsPerDay: 100 },
       reverse:   { maxNewPerDay: 5, maxReviewsPerDay: 100 },
       cry:       { maxNewPerDay: 5, maxReviewsPerDay: 100 },
     };
-    // 2 name candidates, 5 reverse candidates — name bucket drains first
+    // 2 name candidates, 5 reverse candidates - name bucket drains first
     const cards: ReviewableCard[] = [
       nameCard(1), nameCard(2),
       reverseCard(1), reverseCard(2), reverseCard(3), reverseCard(4), reverseCard(5),
@@ -1061,9 +1061,9 @@ describe('buildSessionQueues (round-robin new-card balancing, #842)', () => {
       acc[card.cardType] = (acc[card.cardType] ?? 0) + 1;
       return acc;
     }, {});
-    // name has only 2 candidates — all introduced
+    // name has only 2 candidates - all introduced
     expect(byType['name']    ?? 0).toBe(2);
-    // reverse has 5 candidates and a cap of 5 — all introduced
+    // reverse has 5 candidates and a cap of 5 - all introduced
     expect(byType['reverse'] ?? 0).toBe(5);
   });
 
@@ -1186,18 +1186,18 @@ describe('buildSessionQueues (species-grouped new-card introduction, #928)', () 
     expect(newIds.has(CRY_ID_OFFSET + 1)).toBe(true);
   });
 
-  // (b) Partial-introduction — one direction already seen → admitted alone
+  // (b) Partial-introduction - one direction already seen → admitted alone
   it('admits a direction alone when its partner was introduced on a prior day', () => {
     const PREV_DAY = '2026-05-08';
     const cards: ReviewableCard[] = [
-      // Name for species 1 already graduated — reverse is solo
+      // Name for species 1 already graduated - reverse is solo
       { ...nameCard(1), state: { ...initialReviewState(NOW), lastReview: PREV_DAY, firstSeen: PREV_DAY, reps: 1, dueDate: '2026-05-15' } },
       reverseCard(1),
       nameCard(2), reverseCard(2),
     ];
     const queues = buildSessionQueues(cards, highLimits, TODAY);
     const newIds = new Set(queues.newQueue);
-    // Reverse for species 1 admitted alone — name partner already graduated
+    // Reverse for species 1 admitted alone - name partner already graduated
     expect(newIds.has(REVERSE_ID_OFFSET + 1)).toBe(true);
     // Species 2: name + reverse admitted together
     expect(newIds.has(2)).toBe(true);
@@ -1425,7 +1425,7 @@ describe('stableShuffleForDay (per-user salt)', () => {
 
   it('numeric salt 0 produces a different order from empty-string salt (no type-coercion collision)', () => {
     // Guards a future refactor against accidentally collapsing the numeric/string
-    // code paths — String(0) === "0", which must not equal String("") === "".
+    // code paths - String(0) === "0", which must not equal String("") === "".
     const withZero  = stableShuffleForDay(IDS, TODAY, 0);
     const withEmpty = stableShuffleForDay(IDS, TODAY, '');
     expect(withZero).not.toEqual(withEmpty);
@@ -1734,7 +1734,7 @@ describe('alternate-form cards (#447)', () => {
       // Both Raichu and Alolan Raichu are new cards competing for name slots.
       const cards = buildSession(formSeed, [], NOW);
       const queues = buildSessionQueues(cards, baseLimits, TODAY);
-      // Only 1 new name card allowed — cap is 1.
+      // Only 1 new name card allowed - cap is 1.
       expect(queues.newQueue.filter((id) => id <= 10277)).toHaveLength(1);
     });
 
@@ -1810,7 +1810,7 @@ describe('alternate-form cards (#447)', () => {
 });
 
 // ============================================================
-// buildSessionQueues — "unlimited reviews" edge (#AGENTS.md)
+// buildSessionQueues - "unlimited reviews" edge (#AGENTS.md)
 // ============================================================
 // From AGENTS.md:
 //   "Cards first seen today have firstSeen === today set permanently on the
@@ -1824,7 +1824,7 @@ describe('alternate-form cards (#447)', () => {
 // A card introduced today (firstSeen === today) must never count as a review
 // even if lastReview === today (because it was also introduced today).
 
-describe("buildSessionQueues — firstSeen=today never increments reviewsDoneToday", () => {
+describe("buildSessionQueues - firstSeen=today never increments reviewsDoneToday", () => {
   const TODAY = '2026-05-09';
   const baseLimits: DailyLimits = {
     name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
@@ -1890,9 +1890,9 @@ describe("buildSessionQueues — firstSeen=today never increments reviewsDoneTod
 });
 
 // ============================================================
-// buildSessionQueues — exact-cap boundary (N budget, N+1th excluded)
+// buildSessionQueues - exact-cap boundary (N budget, N+1th excluded)
 // ============================================================
-describe("buildSessionQueues — exact-cap boundary", () => {
+describe("buildSessionQueues - exact-cap boundary", () => {
   const TODAY = '2026-05-09';
 
   function nameCard(id: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): NameReviewCard {
@@ -1952,7 +1952,7 @@ describe("buildSessionQueues — exact-cap boundary", () => {
     ];
     const queues = buildSessionQueues(cards, limits, TODAY);
     expect(queues.reviewQueue).toHaveLength(2); // exactly the cap
-    // All three cannot all be present — one must be excluded.
+    // All three cannot all be present - one must be excluded.
     const reviewIds = new Set(queues.reviewQueue);
     expect(reviewIds.size).toBe(2);
   });
@@ -1971,7 +1971,7 @@ describe("buildSessionQueues — exact-cap boundary", () => {
       nameCard(1, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
       nameCard(2, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
       nameCard(3, { firstSeen: TODAY, lastReview: TODAY, reps: 1 }),
-      // Fresh candidates — should be excluded since budget is exhausted
+      // Fresh candidates - should be excluded since budget is exhausted
       nameCard(4),
       nameCard(5),
     ];
@@ -2020,7 +2020,7 @@ describe("buildSessionQueues — exact-cap boundary", () => {
 });
 
 // ---------------------------------------------------------------------------
-// #835 — non-destructive re-enable and cardTypeIsEnabled
+// #835 - non-destructive re-enable and cardTypeIsEnabled
 // ---------------------------------------------------------------------------
 
 describe('cardTypeIsEnabled (#835)', () => {
@@ -2092,10 +2092,10 @@ describe('non-destructive re-enable: hydrateSession + cardTypeIsEnabled (#835)',
       subjectKey: '1',
       state: { ...initialReviewState(NOW), reps: 8, scheduledDays: 30 },
     };
-    // Disable — cards are preserved, not stripped.
+    // Disable - cards are preserved, not stripped.
     const { cards: afterDisable } = hydrateSession([revCard], seed, [], NOW, { reverseEnabled: false });
     expect(afterDisable.filter((c) => c.cardType === 'reverse')).toHaveLength(1);
-    // Re-enable — cards already there, state intact.
+    // Re-enable - cards already there, state intact.
     const { cards: afterReEnable } = hydrateSession(afterDisable, seed, [], NOW, { reverseEnabled: true });
     const found = afterReEnable.find((c) => c.id === REVERSE_ID_OFFSET + 1);
     expect(found?.state.reps).toBe(8);
@@ -2105,7 +2105,7 @@ describe('non-destructive re-enable: hydrateSession + cardTypeIsEnabled (#835)',
   it('buildSessionQueues excludes disabled-type cards via eligibleCardIds', () => {
     // Build a session with name + reverse cards.
     const built = buildSession(seed, [], NOW, { reverseEnabled: true });
-    // hydrate with reverse disabled — cards preserved in session.
+    // hydrate with reverse disabled - cards preserved in session.
     const { cards: hydrated } = hydrateSession(built, seed, [], NOW, { reverseEnabled: false });
     expect(hydrated.filter((c) => c.cardType === 'reverse')).toHaveLength(2); // preserved
 
@@ -2182,7 +2182,7 @@ describe('buildSessionQueues (per-locale isolation)', () => {
     };
   }
 
-  it('filters to activeLocale — only active-locale cards appear in queue', () => {
+  it('filters to activeLocale - only active-locale cards appear in queue', () => {
     // Use disjoint species IDs for each locale so queued IDs are unambiguous.
     // en locale: species 1, 2. ja locale: species 3, 4.
     const cards: ReviewableCard[] = [
@@ -2213,7 +2213,7 @@ describe('buildSessionQueues (per-locale isolation)', () => {
     expect(jaQueues.newQueue).toHaveLength(2);  // ids 1 + 2 (ja)
   });
 
-  it('per-locale daily-budget isolation — en budget spent does not consume ja budget', () => {
+  it('per-locale daily-budget isolation - en budget spent does not consume ja budget', () => {
     // en: both cards introduced today (budget spent)
     // ja: both cards unseen (budget available)
     const cards: ReviewableCard[] = [
@@ -2225,16 +2225,16 @@ describe('buildSessionQueues (per-locale isolation)', () => {
     const enQueues = buildSessionQueues(cards, { ...baseLimits, name: { maxNewPerDay: 2, maxReviewsPerDay: 10 } }, TODAY, undefined, '', 'en');
     const jaQueues = buildSessionQueues(cards, { ...baseLimits, name: { maxNewPerDay: 2, maxReviewsPerDay: 10 } }, TODAY, undefined, '', 'ja');
 
-    // en budget is spent — no new en cards
+    // en budget is spent - no new en cards
     expect(enQueues.perType.name.newIntroducedToday).toBe(2);
     expect(enQueues.newQueue).toHaveLength(0);
 
-    // ja budget independent — both ja cards available as new
+    // ja budget independent - both ja cards available as new
     expect(jaQueues.perType.name.newIntroducedToday).toBe(0);
     expect(jaQueues.newQueue).toHaveLength(2);
   });
 
-  it('learningCardIds filtered by locale — different species so IDs are unambiguous', () => {
+  it('learningCardIds filtered by locale - different species so IDs are unambiguous', () => {
     // Use different species IDs so the en and ja learning cards have distinct numeric IDs.
     const enLearning = nameCardLocale(1, 'en', { learningStep: 0, stepStartedAt: Date.now() - 1000 });
     const jaLearning = nameCardLocale(2, 'ja', { learningStep: 0, stepStartedAt: Date.now() - 1000 });
@@ -2297,7 +2297,7 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
     expect(jaCards).toHaveLength(1);
   });
 
-  it('evo cards use (id, locale) dedup — a new locale adds a new evo card (#1562)', () => {
+  it('evo cards use (id, locale) dedup - a new locale adds a new evo card (#1562)', () => {
     const evo = makeEvoEdge({ id: 1_500_001, preEvoId: 1, postEvoId: 2 });
     const evoCard: EvolutionReviewCard = {
       ...evo,
@@ -2306,12 +2306,12 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
       state: initialReviewState(NOW),
     };
 
-    // Call with locale="ja" — the en evo card is already saved but there is
+    // Call with locale="ja" - the en evo card is already saved but there is
     // no saved ja evo card yet, so a new ja evo card must be added (#1562).
     const { cards } = hydrateSession([evoCard], [], [evo], NOW, { locale: 'ja', evolutionEnabled: true });
 
     const evos = cards.filter((c) => c.cardType === 'evolution');
-    // One en + one ja — two independent FSRS rows for the same edge.
+    // One en + one ja - two independent FSRS rows for the same edge.
     expect(evos).toHaveLength(2);
     expect(evos.some((c) => (c.locale ?? 'en') === 'en')).toBe(true);
     expect(evos.some((c) => (c.locale ?? 'en') === 'ja')).toBe(true);
@@ -2326,7 +2326,7 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
       state: { ...initialReviewState(NOW), reps: 3 },
     };
 
-    // Already has a ja evo card — hydrateSession with locale="ja" must NOT add another.
+    // Already has a ja evo card - hydrateSession with locale="ja" must NOT add another.
     const { cards } = hydrateSession([jaEvoCard], [], [evo], NOW, { locale: 'ja', evolutionEnabled: true });
 
     const jaEvos = cards.filter((c) => c.cardType === 'evolution' && (c.locale ?? 'en') === 'ja');
@@ -2335,7 +2335,7 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
     expect(jaEvos[0].state.reps).toBe(3);
   });
 
-  it('reverse-evo cards use (id, locale) dedup — a new locale adds a new reverse-evo card (#1562)', () => {
+  it('reverse-evo cards use (id, locale) dedup - a new locale adds a new reverse-evo card (#1562)', () => {
     const evo = makeEvoEdge({ id: 1_500_001, preEvoId: 1, postEvoId: 2 });
     const reverseId = reverseEdgeIdFor(1_500_001);
     const enReverseEvoCard = {
@@ -2347,7 +2347,7 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
       state: initialReviewState(NOW),
     };
 
-    // Call with locale="ja" — the en reverse-evo card exists but not a ja one.
+    // Call with locale="ja" - the en reverse-evo card exists but not a ja one.
     const { cards } = hydrateSession([enReverseEvoCard], [], [evo], NOW, { locale: 'ja', reverseEvolutionEnabled: true });
 
     const reverseEvos = cards.filter((c) => c.cardType === 'reverse-evolution');
@@ -2357,7 +2357,7 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
     expect(reverseEvos.some((c) => (c.locale ?? 'en') === 'ja')).toBe(true);
   });
 
-  it('hydrateSession refresh pass resolves saved evo by (id, locale) — ja state not applied to en card', () => {
+  it('hydrateSession refresh pass resolves saved evo by (id, locale) - ja state not applied to en card', () => {
     // A saved ja evo card must NOT overwrite the en evo card on refresh.
     const evo = makeEvoEdge({ id: 1_500_001, preEvoId: 1, postEvoId: 2 });
     const jaEvoCard: EvolutionReviewCard = {
@@ -2386,10 +2386,10 @@ describe('hydrateSession (per-locale dedup, #1562)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildSessionQueues([]) — empty card list (issue #1528)
+// buildSessionQueues([]) - empty card list (issue #1528)
 // ---------------------------------------------------------------------------
 
-describe('buildSessionQueues([]) — empty card list', () => {
+describe('buildSessionQueues([]) - empty card list', () => {
   const TODAY = '2026-05-09';
   const baseLimits: DailyLimits = {
     name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },

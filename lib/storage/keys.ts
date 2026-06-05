@@ -2,7 +2,7 @@
  * Central registry of every localStorage key string used by poke-memory.
  *
  * Rules:
- *   - Key strings must be byte-identical to their original values —
+ *   - Key strings must be byte-identical to their original values - 
  *     real users' browsers already hold data under these strings; changing
  *     one would silently orphan their saved state.
  *   - All keys follow the pattern `poke-memory:<domain>[:<variant>][:v<n>]`.
@@ -51,7 +51,7 @@ export const KEY_STREAK = "poke-memory:streak:v1";
 
 /**
  * Presence flag: localStorage.getItem === "true" means the developer panel
- * is unlocked. Intentionally has no `:v1` suffix — changing the key would
+ * is unlocked. Intentionally has no `:v1` suffix - changing the key would
  * require a migration of existing QA sessions.
  */
 export const KEY_SUPERUSER_UNLOCKED = "poke-memory:superuser";
@@ -82,7 +82,7 @@ export const KEY_LEGACY_PRACTICE_SCOPE = "poke-memory:practice-scope:v1";
 
 /**
  * Flag written after `navigator.storage.persist()` has been called at least
- * once in this browser. Used to avoid calling it on every page load — one
+ * once in this browser. Used to avoid calling it on every page load - one
  * successful request is sufficient to lock the permission in.
  */
 export const KEY_PERSIST_REQUESTED = "poke-memory:storage-persist-requested:v1";
@@ -94,7 +94,7 @@ export const KEY_PERSIST_REQUESTED = "poke-memory:storage-persist-requested:v1";
  * triggered cloud pulls and the silent SW update flow so they can skip safe
  * moments where activating mid-card would lose user state.
  *
- * Intentionally has no `:v1` suffix — the value lifecycle is bounded by the
+ * Intentionally has no `:v1` suffix - the value lifecycle is bounded by the
  * session mount, never read across versions, and there is nothing to migrate.
  */
 export const KEY_REVIEW_SESSION_ACTIVE = "poke-memory:session-active";
@@ -159,7 +159,7 @@ export const KEY_QA_SEED_ACTIVE = "poke-memory:qa-seed-active";
  * object `{ en: number, ja: number, "zh-Hans": number, "zh-Hant": number }`
  * written by `ReviewSession` after each grade that changes mastery state.
  *
- * One key (one getItem) for all locales — cheaper than one key per locale
+ * One key (one getItem) for all locales - cheaper than one key per locale
  * and forward-compatible via the `v1` version suffix (a future format change
  * is a key bump, not a migration). Mirrors the `has-mastered:v2` pattern.
  *
@@ -178,7 +178,7 @@ export const KEY_DUE_COUNT_BY_LOCALE =
   "poke-memory:due-count-by-locale:v1";
 
 /**
- * Per-locale "has review history" flag — `true` when the locale has at least
+ * Per-locale "has review history" flag - `true` when the locale has at least
  * one card with `state.lastReview !== null`. Written by ReviewSession alongside
  * the due-count cache. Read by the LanguageSwitcher to distinguish a freshly-
  * enrolled language (no history) from a caught-up one (history, all due counts
@@ -194,7 +194,7 @@ export const KEY_HAS_HISTORY_BY_LOCALE =
  * and cleared when the card is graded, the session advances, or the component
  * unmounts. Read by the LanguageSwitcher to block locale switches mid-card.
  *
- * Mirrors the `KEY_REVIEW_SESSION_ACTIVE` pattern — stored in localStorage so
+ * Mirrors the `KEY_REVIEW_SESSION_ACTIVE` pattern - stored in localStorage so
  * it is readable outside the React tree without prop drilling.
  */
 export const KEY_CARD_REVEALED = "poke-memory:card-revealed";
@@ -225,7 +225,7 @@ export const KEY_CLIENT_SALT = "poke-memory:client-salt:v1";
 
 /**
  * Key prefix for per-locale MT-banner dismissal flags.
- * Each locale gets its own key so reads are fast and synchronous — the banner
+ * Each locale gets its own key so reads are fast and synchronous - the banner
  * component reads the key for the active locale in a `useEffect` after hydration.
  *
  * Full key format: `poke-memory:mt-banner-dismissed:<locale>`

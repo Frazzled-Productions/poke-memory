@@ -42,7 +42,7 @@ const LIMITS_NAME_ONLY = {
  * Grading Again (1) enters a short relearning step → card stays immediately
  * due → "Reveal" button appears again.
  * Grading Hard (2) is a standard FSRS update and schedules for a future date
- * → "All caught up!" (not "Reveal") — see SESSION_WITH_ONE_LEARNING_CARD for
+ * → "All caught up!" (not "Reveal") - see SESSION_WITH_ONE_LEARNING_CARD for
  * the Hard-keeps-card-due scenario.
  */
 const SESSION_WITH_ONE_DUE_CARD = {
@@ -134,7 +134,7 @@ async function revealAndGetCentre(page: Parameters<typeof seedSessionIdb>[0]) {
   // Grade buttons should now appear.
   await expect(page.getByRole("group", { name: "Grade your answer" })).toBeVisible();
 
-  // The sprite image is a reliable anchor — always present on a revealed name card.
+  // The sprite image is a reliable anchor - always present on a revealed name card.
   const sprite = page.locator("img[alt='Bulbasaur']");
   await expect(sprite).toBeVisible();
 
@@ -211,7 +211,7 @@ async function simulateSwipe(
         };
       }
 
-      // Find the element at the start coordinates — this is the swipeable card
+      // Find the element at the start coordinates - this is the swipeable card
       // container (or a child of it). Pointer capture means move/up events are
       // always delivered to the element that received pointerdown, regardless of
       // where the pointer travels.
@@ -235,7 +235,7 @@ async function simulateSwipe(
 }
 
 test.describe("Swipe-to-grade gestures (#1052)", () => {
-  // Run on both chromium and mobile-safari — simulateSwipe dispatches pointer
+  // Run on both chromium and mobile-safari - simulateSwipe dispatches pointer
   // events directly on the element, so the event sequence is identical on both
   // engines regardless of hasTouch setting.
   test.skip(
@@ -265,7 +265,7 @@ test.describe("Swipe-to-grade gestures (#1052)", () => {
     // Swipe left: Again (1) keeps the card in the learning queue.
     await simulateSwipe(page, centerX, centerY, centerX - 120, centerY);
 
-    // Again puts the card back into the learning queue — the Reveal button
+    // Again puts the card back into the learning queue - the Reveal button
     // will reappear for the next learning-step presentation.
     await expect(page.getByRole("button", { name: "Reveal" })).toBeVisible({
       timeout: 10_000,
@@ -277,7 +277,7 @@ test.describe("Swipe-to-grade gestures (#1052)", () => {
 
     const { centerX, centerY } = await revealAndGetCentre(page);
 
-    // Swipe up: Easy (5) — move 120 px upward.
+    // Swipe up: Easy (5) - move 120 px upward.
     await simulateSwipe(page, centerX, centerY, centerX, centerY - 120);
 
     // Easy (5) grades the only due card and completes the session.
@@ -294,10 +294,10 @@ test.describe("Swipe-to-grade gestures (#1052)", () => {
 
     const { centerX, centerY } = await revealAndGetCentre(page);
 
-    // Swipe down: Hard (2) — move 120 px downward.
+    // Swipe down: Hard (2) - move 120 px downward.
     await simulateSwipe(page, centerX, centerY, centerX, centerY + 120);
 
-    // Hard on a learning-step card repeats the step — card stays immediately
+    // Hard on a learning-step card repeats the step - card stays immediately
     // due, so the Reveal button reappears for the next presentation.
     await expect(page.getByRole("button", { name: "Reveal" })).toBeVisible({
       timeout: 10_000,
@@ -314,7 +314,7 @@ test.describe("Swipe-to-grade gestures (#1052)", () => {
     const gradeGroup = page.getByRole("group", { name: "Grade your answer" });
     await expect(gradeGroup).toBeVisible();
 
-    // Grade using the button directly — swipe is additive, not exclusive.
+    // Grade using the button directly - swipe is additive, not exclusive.
     await gradeGroup.getByRole("button", { name: /Good/i }).click();
 
     await expect(page.getByText("All caught up!")).toBeVisible({
@@ -327,7 +327,7 @@ test.describe("Swipe-to-grade gestures (#1052)", () => {
 
     const { centerX, centerY } = await revealAndGetCentre(page);
 
-    // Only move 30 px — well below the 80 px commit threshold.
+    // Only move 30 px - well below the 80 px commit threshold.
     await simulateSwipe(page, centerX, centerY, centerX + 30, centerY, 5);
 
     // Grade buttons should still be visible (not graded).
@@ -352,7 +352,7 @@ test.describe("Swipe-to-grade gestures (#1052)", () => {
 
     await simulateSwipe(page, centerX, centerY, centerX + 120, centerY);
 
-    // Grade buttons must NOT appear — swipe is gated on reveal.
+    // Grade buttons must NOT appear - swipe is gated on reveal.
     await expect(
       page.getByRole("group", { name: "Grade your answer" }),
     ).toBeHidden();

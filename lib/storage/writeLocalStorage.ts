@@ -9,7 +9,7 @@
  *   } catch { /* swallow quota / security errors *\/ }
  *
  * Options:
- *   notify — when true, dispatches a synthetic StorageEvent on window after a
+ *   notify - when true, dispatches a synthetic StorageEvent on window after a
  *             successful write so same-tab `window.addEventListener('storage', …)`
  *             listeners re-read the value without waiting for a cross-tab event
  *             (the browser only fires the native event in *other* tabs).
@@ -18,7 +18,7 @@
  *
  * Notes:
  *   - The value is serialised with `JSON.stringify`. Pass a string directly
- *     if you need to store a raw (non-JSON) string — it will be double-encoded
+ *     if you need to store a raw (non-JSON) string - it will be double-encoded
  *     (`'"hello"'`). Use `writeLocalStorageRaw` for that case.
  *   - Errors from `JSON.stringify`, `setItem`, and `StorageEvent` dispatch are
  *     all swallowed. Write failures are always best-effort for localStorage.
@@ -52,7 +52,7 @@ export function writeLocalStorage<T>(
   try {
     window.localStorage.setItem(key, serialised);
   } catch {
-    // QuotaExceededError, SecurityError, or similar — best-effort.
+    // QuotaExceededError, SecurityError, or similar - best-effort.
     return;
   }
   if (options.notify) {
@@ -87,7 +87,7 @@ export function writeLocalStorageRaw(
   try {
     window.localStorage.setItem(key, value);
   } catch {
-    // QuotaExceededError, SecurityError, or similar — best-effort.
+    // QuotaExceededError, SecurityError, or similar - best-effort.
     return;
   }
   if (options.notify) {

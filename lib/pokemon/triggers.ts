@@ -161,7 +161,7 @@ export function triggerPhrase(detail: EvolutionDetail | null): string | null {
     case "level-up":
       return levelUpPhrase(detail);
     case "use-item":
-      // `useItemPhrase` is a plain phrase-builder, not a React hook — the
+      // `useItemPhrase` is a plain phrase-builder, not a React hook - the
       // `use` prefix is incidental. Disable the false-positive here.
       // eslint-disable-next-line react-hooks/rules-of-hooks
       return useItemPhrase(detail);
@@ -192,7 +192,7 @@ export function triggerPhrase(detail: EvolutionDetail | null): string | null {
     case "spin":
       return "by spinning while holding a Sweet";
     case "use-move":
-      // `useMovePhrase` is a plain phrase-builder, not a React hook — the
+      // `useMovePhrase` is a plain phrase-builder, not a React hook - the
       // `use` prefix is incidental. Disable the false-positive here.
       // eslint-disable-next-line react-hooks/rules-of-hooks
       return useMovePhrase(detail);

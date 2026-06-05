@@ -19,7 +19,7 @@ export type GradeStep = {
 
 /**
  * One row of the simulation trace. Captures the externally-observable
- * post-grade state — what changes here is what will change the user's
+ * post-grade state - what changes here is what will change the user's
  * schedule. Floating-point fields are rounded to keep snapshots stable
  * across `ts-fsrs` patch versions that bump precision in the math.
  */
@@ -74,7 +74,7 @@ function rowOf(
 
 /**
  * Replay `sequence` through `nextReview`. Pure: no Date.now() calls leak
- * in — every `now` is derived from `startDate + cumulative daysSinceLast`.
+ * in - every `now` is derived from `startDate + cumulative daysSinceLast`.
  *
  * Returns the trace plus the final state so a snapshot test can assert
  * both the journey and the destination.
@@ -98,7 +98,7 @@ export function simulate(
 }
 
 // ---------------------------------------------------------------------------
-// Fixture lives — five archetypes covering the common shapes of real review
+// Fixture lives - five archetypes covering the common shapes of real review
 // histories. Snapshots over these surface any behavioural drift in the
 // scheduler (parameter tweaks, library upgrades, retention-target changes)
 // as a diff in the PR.

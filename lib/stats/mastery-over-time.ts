@@ -16,11 +16,11 @@ export type MasteryPoint = {
 
 /**
  * Derive a cumulative mastery-over-time series from the FULL card array
- * (all card types). Pure — no I/O.
+ * (all card types). Pure - no I/O.
  *
  * **Species-level mastery (#1234/#1448)**: a species is mastered only when
  * BOTH its name card AND its paired reverse card have cleared the FSRS gate.
- * The `masteredDate` for a species is the later of the two `lastReview` dates —
+ * The `masteredDate` for a species is the later of the two `lastReview` dates - 
  * i.e. the date the SECOND leg crossed the threshold.
  *
  * **Data source**: `lastReview` on the later-crossing card is used as the
@@ -33,7 +33,7 @@ export type MasteryPoint = {
  * **`forceAllMastered`** (superuser `pretendAllMastered` flag): when `true`
  * the series is a single point at `today` with `count` equal to the number of
  * name cards (species count), consistent with `computeStats`'s treatment of
- * the flag. Pass the flag through from the caller — do not read it from context
+ * the flag. Pass the flag through from the caller - do not read it from context
  * here.
  *
  * **Empty state**: an empty array is returned when no species has been fully
@@ -42,7 +42,7 @@ export type MasteryPoint = {
  * @param cards              Full mixed-type card array from the session.
  * @param today              YYYY-MM-DD string for the current date.
  * @param masteryRepetitions Mastery reps threshold (default `MASTERY_REPETITIONS`).
- * @param forceAllMastered   Superuser flag — when `true` collapse to a single point.
+ * @param forceAllMastered   Superuser flag - when `true` collapse to a single point.
  */
 export function computeMasteryOverTime(
   cards: readonly ReviewableCard[],

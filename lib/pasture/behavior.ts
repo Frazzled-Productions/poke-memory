@@ -1,7 +1,7 @@
 /**
  * Pure tick math for Pasture idle behaviour (#402).
  *
- * No React, no DOM — only deterministic state mutations so this module is
+ * No React, no DOM - only deterministic state mutations so this module is
  * fully unit-testable in a Node environment.
  *
  * Coordinates are fractional [0, 1] within the zone container, matching
@@ -11,7 +11,7 @@
  * Squash/stretch axes are unitless scale factors.
  */
 
-/** ~8 Hz update rate — cheap on mobile Safari with many sprites. */
+/** ~8 Hz update rate - cheap on mobile Safari with many sprites. */
 export const TICK_INTERVAL_MS = 120;
 
 /** Jump phase state machine. */
@@ -23,9 +23,9 @@ export type SpriteState = {
   x: number;
   /** Current fractional y position within zone container. */
   y: number;
-  /** Original anchor fractional x — used as zero-point for translate delta. */
+  /** Original anchor fractional x - used as zero-point for translate delta. */
   readonly anchorX: number;
-  /** Original anchor fractional y — used as zero-point for translate delta. */
+  /** Original anchor fractional y - used as zero-point for translate delta. */
   readonly anchorY: number;
   /** Wander target fractional x. */
   targetX: number;
@@ -45,19 +45,19 @@ export type SpriteState = {
   squashX: number;
   /** Vertical scale factor for squash/stretch. */
   squashY: number;
-  /** Allowed wander band — fractional x min. */
+  /** Allowed wander band - fractional x min. */
   bandX0: number;
-  /** Allowed wander band — fractional x max. */
+  /** Allowed wander band - fractional x max. */
   bandX1: number;
-  /** Allowed wander band — fractional y min. */
+  /** Allowed wander band - fractional y min. */
   bandY0: number;
-  /** Allowed wander band — fractional y max. */
+  /** Allowed wander band - fractional y max. */
   bandY1: number;
   /** Timestamp of the last tick that produced an update. */
   lastTickAt: number;
 };
 
-/** Return from tickSprite — only the values the DOM layer needs. */
+/** Return from tickSprite - only the values the DOM layer needs. */
 export type TickResult = {
   x: number;
   y: number;
@@ -72,12 +72,12 @@ export type TickResult = {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Seeded-ish random via Math.random — no state needed for this use case. */
+/** Seeded-ish random via Math.random - no state needed for this use case. */
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
-/** Easing constant — higher → faster convergence. */
+/** Easing constant - higher → faster convergence. */
 const EASE_K = 1.5;
 
 /** Parabola height at peak in CSS px. */
@@ -92,7 +92,7 @@ const SQUASH_MS = 120;
 const SQUASH_SCALE_X = 1.2;
 const SQUASH_SCALE_Y = 0.75;
 
-/** Arrival epsilon — stop easing when this close (fractional coords). */
+/** Arrival epsilon - stop easing when this close (fractional coords). */
 const ARRIVE_EPS = 0.005;
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ export function tickSprite(state: SpriteState, now: number): TickResult {
   state.lastTickAt = now;
 
   // ------------------------------------------------------------------
-  // Wander — pick a new target when due, ease toward current target.
+  // Wander - pick a new target when due, ease toward current target.
   // ------------------------------------------------------------------
   if (now >= state.nextTargetAt) {
     state.targetX = rand(state.bandX0, state.bandX1);
@@ -191,7 +191,7 @@ export function tickSprite(state: SpriteState, now: number): TickResult {
   state.y = Math.max(state.bandY0, Math.min(state.bandY1, state.y));
 
   // ------------------------------------------------------------------
-  // Jump — phase state machine.
+  // Jump - phase state machine.
   // ------------------------------------------------------------------
   if (state.jumpPhase === "grounded" && now >= state.nextJumpAt) {
     state.jumpPhase = "rising";
@@ -202,7 +202,7 @@ export function tickSprite(state: SpriteState, now: number): TickResult {
     case "rising": {
       const elapsed = now - state.jumpStartedAt;
       if (elapsed >= RISING_MS) {
-        // Transition to falling at exactly the peak — no discontinuity.
+        // Transition to falling at exactly the peak - no discontinuity.
         state.jumpPhase = "falling";
         state.jumpStartedAt = now;
         state.jumpOffsetPx = -JUMP_PEAK_PX; // peak is the falling start point
@@ -256,7 +256,7 @@ export function tickSprite(state: SpriteState, now: number): TickResult {
     }
     case "grounded":
     default:
-      // Nothing to do — waiting for nextJumpAt.
+      // Nothing to do - waiting for nextJumpAt.
       break;
   }
 

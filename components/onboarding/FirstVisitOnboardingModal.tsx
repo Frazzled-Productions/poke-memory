@@ -205,7 +205,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
         {/* Body */}
         <div className="flex flex-col gap-5 overflow-y-auto px-6 py-5 max-h-[70vh]">
 
-          {/* Machine-translation notice — self-hides for en and when dismissed */}
+          {/* Machine-translation notice - self-hides for en and when dismissed */}
           <MachineTranslationBanner />
 
           {/* Intro */}

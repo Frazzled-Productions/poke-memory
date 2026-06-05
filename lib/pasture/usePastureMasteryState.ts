@@ -18,7 +18,7 @@ import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
  *   written by ReviewSession on first mastery. A value of `"true"` short-
  *   circuits the full IDB load.
  * - Full path: loads the session from IDB and calls `filterMastered` when the
- *   flag is absent or `"false"` — needed on first load after upgrading, after a
+ *   flag is absent or `"false"` - needed on first load after upgrading, after a
  *   reset, or whenever the masteryRepetitions threshold changes.
  * - Epoch guard: compares `window.__pokeMemorySessionWriteEpoch` on each effect
  *   run against the epoch seen at last attach. If a write happened before React
@@ -34,14 +34,14 @@ import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
  *   or clears it on reset).
  * - A `SETTINGS_SAVED_EVENT` fires (masteryRepetitions threshold change).
  *
- * Returns `{ showPasture }` — `true` when the Pasture nav entry should be
+ * Returns `{ showPasture }` - `true` when the Pasture nav entry should be
  * visible.
  */
 export function usePastureMasteryState(): { showPasture: boolean } {
   const [hasMastered, setHasMastered] = useState(false);
   // Re-runs the mastery check when the session key changes via a cross-tab
   // StorageEvent (e.g. sync pull from another tab, or the E2E seed helper).
-  // The per-grade SESSION_CHANGED_EVENT is no longer the trigger — instead,
+  // The per-grade SESSION_CHANGED_EVENT is no longer the trigger - instead,
   // ReviewSession writes KEY_HAS_MASTERED on the first mastery transition so
   // the Pasture link appears without re-parsing the full IDB blob on every
   // grade (#1191 Class A item 3).
@@ -72,7 +72,7 @@ export function usePastureMasteryState(): { showPasture: boolean } {
     // to loading the full session only when the flag is absent (first load after
     // upgrading, or after a session reset). Once the flag is `"true"`, at least
     // one species is mastered and the Pasture link should be shown. We only
-    // cache `"true"` — a missing or non-"true" flag means we do the full check
+    // cache `"true"` - a missing or non-"true" flag means we do the full check
     // so that threshold changes (via SETTINGS_SAVED_EVENT) are always reflected
     // correctly.
     async function load() {
@@ -80,7 +80,7 @@ export function usePastureMasteryState(): { showPasture: boolean } {
         setHasMastered(true);
         return;
       }
-      // Flag absent or "false" — do the full check.
+      // Flag absent or "false" - do the full check.
       const session = await loadSession();
       const masteryRepetitions = loadSettings().masteryRepetitions;
       const result =

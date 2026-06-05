@@ -53,18 +53,18 @@ async function enableLanguagesFlag(page: import("@playwright/test").Page): Promi
 
 const MT_BANNER_KEY_JA = "poke-memory:mt-banner-dismissed:ja";
 
-test.describe("i18n — MachineTranslationBanner (#1381)", () => {
+test.describe("i18n - MachineTranslationBanner (#1381)", () => {
   test.beforeEach(async ({ page }) => {
     await addOnboardingPreDismiss(page);
   });
 
   test("banner is absent when locale is English (default)", async ({ page }) => {
-    // No locale cookie set — falls back to English. Banner must not render.
+    // No locale cookie set - falls back to English. Banner must not render.
     await page.goto("/");
 
     // The banner's visible text is the machine-translated caution message.
     // We assert it is not visible rather than not in the DOM, since the
-    // component renders null for English — either way the text is absent.
+    // component renders null for English - either way the text is absent.
     await expect(page.getByTestId("machine-translation-banner")).not.toBeVisible();
   });
 
@@ -118,13 +118,13 @@ test.describe("i18n — MachineTranslationBanner (#1381)", () => {
     const flag = await page.evaluate((key) => localStorage.getItem(key), MT_BANNER_KEY_JA);
     expect(flag).toBe("1");
 
-    // Reload — banner must stay gone (localStorage persists the flag).
+    // Reload - banner must stay gone (localStorage persists the flag).
     await page.reload();
     await expect(page.getByTestId("machine-translation-banner")).not.toBeVisible();
   });
 });
 
-test.describe("i18n — Languages Labs flag (#1260)", () => {
+test.describe("i18n - Languages Labs flag (#1260)", () => {
   test.beforeEach(async ({ page }) => {
     await addOnboardingPreDismiss(page);
   });
@@ -191,7 +191,7 @@ test.describe("i18n — Languages Labs flag (#1260)", () => {
     await page.getByRole("button", { name: /Pokémon name language/ }).click();
     await page.getByRole("radio", { name: /简体中文/ }).click();
 
-    // Switch the app language to Japanese via the Settings selector — writes the cookie.
+    // Switch the app language to Japanese via the Settings selector - writes the cookie.
     const appLocaleSelect = page.locator("#labs-app-locale-select");
     await expect(appLocaleSelect).toBeVisible();
     await appLocaleSelect.selectOption("ja");

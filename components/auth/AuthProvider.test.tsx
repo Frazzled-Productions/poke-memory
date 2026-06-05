@@ -2,7 +2,7 @@
  * Tests for AuthProvider (lib/auth/AuthContext.tsx).
  *
  * All tests run in the jsdom vitest project so React rendering works.
- * The Supabase client module is stubbed — no real network calls are made.
+ * The Supabase client module is stubbed - no real network calls are made.
  *
  * Coverage:
  *  - getUser() resolution sets user and clears loading
@@ -25,7 +25,7 @@ const mockOnAuthStateChange = vi.fn();
 
 // Build a minimal fake SupabaseClient that satisfies the narrow surface the
 // AuthProvider actually calls. Cast via `unknown` to sidestep the deep generic
-// signature of SupabaseClient<Database, ...> — the same pattern used in the
+// signature of SupabaseClient<Database, ...> - the same pattern used in the
 // sync test suite (FAKE_CLIENT = {} as unknown as SupabaseClient).
 function makeFakeClient(overrides: Partial<{
   getUser: typeof mockGetUser;
@@ -39,7 +39,7 @@ function makeFakeClient(overrides: Partial<{
   } as unknown as ReturnType<typeof createClient>;
 }
 
-// createClient is called inside useState initialiser — must be mockable at
+// createClient is called inside useState initialiser - must be mockable at
 // module level before the component is imported.
 vi.mock("@/lib/supabase/client", () => ({
   createClient: vi.fn(),

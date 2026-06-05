@@ -13,7 +13,7 @@ export function fnv1a(s: string): number {
 /**
  * FNV-1a over the four bytes of a 32-bit unsigned integer, little-endian
  * (LSB first). Accepts an optional `seed` so callers can chain multiple
- * integers into one hash — pass the result of a previous `fnv1aUint32` (or
+ * integers into one hash - pass the result of a previous `fnv1aUint32` (or
  * `fnv1a`) call as the seed to continue the same hash run.
  *
  * Byte order: low byte first (id & 0xff, then id >>> 8, etc.), matching the

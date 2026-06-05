@@ -36,7 +36,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("sessionActive — SSR guard", () => {
+describe("sessionActive - SSR guard", () => {
   it("isSessionActive returns false when window is undefined", () => {
     expect(isSessionActive()).toBe(false);
   });
@@ -50,7 +50,7 @@ describe("sessionActive — SSR guard", () => {
   });
 });
 
-describe("sessionActive — browser path (reference count)", () => {
+describe("sessionActive - browser path (reference count)", () => {
   it("isSessionActive returns false when no session is active", () => {
     const storage = makeStorage();
     vi.stubGlobal("window", { localStorage: storage });
@@ -98,7 +98,7 @@ describe("sessionActive — browser path (reference count)", () => {
     expect(storage.getItem(KEY_REVIEW_SESSION_ACTIVE)).toBeNull();
   });
 
-  it("markSessionInactive clamps at 0 — count never goes negative", () => {
+  it("markSessionInactive clamps at 0 - count never goes negative", () => {
     const storage = makeStorage();
     vi.stubGlobal("window", { localStorage: storage });
 
@@ -119,7 +119,7 @@ describe("sessionActive — browser path (reference count)", () => {
 
     // Tab A closes/navigates away and calls markSessionInactive
     markSessionInactive(); // Tab A unmounts
-    // Tab B still has a live session — flag must remain active
+    // Tab B still has a live session - flag must remain active
     expect(isSessionActive()).toBe(true);
 
     // Tab B closes too
@@ -128,9 +128,9 @@ describe("sessionActive — browser path (reference count)", () => {
   });
 });
 
-describe("sessionActive — legacy and corrupt value handling", () => {
+describe("sessionActive - legacy and corrupt value handling", () => {
   it('legacy active boolean string "1" is treated as count 1 (active)', () => {
-    // The old implementation stored "1" when active — parseInt("1", 10) === 1
+    // The old implementation stored "1" when active - parseInt("1", 10) === 1
     const storage = makeStorage({ [KEY_REVIEW_SESSION_ACTIVE]: "1" });
     vi.stubGlobal("window", { localStorage: storage });
 
@@ -144,7 +144,7 @@ describe("sessionActive — legacy and corrupt value handling", () => {
     expect(isSessionActive()).toBe(false);
   });
 
-  it("unparseable value (NaN) is treated as 0 — falls through to allow background work", () => {
+  it("unparseable value (NaN) is treated as 0 - falls through to allow background work", () => {
     // e.g. if something wrote a non-numeric value
     const storage = makeStorage({ [KEY_REVIEW_SESSION_ACTIVE]: "corrupt" });
     vi.stubGlobal("window", { localStorage: storage });
@@ -172,7 +172,7 @@ describe("sessionActive — legacy and corrupt value handling", () => {
   });
 });
 
-describe("sessionActive — storage failures", () => {
+describe("sessionActive - storage failures", () => {
   it("markSessionActive swallows setItem errors", () => {
     vi.stubGlobal("window", {
       localStorage: {

@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS } from "@/lib/settings/persistence";
 
 describe("seedOptsFromSettings", () => {
   it("name and reverse are always on regardless of other settings (#1234)", () => {
-    // Name and reverse are now always-on directions — no per-direction toggle.
+    // Name and reverse are now always-on directions - no per-direction toggle.
     const opts = seedOptsFromSettings({
       ...DEFAULT_SETTINGS,
       evolutionCardsEnabled: false,

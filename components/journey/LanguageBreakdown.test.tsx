@@ -148,7 +148,7 @@ beforeEach(() => {
   mockSuperuserValue.anyFlagOn = false;
 });
 
-describe("LanguageBreakdown — gate: single locale", () => {
+describe("LanguageBreakdown - gate: single locale", () => {
   it("does NOT render the heading when learningLocales has only ['en']", () => {
     mockLocaleCtx.learningLocales = ["en"];
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />);
@@ -163,7 +163,7 @@ describe("LanguageBreakdown — gate: single locale", () => {
   });
 });
 
-describe("LanguageBreakdown — multi-locale ['en','ja']", () => {
+describe("LanguageBreakdown - multi-locale ['en','ja']", () => {
   it("renders the Languages heading when enrolled in en + ja", () => {
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />);
     expect(screen.getByRole("heading", { name: "Languages" })).toBeInTheDocument();
@@ -209,7 +209,7 @@ describe("LanguageBreakdown — multi-locale ['en','ja']", () => {
   });
 });
 
-describe("LanguageBreakdown — third locale ['en','zh-Hans']", () => {
+describe("LanguageBreakdown - third locale ['en','zh-Hans']", () => {
   it("renders 'zh-Hans' endonym with lang='zh-Hans'", () => {
     mockLocaleCtx.learningLocales = ["en", "zh-Hans"];
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />);
@@ -219,7 +219,7 @@ describe("LanguageBreakdown — third locale ['en','zh-Hans']", () => {
   });
 });
 
-describe("LanguageBreakdown — fourth locale ['en','zh-Hant']", () => {
+describe("LanguageBreakdown - fourth locale ['en','zh-Hant']", () => {
   it("renders 'zh-Hant' endonym with lang='zh-Hant'", () => {
     mockLocaleCtx.learningLocales = ["en", "zh-Hant"];
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />);
@@ -229,7 +229,7 @@ describe("LanguageBreakdown — fourth locale ['en','zh-Hant']", () => {
   });
 });
 
-describe("LanguageBreakdown — pretendAllMastered superuser flag", () => {
+describe("LanguageBreakdown - pretendAllMastered superuser flag", () => {
   it("shows all cards mastered per locale when forceAllMastered is on", () => {
     mockSuperuserValue.flags = { pretendAllMastered: true };
     mockSuperuserValue.anyFlagOn = true;
@@ -247,9 +247,9 @@ describe("LanguageBreakdown — pretendAllMastered superuser flag", () => {
   });
 });
 
-describe("LanguageBreakdown — empty/no-reviews state", () => {
+describe("LanguageBreakdown - empty/no-reviews state", () => {
   it("shows 'No reviews yet' for an enrolled locale with no grade log entries", () => {
-    // gradeLog is empty — no reviews for any locale.
+    // gradeLog is empty - no reviews for any locale.
     renderWithIntl(<LanguageBreakdown {...defaultProps({ gradeLog: [] })} />);
     // Both locales should show "No reviews yet" (two instances).
     const noReviewEls = screen.getAllByText("No reviews yet");
@@ -268,7 +268,7 @@ describe("LanguageBreakdown — empty/no-reviews state", () => {
   });
 });
 
-describe("LanguageBreakdown — locale rendering (app UI locale)", () => {
+describe("LanguageBreakdown - locale rendering (app UI locale)", () => {
   it("renders the heading in Japanese UI locale", () => {
     renderWithIntl(<LanguageBreakdown {...defaultProps()} />, { locale: "ja" });
     // ja: journey.languageBreakdown.heading = "言語"

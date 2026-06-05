@@ -32,7 +32,7 @@ import {
  *
  * Cards already have an equivalent path via `usePerGradeSync`; this covers
  * the three remaining client-stored data types. All three pushes are
- * best-effort — failures `console.warn` and continue.
+ * best-effort - failures `console.warn` and continue.
  *
  * Cross-device catch-up is handled by: periodic background pull via
  * `useVisibilityPull` (`components/sync/SyncOnVisible.tsx`), sign-in pull
@@ -55,7 +55,7 @@ export function AutoSyncOnChange() {
       if (!detail) return;
       // Diff against the last successful push so we send only changed
       // top-level keys (#583). Two devices changing disjoint settings now
-      // both stick — the merge_user_settings `||` overlay only touches
+      // both stick - the merge_user_settings `||` overlay only touches
       // keys present in the patch. First push from this device sends
       // everything (snapshot null) and is identical to the pre-#583
       // behaviour.
@@ -67,7 +67,7 @@ export function AutoSyncOnChange() {
           // Stamp the snapshot to the full detail (not the patch) so the
           // next diff is computed against what cloud now holds, not the
           // shrunk patch. If the push failed we leave the snapshot
-          // unchanged — the next save will resend the same keys plus any
+          // unchanged - the next save will resend the same keys plus any
           // new ones.
           saveLastPushedSettings(detail);
           markPushSucceeded();

@@ -6,9 +6,9 @@
 // apply this migration" before it ships. See #309.
 //
 // Required env vars:
-//   SUPABASE_ACCESS_TOKEN — personal access token with read access to the
+//   SUPABASE_ACCESS_TOKEN - personal access token with read access to the
 //     project's database. In CI this comes from a repo secret.
-//   SUPABASE_PROJECT_REF  — the project ref (the slug in the dashboard URL).
+//   SUPABASE_PROJECT_REF - the project ref (the slug in the dashboard URL).
 
 import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -52,7 +52,7 @@ async function listAppliedMigrations(projectRef, token) {
   const arr = Array.isArray(body) ? body : body.migrations;
   if (!Array.isArray(arr)) {
     throw new Error(
-      `Unexpected response shape — expected an array of migrations, got: ${JSON.stringify(body).slice(0, 200)}`,
+      `Unexpected response shape - expected an array of migrations, got: ${JSON.stringify(body).slice(0, 200)}`,
     );
   }
   return arr.map((m) => m.name);
@@ -76,12 +76,12 @@ async function main() {
   const missing = local.filter((m) => !applied.has(m.name));
 
   if (missing.length === 0) {
-    console.log(`OK — all ${local.length} local migration(s) are applied to ${projectRef}.`);
+    console.log(`OK - all ${local.length} local migration(s) are applied to ${projectRef}.`);
     return;
   }
 
   console.error(
-    `DRIFT — the following migration file(s) are committed but NOT applied to ${projectRef}:`,
+    `DRIFT - the following migration file(s) are committed but NOT applied to ${projectRef}:`,
   );
   for (const m of missing) {
     console.error(`  - ${m.filename} (name="${m.name}")`);

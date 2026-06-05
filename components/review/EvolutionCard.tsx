@@ -7,10 +7,10 @@ import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 
 type Props = {
   /**
-   * `"evolution"`: asks "What does {preEvo} evolve into?" — hides the post-evo
+   * `"evolution"`: asks "What does {preEvo} evolve into?" - hides the post-evo
    * side until revealed.
    *
-   * `"reverse-evolution"`: asks "Which Pokémon evolves into {postEvo}?" —
+   * `"reverse-evolution"`: asks "Which Pokémon evolves into {postEvo}?" - 
    * hides the pre-evo side until revealed.
    */
   direction: "evolution" | "reverse-evolution";
@@ -53,7 +53,7 @@ export function EvolutionCard({
 }: Props) {
   // Resolve both sides so the question-side prompt and any downstream
   // assertion use the locale-aware name. The layout resolves them again
-  // internally — the duplicate call is cheap (memoised by ID).
+  // internally - the duplicate call is cheap (memoised by ID).
   const { name: resolvedPreEvoName } = useLocalePokemonName(
     preEvoId ?? undefined,
     preEvoName,

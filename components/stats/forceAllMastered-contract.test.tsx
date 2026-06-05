@@ -29,7 +29,7 @@ import { screen } from "@testing-library/react";
 import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
-// Recharts mock — avoids ResizeObserver dependency in jsdom.
+// Recharts mock - avoids ResizeObserver dependency in jsdom.
 // ---------------------------------------------------------------------------
 vi.mock("recharts", () => ({
   AreaChart: ({ children }: { children: React.ReactNode }) => (

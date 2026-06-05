@@ -7,7 +7,7 @@
  *
  * The test applies every file in db/migrations/ in numeric order using the
  * same `applyMigrations` helper used by the regression-trigger and RLS tests.
- * A clean apply (no exceptions thrown) is the only assertion — the schema
+ * A clean apply (no exceptions thrown) is the only assertion - the schema
  * shape tests are the responsibility of the individual feature tests.
  */
 

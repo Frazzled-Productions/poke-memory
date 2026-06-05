@@ -9,7 +9,7 @@ export type GradeLogEntry = {
   grade: Grade;
   cardType: "name" | "evolution" | "reverse-evolution" | "reverse" | "cry";
   /**
-   * Epoch ms when the entry was recorded. Required since #308 — gives every
+   * Epoch ms when the entry was recorded. Required since #308 - gives every
    * entry a stable unique key for cross-device sync deduplication. Legacy
    * entries written before #308 lack this field; `loadGradeLog` synthesizes
    * one deterministically from `date` and the entry's position within its
@@ -31,8 +31,8 @@ export type GradeLogEntry = {
   locale?: AppLocale;
   /**
    * The scheduler's 0-based learning-step index at the moment this grade was
-   * recorded (#1416). NULL (or absent) means the card was graduated — not in a
-   * learning or relearning step — when graded. Pre-existing entries lack this
+   * recorded (#1416). NULL (or absent) means the card was graduated - not in a
+   * learning or relearning step - when graded. Pre-existing entries lack this
    * field; treated as NULL on read and on cloud round-trip.
    */
   learningStep?: number | null;
@@ -64,7 +64,7 @@ const EMPTY_TOTALS: GradeTotals = { 1: 0, 2: 0, 4: 0, 5: 0 };
  * localStorage safety-valve threshold. Trim oldest entries when the
  * serialised grade log would exceed this many bytes. 4.5 MB leaves ~500 KB
  * headroom within the typical 5 MB origin quota for other poke-memory keys.
- * Only applied on the localStorage FALLBACK path — IndexedDB has no
+ * Only applied on the localStorage FALLBACK path - IndexedDB has no
  * meaningful per-key size limit.
  */
 export const LS_QUOTA_BYTES = 4.5 * 1024 * 1024;
@@ -159,7 +159,7 @@ export async function loadGradeLog(): Promise<GradeLog> {
   try {
     const raw = await idbGet(STORAGE_KEY);
     if (raw === null) {
-      // IDB had nothing — fall back to localStorage as last resort.
+      // IDB had nothing - fall back to localStorage as last resort.
       return loadGradeLogLS();
     }
     return parseGradeLog(raw);
@@ -205,7 +205,7 @@ function saveGradeLogLS(log: GradeLog): boolean {
     return true;
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
-      console.warn("poke-memory: grade log write failed — localStorage quota exceeded");
+      console.warn("poke-memory: grade log write failed - localStorage quota exceeded");
     } else {
       console.error("poke-memory: grade log write failed", err);
     }
@@ -229,7 +229,7 @@ export async function appendGradeEntry(
       // the cloud (the grade_log.locale column defaults to "en").
       ...(entry.locale !== undefined ? { locale: entry.locale } : {}),
       // Propagate learningStep and stepStartedAt when present (migration 033).
-      // Both are optional on the entry — legacy call sites that omit them produce
+      // Both are optional on the entry - legacy call sites that omit them produce
       // a stamped entry without the fields, which is valid and reads back as NULL
       // from the cloud.
       ...(entry.learningStep !== undefined ? { learningStep: entry.learningStep } : {}),
@@ -252,7 +252,7 @@ export async function appendGradeEntry(
     return stamped;
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
-      console.warn("poke-memory: grade log write failed — localStorage quota exceeded");
+      console.warn("poke-memory: grade log write failed - localStorage quota exceeded");
     } else {
       console.error("poke-memory: grade log write failed", err);
     }
@@ -263,7 +263,7 @@ export async function appendGradeEntry(
 /**
  * Remove the entry with the matching `occurredAt` from the persisted
  * grade log, if present. Used by the practice-page Undo affordance to
- * roll back the most recent grade — keyed on `occurredAt` rather than
+ * roll back the most recent grade - keyed on `occurredAt` rather than
  * by position so it survives parallel writes from sync.
  */
 export async function removeGradeEntry(occurredAt: number): Promise<void> {
@@ -300,7 +300,7 @@ export function computeGradeTotals(log: GradeLog): GradeTotals {
  * Reconstruct the ordered grade sequence for a single day from the grade log.
  * The grade log is the durable, append-only record of every grade (local-first
  * for both guest and authenticated users), so it can recover today's sequence
- * even when the best-effort `daily-summary` record is missing — e.g. after a
+ * even when the best-effort `daily-summary` record is missing - e.g. after a
  * QuotaExceededError on its write, or when the user finished cards in an
  * earlier browsing session.
  *
@@ -330,7 +330,7 @@ export async function saveGradeLog(log: GradeLog): Promise<void> {
     }
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
-      console.warn("poke-memory: grade log write failed — localStorage quota exceeded");
+      console.warn("poke-memory: grade log write failed - localStorage quota exceeded");
     } else {
       console.error("poke-memory: grade log write failed", err);
     }

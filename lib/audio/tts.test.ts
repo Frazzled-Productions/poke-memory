@@ -193,7 +193,7 @@ describe("speakName", () => {
   });
 
   it("re-picks the voice after voiceschanged fires later", async () => {
-    // Voices empty at module init — initial pick yields null.
+    // Voices empty at module init - initial pick yields null.
     const synth = makeSynthesis([]);
     stubSpeechAPIs(synth);
     const { speakName } = await import("./tts");
@@ -442,7 +442,7 @@ describe("warmupTts", () => {
     expect(utterance.volume).toBe(0);
   });
 
-  it("is idempotent — second call is a no-op", async () => {
+  it("is idempotent - second call is a no-op", async () => {
     const synth = makeSynthesis([voice("en-GB", true, "Daniel")]);
     stubSpeechAPIs(synth);
     const { warmupTts } = await import("./tts");
@@ -561,7 +561,7 @@ function makeMultiAudioCtor(mocks: MockAudio[]): new (src: string) => MockAudio 
   return spy as unknown as new (src: string) => MockAudio;
 }
 
-describe("speakName — Audio element path (id provided)", () => {
+describe("speakName - Audio element path (id provided)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.resetModules();
@@ -659,7 +659,7 @@ describe("speakName — Audio element path (id provided)", () => {
     await Promise.resolve();
     vi.runAllTimers();
 
-    // The second path must not invoke speakNameViaSpeech again — that would
+    // The second path must not invoke speakNameViaSpeech again - that would
     // cancel the utterance the first call already queued.
     expect(synth.speak).toHaveBeenCalledOnce();
   });

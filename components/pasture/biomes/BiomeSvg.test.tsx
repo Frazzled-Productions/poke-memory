@@ -2,7 +2,7 @@
  * Tests for the shared biome wrapper and helper components, plus a smoke
  * test for each biome backdrop.
  *
- * These are rendering tests only — they verify that:
+ * These are rendering tests only - they verify that:
  *  1. BiomeSvg renders an SVG element with the correct invariant attributes.
  *  2. BiomeSky renders a <defs> linearGradient and a full-bleed background
  *     rect with the expected fill reference.
@@ -10,7 +10,7 @@
  *     the correct attributes.
  *  4. Each biome component mounts without throwing and produces an svg root.
  *
- * No pixel snapshot tests are needed: this refactor is purely structural —
+ * No pixel snapshot tests are needed: this refactor is purely structural - 
  * the rendered SVG markup is semantically identical before and after, so a
  * rendering regression would only be possible if the component logic itself
  * changed (which these tests would catch via attribute assertions).
@@ -34,7 +34,7 @@ import { WatersEdgeBiome } from "./WatersEdgeBiome";
 import { WildlandsBiome } from "./WildlandsBiome";
 
 // ---------------------------------------------------------------------------
-// BiomeSvg — invariant attributes
+// BiomeSvg - invariant attributes
 // ---------------------------------------------------------------------------
 
 describe("BiomeSvg", () => {
@@ -68,7 +68,7 @@ describe("BiomeSvg", () => {
 });
 
 // ---------------------------------------------------------------------------
-// BiomeSky — shared background gradient + full-bleed rect
+// BiomeSky - shared background gradient + full-bleed rect
 // ---------------------------------------------------------------------------
 
 describe("BiomeSky", () => {
@@ -144,7 +144,7 @@ describe("BiomeSky", () => {
 });
 
 // ---------------------------------------------------------------------------
-// BiomeFloor — shared wavy terrain polygon + shadow edge stroke
+// BiomeFloor - shared wavy terrain polygon + shadow edge stroke
 // ---------------------------------------------------------------------------
 
 describe("BiomeFloor", () => {
@@ -232,7 +232,7 @@ describe("BiomeFloor", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Individual biome smoke tests — each must mount and produce an svg root.
+// Individual biome smoke tests - each must mount and produce an svg root.
 // ---------------------------------------------------------------------------
 
 const BIOMES = [

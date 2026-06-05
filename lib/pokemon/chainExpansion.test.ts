@@ -89,10 +89,10 @@ describe("buildVarietiesLookup", () => {
 });
 
 // ---------------------------------------------------------------------------
-// addFormEdges — default edges pass through unchanged
+// addFormEdges - default edges pass through unchanged
 // ---------------------------------------------------------------------------
 
-describe("addFormEdges — default edges (no region)", () => {
+describe("addFormEdges - default edges (no region)", () => {
   it("returns an empty array when given an empty input", () => {
     expect(addFormEdges([], new Map())).toEqual([]);
   });
@@ -125,10 +125,10 @@ describe("addFormEdges — default edges (no region)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// addFormEdges — region-tagged edges
+// addFormEdges - region-tagged edges
 // ---------------------------------------------------------------------------
 
-describe("addFormEdges — regional form edges (Pikachu → Raichu / Alolan Raichu)", () => {
+describe("addFormEdges - regional form edges (Pikachu → Raichu / Alolan Raichu)", () => {
   // Pikachu (25) → Raichu (26, default) and → Alolan Raichu (10100, region: alola).
   // Both edges appear in the PokéAPI chain JSON; the alolan one carries region: "alola".
 
@@ -184,17 +184,17 @@ describe("addFormEdges — regional form edges (Pikachu → Raichu / Alolan Raic
   it("skips emitting a form edge when evolvesFromId is null (root node)", () => {
     const n = node(26, "Raichu", null, { region: "alola" });
     const result = addFormEdges([n], lookup);
-    // Root node with region — cannot emit form edge; should just pass through
+    // Root node with region - cannot emit form edge; should just pass through
     expect(result).toHaveLength(1);
     expect(result[0].speciesId).toBe(26);
   });
 });
 
 // ---------------------------------------------------------------------------
-// addFormEdges — regional parent resolution
+// addFormEdges - regional parent resolution
 // ---------------------------------------------------------------------------
 
-describe("addFormEdges — Pikachu (alolan) → Alolan Raichu: parent also has a regional form", () => {
+describe("addFormEdges - Pikachu (alolan) → Alolan Raichu: parent also has a regional form", () => {
   // Hypothetical chain where the parent species also has a regional form that
   // should serve as the evolvesFromId for the child form edge.
   const lookup = buildVarietiesLookup([
@@ -211,10 +211,10 @@ describe("addFormEdges — Pikachu (alolan) → Alolan Raichu: parent also has a
 });
 
 // ---------------------------------------------------------------------------
-// addFormEdges — Eevee-style multi-branch chains
+// addFormEdges - Eevee-style multi-branch chains
 // ---------------------------------------------------------------------------
 
-describe("addFormEdges — multi-branch (Eevee → 8 Eeveelutions)", () => {
+describe("addFormEdges - multi-branch (Eevee → 8 Eeveelutions)", () => {
   const eeveeId = 133;
   const vaporeonId = 134;
   const jolteonId = 135;
@@ -255,17 +255,17 @@ describe("addFormEdges — multi-branch (Eevee → 8 Eeveelutions)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// addFormEdges — three-stage chain with form
+// addFormEdges - three-stage chain with form
 // ---------------------------------------------------------------------------
 
-describe("addFormEdges — three-stage chain with regional branch mid-chain", () => {
+describe("addFormEdges - three-stage chain with regional branch mid-chain", () => {
   // Cubone (104) → Marowak (105) default / Alolan Marowak (10115) with region: "alola"
   const lookup = buildVarietiesLookup([
     { speciesId: 105, isDefaultForm: false, formSlug: "alola", id: 10115, displayName: "Alolan Marowak" },
   ]);
 
   it("emits the default node and a regional form node for a mid-chain species", () => {
-    // Provide only the regional-tagged edge — default and regional share the same
+    // Provide only the regional-tagged edge - default and regional share the same
     // (evolvesFromId, speciesId) dedup key, so we test them separately.
     const root = node(104, "Cubone", null);
     const regionalEvo = node(105, "Marowak", 104, { region: "alola" });
@@ -287,16 +287,16 @@ describe("addFormEdges — three-stage chain with regional branch mid-chain", ()
 });
 
 // ---------------------------------------------------------------------------
-// addFormEdges — detail is null
+// addFormEdges - detail is null
 // ---------------------------------------------------------------------------
 
-describe("addFormEdges — null detail on regional edge", () => {
+describe("addFormEdges - null detail on regional edge", () => {
   const lookup = buildVarietiesLookup([
     { speciesId: 26, isDefaultForm: false, formSlug: "alola", id: 10100, displayName: "Alolan Raichu" },
   ]);
 
   it("emits the form node with null detail when the source detail is null", () => {
-    // A node whose detail is null but whose region was somehow set — exercise
+    // A node whose detail is null but whose region was somehow set - exercise
     // the code path where region is extracted from node.detail which is null.
     // In practice region check guards: detail?.region only, so detail === null
     // means no form edge is emitted. Verify that.

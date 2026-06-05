@@ -71,7 +71,7 @@ const MINIMAL_BACKUP = {
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe("Backup section — export (#766)", () => {
+test.describe("Backup section - export (#766)", () => {
   test("Export button is visible inside Account & Data", async ({ page }) => {
     await openBackupSection(page);
 
@@ -89,7 +89,7 @@ test.describe("Backup section — export (#766)", () => {
     browserName,
   }) => {
     // Download interception is only reliable in Chromium; skip other engines
-    // to avoid flakiness — the button-visibility test above covers presence.
+    // to avoid flakiness - the button-visibility test above covers presence.
     test.skip(
       browserName !== "chromium",
       "download assertion is Chromium-only",
@@ -114,7 +114,7 @@ test.describe("Backup section — export (#766)", () => {
   });
 });
 
-test.describe("Backup section — import (#766)", () => {
+test.describe("Backup section - import (#766)", () => {
   test("Import button is visible inside Account & Data", async ({ page }) => {
     await openBackupSection(page);
 
@@ -192,7 +192,7 @@ test.describe("Backup section — import (#766)", () => {
   });
 });
 
-test.describe("Backup — export then import round-trip (#766)", () => {
+test.describe("Backup - export then import round-trip (#766)", () => {
   test("exported backup can be re-imported (round-trip)", async ({
     page,
     browserName,
@@ -241,7 +241,7 @@ test.describe("Backup — export then import round-trip (#766)", () => {
     await expect(page.getByLabel("Loading settings")).toBeHidden();
     await page.getByRole("button", { name: /account & data/i, exact: true }).click();
 
-    // Step 1: Export — capture the downloaded file contents.
+    // Step 1: Export - capture the downloaded file contents.
     const [download] = await Promise.all([
       page.waitForEvent("download"),
       page.getByRole("button", { name: /^export$/i }).click(),

@@ -110,7 +110,7 @@ describe("pullPushSubscriptionCount", () => {
     expect(client.from).toHaveBeenCalledWith("push_subscriptions");
     // Verify the count query shape.
     expect(builder.select).toHaveBeenCalledWith("id", { count: "exact", head: true });
-    // Verify userId filter — RLS ensures each caller only sees their own rows.
+    // Verify userId filter - RLS ensures each caller only sees their own rows.
     expect(builder.eq).toHaveBeenCalledWith("user_id", FAKE_USER_ID);
   });
 

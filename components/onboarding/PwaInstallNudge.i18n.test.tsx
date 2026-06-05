@@ -1,11 +1,11 @@
 /**
- * PwaInstallNudge — locale coverage.
+ * PwaInstallNudge - locale coverage.
  *
  * Lives in its own file (not the shared nav-pasture-pokedex-i18n suite) on
  * purpose: PwaInstallNudge renders `null` until a mount effect reads
  * localStorage, and when these tests ran in the shared jsdom *after* the
  * NavDrawer describe (whose mocked links trigger a jsdom "navigation to another
- * Document"), that mount effect intermittently never committed — the component
+ * Document"), that mount effect intermittently never committed - the component
  * stayed empty and `findByText` timed out (#1464). vitest isolates per file
  * (isolate: true), so a dedicated file gives these tests a clean document and
  * makes them deterministic.
@@ -61,7 +61,7 @@ function makeLocalStorage(): Storage {
   };
 }
 
-describe("PwaInstallNudge — locale coverage", () => {
+describe("PwaInstallNudge - locale coverage", () => {
   beforeEach(() => {
     Object.defineProperty(window, "sessionStorage", {
       value: makeLocalStorage(),

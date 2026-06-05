@@ -67,7 +67,7 @@ describe("resetAllProgress", () => {
   });
 });
 
-describe("resetAllProgress — cooldown error path", () => {
+describe("resetAllProgress - cooldown error path", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
   });

@@ -54,7 +54,7 @@ import { Footer } from "@/components/Footer";
 
 // ---------------------------------------------------------------------------
 
-// jsdom does not ship localStorage by default — install an in-memory stub.
+// jsdom does not ship localStorage by default - install an in-memory stub.
 function makeLocalStorage(): Storage {
   const store = new Map<string, string>();
   return {

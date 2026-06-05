@@ -6,7 +6,7 @@
  * cross-viewport layout regression is caught that the functional smoke suite
  * (which only checks behaviour) would miss.
  *
- * Excluded surfaces — Practice, Pasture, Pokédex
+ * Excluded surfaces - Practice, Pasture, Pokédex
  * ----------------------------------------------
  * The README covers six surfaces; this snapshot set deliberately covers only
  * two. Practice (front + flipped), Pasture, and Pokédex are NOT snapshotted
@@ -22,7 +22,7 @@
  *     queue. The card shown is therefore not the seeded one, and the queue
  *     order is not pinned per run. Pinning it would mean either seeding the
  *     full ~1025-card catalogue or adding a test-only seam into the product
- *     session builder — out of proportion for a snapshot guard.
+ *     session builder - out of proportion for a snapshot guard.
  *   - Practice flipped: on top of the card-pick problem above, the post-reveal
  *     fact is chosen by `selectFact` (lib/pokemon/facts.ts) via raw
  *     `Math.random()`, so the flipped card shows different copy on every
@@ -33,7 +33,7 @@
  *     in fixed order). But each page renders ~1025+ lazily-decoded sprites.
  *     Under the parallel CI worker pool, sprite decode/paint does not settle to
  *     the same frame run-to-run, so a committed baseline reproducibly diffs.
- *     Run in isolation each surface is stable; under load it is not — so it
+ *     Run in isolation each surface is stable; under load it is not - so it
  *     cannot be a reliable gate. Gating the capture on `img.decode()` for every
  *     sprite was tried and rejected: it pushed run time past a minute and made
  *     the comparison flakier, not less, because the decode work itself competes
@@ -46,7 +46,7 @@
  * deterministic snapshot set is a deliberate trade: a permanently-red or flaky
  * check would be worse than four fewer surfaces of coverage.
  *
- * IMPORTANT — baseline determinism
+ * IMPORTANT - baseline determinism
  * --------------------------------
  * macOS Core Text and Linux font anti-aliasing differ visibly (AGENTS.md
  * documents this, which is why the README screenshots are macOS-only). Baseline

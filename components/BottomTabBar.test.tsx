@@ -168,7 +168,7 @@ describe("BottomTabBar", () => {
   });
 });
 
-describe("BottomTabBar — Japanese locale", () => {
+describe("BottomTabBar - Japanese locale", () => {
   it("renders the Practice tab label in Japanese (練習)", async () => {
     renderJa(<BottomTabBar />);
 

@@ -49,7 +49,7 @@ export function usePersistentStorage(): void {
             writeLocalStorageRaw(KEY_PERSIST_REQUESTED, "true");
           }
           // If not granted (e.g. no PWA install, no engagement heuristic met),
-          // we don't record it — the next mount will try again, which is fine
+          // we don't record it - the next mount will try again, which is fine
           // because the call is cheap and browsers rate-limit it naturally.
         });
       })

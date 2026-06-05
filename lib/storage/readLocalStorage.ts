@@ -13,7 +13,7 @@
  * Notes:
  *   - The `parse` function is called only when `raw` is a non-null string.
  *     If `parse` throws (e.g. malformed JSON) the catch returns `fallback`.
- *   - This helper is intentionally kept pure — no IDB awareness. Modules that
+ *   - This helper is intentionally kept pure - no IDB awareness. Modules that
  *     use IDB as the primary store (review session, grade log) call this only
  *     from their localStorage fallback path; they should not use it on the
  *     IDB-primary path.

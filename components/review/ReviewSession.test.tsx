@@ -37,7 +37,7 @@ const { mockPlayCry } = vi.hoisted(() => ({ mockPlayCry: vi.fn() }));
 
 vi.mock("@/lib/audio/cry", () => ({ playCry: mockPlayCry }));
 
-// vi.mock factories are hoisted — define seed data via vi.hoisted so the
+// vi.mock factories are hoisted - define seed data via vi.hoisted so the
 // factory closure can reference it before the module-level const is initialised.
 const { FIXTURE_CARD, FIXTURE_CARDS_4, GRADUATED_REVERSE_CARD, mockSeedPokemon, mockLoadSettings } = vi.hoisted(() => {
   const card: NameReviewCard = {
@@ -79,7 +79,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, GRADUATED_REVERSE_CARD, mockSeedPokemon, 
       reps: 0,
       lapses: 0,
       fsrsState: "new" as const,
-      dueDate: "1970-01-01", // arbitrary — ignored by buildSession
+      dueDate: "1970-01-01", // arbitrary - ignored by buildSession
       lastReview: null,
       firstSeen: null,
       learningStep: null,
@@ -133,7 +133,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, GRADUATED_REVERSE_CARD, mockSeedPokemon, 
       reps: 3,
       lapses: 0,
       fsrsState: "review" as const,
-      dueDate: "2099-01-01", // far future — not due
+      dueDate: "2099-01-01", // far future - not due
       lastReview: "1970-01-01",
       firstSeen: "1970-01-01",
       learningStep: null,
@@ -173,7 +173,7 @@ vi.mock("@/lib/review/persistence", () => ({
 
 // Grade log operations are async (IDB-backed). Mock them so tests that use
 // fake timers don't stall waiting for IDB microtasks to settle.
-// `todayGradeSequence` keeps its real implementation — it is a pure helper
+// `todayGradeSequence` keeps its real implementation - it is a pure helper
 // over whatever array `loadGradeLog` is mocked to resolve, so tests can drive
 // the Share-button reconstruction path (#896) by overriding loadGradeLog only.
 vi.mock("@/lib/gradelog/persistence", async (importOriginal) => {
@@ -231,7 +231,7 @@ vi.mock("@/lib/audio/tts", () => ({
   awaitTtsEnd: vi.fn(() => Promise.resolve()),
 }));
 
-// waitForAudio resolves immediately by default — audio timing is tested in its
+// waitForAudio resolves immediately by default - audio timing is tested in its
 // own dedicated test file (waitForAudio.test.ts in this directory).
 vi.mock("@/lib/audio/waitForAudio", () => ({
   waitForAudio: vi.fn(() => Promise.resolve()),
@@ -249,7 +249,7 @@ vi.mock("@/lib/sprites/decode", () => ({
   DECODE_GRADE_TIMEOUT_MS: 150,
 }));
 
-// Spy on nextReview using the real implementation by default — individual tests
+// Spy on nextReview using the real implementation by default - individual tests
 // can override with mockImplementationOnce to inject errors.
 // Expose the real function so tests that temporarily swap the implementation
 // (e.g. the hasMastered transition test) can restore it cleanly.
@@ -270,7 +270,7 @@ vi.mock("@/lib/srs/scheduler", async (importOriginal) => {
 // ---------------------------------------------------------------------------
 
 /**
- * Buttons rendered inside the SpritePicker — excludes the new Undo and
+ * Buttons rendered inside the SpritePicker - excludes the new Undo and
  * Scope-toggle buttons that ReviewSession adds at the page level. Lets
  * the existing "exactly 4 tile buttons" assertions stay readable.
  */
@@ -356,7 +356,7 @@ describe("ReviewSession reveal flow", () => {
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
 
-    // playCry is now always invoked with (url, volume, onEnded?) — onEnded is undefined
+    // playCry is now always invoked with (url, volume, onEnded?) - onEnded is undefined
     // when speakNameOnReveal is off, which is the default for this fixture.
     expect(mockPlayCry).toHaveBeenCalledWith("https://example.com/bulbasaur.ogg", 0.6, undefined);
   });
@@ -494,7 +494,7 @@ describe("handleReveal decode-ahead (#930)", () => {
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
 
-    // decodeSpriteUrls should not be called during the reveal of a name card —
+    // decodeSpriteUrls should not be called during the reveal of a name card - 
     // there is no hidden sprite flip, so no decode-ahead is needed.
     expect(mockDecodeSpriteUrls).not.toHaveBeenCalled();
   });
@@ -513,7 +513,7 @@ describe("handleReveal decode-ahead (#930)", () => {
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
     await user.click(revealBtn);
 
-    // Grade buttons must appear after the reveal — confirming that setRevealed
+    // Grade buttons must appear after the reveal - confirming that setRevealed
     // was called after the decode-ahead resolved.
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /again/i })).toBeInTheDocument();
@@ -540,7 +540,7 @@ describe("handleReveal decode-ahead (#930)", () => {
     renderWithIntl(<ReviewSession />);
 
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
-    // Fire the click without awaiting — the decode promise is still pending.
+    // Fire the click without awaiting - the decode promise is still pending.
     const clickPromise = user.click(revealBtn);
 
     // Wait for decodeSpriteUrls to actually be called (handleReveal has started
@@ -563,7 +563,7 @@ describe("handleReveal decode-ahead (#930)", () => {
 describe("ReviewSession onboarding nudges (#702)", () => {
   // Audio-feature hints were removed in #1103 (replaced by the first-visit
   // onboarding modal). Only the card-types nudge on the session-complete screen
-  // remains — it is still rendered by EndOfSessionScreen.
+  // remains - it is still rendered by EndOfSessionScreen.
 
   it("shows the card-types hint on the session-complete screen", async () => {
     // Pre-seed loadSession with a graduated reverse card so hydrateSession
@@ -658,7 +658,7 @@ describe("ReviewSession reverse card flow", () => {
   it("shows the Pokémon name as a prompt and sprite tiles but no Reveal button", async () => {
     renderWithIntl(<ReviewSession />);
 
-    // 4 sprite tile buttons are rendered — no Reveal button.
+    // 4 sprite tile buttons are rendered - no Reveal button.
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
       expect(getTileButtons()).toHaveLength(4);
@@ -741,7 +741,7 @@ describe("Regression: migration-shape learning card (stepStartedAt: null)", () =
       lastReview: null,
       firstSeen: "2026-05-11",
       learningStep: 0,     // in learning step
-      stepStartedAt: null, // migration gap — no start time recorded
+      stepStartedAt: null, // migration gap - no start time recorded
       hiddenSince: null,
       seenInPasture: false,
     },
@@ -868,7 +868,7 @@ describe("Regression: learning-card displaces current card before Reveal (#839)"
     vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
     const now = Date.now();
 
-    // Review card (due today) — the card currently on screen.
+    // Review card (due today) - the card currently on screen.
     const reviewCard: NameReviewCard = {
       ...FIXTURE_CARD,
       id: 1,
@@ -891,7 +891,7 @@ describe("Regression: learning-card displaces current card before Reveal (#839)"
       },
     };
 
-    // Learning card due in 150 ms — will fire its timeout before the user taps Reveal.
+    // Learning card due in 150 ms - will fire its timeout before the user taps Reveal.
     const learningCard: NameReviewCard = {
       ...FIXTURE_CARD,
       id: 2,
@@ -923,7 +923,7 @@ describe("Regression: learning-card displaces current card before Reveal (#839)"
 
     await act(async () => { renderWithIntl(<ReviewSession />); });
 
-    // Review card is on screen — Reveal button visible, name hidden.
+    // Review card is on screen - Reveal button visible, name hidden.
     const revealBtn = screen.getByRole("button", { name: /reveal/i });
     expect(revealBtn).toBeInTheDocument();
 
@@ -931,12 +931,12 @@ describe("Regression: learning-card displaces current card before Reveal (#839)"
     // This fires the countdown setTimeout and triggers a re-render.
     await act(async () => { vi.advanceTimersByTime(300); });
 
-    // The Reveal button must still be present — the review card was NOT displaced.
+    // The Reveal button must still be present - the review card was NOT displaced.
     expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
-    // Grade buttons must not be visible — we haven't revealed anything.
+    // Grade buttons must not be visible - we haven't revealed anything.
     expect(screen.queryByRole("button", { name: /easy/i })).not.toBeInTheDocument();
 
-    // Reveal the card — confirm it is still the review card, not the learning card.
+    // Reveal the card - confirm it is still the review card, not the learning card.
     act(() => { fireEvent.click(screen.getByRole("button", { name: /reveal/i })); });
     // The review card's name must be visible after reveal.
     expect(screen.getByText("Bulbasaur")).toBeInTheDocument();
@@ -965,7 +965,7 @@ describe("Regression: learning-card displaces current card before Reveal (#839)"
       );
     });
 
-    // The learning card (id 2) must remain in its learning step — it was not graded.
+    // The learning card (id 2) must remain in its learning step - it was not graded.
     const lastCallArg = vi.mocked(saveSession).mock.lastCall?.[0] as
       | { cards: { id: number; state: { learningStep: number | null } }[] }
       | undefined;
@@ -984,7 +984,7 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
     vi.setSystemTime(new Date("2026-05-11T12:00:00Z"));
     const now = Date.now();
 
-    // Review card (already reviewed, due today) — the card the user reveals.
+    // Review card (already reviewed, due today) - the card the user reveals.
     const reviewCard: NameReviewCard = {
       ...FIXTURE_CARD,
       id: 1,
@@ -1040,7 +1040,7 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
     // Flush async effects (loadSession is now async) while still in fake-timer mode.
     await act(async () => { renderWithIntl(<ReviewSession />); });
 
-    // loadSession resolved — component is out of the loading skeleton.
+    // loadSession resolved - component is out of the loading skeleton.
     const revealBtn = screen.getByRole("button", { name: /reveal/i });
 
     // Click Reveal on the review card.
@@ -1049,7 +1049,7 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
     // Advance past the learning card's dueAt to trigger the countdown setTimeout.
     await act(async () => { vi.advanceTimersByTime(200); });
 
-    // The grade buttons must still be visible — the locked card has not been replaced.
+    // The grade buttons must still be visible - the locked card has not been replaced.
     expect(screen.getByRole("button", { name: /easy/i })).toBeInTheDocument();
 
     // The review card's name must still be displayed, not the learning card's.
@@ -1074,7 +1074,7 @@ describe("Regression: learning-queue preemption during grading window (#196)", (
       );
     });
 
-    // The learning card (id 2) must remain in its learning step — it was not graded.
+    // The learning card (id 2) must remain in its learning step - it was not graded.
     const lastCallArg = vi.mocked(saveSession).mock.lastCall?.[0] as
       | { cards: { id: number; state: { learningStep: number | null } }[] }
       | undefined;
@@ -1124,7 +1124,7 @@ describe("Learn-ahead: 20-minute boundary", () => {
 
     renderWithIntl(<ReviewSession />);
 
-    // The card should be pulled forward and presented for review — Reveal button visible,
+    // The card should be pulled forward and presented for review - Reveal button visible,
     // no countdown screen.
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument(),
@@ -1167,7 +1167,7 @@ describe("Learn-ahead: 20-minute boundary", () => {
 
     renderWithIntl(<ReviewSession />);
 
-    // Too far in the future — should show countdown, not the card.
+    // Too far in the future - should show countdown, not the card.
     await waitFor(() =>
       expect(screen.getByText(/next card in/i)).toBeInTheDocument(),
     );
@@ -1251,7 +1251,7 @@ describe("QueueCounterRow: live queue counters", () => {
 // ---------------------------------------------------------------------------
 
 describe("Practice scope (#333)", () => {
-  it("default empty scope is a no-op — regression guard", async () => {
+  it("default empty scope is a no-op - regression guard", async () => {
     // The default settings mock returns practiceScope { gens: [], types: [], presets: [] }.
     // The existing reveal-flow expectations should still hold: Reveal button is
     // visible and the empty-state branch is NOT rendered.
@@ -1291,7 +1291,7 @@ describe("Practice scope (#333)", () => {
       ).toBeInTheDocument();
     });
 
-    // The empty-state must offer a way out — a "Clear scope" button.
+    // The empty-state must offer a way out - a "Clear scope" button.
     expect(screen.getByRole("button", { name: /clear scope/i })).toBeInTheDocument();
   });
 
@@ -1377,7 +1377,7 @@ describe("Practice scope: Clear scope button (#835)", () => {
       maxReviewsReversePerDay: 100,
       evolutionCardsEnabled: true,
       playCryOnReveal: false,
-      // Scope to Gen IX — Bulbasaur is Gen I, so zero match.
+      // Scope to Gen IX - Bulbasaur is Gen I, so zero match.
       practiceScope: { gens: [9], types: [], presets: [] },
       earnedBadges: [],
     });
@@ -1394,7 +1394,7 @@ describe("Practice scope: Clear scope button (#835)", () => {
     const clearBtn = screen.getByRole("button", { name: /clear scope/i });
     expect(clearBtn).toBeInTheDocument();
 
-    // Click Clear scope — this fires handleScopeChange with cards !== null.
+    // Click Clear scope - this fires handleScopeChange with cards !== null.
     await user.click(clearBtn);
 
     // After clearing, the scope is empty and Bulbasaur is eligible again.
@@ -1551,7 +1551,7 @@ describe("ReviewSession TTS warm-up (#479)", () => {
 
     // warmupTts fires on the reveal gesture too (gesture-context warm-up must
     // happen synchronously before any await in handleReveal, same as in
-    // handleGrade — see fix for #946).
+    // handleGrade - see fix for #946).
     expect(mockWarmupTts).toHaveBeenCalledOnce();
 
     mockWarmupTts.mockClear();
@@ -1583,7 +1583,7 @@ describe("ReviewSession TTS warm-up (#479)", () => {
 
     await waitFor(() => expect(callOrder).toContain("saveSession"));
 
-    // warmupTts must have been recorded before saveSession is called —
+    // warmupTts must have been recorded before saveSession is called - 
     // it runs synchronously before the first await inside handleGrade.
     expect(callOrder.indexOf("warmupTts")).toBeLessThan(callOrder.indexOf("saveSession"));
   });
@@ -1616,7 +1616,7 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
       screen.getByText(/this grade could not be saved/i),
     ).toBeInTheDocument();
 
-    // Grade buttons are re-enabled — session is not frozen.
+    // Grade buttons are re-enabled - session is not frozen.
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /easy/i })).not.toBeDisabled(),
     );
@@ -1668,7 +1668,7 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
     );
     expect(screen.getByText(/this grade could not be saved/i)).toBeInTheDocument();
 
-    // Session is not frozen — grade buttons are re-enabled.
+    // Session is not frozen - grade buttons are re-enabled.
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /easy/i })).not.toBeDisabled(),
     );
@@ -1698,7 +1698,7 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
     vi.useFakeTimers();
     renderWithIntl(<ReviewSession />);
 
-    // Reverse branch shows sprite tile buttons — no Reveal step.
+    // Reverse branch shows sprite tile buttons - no Reveal step.
     await act(async () => { vi.advanceTimersByTime(0); });
     vi.useRealTimers();
 
@@ -1708,7 +1708,7 @@ describe("Robustness: corrupt grade in handleGrade (#811)", () => {
       throw new RangeError("nextReview: invalid grade 3. Expected one of 1 (Again), 2 (Hard), 4 (Good), or 5 (Easy).");
     });
 
-    // Click the correct tile — the SpritePicker will call handleGrade(4).
+    // Click the correct tile - the SpritePicker will call handleGrade(4).
     const group = screen.getByRole("group");
     const label = group.getAttribute("aria-label") ?? "";
     const match = label.match(/Which Pokémon is (.+)\?/);
@@ -1760,7 +1760,7 @@ describe("Card-type disable guards (#835)", () => {
 
     renderWithIntl(<ReviewSession />);
 
-    // The cry branch shows a Reveal button — the all-disabled guard must not fire.
+    // The cry branch shows a Reveal button - the all-disabled guard must not fire.
     await waitFor(() => {
       expect(
         screen.queryByText(/no card types enabled/i),
@@ -1774,7 +1774,7 @@ describe("Card-type disable guards (#835)", () => {
   it("never shows 'No card types enabled' because reverse is always on (#1234)", async () => {
     // Since #1234, reverse cards are always enabled (reverseEnabled is hardcoded
     // true in ReviewSession). The "No card types enabled" guard requires all of
-    // evolution, reverse, reverse-evolution, and cry to be off — an unreachable
+    // evolution, reverse, reverse-evolution, and cry to be off - an unreachable
     // combination. Even with every opt-in type disabled, the session still builds
     // reverse cards from the fixture seed and renders a Reveal button.
     mockLoadSettings.mockReturnValue({
@@ -1797,7 +1797,7 @@ describe("Card-type disable guards (#835)", () => {
 
     renderWithIntl(<ReviewSession />);
 
-    // Reverse cards are queued — the guard never fires.
+    // Reverse cards are queued - the guard never fires.
     await waitFor(() => {
       expect(
         screen.queryByText(/no card types enabled/i),
@@ -1808,7 +1808,7 @@ describe("Card-type disable guards (#835)", () => {
   it("does not produce NEW_CARDS_LOCKED when cry is capped and disabled (#835)", async () => {
     // Scenario: cry new-card cap is 0 but cry cards are disabled (cryCardsEnabled=false).
     // An unseen cry card in the session would naively trigger the wall, but
-    // hasMoreNewCardsOf checks cardTypeIsEnabled first — since cry is off, the
+    // hasMoreNewCardsOf checks cardTypeIsEnabled first - since cry is off, the
     // cry card is excluded → SESSION_COMPLETE.
     //
     // Seed pokemon has a cryUrl so buildSession/hydrateSession generates a cry card.
@@ -1839,7 +1839,7 @@ describe("Card-type disable guards (#835)", () => {
         seenInPasture: false,
       },
     };
-    // Cry card (unseen) — id = CRY_ID_OFFSET + 1 = 3_000_001
+    // Cry card (unseen) - id = CRY_ID_OFFSET + 1 = 3_000_001
     const unseenCryCard = {
       ...seedWithCry,
       cardType: "cry" as const,
@@ -1911,7 +1911,7 @@ describe("Card-type disable guards (#835)", () => {
     // species with a non-null cryUrl. Because no saved cry card (id CRY_ID_OFFSET+1)
     // exists in the stored session, hydrateSession appends a fresh CryReviewCard
     // via initialReviewState (lastReview: null). That card satisfies
-    // hasMoreNewCardsOf("cry") — the newWall fires.
+    // hasMoreNewCardsOf("cry") - the newWall fires.
     const seedWithCry: NameReviewCard = {
       ...FIXTURE_CARD,
       cryUrl: "https://example.com/bulbasaur.ogg",
@@ -1947,7 +1947,7 @@ describe("Card-type disable guards (#835)", () => {
     renderWithIntl(<ReviewSession />);
 
     // With "cry" in the resolveEndState tuple, hasMoreNewCardsOf("cry") returns
-    // true and the new-card cap fires correctly — showing the locked screen.
+    // true and the new-card cap fires correctly - showing the locked screen.
     await waitFor(() => {
       expect(screen.getByText(/new cards locked for today/i)).toBeInTheDocument();
     });
@@ -2005,7 +2005,7 @@ describe("Card-type disable guards (#835)", () => {
       limits: DEFAULT_LIMITS,
     });
     // maxReviewsCryPerDay: 0 means reviewsDoneToday (0) >= cap (0) is true,
-    // and hasMoreDueReviewsOf("cry") sees dueCryCard — REVIEW_SOFT_WALL fires.
+    // and hasMoreDueReviewsOf("cry") sees dueCryCard - REVIEW_SOFT_WALL fires.
     mockLoadSettings.mockReturnValue({
       masteryRepetitions: 3,
       maxNewPerDay: 0,
@@ -2027,7 +2027,7 @@ describe("Card-type disable guards (#835)", () => {
     renderWithIntl(<ReviewSession />);
 
     // With "cry" in the reviewWall tuple, hasMoreDueReviewsOf("cry") returns
-    // true and the review cap fires — showing the soft-wall screen.
+    // true and the review cap fires - showing the soft-wall screen.
     await waitFor(() => {
       expect(screen.getByText(/daily review limit reached/i)).toBeInTheDocument();
     });
@@ -2038,7 +2038,7 @@ describe("Card-type disable guards (#835)", () => {
 });
 
 describe("Share today button persistence (#896)", () => {
-  // A name card that has already graduated and is not due again until 2099 —
+  // A name card that has already graduated and is not due again until 2099 - 
   // with no unseen cards in the seed, the session lands on SESSION_COMPLETE.
   function buildCompletedNameCard(): NameReviewCard {
     return {
@@ -2079,13 +2079,13 @@ describe("Share today button persistence (#896)", () => {
   }
 
   // Use todayInTimezone from lib/utils/format-date to avoid raw Intl.DateTimeFormat
-  // calls in components/tests — banned by the #1456 lint rule.
+  // calls in components/tests - banned by the #1456 lint rule.
   function todayUtc(): string {
     return todayInTimezone("UTC");
   }
 
   // jsdom on this Node version does not ship localStorage out of the box, so
-  // install an in-memory stub — matching the pattern in CollapsibleSection.test.tsx.
+  // install an in-memory stub - matching the pattern in CollapsibleSection.test.tsx.
   function makeLocalStorage(): Storage {
     const store = new Map<string, string>();
     return {
@@ -2120,10 +2120,10 @@ describe("Share today button persistence (#896)", () => {
     const card = buildCompletedNameCard();
     const reverseCard = buildCompletedReverseCard();
     mockSeedPokemon.mockReturnValue([card]);
-    // Both name and reverse are graduated — hydrateSession won't add an unseen
+    // Both name and reverse are graduated - hydrateSession won't add an unseen
     // reverse card that would drive NEW_CARDS_LOCKED instead of SESSION_COMPLETE.
     vi.mocked(loadSession).mockResolvedValue({ cards: [card, reverseCard], limits: DEFAULT_LIMITS });
-    // A persisted daily-summary record dated today — the in-memory
+    // A persisted daily-summary record dated today - the in-memory
     // sessionGradeSeq is empty on this fresh mount, so the button can only
     // appear if it hydrates from this persisted record.
     localStorage.setItem(
@@ -2154,7 +2154,7 @@ describe("Share today button persistence (#896)", () => {
     const reverseCard = buildCompletedReverseCard();
     mockSeedPokemon.mockReturnValue([card]);
     vi.mocked(loadSession).mockResolvedValue({ cards: [card, reverseCard], limits: DEFAULT_LIMITS });
-    // No daily-summary record — but the durable grade log still has today's
+    // No daily-summary record - but the durable grade log still has today's
     // grades, so the button must reconstruct from the log (#896).
     const today = todayUtc();
     vi.mocked(loadGradeLog).mockResolvedValue([
@@ -2180,7 +2180,7 @@ describe("Share today button persistence (#896)", () => {
     const reverseCard = buildCompletedReverseCard();
     mockSeedPokemon.mockReturnValue([card]);
     vi.mocked(loadSession).mockResolvedValue({ cards: [card, reverseCard], limits: DEFAULT_LIMITS });
-    // Grade log only has entries from a previous day — nothing to share today.
+    // Grade log only has entries from a previous day - nothing to share today.
     vi.mocked(loadGradeLog).mockResolvedValue([
       { date: "2026-01-01", grade: 4, cardType: "name", occurredAt: 1 },
     ]);
@@ -2254,7 +2254,7 @@ describe("Graduated-cards review queue hint (#880)", () => {
 
   it("hint shows with name+reverse even when evolution and cry are off (#1234)", async () => {
     // Since #1234, name and reverse are always on so enabledDirections is always
-    // at least 2 — the hint must show regardless of the optional card types.
+    // at least 2 - the hint must show regardless of the optional card types.
     const nameCard = buildCompletedNameCard();
     const reverseCard = buildCompletedReverseCard();
     mockSeedPokemon.mockReturnValue([nameCard]);
@@ -2325,8 +2325,8 @@ describe("Graduated-cards review queue hint (#880)", () => {
   });
 });
 
-describe("EndOfSessionScreen unification — share button and due-tomorrow on every variant (#926 #914)", () => {
-  // A graduated name card that is not due until 2099 — safe base for all variants.
+describe("EndOfSessionScreen unification - share button and due-tomorrow on every variant (#926 #914)", () => {
+  // A graduated name card that is not due until 2099 - safe base for all variants.
   function buildCompletedCard(): NameReviewCard {
     return {
       ...FIXTURE_CARD,
@@ -2350,7 +2350,7 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
   }
 
   // Use todayInTimezone from lib/utils/format-date to avoid raw Intl.DateTimeFormat
-  // calls in components/tests — banned by the #1456 lint rule.
+  // calls in components/tests - banned by the #1456 lint rule.
   function todayUtc(): string {
     return todayInTimezone("UTC");
   }
@@ -2444,13 +2444,13 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
   });
 
   it("shows the due-tomorrow teaser on the NEW_CARDS_LOCKED variant when cards are due tomorrow (#914)", async () => {
-    // Only fake Date — leaving setTimeout/setInterval real so waitFor works.
+    // Only fake Date - leaving setTimeout/setInterval real so waitFor works.
     vi.useFakeTimers({ toFake: ["Date"] });
     // Fix "today" to 2026-05-17 UTC so "tomorrow" is 2026-05-18.
     vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
 
     const completed = buildCompletedCard();
-    // A second card due tomorrow (2026-05-18) — makes dueTomorrow === 1.
+    // A second card due tomorrow (2026-05-18) - makes dueTomorrow === 1.
     const dueTomorrowCard: NameReviewCard = {
       ...FIXTURE_CARD,
       id: 2,
@@ -2474,7 +2474,7 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
         seenInPasture: false,
       },
     };
-    // Third card unseen — drives NEW_CARDS_LOCKED when new cap is 0.
+    // Third card unseen - drives NEW_CARDS_LOCKED when new cap is 0.
     const unseen: NameReviewCard = {
       ...FIXTURE_CARD,
       id: 3,
@@ -2524,7 +2524,7 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
 
   it("shows the Share today button on the REVIEW_SOFT_WALL variant when a today-dated summary is persisted (#952)", async () => {
     // One card due for review (lastReview set to a past date, dueDate <= today)
-    // with maxReviewsPerDay: 0 — the cap is already hit at 0, reviewsDoneToday
+    // with maxReviewsPerDay: 0 - the cap is already hit at 0, reviewsDoneToday
     // starts at 0 (0 >= 0), and hasMoreDueReviewsOf sees the due card, so the
     // session lands on REVIEW_SOFT_WALL. A persisted daily summary triggers the
     // share button.
@@ -2607,7 +2607,7 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
 
-    // A card due for review today — triggers hasMoreDueReviewsOf with the
+    // A card due for review today - triggers hasMoreDueReviewsOf with the
     // review cap at 0, landing on REVIEW_SOFT_WALL.
     const dueReviewCard: NameReviewCard = {
       ...FIXTURE_CARD,
@@ -2632,7 +2632,7 @@ describe("EndOfSessionScreen unification — share button and due-tomorrow on ev
         seenInPasture: false,
       },
     };
-    // A second card due tomorrow — makes dueTomorrow === 1.
+    // A second card due tomorrow - makes dueTomorrow === 1.
     const dueTomorrowCard: NameReviewCard = {
       ...FIXTURE_CARD,
       id: 2,
@@ -2750,7 +2750,7 @@ describe("Keyboard shortcuts (#1060)", () => {
       expect(screen.getByRole("group", { name: /grade your answer/i })).toBeInTheDocument();
     });
 
-    // Press 1 — Again grades the card.
+    // Press 1 - Again grades the card.
     pressKey("1");
 
     await waitFor(() => {
@@ -2776,7 +2776,7 @@ describe("Keyboard shortcuts (#1060)", () => {
       expect(screen.getByRole("group", { name: /grade your answer/i })).toBeInTheDocument();
     });
 
-    // Grade Easy (5) — for a brand-new card Easy graduates immediately with no
+    // Grade Easy (5) - for a brand-new card Easy graduates immediately with no
     // learning step, so the session completes after the only card is graded.
     pressKey("5");
 
@@ -2946,7 +2946,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     // Wait for the undo button to appear (snapshot populated).
     const undoBtn = await screen.findByRole("button", { name: /undo last grade/i });
 
-    // Click Undo — the ref-based snapshot should be consumed and the button removed.
+    // Click Undo - the ref-based snapshot should be consumed and the button removed.
     await user.click(undoBtn);
 
     // After undo the card is back in its revealed state (setRevealed(true) is
@@ -3054,7 +3054,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       expect(screen.queryByRole("group", { name: /grade your answer/i })).not.toBeInTheDocument(),
     );
 
-    // saveSession hasn't resolved yet — the swap was independent.
+    // saveSession hasn't resolved yet - the swap was independent.
     expect(resolveSaveSession).toBeDefined();
     // Unblock the persistence chain so the test can clean up cleanly.
     resolveSaveSession();
@@ -3089,7 +3089,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     // Flag should not be set before the grade.
     expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
 
-    // Reveal and grade Easy — nextReview is mocked to return a mastered state,
+    // Reveal and grade Easy - nextReview is mocked to return a mastered state,
     // transitioning the card from unmastered to mastered.
     const reveal = await screen.findByRole("button", { name: /reveal/i });
     await user.click(reveal);
@@ -3138,7 +3138,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
   it("hasMastered flag is NOT written when a non-name card (reverse) transitions into mastery (#1219)", async () => {
     // Guard: mastering a reverse card alone must not flip the flag because
     // species-level mastery (#1448/#1234) requires BOTH the name AND reverse legs
-    // to be mastered — the name leg is unreviewed (reps=0) in this session.
+    // to be mastered - the name leg is unreviewed (reps=0) in this session.
     //
     // Use the 4-card seed with reverse-only settings so the session renders a
     // SpritePicker. nextReview is mocked to return a mastered state so that
@@ -3190,7 +3190,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
       seenInPasture: false,
     }));
 
-    // Tap any tile (correct or incorrect — handleGrade fires either way, and
+    // Tap any tile (correct or incorrect - handleGrade fires either way, and
     // nextReview is fully mocked so the resulting state is mastered regardless).
     const tiles = screen
       .getAllByRole("button")
@@ -3201,7 +3201,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     // Wait for the grade to be processed (tiles swap or feedback appears).
     await waitFor(() => expect(saveSession).toHaveBeenCalled());
 
-    // The flag must remain absent — the name leg is unmastered so no species
+    // The flag must remain absent - the name leg is unmastered so no species
     // reached species-level mastery despite the reverse leg crossing the gate.
     expect(window.localStorage.getItem("poke-memory:has-mastered:v2")).toBeNull();
 
@@ -3216,7 +3216,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     vi.setSystemTime(new Date("2026-05-20T12:00:00Z"));
     const T = Date.now();
 
-    // Relearning card due in 30 min — beyond the 20-min learn-ahead window so
+    // Relearning card due in 30 min - beyond the 20-min learn-ahead window so
     // the countdown branch renders instead of the card.
     const learningCard: NameReviewCard = {
       ...FIXTURE_CARD,
@@ -3263,7 +3263,7 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
 // ---------------------------------------------------------------------------
 
 describe("persistenceChainRef: split-write guard (#1196)", () => {
-  /** Minimal name-card-only settings — maxNewReversePerDay: 0 suppresses reverse cards. */
+  /** Minimal name-card-only settings - maxNewReversePerDay: 0 suppresses reverse cards. */
   const nameOnlySettings = {
     masteryRepetitions: 3,
     maxNewPerDay: 10,
@@ -3282,7 +3282,7 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
   };
 
   it("does not call appendGradeEntry when saveSession fails (quota)", async () => {
-    // saveSession returns { ok: false } — IDB or localStorage full.
+    // saveSession returns { ok: false } - IDB or localStorage full.
     vi.mocked(saveSession).mockResolvedValue({ ok: false, reason: "quota" });
     mockLoadSettings.mockReturnValue(nameOnlySettings);
 
@@ -3297,12 +3297,12 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     await user.click(revealBtn);
     await user.click(screen.getByRole("button", { name: /easy/i }));
 
-    // Wait for saveSession to be called by the grade handler — this signals the
+    // Wait for saveSession to be called by the grade handler - this signals the
     // persistence chain settled. Then assert appendGradeEntry was NOT called.
     await waitFor(() => {
       expect(vi.mocked(saveSession)).toHaveBeenCalled();
     });
-    // appendGradeEntry must NOT have been called — the session blob did not
+    // appendGradeEntry must NOT have been called - the session blob did not
     // persist, so writing the grade log would create an orphan entry (#1196).
     expect(vi.mocked(appendGradeEntry)).not.toHaveBeenCalled();
   });
@@ -3328,13 +3328,13 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
 
   it("surfaces the storage-error banner when saveSession fails (#1196)", async () => {
     // Use a 4-card session (FIXTURE_CARDS_4) so the session stays in the active
-    // review UI after one grade — the banner only renders in the active-review
+    // review UI after one grade - the banner only renders in the active-review
     // branches, not the session-complete screen that appears when the last card
     // is graduated with Easy.
     //
     // Mount-time saveSession call count (must succeed so quotaExceeded stays
     // false before the grade click):
-    //   1. ReviewSession.tsx:840 — fresh-session initial save (loadSession → null).
+    //   1. ReviewSession.tsx:840 - fresh-session initial save (loadSession → null).
     //   The post-reconciliation save (previously line 899) is now skipped when
     //   reconcileHiddenState makes no changes (#1262). Fresh sessions built by
     //   buildSession have firstSeen: null on all cards, so reconcile is always a
@@ -3351,10 +3351,10 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
     const user = userEvent.setup();
     renderWithIntl(<ReviewSession />);
 
-    // Wait for mount to settle — both Once calls consumed, quotaExceeded still false.
+    // Wait for mount to settle - both Once calls consumed, quotaExceeded still false.
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
 
-    // The StorageQuotaBanner must NOT be present before the grade click —
+    // The StorageQuotaBanner must NOT be present before the grade click - 
     // rules out mount-time contamination and proves the Once chain is sized
     // correctly. Scoped to the banner's accessible text rather than a bare
     // queryByRole("alert"), because GradeErrorBanner also carries role="alert"
@@ -3369,7 +3369,7 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
 
     // The StorageQuotaBanner has role="alert" and contains the text below.
     // This assertion would fail if notifySaveResult(saveResult) were removed from
-    // the grade-path persistence chain — because quotaExceeded would never flip
+    // the grade-path persistence chain - because quotaExceeded would never flip
     // after the grade and the pre-grade assertion already ruled out mount-time
     // contamination.
     await waitFor(() => {
@@ -3405,7 +3405,7 @@ describe("persistenceChainRef: split-write guard (#1196)", () => {
 // ---------------------------------------------------------------------------
 
 describe("undo snap: only armed after successful saveSession (#1209)", () => {
-  /** Minimal name-card-only settings — maxNewReversePerDay: 0 suppresses reverse cards. */
+  /** Minimal name-card-only settings - maxNewReversePerDay: 0 suppresses reverse cards. */
   const nameOnlySettings = {
     masteryRepetitions: 3,
     maxNewPerDay: 10,
@@ -3460,7 +3460,7 @@ describe("undo snap: only armed after successful saveSession (#1209)", () => {
     const user = userEvent.setup();
     renderWithIntl(<ReviewSession />);
 
-    // Wait for mount to settle — the Once call is consumed.
+    // Wait for mount to settle - the Once call is consumed.
     const revealBtn = await screen.findByRole("button", { name: /reveal/i });
 
     // Undo button must NOT be present before any grade (sanity baseline).
@@ -3479,7 +3479,7 @@ describe("undo snap: only armed after successful saveSession (#1209)", () => {
       expect(vi.mocked(saveSession).mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 
-    // The undo button must NOT be active — the snapshot was never armed because
+    // The undo button must NOT be active - the snapshot was never armed because
     // saveSession returned { ok: false } (#1209).
     expect(
       screen.queryByRole("button", { name: /undo last grade/i }),
@@ -3487,7 +3487,7 @@ describe("undo snap: only armed after successful saveSession (#1209)", () => {
   });
 
   it("undo button IS shown when saveSession succeeds on grade (happy path, #1209 regression guard)", async () => {
-    // All saves succeed — undo snap should be armed and the button rendered.
+    // All saves succeed - undo snap should be armed and the button rendered.
     vi.mocked(saveSession).mockResolvedValue({ ok: true });
     mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
     mockLoadSettings.mockReturnValue(nameOnlySettings);
@@ -3556,7 +3556,7 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
   const learningStepState = {
     ...brandNewState,
     learningStep: 0,
-    stepStartedAt: Date.now() - 1000, // overdue by 1s — eligible immediately
+    stepStartedAt: Date.now() - 1000, // overdue by 1s - eligible immediately
   };
 
   /** State for a graduated card (lastReview set, no learningStep).
@@ -3564,8 +3564,8 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
    * so the heal guard in hydrateSession does not re-init the card to "new". */
   const graduatedState = {
     ...brandNewState,
-    stability: 2.5,   // valid — above 1e-3
-    difficulty: 5,    // valid — within [1, 10]
+    stability: 2.5,   // valid - above 1e-3
+    difficulty: 5,    // valid - within [1, 10]
     lastReview: "2026-05-26",
     firstSeen: "2026-05-26",
     scheduledDays: 1,
@@ -3595,7 +3595,7 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
   });
 
   it("renders MC card for a name card in an active learning step in typed mode", async () => {
-    // Provide a card already in a learning step — overdue so it surfaces
+    // Provide a card already in a learning step - overdue so it surfaces
     // immediately via the learning queue.
     const learningCard = { ...FIXTURE_CARD, state: learningStepState };
     mockSeedPokemon.mockReturnValue(FOUR_POKEMON);
@@ -3724,7 +3724,7 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
       ).toBeInTheDocument();
     });
 
-    // Act step 2: click the correct option (Bulbasaur — the card's displayName).
+    // Act step 2: click the correct option (Bulbasaur - the card's displayName).
     // The button label is the pokemon displayName; Bulbasaur is always in FOUR_POKEMON.
     const correctButton = screen.getByRole("button", { name: /^Bulbasaur$/i });
 
@@ -3747,13 +3747,13 @@ describe("ReviewSession MC name card dispatch (#1237)", () => {
   });
 });
 
-// Locale smoke tests — Japanese (mandatory locale coverage per AGENTS.md)
+// Locale smoke tests - Japanese (mandatory locale coverage per AGENTS.md)
 // ---------------------------------------------------------------------------
 
-describe("ReviewSession locale smoke — Japanese", () => {
+describe("ReviewSession locale smoke - Japanese", () => {
   it("renders the loading skeleton aria-label in Japanese", () => {
     renderJa(<ReviewSession />);
-    // cards starts as null — the loading skeleton is present synchronously
+    // cards starts as null - the loading skeleton is present synchronously
     // before loadSession resolves.
     expect(
       screen.getByLabelText("レビューセッションを読み込み中"),
@@ -3818,7 +3818,7 @@ describe("ReviewSession locale smoke — Japanese", () => {
   });
 
   it("renders the review-wall heading in Japanese (1日のレビュー上限に達しました)", async () => {
-    // Put a due cry card in the session with a maxReviewsCryPerDay of 0 — this
+    // Put a due cry card in the session with a maxReviewsCryPerDay of 0 - this
     // triggers REVIEW_SOFT_WALL, showing the reviewWall / doneForToday screen.
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
@@ -3950,7 +3950,7 @@ describe("ReviewSession per-locale session (#1562)", () => {
   });
 
   it("shows no Reveal button when activePokemonNameLocale is 'en' but only ja cards exist", async () => {
-    // Saved session contains only a ja name card — no en cards.
+    // Saved session contains only a ja name card - no en cards.
     // With activeLocale="en" the locale filter excludes the ja card from
     // the queue, so no card is shown to the user.
     vi.mocked(loadSession).mockResolvedValueOnce({
@@ -3969,14 +3969,14 @@ describe("ReviewSession per-locale session (#1562)", () => {
 
     renderWithIntl(<ReviewSession />);
 
-    // No Reveal button — no en card is due.
+    // No Reveal button - no en card is due.
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
     });
   });
 
   it("defaults to 'en' queue when activePokemonNameLocale is absent (backward compat)", async () => {
-    // No activePokemonNameLocale field in settings — component must default to "en".
+    // No activePokemonNameLocale field in settings - component must default to "en".
     mockLoadSettings.mockReturnValue({
       ...nameOnlySettings,
     });
@@ -3990,7 +3990,7 @@ describe("ReviewSession per-locale session (#1562)", () => {
   });
 
   it("suppresses typed entry when activeLocale is not 'en' (#1561)", async () => {
-    // Session with a graduated ja name card — typed-entry would fire for en
+    // Session with a graduated ja name card - typed-entry would fire for en
     // but must be suppressed for ja since typed answers are English-only.
     const graduatedJaCard: NameReviewCard = {
       ...jaNameCard,
@@ -4020,7 +4020,7 @@ describe("ReviewSession per-locale session (#1562)", () => {
 
     renderWithIntl(<ReviewSession />);
 
-    // Must NOT render a text input — typed entry is English-only (#1561).
+    // Must NOT render a text input - typed entry is English-only (#1561).
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
     });
@@ -4032,7 +4032,7 @@ describe("ReviewSession per-locale session (#1562)", () => {
 // Phase 2 multi-locale tests (#1562)
 // ---------------------------------------------------------------------------
 
-describe("ReviewSession Phase 2 — multi-locale crown-jewel invariant (#1562)", () => {
+describe("ReviewSession Phase 2 - multi-locale crown-jewel invariant (#1562)", () => {
   /** Minimal name-only settings. */
   const nameOnlySettings = {
     masteryRepetitions: 3,
@@ -4171,7 +4171,7 @@ describe("ReviewSession Phase 2 — multi-locale crown-jewel invariant (#1562)",
   });
 
   it("typed-entry note is absent when activeLocale is en", async () => {
-    // A graduated en name card — typed-entry active for en sessions.
+    // A graduated en name card - typed-entry active for en sessions.
     // With verifiedTypedEntryMode=true and activeLocale="en", the
     // typedEntryEnglishOnly note must NOT appear (#1562).
     const graduatedEnCard: NameReviewCard = {
@@ -4227,7 +4227,7 @@ describe("ReviewSession Phase 2 — multi-locale crown-jewel invariant (#1562)",
     };
     // ja name card (id=1, locale=ja)
     const jaName: NameReviewCard = { ...jaCard, state: masteredState };
-    // ja reverse card (id=2_000_001, locale=ja) — needs a reverse shape.
+    // ja reverse card (id=2_000_001, locale=ja) - needs a reverse shape.
     // Typed as NameReviewCard for fixture simplicity; hydrateSession will
     // recognise the saved key `2000001::ja` and skip adding a new one.
     const jaReverse = { ...jaCard, id: 2_000_001, locale: "ja" as const, cardType: "reverse" as const, pokemonId: 1, subjectKey: "1", state: masteredState };
@@ -4348,7 +4348,7 @@ describe("ReviewSession offline-download nudge (#1538)", () => {
 
     renderWithIntl(<ReviewSession />);
 
-    // Cry branch renders a "Reveal" button — wait for it to confirm we are in
+    // Cry branch renders a "Reveal" button - wait for it to confirm we are in
     // the cry branch, then check the nudge is present.
     await screen.findByRole("button", { name: /reveal/i });
 
@@ -4375,7 +4375,7 @@ describe("ReviewSession offline-download nudge (#1538)", () => {
     await act(async () => { vi.advanceTimersByTime(0); });
     vi.useRealTimers();
 
-    // Reverse branch shows 4 tile buttons (SpritePicker) — confirm the branch.
+    // Reverse branch shows 4 tile buttons (SpritePicker) - confirm the branch.
     await waitFor(() => expect(getTileButtons()).toHaveLength(4));
 
     expect(
@@ -4455,7 +4455,7 @@ describe("ReviewSession higher-or-lower nudge seenPokemon gate (#1573)", () => {
   });
 
   it("nudge is visible when seenPokemon.length >= 1 and firstVisitDone is true", async () => {
-    // Seed a saved session where the Bulbasaur name card has firstSeen set — this
+    // Seed a saved session where the Bulbasaur name card has firstSeen set - this
     // makes getSeenPokemon return [Bulbasaur], satisfying the seenPokemon.length >= 1 gate.
     vi.mocked(loadSession).mockResolvedValueOnce({
       cards: [

@@ -46,7 +46,7 @@ describe("decodeSpriteUrls", () => {
   });
 
   it("resolves immediately when given an empty URL list", async () => {
-    // No FakeImage needed — empty list short-circuits before creating any Image.
+    // No FakeImage needed - empty list short-circuits before creating any Image.
     await expect(decodeSpriteUrls([])).resolves.toBeUndefined();
   });
 
@@ -111,7 +111,7 @@ describe("decodeSpriteUrls", () => {
   it("falls back gracefully when decode is not a function on the Image instance", async () => {
     window.Image = class NoDecodeImage {
       src = "";
-      // No decode() method — simulates very old browsers or jsdom baseline.
+      // No decode() method - simulates very old browsers or jsdom baseline.
     } as unknown as typeof window.Image;
 
     await expect(decodeSpriteUrls(["/sprites/old-browser.png"])).resolves.toBeUndefined();
@@ -145,7 +145,7 @@ describe("decodeSpriteUrls", () => {
     const onSlowLoad = vi.fn();
     const promise = decodeSpriteUrls(["/sprites/fast.png"], 500, onSlowLoad);
 
-    // Resolve the decode immediately — decode wins before the timeout.
+    // Resolve the decode immediately - decode wins before the timeout.
     resolvers.forEach((resolve) => resolve());
     await promise;
 

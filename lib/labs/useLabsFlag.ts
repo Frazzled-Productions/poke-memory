@@ -7,7 +7,7 @@
  * Responds to external changes (other-tab writes, `saveSettings` dispatches)
  * via the `storage` event so the value stays in sync across components.
  *
- * The hook is safe to call when `LabsFlagKey` is `never` (empty registry) —
+ * The hook is safe to call when `LabsFlagKey` is `never` (empty registry) - 
  * it simply never renders with a meaningful key in that state and TypeScript
  * rejects the call at compile time.
  *

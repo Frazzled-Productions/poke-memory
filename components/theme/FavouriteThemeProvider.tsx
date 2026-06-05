@@ -93,7 +93,7 @@ export function FavouriteThemeProvider({
     }
 
     function handleSettingsSaved() {
-      // Same-tab updates dispatched by saveSettings — cross-tab updates come
+      // Same-tab updates dispatched by saveSettings - cross-tab updates come
       // via the native StorageEvent above.
       applyIntensity(loadSettings().themeIntensity);
       void resolveFavourite().then((updated) => {

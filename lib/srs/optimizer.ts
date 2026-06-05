@@ -1,7 +1,7 @@
 /**
  * Pure helpers for the FSRS per-user weight optimizer (#268).
  *
- * No React, no DOM — importable from both client and server contexts.
+ * No React, no DOM - importable from both client and server contexts.
  * The native `@open-spaced-repetition/binding` module is intentionally NOT
  * imported here; it is imported only in the API route so the native binary
  * stays out of the client bundle.
@@ -43,7 +43,7 @@ function toFsrsRating(grade: GradeLogEntry["grade"]): FsrsRating {
  * chronologically, compute deltaT in days between consecutive reviews
  * (first review deltaT = 0), and build the optimizer input items.
  *
- * Entries without a `subjectKey` are skipped — they are legacy entries from
+ * Entries without a `subjectKey` are skipped - they are legacy entries from
  * before migration 013 and cannot be attributed to a specific card.
  *
  * Cards with only a single review are dropped: the native FSRS binding
@@ -60,7 +60,7 @@ export function gradeLogToOptimizerItems(entries: GradeLogEntry[]): OptimizerInp
   for (const entry of entries) {
     if (!entry.subjectKey) continue;
     // Include locale in the key so per-locale review histories are grouped
-    // separately — mixing locales would produce nonsensical FSRS weight estimates.
+    // separately - mixing locales would produce nonsensical FSRS weight estimates.
     const key = `${entry.cardType}:${entry.subjectKey}:${entry.locale ?? "en"}`;
     const list = byCard.get(key);
     if (list === undefined) {
@@ -128,7 +128,7 @@ function isFittableGroup(cardEntries: GradeLogEntry[]): boolean {
 }
 
 /**
- * Count how many reviews belong to fittable cards — cards with at least two
+ * Count how many reviews belong to fittable cards - cards with at least two
  * reviews on distinct UTC days. This mirrors the filter applied in
  * `gradeLogToOptimizerItems`, so the eligibility count shown on the Settings
  * page and the server-side gate in `/api/srs/optimize` agree on what counts

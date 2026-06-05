@@ -193,7 +193,7 @@ describe("pullAndMerge", () => {
     const result = await pullAndMerge(fakeClient, fakeUserId);
 
     expect(result).toBe("error");
-    // Subscribers must not be notified of state that was never written —
+    // Subscribers must not be notified of state that was never written - 
     // saveSession's own dispatch is gated on a successful setItem, and
     // saveSyncStatus must not advance the cursor either.
     expect(mockSaveSyncStatus).not.toHaveBeenCalled();
@@ -205,13 +205,13 @@ describe("pullAndMerge", () => {
     expect(result).toBe("ok");
     expect(mockSaveSession).toHaveBeenCalledOnce();
     // The synthetic StorageEvent dispatch is now saveSession's responsibility
-    // (covered by persistence.test.ts) — pullAndMerge just has to call it.
+    // (covered by persistence.test.ts) - pullAndMerge just has to call it.
     expect(mockSaveSyncStatus).toHaveBeenCalledOnce();
   });
 
   // #391: when local has no stored settings and cloud has settings with
   // reverse/cry enabled, the brand-new-device base must include those types
-  // — otherwise their cloud rows are silently dropped by the merge.
+  // - otherwise their cloud rows are silently dropped by the merge.
   it("pulls cloud settings before building base when local has no settings stored", async () => {
     mockHasStoredSettings.mockReturnValue(false);
     mockPullUserSettingsRow.mockResolvedValue({
@@ -297,7 +297,7 @@ describe("pullAndMerge", () => {
     );
   });
 
-  // Guards the strict `>` semantic specifically — a `>=` regression would
+  // Guards the strict `>` semantic specifically - a `>=` regression would
   // wrongly apply cloud here even though the cursor is ahead.
   it("does not apply cloud settings when cloud updated_at is strictly older than lastSettingsPullAt", async () => {
     mockHasStoredSettings.mockReturnValue(true);
@@ -351,13 +351,13 @@ describe("pullAndMerge", () => {
     await pullAndMerge(fakeClient, fakeUserId);
 
     expect(mockSaveSettings).not.toHaveBeenCalled();
-    // Cursor must not move — there is no real timestamp to advance to.
+    // Cursor must not move - there is no real timestamp to advance to.
     expect(mockSaveSyncStatus).toHaveBeenCalledWith(
       expect.objectContaining({ lastSettingsPullAt: "2026-05-10T00:00:00.000Z" }),
     );
   });
 
-  it("does not throw when settings pull fails — sync stays 'ok'", async () => {
+  it("does not throw when settings pull fails - sync stays 'ok'", async () => {
     mockHasStoredSettings.mockReturnValue(true);
     mockPullUserSettingsRow.mockRejectedValue(new Error("network blip"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -398,7 +398,7 @@ describe("pullAndMerge", () => {
     expect(mockSaveStreakData).not.toHaveBeenCalled();
   });
 
-  it("does not throw when streak pull fails — sync stays 'ok'", async () => {
+  it("does not throw when streak pull fails - sync stays 'ok'", async () => {
     mockPullStreak.mockRejectedValue(new Error("network blip"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -470,7 +470,7 @@ describe("pullAndMerge", () => {
     expect(mockSaveGradeLog).not.toHaveBeenCalled();
   });
 
-  it("does not throw when grade-log pull fails — sync stays 'ok'", async () => {
+  it("does not throw when grade-log pull fails - sync stays 'ok'", async () => {
     mockPullGradeLog.mockRejectedValue(new Error("network blip"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -540,9 +540,9 @@ describe("pullAndMerge", () => {
 
     await pullAndMerge(fakeClient, fakeUserId);
 
-    // Cloud returned all-null regional prefs — no fields changed, saveSettings must not fire.
+    // Cloud returned all-null regional prefs - no fields changed, saveSettings must not fire.
     // This assertion is sound because mockPullUserSettingsRow defaults to null (set in
-    // beforeEach), which suppresses the LWW/locale-merge saveSettings path entirely —
+    // beforeEach), which suppresses the LWW/locale-merge saveSettings path entirely - 
     // only the regional-prefs leg is active here.
     expect(mockSaveSettings).not.toHaveBeenCalled();
   });
@@ -555,7 +555,7 @@ describe("pullAndMerge", () => {
     expect(mockSaveSettings).not.toHaveBeenCalled();
   });
 
-  it("does not throw when regional prefs pull fails — sync stays 'ok'", async () => {
+  it("does not throw when regional prefs pull fails - sync stays 'ok'", async () => {
     mockPullRegionalPrefs.mockRejectedValue(new Error("network blip"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -735,7 +735,7 @@ describe("pullAndMerge", () => {
         cards: [card("pikachu", "2026-05-13", "2026-05-01")],
         limits: {},
       } as unknown as Awaited<ReturnType<typeof loadSession>>);
-      // Cloud brings newer lastReview — mergeAffectsProgress would return true,
+      // Cloud brings newer lastReview - mergeAffectsProgress would return true,
       // so suppression must come from wasColdLoad, not from the no-op check.
       mockMerge.mockReturnValue([card("pikachu", "2026-05-14", "2026-05-01")]);
 
@@ -850,7 +850,7 @@ describe("pullAndMerge", () => {
       await pullAndMerge(fakeClient, fakeUserId);
 
       expect(mockLocalStorage["poke-memory:mt-banner-dismissed:ja"]).toBe("1");
-      // Locally-dismissed locale must survive — union, not replace.
+      // Locally-dismissed locale must survive - union, not replace.
       expect(mockLocalStorage["poke-memory:mt-banner-dismissed:zh-Hant"]).toBe("1");
     });
 
@@ -889,7 +889,7 @@ describe("pullAndMerge", () => {
     });
 
     it("skips write-through when no settings row exists (guest path)", async () => {
-      // Guest / no cloud row — pullUserSettingsRow returns null.
+      // Guest / no cloud row - pullUserSettingsRow returns null.
       mockPullUserSettingsRow.mockResolvedValue(null);
 
       await pullAndMerge(fakeClient, fakeUserId);
@@ -960,7 +960,7 @@ describe("pullAndMerge", () => {
 
     it("tombstone: local has zh-Hans in removedLocales → zh-Hans stays absent and tombstone pushed to cloud", async () => {
       // Cloud still has zh-Hans enrolled; local removed it.
-      // Local is already correct (["en"], tombstone ["zh-Hans"]) — no local save needed.
+      // Local is already correct (["en"], tombstone ["zh-Hans"]) - no local save needed.
       // But cloud must receive the tombstone so zh-Hans disappears on the next cloud pull.
       mockPullUserSettingsRow.mockResolvedValue({
         settings: {
@@ -1009,7 +1009,7 @@ describe("pullAndMerge", () => {
 
       expect(result).toBe("ok");
       // Cloud lacks the fields so mergeLearnedLocales treats them as ["en"]/[].
-      // Local already has "en" + "ja"; union with ["en"] gives ["en","ja"] — no change.
+      // Local already has "en" + "ja"; union with ["en"] gives ["en","ja"] - no change.
       // So saveSettings must NOT be called for the locale-specific path.
     });
 
@@ -1079,7 +1079,7 @@ describe("pullAndMerge", () => {
       expect(mockPushSettings).not.toHaveBeenCalled();
     });
 
-    // ─── regression: fix #1 — LWW saveSettings must not clobber locale fields ──
+    // ─── regression: fix #1 - LWW saveSettings must not clobber locale fields ──
     //
     // Scenario: cloudIsNewer = true, local has ["en","ja"] enrolled and ["zh-Hant"]
     // tombstoned. The LWW saveSettings block strips learningLocales/removedLocales
@@ -1095,7 +1095,7 @@ describe("pullAndMerge", () => {
     //
     // The merged/saved/pushed result must still contain the original local locale
     // values, not the reset ones.
-    it("fix #1 — locale merge uses pre-LWW local values even when cloudIsNewer resets them via saveSettings", async () => {
+    it("fix #1 - locale merge uses pre-LWW local values even when cloudIsNewer resets them via saveSettings", async () => {
       // Cloud is newer and has zh-Hans enrolled; local has ja enrolled + zh-Hant tombstoned.
       mockHasStoredSettings.mockReturnValue(true);
       mockLoadSyncStatus.mockReturnValue({
@@ -1179,7 +1179,7 @@ describe("pullAndMerge", () => {
 
       // Cloud push must be suppressed.
       expect(mockPushSettings).not.toHaveBeenCalled();
-      // But the local merge save should still run — reads are always allowed.
+      // But the local merge save should still run - reads are always allowed.
       expect(mockSaveSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           learningLocales: ["en", "ja", "zh-Hans"],
@@ -1190,7 +1190,7 @@ describe("pullAndMerge", () => {
 
     // ─── order-insensitive set comparison ─────────────────────────────────────
     it("does not push back when cloud locale order differs but membership is equal (order-insensitive)", async () => {
-      // Cloud has ["zh-Hans","en"] — same set as ["en","zh-Hans"], just different order.
+      // Cloud has ["zh-Hans","en"] - same set as ["en","zh-Hans"], just different order.
       // A purely order-sensitive comparison would see a mismatch and push on every cycle.
       mockHasStoredSettings.mockReturnValue(true);
       mockLoadSyncStatus.mockReturnValue({
@@ -1213,7 +1213,7 @@ describe("pullAndMerge", () => {
 
       await pullAndMerge(fakeClient, fakeUserId);
 
-      // Membership is equal — no push needed.
+      // Membership is equal - no push needed.
       expect(mockPushSettings).not.toHaveBeenCalled();
     });
   });

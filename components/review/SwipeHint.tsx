@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SwipeHint — directional overlay shown while the user is actively dragging
+ * SwipeHint - directional overlay shown while the user is actively dragging
  * a flip card in a swipe-to-grade gesture (#1052).
  *
  * Displays a grade label (e.g. "Good →" or "← Again") that tracks the swipe
@@ -9,7 +9,7 @@
  *
  * Purely decorative: `aria-hidden="true"` so screen-reader users are unaffected.
  * The grade still commits on pointer release even when the user prefers reduced
- * motion — the animation is suppressed but the interaction is preserved.
+ * motion - the animation is suppressed but the interaction is preserved.
  */
 
 import type { SwipeState } from "@/components/review/useSwipeGrade";

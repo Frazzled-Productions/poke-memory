@@ -4,7 +4,7 @@ import { renderWithIntl as render, renderJa, screen, fireEvent, act } from "@/co
 import { MultipleChoiceNameCard, FEEDBACK_HOLD_MS } from "./MultipleChoiceNameCard";
 import type { Grade } from "@/lib/review/session";
 
-// Stub next/image — same pattern as TypedEntryNameCard.test.tsx.
+// Stub next/image - same pattern as TypedEntryNameCard.test.tsx.
 vi.mock("next/image", () => ({
   default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
@@ -185,7 +185,7 @@ describe("MultipleChoiceNameCard", () => {
 // Localised aria-labels (#1607)
 // ---------------------------------------------------------------------------
 
-describe("MultipleChoiceNameCard — localised aria-labels", () => {
+describe("MultipleChoiceNameCard - localised aria-labels", () => {
   it("group aria-label is localised in Japanese", () => {
     const { container } = renderJa(
       <MultipleChoiceNameCard
@@ -253,7 +253,7 @@ describe("MultipleChoiceNameCard — localised aria-labels", () => {
 // Locale-aware name display (#1260 followup)
 // ---------------------------------------------------------------------------
 
-describe("MultipleChoiceNameCard — locale-aware names", () => {
+describe("MultipleChoiceNameCard - locale-aware names", () => {
   it("option buttons render the locale-resolved name instead of English", async () => {
     vi.resetModules();
     vi.doMock("@/lib/i18n/useLocalePokemonName", () => ({

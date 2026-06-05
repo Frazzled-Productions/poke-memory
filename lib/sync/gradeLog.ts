@@ -2,13 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 
 // Grade-log sync is best-effort. Failures are surfaced as `false` / `null`
-// and the caller is expected to keep going — analytics history is auxiliary
+// and the caller is expected to keep going - analytics history is auxiliary
 // to card-review state.
 
 /**
  * The `onConflict` column list for `grade_log` upserts.
  *
- * Matches the UNIQUE constraint on grade_log: (user_id, occurred_at) — migration 006.
+ * Matches the UNIQUE constraint on grade_log: (user_id, occurred_at) - migration 006.
  * Exported so the onConflict-PK parity integration test can import the live
  * client constant and compare it against the DB constraint.
  */
@@ -31,9 +31,9 @@ export async function pushGradeLog(
       card_type: e.cardType,
       grade: e.grade,
       subject_key: e.subjectKey ?? null,
-      // Migration 029 field — coalesce to "en" for pre-migration entries.
+      // Migration 029 field - coalesce to "en" for pre-migration entries.
       locale: e.locale ?? "en",
-      // Migration 033 fields — NULL for graduated cards and pre-migration entries.
+      // Migration 033 fields - NULL for graduated cards and pre-migration entries.
       learning_step: e.learningStep ?? null,
       step_started_at: e.stepStartedAt ?? null,
     }));
@@ -55,11 +55,11 @@ type GradeLogCloudRow = {
   card_type: GradeLogEntry["cardType"];
   grade: GradeLogEntry["grade"];
   subject_key: string | null;
-  /** Migration 029 field — absent on pre-migration rows, defaults to "en". */
+  /** Migration 029 field - absent on pre-migration rows, defaults to "en". */
   locale?: string | null;
-  /** Migration 033 field — NULL for graduated cards and pre-migration rows. */
+  /** Migration 033 field - NULL for graduated cards and pre-migration rows. */
   learning_step?: number | null;
-  /** Migration 033 field — epoch ms; NULL for graduated cards and pre-migration rows. */
+  /** Migration 033 field - epoch ms; NULL for graduated cards and pre-migration rows. */
   step_started_at?: number | null;
 };
 
@@ -85,7 +85,7 @@ export async function pullGradeLog(
       if (r.subject_key !== null && r.subject_key !== undefined) {
         entry.subjectKey = r.subject_key;
       }
-      // Migration 033 fields — NULL on pre-migration rows (column didn't exist
+      // Migration 033 fields - NULL on pre-migration rows (column didn't exist
       // when they were inserted); undefined/null both treated as "graduated" by
       // the scheduler. Omit the key entirely when null so legacy-shaped entries
       // are indistinguishable from new graduated entries.
@@ -103,7 +103,7 @@ export async function pullGradeLog(
 }
 
 // Union-merge: every distinct `occurredAt` survives. If two entries share a
-// timestamp they collapse to one (the local copy wins for the tiebreaker —
+// timestamp they collapse to one (the local copy wins for the tiebreaker - 
 // arbitrary but stable). Returns entries sorted by `occurredAt` ascending.
 export function mergeGradeLog(
   local: GradeLogEntry[],

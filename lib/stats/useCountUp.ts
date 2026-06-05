@@ -25,7 +25,7 @@ export function useCountUp(target: number, durationMs = 600): number {
       return;
     }
 
-    // Respect the OS reduced-motion preference — skip the animation entirely
+    // Respect the OS reduced-motion preference - skip the animation entirely
     // and jump straight to the target value.
     const motionQuery =
       typeof window !== "undefined" && typeof window.matchMedia === "function"

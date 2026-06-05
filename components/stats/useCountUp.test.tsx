@@ -43,7 +43,7 @@ describe("useCountUp", () => {
     });
 
     expect(result.current).toBe(80);
-    // Advance well past the duration — no rAF should have been scheduled.
+    // Advance well past the duration - no rAF should have been scheduled.
     await act(async () => {
       vi.advanceTimersByTime(700);
     });
@@ -89,7 +89,7 @@ describe("useCountUp", () => {
     expect(midValue).toBeGreaterThan(0);
     expect(midValue).toBeLessThan(100);
 
-    // Rerender with a different target — the animation should restart from
+    // Rerender with a different target - the animation should restart from
     // `midValue`, not from 0, exercising the
     // `from = lastTargetRef.current === target ? 0 : displayed` branch.
     rerender({ target: 200 });

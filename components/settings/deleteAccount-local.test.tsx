@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { deleteAccountEverywhere } from "@/lib/sync/deleteAccount";
 import { clearLocalProgress } from "@/lib/storage/reset";
 
-// deleteAccountEverywhere sweeps localStorage — including the
+// deleteAccountEverywhere sweeps localStorage - including the
 // poke-memory:settings:* keys that clearLocalProgress deliberately spares.
 // That sweep needs a real DOM, so this test lives in the jsdom project (it
 // would crash in the DOM-free `node` project). The RPC-orchestration tests
@@ -19,7 +19,7 @@ function makeRpcClient(rpcError: null | object = null) {
 }
 
 // jsdom on this Node version does not ship localStorage out of the box, so
-// the test provides its own in-memory stub — matching the pattern used in
+// the test provides its own in-memory stub - matching the pattern used in
 // CollapsibleSection.test.tsx.
 function makeLocalStorage(): Storage {
   const store = new Map<string, string>();
@@ -39,7 +39,7 @@ function makeLocalStorage(): Storage {
   };
 }
 
-describe("deleteAccountEverywhere — localStorage sweep", () => {
+describe("deleteAccountEverywhere - localStorage sweep", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(clearLocalProgress).mockClear();
@@ -58,7 +58,7 @@ describe("deleteAccountEverywhere — localStorage sweep", () => {
 
   it("clears ALL poke-memory keys including settings keys", async () => {
     // A normal reset (clearLocalProgress) spares poke-memory:settings:*.
-    // Account deletion is a full erasure — those keys must go too.
+    // Account deletion is a full erasure - those keys must go too.
     localStorage.setItem("poke-memory:settings:v1", "{}");
     localStorage.setItem("poke-memory:review-session:v1", "[]");
     localStorage.setItem("poke-memory:superuser:flags", "{}");

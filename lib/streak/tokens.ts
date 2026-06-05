@@ -7,7 +7,7 @@
  * 1. Earn rate. The user earns one token after `EARN_INTERVAL_DAYS` of
  *    consecutive review days since the last token was earned (or since the
  *    feature first applied). A "review day" matches the existing streak
- *    counter — every day that is in the `streakDates` set qualifies.
+ *    counter - every day that is in the `streakDates` set qualifies.
  * 2. Cap. The balance is capped at `MAX_BALANCE`. Earning a token while the
  *    balance is already at the cap is a no-op (the counter still resets, so
  *    the next earn requires another `EARN_INTERVAL_DAYS` of reviews).
@@ -17,7 +17,7 @@
  *    balance must be >= gapLength to bridge the whole run; if the gap is
  *    unsavable no tokens are spent and the balance is preserved. The
  *    walk-back is bounded by MAX_BALANCE so at most 3 days are scanned.
- *    Consecutive spends are permitted — scarcity (earn rate + balance cap)
+ *    Consecutive spends are permitted - scarcity (earn rate + balance cap)
  *    is the only gate (#1245, extended #1399).
  *
  * The full design is documented in #1227. These constants are tunable; if a
@@ -38,9 +38,9 @@ export const MAX_PROTECTION_EVENTS = 10;
 
 /**
  * A single protection event recorded in the history list.
- * - `"earned"` — a token was earned on this date (no spend that day).
- * - `"spent"` — a token was spent on this date (no earn that day).
- * - `"earned-and-spent"` — a token was earned AND spent in the same step
+ * - `"earned"` - a token was earned on this date (no spend that day).
+ * - `"spent"` - a token was spent on this date (no earn that day).
+ * - `"earned-and-spent"` - a token was earned AND spent in the same step
  *   (the silent same-day case the user may not have noticed).
  */
 export type ProtectionEventKind = "earned" | "spent" | "earned-and-spent";
@@ -107,7 +107,7 @@ export const DEFAULT_STREAK_PROTECTION: StreakProtection = {
 
 /**
  * Defensive parser for the persisted shape. Returns sensible defaults when
- * the payload is missing, malformed, or partially corrupted — never throws.
+ * the payload is missing, malformed, or partially corrupted - never throws.
  * Keeps the same posture as the rest of `lib/settings/persistence.ts`.
  */
 export function validateStreakProtection(value: unknown): StreakProtection {
@@ -187,7 +187,7 @@ export function validateStreakProtection(value: unknown): StreakProtection {
 }
 
 /**
- * Result of applying the protection rules for a given `today`. Pure — no
+ * Result of applying the protection rules for a given `today`. Pure - no
  * side effects. The caller decides when to persist the returned `protection`
  * and whether to dispatch any events.
  */
@@ -203,7 +203,7 @@ export type ProtectionStepResult = {
 /**
  * Advance the protection state for a fresh day. Three phases run in order:
  *
- * Phase 1 — Spend (pre-earn): if there is a consecutive run of missing days
+ * Phase 1 - Spend (pre-earn): if there is a consecutive run of missing days
  *     immediately before today, bounded by a still-alive day (a review day or
  *     a prior spend) before it, and the current balance >= gapLength, every
  *     missing day is bridged in one app-open by spending one token per day.
@@ -214,19 +214,19 @@ export type ProtectionStepResult = {
  *     per day. (#1399). `spendSet` is updated immediately after so the earn
  *     leg sees the bridged days.
  *
- * Phase 2 — Earn: if today is a qualifying review day (present in
+ * Phase 2 - Earn: if today is a qualifying review day (present in
  *     `streakDates`), `daysSinceLastEarn` increments by one (guarded by
  *     `lastEarnCheckDate` so multiple grade events in the same day count
  *     once). When the counter reaches `EARN_INTERVAL_DAYS`, balance is
  *     incremented (clamped to `MAX_BALANCE`) and the counter resets to 0. If
  *     any day strictly between `lastEarnCheckDate` and `today` is neither a
- *     review day nor a spend day, the consecutive-review chain was broken —
+ *     review day nor a spend day, the consecutive-review chain was broken - 
  *     the counter resets to 0 before incrementing for today, so the 30-day
  *     clock only counts *sustained* practice (#1227 scarcity invariant).
  *     Because `spendSet` was updated in Phase 1, bridged days are correctly
  *     seen here (#1399 ordering hazard).
  *
- * Phase 3 — Spend (post-earn): a second spend check runs only when the earn
+ * Phase 3 - Spend (post-earn): a second spend check runs only when the earn
  *     leg actually awarded a new token in Phase 2 AND no spend fired in
  *     Phase 1. This handles the combined earn-then-spend case: the user's
  *     balance was 0 (so Phase 1 couldn't spend), earn raised it to 1, and the
@@ -254,7 +254,7 @@ export function applyProtectionStep(
   let spent = false;
 
   // -------------------------------------------------------------------------
-  // Shared walk-back helper (inline) — finds the consecutive missing days
+  // Shared walk-back helper (inline) - finds the consecutive missing days
   // immediately before today and the anchor that bounds the gap. Used by both
   // the pre-earn spend leg (Phase 1) and the post-earn spend leg (Phase 3).
   //
@@ -282,7 +282,7 @@ export function applyProtectionStep(
   }
 
   // -------------------------------------------------------------------------
-  // Phase 1 — Spend (pre-earn).
+  // Phase 1 - Spend (pre-earn).
   //
   // Walk backwards from yesterday collecting consecutive missing days until we
   // find a still-alive day (review or prior spend) that anchors the gap. The
@@ -313,14 +313,14 @@ export function applyProtectionStep(
   }
 
   // -------------------------------------------------------------------------
-  // Phase 2 — Earn leg.
+  // Phase 2 - Earn leg.
   //
   // Only counts when today is a qualifying review day and we have not already
-  // counted today. The check fires daily — at most one increment per calendar
+  // counted today. The check fires daily - at most one increment per calendar
   // day, regardless of how many grade events fire.
   if (dateSet.has(today) && next.lastEarnCheckDate !== today) {
     // Reset the consecutive-review counter if the chain between
-    // `lastEarnCheckDate` and `today` is broken — any interstitial day that
+    // `lastEarnCheckDate` and `today` is broken - any interstitial day that
     // is neither a review day nor bridged by a spend means the user did not
     // sustain the streak, so the earn clock must start over. Token spends
     // legitimately bridge a missed day (the streak is preserved) so they
@@ -353,7 +353,7 @@ export function applyProtectionStep(
   }
 
   // -------------------------------------------------------------------------
-  // Phase 3 — Spend (post-earn).
+  // Phase 3 - Spend (post-earn).
   //
   // Only runs when earn fired in Phase 2 AND no spend fired in Phase 1. This
   // handles the combined "earn-then-spend" case: balance was 0 (Phase 1
@@ -408,7 +408,7 @@ export function applyProtectionStep(
 /**
  * Compose `streakDates` with `spendDates` so a downstream `computeStreak`
  * call treats spent days as bridged. Returns a sorted, deduped ISO-string
- * array. Pure — no mutation of inputs.
+ * array. Pure - no mutation of inputs.
  */
 export function effectiveStreakDates(
   streakDates: readonly string[],
@@ -440,7 +440,7 @@ function offsetDate(date: string, days: number): string {
 
 /**
  * Returns true when at least one ISO date strictly between `from` and `to`
- * (exclusive at both ends) is neither in `dateSet` nor in `spendSet` — i.e.
+ * (exclusive at both ends) is neither in `dateSet` nor in `spendSet` - i.e.
  * the user missed a day that no token spend covered. Used to decide whether
  * the earn counter should reset before incrementing for `to`.
  *

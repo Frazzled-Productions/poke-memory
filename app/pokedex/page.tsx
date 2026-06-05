@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useTranslations, useFormatter } from "next-intl";
+import { mutedText } from "@/lib/utils/class-names";
 import { buildSession, hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
@@ -58,7 +59,7 @@ export default function PokedexPage() {
     }
   }
 
-  // Default forms only — one tile per species. Falls back to all entries when
+  // Default forms only - one tile per species. Falls back to all entries when
   // the seed hasn't been re-run yet (isDefaultForm will be undefined on older
   // generated.json) to avoid an empty grid.
   const defaultFormPokemon = SEED_POKEMON.filter(
@@ -85,7 +86,7 @@ export default function PokedexPage() {
         <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
           {t("title")}
         </h1>
-        <p className="mb-8 text-sm text-zinc-500 dark:text-zinc-400 tabular-nums">
+        <p className={`mb-8 ${mutedText} tabular-nums`}>
           {cards === null ? (
             <span className="inline-block h-4 w-36 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
           ) : (

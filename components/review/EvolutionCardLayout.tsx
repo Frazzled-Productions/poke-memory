@@ -17,7 +17,7 @@ export const PLACEHOLDER_CLASS =
   "flex h-24 w-24 items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 text-2xl font-semibold text-zinc-400 sm:h-48 sm:w-48 sm:text-5xl dark:border-zinc-700 dark:text-zinc-600";
 
 type Props = {
-  /** Badge direction — determines which `DirectionBadge` label is shown. */
+  /** Badge direction - determines which `DirectionBadge` label is shown. */
   direction: Extract<CardDirection, "evolution" | "reverse-evolution">;
   /** The full prompt sentence, including any inline TTS button. */
   prompt: ReactNode;
@@ -30,12 +30,12 @@ type Props = {
   preEvoSpriteUrl: string;
   /** English fallback name for the pre-evolution Pokémon. */
   preEvoName: string;
-  /** Species ID for the pre-evolution — used to resolve locale-aware name. */
+  /** Species ID for the pre-evolution - used to resolve locale-aware name. */
   preEvoId?: number | null;
   postEvoSpriteUrl: string;
   /** English fallback name for the post-evolution Pokémon. */
   postEvoName: string;
-  /** Species ID for the post-evolution — used to resolve locale-aware name. */
+  /** Species ID for the post-evolution - used to resolve locale-aware name. */
   postEvoId?: number | null;
   /** Name of the Pokémon shown after reveal in the answer row. */
   answerName: string;
@@ -97,7 +97,7 @@ export function EvolutionCardLayout({
         : answerName;
 
   // The always-visible sprite gets `priority` for LCP; the hidden/revealed
-  // sprite does not — preserving the original per-card behaviour.
+  // sprite does not - preserving the original per-card behaviour.
   const preEvoImg = (
     <Image
       src={preEvoSpriteUrl}

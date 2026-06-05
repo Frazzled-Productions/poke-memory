@@ -8,11 +8,11 @@
  * Strategy:
  *  - Sprites are cached as pre-generated static WebP files at every render
  *    width used by the app. The browser fetches these directly from
- *    `/sprites/pokemon/webp/<id>/<width>.webp` — the `/_next/image` endpoint
+ *    `/sprites/pokemon/webp/<id>/<width>.webp` - the `/_next/image` endpoint
  *    is no longer used for sprites. The raw `/sprites/pokemon/<id>.png` path
  *    is also cached for the Pokédex-grid plain-`<img>` exemption.
  *  - Cries are cached once at their canonical /cries/<id>.ogg URL.
- *  - Each URL is checked with `cache.match` before fetching — already-cached
+ *  - Each URL is checked with `cache.match` before fetching - already-cached
  *    assets are skipped, making the operation idempotent and resumable.
  *  - Fetches are bounded to CONCURRENCY at a time to avoid hammering the server.
  *  - An AbortSignal can cancel the loop mid-way; the summary reflects what
@@ -66,7 +66,7 @@ type PrecacheOptions = {
  *
  * For each ID we produce:
  *  - Pre-generated static WebP sprite paths at each render width
- *    (`/sprites/pokemon/webp/<id>/<width>.webp`) — served as static files,
+ *    (`/sprites/pokemon/webp/<id>/<width>.webp`) - served as static files,
  *    no `/_next/image` endpoint involvement.
  *  - The raw PNG sprite path for the Pokédex-grid <img> exemption
  *    (`/sprites/pokemon/<id>.png`).
@@ -80,7 +80,7 @@ export function buildPrecacheUrls(ids: number[]): string[] {
   const urls: string[] = [];
 
   for (const id of ids) {
-    // Pre-generated WebP variants — one per render width.
+    // Pre-generated WebP variants - one per render width.
     for (const w of SPRITE_RENDER_WIDTHS) {
       urls.push(spriteVariantUrl(id, w));
     }
@@ -103,8 +103,8 @@ export function buildPrecacheUrls(ids: number[]): string[] {
  *  - /cries/...                                → versioned cries cache
  *
  * The versioned names (e.g. "poke-memory-sprites-v2") are derived from
- * `versionedCacheName` — the same helper used by the service worker's
- * `CacheFirst` route handlers — so writes from this function always land in
+ * `versionedCacheName` - the same helper used by the service worker's
+ * `CacheFirst` route handlers - so writes from this function always land in
  * the exact bucket the SW reads from.
  *
  * Returns `'skipped'` when the entry already exists in the cache.
@@ -130,7 +130,7 @@ async function fetchAndCache(
     return "failed";
   }
 
-  // Idempotency check — skip already-cached entries.
+  // Idempotency check - skip already-cached entries.
   try {
     const existing = await cache.match(url);
     if (existing !== undefined) return "skipped";
@@ -164,7 +164,7 @@ async function fetchAndCache(
  * Progress is reported via `onProgress` after each completed URL.
  * When `signal` is aborted the loop stops and returns a partial summary.
  *
- * Safe to call multiple times — already-cached URLs are skipped.
+ * Safe to call multiple times - already-cached URLs are skipped.
  */
 export async function precacheAll(options: PrecacheOptions): Promise<PrecacheSummary> {
   const { ids, onProgress, signal } = options;

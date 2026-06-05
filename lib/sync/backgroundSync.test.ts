@@ -92,7 +92,7 @@ describe("registerBackgroundSync", () => {
     });
     vi.stubGlobal("window", { SyncManager: class {} });
 
-    // Should not throw — errors are swallowed and logged.
+    // Should not throw - errors are swallowed and logged.
     await expect(registerBackgroundSync()).resolves.toBeUndefined();
   });
 

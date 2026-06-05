@@ -3,11 +3,11 @@
 /**
  * "Mark Pokémon I already know" quiz (#1084).
  *
- * Opened from the Settings page (a Settings entry — no first-run onboarding
+ * Opened from the Settings page (a Settings entry - no first-run onboarding
  * flow in this change). The user picks a generation, taps sprites for species
  * they already know, then applies. Each selected card is run through
- * `nextReview(state, Easy, now)` — the brand-new + Easy graduation path A2 in
- * `lib/srs/scheduler.ts` — producing a real graduated FSRS state with
+ * `nextReview(state, Easy, now)` - the brand-new + Easy graduation path A2 in
+ * `lib/srs/scheduler.ts` - producing a real graduated FSRS state with
  * `reps = 1` and a long initial interval. We never synthesise a "mastered"
  * state: mastery requires `reps >= masteryRepetitions && scheduledDays >= 21`
  * (`lib/stats/derive.ts`) and a single tap cannot establish 21-day retention.
@@ -22,12 +22,12 @@
  * also emits a real grade-log entry via `appendGradeEntry` so the FSRS
  * optimiser sees the signal. For authenticated users, `enqueueGrade` queues
  * each card through the standard per-grade debounced upsert path
- * (`usePerGradeSync`) — the 200 ms debounce coalesces a batch of taps into
+ * (`usePerGradeSync`) - the 200 ms debounce coalesces a batch of taps into
  * one network drain per cycle, and `AutoSyncOnChange` pushes grade-log
  * entries automatically via its `GRADE_LOG_APPENDED_EVENT` listener.
  *
  * Superuser write-guard: while any superuser flag is on, the Apply button is
- * disabled with a "Sync paused (superuser)" label — same pattern as
+ * disabled with a "Sync paused (superuser)" label - same pattern as
  * `FsrsOptimizerSection`. The quiz never runs when a flag is active.
  *
  * Quiz scope: name cards only. Reverse/cry/evolution variants are out of
@@ -57,10 +57,10 @@ import {
 import { colStack, colStackLg, dialogPanel, mutedText, sectionLabel } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
-// KnownPokemonCard — single sprite tile in the "mark as known" grid.
+// KnownPokemonCard - single sprite tile in the "mark as known" grid.
 //
 // Extracted as its own component so `useLocalePokemonName` can be called
-// unconditionally — hooks may not be called inside array maps (#1327).
+// unconditionally - hooks may not be called inside array maps (#1327).
 // ---------------------------------------------------------------------------
 
 type KnownPokemonCardProps = {
@@ -146,10 +146,10 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
-  // Per-grade sync hook — mounted at the component level so its 200 ms
+  // Per-grade sync hook - mounted at the component level so its 200 ms
   // debounce coalesces a batch of "I know this" taps into one drain.
   // When the user is a guest or any superuser flag is on, the caller passes
-  // null client/userId and the hook short-circuits — same path as
+  // null client/userId and the hook short-circuits - same path as
   // `ReviewSession`.
   const effectiveClient = superuserPaused ? null : client;
   const effectiveUserId = superuserPaused ? null : userId;
@@ -173,11 +173,11 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         new Date(),
         opts,
       );
-      // Quiz operates on name cards only — keep the grid scannable.
+      // Quiz operates on name cards only - keep the grid scannable.
       const names = cards.filter((c): c is NameReviewCard => c.cardType === "name");
       // Pass alternateFormsEnabled so alternate-form cards (Alolan, Galarian,
       // Mega, etc.) are excluded from the grid when the user has not enabled
-      // them — matching the gate buildSessionQueues applies via isCardEligible
+      // them - matching the gate buildSessionQueues applies via isCardEligible
       // (#1481).
       setEligibleCards(eligibleCardsForKnownQuiz(names, settings.alternateFormsEnabled) as NameReviewCard[]);
       setLoaded(true);
@@ -261,7 +261,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
     try {
       // Re-load the latest session so the merge does not clobber any grades
       // that landed between mount and apply (e.g. a background pull). Build
-      // a fresh seed-derived session when none exists yet — the quiz acts as
+      // a fresh seed-derived session when none exists yet - the quiz acts as
       // a first-touch entry point and must not depend on Practice having
       // been visited first.
       const settings = loadSettings();
@@ -308,7 +308,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         const card = gradedCardsById.get(id);
         if (!card) continue;
         // appendGradeEntry is awaited individually inside the loop so an IDB
-        // error on one entry does not break the others — sequential writes
+        // error on one entry does not break the others - sequential writes
         // avoid contention on the single IDB store.
         // Onboarding bulk-grades at Easy which graduates immediately;
         // learningStep and stepStartedAt are null for graduated cards (#1416).
@@ -517,6 +517,6 @@ function formatTodayUtc(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-// Helper export for use in callers — keeps the `ReviewableCard` import surface
+// Helper export for use in callers - keeps the `ReviewableCard` import surface
 // small.
 export type { ReviewableCard };

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * useIdleBehaviour — drives Pasture sprite idle animation (#402).
+ * useIdleBehaviour - drives Pasture sprite idle animation (#402).
  *
  * Runs a single requestAnimationFrame loop that throttles per-sprite updates
  * to ~8 Hz via TICK_INTERVAL_MS. CSS transforms are written directly to DOM
@@ -36,7 +36,7 @@ export type Placement = {
   anchor: AnchorSlot;
 };
 
-/** Per-entry in the sprite map — combines DOM ref, band, and tick state. */
+/** Per-entry in the sprite map - combines DOM ref, band, and tick state. */
 type SpriteEntry = {
   el: HTMLElement;
   state: SpriteState;
@@ -111,7 +111,7 @@ export function useIdleBehaviour(
     const container = zoneRef.current;
     if (!container) return;
 
-    // Freeze flag — set by screenshot script before page JS runs.
+    // Freeze flag - set by screenshot script before page JS runs.
     if (typeof window !== "undefined" && window.__PASTURE_FREEZE_IDLE) {
       frozenRef.current = true;
       return;
@@ -128,7 +128,7 @@ export function useIdleBehaviour(
       return;
     }
 
-    // Build sprite map — query [data-sprite-id] elements inside container.
+    // Build sprite map - query [data-sprite-id] elements inside container.
     const map = spriteMapRef.current;
     map.clear();
 
@@ -153,7 +153,7 @@ export function useIdleBehaviour(
       map.set(card.id, { el, state });
     }
 
-    // IntersectionObserver — pause loop when zone is off-screen.
+    // IntersectionObserver - pause loop when zone is off-screen.
     const observer = new IntersectionObserver(
       ([entry]) => {
         isVisibleRef.current = entry.isIntersecting;
@@ -162,7 +162,7 @@ export function useIdleBehaviour(
     );
     observer.observe(container);
 
-    // visibilitychange — pause when tab is hidden.
+    // visibilitychange - pause when tab is hidden.
     function onVisibility() {
       docVisibleRef.current = document.visibilityState === "visible";
     }

@@ -11,7 +11,7 @@ type Props = {
   /**
    * The badge definitions that the user has already earned (in catalog order).
    * When `forceAllMastered` is true this should be the full catalog so every
-   * tile renders earned — the superuser flag is honoured upstream by the caller.
+   * tile renders earned - the superuser flag is honoured upstream by the caller.
    */
   earnedBadges: readonly BadgeDefinition[];
   /**
@@ -46,7 +46,7 @@ function findNextBadge(
     const remaining = badge.criterion.speciesIds.filter(
       (id) => !mastered.has(id),
     ).length;
-    if (remaining === 0) continue; // about to be awarded — skip
+    if (remaining === 0) continue; // about to be awarded - skip
     if (best === null || remaining < best.remaining) {
       best = { badge, remaining };
     }

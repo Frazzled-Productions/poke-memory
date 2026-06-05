@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
-// Mock next/image — renders as a plain img so alt/src/width assertions work
+// Mock next/image - renders as a plain img so alt/src/width assertions work
 // ---------------------------------------------------------------------------
 
 vi.mock("next/image", () => ({
@@ -43,7 +43,7 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => ({ flags: { pretendAllMastered: mockPretendAllMastered.value } }),
 }));
 
-// SEED_POKEMON used for evolution sprite lookup — empty array is fine for these tests
+// SEED_POKEMON used for evolution sprite lookup - empty array is fine for these tests
 vi.mock("@/lib/pokemon/seed", () => ({
   SEED_POKEMON: [],
 }));
@@ -67,7 +67,7 @@ vi.mock("@/lib/pokemon/facts", () => ({
   loadFlavorTexts: () => mockLoadFlavorTexts(),
 }));
 
-// useNextReviewDate — default to "not-started" so it never renders review-date
+// useNextReviewDate - default to "not-started" so it never renders review-date
 // copy in unrelated tests.
 vi.mock("@/lib/review/useNextReviewDate", () => ({
   useNextReviewDate: () => ({ status: "not-started" }),
@@ -132,10 +132,10 @@ function makeAltForm(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
 import { PokemonDetailDisclosure } from "@/components/pokedex/PokemonDetailDisclosure";
 
 // ---------------------------------------------------------------------------
-// Tests — audio buttons
+// Tests - audio buttons
 // ---------------------------------------------------------------------------
 
-describe("PokemonDetailDisclosure — audio buttons", () => {
+describe("PokemonDetailDisclosure - audio buttons", () => {
   beforeEach(() => {
     mockSpeakName.mockClear();
     mockPlayCry.mockClear();
@@ -198,10 +198,10 @@ describe("PokemonDetailDisclosure — audio buttons", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — Bug #484: alt-form visibility gated on parent being unlocked
+// Tests - Bug #484: alt-form visibility gated on parent being unlocked
 // ---------------------------------------------------------------------------
 
-describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => {
+describe("PokemonDetailDisclosure - alt-form disclosure gating (#484)", () => {
   beforeEach(() => {
     mockSpeakName.mockClear();
     mockPlayCry.mockClear();
@@ -283,7 +283,7 @@ describe("PokemonDetailDisclosure — alt-form disclosure gating (#484)", () => 
 });
 
 // ---------------------------------------------------------------------------
-// Tests — sprite sizes (#931: shared primitive adoption)
+// Tests - sprite sizes (#931: shared primitive adoption)
 // ---------------------------------------------------------------------------
 
 import {
@@ -292,7 +292,7 @@ import {
   POKEDEX_NODE_SPRITE_SIZE,
 } from "@/lib/sprites/sizes";
 
-describe("PokemonDetailDisclosure — sprite sizes (#931)", () => {
+describe("PokemonDetailDisclosure - sprite sizes (#931)", () => {
   beforeEach(() => {
     mockCardClass.value = "mastered";
     mockPretendAllMastered.value = false;
@@ -338,10 +338,10 @@ describe("PokemonDetailDisclosure — sprite sizes (#931)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — locked-state signposts (#1440)
+// Tests - locked-state signposts (#1440)
 // ---------------------------------------------------------------------------
 
-describe("PokemonDetailDisclosure — locked-state signposts (#1440)", () => {
+describe("PokemonDetailDisclosure - locked-state signposts (#1440)", () => {
   beforeEach(() => {
     mockSpeakName.mockClear();
     mockPlayCry.mockClear();
@@ -481,7 +481,7 @@ describe("PokemonDetailDisclosure — locked-state signposts (#1440)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — game-label facts (#1559)
+// Tests - game-label facts (#1559)
 // Verifies that FlavorTextEntry facts render with game names instead of the
 // generic "Pokédex entry" label, and that game names stay English across all
 // four supported locales (English proper nouns are locale-invariant by design).
@@ -489,7 +489,7 @@ describe("PokemonDetailDisclosure — locked-state signposts (#1440)", () => {
 
 import type { PokemonFact } from "@/lib/pokemon/facts";
 
-describe("PokemonDetailDisclosure — game-label facts (#1559)", () => {
+describe("PokemonDetailDisclosure - game-label facts (#1559)", () => {
   beforeEach(() => {
     mockCardClass.value = "mastered";
     mockPretendAllMastered.value = false;
@@ -543,14 +543,14 @@ describe("PokemonDetailDisclosure — game-label facts (#1559)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — re-render after async flavour load (#1559 regression guard)
+// Tests - re-render after async flavour load (#1559 regression guard)
 // Verifies that game labels appear after loadFlavorTexts resolves even on a
 // cold first visit where the module-level cache is empty on initial render.
 // Without the `flavorLoaded` state wiring the component has no re-render
 // trigger and game labels are silently absent.
 // ---------------------------------------------------------------------------
 
-describe("PokemonDetailDisclosure — async flavour re-render (#1559)", () => {
+describe("PokemonDetailDisclosure - async flavour re-render (#1559)", () => {
   beforeEach(() => {
     mockCardClass.value = "mastered";
     mockPretendAllMastered.value = false;
@@ -593,7 +593,7 @@ describe("PokemonDetailDisclosure — async flavour re-render (#1559)", () => {
   });
 
   it("when cache is already warm (isFlavorTextsReady=true), no deferred render needed", () => {
-    // Cache already populated — component should render game labels immediately.
+    // Cache already populated - component should render game labels immediately.
     mockIsFlavorTextsReady.mockReturnValue(true);
     mockLoadFlavorTexts.mockReturnValue(Promise.resolve(new Map()));
     mockGetPokemonFacts.mockReturnValue([

@@ -9,14 +9,14 @@
  *   - Mobile (<md): hidden on Practice (/); shown on all other routes.
  *
  * Three status chips (each a `<button>`, `ChipVisual` is `aria-hidden`):
- *   - StreakChip  — aria-label "Start your streak" at 0, "N day(s) streak" active.
- *   - TokenChip   — renders nothing when balance < 1 (hidden in fresh state).
- *   - MasteryChip — always rendered; aria-label "0 of N Pokémon mastered…" at
+ *   - StreakChip - aria-label "Start your streak" at 0, "N day(s) streak" active.
+ *   - TokenChip - renders nothing when balance < 1 (hidden in fresh state).
+ *   - MasteryChip - always rendered; aria-label "0 of N Pokémon mastered…" at
  *                   zero, "M of N Pokémon mastered" when non-zero.
  *
  * State matrix covered:
- *   1. Empty state  — fresh guest session (streak=0, no tokens, mastery=0).
- *   2. Populated state — QA-seed `pasture-progression` (streak > 0,
+ *   1. Empty state - fresh guest session (streak=0, no tokens, mastery=0).
+ *   2. Populated state - QA-seed `pasture-progression` (streak > 0,
  *      tokens > 0, mastery > 0) via the superuser qaSeedMode flow.
  *
  * Route-awareness (mobile-only):
@@ -165,7 +165,7 @@ async function seedMasteryCount(
 // Describe: core render on a non-Practice route (desktop, chromium)
 // ---------------------------------------------------------------------------
 
-test.describe("ProfileStatusBar — core render (desktop)", () => {
+test.describe("ProfileStatusBar - core render (desktop)", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "chromium",
@@ -201,10 +201,10 @@ test.describe("ProfileStatusBar — core render (desktop)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Describe: empty state — fresh guest session
+// Describe: empty state - fresh guest session
 // ---------------------------------------------------------------------------
 
-test.describe("ProfileStatusBar — empty state (fresh guest)", () => {
+test.describe("ProfileStatusBar - empty state (fresh guest)", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "chromium",
@@ -253,10 +253,10 @@ test.describe("ProfileStatusBar — empty state (fresh guest)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Describe: populated state — non-zero streak, token, mastery
+// Describe: populated state - non-zero streak, token, mastery
 // ---------------------------------------------------------------------------
 
-test.describe("ProfileStatusBar — populated state", () => {
+test.describe("ProfileStatusBar - populated state", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "chromium",
@@ -326,7 +326,7 @@ test.describe("ProfileStatusBar — populated state", () => {
 // Describe: populated state via QA-seed (pasture-progression scenario)
 // ---------------------------------------------------------------------------
 
-test.describe("ProfileStatusBar — populated state via QA-seed", () => {
+test.describe("ProfileStatusBar - populated state via QA-seed", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "chromium",
@@ -400,7 +400,7 @@ test.describe("ProfileStatusBar — populated state via QA-seed", () => {
 // Describe: route-aware mobile behaviour
 // ---------------------------------------------------------------------------
 
-test.describe("ProfileStatusBar — mobile route visibility", () => {
+test.describe("ProfileStatusBar - mobile route visibility", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "mobile-safari",
@@ -448,7 +448,7 @@ test.describe("ProfileStatusBar — mobile route visibility", () => {
 // Describe: locale rendering (Japanese app locale)
 // ---------------------------------------------------------------------------
 
-test.describe("ProfileStatusBar — locale rendering (ja)", () => {
+test.describe("ProfileStatusBar - locale rendering (ja)", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "chromium",
@@ -479,7 +479,7 @@ test.describe("ProfileStatusBar — locale rendering (ja)", () => {
     await expect(bar).toBeVisible({ timeout: 15_000 });
 
     // Japanese streak aria-label is "{count}日連続" (e.g. "4日連続").
-    // Numbers may gain digit-group separators via Intl (#1408) — tolerate them.
+    // Numbers may gain digit-group separators via Intl (#1408) - tolerate them.
     await expect(
       bar.getByRole("button", { name: /[\d,.\s]+日連続/i }),
     ).toBeVisible();
@@ -536,7 +536,7 @@ test.describe("ProfileStatusBar — locale rendering (ja)", () => {
     await expect(bar).toBeVisible({ timeout: 15_000 });
 
     // Japanese masteryChipAriaLabel: "{mastered} / {total} 種族習得済み".
-    // Numbers may be formatted with separators — tolerate them.
+    // Numbers may be formatted with separators - tolerate them.
     await expect(
       bar.getByRole("button", { name: /[\d,.\s]+ \/ [\d,.\s]+ 種族習得済み/i }),
     ).toBeVisible();
@@ -551,7 +551,7 @@ test.describe("ProfileStatusBar — locale rendering (ja)", () => {
     const bar = page.getByRole("region", { name: BAR_LABEL });
     await expect(bar).toBeVisible({ timeout: 15_000 });
 
-    // MasteryChip visible label is "{pct}%" — the % sign must be present.
+    // MasteryChip visible label is "{pct}%" - the % sign must be present.
     // We do not assert the exact number so digit-grouping doesn't break the test.
     const masteryChip = bar.getByRole("button", { name: /Pok[eé]mon mastered/i });
     await expect(masteryChip).toBeVisible();

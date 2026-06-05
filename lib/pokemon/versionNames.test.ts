@@ -42,10 +42,10 @@ describe("VERSION_NAMES parity", () => {
 });
 
 // ---------------------------------------------------------------------------
-// formatVersions — single slug
+// formatVersions - single slug
 // ---------------------------------------------------------------------------
 
-describe("formatVersions — single slug", () => {
+describe("formatVersions - single slug", () => {
   it("resolves 'red' to 'Red'", () => {
     expect(formatVersions(["red"])).toBe("Red");
   });
@@ -68,12 +68,12 @@ describe("formatVersions — single slug", () => {
 });
 
 // ---------------------------------------------------------------------------
-// formatVersions — release-order sort
+// formatVersions - release-order sort
 // ---------------------------------------------------------------------------
 
-describe("formatVersions — release-order sort", () => {
+describe("formatVersions - release-order sort", () => {
   it("sorts slugs by release order (earlier game first)", () => {
-    // yellow (order 3) then red (order 1) — should come out Red · Yellow
+    // yellow (order 3) then red (order 1) - should come out Red · Yellow
     expect(formatVersions(["yellow", "red"])).toBe("Red · Yellow");
   });
 
@@ -88,10 +88,10 @@ describe("formatVersions — release-order sort", () => {
 });
 
 // ---------------------------------------------------------------------------
-// formatVersions — up-to-3 display, +N overflow
+// formatVersions - up-to-3 display, +N overflow
 // ---------------------------------------------------------------------------
 
-describe("formatVersions — overflow logic", () => {
+describe("formatVersions - overflow logic", () => {
   it("shows all 3 when exactly 3 slugs", () => {
     expect(formatVersions(["red", "blue", "yellow"])).toBe("Red · Blue · Yellow");
   });
@@ -117,11 +117,11 @@ describe("formatVersions — overflow logic", () => {
 });
 
 // ---------------------------------------------------------------------------
-// formatVersions — locale invariance (game names stay English)
+// formatVersions - locale invariance (game names stay English)
 // ---------------------------------------------------------------------------
 
-describe("formatVersions — locale-invariant English proper nouns", () => {
-  // Game names do not change based on locale — they are English proper nouns.
+describe("formatVersions - locale-invariant English proper nouns", () => {
+  // Game names do not change based on locale - they are English proper nouns.
   // This test documents the invariant: the same slug always resolves to the
   // same English display name regardless of the calling context's locale.
 

@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Module mocks — factories must not reference outer variables (hoisting rule).
+// Module mocks - factories must not reference outer variables (hoisting rule).
 // ---------------------------------------------------------------------------
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -226,7 +226,7 @@ describe("GET /api/export", () => {
     const response = await GET();
     const lines = await csvLines(response);
 
-    // null subject_key resolves to "" — the pokemon column is empty.
+    // null subject_key resolves to "" - the pokemon column is empty.
     const fields = lines[1].split(",");
     // date,pokemon,card_type,grade,grade_label → index 1 is pokemon
     expect(fields[1]).toBe("");
@@ -263,7 +263,7 @@ describe("GET /api/export", () => {
   it("escapes a field value that contains a double-quote (RFC 4180)", async () => {
     makeSupabaseMock({
       // Inject a custom subject_key that will fail species parsing (non-numeric)
-      // and be used verbatim — the verbatim value contains a double-quote to
+      // and be used verbatim - the verbatim value contains a double-quote to
       // test csvField quoting.
       gradeLogData: makeGradeLogRows([
         { card_type: "name", subject_key: 'say "hello"' },

@@ -10,7 +10,7 @@ function deriveQueueState(
   state: ReviewState,
   forceCardsGraduated: boolean,
 ): QueueState {
-  // When forceCardsGraduated is active, the card is treated as graduated —
+  // When forceCardsGraduated is active, the card is treated as graduated - 
   // suppress the "Learning" badge so QA developers see the correct state.
   if (!forceCardsGraduated && state.learningStep !== null) return "learning";
   if (state.lastReview === null) return "new";

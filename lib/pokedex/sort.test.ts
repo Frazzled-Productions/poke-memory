@@ -133,7 +133,7 @@ describe("compareAlphabetical", () => {
   it("is case-insensitive", () => {
     const a = makeCell(1, "bulbasaur");
     const b = makeCell(2, "Bulbasaur2");
-    // "bulbasaur" and "bulbasaur2" — lowercase a comes before "2" so a < b
+    // "bulbasaur" and "bulbasaur2" - lowercase a comes before "2" so a < b
     expect(compareAlphabetical(a, b)).toBeLessThan(0);
   });
 
@@ -230,7 +230,7 @@ describe("compareClosestToMastery", () => {
     const locked = makeCell(1, "A", "locked");
     const mastered = makeCell(5, "B", "mastered");
     // Without force: mastered(5) should come before locked(1) since mastered tier < locked tier.
-    // With force: id order — id 1 before id 5.
+    // With force: id order - id 1 before id 5.
     expect(compareClosestToMastery(locked, mastered, true)).toBeLessThan(0);
   });
 });

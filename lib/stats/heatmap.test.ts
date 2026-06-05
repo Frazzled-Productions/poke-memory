@@ -57,7 +57,7 @@ describe("intensityBucket", () => {
   });
 });
 
-describe("computeReviewHeatmap — all grades on one day (high density)", () => {
+describe("computeReviewHeatmap - all grades on one day (high density)", () => {
   it("accumulates 50 reviews on the same date into a single cell with count 50", () => {
     // Scenario from issue #1019: all grades on one day should accumulate
     // correctly rather than being capped or deduplicated.
@@ -69,7 +69,7 @@ describe("computeReviewHeatmap — all grades on one day (high density)", () => 
     expect(intensityBucket(todayCell!.count)).toBe(3);
   });
 
-  it("accumulates 100 reviews on the same date — saturates at bucket 4", () => {
+  it("accumulates 100 reviews on the same date - saturates at bucket 4", () => {
     const log = Array.from({ length: 100 }, () => entry(TODAY));
     const columns = computeReviewHeatmap(log, TODAY);
     const todayCell = columns.flat().find((c) => c.date === TODAY);
@@ -78,7 +78,7 @@ describe("computeReviewHeatmap — all grades on one day (high density)", () => 
   });
 });
 
-describe("computeReviewHeatmap — weekStart=1 (Monday-start)", () => {
+describe("computeReviewHeatmap - weekStart=1 (Monday-start)", () => {
   it("still returns 53 columns of 7 cells when weekStart=1", () => {
     const columns = computeReviewHeatmap([], TODAY, 1);
     expect(columns).toHaveLength(53);

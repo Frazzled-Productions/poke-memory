@@ -7,7 +7,7 @@
 //   toggles. Each flag is independently set from the Developer panel.
 //
 // Flags are kept separate from "unlocked" so a user can have superuser
-// unlocked but no flags active — equivalent to a closed inspector window.
+// unlocked but no flags active - equivalent to a closed inspector window.
 
 import { KEY_SUPERUSER_UNLOCKED, KEY_SUPERUSER_FLAGS } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
@@ -55,7 +55,7 @@ export const DEFAULT_FLAGS: SuperuserFlags = {
 };
 
 export function isUnlocked(): boolean {
-  // Raw string "true" — not JSON, so read directly rather than via readLocalStorage.
+  // Raw string "true" - not JSON, so read directly rather than via readLocalStorage.
   if (typeof window === "undefined") return false;
   return localStorage.getItem(UNLOCKED_KEY) === "true";
 }

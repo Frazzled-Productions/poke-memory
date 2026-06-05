@@ -2,7 +2,7 @@ import { BiomeSvg } from "./BiomeSvg";
 import { BiomeSky } from "./BiomeSky";
 
 /**
- * Urban habitat backdrop — dusk city skyline with windows lit, foreground
+ * Urban habitat backdrop - dusk city skyline with windows lit, foreground
  * sidewalk with a street lamp and a Pokémon Center sign. Anchor bands
  * cluster sprites along the sidewalk and city park strip in front of the
  * buildings.
@@ -84,7 +84,7 @@ export function UrbanBiome() {
         ))}
       </g>
 
-      {/* Sidewalk + street — flat rectangular bands, bespoke to this biome */}
+      {/* Sidewalk + street - flat rectangular bands, bespoke to this biome */}
       <path
         d="M0,475 L1600,475 L1600,520 L0,520 Z"
         fill="#3a3a48"
@@ -115,7 +115,7 @@ export function UrbanBiome() {
       <line x1="0" y1="475" x2="1600" y2="475" stroke="#1f1f28" strokeWidth="2" />
       <line x1="0" y1="520" x2="1600" y2="520" stroke="#1f1f28" strokeWidth="2" />
 
-      {/* Street lamp — left */}
+      {/* Street lamp - left */}
       <g>
         <rect x="138" y="380" width="6" height="100" fill="#3a3a48" />
         <rect x="120" y="376" width="42" height="8" fill="#3a3a48" />
@@ -123,7 +123,7 @@ export function UrbanBiome() {
         <ellipse cx="141" cy="372" rx="32" ry="20" fill="#ffe89c" opacity="0.25" />
       </g>
 
-      {/* Street lamp — right */}
+      {/* Street lamp - right */}
       <g>
         <rect x="1438" y="370" width="6" height="110" fill="#3a3a48" />
         <rect x="1420" y="366" width="42" height="8" fill="#3a3a48" />

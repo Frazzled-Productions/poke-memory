@@ -77,7 +77,7 @@ describe("computeActivityHistory", () => {
   it("counts introductions for first-time subjectKey within window", () => {
     const log: GradeLog = [
       entry(TODAY, "25"),
-      entry(TODAY, "25"), // same key — only one introduction
+      entry(TODAY, "25"), // same key - only one introduction
       entry(TODAY, "26"),
     ];
     const result = computeActivityHistory(log, TODAY, 7);
@@ -89,7 +89,7 @@ describe("computeActivityHistory", () => {
   it("does not count a key as introduced if first seen before the window", () => {
     const log: GradeLog = [
       entry("2026-01-01", "25"), // before the window
-      entry(TODAY, "25"),        // re-reviewed inside window — not an introduction
+      entry(TODAY, "25"),        // re-reviewed inside window - not an introduction
     ];
     const result = computeActivityHistory(log, TODAY, 7);
     const today = result.find((p) => p.date === TODAY)!;
@@ -112,7 +112,7 @@ describe("computeActivityHistory", () => {
 
   it("excludes entries without subjectKey from introduced count", () => {
     const log: GradeLog = [
-      entry(TODAY, undefined), // legacy entry — no subjectKey
+      entry(TODAY, undefined), // legacy entry - no subjectKey
       entry(TODAY, undefined),
     ];
     const result = computeActivityHistory(log, TODAY, 7);

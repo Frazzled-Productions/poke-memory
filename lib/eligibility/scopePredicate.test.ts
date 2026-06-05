@@ -39,7 +39,7 @@ const CHARIZARD: ScopeLookupEntry = {
   isLegendary: false,
 };
 
-/** Default-form Pikachu (Gen 1, Electric) — a starter-set non-member. */
+/** Default-form Pikachu (Gen 1, Electric) - a starter-set non-member. */
 const PIKACHU: ScopeLookupEntry = {
   id: 25,
   speciesId: 25,
@@ -50,10 +50,10 @@ const PIKACHU: ScopeLookupEntry = {
   isLegendary: false,
 };
 
-/** Default-form Bulbasaur — confirmed starter. */
+/** Default-form Bulbasaur - confirmed starter. */
 const STARTER_BULBASAUR = BULBASAUR; // id 1 is in STARTER_IDS
 
-/** Default-form Mewtwo (Gen 1, Psychic) — legendary. */
+/** Default-form Mewtwo (Gen 1, Psychic) - legendary. */
 const MEWTWO: ScopeLookupEntry = {
   id: 150,
   speciesId: 150,
@@ -64,7 +64,7 @@ const MEWTWO: ScopeLookupEntry = {
   isLegendary: true,
 };
 
-/** Alolan Raichu (id=10100, speciesId=26) — alternate form, regional. */
+/** Alolan Raichu (id=10100, speciesId=26) - alternate form, regional. */
 const ALOLAN_RAICHU: ScopeLookupEntry = {
   id: 10100,
   speciesId: 26,
@@ -75,7 +75,7 @@ const ALOLAN_RAICHU: ScopeLookupEntry = {
   isLegendary: false,
 };
 
-/** Gen 5 Pichu (id=172, speciesId=172) — Gen 2. */
+/** Gen 5 Pichu (id=172, speciesId=172) - Gen 2. */
 const PICHU: ScopeLookupEntry = {
   id: 172,
   speciesId: 172,
@@ -90,7 +90,7 @@ const PICHU: ScopeLookupEntry = {
 // Empty scope
 // ---------------------------------------------------------------------------
 
-describe("scopeMatchesEntry — empty scope", () => {
+describe("scopeMatchesEntry - empty scope", () => {
   it("passes every entry when scope is completely empty", () => {
     expect(scopeMatchesEntry(BULBASAUR, EMPTY_SCOPE)).toBe(true);
     expect(scopeMatchesEntry(ALOLAN_RAICHU, EMPTY_SCOPE)).toBe(true);
@@ -102,7 +102,7 @@ describe("scopeMatchesEntry — empty scope", () => {
 // gens axis
 // ---------------------------------------------------------------------------
 
-describe("scopeMatchesEntry — gens axis", () => {
+describe("scopeMatchesEntry - gens axis", () => {
   const GEN1_SCOPE: PracticeScope = {
     gens: [1],
     types: [],
@@ -131,7 +131,7 @@ describe("scopeMatchesEntry — gens axis", () => {
 // types axis
 // ---------------------------------------------------------------------------
 
-describe("scopeMatchesEntry — types axis", () => {
+describe("scopeMatchesEntry - types axis", () => {
   const FIRE_SCOPE: PracticeScope = {
     gens: [],
     types: ["fire"],
@@ -166,7 +166,7 @@ describe("scopeMatchesEntry — types axis", () => {
 // presets axis
 // ---------------------------------------------------------------------------
 
-describe("scopeMatchesEntry — starters preset", () => {
+describe("scopeMatchesEntry - starters preset", () => {
   const STARTERS_SCOPE: PracticeScope = {
     gens: [],
     types: [],
@@ -184,7 +184,7 @@ describe("scopeMatchesEntry — starters preset", () => {
   });
 });
 
-describe("scopeMatchesEntry — legendaries preset", () => {
+describe("scopeMatchesEntry - legendaries preset", () => {
   const LEGENDARIES_SCOPE: PracticeScope = {
     gens: [],
     types: [],
@@ -202,7 +202,7 @@ describe("scopeMatchesEntry — legendaries preset", () => {
   });
 });
 
-describe("scopeMatchesEntry — incomplete-chains preset (skipped server-side)", () => {
+describe("scopeMatchesEntry - incomplete-chains preset (skipped server-side)", () => {
   const IC_SCOPE: PracticeScope = {
     gens: [],
     types: [],
@@ -215,7 +215,7 @@ describe("scopeMatchesEntry — incomplete-chains preset (skipped server-side)",
    * Deliberate server-side approximation: `incomplete-chains` requires
    * per-user card-review state (which species in a chain have been mastered)
    * that the daily-push route does not load. The safe posture is to treat the
-   * preset as "never matches" — meaning users with only this preset active
+   * preset as "never matches" - meaning users with only this preset active
    * will receive 0 cards from the `incomplete-chains` axis in their push
    * count. This intentionally under-counts rather than over-counts, avoiding
    * phantom notifications for cards the user would not actually be shown.
@@ -234,7 +234,7 @@ describe("scopeMatchesEntry — incomplete-chains preset (skipped server-side)",
 // games axis
 // ---------------------------------------------------------------------------
 
-describe("scopeMatchesEntry — games axis", () => {
+describe("scopeMatchesEntry - games axis", () => {
   const RED_BLUE_SCOPE: PracticeScope = {
     gens: [],
     types: [],
@@ -257,7 +257,7 @@ describe("scopeMatchesEntry — games axis", () => {
 // formCategories gate
 // ---------------------------------------------------------------------------
 
-describe("scopeMatchesEntry — formCategories gate", () => {
+describe("scopeMatchesEntry - formCategories gate", () => {
   it("default-only mode excludes alternate forms", () => {
     const scope: PracticeScope = {
       gens: [1],
@@ -266,9 +266,9 @@ describe("scopeMatchesEntry — formCategories gate", () => {
       formCategories: { mode: "default-only" },
       games: [],
     };
-    // Alolan Raichu is not a default form — excluded even though speciesId=26 is Gen 1
+    // Alolan Raichu is not a default form - excluded even though speciesId=26 is Gen 1
     expect(scopeMatchesEntry(ALOLAN_RAICHU, scope)).toBe(false);
-    // Pikachu is default — passes
+    // Pikachu is default - passes
     expect(scopeMatchesEntry(PIKACHU, scope)).toBe(true);
   });
 
@@ -280,7 +280,7 @@ describe("scopeMatchesEntry — formCategories gate", () => {
       formCategories: { mode: "include", categories: ["regional"] },
       games: [],
     };
-    // Charizard is a default form and is Fire — passes both form gate and type axis
+    // Charizard is a default form and is Fire - passes both form gate and type axis
     expect(scopeMatchesEntry(CHARIZARD, scope)).toBe(true);
   });
 
@@ -294,7 +294,7 @@ describe("scopeMatchesEntry — formCategories gate", () => {
     };
     // Alolan Raichu: formCategory=regional → passes the include gate.
     // presets=['starters'], Raichu (speciesId 26) is not a starter → false.
-    // But formCategories doesn't make the species match starters — it just
+    // But formCategories doesn't make the species match starters - it just
     // doesn't exclude it from the form gate. The OR axes still need a hit.
     expect(scopeMatchesEntry(ALOLAN_RAICHU, scope)).toBe(false);
   });
@@ -349,7 +349,7 @@ describe("scopeMatchesEntry — formCategories gate", () => {
 // OR logic across axes
 // ---------------------------------------------------------------------------
 
-describe("scopeMatchesEntry — OR logic across axes", () => {
+describe("scopeMatchesEntry - OR logic across axes", () => {
   it("passes when only the types axis matches (gens does not)", () => {
     // Mewtwo is Gen 1 Psychic; scope is Gen 5 + Psychic
     const scope: PracticeScope = {
@@ -382,7 +382,7 @@ describe("scopeMatchesEntry — OR logic across axes", () => {
       formCategories: { mode: "all" },
       games: [],
     };
-    // Mewtwo is Gen 1 Psychic — neither Gen 5 nor Water
+    // Mewtwo is Gen 1 Psychic - neither Gen 5 nor Water
     expect(scopeMatchesEntry(MEWTWO, scope)).toBe(false);
   });
 });

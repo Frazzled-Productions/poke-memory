@@ -60,7 +60,7 @@ export function pickMcDistractors(
 
 /**
  * Produces all 4 option entries (correct + 3 distractors) in a shuffled order.
- * The shuffle is deterministic given the same `seed` — stable across re-renders.
+ * The shuffle is deterministic given the same `seed` - stable across re-renders.
  *
  * Returns an array of `{ pokemon, isCorrect }` tuples ready to map into buttons.
  */
@@ -80,7 +80,7 @@ export function buildMcOptions(
   // Shuffle the four options deterministically so the correct answer is not
   // always in the first position. Use a separate hash pass keyed on "options"
   // so the shuffle differs from the distractor-selection hash. Only 4 distinct
-  // FNV inputs (idx 0–3) are needed here — the narrow range is intentional and
+  // FNV inputs (idx 0–3) are needed here - the narrow range is intentional and
   // the keys are distinct by construction (unique idx values).
   const optionSeedHash = fnv1a("options:" + seed + String(targetId));
   return all

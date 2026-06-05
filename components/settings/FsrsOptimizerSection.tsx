@@ -12,7 +12,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 type CooldownState = { optimizedAt: string; daysRemaining: number };
 
 /**
- * Pure given a `nowMs` reference time — the caller captures `Date.now()` once
+ * Pure given a `nowMs` reference time - the caller captures `Date.now()` once
  * (in a lazy `useState` initialiser) so the render body itself stays
  * deterministic.
  */
@@ -38,7 +38,7 @@ type Props = {
   optimizableReviewCount: number;
   /** True when the user is signed in. */
   isSignedIn: boolean;
-  /** True when any superuser flag is on — disabled while superuser is active. */
+  /** True when any superuser flag is on - disabled while superuser is active. */
   superuserPaused: boolean;
   /** Called after a successful optimization with the updated optimizedAt timestamp. */
   onOptimized: (optimizedAt: string, weights: number[]) => void;
@@ -55,7 +55,7 @@ export function FsrsOptimizerSection({
   const [optimizerState, setOptimizerState] = useState<OptimizerState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // Capture the current time once at mount. The lazy initialiser runs outside
-  // the render pass, so the render body stays pure — the cooldown is a
+  // the render pass, so the render body stays pure - the cooldown is a
   // coarse day-granularity countdown, so a snapshot at mount is accurate
   // enough without a ticking timer.
   const [nowMs] = useState(() => Date.now());
@@ -91,7 +91,7 @@ export function FsrsOptimizerSection({
               : "Sync your reviews first, then try again.",
           );
         } else if (res.status === 422 && errorCode === "degenerate_data") {
-          // The native binding rejected the data distribution — reviews exist
+          // The native binding rejected the data distribution - reviews exist
           // but aren't spread enough for the optimiser yet.
           const count = body?.reviewCount;
           setErrorMsg(
@@ -112,13 +112,13 @@ export function FsrsOptimizerSection({
         } else if (errorCode === "save_failed") {
           setErrorMsg("Optimisation succeeded but couldn't be saved. Try again.");
         } else if (errorCode === "unknown") {
-          // The server returned a structured unknown error — surface the status
+          // The server returned a structured unknown error - surface the status
           // code so the next opaque failure can be diagnosed from a screenshot.
           setErrorMsg(
             `Couldn't optimise (HTTP ${res.status}). Please file an issue.`,
           );
         } else {
-          // Unexpected error code or missing body — include status for diagnosability.
+          // Unexpected error code or missing body - include status for diagnosability.
           setErrorMsg(
             `Couldn't optimise (HTTP ${res.status}). Try again later.`,
           );
@@ -142,7 +142,7 @@ export function FsrsOptimizerSection({
       onOptimized(data.optimizedAt, data.weights);
     } catch {
       setOptimizerState("error");
-      // Network-level failure (fetch threw — no HTTP response available).
+      // Network-level failure (fetch threw - no HTTP response available).
       setErrorMsg("Couldn't reach the server. Check your connection and try again.");
     }
   }
@@ -165,7 +165,7 @@ export function FsrsOptimizerSection({
             Sign in to enable personalized scheduling.
           </p>
         ) : superuserPaused ? (
-          /* Superuser flag(s) on — paused style */
+          /* Superuser flag(s) on - paused style */
           <div className={colStack}>
             <p className="text-sm text-foreground">
               Tune scheduling to your memory using your full review history.
@@ -202,7 +202,7 @@ export function FsrsOptimizerSection({
             </p>
           </div>
         ) : cooldown !== null ? (
-          /* Cooldown active — show when next optimization is available */
+          /* Cooldown active - show when next optimization is available */
           <div className={colStack}>
             <p className="text-sm text-foreground">
               Tune scheduling to your memory using your full review history.

@@ -10,7 +10,7 @@
 // The Pokémon-name locale is independent of the app UI locale (#1260 follow-up).
 // It is read from `UserSettings.pokemonNameLocale` (localStorage) via
 // `PokemonLocaleContext` rather than calling `loadSettings()` directly. This
-// means all N call sites on a page share one subscription instead of N — the
+// means all N call sites on a page share one subscription instead of N - the
 // structural fix for the hydration timeout on WebKit CI (#1329).
 
 import { useEffect, useState } from "react";
@@ -37,11 +37,11 @@ export type LocalePokemonName = {
  * whole tree.  Each call site costs one `useContext` read per render rather
  * than one `loadSettings()` call + two event-listener registrations.
  *
- * The hook's external API is unchanged — existing call sites continue to work
+ * The hook's external API is unchanged - existing call sites continue to work
  * without modification.
  *
  * @param speciesId  PokéAPI species ID (matches SeedPokemon.speciesId).
- * @param englishName  The English name — used immediately and as a fallback.
+ * @param englishName  The English name - used immediately and as a fallback.
  *
  * Returns synchronously on first render (English name, no transliteration),
  * then updates once the locale-names sidecar resolves.
@@ -50,7 +50,7 @@ export function useLocalePokemonName(
   speciesId: number | undefined,
   englishName: string,
 ): LocalePokemonName {
-  // O(1) context read — the subscription is owned by PokemonLocaleProvider.
+  // O(1) context read - the subscription is owned by PokemonLocaleProvider.
   const { locale } = usePokemonLocaleContext();
 
   const [localeName, setLocaleName] = useState<LocalePokemonName>({

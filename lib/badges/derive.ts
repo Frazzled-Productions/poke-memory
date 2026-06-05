@@ -15,7 +15,7 @@ const REVERSE_ID_OFFSET = 2_000_000;
  * Since #1259, mastery is scoped to `locale` (defaults to `"en"` for
  * backward-compatibility). Only cards whose `locale` matches are counted.
  *
- * Badges are locale-agnostic at award time — once earned, always earned.
+ * Badges are locale-agnostic at award time - once earned, always earned.
  * The `locale` parameter scopes which cards count toward earning a badge,
  * so a user can earn mastery badges in English and keep them when switching
  * to Japanese. The Journey page passes the current locale so progress toward

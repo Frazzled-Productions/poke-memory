@@ -3,7 +3,7 @@ import { BiomeSky } from "./BiomeSky";
 import { BiomeFloor } from "./BiomeFloor";
 
 /**
- * Cave habitat backdrop — dark rock interior with stalactites overhead,
+ * Cave habitat backdrop - dark rock interior with stalactites overhead,
  * stalagmites underfoot, glowing crystal clusters, and a small dim pool.
  * Anchor bands cluster sprites on the cavern floor with one row further
  * back near the crystal hollow.
@@ -49,7 +49,7 @@ export function CaveBiome() {
       {/* Crystal hollow glow */}
       <ellipse cx="800" cy="220" rx="380" ry="160" fill="url(#cave-crystal-glow)" />
 
-      {/* Stalactites — hanging from ceiling */}
+      {/* Stalactites - hanging from ceiling */}
       <g fill="#3a3445" stroke="#15121e" strokeWidth="1.5">
         <polygon points="80,0 100,80 120,0" />
         <polygon points="170,0 188,60 206,0" />
@@ -74,7 +74,7 @@ export function CaveBiome() {
         <polygon points="1266,0 1280,40 1294,0" />
       </g>
 
-      {/* Crystal clusters — back-left */}
+      {/* Crystal clusters - back-left */}
       <g>
         <polygon points="260,440 250,490 290,490 280,440" fill="#9b6cff" stroke="#5a3eff" strokeWidth="2" />
         <polygon points="280,440 270,500 310,500 300,440" fill="#b89bff" stroke="#5a3eff" strokeWidth="2" />
@@ -83,7 +83,7 @@ export function CaveBiome() {
         <ellipse cx="285" cy="490" rx="60" ry="10" fill="#b08aff" opacity="0.35" />
       </g>
 
-      {/* Crystal clusters — center-back (around hollow) */}
+      {/* Crystal clusters - center-back (around hollow) */}
       <g>
         <polygon points="760,400 750,460 790,460 780,400" fill="#7ddfff" stroke="#3aa8d0" strokeWidth="2" />
         <polygon points="780,400 770,470 815,470 805,400" fill="#a6e8ff" stroke="#3aa8d0" strokeWidth="2" />
@@ -91,7 +91,7 @@ export function CaveBiome() {
         <ellipse cx="788" cy="470" rx="70" ry="10" fill="#7dd5ff" opacity="0.35" />
       </g>
 
-      {/* Crystal clusters — right */}
+      {/* Crystal clusters - right */}
       <g>
         <polygon points="1300,420 1290,490 1330,490 1320,420" fill="#ff8edc" stroke="#a23e8e" strokeWidth="2" />
         <polygon points="1320,420 1310,500 1355,500 1345,420" fill="#ffaae0" stroke="#a23e8e" strokeWidth="2" />
@@ -107,7 +107,7 @@ export function CaveBiome() {
         strokeOpacity={0.7}
       />
 
-      {/* Dim pool — front-left */}
+      {/* Dim pool - front-left */}
       <g>
         <ellipse cx="220" cy="568" rx="140" ry="14" fill="#0a0814" opacity="0.5" />
         <ellipse cx="220" cy="564" rx="135" ry="11" fill="url(#cave-pool)" />
@@ -115,7 +115,7 @@ export function CaveBiome() {
         <ellipse cx="180" cy="561" rx="20" ry="2" fill="#7dd5ff" opacity="0.5" />
       </g>
 
-      {/* Stalagmites — rising from floor */}
+      {/* Stalagmites - rising from floor */}
       <g fill="#3a3445" stroke="#0a0814" strokeWidth="1.5">
         <polygon points="420,560 432,490 444,560" />
         <polygon points="480,565 490,520 500,565" />

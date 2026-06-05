@@ -13,7 +13,7 @@ import { REVERSE_ID_OFFSET, masteredReverseCard } from "./helpers/mastery";
 // prevent BottomTabBar from rendering on mobile-safari tests and make the
 // Pasture link permanently invisible in the `"Mobile tab navigation"` landmark.
 // `addOnboardingPreDismiss` only seeds `mobileNav` when the settings key is
-// absent entirely — it does not force the value when the key already exists.
+// absent entirely - it does not force the value when the key already exists.
 test.beforeEach(async ({ page }) => {
   // Merge `mobileNav: "bottom"` into settings regardless of prior state.
   await page.addInitScript(() => {
@@ -106,7 +106,7 @@ function buildSession(cards: any[]) {
 
 test.describe("Pasture nav guard", () => {
   test("Pasture link is absent when no mastered cards", async ({ page }) => {
-    // Fresh session — no cards at all.
+    // Fresh session - no cards at all.
     await seedSessionIdb(page, { cards: [], limits: { name: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 }, reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 } } });
 
     await page.goto("/");
@@ -121,7 +121,7 @@ test.describe("Pasture nav guard", () => {
     page,
   }, testInfo) => {
     // Caterpie is in the Forest habitat. reps=4, scheduledDays=28 → mastered.
-    // Pair with a mastered reverse card — filterMastered requires both legs (#1234).
+    // Pair with a mastered reverse card - filterMastered requires both legs (#1234).
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
       masteredReverseCard(10),
@@ -132,7 +132,7 @@ test.describe("Pasture nav guard", () => {
 
     // Reload after the IDB seed commits so the BottomTabBar's mastery-check
     // useEffect runs against committed data. BottomTabBar (and NavDrawer) no
-    // longer subscribe to `poke-memory:session-changed` — they read the
+    // longer subscribe to `poke-memory:session-changed` - they read the
     // KEY_HAS_MASTERED localStorage flag on mount instead. The reload is the
     // reliable trigger here; it ensures the flag is visible to both components
     // on their initial mount. If a future E2E test needs Pasture-tab visibility
@@ -157,12 +157,12 @@ test.describe("Pasture nav guard", () => {
   });
 });
 
-test.describe("Pasture page — with mastered cards", () => {
+test.describe("Pasture page - with mastered cards", () => {
   test.beforeEach(async ({ page }) => {
     // Seed two mastered cards from different habitats so at least two zones render.
     // Caterpie: forest → "Forest" zone
     // Tentacool: sea   → "Open Sea" zone
-    // Pair each name card with a mastered reverse card — filterMastered requires
+    // Pair each name card with a mastered reverse card - filterMastered requires
     // both legs since #1234.
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
@@ -207,12 +207,12 @@ test.describe("Pasture page — with mastered cards", () => {
   });
 });
 
-test.describe("Pasture page — sparkle clears on tap", () => {
+test.describe("Pasture page - sparkle clears on tap", () => {
   test("tapping a new-arrival sprite clears its sparkle and persists to IndexedDB", async ({
     page,
   }) => {
     // Seed exactly one mastered card with seenInPasture = false (new arrival).
-    // Pair with a mastered reverse card — filterMastered requires both legs (#1234).
+    // Pair with a mastered reverse card - filterMastered requires both legs (#1234).
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest", false),
       masteredReverseCard(10),
@@ -237,7 +237,7 @@ test.describe("Pasture page — sparkle clears on tap", () => {
       el.scrollIntoView({ block: "center", inline: "center" }),
     );
     // `force: true` bypasses Playwright's actionability "stability" check, which
-    // can time out when the CSS bob animation continuously moves the img child —
+    // can time out when the CSS bob animation continuously moves the img child - 
     // the button element itself is stable but Playwright's heuristic sees motion.
     await spriteBtn.click({ force: true });
 
@@ -282,7 +282,7 @@ test.describe("Pasture page — sparkle clears on tap", () => {
   });
 });
 
-test.describe("Pasture page — idle behaviour", () => {
+test.describe("Pasture page - idle behaviour", () => {
   test.beforeEach(async ({ page }) => {
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
@@ -300,7 +300,7 @@ test.describe("Pasture page — idle behaviour", () => {
     // production, but we can locate it via the aria region).
     const region = page.getByRole("region", { name: "Forest zone" });
     await expect(region).toBeVisible();
-    // The div inside the section is the zone container — verify it exists.
+    // The div inside the section is the zone container - verify it exists.
     const zoneContainer = region.locator("div").first();
     await expect(zoneContainer).toBeVisible();
   });
@@ -309,7 +309,7 @@ test.describe("Pasture page — idle behaviour", () => {
     await page.goto("/pasture");
     await awaitSeedIdb(page);
 
-    // useIdleBehaviour queries [data-sprite-id] elements — verify they exist.
+    // useIdleBehaviour queries [data-sprite-id] elements - verify they exist.
     const spriteWrappers = page.locator("[data-sprite-id]");
     await expect(spriteWrappers.first()).toBeVisible();
     // Both seeded sprites should be present.
@@ -331,7 +331,7 @@ test.describe("Pasture page — idle behaviour", () => {
     await page.goto("/pasture");
     await awaitSeedIdb(page);
 
-    // Sprites must still be visible — just static (no motion).
+    // Sprites must still be visible - just static (no motion).
     await expect(
       page.getByRole("button", { name: /Caterpie/ }),
     ).toBeVisible();
@@ -340,7 +340,7 @@ test.describe("Pasture page — idle behaviour", () => {
   });
 });
 
-test.describe("Pasture page — name search", () => {
+test.describe("Pasture page - name search", () => {
   test.beforeEach(async ({ page }) => {
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
@@ -389,7 +389,7 @@ test.describe("Pasture page — name search", () => {
   });
 });
 
-test.describe("Pasture page — biome landscape view", () => {
+test.describe("Pasture page - biome landscape view", () => {
   test.beforeEach(async ({ page }) => {
     await seedSessionIdb(page, buildSession([
       masteredCard(10, "Caterpie", "forest"),
@@ -409,7 +409,7 @@ test.describe("Pasture page — biome landscape view", () => {
       forestSection.getByRole("link", { name: /View Forest in landscape/i }),
     ).toBeVisible();
 
-    // The Open Sea zone should also have a "Landscape" link — the aria-label
+    // The Open Sea zone should also have a "Landscape" link - the aria-label
     // uses "View … in landscape" to avoid the double-word "Open Open Sea".
     const seaSection = page.getByRole("region", { name: "Open Sea zone" });
     await expect(
@@ -441,7 +441,7 @@ test.describe("Pasture page — biome landscape view", () => {
     await page.goto("/pasture/forest");
     await awaitSeedIdb(page);
 
-    // Caterpie is in the forest habitat — its sprite button should be visible.
+    // Caterpie is in the forest habitat - its sprite button should be visible.
     await expect(page.getByRole("button", { name: /Caterpie/ })).toBeVisible();
   });
 
@@ -461,7 +461,7 @@ test.describe("Pasture page — biome landscape view", () => {
 
   test("unknown biome slug shows the not-found page", async ({ page }) => {
     // With cacheComponents: true the /pasture/[biome] route is a Partial
-    // Prerender (PPR) — the static shell is streamed with HTTP 200 before the
+    // Prerender (PPR) - the static shell is streamed with HTTP 200 before the
     // dynamic segment runs notFound(). The HTTP status will therefore always be
     // 200, so we assert on the rendered UI instead of the status code.
     await page.goto("/pasture/not-a-real-biome");
@@ -477,7 +477,7 @@ test.describe("Pasture page — biome landscape view", () => {
   });
 });
 
-test.describe("Pasture — biome landscape view with pretendAllMastered", () => {
+test.describe("Pasture - biome landscape view with pretendAllMastered", () => {
   /**
    * Seeds localStorage so SuperuserContext boots with the pretendAllMastered
    * flag active. Mirrors the approach used in e2e/superuser.spec.ts.
@@ -499,7 +499,7 @@ test.describe("Pasture — biome landscape view with pretendAllMastered", () => 
   }) => {
     await seedSuperuserAllMastered(page);
 
-    // Navigate directly to a known biome — the synthesised collection includes
+    // Navigate directly to a known biome - the synthesised collection includes
     // every species, so the forest biome should be populated.
     await page.goto("/pasture/forest");
 
@@ -521,7 +521,7 @@ test.describe("Pasture — biome landscape view with pretendAllMastered", () => 
   });
 });
 
-test.describe("Pasture page — biome stats (#623)", () => {
+test.describe("Pasture page - biome stats (#623)", () => {
   test.beforeEach(async ({ page }) => {
     // Two forest name cards with paired reverse cards so the stats strip
     // appears for the Forest zone. filterMastered requires both legs (#1234).
@@ -542,7 +542,7 @@ test.describe("Pasture page — biome stats (#623)", () => {
     const forestZone = page.getByRole("region", { name: "Forest zone" });
     await expect(forestZone).toBeVisible();
 
-    // The stats strip contains a percentage sign — confirm it is rendered.
+    // The stats strip contains a percentage sign - confirm it is rendered.
     await expect(forestZone.getByText(/%/)).toBeVisible();
   });
 
@@ -586,7 +586,7 @@ test.describe("Pasture page — biome stats (#623)", () => {
   });
 });
 
-test.describe("Pasture page — empty state", () => {
+test.describe("Pasture page - empty state", () => {
   test("visiting /pasture directly with no mastered cards shows friendly empty state", async ({
     page,
   }) => {
@@ -615,7 +615,7 @@ test.describe("Pasture page — empty state", () => {
   });
 });
 
-test.describe("Pasture page — reacts to clearLocalProgress storage event", () => {
+test.describe("Pasture page - reacts to clearLocalProgress storage event", () => {
   test("clearing IDB and dispatching the synthetic storage event re-renders the empty state", async ({
     page,
   }) => {
@@ -653,7 +653,7 @@ test.describe("Pasture page — reacts to clearLocalProgress storage event", () 
     });
 
     // Without storageVersion in the load useEffect deps, this assertion would
-    // fail — the page would still show Caterpie until a manual reload.
+    // fail - the page would still show Caterpie until a manual reload.
     await expect(
       page.getByText(/master your first Pokémon/i),
     ).toBeVisible({ timeout: 5_000 });
@@ -667,7 +667,7 @@ test.describe("Pasture page — reacts to clearLocalProgress storage event", () 
 // Pasture filter strip (type + generation)
 // ---------------------------------------------------------------------------
 
-test.describe("Pasture page — type filter", () => {
+test.describe("Pasture page - type filter", () => {
   // Seed three Pokémon with distinct types for filtering:
   //   Caterpie   (id=10,  Bug,   Gen I,  forest)
   //   Charmander (id=4,   Fire,  Gen I,  mountain)
@@ -741,14 +741,14 @@ test.describe("Pasture page — type filter", () => {
     await awaitSeedIdb(page);
 
     const typeGroup = page.getByRole("group", { name: "Filter by type" });
-    // Select "Dragon" — none of the seeded cards are Dragon type
+    // Select "Dragon" - none of the seeded cards are Dragon type
     await typeGroup.getByRole("button", { name: "Dragon" }).click();
 
     await expect(page.getByText(/No Pokémon match your filters/i)).toBeVisible();
   });
 });
 
-test.describe("Pasture page — generation filter", () => {
+test.describe("Pasture page - generation filter", () => {
   test.beforeEach(async ({ page }) => {
     await seedSessionIdb(
       page,
@@ -789,12 +789,12 @@ test.describe("Pasture page — generation filter", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Pasture page — "Next arrivals" strip (#1316)
+// Pasture page - "Next arrivals" strip (#1316)
 // ---------------------------------------------------------------------------
 
 /**
  * A seen (reviewed) but not-yet-mastered name card in the FSRS session shape.
- * reps=2, scheduledDays=10 — below the mastery gate (reps >= 3, scheduledDays >= 21).
+ * reps=2, scheduledDays=10 - below the mastery gate (reps >= 3, scheduledDays >= 21).
  */
 function reviewedCard(id: number, name: string, habitat: string) {
   return {
@@ -826,11 +826,11 @@ function reviewedCard(id: number, name: string, habitat: string) {
 // Long-press discovery hint (#1572)
 // ---------------------------------------------------------------------------
 
-test.describe("Pasture page — long-press discovery hint (#1572)", () => {
+test.describe("Pasture page - long-press discovery hint (#1572)", () => {
   test("hint renders on first Pasture visit (empty state, fresh session)", async ({
     page,
   }) => {
-    // Fresh session — no mastered cards. Hint flag is absent → hint shows.
+    // Fresh session - no mastered cards. Hint flag is absent → hint shows.
     await seedSessionIdb(page, {
       cards: [],
       limits: {
@@ -908,7 +908,7 @@ test.describe("Pasture page — long-press discovery hint (#1572)", () => {
   });
 
   test("dismiss button persists the flag and hides the hint", async ({ page }) => {
-    // Fresh session — hint shows; user taps the dismiss (×) button.
+    // Fresh session - hint shows; user taps the dismiss (×) button.
     await seedSessionIdb(page, {
       cards: [],
       limits: {
@@ -949,7 +949,7 @@ test.describe("Pasture page — long-press discovery hint (#1572)", () => {
   });
 });
 
-test.describe("Pasture page — Next arrivals strip (#1316)", () => {
+test.describe("Pasture page - Next arrivals strip (#1316)", () => {
   test("strip renders with species that are reviewed but not yet mastered", async ({
     page,
   }) => {
@@ -959,10 +959,10 @@ test.describe("Pasture page — Next arrivals strip (#1316)", () => {
     await seedSessionIdb(
       page,
       buildSession([
-        // Mastered pair — needed so the page is not in the empty state
+        // Mastered pair - needed so the page is not in the empty state
         masteredCard(10, "Caterpie", "forest"),
         masteredReverseCard(10),
-        // Reviewed but not mastered — should appear in the strip
+        // Reviewed but not mastered - should appear in the strip
         reviewedCard(1, "Bulbasaur", "grassland"),
         reviewedCard(4, "Charmander", "mountain"),
       ]),
@@ -990,7 +990,7 @@ test.describe("Pasture page — Next arrivals strip (#1316)", () => {
   test("strip shows all-caught-up message when all reviewed species are mastered", async ({
     page,
   }) => {
-    // Seed only fully mastered species — no arrivals remain.
+    // Seed only fully mastered species - no arrivals remain.
     await seedSessionIdb(
       page,
       buildSession([
@@ -1008,6 +1008,31 @@ test.describe("Pasture page — Next arrivals strip (#1316)", () => {
 
     await expect(
       page.getByText(/All reviewed Pokémon are already in your Pasture/i),
+    ).toBeVisible();
+  });
+
+  test("reps InfoButton is visible and reveals its panel on click", async ({
+    page,
+  }) => {
+    await seedSessionIdb(
+      page,
+      buildSession([
+        masteredCard(10, "Caterpie", "forest"),
+        masteredReverseCard(10),
+        reviewedCard(1, "Bulbasaur", "grassland"),
+      ]),
+    );
+
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    const infoBtn = page.getByRole("button", { name: "What does reps mean?" });
+    await expect(infoBtn).toBeVisible();
+
+    await infoBtn.click();
+
+    await expect(
+      page.getByText(/how many times you have reviewed this card/i),
     ).toBeVisible();
   });
 });

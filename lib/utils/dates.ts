@@ -1,5 +1,5 @@
 /**
- * Shared date helpers for "YYYY-MM-DD" strings — the canonical date format
+ * Shared date helpers for "YYYY-MM-DD" strings - the canonical date format
  * across persisted SRS state (per AGENTS.md). String-comparable, no
  * timezone math.
  *
@@ -25,7 +25,7 @@ export function daysBetweenIsoDates(fromIso: string, toIso: string): number {
 
 /**
  * Returns `date + days` formatted as YYYY-MM-DD. Negative `days` shifts
- * backward. UTC math throughout — the result is independent of the
+ * backward. UTC math throughout - the result is independent of the
  * caller's timezone.
  */
 export function addDaysToIsoDate(date: string, days: number): string {

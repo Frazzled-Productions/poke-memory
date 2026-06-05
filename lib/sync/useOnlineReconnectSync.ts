@@ -22,7 +22,7 @@ import { SW_REPLAY_MESSAGE } from "@/lib/sync/backgroundSync";
  * pull-then-push catch-up when the device reconnects.
  *
  * Ordering (respects the pull-before-push invariant from docs/sync.md):
- *   1. `pullAndMerge` — brings local state up to date with cloud.
+ *   1. `pullAndMerge` - brings local state up to date with cloud.
  *   2. Push any cards that failed the per-grade path while offline.
  *
  * Card selection and success semantics mirror `useRetryPush` exactly (#893):
@@ -33,7 +33,7 @@ import { SW_REPLAY_MESSAGE } from "@/lib/sync/backgroundSync";
  *     reviewed cards when the today-filter is empty).
  *   - `failedCardCount` null → push all reviewed cards.
  * On PARTIAL success (some cards failed), `lastPushFailed` is kept `true` so
- * the retry banner remains visible — `markPushSucceeded` is only called when
+ * the retry banner remains visible - `markPushSucceeded` is only called when
  * every card push succeeded.
  *
  * The call site is responsible for passing `client=null` / `userId=null` when
@@ -76,12 +76,12 @@ export function useOnlineReconnectSync(
       try {
         // Reset the session-scoped structural-error probe guard (#1358 FIX 3).
         // The 'online' event signals that connectivity was lost and has now
-        // returned — a deploy fix is more likely to have landed during the
+        // returned - a deploy fix is more likely to have landed during the
         // outage than during continuous operation. Resetting the guard lets the
         // next drainQueue attempt serve as a fresh self-heal probe.
         resetStructuralProbe();
 
-        // Step 1: Pull-before-push — bring local state up to date. If pull
+        // Step 1: Pull-before-push - bring local state up to date. If pull
         // fails, abort: pushing without knowing cloud state risks clobbering
         // cloud progress (the exact failure mode of incident #293).
         const pullResult = await pullAndMerge(c, uid);
@@ -124,7 +124,7 @@ export function useOnlineReconnectSync(
             savePendingQueue(failedCards);
             console.warn("[online-reconnect] some persisted-queue cards failed to push; will retry on next grade or reconnect");
           } else {
-            // All persisted-queue cards succeeded — clear both the failure signal
+            // All persisted-queue cards succeeded - clear both the failure signal
             // and the persisted queue so stale data does not accumulate.
             markPushSucceeded();
             clearPendingQueue();
@@ -139,7 +139,7 @@ export function useOnlineReconnectSync(
         );
 
         if (status.failedCardCount === 0) {
-          // failedCardCount is explicitly 0 — nothing to re-push.
+          // failedCardCount is explicitly 0 - nothing to re-push.
           return;
         }
 
@@ -174,11 +174,11 @@ export function useOnlineReconnectSync(
           // in the cloud).
           console.warn("[online-reconnect] some cards failed to push after reconnect; will retry on next grade or page reload");
         } else {
-          // All cards succeeded — safe to clear the failure signal.
+          // All cards succeeded - safe to clear the failure signal.
           markPushSucceeded();
         }
       } catch (err) {
-        // Best-effort — never surface as a user-visible sync error.
+        // Best-effort - never surface as a user-visible sync error.
         console.warn("[online-reconnect] unexpected error during reconnect catch-up", err);
       } finally {
         runningRef.current = false;
@@ -191,7 +191,7 @@ export function useOnlineReconnectSync(
     // deciding whether to fall through to the direct-push path. This hook
     // replies on the transferred port immediately (ACK = "I'm handling it") and
     // then runs the pull-push sequence. If the reply races the SW timeout, the
-    // SW may push directly in parallel — the upsert is idempotent so that is
+    // SW may push directly in parallel - the upsert is idempotent so that is
     // safe (#1072 B3).
     function handleSwMessage(event: MessageEvent<unknown>) {
       const data = event.data as Record<string, unknown> | null;
@@ -210,7 +210,7 @@ export function useOnlineReconnectSync(
 
     window.addEventListener("online", handleOnline);
     // Capture the serviceWorker reference at registration time so the cleanup
-    // closure uses the same object — the property may become undefined later in
+    // closure uses the same object - the property may become undefined later in
     // tests (afterEach teardown) before cleanup runs.
     const swContainer =
       typeof navigator !== "undefined" && "serviceWorker" in navigator
@@ -225,5 +225,5 @@ export function useOnlineReconnectSync(
         swContainer.removeEventListener("message", handleSwMessage);
       }
     };
-  }, []); // empty deps — handler always reads from refs
+  }, []); // empty deps - handler always reads from refs
 }

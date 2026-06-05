@@ -109,8 +109,8 @@ describe("computeGradeTrend", () => {
 
     it("returns an empty array when all entries are in the current week", () => {
       // today = 2026-05-12 (Tue); currentWeekStart = 2026-05-11 (Mon).
-      // All grades are in the current in-progress week — excluded from the
-      // window — so no complete weeks have data.
+      // All grades are in the current in-progress week - excluded from the
+      // window - so no complete weeks have data.
       const log: GradeLog = [
         entry(4, "2026-05-11"),
         entry(5, "2026-05-12"),
@@ -121,7 +121,7 @@ describe("computeGradeTrend", () => {
 
     it("returns only the weeks from the first active week onward", () => {
       // today = 2026-05-12 (Tue); 12-week window starts 2026-02-16.
-      // Only the last slot (2026-05-04) has data — 11 leading zero weeks
+      // Only the last slot (2026-05-04) has data - 11 leading zero weeks
       // are trimmed, leaving exactly 1 point.
       const log: GradeLog = [entry(4, "2026-05-04")];
       const points = computeGradeTrend(log, "2026-05-12", 12);
@@ -132,7 +132,7 @@ describe("computeGradeTrend", () => {
 
     it("preserves trailing zero weeks after the first active week", () => {
       // today = 2026-05-12; weeks=4 covers 2026-04-13, 2026-04-20, 2026-04-27,
-      // 2026-05-04. Put data only in the first slot — three trailing zero weeks
+      // 2026-05-04. Put data only in the first slot - three trailing zero weeks
       // should remain, giving 4 points total.
       const log: GradeLog = [entry(1, "2026-04-13")];
       const points = computeGradeTrend(log, "2026-05-12", 4);
@@ -146,7 +146,7 @@ describe("computeGradeTrend", () => {
     });
 
     it("returns all weeks when data starts in the oldest slot", () => {
-      // 12-week window, data in the first slot — no leading zeros to trim.
+      // 12-week window, data in the first slot - no leading zeros to trim.
       // today = 2026-05-12; oldest slot = 2026-02-16.
       const log: GradeLog = [entry(5, "2026-02-16")];
       const points = computeGradeTrend(log, "2026-05-12", 12);
@@ -167,7 +167,7 @@ describe("computeGradeTrend", () => {
   });
 
   it("buckets entries into the correct week", () => {
-    // 2026-05-12 is a Tuesday — currentWeekStart = 2026-05-11 (Monday).
+    // 2026-05-12 is a Tuesday - currentWeekStart = 2026-05-11 (Monday).
     // With weeks=4 the window covers 2026-04-13 through 2026-05-04 (inclusive);
     // the current in-progress week (2026-05-11) is excluded.
     const log: GradeLog = [
@@ -195,9 +195,9 @@ describe("computeGradeTrend", () => {
     // The current in-progress week (2026-05-11) is outside the window.
     // An entry from 2026-01-01 is also out of window.
     const log: GradeLog = [
-      entry(4, "2026-01-01"),   // before window — dropped
-      entry(4, "2026-05-12"),   // current week (excluded) — dropped
-      entry(4, "2026-05-04"),   // last slot in window — counted
+      entry(4, "2026-01-01"),   // before window - dropped
+      entry(4, "2026-05-12"),   // current week (excluded) - dropped
+      entry(4, "2026-05-04"),   // last slot in window - counted
     ];
     const points = computeGradeTrend(log, "2026-05-12", 12);
     const total = points.reduce((s, p) => s + p.total, 0);
@@ -217,7 +217,7 @@ describe("computeGradeTrend", () => {
   });
 
   it("total per point equals sum of the four grade buckets", () => {
-    // Use 2026-05-04 — within the 4-week window for today=2026-05-12.
+    // Use 2026-05-04 - within the 4-week window for today=2026-05-12.
     const log: GradeLog = [
       entry(1, "2026-05-04"),
       entry(2, "2026-05-04"),

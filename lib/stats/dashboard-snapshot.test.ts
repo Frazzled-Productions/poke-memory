@@ -148,7 +148,7 @@ function makeSettings(overrides: Partial<EligibilitySettings> = {}): Eligibility
 
 /**
  * A minimal evolution card fixture. The IDs (preEvoId=1, postEvoId=2) are kept
- * out of the name-card speciesId space so generation lookups still work — both
+ * out of the name-card speciesId space so generation lookups still work - both
  * are Gen I (1..151).
  */
 function makeEvoCard(
@@ -239,7 +239,7 @@ describe("queue axis", () => {
       newCard(2),
       learningCard(10, "2026-05-18"),
       learningCard(11, "2026-05-17"),
-      // already reviewed today — excluded
+      // already reviewed today - excluded
       makeCard(20, { lastReview: TODAY, dueDate: TODAY, firstSeen: "2026-05-01", reps: 1, scheduledDays: 1, fsrsState: "review" }),
     ];
     const settings = makeSettings();
@@ -261,13 +261,13 @@ describe("queue axis", () => {
     expect(snapshot.queue).toBeNull();
   });
 
-  it("respects scope filter — Gen I only excludes Gen II+ cards", () => {
+  it("respects scope filter - Gen I only excludes Gen II+ cards", () => {
     const genIScope = { ...EMPTY_SCOPE, gens: [1] };
     const settings = makeSettings({ practiceScope: genIScope });
     const cards: ReviewableCard[] = [
       newCard(1),   // Gen I
       newCard(4),   // Gen I
-      // Gen II (id 152 → species 152 → Gen II) — excluded by scope
+      // Gen II (id 152 → species 152 → Gen II) - excluded by scope
       makeCard(152, { lastReview: "2026-05-18", dueDate: TODAY, firstSeen: "2026-05-01", reps: 1, scheduledDays: 1, fsrsState: "review" }),
     ];
     const snapshot = computeDashboardSnapshot(cards, settings, DEFAULT_LIMITS, TODAY, {
@@ -393,7 +393,7 @@ describe("forecast axis", () => {
   });
 
   it("today bar is 0 when no cards are due or new", () => {
-    // A single mastered card that's not due today — nothing in queue
+    // A single mastered card that's not due today - nothing in queue
     const cards: ReviewableCard[] = [
       makeCard(1, { lastReview: "2026-04-01", firstSeen: "2026-01-01", reps: 5, scheduledDays: 30, dueDate: "2026-06-01", fsrsState: "review" }),
     ];
@@ -452,10 +452,10 @@ describe("forecast axis", () => {
 });
 
 // ---------------------------------------------------------------------------
-// forecast axis — all card types (#1138)
+// forecast axis - all card types (#1138)
 // ---------------------------------------------------------------------------
 
-describe("forecast axis — all card types", () => {
+describe("forecast axis - all card types", () => {
   // Helper: future date N days from TODAY. Derived from the TODAY constant so
   // that bumping TODAY keeps the forecast-window indices in sync (#1150).
   function futureDate(n: number): string {
@@ -499,7 +499,7 @@ describe("forecast axis — all card types", () => {
       dueDate: futureDate(5),
       fsrsState: "review",
     });
-    // Reverse is always on since #1234 — no override needed.
+    // Reverse is always on since #1234 - no override needed.
     const settings = makeSettings();
     const snapshot = computeDashboardSnapshot(
       [reverseCard],
@@ -516,7 +516,7 @@ describe("forecast axis — all card types", () => {
   });
 
   it("future bars show mixed card types in the correct bars", () => {
-    // Name card due day 1, evolution card due day 3 — both should appear.
+    // Name card due day 1, evolution card due day 3 - both should appear.
     const nameCardFuture = makeCard(5, {
       lastReview: "2026-05-19",
       firstSeen: "2026-05-01",
@@ -575,7 +575,7 @@ describe("forecast axis — all card types", () => {
     expect(bar2!.count).toBe(0);
   });
 
-  it("future bars respect practiceScope — excludes out-of-scope name cards", () => {
+  it("future bars respect practiceScope - excludes out-of-scope name cards", () => {
     // A Gen II name card due day 4, with Gen I scope active.
     const genIICardFuture = makeCard(152, {
       lastReview: "2026-05-16",
@@ -617,7 +617,7 @@ describe("forecast axis — all card types", () => {
     );
 
     const bar2 = snapshot.dueForecast!.find((d) => d.date === futureDate(2));
-    // New card excluded — it flows through the new-card queue, not the review forecast.
+    // New card excluded - it flows through the new-card queue, not the review forecast.
     expect(bar2!.count).toBe(0);
   });
 
@@ -686,7 +686,7 @@ describe("mastery axis", () => {
   });
 
   it("a name card mastered without a mastered reverse card is not counted as mastered", () => {
-    // Only name card for species 20 is mastered — no paired reverse card.
+    // Only name card for species 20 is mastered - no paired reverse card.
     const cards: ReviewableCard[] = [masteredCard(20)];
     const snapshot = computeDashboardSnapshot(cards, makeSettings(), DEFAULT_LIMITS, TODAY, {
       include: ["mastery"],
@@ -745,7 +745,7 @@ describe("struggling axis", () => {
     const cards: ReviewableCard[] = [
       strugglingCard(1),
       strugglingCard(2),
-      newCard(3), // locked — excluded
+      newCard(3), // locked - excluded
     ];
     const snapshot = computeDashboardSnapshot(cards, makeSettings(), DEFAULT_LIMITS, TODAY, {
       include: ["struggling"],
@@ -886,7 +886,7 @@ describe("firstMastery axis", () => {
       include: ["firstMastery", "mastery"],
       masteryRepetitions: 3,
     });
-    // Both cards introduced, none mastered — should get a projection
+    // Both cards introduced, none mastered - should get a projection
     expect(snapshot.firstMasteryDays).toBeGreaterThan(0);
   });
 
@@ -1058,7 +1058,7 @@ describe("superuser forceAllMastered", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeQueueCount — shared badge helper (#1137)
+// computeQueueCount - shared badge helper (#1137)
 // ---------------------------------------------------------------------------
 
 describe("computeQueueCount", () => {
@@ -1101,13 +1101,13 @@ describe("computeQueueCount", () => {
     expect(countResult.reviewCount).toBe(snapshot.queue!.reviewCount);
   });
 
-  it("respects scope filter — excludes cards outside active scope", () => {
+  it("respects scope filter - excludes cards outside active scope", () => {
     const genIScope = { ...EMPTY_SCOPE, gens: [1] };
     const settings = makeSettings({ practiceScope: genIScope });
     const cards: ReviewableCard[] = [
-      newCard(1),  // Gen I — included
-      newCard(4),  // Gen I — included
-      newCard(152), // Gen II — excluded by scope
+      newCard(1),  // Gen I - included
+      newCard(4),  // Gen I - included
+      newCard(152), // Gen II - excluded by scope
     ];
 
     const result = computeQueueCount(cards, settings, DEFAULT_LIMITS, TODAY);
@@ -1115,7 +1115,7 @@ describe("computeQueueCount", () => {
     expect(result.totalCount).toBe(2);
   });
 
-  it("respects card-type toggles — excludes disabled enrichment card types", () => {
+  it("respects card-type toggles - excludes disabled enrichment card types", () => {
     // Name and reverse are always on (#1234). Only enrichment types are toggled.
     // With evolution disabled and no evolution cards in the fixture, the result
     // should match queueTotal with the same settings.
@@ -1138,7 +1138,7 @@ describe("computeQueueCount", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeQueueCountFromEligible — lower-level helper (#1158)
+// computeQueueCountFromEligible - lower-level helper (#1158)
 // ---------------------------------------------------------------------------
 
 describe("computeQueueCountFromEligible", () => {
@@ -1153,7 +1153,7 @@ describe("computeQueueCountFromEligible", () => {
     expect(fromEligible).toEqual(fromCount);
   });
 
-  it("respects a pre-filtered eligible set — excluding a card reduces the total", () => {
+  it("respects a pre-filtered eligible set - excluding a card reduces the total", () => {
     const cards: ReviewableCard[] = [newCard(1), newCard(2), newCard(3)];
     const settings = makeSettings();
     const allEligible = computeEligibleCardIds(cards, settings);

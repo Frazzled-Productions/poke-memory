@@ -55,7 +55,7 @@ vi.mock("@/lib/i18n/PokemonLocaleContext", () => ({
   usePokemonLocaleContext: () => mockUsePokemonLocaleContext(),
 }));
 
-// Stub LanguageSwitcher — its own test covers it; here we just need it to
+// Stub LanguageSwitcher - its own test covers it; here we just need it to
 // render something stable so we can test the bar structure around it.
 vi.mock("@/components/i18n/LanguageSwitcher", () => ({
   LanguageSwitcher: () => <span data-testid="language-switcher" />,
@@ -65,7 +65,7 @@ vi.mock("@/components/i18n/LanguageSwitcher", () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Null state — before first client render / skeleton phase. */
+/** Null state - before first client render / skeleton phase. */
 const NULL_STATE = {
   streak: null,
   tokenBalance: null,
@@ -83,7 +83,7 @@ const POPULATED_STATE = {
   masteryPercent: 14,
 };
 
-/** Zero state — fresh user with no activity. */
+/** Zero state - fresh user with no activity. */
 const ZERO_STATE = {
   streak: 0,
   tokenBalance: 0,
@@ -92,7 +92,7 @@ const ZERO_STATE = {
   masteryPercent: 0,
 };
 
-/** pretendAllMastered state — all species mastered. */
+/** pretendAllMastered state - all species mastered. */
 const ALL_MASTERED_STATE = {
   streak: 5,
   tokenBalance: 1,
@@ -119,7 +119,7 @@ afterEach(() => {
 // Skeleton / pre-mount (null state)
 // ---------------------------------------------------------------------------
 
-describe("ProfileStatusBar — skeleton (null state)", () => {
+describe("ProfileStatusBar - skeleton (null state)", () => {
   it("renders a fixed-height placeholder when values are null (no layout shift)", () => {
     mockUseProfileStatus.mockReturnValue(NULL_STATE);
     renderWithIntl(<ProfileStatusBar />);
@@ -140,16 +140,16 @@ describe("ProfileStatusBar — skeleton (null state)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Accessibility — role="region" + per-chip aria-labels (chips are buttons now)
+// Accessibility - role="region" + per-chip aria-labels (chips are buttons now)
 // ---------------------------------------------------------------------------
 
-describe("ProfileStatusBar — accessibility", () => {
+describe("ProfileStatusBar - accessibility", () => {
   it("is a named region landmark (not a live status region)", () => {
     renderWithIntl(<ProfileStatusBar />);
     expect(
       screen.getByRole("region", { name: /profile status/i }),
     ).toBeInTheDocument();
-    // It must NOT be a live region — would announce on every navigation.
+    // It must NOT be a live region - would announce on every navigation.
     expect(screen.queryByRole("status")).toBeNull();
   });
 
@@ -184,10 +184,10 @@ describe("ProfileStatusBar — accessibility", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Populated state — chip visibility + terse labels
+// Populated state - chip visibility + terse labels
 // ---------------------------------------------------------------------------
 
-describe("ProfileStatusBar — populated state", () => {
+describe("ProfileStatusBar - populated state", () => {
   it("renders the streak chip with the terse day count", () => {
     renderWithIntl(<ProfileStatusBar />);
     // streakLabel "{count}d" → "7d"
@@ -212,7 +212,7 @@ describe("ProfileStatusBar — populated state", () => {
 // Zero / empty state
 // ---------------------------------------------------------------------------
 
-describe("ProfileStatusBar — zero state", () => {
+describe("ProfileStatusBar - zero state", () => {
   beforeEach(() => {
     mockUseProfileStatus.mockReturnValue(ZERO_STATE);
   });
@@ -238,7 +238,7 @@ describe("ProfileStatusBar — zero state", () => {
 // pretendAllMastered state
 // ---------------------------------------------------------------------------
 
-describe("ProfileStatusBar — pretendAllMastered", () => {
+describe("ProfileStatusBar - pretendAllMastered", () => {
   beforeEach(() => {
     mockUseProfileStatus.mockReturnValue(ALL_MASTERED_STATE);
   });
@@ -258,7 +258,7 @@ describe("ProfileStatusBar — pretendAllMastered", () => {
 // Route behaviour: mobile Practice hides, non-Practice shows
 // ---------------------------------------------------------------------------
 
-describe("ProfileStatusBar — route / responsive", () => {
+describe("ProfileStatusBar - route / responsive", () => {
   it("applies the 'hidden md:block' class on the Practice route", () => {
     mockUsePathname.mockReturnValue("/");
     renderWithIntl(<ProfileStatusBar />);
@@ -291,10 +291,10 @@ describe("ProfileStatusBar — route / responsive", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Locale rendering — all four locales
+// Locale rendering - all four locales
 // ---------------------------------------------------------------------------
 
-describe("ProfileStatusBar — locale rendering", () => {
+describe("ProfileStatusBar - locale rendering", () => {
   beforeEach(() => {
     mockUseProfileStatus.mockReturnValue(POPULATED_STATE);
     mockUsePathname.mockReturnValue("/stats");
@@ -351,11 +351,11 @@ describe("ProfileStatusBar — locale rendering", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Bar height: must not change (h-9 class) — chips are interactive but the
+// Bar height: must not change (h-9 class) - chips are interactive but the
 // bar height is fixed so mobile Practice one-viewport fit is preserved (#1556)
 // ---------------------------------------------------------------------------
 
-describe("ProfileStatusBar — bar height unchanged (#1556)", () => {
+describe("ProfileStatusBar - bar height unchanged (#1556)", () => {
   it("the inner flex row keeps the h-9 class after making chips interactive", () => {
     renderWithIntl(<ProfileStatusBar />);
     const bar = screen.getByRole("region", { name: /profile status/i });
@@ -366,10 +366,10 @@ describe("ProfileStatusBar — bar height unchanged (#1556)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Popover integration in the bar — chip click opens popover over bar content
+// Popover integration in the bar - chip click opens popover over bar content
 // ---------------------------------------------------------------------------
 
-describe("ProfileStatusBar — popover opens in bar context (#1556)", () => {
+describe("ProfileStatusBar - popover opens in bar context (#1556)", () => {
   it("clicking the streak chip shows a popover with the streak description", () => {
     renderWithIntl(<ProfileStatusBar />);
 
@@ -394,10 +394,10 @@ describe("ProfileStatusBar — popover opens in bar context (#1556)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Item 2: Status-bar divider — present when languages flag on, absent when off
+// Item 2: Status-bar divider - present when languages flag on, absent when off
 // ---------------------------------------------------------------------------
 
-describe("ProfileStatusBar — clarity polish: global/per-language divider (item 2)", () => {
+describe("ProfileStatusBar - clarity polish: global/per-language divider (item 2)", () => {
   beforeEach(() => {
     mockUseProfileStatus.mockReturnValue(POPULATED_STATE);
     mockUsePathname.mockReturnValue("/stats");

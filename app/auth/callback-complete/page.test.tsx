@@ -14,7 +14,7 @@ import { screen } from "@testing-library/react";
 import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
-// Mocks — declared before the component import so vi.mock hoisting applies.
+// Mocks - declared before the component import so vi.mock hoisting applies.
 // ---------------------------------------------------------------------------
 
 vi.mock("next/navigation", () => ({
@@ -99,7 +99,7 @@ import CallbackCompletePage from "./page";
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("CallbackCompletePage — loading state", () => {
+describe("CallbackCompletePage - loading state", () => {
   it("renders the loading spinner with an aria-busy div in English", () => {
     const { container } = renderWithIntl(<CallbackCompletePage />);
     const busyEl = container.querySelector('[aria-busy="true"]');

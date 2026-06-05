@@ -23,7 +23,7 @@ vi.mock("@/lib/settings/persistence", () => ({
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("useShareSheet — empty state", () => {
+describe("useShareSheet - empty state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -37,7 +37,7 @@ describe("useShareSheet — empty state", () => {
   });
 });
 
-describe("useShareSheet — populated state", () => {
+describe("useShareSheet - populated state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -87,7 +87,7 @@ describe("useShareSheet — populated state", () => {
     expect((result.current.shareText?.length ?? 0) > 0).toBe(true);
   });
 
-  it("memoises — returns the same object references when inputs are unchanged", () => {
+  it("memoises - returns the same object references when inputs are unchanged", () => {
     const seq: (1 | 2 | 4 | 5)[] = [4, 5];
     const { result, rerender } = renderHook(
       ({ gradeSeq }) => useShareSheet(gradeSeq, 0, 0, "UTC"),

@@ -257,7 +257,7 @@ describe("pull-before-push invariant (regression guard)", () => {
     };
     // The name card should not pick up the reverse-card's cloud row.
     const merged = mergeCloudIntoLocal([nameCard], [reverseCloudRow]);
-    expect(merged[0].state.lastReview).toBeNull(); // unchanged — no matching cloud row
+    expect(merged[0].state.lastReview).toBeNull(); // unchanged - no matching cloud row
   });
 
   it("merge correctly matches a name card with its cloud row", () => {
@@ -722,7 +722,7 @@ describe("mergeCloudIntoLocalSilent: inserts unmatched-locale cloud rows (#1562)
       updated_at: "2026-05-11T12:00:00.000Z",
     };
 
-    // No seed passed — insert pass skipped.
+    // No seed passed - insert pass skipped.
     const merged = mergeCloudIntoLocalSilent([localEn], [cloudJaRow], null);
     expect(merged).toHaveLength(1);
   });
@@ -752,7 +752,7 @@ describe("mergeCloudIntoLocalSilent: inserts unmatched-locale cloud rows (#1562)
 
     const seed = [makeSeedPokemon(1)];
     const merged = mergeCloudIntoLocalSilent([localEn, localJa], [cloudJaRow], null, seed, []);
-    // No new card inserted — the ja card was matched in Pass 1.
+    // No new card inserted - the ja card was matched in Pass 1.
     expect(merged).toHaveLength(2);
   });
 });
@@ -813,7 +813,7 @@ describe("mergeAffectsProgress: key-based comparison (#1562)", () => {
     }];
 
     const merged = mergeCloudIntoLocalSilent([localEn], [cloudJaRow], null, seed, []);
-    // Insertion happened — array is longer, which signals mergeAffectsProgress.
+    // Insertion happened - array is longer, which signals mergeAffectsProgress.
     expect(merged.length).toBe(2);
   });
 });
@@ -1006,7 +1006,7 @@ describe("locale round-trip (#1259)", () => {
       locale: "ja",
     };
     const [merged] = mergeCloudIntoLocal([enCard], [jaRow]);
-    // The "en" card should be unchanged — no matching cloud row.
+    // The "en" card should be unchanged - no matching cloud row.
     expect(merged.state.lastReview).toBeNull();
     expect(merged).toBe(enCard);
   });
@@ -1031,7 +1031,7 @@ describe("isStructuralError (#1358)", () => {
     expect(isStructuralError(null)).toBe(false);
   });
 
-  it("returns true for 42P10 (ON CONFLICT mismatch — the #1344 incident code)", () => {
+  it("returns true for 42P10 (ON CONFLICT mismatch - the #1344 incident code)", () => {
     expect(isStructuralError(makePostgrestError("42P10"))).toBe(true);
   });
 
@@ -1055,9 +1055,9 @@ describe("isStructuralError (#1358)", () => {
     expect(isStructuralError(makePostgrestError("23503"))).toBe(true);
   });
 
-  it("returns false for 23514 (check_violation — deliberate regression trigger)", () => {
+  it("returns false for 23514 (check_violation - deliberate regression trigger)", () => {
     // 23514 is the DELIBERATE regression trigger (migrations 002/015/016/017).
-    // It must NOT fail loud — it is the expected rejection of bad state.
+    // It must NOT fail loud - it is the expected rejection of bad state.
     expect(isStructuralError(makePostgrestError("23514"))).toBe(false);
   });
 
@@ -1067,7 +1067,7 @@ describe("isStructuralError (#1358)", () => {
   });
 
   it("returns false for generic 5xx-style codes", () => {
-    // These are transient — not structural.
+    // These are transient - not structural.
     expect(isStructuralError(makePostgrestError("500"))).toBe(false);
   });
 
@@ -1132,7 +1132,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
   });
 
   it("does not call markStructuralSyncError on a 23514 (deliberate regression trigger)", async () => {
-    // 23514 is deliberate — the regression trigger rejecting bad state.
+    // 23514 is deliberate - the regression trigger rejecting bad state.
     const client = makeSupabaseClient({ code: "23514", message: "check violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const card = makeCard(3, "2026-05-10", "2026-05-10");
 
@@ -1164,7 +1164,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
   });
 
   it("calls clearStructuralSyncError on a successful push (self-heal after deploy fix)", async () => {
-    const client = makeSupabaseClient(null); // no error — success
+    const client = makeSupabaseClient(null); // no error - success
     const card = makeCard(6, "2026-05-10", "2026-05-10");
 
     const result = await pushSingleCard(client, "user-1", card);
@@ -1220,7 +1220,7 @@ describe("pushSession structural error handling (#1358)", () => {
   });
 
   it("calls clearStructuralSyncError when all batches succeed (self-heal)", async () => {
-    const client = makeSupabaseClient(null); // no error — success
+    const client = makeSupabaseClient(null); // no error - success
     const cards = [makeCard(12, "2026-05-10", "2026-05-10")];
 
     const result = await pushSession(client, "user-1", cards);

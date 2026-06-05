@@ -639,11 +639,15 @@
     "closeDetailsAriaLabel": "关闭详情",
     "pokemonDetailsAriaLabel": "{name}的详情",
     "newArrivalSuffix": "（新到来）",
+    "firstSeen": "初见",
+    "interval": "间隔",
     "nextArrivals": {
       "ariaLabel": "即将到来",
       "heading": "即将到来",
       "upcomingAriaLabel": "即将加入牧场的宝可梦",
-      "allCaughtUp": "所有已复习的宝可梦都已在您的牧场中。"
+      "allCaughtUp": "所有已复习的宝可梦都已在您的牧场中。",
+      "repsInfoAriaLabel": "「reps」是什么意思？",
+      "repsInfoPanel": "Reps（复习次数）：您迄今为止复习该卡片的次数。数字越高，代表您越接近掌握。"
     },
     "longPressHint": "长按任意宝可梦，查看其名称、掌握日期和复习间隔。"
   },

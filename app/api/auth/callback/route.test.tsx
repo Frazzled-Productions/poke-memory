@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Module mocks — hoisted so vi.mock runs before imports.
+// Module mocks - hoisted so vi.mock runs before imports.
 // ---------------------------------------------------------------------------
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -101,7 +101,7 @@ describe("GET /api/auth/callback", () => {
   });
 
   // -------------------------------------------------------------------------
-  // OAuth error codes — failure redirect
+  // OAuth error codes - failure redirect
   // -------------------------------------------------------------------------
 
   it("redirects to /?error=auth when no code param is present", async () => {
@@ -123,7 +123,7 @@ describe("GET /api/auth/callback", () => {
 
   it("does not call exchangeCodeForSession when code is absent", async () => {
     // The route short-circuits before createClient when there is no code, so no
-    // Supabase mock is needed — calling createClient here would be a bug.
+    // Supabase mock is needed - calling createClient here would be a bug.
     const createClientMock = createClient as ReturnType<typeof vi.fn>;
 
     await GET(makeCallbackRequest());
@@ -132,7 +132,7 @@ describe("GET /api/auth/callback", () => {
   });
 
   it("redirects to /?error=auth when an empty-string code is provided", async () => {
-    // An empty-string code is falsy — the route treats it the same as absent.
+    // An empty-string code is falsy - the route treats it the same as absent.
     const res = await GET(makeCallbackRequest({ code: "" }));
 
     expect(res.status).toBe(307);

@@ -8,7 +8,7 @@
 //
 // Options:
 //   --apply   Overwrite generated.json with the corrected values (dry-run by
-//             default — only prints the diff).
+//             default - only prints the diff).
 //   --json    Print results as JSON instead of human-readable text.
 //
 // Rate-limit note: PokéAPI advises ~100 req/min. This script caps concurrency
@@ -83,11 +83,11 @@ async function runConcurrently(tasks, concurrency) {
 }
 
 // ---------------------------------------------------------------------------
-// Form category derivation — must stay in sync with seed-pokemon.mjs
+// Form category derivation - must stay in sync with seed-pokemon.mjs
 //
 // This function is intentionally identical to `formCategoryFor` in
 // seed-pokemon.mjs.  The `formData.is_default` field is NOT used (see that
-// function's comment for the full rationale — PokéAPI can set it on non-
+// function's comment for the full rationale - PokéAPI can set it on non-
 // default varieties, which was the root cause of the original misclassification
 // bug reported in issue #837).
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ async function main() {
   const raw = await readFile(GENERATED_PATH, "utf-8");
   const seed = JSON.parse(raw);
 
-  // Only non-default forms have a formCategory that needs auditing — the
+  // Only non-default forms have a formCategory that needs auditing - the
   // default-form record is always emitted with formCategory: "default" by the
   // seed script and is never fed through formCategoryFor.
   const candidates = seed.filter((p) => p.isDefaultForm === false && p.formSlug);
@@ -221,7 +221,7 @@ async function main() {
     }
   } else if (applyFix && mismatches.length === 0) {
     if (!jsonOutput) {
-      process.stdout.write("[audit] Nothing to apply — no mismatches found.\n");
+      process.stdout.write("[audit] Nothing to apply - no mismatches found.\n");
     }
   }
 
@@ -231,7 +231,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Exit non-zero whenever any PokéAPI fetch failed — regardless of --apply or
+  // Exit non-zero whenever any PokéAPI fetch failed - regardless of --apply or
   // mismatch count. A partial audit must not report success: unfetched forms
   // could be hiding real drift, so a clean exit code would mask the gap.
   if (errors.length > 0) {

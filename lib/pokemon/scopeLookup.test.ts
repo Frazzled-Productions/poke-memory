@@ -6,7 +6,7 @@
  * across the gens / types / legendaries / version-groups axes for
  * representative known species. The `scopePredicate.test.ts` already covers
  * the predicate *logic* using fixture objects; these tests verify the *data*
- * behind the lookup — that the entries were built correctly and describe real
+ * behind the lookup - that the entries were built correctly and describe real
  * Pokémon.
  *
  * Node project (no DOM). Uses vitest's `node` environment.
@@ -19,7 +19,7 @@ import { SCOPE_LOOKUP, type ScopeLookupEntry } from "./scopeLookup";
 // Structural invariants
 // ---------------------------------------------------------------------------
 
-describe("SCOPE_LOOKUP — structural invariants", () => {
+describe("SCOPE_LOOKUP - structural invariants", () => {
   it("contains 1174 entries", () => {
     // Hard-coded count matches the comment in the generated file; if the seed
     // is regenerated this test will catch unintended deletions or additions.
@@ -60,7 +60,7 @@ describe("SCOPE_LOOKUP — structural invariants", () => {
 // Default-form coverage
 // ---------------------------------------------------------------------------
 
-describe("SCOPE_LOOKUP — default-form entries", () => {
+describe("SCOPE_LOOKUP - default-form entries", () => {
   it("Gen I species (speciesId 1–151) all have exactly one default-form entry each", () => {
     const gen1Defaults = SCOPE_LOOKUP.filter(
       (e) => e.speciesId >= 1 && e.speciesId <= 151 && e.isDefaultForm,
@@ -81,10 +81,10 @@ describe("SCOPE_LOOKUP — default-form entries", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Known-species membership — gens axis (via speciesId ranges)
+// Known-species membership - gens axis (via speciesId ranges)
 // ---------------------------------------------------------------------------
 
-describe("SCOPE_LOOKUP — gens axis (speciesId ranges)", () => {
+describe("SCOPE_LOOKUP - gens axis (speciesId ranges)", () => {
   function defaultEntry(id: number): ScopeLookupEntry {
     const entry = SCOPE_LOOKUP.find((e) => e.id === id && e.isDefaultForm);
     if (!entry) throw new Error(`No default-form entry found for id=${id}`);
@@ -123,10 +123,10 @@ describe("SCOPE_LOOKUP — gens axis (speciesId ranges)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Known-species membership — types axis
+// Known-species membership - types axis
 // ---------------------------------------------------------------------------
 
-describe("SCOPE_LOOKUP — types axis", () => {
+describe("SCOPE_LOOKUP - types axis", () => {
   it("Bulbasaur (id=1) is Grass/Poison", () => {
     const entry = SCOPE_LOOKUP.find((e) => e.id === 1)!;
     expect(entry.types).toEqual(expect.arrayContaining(["grass", "poison"]));
@@ -156,10 +156,10 @@ describe("SCOPE_LOOKUP — types axis", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Known-species membership — legendaries
+// Known-species membership - legendaries
 // ---------------------------------------------------------------------------
 
-describe("SCOPE_LOOKUP — legendaries axis", () => {
+describe("SCOPE_LOOKUP - legendaries axis", () => {
   it("Mewtwo (id=150) is marked legendary", () => {
     const entry = SCOPE_LOOKUP.find((e) => e.id === 150)!;
     expect(entry.isLegendary).toBe(true);
@@ -184,10 +184,10 @@ describe("SCOPE_LOOKUP — legendaries axis", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Known-species membership — version-groups (games) axis
+// Known-species membership - version-groups (games) axis
 // ---------------------------------------------------------------------------
 
-describe("SCOPE_LOOKUP — version-groups axis", () => {
+describe("SCOPE_LOOKUP - version-groups axis", () => {
   it("Bulbasaur (id=1) appears in 'red-blue' and 'scarlet-violet'", () => {
     const entry = SCOPE_LOOKUP.find((e) => e.id === 1)!;
     expect(entry.versionGroups).toContain("red-blue");
@@ -211,7 +211,7 @@ describe("SCOPE_LOOKUP — version-groups axis", () => {
 // Edge cases
 // ---------------------------------------------------------------------------
 
-describe("SCOPE_LOOKUP — edge cases", () => {
+describe("SCOPE_LOOKUP - edge cases", () => {
   it("looking up an id that does not exist returns undefined", () => {
     const entry = SCOPE_LOOKUP.find((e) => e.id === 99999);
     expect(entry).toBeUndefined();

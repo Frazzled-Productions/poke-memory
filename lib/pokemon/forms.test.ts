@@ -13,7 +13,7 @@ import {
 } from "./chainExpansion";
 
 // ---------------------------------------------------------------------------
-// Fixtures — representative PokéAPI shapes (trimmed to relevant fields)
+// Fixtures - representative PokéAPI shapes (trimmed to relevant fields)
 // ---------------------------------------------------------------------------
 
 /** Alolan Raichu (pokemon ID 10100, species 26) */
@@ -39,7 +39,7 @@ const megaCharizardXForm = {
 };
 
 /**
- * Vivillon-Meadow: cosmetic variant — does not appear in varieties[] at all
+ * Vivillon-Meadow: cosmetic variant - does not appear in varieties[] at all
  * (all Vivillon share the same pokemon_id). This filter is never reached for
  * Vivillon; tested here for documentation purposes only.
  */
@@ -54,7 +54,7 @@ const vivillonMeadowForm = {
 };
 
 /**
- * Stub Mega (e.g. IDs 10278+) — fan-wiki entry with no real game data.
+ * Stub Mega (e.g. IDs 10278+) - fan-wiki entry with no real game data.
  */
 const stubMegaPokemon = {
   base_experience: null,
@@ -123,7 +123,7 @@ describe("isStubEntry", () => {
     expect(isStubEntry(alolanRaichuPokemon)).toBe(false);
   });
 
-  it("returns false when base_experience is 0 (edge case — some baby Pokémon)", () => {
+  it("returns false when base_experience is 0 (edge case - some baby Pokémon)", () => {
     expect(isStubEntry({ base_experience: 0, moves: [] })).toBe(false);
   });
 
@@ -176,9 +176,9 @@ describe("isWorthLearning", () => {
     ).toBe(false);
   });
 
-  it("Vivillon-Meadow: is_default=true means form_name may differ — included if non-empty & non-battle-only", () => {
+  it("Vivillon-Meadow: is_default=true means form_name may differ - included if non-empty & non-battle-only", () => {
     // Cosmetic pattern forms don't appear in varieties[] in practice; this
-    // test documents that the filter alone doesn't exclude Vivillon-Meadow —
+    // test documents that the filter alone doesn't exclude Vivillon-Meadow - 
     // it would be included if it appeared as a variety. The correct exclusion
     // mechanism is that cosmetic forms share a pokemon_id and are absent from
     // varieties[].
@@ -316,7 +316,7 @@ describe("buildVarietiesLookup", () => {
       { speciesId: 6, isDefaultForm: false, formSlug: "mega-x", id: 10034, displayName: "Mega Charizard X" },
     ];
     const lookup = buildVarietiesLookup(records);
-    // mega-x is not a regional slug — must not appear
+    // mega-x is not a regional slug - must not appear
     expect(lookup.get(6)).toBeUndefined();
   });
 
@@ -336,7 +336,7 @@ describe("buildVarietiesLookup", () => {
 });
 
 // ---------------------------------------------------------------------------
-// addFormEdges — chain-expansion logic
+// addFormEdges - chain-expansion logic
 // ---------------------------------------------------------------------------
 
 // Varieties lookup used across the chain-expansion tests below.
@@ -372,7 +372,7 @@ function node(
   };
 }
 
-describe("addFormEdges — edge with region: null passes through unchanged", () => {
+describe("addFormEdges - edge with region: null passes through unchanged", () => {
   it("emits only the default edge when region is null", () => {
     const nodes: ChainNode[] = [
       node(1, null, null),    // root
@@ -387,7 +387,7 @@ describe("addFormEdges — edge with region: null passes through unchanged", () 
   });
 });
 
-describe("addFormEdges — Pikachu chain with Alolan Raichu", () => {
+describe("addFormEdges - Pikachu chain with Alolan Raichu", () => {
   // Models the PokéAPI chain: Pichu(172) → Pikachu(25) → Raichu(26) where
   // the Pikachu→Raichu step has two evolves_to entries:
   //   - Raichu(26) with region: null  (default)
@@ -401,7 +401,7 @@ describe("addFormEdges — Pikachu chain with Alolan Raichu", () => {
     node(172, null, null),   // Pichu root
     node(25, 172, null),     // Pikachu (default)
     node(26, 25, null),      // Raichu default path
-    node(26, 25, "alola"),   // Raichu alola path — same speciesId, different region
+    node(26, 25, "alola"),   // Raichu alola path - same speciesId, different region
   ];
 
   it("emits the default edge 25→26", () => {
@@ -430,7 +430,7 @@ describe("addFormEdges — Pikachu chain with Alolan Raichu", () => {
   });
 });
 
-describe("addFormEdges — Hisuian Typhlosion chain", () => {
+describe("addFormEdges - Hisuian Typhlosion chain", () => {
   // Models the PokéAPI chain: Cyndaquil(155) → Quilava(156) → Typhlosion(157).
   // Both the Quilava and Typhlosion nodes appear twice in evolves_to:
   // once with region:null and once with region:hisui.
@@ -441,8 +441,8 @@ describe("addFormEdges — Hisuian Typhlosion chain", () => {
     node(155, null, null),    // Cyndaquil root
     node(156, 155, null),     // Quilava default
     node(157, 156, null),     // Typhlosion default
-    node(156, 155, "hisui"),  // Quilava hisui — same speciesId as default
-    node(157, 156, "hisui"),  // Typhlosion hisui — same speciesId as default
+    node(156, 155, "hisui"),  // Quilava hisui - same speciesId as default
+    node(157, 156, "hisui"),  // Typhlosion hisui - same speciesId as default
   ];
 
   it("emits the two default edges (155→156, 156→157)", () => {
@@ -476,7 +476,7 @@ describe("addFormEdges — Hisuian Typhlosion chain", () => {
   });
 });
 
-describe("addFormEdges — Eevee branching (no regional variants)", () => {
+describe("addFormEdges - Eevee branching (no regional variants)", () => {
   // Eevee(133) evolves into 8 eeveelutions, none of which have regional variants.
   // All edges have region: null → no form edges emitted.
   const eeveeChainNodes: ChainNode[] = [
@@ -513,7 +513,7 @@ describe("addFormEdges — Eevee branching (no regional variants)", () => {
   });
 });
 
-describe("addFormEdges — dedup on (evolvesFromId, speciesId)", () => {
+describe("addFormEdges - dedup on (evolvesFromId, speciesId)", () => {
   it("collapses duplicate nodes with the same (from, to) pair", () => {
     const nodes: ChainNode[] = [
       node(1, null, null),

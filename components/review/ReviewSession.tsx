@@ -127,7 +127,7 @@ const SCOPE_NUDGE_SESSION_KEY = "poke-memory:practice-session-counted:v1";
 const OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD = 3;
 const OFFLINE_NUDGE_SESSION_THRESHOLD = 5;
 
-// Module-scoped seed lookup map. Built once at module load — the 1025-entry
+// Module-scoped seed lookup map. Built once at module load - the 1025-entry
 // Map would be wasteful to rebuild on every render of ReviewSession.
 const SEED_BY_ID = new Map(SEED_POKEMON.map((p) => [p.id, p]));
 
@@ -155,7 +155,7 @@ type UndoSnapshot = {
   masteredThisSession: number;
   learningQueue: LearningQueueEntry[];
   cardId: number;
-  // `occurredAt` of the grade-log entry written by this grade — used to
+  // `occurredAt` of the grade-log entry written by this grade - used to
   // pop the entry back out on undo. `null` if appendGradeEntry failed.
   gradeLogOccurredAt: number | null;
 };
@@ -289,7 +289,7 @@ function writeHasMasteredFlag(val: boolean): void {
       }),
     );
   } catch {
-    // Quota or non-standard environment — silently skip.
+    // Quota or non-standard environment - silently skip.
   }
 }
 
@@ -299,8 +299,8 @@ function writeHasMasteredFlag(val: boolean): void {
  * persistence chain (where `newCards` is the post-grade card array) and on
  * session mount (to populate the cache for existing users on upgrade).
  *
- * Uses `filterMastered` — the same authoritative derivation as
- * `computeStats` — so the parity contract test in
+ * Uses `filterMastered` - the same authoritative derivation as
+ * `computeStats` - so the parity contract test in
  * `components/profile/useProfileStatus.test.tsx` can hold.
  *
  * Only fires when not superuser-guarded (consistent with other localStorage
@@ -318,7 +318,7 @@ function writeMasteredCountCache(
 /**
  * Computes per-locale due-today review counts from the hydrated card array and
  * writes them to the due-count cache read by the LanguageSwitcher badges
- * (#1484). Purely additive + read-only — it does not touch the queue logic.
+ * (#1484). Purely additive + read-only - it does not touch the queue logic.
  * Counts graduated cards (learningStep === null) that have been reviewed before
  * and are due on or before today, excluding cards already reviewed today.
  */
@@ -366,7 +366,7 @@ type PerTypeTodayCounts = {
 /**
  * `TodayPill` receives only primitive/plain-object props from `ReviewSession`.
  * `React.memo` skips re-renders when none of the props have shallowly changed
- * — primarily useful between grading batches when the card flips but the daily
+ * - primarily useful between grading batches when the card flips but the daily
  * counters haven't changed yet (#1191 Class B item 8).
  */
 const TodayPill = React.memo(function TodayPill({
@@ -387,7 +387,7 @@ const TodayPill = React.memo(function TodayPill({
   /**
    * When more than one language is enrolled, show the active language endonym
    * in the "Done today" heading (#1562). `null` when only English is active
-   * (single-language user — heading stays plain "Done today").
+   * (single-language user - heading stays plain "Done today").
    */
   activeLocaleEndonym: string | null;
 }) {
@@ -484,7 +484,7 @@ const TodayPill = React.memo(function TodayPill({
  * graded nothing, so there is nothing to show).
  *
  * Accuracy is defined as the share of grades that were Good (4) or Easy (5)
- * — the same pass/fail convention used in `computeDirectionBreakdown` on the
+ * - the same pass/fail convention used in `computeDirectionBreakdown` on the
  * Stats page, so both surfaces are consistent.
  */
 function DirectionAccuracyRow({ tally }: { tally: SessionDirectionTally }) {
@@ -527,9 +527,9 @@ type EndOfSessionVariant =
 /**
  * Single component that covers all three end-of-session states:
  * "all caught up" (SESSION_COMPLETE), "new cards locked" (NEW_CARDS_LOCKED),
- * and "daily review limit reached" (REVIEW_SOFT_WALL). Shared affordances —
+ * and "daily review limit reached" (REVIEW_SOFT_WALL). Shared affordances - 
  * the "N cards due tomorrow" teaser (#914), the TodayPill, the Share button,
- * and the card-types onboarding nudge — render on every variant when applicable.
+ * and the card-types onboarding nudge - render on every variant when applicable.
  */
 function EndOfSessionScreen({
   variant,
@@ -658,7 +658,7 @@ function EndOfSessionScreen({
             type="button"
             className="min-h-[44px] rounded-lg bg-zinc-100 px-8 py-2 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
             onClick={() => {
-              // "Done for today" — reload the page so the session resets cleanly.
+              // "Done for today" - reload the page so the session resets cleanly.
               window.location.reload();
             }}
           >
@@ -745,7 +745,7 @@ export function ReviewSession() {
   //
   // MULTI-LOCALE: `cards` is the ACTIVE-LOCALE-FILTERED view of the session.
   // The complete multi-locale array lives in `fullSessionRef`. Every saveSession
-  // call must write the full array — never the filtered `cards`. See the invariant
+  // call must write the full array - never the filtered `cards`. See the invariant
   // comment at each saveSession call site in this file.
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   // MULTI-LOCALE: holds the complete multi-locale card array from the last load
@@ -780,7 +780,7 @@ export function ReviewSession() {
   // Defaults true so a returning user (firstVisitOnboardingDismissed = true in
   // storage) sees no blank gap while settings load. Brand-new users will briefly
   // see the scope nudge until the session-load effect fires and sets this to
-  // false — acceptable given the short hydration window.
+  // false - acceptable given the short hydration window.
   const [firstVisitDone, setFirstVisitDone] = useState(true);
   // Scope-nudge gate signals (#1482). Read from settings on session load.
   // `scopeEverOpened` is true when the user has previously interacted with
@@ -802,7 +802,7 @@ export function ReviewSession() {
   // settings default) until the session load effect reads the real value.
   const [masteryRepetitions, setMasteryRepetitions] = useState(3);
   // Onboarding nudges (#702). `cardTypesAllOn` is true when every
-  // off-by-default card type is enabled — when that holds there is nothing
+  // off-by-default card type is enabled - when that holds there is nothing
   // left to nudge towards on the session-complete screen.
   // Note: `audioFeaturesOff` was removed in #1103 (consolidated into the
   // one-time first-visit modal). `cardTypesAllOn` remains for the end-of-session
@@ -814,22 +814,22 @@ export function ReviewSession() {
   const [revealing, setRevealing] = useState(false);
   const [grading, setGrading] = useState(false);
   // Transient flag: user chose "Keep reviewing" at the soft wall.
-  // Not persisted — resets on every page load by design.
+  // Not persisted - resets on every page load by design.
   const [extendedReview, setExtendedReview] = useState(false);
 
-  // Keyboard shortcuts overlay — opened by the `?` key or the `?` hint button
+  // Keyboard shortcuts overlay - opened by the `?` key or the `?` hint button
   // on the GradeButtons panel. Controlled here so the keydown handler can open
   // it without going through a ref or event bus.
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
 
-  // Fact shown after card reveal — randomised on each reveal.
+  // Fact shown after card reveal - randomised on each reveal.
   const [currentFact, setCurrentFact] = useState<PokemonFact | null>(null);
 
   // In-memory learning queue: cards currently in a learning or relearning step.
   // Initialized at mount from learningCardIds; updated on every grade.
   const [learningQueue, setLearningQueue] = useState<LearningQueueEntry[]>([]);
 
-  // Live session grade tally — resets on page navigation by design. Labelled
+  // Live session grade tally - resets on page navigation by design. Labelled
   // "this session" in the UI to set expectations.
   const [sessionGrades, setSessionGrades] = useState<Record<Grade, number>>({ 1: 0, 2: 0, 4: 0, 5: 0 });
   // Per-direction grade tally for the session-end accuracy breakdown row.
@@ -849,9 +849,9 @@ export function ReviewSession() {
   const [timezone, setTimezone] = useState("UTC");
   // Queue of newly-earned badges awaiting their reveal toast (#420). One is
   // rendered at a time; dismiss shifts the head off. Persisting is handled
-  // in handleGrade — this queue only drives the in-session UI.
+  // in handleGrade - this queue only drives the in-session UI.
   const [pendingBadgeToasts, setPendingBadgeToasts] = useState<BadgeDefinition[]>([]);
-  // Render the head of the queue — `position: fixed` on the toast itself, so
+  // Render the head of the queue - `position: fixed` on the toast itself, so
   // it doesn't matter which branch renders this node. Shared between every
   // user-facing return below so the reveal fires on session-complete too.
   const badgeToastSlot = pendingBadgeToasts.length > 0 ? (
@@ -889,7 +889,7 @@ export function ReviewSession() {
     // Persist scope through user settings so it syncs cross-device (#333).
     // Read the latest settings before patching to avoid clobbering other
     // fields that may have been updated since this component mounted.
-    // Also dismiss the scope nudge and mark scope as ever-opened — the user
+    // Also dismiss the scope nudge and mark scope as ever-opened - the user
     // has found the feature, so the nudge must not show again (#1482).
     const current = loadSettings();
     saveSettings({
@@ -907,7 +907,7 @@ export function ReviewSession() {
     // are durable. Persist if any card mutated.
     if (cards !== null) {
       const today = todayString(new Date());
-      // `changed` is intentionally unused here — handleScopeChange always
+      // `changed` is intentionally unused here - handleScopeChange always
       // persists the full session after a scope change (line below) regardless
       // of whether reconcile modified any card state. Pass the current
       // incompleteChains context so the "Incomplete evolution chains" scope
@@ -952,7 +952,7 @@ export function ReviewSession() {
 
   // Single-step undo: snapshot of pre-grade state. Captured in handleGrade
   // and consumed by handleUndo. Cleared when the next grade fires. Held in a
-  // ref because it is only read by the undo handler, never by render — moving
+  // ref because it is only read by the undo handler, never by render - moving
   // to a ref avoids forcing React to retain two full card-list copies in state
   // and re-rendering undo-snapshot consumers on every grade (#1191).
   const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
@@ -963,7 +963,7 @@ export function ReviewSession() {
   const { quotaExceeded, dismiss, notifySaveResult } = useStorageQuota();
 
   // Non-fatal grade error: set when nextReview throws (e.g. a corrupt grade
-  // value that slips past TypeScript at runtime). The session remains usable —
+  // value that slips past TypeScript at runtime). The session remains usable - 
   // the corrupt grade is skipped and the user can continue.
   const [gradeError, setGradeError] = useState<string | null>(null);
 
@@ -1006,14 +1006,14 @@ export function ReviewSession() {
   const persistenceChainRef = useRef<Promise<void>>(Promise.resolve());
 
   // Ref attached to the swipeable card container. Swipe-to-grade is active
-  // only for flip-card types (name / evolution / cry) — reverse cards use
+  // only for flip-card types (name / evolution / cry) - reverse cards use
   // SpritePicker and have their own tap interaction (#1052).
   const cardRef = useRef<HTMLDivElement | null>(null);
   // Stable refs to the latest handleReveal / handleGrade so the keyboard
   // keydown effect never captures stale closures. handleReveal and handleGrade
   // are function-declarations (hoisted), so they can be referenced here even
   // though they appear lower in the file. The refs are updated synchronously
-  // every render — no effect needed.
+  // every render - no effect needed.
   // eslint-disable-next-line @typescript-eslint/no-use-before-define
   const handleRevealRef = useRef<() => Promise<void>>(handleReveal);
   // eslint-disable-next-line @typescript-eslint/no-use-before-define
@@ -1035,7 +1035,7 @@ export function ReviewSession() {
   // daily card order is deterministic per (user, day) but differs across users.
   //
   // Wrapped in useMemo so the localStorage read/write only fires when the
-  // identity changes, not on every render — avoids a side effect during render
+  // identity changes, not on every render - avoids a side effect during render
   // that React 19 strict-mode would double-invoke.
   const shuffleSalt = useMemo(
     () => user?.id ?? getOrCreateClientSalt(),
@@ -1050,7 +1050,7 @@ export function ReviewSession() {
   // and the wall always agree.
   //
   // Superuser: under `pretendAllMastered` every edge counts as mastered, so
-  // every family is `completed` and the set is empty — the preset legitimately
+  // every family is `completed` and the set is empty - the preset legitimately
   // matches nothing. `incompleteChainSpeciesIds` threads the flag through.
   const incompleteChains = useMemo(
     () =>
@@ -1126,7 +1126,7 @@ export function ReviewSession() {
       const cryEnabled = settings.cryCardsEnabled;
 
       // poke-memory:settings:v1 is the source of truth for limits.
-      // saved.limits (from the session) is intentionally ignored — settings
+      // saved.limits (from the session) is intentionally ignored - settings
       // take effect on the next page load, which is the definition of "next session".
       const settingsLimits = limitsFromSettings(settings);
 
@@ -1204,10 +1204,10 @@ export function ReviewSession() {
       // `alternateFormsEnabled` gate, then scope filter (#658, #835).
       // Context for the "Incomplete evolution chains" preset (#995): derive
       // chain progress from the freshly-built/hydrated card set. The
-      // `scopeContext` memo cannot be used here — it depends on `cards` state
+      // `scopeContext` memo cannot be used here - it depends on `cards` state
       // which has not been set yet at this point in the load effect.
       // Computed before reconcileHiddenState so the same context is passed to
-      // both — avoids a second pass over all cards and ensures reconciliation
+      // both - avoids a second pass over all cards and ensures reconciliation
       // uses the correct in-progress set when the scope is "incomplete-chains".
       const loadScopeContext: ScopeMatchContext = {
         incompleteChainSpeciesIds: incompleteChainSpeciesIds(
@@ -1231,7 +1231,7 @@ export function ReviewSession() {
       // Only persist when reconcileHiddenState actually mutated card state
       // (stamped or cleared hiddenSince, shifted dueDate). Skipping the save
       // when nothing changed avoids a redundant ~600 KB IDB write on every
-      // page load — the main cause of hydration slowness after #1234 doubled
+      // page load - the main cause of hydration slowness after #1234 doubled
       // the card count to ~2 050 (#1262).
       if (reconcileChanged) {
         // MULTI-LOCALE: save the full array, never the filtered view.
@@ -1269,7 +1269,7 @@ export function ReviewSession() {
       setPracticeSessionsCount(settings.onboarding?.practiceSessionsCount ?? 0);
       // Offline-download nudge gate signals (#1538).
       setSlowSpriteLoadCount(settings.onboarding?.slowSpriteLoadCount ?? 0);
-      // Check whether a download already exists — if so, suppress the nudge.
+      // Check whether a download already exists - if so, suppress the nudge.
       // The typeof + optional-chain guards cover SSR and test environments
       // where window.localStorage may be undefined.
       const hasDownload = typeof window !== "undefined"
@@ -1279,7 +1279,7 @@ export function ReviewSession() {
 
       // Hydrate the daily summary so the "Share today" button survives a page
       // reload, a navigation away and back, or reopening the app later in the
-      // day (#685, #896). Prefer the persisted daily-summary record — it also
+      // day (#685, #896). Prefer the persisted daily-summary record - it also
       // carries the new-card and mastered counts. When that record is absent
       // (e.g. its best-effort write hit a quota error, or the user finished
       // their cards in an earlier browsing session), fall back to the grade
@@ -1429,7 +1429,7 @@ export function ReviewSession() {
           }
           // Roll back persisted daily summary to match reverted state (#685).
           // Skipped while a superuser flag is on so QA grade sequences never
-          // reach localStorage — consistent with the cloud write-guard.
+          // reach localStorage - consistent with the cloud write-guard.
           if (!superuserGuarded) {
             const kbSeq = snapshot.sessionGradeSeq;
             saveDailySummary({
@@ -1458,8 +1458,8 @@ export function ReviewSession() {
     // notifySaveResult and limits are stable inside the same render;
     // timezone starts as "UTC" and is set once on mount, so including it
     // causes exactly one extra registration (UTC → real tz) and is otherwise
-    // stable — the dep is needed so the persist call sees the real timezone.
-    // undoSnapshotRef is a stable ref object — its identity never changes, so
+    // stable - the dep is needed so the persist call sees the real timezone.
+    // undoSnapshotRef is a stable ref object - its identity never changes, so
     // it is intentionally omitted from deps. The closure reads .current at
     // call time, which is always the latest snapshot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1549,7 +1549,7 @@ export function ReviewSession() {
         if (grade !== undefined) {
           e.preventDefault();
           // Fire haptic on keyboard-driven grades. The iOS switch technique
-          // is omitted here (null) — keyboard users are on desktop and the
+          // is omitted here (null) - keyboard users are on desktop and the
           // Vibration API path covers Android/Chromium where it applies.
           triggerHaptic(grade, null);
           void handleGradeRef.current(grade);
@@ -1561,7 +1561,7 @@ export function ReviewSession() {
     return () => window.removeEventListener("keydown", onKey);
     // handleReveal / handleGrade are accessed via stable refs (updated every
     // render above) so they do not belong in deps. Only the state values used
-    // as guards inside the handler — `revealed`, `grading`, `revealing` — need
+    // as guards inside the handler - `revealed`, `grading`, `revealing` - need
     // to be listed so the listener is re-registered when those values change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealed, grading, revealing]);
@@ -1710,7 +1710,7 @@ export function ReviewSession() {
     );
   }
 
-  // --- Derived state (recomputed every render — cheap, pure) ---
+  // --- Derived state (recomputed every render - cheap, pure) ---
   const today = todayString(new Date());
 
   // While extendedReview is active, uncap all per-type review limits so all
@@ -1727,7 +1727,7 @@ export function ReviewSession() {
 
   // Practice scope is enforced via the eligibility set passed into the queue
   // builder, not by pre-filtering the cards array. This way the counters
-  // (`newIntroducedToday`, `reviewsDoneToday`) still see the full card set —
+  // (`newIntroducedToday`, `reviewsDoneToday`) still see the full card set - 
   // changing scope mid-day cannot reset daily caps (#333). Out-of-scope cards
   // are snoozed by `reconcileHiddenState` at session-load time, so their
   // dueDate doesn't drift while they're hidden.
@@ -1793,7 +1793,7 @@ export function ReviewSession() {
   // clearing the lock explicitly: if any future code path mutates
   // eligibleCardIds without remembering to release the lock, we still fall
   // through to the freshly-computed currentCard so the user never sees a
-  // frozen out-of-scope card. The check only kicks in when a scope is active —
+  // frozen out-of-scope card. The check only kicks in when a scope is active - 
   // an empty scope means every card is eligible, so the eligibleCardIds set
   // is intentionally empty and is not consulted (see the
   // `isScopeEmpty(scope)` gate at line 1211).
@@ -1832,7 +1832,7 @@ export function ReviewSession() {
   // SpritePreloader keys its <Image> children by a composite `${width}:${url}`
   // string, so handing it a fresh array reference each render triggers no refetch.
   //
-  // Reverse cards render as a four-tile SpritePicker at 150 px — a different
+  // Reverse cards render as a four-tile SpritePicker at 150 px - a different
   // optimiser variant from the 320 px flip cards. They are expanded into
   // `preloadPickerUrls` (passed as `sizedUrls` to SpritePreloader) so the
   // correct variant is warmed. `preloadableSpriteUrls` returns [] for reverse
@@ -1872,7 +1872,7 @@ export function ReviewSession() {
     }
   })();
 
-  // Per-button interval previews — computed for every render (O(1) per grade, cheap).
+  // Per-button interval previews - computed for every render (O(1) per grade, cheap).
   const gradePreviewsOrNull =
     effectiveCard !== null
       ? previewIntervals(effectiveCard.state, new Date(), (() => {
@@ -1893,12 +1893,12 @@ export function ReviewSession() {
     // *that* type has more candidates. Mixed-type sessions therefore keep
     // serving cards from the type that still has budget; the end-state UI
     // appears only when no type has any work left.
-    // Compare by limit bucket, not raw cardType — reverse-evolution cards
+    // Compare by limit bucket, not raw cardType - reverse-evolution cards
     // count under "evolution" so the wall-detection matches the per-type
     // counters in `perType`.
     // Card-type gate for end-state checks: disabled-type cards must never
-    // drive the wall. We check card-type enablement directly — not via
-    // eligibleCardIds — so that alternate-form and scope filters do not
+    // drive the wall. We check card-type enablement directly - not via
+    // eligibleCardIds - so that alternate-form and scope filters do not
     // suppress the wall for genuinely-enabled card types (#835).
     const endStateTypeOpts = {
       nameEnabled: true,
@@ -1909,7 +1909,7 @@ export function ReviewSession() {
     };
 
     function hasMoreDueReviewsOf(type: "name" | "evolution" | "reverse" | "cry"): boolean {
-      // Mirror the candidate filter in buildSessionQueues — cards in a
+      // Mirror the candidate filter in buildSessionQueues - cards in a
       // learning/relearning step are served via the in-memory learning
       // queue, not the review queue, and must not count toward "more due
       // reviews exist" or the soft-wall would fire spuriously.
@@ -1994,7 +1994,7 @@ export function ReviewSession() {
 
     const endState = resolveEndState();
 
-    // today is UTC (scheduler-internal — card dues, streak); tomorrow uses the
+    // today is UTC (scheduler-internal - card dues, streak); tomorrow uses the
     // user's timezone (state var loaded from settings) because it is a calendar
     // label for a user-facing count. Derive tomorrow from the tz-aware calendar
     // date rather than adding 86 400 s, which is wrong on DST-change nights.
@@ -2003,7 +2003,7 @@ export function ReviewSession() {
     const today = todayString(new Date());
     const todayTz = todayString(new Date(), timezone);
     // Use addDaysToIsoDate so tomorrow is derived the same way as other callers
-    // in lib/stats — replaces the inline setUTCDate arithmetic (#1522).
+    // in lib/stats - replaces the inline setUTCDate arithmetic (#1522).
     const tomorrow = addDaysToIsoDate(todayTz, 1);
     const dueTomorrow = countDueTomorrow(cards, tomorrow, eligibleCardIds, activeLocale);
     // shareParts / shareText are derived unconditionally by useShareSheet above
@@ -2061,7 +2061,7 @@ export function ReviewSession() {
     if (effectiveCard === null || revealing) return;
 
     // Warm up speechSynthesis synchronously inside the gesture handler. This
-    // must run before any `await` — after the first await the browser's gesture
+    // must run before any `await` - after the first await the browser's gesture
     // context is lost and warmupTts() would not count for Chromium / WebKit,
     // causing speakNameOnReveal to silently fail on the very first Reveal of a
     // session (before any card has been graded via handleGrade). Mirror of the
@@ -2102,7 +2102,7 @@ export function ReviewSession() {
     // reverse-evolution: hiddenSide="pre"  → reveal shows preEvoSpriteUrl
     //
     // Audio (cry + TTS) is triggered below, after `setRevealed`, so this await
-    // does not delay or reorder audio — it only defers the state swap briefly.
+    // does not delay or reorder audio - it only defers the state swap briefly.
     // The 500 ms safety valve in `decodeSpriteUrls` ensures the UI is never
     // stuck even on a slow or absent decode path (e.g. test environments).
     if (
@@ -2199,7 +2199,7 @@ export function ReviewSession() {
 
   async function handleGrade(grade: Grade) {
     if (effectiveCard === null || grading) return;
-    // Re-narrow cards inside the closure — TS doesn't carry the outer
+    // Re-narrow cards inside the closure - TS doesn't carry the outer
     // null-check through a function that captures a useState variable.
     if (cards === null) return;
 
@@ -2223,14 +2223,14 @@ export function ReviewSession() {
     // Warm up speechSynthesis on the first grade gesture. This satisfies the
     // browser's autoplay policy (Chromium / WebKit) so that speakNameOnReveal
     // fires on the very next card without requiring the user to manually tap
-    // the speaker icon first. Must run synchronously here — after any `await`
+    // the speaker icon first. Must run synchronously here - after any `await`
     // the gesture context is lost and the warm-up would not count (#479).
     warmupTts();
 
     setGrading(true);
 
     // Snapshot the pre-grade state for single-step undo. The previous
-    // snapshot (if any) is replaced — undo is one-deep, not a stack.
+    // snapshot (if any) is replaced - undo is one-deep, not a stack.
     const snapshot: UndoSnapshot = {
       cards,                           // locale-filtered view for setCards restore
       fullCards: fullSessionRef.current, // full array for saveSession
@@ -2256,7 +2256,7 @@ export function ReviewSession() {
       // nextReview throws a RangeError for invalid grades (e.g. corrupt
       // payload or future grade-log replay). Log, surface a non-fatal banner,
       // and unlock the session so the user can continue.
-      console.error("[handleGrade] nextReview threw — skipping corrupt grade:", err);
+      console.error("[handleGrade] nextReview threw - skipping corrupt grade:", err);
       setGrading(false);
       setGradeError(t("gradeErrorMessage"));
       return;
@@ -2296,7 +2296,7 @@ export function ReviewSession() {
     );
 
     // Decode-ahead: fetch and decode the next card's sprite(s) before advancing
-    // React state. `SpritePreloader` has already warmed the network cache —
+    // React state. `SpritePreloader` has already warmed the network cache - 
     // this call bridges the fetch→decode gap so the bitmap is GPU-ready by the
     // time the next <Image> mounts, eliminating the residual pop-in (#719).
     //
@@ -2304,7 +2304,7 @@ export function ReviewSession() {
     // the graded card's updated state, and `nextLearningQueue`, the post-grade
     // learning queue computed below) to find what card will be shown next.
     // `buildSessionQueues` is O(n) in the card list but is already called on
-    // every render — one extra call here is negligible. The effective limits and
+    // every render - one extra call here is negligible. The effective limits and
     // scope eligibility set are those captured from the current render closure.
     const nextQueues = buildSessionQueues(
       newCards,
@@ -2317,7 +2317,7 @@ export function ReviewSession() {
 
     // Compute the post-grade learning queue here, mirroring the `setLearningQueue`
     // updater below. The decode-ahead prediction must run against the queue as it
-    // will be *after* this grade — using the pre-grade `learningQueue` closure
+    // will be *after* this grade - using the pre-grade `learningQueue` closure
     // would mispredict when the graded card re-enters a learning step (its new
     // `dueAt`) or graduates out (#719).
     const nextLearningQueue: LearningQueueEntry[] = (() => {
@@ -2349,7 +2349,7 @@ export function ReviewSession() {
     // Learn-ahead fallback: when the queue is otherwise empty, the render-time
     // card picker pulls the earliest learning card forward if it falls within
     // LEARN_AHEAD_MS. Mirror that here so the card that actually renders is the
-    // one we decode — otherwise the learn-ahead card pops in (#719).
+    // one we decode - otherwise the learn-ahead card pops in (#719).
     if (nextCardId === null) {
       const decodeNow = Date.now();
       const ahead = nextLearningQueue
@@ -2368,7 +2368,7 @@ export function ReviewSession() {
           // `preloadableSpriteUrls` returns [] for reverse cards (it feeds the
           // 320 px flip-card pipeline), so decode the picker tile sprites
           // directly here instead.
-          // Use the tighter grade-path ceiling (#1191) — sprites are
+          // Use the tighter grade-path ceiling (#1191) - sprites are
           // self-hosted and already network-warmed, so 150 ms is sufficient.
           const target = SEED_BY_ID.get(nextCard.pokemonId);
           if (target) {
@@ -2387,7 +2387,7 @@ export function ReviewSession() {
 
     // Optionally wait for any in-progress cry and/or TTS playback to finish
     // before swapping the visible card. When `waitForAudioOnGrade` is on
-    // (default), today's behaviour is preserved — the swap is deferred until
+    // (default), today's behaviour is preserved - the swap is deferred until
     // audio finishes. When off, the swap fires immediately and audio continues
     // playing under the next card: cry/TTS are global and are not cut off,
     // only overlapped. This removes the ~1-3 s audio-wait lag from the grade
@@ -2438,7 +2438,7 @@ export function ReviewSession() {
     // Update the per-direction tally. Good (4) and Easy (5) count as passes;
     // Again (1) and Hard (2) do not. Only directions that receive at least one
     // grade appear in the map, so the session-end row omits directions with no
-    // history — matching the convention in computeDirectionBreakdown.
+    // history - matching the convention in computeDirectionBreakdown.
     setSessionDirectionGrades((prev) => {
       const dir = effectiveCard.cardType;
       const existing = prev.get(dir) ?? { total: 0, passes: 0 };
@@ -2471,8 +2471,8 @@ export function ReviewSession() {
     // Written regardless of speciesJustMastered so lapse events (count going
     // down) are also reflected, and so the cache is accurate for any grade.
     // Skipped while superuser-guarded (consistent with other localStorage
-    // writes). Uses `filterMastered` — the same authoritative derivation as
-    // `computeStats` — so the parity contract test can hold (#1489).
+    // writes). Uses `filterMastered` - the same authoritative derivation as
+    // `computeStats` - so the parity contract test can hold (#1489).
     if (
       !superuserGuarded &&
       (effectiveCard.cardType === "name" || effectiveCard.cardType === "reverse")
@@ -2485,7 +2485,7 @@ export function ReviewSession() {
     }
     if (!superuserGuarded) {
       // MULTI-LOCALE: this writes the due-count + has-history cache for ALL
-      // locales, so it must see the full multi-locale array — not the
+      // locales, so it must see the full multi-locale array - not the
       // active-locale-filtered `newCards`, which would zero every other
       // language's badge on each grade (#1484 clarity follow-up review).
       writeDueCountCacheFromCards(fullSessionRef.current, today);
@@ -2515,7 +2515,7 @@ export function ReviewSession() {
         }
         return [...prev, newEntry];
       } else {
-        // Card has graduated or is in a non-learning state — remove from queue.
+        // Card has graduated or is in a non-learning state - remove from queue.
         return prev.filter((e) => e.cardId !== effectiveCard.id);
       }
     });
@@ -2532,7 +2532,7 @@ export function ReviewSession() {
     // same card) gets a fresh SpritePicker mount with a re-shuffled option
     // grid (#496).
     setCardPresentationCount((n) => n + 1);
-    // Clear any previous grade error — the user has successfully graded a card,
+    // Clear any previous grade error - the user has successfully graded a card,
     // so the "please retry" banner is no longer relevant.
     setGradeError(null);
     setGrading(false);
@@ -2549,10 +2549,10 @@ export function ReviewSession() {
     // resolves. Undo reads it from undoSnapshotRef.current at click-time; if
     // the user undoes before persistence completes the entry is simply left in
     // the grade log (a minor non-critical omission in an extremely narrow race
-    // window — the same behaviour as if IDB were slow under the old ordering).
+    // window - the same behaviour as if IDB were slow under the old ordering).
     persistenceChainRef.current = persistenceChainRef.current.then(async () => {
       if (!isMountedRef.current) return;
-      // saveSession resolves with { ok: true } or { ok: false } — it never
+      // saveSession resolves with { ok: true } or { ok: false } - it never
       // rejects. Only append to the grade log when the session blob persisted
       // successfully; writing the grade log on a failed session write would
       // create a split-write where the grade log advanced past the saved state
@@ -2565,14 +2565,14 @@ export function ReviewSession() {
       notifySaveResult(saveResult);
       if (!saveResult.ok) {
         console.error(
-          "[handleGrade] saveSession failed — skipping grade-log append to avoid split-write:",
+          "[handleGrade] saveSession failed - skipping grade-log append to avoid split-write:",
           saveResult.reason,
         );
         // Do NOT set the undo snapshot on a failed save (#1209). The undo
         // button stays disabled so its enabled state matches persisted state.
         return;
       }
-      // Session persisted successfully — arm the undo snapshot now so the
+      // Session persisted successfully - arm the undo snapshot now so the
       // undo button only becomes active when there is a durable write to
       // revert (#1209).
       undoSnapshotRef.current = snapshot;
@@ -2608,9 +2608,9 @@ export function ReviewSession() {
     // reload (#685). React state setters above are async; compute totals from
     // the pre-grade snapshot + this grade. snapshot.sessionGradeSeq is
     // already the day's cumulative sequence (hydrated at mount), so writing
-    // directly is correct — no need to re-read and merge from localStorage.
+    // directly is correct - no need to re-read and merge from localStorage.
     // Skipped while a superuser flag is on so QA grade sequences never reach
-    // localStorage — consistent with the cloud write-guard.
+    // localStorage - consistent with the cloud write-guard.
     if (!superuserGuarded) {
       const nextGradeSeq = [...snapshot.sessionGradeSeq, grade];
       const nextNewCards =
@@ -2630,10 +2630,10 @@ export function ReviewSession() {
     // Badge award (#420). Deferred to a macrotask so the heavy
     // `masteredSpeciesIds` scan and Set construction run after the visible
     // swap commits (#1191 Class B item 9). The toast can appear a frame later
-    // — that is the deliberate trade for instant swap. Only fires when a name
+    // - that is the deliberate trade for instant swap. Only fires when a name
     // card just crossed the mastery threshold.
     //
-    // Superuser guard: skip entirely while any flag is on — see the full
+    // Superuser guard: skip entirely while any flag is on - see the full
     // rationale in the comment below.
     if (!wasMastered && nowMastered && effectiveCard.cardType === "name" && !superuserGuarded) {
       // Capture values needed inside the timeout closure now, before they
@@ -2684,7 +2684,7 @@ export function ReviewSession() {
     }
     // Roll back the persisted daily summary to match the reverted state (#685).
     // Skipped while a superuser flag is on so QA grade sequences never reach
-    // localStorage — consistent with the cloud write-guard.
+    // localStorage - consistent with the cloud write-guard.
     if (!superuserGuarded) {
       const seq = snapshot.sessionGradeSeq;
       saveDailySummary({
@@ -2715,7 +2715,7 @@ export function ReviewSession() {
   // Extract the English display name once for all render branches below.
   // Each child component (PokemonCard, MultipleChoiceNameCard, TypedEntryNameCard)
   // calls useLocalePokemonName internally, so `cardEnglishName` is the
-  // fallback argument, not a final render value — the lint rule is intentionally
+  // fallback argument, not a final render value - the lint rule is intentionally
   // suppressed here (#1327).
   // EvolutionReviewCard and ReverseEvolutionReviewCard do not carry displayName
   // (they render via EvolutionCard, not PokemonCard), so we fall back to ""
@@ -2752,7 +2752,7 @@ export function ReviewSession() {
         }
         queueStateBadge={<QueueStateBadge state={effectiveCard.state} forceCardsGraduated={superuserFlags.forceCardsGraduated} />}
         cardRegion={
-          /* Swipeable card wrapper — pointer listeners attached here (#1052).
+          /* Swipeable card wrapper - pointer listeners attached here (#1052).
              PokemonCard reserves the revealed-state height in its answer container
              so the bounding box is stable across reveal (#1104). The cry play
              button (h-28 ≈ 7rem) coincidentally matches that reserved height, so
@@ -2937,7 +2937,7 @@ export function ReviewSession() {
   // A card is in the learning phase when it has never graduated (lastReview is
   // null) OR when it is currently working through learning/relearning steps
   // (learningStep is not null). The scheduler sets lastReview only on graduation
-  // or lapse — not on in-step touches — so this check is reliable.
+  // or lapse - not on in-step touches - so this check is reliable.
   //
   // `forceCardsGraduated` (superuser flag #1270) bypasses this so typed-entry
   // mode can be tested without grinding through learning steps.
@@ -2955,7 +2955,7 @@ export function ReviewSession() {
 
   // Pre-build MC options when we know we will render the MC card. The options
   // array is stable per card id: the same 4 options and order appear on every
-  // replay during learning steps. This is deliberate — replays are about
+  // replay during learning steps. This is deliberate - replays are about
   // recognition, not re-puzzle-solving.
   const mcOptions =
     isMcLearningActive
@@ -3033,7 +3033,7 @@ export function ReviewSession() {
             grading={grading}
           />
         ) : (
-          /* Swipeable card wrapper — pointer listeners attached here (#1052).
+          /* Swipeable card wrapper - pointer listeners attached here (#1052).
              PokemonCard and EvolutionCard reserve the revealed-state height in
              their inner answer container (min-h-[7rem]), so the card's bounding
              box is the same size across reveal and centring does not cause the

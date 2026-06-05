@@ -15,14 +15,14 @@ const DISMISS_AFTER_MS = 4500;
 /**
  * Self-dismissing reveal toast for newly earned gym badges (#420). Pinned
  * bottom-centre, above all other UI. The reveal moment is the whole point
- * of the secret-until-earned design — keep the visual restrained but
+ * of the secret-until-earned design - keep the visual restrained but
  * unmistakable.
  *
  * Auto-dismisses after 4.5s; user can tap/click to dismiss earlier.
  * `role="status"` so screen readers announce the badge name politely.
  *
  * `onDismiss` is read through a ref so a fresh function identity from the
- * parent re-render (very common — every grade re-renders ReviewSession)
+ * parent re-render (very common - every grade re-renders ReviewSession)
  * does not restart the dismiss timer.
  */
 export function BadgeToast({ badgeName, badgeDescription, onDismiss }: Props) {

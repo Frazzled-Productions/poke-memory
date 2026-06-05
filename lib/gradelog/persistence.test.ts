@@ -172,7 +172,7 @@ describe("appendGradeEntry (IDB-backed)", () => {
 
   it("retains entries older than 365 days on the IDB path", async () => {
     // Seed old entries directly into IDB, then append a new one.
-    // The IDB path must not prune by date — full history is kept.
+    // The IDB path must not prune by date - full history is kept.
     const { openAppDb } = await import("@/lib/idb/db");
     vi.stubGlobal("window", {
       indexedDB: globalThis.indexedDB,
@@ -188,7 +188,7 @@ describe("appendGradeEntry (IDB-backed)", () => {
 
     await appendGradeEntry({ date: "2026-05-09", grade: 5, cardType: "evolution" });
     const log = await loadGradeLog();
-    // Both old entries are retained — no date-based prune on the IDB path.
+    // Both old entries are retained - no date-based prune on the IDB path.
     expect(log.some((e) => e.date === "2024-05-08")).toBe(true);
     expect(log.some((e) => e.date === "2025-05-09")).toBe(true);
     expect(log.some((e) => e.date === "2026-05-09")).toBe(true);

@@ -1,0 +1,198 @@
+name: Auto Close Umbrella
+
+# Auto-closes an umbrella issue when every child it tracks has been closed.
+#
+# Why this exists
+# ---------------
+# Umbrella issues (weekly digests like #1618 / #1601, epics like #1445) spawn
+# child issues. When every child is resolved the maintainer otherwise has to
+# close the umbrella by hand - avoidable toil. This workflow closes it for
+# them. Surfaced during the 2026-06-04 batch drain, where #1618 / #1601 / #1445
+# were left open after their children shipped.
+#
+# How an umbrella declares its children
+# -------------------------------------
+# Primary signal: a GitHub task-list of `#N` references in the umbrella body,
+# i.e. lines matching `- [ ] #N` or `- [x] #N`. The checkbox tick is NOT
+# trusted - each child's real state is read from the API. Plain `#N` prose
+# references are ignored (they are not a tracking declaration).
+#
+# Opt-in gate
+# -----------
+# Auto-close fires only for umbrellas carrying the `auto-close-when-complete`
+# label. Weekly digests are point-in-time snapshots and are safe to auto-close
+# once their listed proposals are filed / resolved, so they should carry the
+# label by default. Open-ended epics (e.g. #1445) keep gaining children, so
+# they deliberately do NOT carry the label and never auto-close. The umbrella
+# (not the child) must carry the label. The maintainer must create the
+# `auto-close-when-complete` label once - there is no label-sync manifest in
+# this repo to add it to.
+#
+# Finding candidate umbrellas
+# ---------------------------
+# We do NOT use `gh issue list --search '... in:body'` - GitHub's search index
+# strips body content / HTML-comment tokens, so a body-text search is
+# unreliable (documented in auto-retro-harvest.yml). Instead we list every open
+# issue carrying the gate label and filter locally with jq on the fetched body.
+#
+# Child-reopened case
+# -------------------
+# There is intentionally NO `reopened` trigger. Reopening a child does NOT
+# reopen the umbrella - a human reopens the umbrella if they want it back. This
+# avoids thrashing the umbrella open/closed as children churn.
+#
+# Batch-close race
+# ----------------
+# A `qa -> main` promotion PR can close ~20 issues at once, firing ~20 runs that
+# all evaluate the same umbrella. The "umbrella already closed" guard plus
+# `cancel-in-progress: false` make this safe: the first run that finds all
+# children closed closes the umbrella, and every later run finds it already
+# closed and skips. Children closing on the default branch via the promotion PR
+# is the correct trigger point.
+#
+# Token / auth follows the auto-status.yml pattern (repo-scoped App token for
+# issue reads / writes). British English; no em dashes anywhere.
+
+on:
+  issues:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Closed child issue number to evaluate umbrellas for"
+        required: true
+        type: string
+      dry_run:
+        description: "Report what would close without closing"
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: auto-close-umbrella-${{ github.event.issue.number || github.event.inputs.issue_number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  close-umbrella:
+    name: Close completed umbrella
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Mint repo-scoped App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Evaluate umbrellas
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          # The just-closed child issue number (from the issues event, or the
+          # manual dispatch input).
+          CLOSED: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+
+          echo "Evaluating umbrellas tracking the just-closed issue #$CLOSED (dry_run=$DRY_RUN)."
+
+          # Find candidate umbrellas: OPEN issues carrying the gate label whose
+          # body tracks the just-closed number as a task-list item. The jq regex
+          # matches `- [ ] #N` and `- [x] #N` but requires a non-digit (or end
+          # of line) after N, so #157 does not match a closed #1573.
+          CANDIDATES=$(gh issue list \
+            --repo "$REPO" \
+            --state open \
+            --label "auto-close-when-complete" \
+            --limit 200 \
+            --json number,body \
+            --jq '.[] | select(.body | test("- \\[.\\] #" + env.CLOSED + "([^0-9]|$)")) | .number')
+
+          if [ -z "$CANDIDATES" ]; then
+            echo "No open umbrella with the auto-close-when-complete label tracks #$CLOSED. Nothing to do."
+            exit 0
+          fi
+
+          echo "Candidate umbrella(s): $(echo "$CANDIDATES" | tr '\n' ' ')"
+
+          for UMBRELLA in $CANDIDATES; do
+            echo "::group::Umbrella #$UMBRELLA"
+
+            # Guard: skip if the umbrella is already closed (covers the
+            # batch-close race - a sibling run may have closed it first).
+            STATE=$(gh api "repos/$REPO/issues/$UMBRELLA" --jq '.state' 2>/dev/null || echo "")
+            if [ "$STATE" != "open" ]; then
+              echo "Umbrella #$UMBRELLA is '$STATE' (not open) - skipping."
+              echo "::endgroup::"
+              continue
+            fi
+
+            BODY=$(gh api "repos/$REPO/issues/$UMBRELLA" --jq '.body // ""')
+
+            # Extract child numbers from task-list lines only. Plain `#N` prose
+            # references are deliberately ignored - only `- [ ] #N` / `- [x] #N`
+            # count as a tracking declaration. Both checkbox states are read.
+            CHILDREN=$(printf '%s\n' "$BODY" \
+              | grep -oE '^[[:space:]]*- \[.\] #[0-9]+' \
+              | grep -oE '[0-9]+' \
+              | sort -un || true)
+
+            # Best-effort secondary read: GitHub-native sub-issues, unioned with
+            # the task-list children. Sub-issue API errors are non-fatal - the
+            # task list is the primary signal.
+            SUBISSUES=$(gh api "repos/$REPO/issues/$UMBRELLA/sub_issues" --paginate \
+              --jq '.[].number' 2>/dev/null || true)
+            if [ -n "$SUBISSUES" ]; then
+              echo "Found GitHub-native sub-issue(s): $(echo "$SUBISSUES" | tr '\n' ' ')"
+              CHILDREN=$(printf '%s\n%s\n' "$CHILDREN" "$SUBISSUES" \
+                | grep -E '^[0-9]+$' | sort -un || true)
+            fi
+
+            if [ -z "$CHILDREN" ]; then
+              echo "Umbrella #$UMBRELLA has no task-list child refs - cannot determine completeness, skipping."
+              echo "::endgroup::"
+              continue
+            fi
+
+            echo "Tracked children: $(echo "$CHILDREN" | tr '\n' ' ')"
+
+            # Verify each child's REAL state via the API (the checkbox tick is
+            # not trusted). A fetch error is treated as "not closed" so a
+            # transient failure can never trigger an erroneous close.
+            ALL_CLOSED=true
+            CHILD_REFS=""
+            for CHILD in $CHILDREN; do
+              CHILD_STATE=$(gh api "repos/$REPO/issues/$CHILD" --jq '.state' 2>/dev/null || echo "")
+              if [ "$CHILD_STATE" != "closed" ]; then
+                echo "Child #$CHILD state is '${CHILD_STATE:-unknown}' (not closed) - umbrella stays open."
+                ALL_CLOSED=false
+                break
+              fi
+              CHILD_REFS="${CHILD_REFS:+$CHILD_REFS, }#$CHILD"
+            done
+
+            if [ "$ALL_CLOSED" != "true" ]; then
+              echo "Not all children of #$UMBRELLA are closed - skipping."
+              echo "::endgroup::"
+              continue
+            fi
+
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "[DRY RUN] Would close umbrella #$UMBRELLA."
+              gh issue comment "$UMBRELLA" --repo "$REPO" \
+                --body "[DRY RUN] Would close: all tracked children ($CHILD_REFS) are now closed."
+            else
+              echo "All tracked children closed - closing umbrella #$UMBRELLA."
+              gh issue close "$UMBRELLA" --repo "$REPO" \
+                --reason completed \
+                --comment "Auto-closed: all tracked children ($CHILD_REFS) are now closed."
+            fi
+
+            echo "::endgroup::"
+          done

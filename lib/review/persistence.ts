@@ -24,7 +24,7 @@ export const STORAGE_KEY = KEY_REVIEW_SESSION;
 // then layers the extra checks on top.
 //
 // Returns boolean (not a type predicate) because the checks here do not cover
-// every field required to soundly narrow to ReviewableCard — subjectKey,
+// every field required to soundly narrow to ReviewableCard - subjectKey,
 // flavorTexts, evolutionChain, pokemonId, and others are absent.  A
 // type-predicate return would be a lie the compiler would trust.  The single
 // authoritative cast lives in parseSession, at the point where the validated
@@ -32,7 +32,7 @@ export const STORAGE_KEY = KEY_REVIEW_SESSION;
 function isReviewCardShaped(value: unknown): boolean {
   if (!isBaseCardShaped(value)) return false;
   // isBaseCardShaped narrows value to Record<string, unknown> and guarantees a
-  // valid cardType, state.dueDate, id, and — for evolution cards — a recognised
+  // valid cardType, state.dueDate, id, and - for evolution cards - a recognised
   // evolution shape.  We only need to add the extra checks below.
 
   // Evolution cards were fully validated by isBaseCardShaped.
@@ -40,7 +40,7 @@ function isReviewCardShaped(value: unknown): boolean {
 
   if (value.cardType === "reverse-evolution") {
     // Edge card derived 1:1 from a forward EvolutionCard (#343). Shares the
-    // postEvoId-keyed shape and is refreshed from seed on hydrate — no
+    // postEvoId-keyed shape and is refreshed from seed on hydrate - no
     // name/spriteUrl is ever serialised for edge cards.
     return typeof value.preEvoId === "number" && typeof value.postEvoId === "number";
   }
@@ -98,7 +98,7 @@ function migrateDailyLimits(raw: unknown): DailyLimits {
         : { ...DEFAULT_LIMITS.cry },
     };
   }
-  // Legacy flat shape — promote to name limits, the rest get defaults.
+  // Legacy flat shape - promote to name limits, the rest get defaults.
   if (
     typeof raw.maxNewPerDay === "number" &&
     typeof raw.maxReviewsPerDay === "number"
@@ -119,10 +119,10 @@ function migrateDailyLimits(raw: unknown): DailyLimits {
 // Backfills missing state fields from localStorage. No-op on already-present
 // fields. Migrations applied in order so older sessions pick up every missing
 // field regardless of which version they last saved on:
-//   1. firstSeen     — backfill from lastReview (added before learningStep)
-//   2. learningStep  — backfill to null (not in a step)
-//   3. stepStartedAt — concrete timestamp for in-learning cards, null for graduated cards
-//   4. SM-2 → FSRS — if `stability` is missing, derive FSRS fields from the
+//   1. firstSeen - backfill from lastReview (added before learningStep)
+//   2. learningStep - backfill to null (not in a step)
+//   3. stepStartedAt - concrete timestamp for in-learning cards, null for graduated cards
+//   4. SM-2 → FSRS - if `stability` is missing, derive FSRS fields from the
 //      old SM-2 fields (repetitions / interval / easeFactor) and remove them.
 //      Mirrors the formula in #263.
 export function migrateReviewState(state: unknown): void {
@@ -141,13 +141,13 @@ export function migrateReviewState(state: unknown): void {
   }
   if (s.hiddenSince === undefined) {
     // Backfill for sessions saved before #333. Null means "currently eligible
-    // under the filter" — the reconciliation step on next load will set it
+    // under the filter" - the reconciliation step on next load will set it
     // forward when applicable.
     s.hiddenSince = null;
   }
   if (typeof s.seenInPasture !== "boolean") {
     // Backfill for sessions saved before #350. Existing mastered cards have
-    // not yet been acknowledged in the pasture — default to false so they
+    // not yet been acknowledged in the pasture - default to false so they
     // appear as "new arrivals" the first time the pasture page is visited.
     s.seenInPasture = false;
   }
@@ -188,7 +188,7 @@ export function migrateReviewState(state: unknown): void {
 // exercise the legacy-shape migration without needing a localStorage harness.
 //
 // Legacy evolution cards (#262 retired the per-pre-evo shape): no migration
-// is attempted here — they're filtered out at session-load time by
+// is attempted here - they're filtered out at session-load time by
 // isLegacyEvolutionCard() because there's no 1:N mapping to the new edge
 // cards. This function is a no-op for them.
 export function migrateReviewCard(card: unknown): void {
@@ -197,7 +197,7 @@ export function migrateReviewCard(card: unknown): void {
   if (c.cardType === undefined) {
     c.cardType = "name";
   }
-  // Backfill locale for cards saved before #1259 — all pre-existing cards are
+  // Backfill locale for cards saved before #1259 - all pre-existing cards are
   // English-language cards, so "en" is the correct default.
   if (c.locale === undefined) {
     c.locale = "en";
@@ -252,7 +252,7 @@ function parseSession(raw: string): SavedSession | null {
       // localised cast here is the honest narrowing point.
       const validated = parsed as ReviewableCard[];
       // isLegacyEvolutionCard identifies legacy cards to drop; it is not a type
-      // predicate, so we use a plain boolean filter — no inline type assertion needed.
+      // predicate, so we use a plain boolean filter - no inline type assertion needed.
       const filtered = validated.filter((c) => !isLegacyEvolutionCard(c));
       return {
         cards: filtered,
@@ -313,7 +313,7 @@ export async function loadSession(): Promise<SavedSession | null> {
   try {
     const raw = await idbGet(STORAGE_KEY);
     if (raw === null) {
-      // IDB had nothing — check localStorage as a last resort (covers the
+      // IDB had nothing - check localStorage as a last resort (covers the
       // window between migration running and a fresh install).
       return loadSessionLS();
     }
@@ -360,7 +360,7 @@ function saveSessionLS(session: SavedSession): SaveResult {
 /**
  * CustomEvent name dispatched on `window` whenever the review session is
  * written to IndexedDB (or localStorage). Subscribers that need a reliable
- * post-IDB-write signal — such as BottomTabBar — should listen for this
+ * post-IDB-write signal - such as BottomTabBar - should listen for this
  * event in addition to (or instead of) the synthetic `storage` event, because
  * WebKit does not reliably propagate synthetic StorageEvents to same-tab
  * `storage` listeners after an addInitScript IDB seed.
@@ -372,7 +372,7 @@ export const SESSION_CHANGED_EVENT = "poke-memory:session-changed";
 // Every IDB (or localStorage) session write bumps a monotonically increasing
 // counter on `window`. Components that subscribe to SESSION_CHANGED_EVENT can
 // capture this counter at mount time and then check in a `requestAnimationFrame`
-// whether the counter advanced before their listener attached — catching the
+// whether the counter advanced before their listener attached - catching the
 // race where the write (and event dispatch) happened before the React tree
 // hydrated and the listener was registered.
 //
@@ -384,7 +384,7 @@ declare global {
     // Set by the E2E seed helper (e2e/helpers/seedIdb.ts) before page.goto.
     // Resolves when the IDB seed transaction commits. loadSession awaits this
     // when present so the app never reads IDB before the test seed is durable.
-    // Never set in production — the guard is a no-op outside the test harness.
+    // Never set in production - the guard is a no-op outside the test harness.
     __seedIdbReady?: Promise<void>;
   }
 }
@@ -449,7 +449,7 @@ export async function saveSession(session: SavedSession): Promise<SaveResult> {
 
   await idbSet(STORAGE_KEY, json);
 
-  // idbSet swallows internal errors without throwing — it just flips
+  // idbSet swallows internal errors without throwing - it just flips
   // idbAvailable to false. Check after the await so a silently-failed write
   // falls back to localStorage instead of returning a false-positive ok.
   if (!isIdbAvailable()) {

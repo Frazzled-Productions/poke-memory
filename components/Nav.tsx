@@ -13,7 +13,7 @@ export async function Nav() {
         className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3"
         aria-label={t("ariaLabel")}
       >
-        {/* Brand — always visible */}
+        {/* Brand - always visible */}
         <Link
           href="/"
           className="flex items-center gap-2 text-sm font-bold tracking-tight text-theme-fg-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
@@ -25,14 +25,14 @@ export async function Nav() {
           {t("brand")}
         </Link>
 
-        {/* Desktop horizontal link row — hidden below md */}
+        {/* Desktop horizontal link row - hidden below md */}
         <div className="hidden md:flex md:items-center md:gap-1">
           <Suspense fallback={<NavLinksFallback />}>
             <NavLinks />
           </Suspense>
         </div>
 
-        {/* Mobile slot — hamburger or auth cluster depending on mobileNav setting */}
+        {/* Mobile slot - hamburger or auth cluster depending on mobileNav setting */}
         <MobileNavSlot />
       </nav>
     </header>

@@ -66,7 +66,7 @@ export function computeNextReview(
   }
 
   // Find the earliest dueDate among started cards. String comparison is safe
-  // for YYYY-MM-DD strings — lexicographic order matches calendar order.
+  // for YYYY-MM-DD strings - lexicographic order matches calendar order.
   const earliest = relevant.reduce((min, c) =>
     c.state.dueDate < min ? c.state.dueDate : min,
     relevant[0].state.dueDate,

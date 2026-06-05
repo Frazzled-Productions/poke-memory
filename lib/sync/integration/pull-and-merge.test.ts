@@ -4,18 +4,18 @@
  * Covers the real-Postgres behaviour that pullAndMerge / pushSingleCard depend on
  * but that unit tests (with mocked Supabase) cannot verify:
  *
- * 1. Upsert conflict resolution — INSERT … ON CONFLICT (user_id, card_type,
+ * 1. Upsert conflict resolution - INSERT … ON CONFLICT (user_id, card_type,
  *    subject_key, locale) DO UPDATE correctly overwrites every FSRS field when
  *    a row already exists, and correctly INSERTs when no row exists.
  *    After migration 029 the PK includes `locale`.
  *
- * 2. Forward-progress is preserved — upserting a row with an older last_review
+ * 2. Forward-progress is preserved - upserting a row with an older last_review
  *    via a same-key INSERT does NOT trigger the regression trigger (the upsert
  *    arrives as a new-INSERT on ON CONFLICT path), but an explicit UPDATE with
  *    a regressed last_review still fires the trigger (regression-trigger.test.ts
  *    covers that path; this file confirms the ON CONFLICT update does not).
  *
- * 3. Per-card conflict rule semantics — the `mergeCloudIntoLocalSilent` function
+ * 3. Per-card conflict rule semantics - the `mergeCloudIntoLocalSilent` function
  *    implements a lastPullAt-based rule. This test verifies the *DB preconditions*
  *    that rule relies on:
  *    a. updated_at is written correctly on every upsert (the merge rule reads it
@@ -25,20 +25,20 @@
  *    c. A repeated upsert of the same state (no change) still writes updated_at
  *       (PostgreSQL ON CONFLICT DO UPDATE unconditionally executes the SET clause).
  *
- * 4. Multi-user isolation — two users sharing the same (card_type, subject_key)
+ * 4. Multi-user isolation - two users sharing the same (card_type, subject_key)
  *    are stored as separate rows and neither upsert clobbers the other.
  *
- * 5. seen_in_pasture one-way invariant (migration 017) — the upsert path that
+ * 5. seen_in_pasture one-way invariant (migration 017) - the upsert path that
  *    tries to write seen_in_pasture = false when the existing row has true must be
  *    rejected by the trigger, even when arriving as an ON CONFLICT DO UPDATE.
  *
- * 6. card_type discriminator — two cards with the same subject_key but different
+ * 6. card_type discriminator - two cards with the same subject_key but different
  *    card_types are stored as entirely independent rows in the composite PK.
  *
  * All writes use direct SQL via pg (no Supabase JS client). The ON CONFLICT clause
  * is written to match the pushSingleCard / pushSession production paths (lib/sync/cloud.ts),
  * which always include both `hidden_since` and `seen_in_pasture` in every upsert.
- * Note: the beacon route (app/api/sync/route.ts) takes a slightly different approach —
+ * Note: the beacon route (app/api/sync/route.ts) takes a slightly different approach - 
  * it always writes `hidden_since` but conditionally omits `seen_in_pasture` when the
  * field is null, so that a missing value on the wire does not clobber an existing true.
  * The helper here matches the pushSingleCard / pushSession shape; the trigger-rejection
@@ -234,7 +234,7 @@ describe("upsert conflict resolution (integration)", () => {
   });
 
   it("ON CONFLICT overwrites all FSRS fields on second upsert of same key", async () => {
-    // First upsert — baseline state.
+    // First upsert - baseline state.
     await upsertAndCommit(pool, USER_A, {
       subjectKey: "1002",
       reps: 1,
@@ -247,7 +247,7 @@ describe("upsert conflict resolution (integration)", () => {
       updatedAt: T1,
     });
 
-    // Second upsert — newer FSRS state (simulates a review on another device).
+    // Second upsert - newer FSRS state (simulates a review on another device).
     await upsertAndCommit(pool, USER_A, {
       subjectKey: "1002",
       reps: 2,
@@ -335,7 +335,7 @@ describe("multi-user isolation (integration)", () => {
     await upsertAndCommit(pool, USER_A, { subjectKey: KEY, reps: 1 });
     await upsertAndCommit(pool, USER_B, { subjectKey: KEY, reps: 5, stability: 9.9 });
 
-    // Re-upsert USER_A with different state — must not touch USER_B's row.
+    // Re-upsert USER_A with different state - must not touch USER_B's row.
     await upsertAndCommit(pool, USER_A, {
       subjectKey: KEY,
       reps: 2,
@@ -363,7 +363,7 @@ describe("updated_at as merge-rule anchor (integration)", () => {
     expect(rowAfterFirst).not.toBeNull();
     const firstAt = (rowAfterFirst!.updated_at as Date).toISOString();
     // T1 must compare correctly against itself. The merge rule checks
-    // `row.updated_at > lastPullAt` — a pull anchored at T1 would see this row
+    // `row.updated_at > lastPullAt` - a pull anchored at T1 would see this row
     // as "not newer" (T1 is not > T1) and would keep local state.
     expect(firstAt).toBe(T1);
 
@@ -378,7 +378,7 @@ describe("updated_at as merge-rule anchor (integration)", () => {
     const rowAfterSecond = await readCard(USER_A, "name", "3001");
     expect(rowAfterSecond).not.toBeNull();
     const secondAt = (rowAfterSecond!.updated_at as Date).toISOString();
-    // T2 > T1 — a pull anchored at T1 correctly classifies this row as newer
+    // T2 > T1 - a pull anchored at T1 correctly classifies this row as newer
     // and would take the cloud row.
     expect(secondAt > T1).toBe(true);
     expect(Number(rowAfterSecond!.reps)).toBe(3);
@@ -387,7 +387,7 @@ describe("updated_at as merge-rule anchor (integration)", () => {
   it("a fresh-device pull (lastPullAt = null) can read the stored row", async () => {
     // When lastPullAt is null, mergeCloudIntoLocalSilent applies cloud state to
     // any local card that has no progress (lastReview === null). This test
-    // verifies that after an upsert the row is readable — the fields the merge
+    // verifies that after an upsert the row is readable - the fields the merge
     // function reads (reps, last_review, first_seen, updated_at) are all present.
     await upsertAndCommit(pool, USER_A, {
       subjectKey: "3002",
@@ -478,7 +478,7 @@ describe("card_type discriminator (integration)", () => {
   it("same subject_key with different card_types are stored as separate rows", async () => {
     // The composite PK is (user_id, card_type, subject_key). Two cards with the
     // same subject_key but different types (e.g. 'name' vs 'reverse') must be
-    // independent rows — a conflict on one must not overwrite the other.
+    // independent rows - a conflict on one must not overwrite the other.
     const KEY = "5001";
 
     await upsertAndCommit(pool, USER_A, {
@@ -511,7 +511,7 @@ describe("card_type discriminator (integration)", () => {
     await upsertAndCommit(pool, USER_A, { subjectKey: KEY, cardType: "name", reps: 1 });
     await upsertAndCommit(pool, USER_A, { subjectKey: KEY, cardType: "reverse", reps: 7 });
 
-    // Re-upsert the 'name' row with updated data — must not affect 'reverse'.
+    // Re-upsert the 'name' row with updated data - must not affect 'reverse'.
     await upsertAndCommit(pool, USER_A, {
       subjectKey: KEY,
       cardType: "name",
@@ -555,7 +555,7 @@ describe("locale discriminator (integration, #1259)", () => {
     await upsertAndCommit(pool, USER_A, { subjectKey: KEY, locale: "en", reps: 5, stability: 6.5 });
     await upsertAndCommit(pool, USER_A, { subjectKey: KEY, locale: "ja", reps: 1, stability: 1.0 });
 
-    // Re-upsert the "ja" row with different state — must not touch the "en" row.
+    // Re-upsert the "ja" row with different state - must not touch the "en" row.
     await upsertAndCommit(pool, USER_A, {
       subjectKey: KEY,
       locale: "ja",

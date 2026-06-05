@@ -31,7 +31,7 @@ const THREE_GENS = [
 // Null / below-threshold cases
 // ---------------------------------------------------------------------------
 
-describe("detectTopMilestone — no milestone", () => {
+describe("detectTopMilestone - no milestone", () => {
   it("returns null for 0 mastered", () => {
     expect(detectTopMilestone(0, EMPTY_GENS)).toBeNull();
   });
@@ -49,7 +49,7 @@ describe("detectTopMilestone — no milestone", () => {
 // Count milestones
 // ---------------------------------------------------------------------------
 
-describe("detectTopMilestone — mastery-count kind", () => {
+describe("detectTopMilestone - mastery-count kind", () => {
   it("returns the lowest threshold when exactly at 10", () => {
     const result = detectTopMilestone(10, EMPTY_GENS);
     expect(result).not.toBeNull();
@@ -96,7 +96,7 @@ describe("detectTopMilestone — mastery-count kind", () => {
 // Generation-complete milestones
 // ---------------------------------------------------------------------------
 
-describe("detectTopMilestone — gen-complete kind", () => {
+describe("detectTopMilestone - gen-complete kind", () => {
   it("returns gen-complete when a generation is fully mastered", () => {
     const gens = [makeGen(1, 151, 151), makeGen(2, 100, 0)];
     const result = detectTopMilestone(200, gens);
@@ -148,7 +148,7 @@ describe("detectTopMilestone — gen-complete kind", () => {
 // All-mastered
 // ---------------------------------------------------------------------------
 
-describe("detectTopMilestone — all-mastered kind", () => {
+describe("detectTopMilestone - all-mastered kind", () => {
   it("returns all-mastered at exactly 1025", () => {
     const result = detectTopMilestone(1025, EMPTY_GENS);
     expect(result).not.toBeNull();

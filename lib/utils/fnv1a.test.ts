@@ -24,7 +24,7 @@ describe("fnv1a", () => {
     expect(fnv1a("test")).toBeGreaterThanOrEqual(0);
   });
 
-  it("is deterministic — same input always yields the same output", () => {
+  it("is deterministic - same input always yields the same output", () => {
     expect(fnv1a("Bulbasaur")).toBe(fnv1a("Bulbasaur"));
   });
 
@@ -74,7 +74,7 @@ describe("fnv1aUint32", () => {
     expect(fnv1aUint32(0xffffffff)).toBeGreaterThanOrEqual(0);
   });
 
-  it("is deterministic — same input always yields the same output", () => {
+  it("is deterministic - same input always yields the same output", () => {
     expect(fnv1aUint32(42)).toBe(fnv1aUint32(42));
   });
 
@@ -82,7 +82,7 @@ describe("fnv1aUint32", () => {
     expect(fnv1aUint32(1)).not.toBe(fnv1aUint32(2));
   });
 
-  it("honours the seed parameter — chaining two calls is equivalent to the inline 8-byte block", () => {
+  it("honours the seed parameter - chaining two calls is equivalent to the inline 8-byte block", () => {
     // The inline block from stableShuffleForDay hashes `id` then `daySalt`
     // all from FNV_OFFSET. Verify the chain produces the same result.
     const id = 25; // Pikachu
@@ -113,7 +113,7 @@ describe("fnv1aUint32", () => {
     expect(actual).toBe(expected);
   });
 
-  it("honours an explicit seed — result matches seeded inline block", () => {
+  it("honours an explicit seed - result matches seeded inline block", () => {
     // Mirrors the pickDistractors usage where the seed is a pre-computed
     // string hash rather than FNV_OFFSET.
     const seedHash = fnv1a("bulbasaur1");

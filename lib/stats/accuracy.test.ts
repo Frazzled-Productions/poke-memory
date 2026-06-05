@@ -59,7 +59,7 @@ describe("computeRollingAccuracy", () => {
     expect(computeRollingAccuracy([], TODAY, 7)).toBeNull();
   });
 
-  it("aggregates passes / total over the window — not per-day mean", () => {
+  it("aggregates passes / total over the window - not per-day mean", () => {
     const log: GradeLog = [
       // Day A: 1 review, 1 pass → 100%
       entry("2026-05-12", 4),
@@ -72,8 +72,8 @@ describe("computeRollingAccuracy", () => {
 
   it("respects the window boundary inclusively", () => {
     const log: GradeLog = [
-      entry("2026-05-06", 4), // 6 days before today — inside a 7-day window
-      entry("2026-05-05", 1), // 7 days before — outside
+      entry("2026-05-06", 4), // 6 days before today - inside a 7-day window
+      entry("2026-05-05", 1), // 7 days before - outside
     ];
     expect(computeRollingAccuracy(log, TODAY, 7)).toBe(1);
   });

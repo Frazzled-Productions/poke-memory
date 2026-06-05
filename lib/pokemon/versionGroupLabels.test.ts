@@ -55,7 +55,7 @@ describe("versionGroupLabels: completeness", () => {
       for (const vg of vgs) slugsInSeed.add(vg);
     }
     // Any key in VERSION_GROUP_LABELS that never appears in the seed is an orphan
-    // — it can never be toggled by the game-scope picker and should be removed.
+    // - it can never be toggled by the game-scope picker and should be removed.
     const orphans = Object.keys(VERSION_GROUP_LABELS).filter((k) => !slugsInSeed.has(k));
     expect(orphans).toEqual([]);
   });

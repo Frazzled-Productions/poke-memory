@@ -29,7 +29,7 @@ export type PracticeScopePreset = "starters" | "legendaries" | "incomplete-chain
  * `incompleteChainSpeciesIds` in `lib/evolution/chains.ts`).
  *
  * Callers that do not use a progress-dependent preset can omit the context
- * entirely — `speciesMatchesScope` treats a missing set as empty, so an
+ * entirely - `speciesMatchesScope` treats a missing set as empty, so an
  * `incomplete-chains` scope with no context simply matches nothing.
  */
 export type ScopeMatchContext = {
@@ -43,10 +43,10 @@ export type ScopeMatchContext = {
 /**
  * Controls which alternate-form cards surface in practice sessions.
  *
- * - `all`          — default forms + every form category present in the seed.
- * - `default-only` — only base species (isDefaultForm === true). Excludes all
+ * - `all` - default forms + every form category present in the seed.
+ * - `default-only` - only base species (isDefaultForm === true). Excludes all
  *                    alternate forms (Alolan Raichu, Rotom appliances, etc.).
- * - `include`      — default forms PLUS an explicit allow-list of categories.
+ * - `include` - default forms PLUS an explicit allow-list of categories.
  */
 export type FormCategoryFilter =
   | { mode: "all" }
@@ -63,7 +63,7 @@ export type PracticeScope = {
   /**
    * Alternate-form filter axis. Defaults to `{mode:'all'}` so new users see
    * all seeded forms. Persisted scopes without this field migrate to
-   * `{mode:'all'}` on load — existing users see no behaviour change.
+   * `{mode:'all'}` on load - existing users see no behaviour change.
    *
    * Optional at the TypeScript level for backwards-compatibility with
    * pre-#450 code that constructs `PracticeScope` literals without the field
@@ -85,7 +85,7 @@ export type PracticeScope = {
 /**
  * Pre-#333 storage key. The scope is now folded into `UserSettings` and
  * synced with the rest of settings via Supabase. The legacy key is read
- * once by `loadSettings` on first run after deploy and then cleared — see
+ * once by `loadSettings` on first run after deploy and then cleared - see
  * `readLegacyScope` / `clearLegacyScope` below.
  */
 const LEGACY_SCOPE_KEY = KEY_LEGACY_PRACTICE_SCOPE;
@@ -119,14 +119,14 @@ function getLegendaryIds(): ReadonlySet<number> {
  * any active category passes the species. Within each category, an empty list
  * is "no contribution to the OR" (does not match anything).
  *
- * Empty scope is handled by callers — this function is only reached for
+ * Empty scope is handled by callers - this function is only reached for
  * non-empty scopes.
  *
  * @param isDefaultForm  Whether this is the primary form of its species.
  *   Defaults to `true` (safe fallback for seeds that pre-date #445).
  * @param formCategory   The broad category of the form. Defaults to `"default"`.
  * @param versionGroups  PokéAPI version-group slugs whose pokedex includes
- *   this entry. Defaults to `[]` (safe fallback for pre-#1089 seeds — the
+ *   this entry. Defaults to `[]` (safe fallback for pre-#1089 seeds - the
  *   entry then can never satisfy a games-axis match, which is the
  *   conservative behaviour).
  * @param context        Runtime data for progress-dependent presets. When the
@@ -152,7 +152,7 @@ function speciesMatchesScope(
   } else if (fc.mode === "include") {
     if (!isDefaultForm && !fc.categories.includes(formCategory)) return false;
   }
-  // fc.mode === 'all' — passthrough; form is never excluded
+  // fc.mode === 'all' - passthrough; form is never excluded
 
   // ── gens / types / presets / games (OR'd) ──────────────────────────────
   // If none of these axes are active, the species passes the scope based on
@@ -198,7 +198,7 @@ function speciesMatchesScope(
  *
  * For the `formCategories` axis, name/reverse/cry cards carry `isDefaultForm`
  * and `formCategory` directly (spread from SeedPokemon). For evolution cards,
- * form-specific evolution edges are always excluded (#448 is the follow-up) —
+ * form-specific evolution edges are always excluded (#448 is the follow-up) - 
  * they are treated as default forms to avoid spurious exclusions while the
  * form-edge feature is in progress.
  *
@@ -206,7 +206,7 @@ function speciesMatchesScope(
  * receive safe defaults: `isDefaultForm=true`, `formCategory='default'`.
  */
 
-/** Lazy lookup map from pokemon id to SeedPokemon — built once on first use. */
+/** Lazy lookup map from pokemon id to SeedPokemon - built once on first use. */
 let _seedById: Map<number, SeedPokemon> | null = null;
 function getSeedById(): Map<number, SeedPokemon> {
   if (_seedById === null) _seedById = new Map(SEED_POKEMON.map((p) => [p.id, p]));
@@ -220,13 +220,13 @@ export function cardMatchesScope(
 ): boolean {
   if (isScopeEmpty(scope)) return true;
   // Evolution edge cards filter on the pre-evo's species ID (the card is
-  // "about" the pre-evolution — Bulbasaur → Ivysaur is a Gen 1 / Starters card
+  // "about" the pre-evolution - Bulbasaur → Ivysaur is a Gen 1 / Starters card
   // because of Bulbasaur, not Ivysaur). Reverse-evolution cards use the same
-  // pre-evo anchor — the answer-side species. Other card types use their own id.
+  // pre-evo anchor - the answer-side species. Other card types use their own id.
   //
   // For alternate-form cards (e.g. Alolan Raichu, id=10100), the card's own id
   // is outside the 1-1025 gen range so `generationOf(id)` returns 0. We use
-  // `speciesId` instead — the base species ID that maps back into the gen table.
+  // `speciesId` instead - the base species ID that maps back into the gen table.
   // This follows the `card.speciesId ?? card.id` pattern from the brief.
   const pokemonId =
     card.cardType === "evolution" || card.cardType === "reverse-evolution"
@@ -244,7 +244,7 @@ export function cardMatchesScope(
 
   // Resolve form metadata. Name/reverse/cry cards spread SeedPokemon and carry
   // these fields. Evolution cards are treated as default forms (form-specific
-  // evolution edges are a follow-up — #448). Fall back to safe defaults for
+  // evolution edges are a follow-up - #448). Fall back to safe defaults for
   // seeds built before #445 where the fields may be absent.
   const isDefaultForm: boolean =
     card.cardType === "evolution" || card.cardType === "reverse-evolution"
@@ -256,7 +256,7 @@ export function cardMatchesScope(
       : (card as { formCategory?: FormCategory }).formCategory ?? "default";
 
   // Version-groups (#1089). Evolution cards anchor to the pre-evo just like
-  // every other axis — a card "about" Bulbasaur should match a Red/Blue scope
+  // every other axis - a card "about" Bulbasaur should match a Red/Blue scope
   // because Bulbasaur appears in that dex, even though Ivysaur's set is
   // (effectively) identical here. Name/reverse/cry cards spread SeedPokemon
   // and carry `versionGroups` directly; fall back to [] for pre-#1089 seeds.
@@ -308,7 +308,7 @@ function toEligibilityInput(card: ReviewableCard): { cardType: string; subjectKe
  *     filter (`cardMatchesScope`) applies as normal.
  *
  * Evolution and reverse-evolution cards are never treated as alternate forms
- * by this gate — they represent the default-form pre-evo identity.
+ * by this gate - they represent the default-form pre-evo identity.
  *
  * Use this function as the single eligibility chokepoint in the session
  * builder / scope-change handler instead of calling `cardMatchesScope` directly
@@ -371,7 +371,7 @@ export type EligibilitySettings = CardEligibilitySettings & {
  *   preset). When omitted the preset simply matches nothing, which is the
  *   correct behaviour for callers without access to the full review state.
  *
- * Pure — no I/O, no DOM access, no hooks.
+ * Pure - no I/O, no DOM access, no hooks.
  */
 export function computeEligibleCardIds(
   cards: readonly ReviewableCard[],
@@ -385,7 +385,7 @@ export function computeEligibleCardIds(
         // Gates 1 + 2: card-type enable flags + alternateFormsEnabled.
         // Shared with the server-side Web Push eligibility filter (#1160).
         if (!isCardEligible(toEligibilityInput(c), settings)) return false;
-        // Gate 3: practice scope (client-only — localStorage-backed).
+        // Gate 3: practice scope (client-only - localStorage-backed).
         if (scopeEmpty) return true;
         return cardMatchesScope(c, settings.practiceScope, context);
       })
@@ -394,7 +394,7 @@ export function computeEligibleCardIds(
 }
 
 /**
- * Species-level eligibility check — mirrors `cardIsEligible` but operates on
+ * Species-level eligibility check - mirrors `cardIsEligible` but operates on
  * a `SeedPokemon` rather than a `ReviewableCard`. Used by `getSeenPokemon` in
  * the Higher-or-Lower minigame so the pool respects the same two-tier gate
  * (master alternate-forms toggle first, then gens/types/presets scope) as the
@@ -402,7 +402,7 @@ export function computeEligibleCardIds(
  *
  * @param alternateFormsEnabled  Mirror of `UserSettings.alternateFormsEnabled`.
  *   Defaults to `true` so callers that do not yet pass the flag see the
- *   previous behaviour — all species included.
+ *   previous behaviour - all species included.
  */
 export function seedPokemonIsEligible(
   p: SeedPokemon,
@@ -442,12 +442,12 @@ export function seedPokemonIsEligible(
  * session.
  *
  * Distinct from `cardMatchesScope` because the caller has a `SeedPokemon`,
- * not a `ReviewableCard` — the underlying matching logic is shared via
+ * not a `ReviewableCard` - the underlying matching logic is shared via
  * the private `speciesMatchesScope` helper to keep them from drifting.
  *
  * @param alternateFormsEnabled  Mirror of `UserSettings.alternateFormsEnabled`.
  *   Defaults to `true` so existing callers that do not yet pass the gate
- *   (e.g. tests) see the previous behaviour — all species counted.
+ *   (e.g. tests) see the previous behaviour - all species counted.
  */
 export function countMatchingSpecies(
   seed: readonly SeedPokemon[],
@@ -501,7 +501,7 @@ export function countMatchingSpecies(
 
 /**
  * Internal: shape-validate a raw parsed JSON value into a PracticeScope.
- * Permissive on individual entries — bad members are filtered out rather
+ * Permissive on individual entries - bad members are filtered out rather
  * than dropping the whole payload. Returns null on a non-object payload.
  *
  * NOTE: `lib/settings/persistence.ts#validatePracticeScope` is the strict
@@ -538,7 +538,7 @@ function parseScopeShape(value: unknown): PracticeScope | null {
  * Read the legacy practice-scope key. Returns `null` when the key is
  * absent, malformed, or the runtime has no window/localStorage (SSR).
  *
- * Does NOT delete the key on read — callers stage the read-then-clear
+ * Does NOT delete the key on read - callers stage the read-then-clear
  * sequence so we never lose data on a transient failure between the two
  * steps. `loadSettings` is the canonical caller (#333).
  */
@@ -559,7 +559,7 @@ export function clearLegacyScope(): void {
   try {
     window.localStorage.removeItem(LEGACY_SCOPE_KEY);
   } catch {
-    // ignore — scope is non-critical
+    // ignore - scope is non-critical
   }
 }
 
@@ -576,7 +576,7 @@ export function loadScope(): PracticeScope {
 
 /**
  * @deprecated writes the legacy localStorage key directly. New callers
- * should use the settings hooks (`useSettings`) — `practiceScope` lives
+ * should use the settings hooks (`useSettings`) - `practiceScope` lives
  * inside `UserSettings` and rides the existing settings JSONB sync.
  * Retained as a transitional shim (#333).
  */
@@ -589,7 +589,7 @@ export function saveScope(scope: PracticeScope): void {
       window.localStorage.setItem(LEGACY_SCOPE_KEY, JSON.stringify(scope));
     }
   } catch {
-    // ignore quota / serialisation errors — scope is non-critical
+    // ignore quota / serialisation errors - scope is non-critical
   }
 }
 

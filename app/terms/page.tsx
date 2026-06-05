@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { resolveLocale } from "@/i18n/request";
-import { inlineLink } from "@/lib/utils/class-names";
+import { inlineLink, mutedText } from "@/lib/utils/class-names";
 
 export const metadata: Metadata = {
   title: "Terms of Use - Poké Memory",
@@ -32,7 +32,7 @@ export default async function TermsPage() {
       )}
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Terms of Use</h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className={`mt-2 ${mutedText}`}>
           Last updated: 16 May 2026
         </p>
       </header>

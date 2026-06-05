@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 
 // ---------------------------------------------------------------------------
-// Module mocks — must be declared before the import under test.
+// Module mocks - must be declared before the import under test.
 // ---------------------------------------------------------------------------
 
 const mockLoadSession = vi.fn().mockResolvedValue(null);
@@ -51,7 +51,7 @@ import { usePastureMasteryState } from "@/lib/pasture/usePastureMasteryState";
 import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
 
 // ---------------------------------------------------------------------------
-// localStorage stub — jsdom does not always ship one.
+// localStorage stub - jsdom does not always ship one.
 // ---------------------------------------------------------------------------
 
 function makeLocalStorage(): Storage {
@@ -89,7 +89,7 @@ afterEach(() => {
 
 // ---------------------------------------------------------------------------
 
-describe("usePastureMasteryState — no session", () => {
+describe("usePastureMasteryState - no session", () => {
   it("returns showPasture=false when loadSession returns null", async () => {
     mockLoadSession.mockResolvedValue(null);
 
@@ -101,7 +101,7 @@ describe("usePastureMasteryState — no session", () => {
   });
 });
 
-describe("usePastureMasteryState — populated session", () => {
+describe("usePastureMasteryState - populated session", () => {
   it("returns showPasture=true after loadSession resolves with mastered cards", async () => {
     mockLoadSession.mockResolvedValue({ cards: [{ id: 1 }] });
     mockFilterMastered.mockReturnValue([{ id: 1 }]);
@@ -125,7 +125,7 @@ describe("usePastureMasteryState — populated session", () => {
   });
 });
 
-describe("usePastureMasteryState — KEY_HAS_MASTERED fast path", () => {
+describe("usePastureMasteryState - KEY_HAS_MASTERED fast path", () => {
   it("returns showPasture=true immediately when localStorage flag is 'true'", async () => {
     localStorage.setItem(KEY_HAS_MASTERED, "true");
 
@@ -139,7 +139,7 @@ describe("usePastureMasteryState — KEY_HAS_MASTERED fast path", () => {
   });
 });
 
-describe("usePastureMasteryState — superuser flag", () => {
+describe("usePastureMasteryState - superuser flag", () => {
   it("returns showPasture=true when pretendAllMastered is on regardless of session", async () => {
     mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: true } });
     mockLoadSession.mockResolvedValue(null);
@@ -148,14 +148,14 @@ describe("usePastureMasteryState — superuser flag", () => {
     const { result } = renderHook(() => usePastureMasteryState());
 
     // showPasture is derived synchronously from the flag, so no waitFor needed
-    // for the flag itself — but we await to let any async load settle.
+    // for the flag itself - but we await to let any async load settle.
     await waitFor(() => {
       expect(result.current.showPasture).toBe(true);
     });
   });
 });
 
-describe("usePastureMasteryState — SETTINGS_SAVED_EVENT re-derivation", () => {
+describe("usePastureMasteryState - SETTINGS_SAVED_EVENT re-derivation", () => {
   it("re-runs mastery check when SETTINGS_SAVED_EVENT fires and returns updated showPasture", async () => {
     // Initially nothing mastered.
     mockLoadSession.mockResolvedValue({ cards: [] });
@@ -167,7 +167,7 @@ describe("usePastureMasteryState — SETTINGS_SAVED_EVENT re-derivation", () => 
       expect(result.current.showPasture).toBe(false);
     });
 
-    // User lowers the threshold — filterMastered now returns a mastered card.
+    // User lowers the threshold - filterMastered now returns a mastered card.
     mockFilterMastered.mockReturnValue([{ id: 1 }]);
     act(() => {
       window.dispatchEvent(new Event("poke-memory:settings-saved"));
@@ -179,14 +179,14 @@ describe("usePastureMasteryState — SETTINGS_SAVED_EVENT re-derivation", () => 
   });
 });
 
-describe("usePastureMasteryState — epoch catch-up guard", () => {
+describe("usePastureMasteryState - epoch catch-up guard", () => {
   it("schedules a rAF load when the write epoch has advanced since last attach", async () => {
     // Advance the epoch to simulate a write that happened before the effect
     // registered its listener (e.g. the E2E seed fires before React hydrates).
     (window as Window & { __pokeMemorySessionWriteEpoch?: number }).__pokeMemorySessionWriteEpoch = 5;
 
     // First direct load returns null so showPasture stays false; only the
-    // rAF-triggered re-load can flip it to true — proving the epoch guard is
+    // rAF-triggered re-load can flip it to true - proving the epoch guard is
     // what fires the rAF, not the unconditional void load() call.
     mockLoadSession
       .mockResolvedValueOnce(null)

@@ -28,9 +28,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("readLocalStorage — SSR guard", () => {
+describe("readLocalStorage - SSR guard", () => {
   it("returns the fallback when window is undefined", () => {
-    // Do not stub window — let it remain undefined (node environment).
+    // Do not stub window - let it remain undefined (node environment).
     expect(readLocalStorage("any-key", identity, "fallback")).toBe("fallback");
   });
 
@@ -39,7 +39,7 @@ describe("readLocalStorage — SSR guard", () => {
   });
 });
 
-describe("readLocalStorage — key absent", () => {
+describe("readLocalStorage - key absent", () => {
   it("returns the fallback when the key is not present", () => {
     vi.stubGlobal("window", { localStorage: makeStorage() });
     expect(readLocalStorage("missing-key", identity, "fallback")).toBe("fallback");
@@ -56,7 +56,7 @@ describe("readLocalStorage — key absent", () => {
   });
 });
 
-describe("readLocalStorage — key present", () => {
+describe("readLocalStorage - key present", () => {
   it("parses and returns the stored value", () => {
     vi.stubGlobal("window", { localStorage: makeStorage({ "my-key": '"hello"' }) });
     expect(readLocalStorage("my-key", (raw) => JSON.parse(raw) as string, "fallback")).toBe("hello");
@@ -73,7 +73,7 @@ describe("readLocalStorage — key present", () => {
   });
 });
 
-describe("readLocalStorage — parse throws", () => {
+describe("readLocalStorage - parse throws", () => {
   it("returns the fallback when parse throws on malformed JSON", () => {
     vi.stubGlobal("window", { localStorage: makeStorage({ "bad-key": "{not valid json" }) });
     expect(readLocalStorage("bad-key", parseJson, "default")).toBe("default");
@@ -97,7 +97,7 @@ describe("readLocalStorage — parse throws", () => {
   });
 });
 
-describe("readLocalStorage — storage access throws", () => {
+describe("readLocalStorage - storage access throws", () => {
   it("returns the fallback when window.localStorage.getItem throws", () => {
     const brokenStorage = {
       getItem: () => { throw new DOMException("SecurityError"); },
@@ -107,13 +107,13 @@ describe("readLocalStorage — storage access throws", () => {
   });
 });
 
-describe("readLocalStorage — type parameter", () => {
+describe("readLocalStorage - type parameter", () => {
   it("infers the return type from the parse function", () => {
     vi.stubGlobal("window", {
       localStorage: makeStorage({ "num-key": "42" }),
     });
     const result = readLocalStorage("num-key", (raw) => parseInt(raw, 10), 0);
-    // TypeScript should infer `result` as `number` — enforce at runtime too.
+    // TypeScript should infer `result` as `number` - enforce at runtime too.
     expect(typeof result).toBe("number");
     expect(result).toBe(42);
   });

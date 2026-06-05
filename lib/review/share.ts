@@ -31,7 +31,7 @@ export type DailySummaryParts = {
   newCards: number;
   /** Cards that crossed the mastery threshold this session. */
   mastered: number;
-  /** Ordered grade sequence — one emoji per square in the share grid. */
+  /** Ordered grade sequence - one emoji per square in the share grid. */
   gradeSequence: readonly Grade[];
   /**
    * Pokémon-name locale for this practice session (#1562). When non-English,
@@ -44,7 +44,7 @@ export type DailySummaryParts = {
 
 /**
  * Format a Wordle-style daily summary. Plain text only, no Pokémon
- * names or sprites — spoiler-safe by design. Grid wraps every 20
+ * names or sprites - spoiler-safe by design. Grid wraps every 20
  * squares so it stays readable in chat.
  *
  * For non-English sessions the mastered line is suffixed with the
@@ -57,7 +57,7 @@ export function formatDailySummary(parts: DailySummaryParts): string {
     lines.push(`${parts.streak}-day streak 🔥`);
   }
   // Append the language endonym for non-English sessions. English needs no
-  // qualifier — it is the implicit default.
+  // qualifier - it is the implicit default.
   const endonym = parts.locale ? LOCALE_ENDONYM[parts.locale] : undefined;
   const masteredSuffix = endonym ? ` (${endonym})` : "";
   lines.push(
@@ -65,7 +65,7 @@ export function formatDailySummary(parts: DailySummaryParts): string {
   );
   const squares = parts.gradeSequence.map((g) => GRADE_EMOJI[g]);
   // Wrap grid every 20 squares (~Wordle width) so the text reads well
-  // inside chat bubbles. Slice on the array, not the string — emoji are
+  // inside chat bubbles. Slice on the array, not the string - emoji are
   // surrogate pairs in JS strings, so `.slice(i, i+20)` on the joined
   // form would split codepoints in half.
   for (let i = 0; i < squares.length; i += 20) {

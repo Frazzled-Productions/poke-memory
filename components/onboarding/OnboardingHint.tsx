@@ -13,7 +13,7 @@ import {
 
 type Tone = "hint" | "callout";
 
-/** Extract the boolean-valued keys of OnboardingFlags — only dismissal flags
+/** Extract the boolean-valued keys of OnboardingFlags - only dismissal flags
  *  are valid ids for OnboardingHint (non-boolean fields like counters are not). */
 type OnboardingBooleanKey = {
   [K in keyof OnboardingFlags]: OnboardingFlags[K] extends boolean ? K : never;

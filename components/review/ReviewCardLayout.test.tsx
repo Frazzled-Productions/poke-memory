@@ -44,10 +44,10 @@ describe("UndoButton", () => {
 });
 
 // ---------------------------------------------------------------------------
-// ReviewCardLayout — out-of-scope hint
+// ReviewCardLayout - out-of-scope hint
 // ---------------------------------------------------------------------------
 
-describe("ReviewCardLayout — out-of-scope hint", () => {
+describe("ReviewCardLayout - out-of-scope hint", () => {
   const baseProps = {
     variant: "flip" as const,
     cardRegion: <div>card</div>,

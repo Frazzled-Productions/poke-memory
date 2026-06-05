@@ -1,5 +1,5 @@
 /**
- * StreakBadge tests — token earn/spend toast (#1438).
+ * StreakBadge tests - token earn/spend toast (#1438).
  *
  * Covers:
  *  - 0 tokens (no toast)
@@ -41,7 +41,7 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => mockUseSuperuser(),
 }));
 
-// Stub PokemonLocaleContext — StreakBadge reads languagesEnabled to render the
+// Stub PokemonLocaleContext - StreakBadge reads languagesEnabled to render the
 // global/per-language divider. Exposed as a vi.fn() so individual tests can
 // override the return value (e.g. to enable the multi-language branch).
 // Default to languagesEnabled: false so existing tests are unaffected.
@@ -128,12 +128,12 @@ function seedProtection(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// State: 0 tokens, no earn activity — no toast
+// State: 0 tokens, no earn activity - no toast
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — no toast states", () => {
+describe("StreakBadge - no toast states", () => {
   it("renders the streak badge without a toast when there is no earn/spend", () => {
-    // Fresh settings — nothing to earn (today not a review day) and nothing to spend.
+    // Fresh settings - nothing to earn (today not a review day) and nothing to spend.
     seedProtection({ balance: 0 });
 
     renderWithIntl(<StreakBadge />);
@@ -158,10 +158,10 @@ describe("StreakBadge — no toast states", () => {
 });
 
 // ---------------------------------------------------------------------------
-// State: token earned — toast fires (AC happy-path requirement)
+// State: token earned - toast fires (AC happy-path requirement)
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — token earned", () => {
+describe("StreakBadge - token earned", () => {
   it("shows the earn toast when a token is earned on mount (HAPPY PATH)", () => {
     // Set up so today's review day pushes the counter to the threshold.
     seedProtection({
@@ -256,10 +256,10 @@ describe("StreakBadge — token earned", () => {
 });
 
 // ---------------------------------------------------------------------------
-// State: token spent — toast fires
+// State: token spent - toast fires
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — token spent", () => {
+describe("StreakBadge - token spent", () => {
   it("shows the spend toast when a token is spent to bridge a missed day", () => {
     // Balance = 1, reviewed two days ago, missed yesterday.
     const dayBeforeYesterday = "2026-05-29";
@@ -290,10 +290,10 @@ describe("StreakBadge — token spent", () => {
 });
 
 // ---------------------------------------------------------------------------
-// State: earned-and-spent combo — single toast
+// State: earned-and-spent combo - single toast
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — earned-and-spent combo", () => {
+describe("StreakBadge - earned-and-spent combo", () => {
   it("shows a single combined toast, not two separate toasts", () => {
     // Balance=0 means Phase 1 cannot spend. After Phase 2 earns (counter hits
     // threshold), Phase 3 spends the freshly earned token to bridge yesterday.
@@ -307,7 +307,7 @@ describe("StreakBadge — earned-and-spent combo", () => {
 
     renderWithIntl(<StreakBadge />);
 
-    // Exactly one status element — not two.
+    // Exactly one status element - not two.
     const statuses = screen.queryAllByRole("status");
     expect(statuses).toHaveLength(1);
 
@@ -319,10 +319,10 @@ describe("StreakBadge — earned-and-spent combo", () => {
 });
 
 // ---------------------------------------------------------------------------
-// State: at 3-token cap — earn is a no-op, no toast
+// State: at 3-token cap - earn is a no-op, no toast
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — at token cap", () => {
+describe("StreakBadge - at token cap", () => {
   it("shows no earn toast when the balance is already at the cap", () => {
     // Balance = MAX_BALANCE (3). Earning while capped does NOT increment the
     // balance, so `earned=false` from applyProtectionStep.
@@ -342,10 +342,10 @@ describe("StreakBadge — at token cap", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Locale rendering — earn copy correct in all supported locales
+// Locale rendering - earn copy correct in all supported locales
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — locale: earn toast copy", () => {
+describe("StreakBadge - locale: earn toast copy", () => {
   function seedEarn() {
     seedProtection({
       balance: 0,
@@ -389,10 +389,10 @@ describe("StreakBadge — locale: earn toast copy", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Locale rendering — spend copy correct in all supported locales
+// Locale rendering - spend copy correct in all supported locales
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — locale: spend toast copy", () => {
+describe("StreakBadge - locale: spend toast copy", () => {
   function seedSpend() {
     const dayBeforeYesterday = "2026-05-29";
     seedProtection({
@@ -433,7 +433,7 @@ describe("StreakBadge — locale: spend toast copy", () => {
 // by the shared TokenChip. The milestone countdown is kept. IN and OUT covered.
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — mobile status chips + milestone signpost", () => {
+describe("StreakBadge - mobile status chips + milestone signpost", () => {
   it("shows the status chips and the milestone signpost on a live streak", () => {
     // 3-day consecutive run ending today → milestone countdown visible.
     seedProtection({
@@ -503,7 +503,7 @@ describe("StreakBadge — mobile status chips + milestone signpost", () => {
 // languagesEnabled: divider and per-language chip order (mirrors ProfileStatusBar)
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — languagesEnabled chip order and divider", () => {
+describe("StreakBadge - languagesEnabled chip order and divider", () => {
   function seedLiveStreak() {
     // Seed a live 3-day streak so the token chip (balance=2) is rendered and
     // we can assert its position relative to the divider.
@@ -515,7 +515,7 @@ describe("StreakBadge — languagesEnabled chip order and divider", () => {
 
   it("single-language (off): does NOT render the hairline divider", () => {
     seedLiveStreak();
-    // Default mock has languagesEnabled: false — no override needed.
+    // Default mock has languagesEnabled: false - no override needed.
     renderWithIntl(<StreakBadge />);
 
     const group = document.querySelector("[role='group']");
@@ -528,7 +528,7 @@ describe("StreakBadge — languagesEnabled chip order and divider", () => {
     seedLiveStreak();
     // Use mockReturnValue (not Once) so every re-render triggered by the
     // useEffect state updates in StreakBadge consistently returns the enabled
-    // state — mockReturnValueOnce is consumed on the first call.
+    // state - mockReturnValueOnce is consumed on the first call.
     mockUsePokemonLocaleContext.mockReturnValue({
       locale: "en" as const,
       languagesEnabled: true,
@@ -583,12 +583,12 @@ describe("StreakBadge — languagesEnabled chip order and divider", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Superuser forceTokenToast flag (#1443 QA) — forces the earn helper toast so
+// Superuser forceTokenToast flag (#1443 QA) - forces the earn helper toast so
 // QA can verify the copy without grinding a 30-day streak. Self-clears on
 // dismiss. IN (flag on, no real earn) and OUT (flag off) covered.
 // ---------------------------------------------------------------------------
 
-describe("StreakBadge — forceTokenToast superuser flag", () => {
+describe("StreakBadge - forceTokenToast superuser flag", () => {
   // Reset to a known-off default before each test so a per-test
   // mockReturnValue override cannot leak into the next test.
   beforeEach(() => {

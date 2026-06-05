@@ -109,7 +109,7 @@ test.describe("QA seed mode", () => {
     // Reload the page (seeded state is now in IDB).
     await page.reload();
 
-    // Navigate to the Pasture — it should be populated (not the empty-state).
+    // Navigate to the Pasture - it should be populated (not the empty-state).
     await page.goto("/pasture");
 
     // The Pasture heading must be visible (not the empty-state copy).
@@ -160,7 +160,7 @@ test.describe("QA seed mode", () => {
       nextArrivalsSection.getByRole("list", { name: /upcoming pasture species/i }),
     ).toBeVisible();
 
-    // Navigate to Journey and verify "Close to mastery" is populated — the
+    // Navigate to Journey and verify "Close to mastery" is populated - the
     // scenario description explicitly lists this as the second exercised behaviour.
     await page.goto("/journey");
     const closeToMasterySection = page.getByRole("region", { name: /close to mastery/i });

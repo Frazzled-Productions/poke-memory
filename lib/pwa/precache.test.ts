@@ -41,7 +41,7 @@ function makeOkFetch(extraUrls: Set<string> = new Set()) {
 
 describe("buildPrecacheUrls", () => {
   it("includes pre-generated WebP variants for each sprite width", () => {
-    // Sprites are now served as static WebP files — no /_next/image endpoint.
+    // Sprites are now served as static WebP files - no /_next/image endpoint.
     const urls = buildPrecacheUrls([25]);
     const webpUrls = urls.filter((u) => u.startsWith("/sprites/pokemon/webp/"));
     expect(webpUrls.length).toBeGreaterThan(0);
@@ -70,7 +70,7 @@ describe("buildPrecacheUrls", () => {
 
   it("produces a distinct set of URLs for multiple IDs", () => {
     const urls = buildPrecacheUrls([1, 2, 3]);
-    // Each ID contributes at least one raw sprite URL — three total.
+    // Each ID contributes at least one raw sprite URL - three total.
     const rawSprites = urls.filter(
       (u) => u.match(/^\/sprites\/pokemon\/\d+\.png$/),
     );
@@ -96,7 +96,7 @@ describe("precacheAll", () => {
     vi.restoreAllMocks();
   });
 
-  it("opens the versioned sprites cache bucket — byte-identical to the SW runtime handler", async () => {
+  it("opens the versioned sprites cache bucket - byte-identical to the SW runtime handler", async () => {
     // This test pins the contract between the precache orchestrator and the
     // service worker's CacheFirst route: both must open the SAME cache name.
     // If this assertion fails after a SW_CACHE_VERSION bump, it means the

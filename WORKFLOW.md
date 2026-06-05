@@ -130,7 +130,7 @@ Batch PRs ─▶ qa ─▶ (preview deploy + maintainer QA) ─▶ qa→main PR 
 **Batch-drain pre-flight: aggregate coverage check.** Diff coverage is gated per-PR, but a set of PRs that each clear the 90% patch bar individually can still leave the *aggregate* `qa -> main` diff below the bar - a UI-heavy PR with E2E but thin unit coverage is the usual culprit. This surfaces as a failed `qa -> main` promotion needing a dedicated catch-up PR. To catch it before the drain rather than after, run the diff-coverage gate against the whole `qa`-vs-`main` diff before initiating a batch drain:
 
 1. Run `npm run test:coverage` once to produce `coverage/coverage-final.json` (the `json` reporter). The script reads this file; it does not run the suite itself.
-2. Pipe the aggregate diff into the gate: `git diff origin/main...origin/qa | node scripts/diff-coverage.mjs`. The script reads a unified diff on **stdin** - it has no diff-range argument. (`npm run coverage:diff` is the per-PR shortcut and hard-codes `origin/qa...HEAD`, so it is not the right invocation for the aggregate check.)
+2. Pipe the aggregate diff into the gate: `git diff origin/main...origin/qa | node scripts/diff-coverage.mjs`. The script reads a unified diff on **stdin** - it has no diff-range argument. (`npm run test:diff-coverage` is the per-PR shortcut and defaults to `origin/qa...HEAD` - override the base with `DIFF_COVERAGE_BASE` - so it is not the right invocation for this `main...qa` aggregate check.)
 
 A non-zero exit means the aggregate patch coverage is below the 90% bar; fold the gap into the batch as an extra test-only change. Do this at drain start, not at promotion time.
 
@@ -450,6 +450,25 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Trigger** | `issues: [closed]` |
 | **What it does** | Moves the issue to **Done** on the project board - regardless of how it was closed (PR merge, manual close, or `not_planned`) |
 | **Note** | All other project-status transitions are driven from `auto-issue.yml` and `auto-pr.yml`. This workflow owns only the terminal **Done** state. |
+
+---
+
+### `auto-close-umbrella.yml` - Auto Close Umbrella
+
+| | |
+|---|---|
+| **Trigger** | `issues: [closed]`; `workflow_dispatch` (inputs `issue_number` required, `dry_run` boolean default `true`) |
+| **Job** | `close-umbrella` |
+| **What it does** | When a child issue closes, finds any OPEN umbrella that tracks it, checks whether ALL of that umbrella's tracked children are now closed, and if so closes the umbrella with a comment noting all tracked items are complete. Saves the maintainer from hand-closing digests / epics once their children ship. |
+| **How children are declared** | A task-list of `#N` refs in the umbrella body (`- [ ] #N` / `- [x] #N`). The checkbox tick is not trusted - each child's real state is read from the API. GitHub-native sub-issues are read as a best-effort secondary signal and unioned in; sub-issue API errors are non-fatal. Plain `#N` prose refs are ignored. |
+| **Opt-in gate** | Fires only for umbrellas carrying the `auto-close-when-complete` label - the umbrella, not the child, must carry it. Weekly digests (snapshots) should carry it by default; open-ended epics (e.g. #1445) deliberately omit it so they never auto-close prematurely. The maintainer creates the label once (no label-sync manifest exists in `.github/`). |
+| **Candidate lookup** | Lists open issues with the gate label and filters locally with jq on the fetched body - never `gh issue list --search '... in:body'`, which the GitHub search index strips (same caveat as `auto-retro-harvest.yml`). |
+| **Child-reopened** | No `reopened` trigger by design - reopening a child leaves the umbrella closed; a human reopens it if needed. Avoids open/close thrash. |
+| **Batch-close race** | A `qa -> main` promotion PR closing ~20 issues fires ~20 runs against the same umbrella; the "already closed" guard plus `cancel-in-progress: false` make this safe (first run closes, the rest find it closed). |
+| **Dry run** | `workflow_dispatch` with `dry_run: true` posts a `[DRY RUN] Would close ...` comment instead of closing. |
+| **Token** | Repo-scoped App token via `actions/create-github-app-token@v3` (mirrors `auto-status.yml`). No board move - this workflow only closes the issue. |
+| **Required check** | No - board / backlog hygiene, does not gate merge. |
+| **Concurrency** | `auto-close-umbrella-${{ github.event.issue.number || github.event.inputs.issue_number }}` (the manual-dispatch branch produces a distinct key), `cancel-in-progress: false`. |
 
 ---
 

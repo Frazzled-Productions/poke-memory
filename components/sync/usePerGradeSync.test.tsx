@@ -99,7 +99,7 @@ function makeCard(id: number): ReviewableCard {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe("usePerGradeSync — markPushSucceeded wiring", () => {
+describe("usePerGradeSync - markPushSucceeded wiring", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -228,7 +228,7 @@ async function drainNTimes(
   }
 }
 
-describe("usePerGradeSync — consecutive-failure banner (#606)", () => {
+describe("usePerGradeSync - consecutive-failure banner (#606)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -261,10 +261,10 @@ describe("usePerGradeSync — consecutive-failure banner (#606)", () => {
   it("resets the counter and does not call markPushFailed after a success", async () => {
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
-    // 2 failures — below threshold.
+    // 2 failures - below threshold.
     await drainNTimes(result.current.enqueueGrade, 2);
 
-    // One success — resets counter.
+    // One success - resets counter.
     vi.mocked(pushSingleCard).mockResolvedValueOnce(true);
     act(() => { result.current.enqueueGrade(makeCard(2)); });
     await act(async () => {
@@ -273,7 +273,7 @@ describe("usePerGradeSync — consecutive-failure banner (#606)", () => {
       await Promise.resolve();
     });
 
-    // 2 more failures — still below threshold since counter was reset.
+    // 2 more failures - still below threshold since counter was reset.
     vi.mocked(pushSingleCard).mockResolvedValue(false);
     await drainNTimes(result.current.enqueueGrade, 2);
 
@@ -283,7 +283,7 @@ describe("usePerGradeSync — consecutive-failure banner (#606)", () => {
   it("fires markPushFailed exactly once even after 5 consecutive failures (not on 4th or 5th)", async () => {
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
-    // 5 all-failure drains — threshold is 3, so markPushFailed should fire only
+    // 5 all-failure drains - threshold is 3, so markPushFailed should fire only
     // on drain 3 (the === transition), not on drains 4 or 5.
     await drainNTimes(result.current.enqueueGrade, 5);
 
@@ -316,7 +316,7 @@ describe("usePerGradeSync — consecutive-failure banner (#606)", () => {
 // hook's null short-circuit actually suppresses every cloud-write path, so a
 // future refactor cannot silently re-enable writes during a QA session.
 
-describe("usePerGradeSync — superuser write-guard (null client/userId)", () => {
+describe("usePerGradeSync - superuser write-guard (null client/userId)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -381,12 +381,12 @@ describe("usePerGradeSync — superuser write-guard (null client/userId)", () =>
 
 // ─── Structural-error hook-integration tests (#1358 FIX 5) ───────────────────
 //
-// These tests verify the hook-level wiring for structural errors — the paths
+// These tests verify the hook-level wiring for structural errors - the paths
 // between drainQueue and the structuralError.ts / persistence.ts markers. The
 // raw function behaviour (markStructuralSyncError firing) is covered in
 // cloud.test.ts; these tests cover the hook's short-circuit and probe logic.
 
-describe("usePerGradeSync — structural error: drain marks structural immediately and persists queue", () => {
+describe("usePerGradeSync - structural error: drain marks structural immediately and persists queue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -439,7 +439,7 @@ describe("usePerGradeSync — structural error: drain marks structural immediate
   });
 
   it("when structuralSyncError is already set and probe not attempted, drain allows ONE probe attempt", async () => {
-    // Structural error already in persisted status — but probe not yet attempted.
+    // Structural error already in persisted status - but probe not yet attempted.
     vi.mocked(loadSyncStatus).mockReturnValue({
       lastPushAt: null,
       lastPushFailed: true,
@@ -463,7 +463,7 @@ describe("usePerGradeSync — structural error: drain marks structural immediate
       await Promise.resolve();
     });
 
-    // The probe was attempted — markStructuralProbeAttempted should have been called.
+    // The probe was attempted - markStructuralProbeAttempted should have been called.
     expect(vi.mocked(markStructuralProbeAttempted)).toHaveBeenCalledTimes(1);
     // The push was attempted (probe runs).
     expect(pushSingleCard).toHaveBeenCalledTimes(1);
@@ -495,7 +495,7 @@ describe("usePerGradeSync — structural error: drain marks structural immediate
       await Promise.resolve();
     });
 
-    // Short-circuits — pushSingleCard must NOT be called.
+    // Short-circuits - pushSingleCard must NOT be called.
     expect(pushSingleCard).not.toHaveBeenCalled();
     expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
     expect(vi.mocked(markPushFailed)).not.toHaveBeenCalled();

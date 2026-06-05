@@ -137,7 +137,7 @@ describe("assignAnchors", () => {
   });
 
   it("sorts by firstSeen ASC before assigning", () => {
-    // Card 99 has an earlier firstSeen — should get slot 0.
+    // Card 99 has an earlier firstSeen - should get slot 0.
     const early = makeCard(99, "2026-01-01");
     const late = makeCard(1, "2026-04-01");
     const result = assignAnchors([late, early], tinyZone);
@@ -179,7 +179,7 @@ describe("assignAnchors", () => {
   });
 
   it("multiple cards with null firstSeen are tie-broken by id ASC", () => {
-    // All three cards have no firstSeen — sort must fall back to id.
+    // All three cards have no firstSeen - sort must fall back to id.
     const cardA = makeCard(10, null);
     const cardB = makeCard(3, null);
     const cardC = makeCard(7, null);

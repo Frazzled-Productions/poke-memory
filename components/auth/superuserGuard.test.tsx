@@ -3,9 +3,9 @@
  *
  * The guard lives at two sites today:
  *
- *  1. ReviewSession — passes null client/userId to usePerGradeSync and
+ *  1. ReviewSession - passes null client/userId to usePerGradeSync and
  *     useSyncOnUnload when anyFlagOn is true.
- *  2. AutoSyncOnChange — short-circuits all push handlers when anyFlagOn is
+ *  2. AutoSyncOnChange - short-circuits all push handlers when anyFlagOn is
  *     true (client and userId are both forced to null before the useEffect).
  *
  * These are logic-level tests: we assert that cloud-write hooks receive null
@@ -28,7 +28,7 @@ const FAKE_CLIENT = {} as unknown as SupabaseClient;
 const FAKE_USER = { id: "00000000-0000-0000-0000-000000000001" };
 
 // ---------------------------------------------------------------------------
-// Section 1 — AutoSyncOnChange short-circuit
+// Section 1 - AutoSyncOnChange short-circuit
 // The established test file (AutoSyncOnChange.test.tsx) covers the happy path.
 // Here we specifically assert that when anyFlagOn is true the push helpers are
 // never called, regardless of which event fires.
@@ -91,7 +91,7 @@ import { SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { STREAK_UPDATED_EVENT } from "@/lib/streak/persistence";
 import { GRADE_LOG_APPENDED_EVENT } from "@/lib/gradelog/persistence";
 
-describe("AutoSyncOnChange — superuser write guard", () => {
+describe("AutoSyncOnChange - superuser write guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(pushSettings).mockResolvedValue(true);
@@ -204,7 +204,7 @@ describe("AutoSyncOnChange — superuser write guard", () => {
     });
     expect(pushSettings).not.toHaveBeenCalled();
 
-    // Turn the flag off — the component re-renders and the effect re-runs.
+    // Turn the flag off - the component re-renders and the effect re-runs.
     mockUseSuperuser.mockReturnValue({ anyFlagOn: false });
     rerender(<AutoSyncOnChange />);
 
@@ -219,10 +219,10 @@ describe("AutoSyncOnChange — superuser write guard", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 2 — ReviewSession null client/userId guard
+// Section 2 - ReviewSession null client/userId guard
 // We don't render the full ReviewSession (too many deps); we test the hook
-// layer that ReviewSession delegates to — usePerGradeSync and useSyncOnUnload
-// — which both accept null to short-circuit. This is a logic-level assertion:
+// layer that ReviewSession delegates to - usePerGradeSync and useSyncOnUnload
+// - which both accept null to short-circuit. This is a logic-level assertion:
 // null inputs → no cloud writes.
 // ---------------------------------------------------------------------------
 
@@ -238,7 +238,7 @@ import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
 import { pushSingleCard } from "@/lib/sync/cloud";
 
-describe("usePerGradeSync — null guard (ReviewSession superuser path)", () => {
+describe("usePerGradeSync - null guard (ReviewSession superuser path)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(pushSingleCard).mockResolvedValue(true);
@@ -360,7 +360,7 @@ describe("usePerGradeSync — null guard (ReviewSession superuser path)", () => 
   });
 });
 
-describe("useSyncOnUnload — null guard (ReviewSession superuser path)", () => {
+describe("useSyncOnUnload - null guard (ReviewSession superuser path)", () => {
   it("does not register unload listeners when client is null", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
     const getUnsynced = vi.fn(() => []);
@@ -368,7 +368,7 @@ describe("useSyncOnUnload — null guard (ReviewSession superuser path)", () => 
     renderHook(() => useSyncOnUnload(null, FAKE_USER.id, getUnsynced));
 
     // useSyncOnUnload adds visibilitychange and pagehide only when both client
-    // and userId are non-null — verify neither is registered.
+    // and userId are non-null - verify neither is registered.
     const calls = addSpy.mock.calls.map(([ev]) => ev);
     expect(calls).not.toContain("visibilitychange");
     expect(calls).not.toContain("pagehide");

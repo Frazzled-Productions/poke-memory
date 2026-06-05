@@ -37,7 +37,7 @@ describe("preloadableSpriteUrls", () => {
     ]);
   });
 
-  it("returns nothing for a reverse card — picker tiles are decoded separately in ReviewSession at PICKER_SPRITE_SIZE", () => {
+  it("returns nothing for a reverse card - picker tiles are decoded separately in ReviewSession at PICKER_SPRITE_SIZE", () => {
     // Reverse cards display as a four-tile SpritePicker rendered at 150 px, not
     // the 320 px flip-card size. `preloadableSpriteUrls` intentionally returns []
     // here so callers do not accidentally warm the wrong optimiser variant.
@@ -52,7 +52,7 @@ describe("preloadableSpriteUrls", () => {
     expect(PRACTICE_SPRITE_SIZE).toBe(320);
   });
 
-  it("pins the picker sprite size to 150 px — must match SpritePicker's <Image width={150}>", () => {
+  it("pins the picker sprite size to 150 px - must match SpritePicker's <Image width={150}>", () => {
     expect(PICKER_SPRITE_SIZE).toBe(150);
   });
 });

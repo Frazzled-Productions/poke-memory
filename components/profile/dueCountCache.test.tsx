@@ -1,5 +1,5 @@
 /**
- * dueCountCache tests (#1484). jsdom (needs a localStorage stub) — mirrors the
+ * dueCountCache tests (#1484). jsdom (needs a localStorage stub) - mirrors the
  * pattern in useProfileStatus.test.tsx.
  */
 
@@ -84,7 +84,7 @@ describe("dueCountCache", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Has-history cache — readHasHistoryCache / writeHasHistory
+// Has-history cache - readHasHistoryCache / writeHasHistory
 // ---------------------------------------------------------------------------
 
 describe("hasHistoryCache", () => {

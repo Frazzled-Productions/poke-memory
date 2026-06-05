@@ -13,13 +13,13 @@ type Props = {
   /**
    * Gym badges (#420) the user has earned. Optional so existing tests that
    * predate the prop still render the component without setup. When empty
-   * or omitted, the badge rail is not rendered — unearned badges must
+   * or omitted, the badge rail is not rendered - unearned badges must
    * not be hinted at anywhere in the UI.
    */
   earnedBadges?: readonly BadgeDefinition[];
   /**
    * Number of alternate-form name cards the user has mastered.
-   * Optional — omit (or pass 0) to suppress the forms line.
+   * Optional - omit (or pass 0) to suppress the forms line.
    * Kept separate from `totalMastered` so the level calc (which is keyed
    * on base species) is not affected when forms are added (#446).
    */
@@ -35,7 +35,7 @@ type Props = {
  * Trainer level: pinned to total mastered count via a square-root curve.
  * Picks 16 as the scaling constant so the early game feels rewarding
  * (10 mastered → level 5, 100 mastered → level 16, 1025 mastered → level 51).
- * Deterministic and pure — no persistence needed.
+ * Deterministic and pure - no persistence needed.
  */
 export function trainerLevel(mastered: number): number {
   if (mastered <= 0) return 1;
@@ -48,7 +48,7 @@ export function nextLevelMastered(level: number): number {
 }
 
 /**
- * Base species count — count of default-form entries (isDefaultForm=true) in
+ * Base species count - count of default-form entries (isDefaultForm=true) in
  * the seed. Equals 1025 for the v1 seed, grows with future seed expansions.
  * Level calculation is pinned to this value so existing users' levels are
  * unaffected when alternate-form cards are added.
@@ -56,7 +56,7 @@ export function nextLevelMastered(level: number): number {
 export const BASE_SPECIES_COUNT = SEED_POKEMON.filter((p) => p.isDefaultForm).length || 1025;
 
 /**
- * Total card count — all entries in the seed (base + alternate forms).
+ * Total card count - all entries in the seed (base + alternate forms).
  * Grows beyond BASE_SPECIES_COUNT once alternate forms are seeded.
  */
 export const TOTAL_CARD_COUNT = SEED_POKEMON.length;

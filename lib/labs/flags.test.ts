@@ -9,7 +9,7 @@ import {
 } from './flags';
 
 describe('LABS_FLAGS registry (#1258)', () => {
-  it('is an object (may be empty — infrastructure-only on initial ship)', () => {
+  it('is an object (may be empty - infrastructure-only on initial ship)', () => {
     expect(typeof LABS_FLAGS).toBe('object');
   });
 
@@ -46,7 +46,7 @@ describe('parseLabsFlags (#1258)', () => {
     expect(parseLabsFlags({})).toEqual(DEFAULT_LABS_FLAGS);
   });
 
-  it('silently drops unknown keys — only registry keys survive', () => {
+  it('silently drops unknown keys - only registry keys survive', () => {
     const result = parseLabsFlags({ unknownFeature: true, anotherOne: false });
     // Result must equal DEFAULT_LABS_FLAGS (unknown keys discarded).
     expect(result).toEqual(DEFAULT_LABS_FLAGS);

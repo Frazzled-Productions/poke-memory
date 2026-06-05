@@ -40,7 +40,7 @@
 
 // Snapshot today's date at module load time (the moment the script starts).
 // All card state dates are computed relative to NOW so the rendered practice
-// queue reflects "today" correctly — mastered cards have future due dates
+// queue reflects "today" correctly - mastered cards have future due dates
 // (so they stay out of the review queue), while the grade-log history is
 // anchored to a fixed past epoch (so Stats always shows 30 days of history).
 const NOW_MS = Date.now();

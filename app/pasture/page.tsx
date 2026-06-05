@@ -163,7 +163,7 @@ export default function PasturePage() {
         // those fields, causing all species to fall into the "unknown"/Wildlands
         // bucket and biomeStats to report 0 mastered per biome.
         const { pokemonNameLocale } = loadSettings();
-        // All *Enabled flags are false — we only want the refresh step of
+        // All *Enabled flags are false - we only want the refresh step of
         // hydrateSession (backfill habitat, isDefaultForm, types, etc. onto
         // each saved card from SEED_POKEMON). Adding new cards here would bloat
         // session.cards with ~1 000 unseen species, hurting filterMastered perf.
@@ -269,7 +269,7 @@ export default function PasturePage() {
   );
 
   if (!loaded) {
-    // Render nothing until the client reads localStorage — avoids a flash of
+    // Render nothing until the client reads localStorage - avoids a flash of
     // the empty state on first paint for users who have mastered cards.
     return null;
   }
@@ -278,7 +278,7 @@ export default function PasturePage() {
   // directly so the pasture is fully populated even on a fresh or sparse
   // localStorage session. seenInPasture is forced true so the synthesized
   // cards don't sparkle as "new arrivals" in QA mode. Persisted state is left
-  // untouched — markSeenInPasture is a no-op for ids not in session.cards.
+  // untouched - markSeenInPasture is a no-op for ids not in session.cards.
   const masteredCards: NameReviewCard[] = flags.pretendAllMastered
     ? SEED_POKEMON.map((p) => ({
         ...p,
@@ -296,7 +296,7 @@ export default function PasturePage() {
       : [];
 
   // Compute next arrivals from the full raw session (all card types, all
-  // species — not just the mastered subset). Computed before the early-return
+  // species - not just the mastered subset). Computed before the early-return
   // so the strip can show upcoming arrivals even when the Pasture is empty.
   // When pretendAllMastered is on, nextArrivals returns [] and the strip shows
   // an all-caught-up message.

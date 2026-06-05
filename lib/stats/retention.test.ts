@@ -61,7 +61,7 @@ describe("computeRetentionComparison", () => {
     expect(result.reviews).toBe(1);
   });
 
-  it("single review in window — zero Again grades — actual is 1.0", () => {
+  it("single review in window - zero Again grades - actual is 1.0", () => {
     // Single-day log with one passing grade: reviews=1, actual=1.0.
     // This is the "retention with zero Again grades" scenario from issue #1019.
     const log: GradeLog = [entry("2026-05-12", 5)];

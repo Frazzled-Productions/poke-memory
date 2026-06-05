@@ -9,7 +9,7 @@
  *
  * Superuser behaviour: when pretendAllMastered is active, every species is
  * already mastered so there are no upcoming arrivals. The strip renders an
- * all-caught-up message in that state — this is correct and deliberate.
+ * all-caught-up message in that state - this is correct and deliberate.
  */
 
 import Image from "next/image";
@@ -18,6 +18,7 @@ import type { NextArrival } from "@/lib/pasture/nextArrivals";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { PASTURE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { mutedText } from "@/lib/utils/class-names";
+import { InfoButton } from "@/components/ui/InfoButton";
 
 // ---------------------------------------------------------------------------
 // Individual arrival tile
@@ -79,8 +80,16 @@ export function NextArrivalsStrip({ arrivals }: Props) {
       aria-label={t("ariaLabel")}
       className="mt-8 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 dark:border-zinc-700 dark:bg-zinc-900/50"
     >
-      <h2 className="mb-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+      <h2 className="flex items-center gap-1.5 mb-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400">
         {t("heading")}
+        {arrivals.length > 0 && (
+          <InfoButton
+            ariaLabel={t("repsInfoAriaLabel")}
+            panelId="next-arrivals-reps-info"
+            panelContent={<p>{t("repsInfoPanel")}</p>}
+            panelClassName="left-0"
+          />
+        )}
       </h2>
 
       {arrivals.length === 0 ? (

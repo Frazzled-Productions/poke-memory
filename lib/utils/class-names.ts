@@ -4,7 +4,7 @@
  * Extract repeated Tailwind literals into named constants so dark-mode variant
  * changes, spacing adjustments, and border colour tweaks propagate everywhere
  * from a single edit. Only patterns that appear verbatim in 8+ places are
- * extracted — one-off strings stay inline.
+ * extracted - one-off strings stay inline.
  *
  * Import individual constants as needed:
  *   import { cardPanel, colStack } from "@/lib/utils/class-names";
@@ -29,7 +29,7 @@ export const colStackLg = "flex flex-col gap-4";
 
 /**
  * Muted chart-axis / label text colour.
- * Lighter than the body-muted shade — used on recharts tick labels and
+ * Lighter than the body-muted shade - used on recharts tick labels and
  * secondary annotations inside chart areas.
  */
 export const chartTickText = "text-zinc-400 dark:text-zinc-500";
@@ -94,7 +94,7 @@ export const statValue = "tabular-nums text-zinc-600 dark:text-zinc-300";
  * metadata throughout Settings, Stats, and review surfaces.
  *
  * Compose spacing at call sites: `\`mt-1 \${mutedTextXs}\`` or
- * `cn("mt-1", mutedTextXs)` — do not inline the colour classes directly.
+ * `cn("mt-1", mutedTextXs)` - do not inline the colour classes directly.
  */
 export const mutedTextXs = "text-xs text-zinc-500 dark:text-zinc-400";
 
@@ -110,7 +110,7 @@ export const inlineLink =
  * Chart tooltip card container used by all five Stats custom tooltips
  * (`DirectionBreakdownChart`, `MasteryOverTimeChart`, `DifficultyHistogram`,
  * `GradeDistributionChart`, `ActivityHistoryChart`). Uses `border-zinc-700`
- * in dark mode — distinct from the `cardPanel` / `cardPanelPadded` family
+ * in dark mode - distinct from the `cardPanel` / `cardPanelPadded` family
  * which use `border-zinc-800`.
  */
 export const chartTooltipCard =

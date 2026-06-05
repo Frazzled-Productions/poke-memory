@@ -3,12 +3,12 @@ import { KEY_REVIEW_SESSION, KEY_GRADE_LOG } from "@/lib/storage/keys";
 
 // Local aliases so the idbDelete calls below read like named store handles
 // rather than raw key strings. Both constants are sourced from the shared
-// key registry (lib/storage/keys.ts) — lib/idb/db.ts does the same.
+// key registry (lib/storage/keys.ts) - lib/idb/db.ts does the same.
 const SESSION_IDB_KEY = KEY_REVIEW_SESSION;
 const GRADE_LOG_IDB_KEY = KEY_GRADE_LOG;
 
 /**
- * Wipes localStorage + IDB stores for a guest reset. **Local-only** — does
+ * Wipes localStorage + IDB stores for a guest reset. **Local-only** - does
  * not touch cloud. Signed-in callers should use
  * `resetAllProgressEverywhere` from `lib/sync/reset` instead; calling this
  * directly when authenticated leaves cloud populated and the next background
@@ -30,10 +30,10 @@ export async function clearLocalProgress(): Promise<void> {
     // localStorage inaccessible (e.g. Safari ITP in a third-party context).
   }
 
-  // When IDB is unavailable, idbDelete is a no-op — that's fine because the
+  // When IDB is unavailable, idbDelete is a no-op - that's fine because the
   // persistence layers fall back to localStorage, so the sweep above already
   // cleared those keys (they start with "poke-memory:" but not "poke-memory:settings:").
-  // Run all three deletes in parallel — each opens its own short transaction
+  // Run all three deletes in parallel - each opens its own short transaction
   // and there is no ordering dependency between them.
   await Promise.all([
     idbDelete(SESSION_IDB_KEY),
@@ -45,7 +45,7 @@ export async function clearLocalProgress(): Promise<void> {
   // dispatch synthetic ones keyed to both stores so they pick up the empty
   // state without a full reload. Cross-tab listeners receive a real
   // StorageEvent from localStorage.removeItem above. The grade-log dispatch
-  // is the explicit delete-signal — GRADE_LOG_APPENDED_EVENT only announces
+  // is the explicit delete-signal - GRADE_LOG_APPENDED_EVENT only announces
   // appends, so without this dispatch a future decoupling of the Stats grade-
   // log read from its session read would silently stop reacting to resets.
   if (typeof window !== "undefined") {

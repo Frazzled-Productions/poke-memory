@@ -3,7 +3,7 @@ import { BiomeSky } from "./BiomeSky";
 import { BiomeFloor } from "./BiomeFloor";
 
 /**
- * Rough Terrain habitat backdrop — sunset over orange mesas with cracked
+ * Rough Terrain habitat backdrop - sunset over orange mesas with cracked
  * earth, scattered boulders, dry brush, and cacti. Anchor bands cluster
  * sprites along the lower mesa ledges and the foreground badlands.
  */
@@ -43,7 +43,7 @@ export function RoughTerrainBiome() {
         />
       </g>
 
-      {/* Mid mesas — chunky stepped silhouettes */}
+      {/* Mid mesas - chunky stepped silhouettes */}
       <g>
         <path
           d="M0,460 L80,460 L100,400 L320,400 L340,460 L520,460 L540,420 L760,420 L780,380 L1000,380 L1020,420 L1240,420 L1260,460 L1440,460 L1460,410 L1600,410 L1600,500 L0,500 Z"
@@ -91,7 +91,7 @@ export function RoughTerrainBiome() {
         </g>
       </g>
 
-      {/* Cactus — left foreground */}
+      {/* Cactus - left foreground */}
       <g transform="translate(420 540)">
         <ellipse cx="0" cy="40" rx="24" ry="5" fill="#5a2e16" opacity="0.5" />
         <rect x="-9" y="-10" width="18" height="50" rx="8" fill="#4ea142" stroke="#2a6a2a" strokeWidth="2.5" />
@@ -110,7 +110,7 @@ export function RoughTerrainBiome() {
         <circle cx="0" cy="-14" r="4" fill="#ff6ea8" stroke="#a02a60" strokeWidth="1.2" />
       </g>
 
-      {/* Cactus — right foreground (smaller) */}
+      {/* Cactus - right foreground (smaller) */}
       <g transform="translate(1300 555)">
         <ellipse cx="0" cy="32" rx="18" ry="4" fill="#5a2e16" opacity="0.5" />
         <rect x="-7" y="-6" width="14" height="38" rx="6.5" fill="#4ea142" stroke="#2a6a2a" strokeWidth="2.5" />

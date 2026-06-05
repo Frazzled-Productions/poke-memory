@@ -8,16 +8,16 @@ import { awaitTtsEnd } from "./tts";
  * When both audio features are on, playback is CHAINED: the cry plays first,
  * and TTS starts only when the cry's `ended` event fires (via the
  * `speakAfterCry` callback inside `playCry`). Awaiting them concurrently with
- * `Promise.all` would settle the moment the cry ends — exactly when TTS
- * begins — so the two are awaited SEQUENTIALLY instead:
+ * `Promise.all` would settle the moment the cry ends - exactly when TTS
+ * begins - so the two are awaited SEQUENTIALLY instead:
  *
- *   1. `await awaitCryEnd()` — blocks until the cry's `ended` event fires.
+ *   1. `await awaitCryEnd()` - blocks until the cry's `ended` event fires.
  *      Because `awaitCryEnd` registers its listener *after* `playCry`'s
  *      `onEnded` listener, the event fires `onEnded` (starts TTS) before
  *      resolving this promise.
  *   2. Yield a macrotask tick so that any TTS started inside a `setTimeout(0)`
  *      (the Web Speech API path in `speakNameViaSpeech`) has been queued.
- *   3. `await awaitTtsEnd()` — blocks until TTS finishes (or resolves
+ *   3. `await awaitTtsEnd()` - blocks until TTS finishes (or resolves
  *      immediately when TTS is not in use).
  *
  * This also handles the concurrent case (both already playing when graded)

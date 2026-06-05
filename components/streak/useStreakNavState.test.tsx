@@ -135,7 +135,7 @@ describe("nextMilestoneAbove", () => {
 // Hook tests
 // ---------------------------------------------------------------------------
 
-describe("useStreakNavState — 0-day streak state", () => {
+describe("useStreakNavState - 0-day streak state", () => {
   it("returns streak=0, tokenBalance=0, daysToNextMilestone=null when no reviews", async () => {
     mockComputeStreak.mockReturnValue(0);
 
@@ -148,7 +148,7 @@ describe("useStreakNavState — 0-day streak state", () => {
   });
 });
 
-describe("useStreakNavState — active streak state", () => {
+describe("useStreakNavState - active streak state", () => {
   it("returns streak > 0 and daysToNextMilestone for a mid-streak user", async () => {
     mockComputeStreak.mockReturnValue(4);
 
@@ -189,7 +189,7 @@ describe("useStreakNavState — active streak state", () => {
   });
 });
 
-describe("useStreakNavState — forceNextStreakMilestone flag", () => {
+describe("useStreakNavState - forceNextStreakMilestone flag", () => {
   it("suppresses daysToNextMilestone when forceNextStreakMilestone is on", async () => {
     mockUseSuperuser.mockReturnValue({ flags: { forceNextStreakMilestone: true } });
     mockComputeStreak.mockReturnValue(4);
@@ -220,7 +220,7 @@ describe("useStreakNavState — forceNextStreakMilestone flag", () => {
   });
 });
 
-describe("useStreakNavState — event reactivity", () => {
+describe("useStreakNavState - event reactivity", () => {
   it("re-reads state when STREAK_UPDATED_EVENT fires", async () => {
     mockComputeStreak.mockReturnValue(0);
 
@@ -266,7 +266,7 @@ describe("useStreakNavState — event reactivity", () => {
   });
 });
 
-describe("useStreakNavState — immediately-after-milestone state", () => {
+describe("useStreakNavState - immediately-after-milestone state", () => {
   it("shows next target after milestone fires (e.g. 7 achieved, next=14, distance=7)", async () => {
     mockComputeStreak.mockReturnValue(7);
 

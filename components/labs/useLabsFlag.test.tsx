@@ -2,13 +2,13 @@
  * jsdom tests for useLabsFlag (#1258).
  *
  * The hook lives in lib/ but its tests must live under components/ so the
- * jsdom vitest project picks them up (AGENTS.md "Testing — Unit / component
+ * jsdom vitest project picks them up (AGENTS.md "Testing - Unit / component
  * tests"). lib/ tests run in the `node` project which has no DOM, and
  * renderHook requires jsdom.
  *
  * Because LabsFlagKey is `never` while the LABS_FLAGS registry is empty
  * (infrastructure-only ship), we cast the key argument via `as LabsFlagKey`
- * throughout — the same pattern used in lib/labs/flags.test.ts.
+ * throughout - the same pattern used in lib/labs/flags.test.ts.
  *
  * Covers:
  *   - Returns false on initial render when settings have no labsFlags blob.
@@ -42,7 +42,7 @@ import { useLabsFlag } from "@/lib/labs/useLabsFlag";
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Minimal UserSettings stub — only labsFlags matters to this hook. */
+/** Minimal UserSettings stub - only labsFlags matters to this hook. */
 function settingsWithFlags(labsFlags: Record<string, boolean> | undefined) {
   return { labsFlags } as ReturnType<typeof mockLoadSettings>;
 }
@@ -172,7 +172,7 @@ describe("useLabsFlag (#1258)", () => {
       settingsWithFlags({ liveFlag: true }),
     );
 
-    // Dispatch outside of act — we expect no state update; no warning should appear.
+    // Dispatch outside of act - we expect no state update; no warning should appear.
     window.dispatchEvent(new StorageEvent("storage"));
 
     // Value stays at the pre-unmount reading because the listener was removed.

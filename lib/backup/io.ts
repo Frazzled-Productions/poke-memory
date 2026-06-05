@@ -7,7 +7,7 @@ import type { UserSettings } from "@/lib/settings/persistence";
 import { BACKUP_VERSION, isBackupFile } from "./schema";
 import { isoDate } from "@/lib/utils/format-date";
 
-// Built once at module load — SEED_POKEMON and SEED_EVOLUTION_CARDS are constants.
+// Built once at module load - SEED_POKEMON and SEED_EVOLUTION_CARDS are constants.
 const VALID_IDS = new Set<number>([
   ...SEED_POKEMON.map((p) => p.id),
   ...SEED_EVOLUTION_CARDS.map((e) => e.id),
@@ -80,13 +80,13 @@ export async function validateBackup(
 
   // Null out stepStartedAt to prevent stale countdown timers after import.
   // ReviewSession's mount-time stamp loop will re-stamp any in-learning card
-  // with null stepStartedAt as Date.now(), giving it a fresh step window —
+  // with null stepStartedAt as Date.now(), giving it a fresh step window - 
   // this is intentional: imported cards start a clean step rather than
   // inheriting a possibly-hours-old anchor from the backup.
   // Static seed fields (name, spriteUrl, evolvesInto) are intentionally kept
   // from the backup: every consumer calls hydrateSession after loadSession,
   // which refreshes them from the current seed. Calling hydrateSession here
-  // would also add all seed cards missing from the backup — not the right
+  // would also add all seed cards missing from the backup - not the right
   // behaviour for a restore operation.
   const cards = parsed.cards.map(
     (card) =>

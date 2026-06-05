@@ -30,7 +30,7 @@ async function AuthErrorBanner({
   );
 }
 
-// Home stays synchronous and forwards searchParams to AuthErrorBanner — awaiting
+// Home stays synchronous and forwards searchParams to AuthErrorBanner - awaiting
 // searchParams here would pull the suspend point up to the page root and break
 // prerender under cacheComponents.
 export default function Home({
@@ -55,7 +55,7 @@ export default function Home({
     <div className="flex flex-1 flex-col min-h-0 bg-background px-4 pt-2 sm:items-center sm:py-16">
       <Suspense fallback={null}>
         {/*
-          AuthErrorBanner needs the full viewport width at the top — render it
+          AuthErrorBanner needs the full viewport width at the top - render it
           outside the constrained inner container so it can take `max-w-md`.
         */}
         <AuthErrorBanner searchParams={searchParams} />
@@ -69,8 +69,8 @@ export default function Home({
 
         On mobile and tablet the grid collapses to a single column and the
         sidebar is hidden. The sidebar shows session-local counters only (grades
-        reviewed today, accuracy, recent grade dots) — not mastery/completion
-        state — so it is unaffected by the `pretendAllMastered` superuser flag.
+        reviewed today, accuracy, recent grade dots) - not mastery/completion
+        state - so it is unaffected by the `pretendAllMastered` superuser flag.
 
         `flex-1 flex-col min-h-0` continues the height chain on mobile so that
         ReviewSession fills the remaining space and places grade buttons on screen.
@@ -78,15 +78,15 @@ export default function Home({
         three-column grid takes over.
       */}
       <div className="flex flex-1 flex-col min-h-0 w-full max-w-md lg:max-w-5xl lg:flex-none lg:grid lg:grid-cols-[1fr_min(448px,100%)_1fr] lg:gap-8 lg:items-start">
-        {/* Left gutter — empty on lg+, keeps the card centred */}
+        {/* Left gutter - empty on lg+, keeps the card centred */}
         <div className="hidden lg:block" aria-hidden="true" />
 
-        {/* Main review session — always visible */}
+        {/* Main review session - always visible */}
         <main className="flex flex-1 flex-col min-h-0 w-full lg:flex-none">
           {/*
             First-visit onboarding modal (#1103). Renders as a fixed overlay;
             it reads its own persisted flag so no state is needed here.
-            Rendered client-side only — no SSR flash because the component
+            Rendered client-side only - no SSR flash because the component
             stays null until the flag is read from localStorage.
           */}
           <FirstVisitOnboardingModal />
@@ -100,7 +100,7 @@ export default function Home({
           </div>
         </main>
 
-        {/* Session progress sidebar — visible only at lg+, hidden on mobile/tablet */}
+        {/* Session progress sidebar - visible only at lg+, hidden on mobile/tablet */}
         <div className="hidden lg:block lg:pt-0">
           <div className="sticky top-6">
             <PracticeSidebar />

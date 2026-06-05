@@ -94,9 +94,9 @@ test.describe("Superuser mode", () => {
   }) => {
     await seedSuperuser(page, { unlocked: true, pretendAllMastered: false });
     await page.goto("/settings");
-    // Expand the Advanced section — the Developer panel lives inside it.
+    // Expand the Advanced section - the Developer panel lives inside it.
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
-    // Wait for settings to hydrate — the Developer panel only renders once
+    // Wait for settings to hydrate - the Developer panel only renders once
     // `settings !== null` (useEffect) AND `unlocked` (SuperuserContext useEffect)
     // are both resolved. Waiting for the region is the right gate.
     const developerSection = page.getByRole("region", {

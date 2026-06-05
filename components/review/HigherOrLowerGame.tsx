@@ -125,7 +125,7 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
     if (!canPlay) return;
     // Guard against re-running when React re-shows a preserved route segment
     // (e.g. tab away + back). pair is null only on the very first mount, so
-    // this check makes the initialisation idempotent — an in-progress or
+    // this check makes the initialisation idempotent - an in-progress or
     // game-over state is never clobbered by a re-show (#887).
     // bestScore is similarly guarded: re-reading settings on re-show would
     // overwrite an in-session high score before the user has acknowledged it.
@@ -137,7 +137,7 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
     // canPlay, seenPokemon, loadSettings, shufflePair, and pickPair are
     // intentionally omitted: seenPokemon is stable for the component lifetime
     // (memoised at the call site), canPlay is derived from it, and the
-    // imported functions are module-level constants — none of them change, so
+    // imported functions are module-level constants - none of them change, so
     // adding them would not change behaviour but would risk re-triggering the
     // effect (and therefore clobbering game state) if the reference ever
     // shifts at the call site.
@@ -187,7 +187,7 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
     setTransitioning(true);
     void decodeSpriteUrls([nextPair.left.spriteUrl, nextPair.right.spriteUrl]).then(() => {
       // Reset streak atomically with the new pair so the game-over banner
-      // ("Game over — streak of N!") keeps showing the correct value during
+      // ("Game over - streak of N!") keeps showing the correct value during
       // the decode window and only disappears when all state flips together.
       setStreak(0);
       setPair(nextPair);
