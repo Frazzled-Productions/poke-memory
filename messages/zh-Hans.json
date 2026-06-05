@@ -41,7 +41,12 @@
     "connectProviderAriaLabel": "连接 {provider}",
     "connectedProvidersAriaLabel": "已连接的登录方式",
     "providerConnectedAriaLabel": "{provider} 已连接",
-    "checkingSyncStatusAriaLabel": "正在检查同步状态"
+    "checkingSyncStatusAriaLabel": "正在检查同步状态",
+    "signInSheet": {
+      "heading": "保护你的学习进度",
+      "body": "登录一次，即可在所有设备上备份数据。免费，无垃圾邮件。",
+      "closeAriaLabel": "关闭登录面板"
+    }
   },
   "settings": {
     "heading": "设置",

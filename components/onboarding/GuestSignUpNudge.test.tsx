@@ -52,6 +52,9 @@ vi.mock("@/lib/auth/actions", () => ({
   signOut: vi.fn(),
 }));
 
+// SignInSheet uses createPortal into document.body, which is fine in jsdom.
+// No special setup needed - screen queries the full DOM including portals.
+
 // ---------------------------------------------------------------------------
 // Settings stub - same pattern as other onboarding tests
 // ---------------------------------------------------------------------------
@@ -296,11 +299,11 @@ describe("dismissal", () => {
 });
 
 // ---------------------------------------------------------------------------
-// CTA: clicking opens the provider picker
+// CTA: clicking opens the SignInSheet (#1669 consolidation)
 // ---------------------------------------------------------------------------
 
-describe("CTA - opens provider picker", () => {
-  it("shows a CTA button before picker is opened", async () => {
+describe("CTA - opens SignInSheet", () => {
+  it("shows a CTA button", async () => {
     currentSettings = settingsWithFlag(false, 0);
 
     renderWithIntl(
@@ -309,7 +312,7 @@ describe("CTA - opens provider picker", () => {
     expect(await screen.findByRole("button", { name: /create a free account/i })).toBeTruthy();
   });
 
-  it("clicking CTA reveals GitHub and Google sign-in buttons", async () => {
+  it("clicking CTA opens the SignInSheet with GitHub and Google buttons", async () => {
     currentSettings = settingsWithFlag(false, 0);
 
     renderWithIntl(
@@ -319,8 +322,29 @@ describe("CTA - opens provider picker", () => {
     const cta = await screen.findByRole("button", { name: /create a free account/i });
     await userEvent.click(cta);
 
+    // SignInSheet is portalled to document.body; screen queries the full DOM.
+    expect(await screen.findByRole("dialog")).toBeTruthy();
     expect(await screen.findByRole("button", { name: /continue with github/i })).toBeTruthy();
     expect(await screen.findByRole("button", { name: /continue with google/i })).toBeTruthy();
+  });
+
+  it("SignInSheet can be closed after opening", async () => {
+    currentSettings = settingsWithFlag(false, 0);
+
+    renderWithIntl(
+      <GuestSignUpNudge masteredSpecies={15} practiceSessionsCount={0} />,
+    );
+
+    const cta = await screen.findByRole("button", { name: /create a free account/i });
+    await userEvent.click(cta);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeTruthy();
+
+    const closeBtn = screen.getByRole("button", { name: /close sign-in sheet/i });
+    await userEvent.click(closeBtn);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 

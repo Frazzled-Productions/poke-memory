@@ -799,9 +799,9 @@ test.describe("Settings page", () => {
   });
 });
 
-test.describe("Sign-in picker (#360)", () => {
+test.describe("Sign-in sheet (#1669)", () => {
 
-  test("opens menu with GitHub and Google options plus provider warning", async ({
+  test("opens SignInSheet dialog with GitHub and Google options and value-prop heading", async ({
     page,
   }) => {
     await page.goto("/");
@@ -816,58 +816,64 @@ test.describe("Sign-in picker (#360)", () => {
 
     await signIn.click();
 
-    const menu = page.getByRole("menu");
-    await expect(menu).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: /keep your progress safe/i });
+    await expect(dialog).toBeVisible();
     await expect(
-      menu.getByRole("menuitem", { name: "Continue with GitHub" }),
+      dialog.getByRole("button", { name: "Continue with GitHub" }),
     ).toBeVisible();
     await expect(
-      menu.getByRole("menuitem", { name: "Continue with Google" }),
-    ).toBeVisible();
-    await expect(
-      menu.getByText(/Use the same provider you signed up with/i),
+      dialog.getByRole("button", { name: "Continue with Google" }),
     ).toBeVisible();
   });
 
-  // Header flex-wrap puts the Sign-in trigger at the LEFT edge of the
-  // viewport on narrow mobile (e.g. 390px iPhone 14 - nav-ul wraps below
-  // the logo and the trigger sits beside it) and at the RIGHT edge on
-  // wider mobile below the `sm:` breakpoint (e.g. 430px iPhone 14 Pro Max
-  // - the whole row fits and `justify-between` pushes the trigger right).
-  // Exercise both wrap modes so the panel doesn't regress to overflowing
-  // on either edge (#406, #441).
-  for (const vw of [375, 414]) {
-    test(`popup stays within the viewport at ${vw}px (#441)`, async ({
-      page,
-      browserName,
-    }) => {
-      test.skip(
-        browserName !== "chromium",
-        "viewport-fit check only needs one engine",
-      );
-      await page.setViewportSize({ width: vw, height: 800 });
-      await page.goto("/");
+  test("SignInSheet closes when Escape is pressed", async ({ page, browserName }) => {
+    test.skip(browserName !== "chromium", "keyboard check only needs one engine");
+    await page.goto("/");
 
-      const signIn = page.getByRole("button", { name: "Sign in" });
-      if (!(await signIn.isVisible().catch(() => false))) {
-        test.skip();
-        return;
-      }
+    const signIn = page.getByRole("button", { name: "Sign in" });
+    if (!(await signIn.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
 
-      await signIn.click();
-      const menu = page.getByRole("menu");
-      await expect(menu).toBeVisible();
+    await signIn.click();
+    const dialog = page.getByRole("dialog", { name: /keep your progress safe/i });
+    await expect(dialog).toBeVisible();
 
-      const menuBox = await menu.boundingBox();
-      const viewport = page.viewportSize();
-      expect(menuBox).not.toBeNull();
-      expect(viewport).not.toBeNull();
-      if (!menuBox || !viewport) return;
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+  });
 
-      expect(menuBox.x).toBeGreaterThanOrEqual(0);
-      expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(viewport.width);
-    });
-  }
+  test("SignInSheet stays within viewport on mobile (#441)", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "viewport-fit check only needs one engine",
+    );
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+
+    const signIn = page.getByRole("button", { name: "Sign in" });
+    if (!(await signIn.isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    await signIn.click();
+    const dialog = page.getByRole("dialog", { name: /keep your progress safe/i });
+    await expect(dialog).toBeVisible();
+
+    const dialogBox = await dialog.boundingBox();
+    const viewport = page.viewportSize();
+    expect(dialogBox).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    if (!dialogBox || !viewport) return;
+
+    expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+    expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(viewport.width);
+  });
 });
 
 test.describe("Streak status on Practice (#1443)", () => {

@@ -41,7 +41,12 @@
     "connectProviderAriaLabel": "{provider} に接続",
     "connectedProvidersAriaLabel": "連携済みプロバイダー",
     "providerConnectedAriaLabel": "{provider} 連携済み",
-    "checkingSyncStatusAriaLabel": "同期状態を確認中"
+    "checkingSyncStatusAriaLabel": "同期状態を確認中",
+    "signInSheet": {
+      "heading": "進捗データを安全に保存しよう",
+      "body": "一度サインインするだけで、すべてのデバイスにデータをバックアップできます。無料・スパムなし。",
+      "closeAriaLabel": "サインインシートを閉じる"
+    }
   },
   "settings": {
     "heading": "設定",

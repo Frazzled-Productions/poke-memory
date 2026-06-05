@@ -938,7 +938,7 @@ test.describe("Guest sign-up nudge (#1668)", () => {
     ).toHaveCount(0);
   });
 
-  test("CTA on Stats page opens the sign-in provider picker", async ({
+  test("CTA on Stats page opens the SignInSheet (#1669)", async ({
     page,
   }) => {
     await page.addInitScript((key) => {
@@ -957,12 +957,14 @@ test.describe("Guest sign-up nudge (#1668)", () => {
     const nudge = page.locator(`[role="note"]`, { hasText: /your progress is at risk/i });
     await expect(nudge).toBeVisible({ timeout: 20_000 });
 
-    // Click the CTA button to open the provider picker.
+    // Click the CTA button to open the SignInSheet.
     await nudge.getByRole("button", { name: /create a free account/i }).click();
 
-    // Provider buttons should appear inside the nudge.
-    await expect(nudge.getByRole("button", { name: /continue with github/i })).toBeVisible();
-    await expect(nudge.getByRole("button", { name: /continue with google/i })).toBeVisible();
+    // SignInSheet is a portal at document root - use page-level selectors.
+    const dialog = page.getByRole("dialog", { name: /keep your progress safe/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /continue with github/i })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /continue with google/i })).toBeVisible();
   });
 
   test("nudge on Stats page is dismissible and absent after dismissal", async ({
