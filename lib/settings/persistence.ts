@@ -114,6 +114,9 @@ export type OnboardingFlags = {
    * absent in pre-#1482 blobs resolves to `0` (below threshold) via
    * integer coercion.
    */
+  // NOTE: this counts completed practice sessions since the field shipped
+  // (#1505 / 2026-06-01), NOT lifetime sessions. A low value on an older
+  // account is expected and is NOT a sign that progress was wiped.
   practiceSessionsCount: number;
   /**
    * One-time dismissal flag for the offline-download discovery nudge (#1538).
