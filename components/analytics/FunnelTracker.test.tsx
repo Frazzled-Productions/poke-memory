@@ -48,8 +48,14 @@ import {
   FunnelTracker,
 } from "./FunnelTracker";
 import {
-  KEY_LAST_SEEN_VERSION,
   KEY_MASTERED_COUNT_BY_LOCALE,
+  KEY_REVIEW_SESSION,
+  KEY_STREAK,
+  KEY_PERSIST_REQUESTED,
+  KEY_LAST_SEEN_VERSION,
+  KEY_CLIENT_SALT,
+  KEY_SUPERUSER_UNLOCKED,
+  KEY_SUPERUSER_FLAGS,
 } from "@/lib/storage/keys";
 
 // -----------------------------------------------------------------
@@ -144,12 +150,13 @@ describe("readTotalMasteredCount", () => {
       "zh-Hans": 3,
       "zh-Hant": 2,
     });
+    // max(10, 5, 3, 2) = 10, not the sum (20)
     expect(readTotalMasteredCount()).toBe(10);
   });
 
   it("does not double-count species mastered in multiple locales", () => {
     // A user who has mastered 42 species in both English and Japanese has
-    // not mastered 84 unique species — the peak locale count is the correct proxy.
+    // not mastered 84 unique species - the peak locale count is the correct proxy.
     mockReadMasteredCountCache.mockReturnValue({
       en: 42,
       ja: 42,
@@ -157,6 +164,16 @@ describe("readTotalMasteredCount", () => {
       "zh-Hant": 0,
     });
     expect(readTotalMasteredCount()).toBe(42);
+  });
+
+  it("returns the single non-zero locale count when only one locale has progress", () => {
+    mockReadMasteredCountCache.mockReturnValue({
+      en: 0,
+      ja: 25,
+      "zh-Hans": 0,
+      "zh-Hant": 0,
+    });
+    expect(readTotalMasteredCount()).toBe(25);
   });
 
   it("handles a cache with only English counts", () => {
@@ -182,13 +199,25 @@ describe("hasPriorLocalProgress", () => {
     expect(hasPriorLocalProgress()).toBe(false);
   });
 
-  it("returns false when only the superuser key is present", () => {
-    setLocalStorageKeys(["poke-memory:superuser"]);
+  it("returns false when only non-poke-memory keys are present", () => {
+    setLocalStorageKeys(["some-other-app:key", "unrelated"]);
     expect(hasPriorLocalProgress()).toBe(false);
   });
 
-  it("returns false when only a superuser flags key is present", () => {
-    setLocalStorageKeys(["poke-memory:superuser:flags:v1"]);
+  // ── Non-progress keys written on first visit must NOT trigger returning_guest ──
+
+  it("returns false when only the superuser unlock key is present", () => {
+    setLocalStorageKeys([KEY_SUPERUSER_UNLOCKED]);
+    expect(hasPriorLocalProgress()).toBe(false);
+  });
+
+  it("returns false when only the superuser flags key is present", () => {
+    setLocalStorageKeys([KEY_SUPERUSER_FLAGS]);
+    expect(hasPriorLocalProgress()).toBe(false);
+  });
+
+  it("returns false when only the persist-requested key is present", () => {
+    setLocalStorageKeys([KEY_PERSIST_REQUESTED]);
     expect(hasPriorLocalProgress()).toBe(false);
   });
 
@@ -197,13 +226,31 @@ describe("hasPriorLocalProgress", () => {
     expect(hasPriorLocalProgress()).toBe(false);
   });
 
+  it("returns false when only the client-salt key is present", () => {
+    setLocalStorageKeys([KEY_CLIENT_SALT]);
+    expect(hasPriorLocalProgress()).toBe(false);
+  });
+
+  it("returns false when all first-visit non-progress keys are present but no progress keys", () => {
+    setLocalStorageKeys([
+      KEY_PERSIST_REQUESTED,
+      KEY_LAST_SEEN_VERSION,
+      KEY_CLIENT_SALT,
+      KEY_SUPERUSER_UNLOCKED,
+      KEY_SUPERUSER_FLAGS,
+    ]);
+    expect(hasPriorLocalProgress()).toBe(false);
+  });
+
+  // ── Real progress keys must trigger returning_guest ──
+
   it("returns true when the review session key is present", () => {
-    setLocalStorageKeys(["poke-memory:review-session:v1"]);
+    setLocalStorageKeys([KEY_REVIEW_SESSION]);
     expect(hasPriorLocalProgress()).toBe(true);
   });
 
-  it("returns true when the settings key is present", () => {
-    setLocalStorageKeys(["poke-memory:settings:v1"]);
+  it("returns true when the streak key is present", () => {
+    setLocalStorageKeys([KEY_STREAK]);
     expect(hasPriorLocalProgress()).toBe(true);
   });
 
@@ -212,15 +259,17 @@ describe("hasPriorLocalProgress", () => {
     expect(hasPriorLocalProgress()).toBe(true);
   });
 
-  it("returns false when only non-poke-memory keys are present", () => {
-    setLocalStorageKeys(["some-other-app:key", "unrelated"]);
-    expect(hasPriorLocalProgress()).toBe(false);
+  it("returns true when multiple progress keys are present", () => {
+    setLocalStorageKeys([KEY_REVIEW_SESSION, KEY_STREAK]);
+    expect(hasPriorLocalProgress()).toBe(true);
   });
 
-  it("returns true when multiple poke-memory keys are present", () => {
+  it("returns true even when non-progress keys are also present alongside a progress key", () => {
     setLocalStorageKeys([
-      "poke-memory:review-session:v1",
-      "poke-memory:streak:v1",
+      KEY_PERSIST_REQUESTED,
+      KEY_LAST_SEEN_VERSION,
+      KEY_CLIENT_SALT,
+      KEY_REVIEW_SESSION,
     ]);
     expect(hasPriorLocalProgress()).toBe(true);
   });
@@ -271,7 +320,7 @@ describe("FunnelTracker component", () => {
   });
 
   it("fires app_open with userType='returning_guest' when prior localStorage progress exists", async () => {
-    setLocalStorageKeys(["poke-memory:review-session:v1"]);
+    setLocalStorageKeys([KEY_REVIEW_SESSION]);
     renderTracker({ user: null, loading: false });
     await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
     expect(mockTrack).toHaveBeenCalledWith("app_open", {
@@ -301,10 +350,12 @@ describe("FunnelTracker component", () => {
     );
   });
 
-  it("uses progressBucket='11-50' when peak locale mastered is 25", async () => {
+  it("uses progressBucket='11-50' when best-locale mastered count is 25", async () => {
+    // max(25, 8, 5, 2) = 25 => '11-50'. A sum-based approach would give 40
+    // but that is double-counting; the bucket reflects the best single locale.
     renderTracker({
       user: null,
-      masteredCounts: { en: 25, ja: 0, "zh-Hans": 0, "zh-Hant": 0 },
+      masteredCounts: { en: 25, ja: 8, "zh-Hans": 5, "zh-Hant": 2 },
     });
     await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
     expect(mockTrack).toHaveBeenCalledWith(
