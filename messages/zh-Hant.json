@@ -45,7 +45,30 @@
     "signInSheet": {
       "heading": "保護你的學習進度",
       "body": "登入一次，即可在所有裝置上備份資料。免費，無垃圾郵件。",
-      "closeAriaLabel": "關閉登入面板"
+      "closeAriaLabel": "關閉登入面板",
+      "socialHeading": "快速 - 無需額外帳號",
+      "usernameHeading": "更快速，但功能受限",
+      "usernameDivider": "或",
+      "signInInstead": "已有帳號？立即登入",
+      "signUpInstead": "新用戶？建立帳號",
+      "username": {
+        "usernamePlaceholder": "使用者名稱",
+        "usernameLabel": "使用者名稱",
+        "passwordPlaceholder": "密碼",
+        "passwordLabel": "密碼",
+        "submitSignUp": "建立帳號",
+        "submitSignIn": "登入",
+        "submitting": "請稍候…",
+        "warningNoReset": "沒有密碼重設功能。請將密碼儲存至密碼管理工具，否則您將永久失去存取權限。",
+        "warningNoRealName": "請勿將您的真實姓名或個人資訊用作使用者名稱。",
+        "errorUsernameTooShort": "使用者名稱至少需要3個字元。",
+        "errorUsernameTooLong": "使用者名稱最多30個字元。",
+        "errorUsernameInvalidChars": "使用者名稱只能包含字母、數字、底線和連字號。",
+        "errorPasswordTooShort": "密碼至少需要8個字元。",
+        "errorUsernameTaken": "該使用者名稱已被使用，請選擇其他名稱。",
+        "errorInvalidCredentials": "使用者名稱或密碼不正確。",
+        "errorSignupFailed": "註冊失敗，請重試。"
+      }
     }
   },
   "settings": {

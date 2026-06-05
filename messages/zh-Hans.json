@@ -45,7 +45,30 @@
     "signInSheet": {
       "heading": "保护你的学习进度",
       "body": "登录一次，即可在所有设备上备份数据。免费，无垃圾邮件。",
-      "closeAriaLabel": "关闭登录面板"
+      "closeAriaLabel": "关闭登录面板",
+      "socialHeading": "快捷 - 无需额外账号",
+      "usernameHeading": "更快捷，但功能有限",
+      "usernameDivider": "或",
+      "signInInstead": "已有账号？立即登录",
+      "signUpInstead": "新用户？创建账号",
+      "username": {
+        "usernamePlaceholder": "用户名",
+        "usernameLabel": "用户名",
+        "passwordPlaceholder": "密码",
+        "passwordLabel": "密码",
+        "submitSignUp": "创建账号",
+        "submitSignIn": "登录",
+        "submitting": "请稍候…",
+        "warningNoReset": "没有密码重置功能。请将密码保存到密码管理器，否则您将永久失去访问权限。",
+        "warningNoRealName": "请勿将您的真实姓名或个人信息用作用户名。",
+        "errorUsernameTooShort": "用户名至少需要3个字符。",
+        "errorUsernameTooLong": "用户名最多30个字符。",
+        "errorUsernameInvalidChars": "用户名只能包含字母、数字、下划线和连字符。",
+        "errorPasswordTooShort": "密码至少需要8个字符。",
+        "errorUsernameTaken": "该用户名已被使用，请选择其他用户名。",
+        "errorInvalidCredentials": "用户名或密码不正确。",
+        "errorSignupFailed": "注册失败，请重试。"
+      }
     }
   },
   "settings": {

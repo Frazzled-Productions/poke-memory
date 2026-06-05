@@ -6,6 +6,10 @@
  * Replaces the old `SignInPicker` dropdown in AuthButton and consolidates
  * every sign-in entry point to a single surface (#1669).
  *
+ * Now includes a username/password door (#1671) as a secondary "Quicker, but
+ * limited" tier below a divider. The username door supports both sign-up and
+ * sign-in via a mode toggle.
+ *
  * Accessibility contract (mirrors FirstVisitOnboardingModal):
  * - Rendered via createPortal outside #app-root.
  * - While open, #app-root receives `inert` and `aria-hidden` so screen-reader
@@ -17,19 +21,25 @@
  *   visible text label so there is no Label-in-Name mismatch.
  * - Mobile: padding-bottom honours env(safe-area-inset-bottom) (mirrors
  *   BottomTabBar).
+ * - Username form: labelled inputs with visible <label> elements; form element
+ *   with a submit button so Enter submits.
  */
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { signIn } from "@/lib/auth/actions";
+import { signIn, signUpWithUsername, signInWithUsername } from "@/lib/auth/actions";
 import type { AuthProvider } from "@/lib/auth/types";
+import { normaliseUsername, validateUsername, MIN_PASSWORD_LENGTH } from "@/lib/auth/username";
 import { colStack } from "@/lib/utils/class-names";
 
 type Props = {
   open: boolean;
   onClose: () => void;
 };
+
+/** Whether the username form is in sign-up or sign-in mode. */
+type UsernameMode = "signup" | "signin";
 
 export function SignInSheet({ open, onClose }: Props) {
   const t = useTranslations("auth");
@@ -39,10 +49,27 @@ export function SignInSheet({ open, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const prevFocusRef = useRef<HTMLElement | null>(null);
 
+  // Username/password form state.
+  const [usernameMode, setUsernameMode] = useState<UsernameMode>("signup");
+  const [usernameValue, setUsernameValue] = useState("");
+  const [passwordValue, setPasswordValue] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Guard against SSR - createPortal requires a DOM.
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Reset form state when sheet closes.
+  useEffect(() => {
+    if (!open) {
+      setUsernameValue("");
+      setPasswordValue("");
+      setFormError(null);
+      setUsernameMode("signup");
+    }
+  }, [open]);
 
   // When the sheet opens:
   //   1. Capture the currently focused element for focus restore on close.
@@ -93,7 +120,7 @@ export function SignInSheet({ open, onClose }: Props) {
         const dialog = dialogRef.current;
         if (!dialog) return;
         const focusable = dialog.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
         );
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
@@ -125,6 +152,56 @@ export function SignInSheet({ open, onClose }: Props) {
     startTransition(() => signIn(provider));
     // Do not close the sheet here - the server action triggers a redirect.
     // Closing prematurely removes the inert guard before the navigation completes.
+  }
+
+  async function handleUsernameSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setFormError(null);
+
+    const normalised = normaliseUsername(usernameValue);
+    const usernameErr = validateUsername(normalised);
+    if (usernameErr) {
+      setFormError(
+        usernameErr === "username_too_short"
+          ? t("signInSheet.username.errorUsernameTooShort")
+          : usernameErr === "username_too_long"
+            ? t("signInSheet.username.errorUsernameTooLong")
+            : t("signInSheet.username.errorUsernameInvalidChars"),
+      );
+      return;
+    }
+
+    if (passwordValue.length < MIN_PASSWORD_LENGTH) {
+      setFormError(t("signInSheet.username.errorPasswordTooShort"));
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result =
+        usernameMode === "signup"
+          ? await signUpWithUsername(normalised, passwordValue)
+          : await signInWithUsername(normalised, passwordValue);
+
+      if (!result.ok) {
+        const errKey = result.error;
+        setFormError(
+          errKey === "username_taken"
+            ? t("signInSheet.username.errorUsernameTaken")
+            : errKey === "invalid_credentials"
+              ? t("signInSheet.username.errorInvalidCredentials")
+              : errKey === "password_too_short"
+                ? t("signInSheet.username.errorPasswordTooShort")
+                : t("signInSheet.username.errorSignupFailed"),
+        );
+      } else {
+        // Success - the session is now set. Close the sheet; the page will
+        // re-render with the authenticated state via onAuthStateChange.
+        handleClose();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (!mounted || !open) return null;
@@ -177,12 +254,15 @@ export function SignInSheet({ open, onClose }: Props) {
             {t("signInSheet.body")}
           </p>
 
-          {/* Provider buttons */}
+          {/* Social provider tier */}
           <div className={colStack}>
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+              {t("signInSheet.socialHeading")}
+            </p>
             <button
               type="button"
               onClick={() => handleSignIn("github")}
-              disabled={isPending}
+              disabled={isPending || isSubmitting}
               className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-200 bg-background px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
               {isPending ? t("signingIn") : t("continueWithGitHub")}
@@ -190,13 +270,130 @@ export function SignInSheet({ open, onClose }: Props) {
             <button
               type="button"
               onClick={() => handleSignIn("google")}
-              disabled={isPending}
+              disabled={isPending || isSubmitting}
               className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-200 bg-background px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-900"
             >
               {isPending ? t("signingIn") : t("continueWithGoogle")}
             </button>
           </div>
 
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700" />
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">
+              {t("signInSheet.usernameDivider")}
+            </span>
+            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700" />
+          </div>
+
+          {/* Username/password tier */}
+          <div className={colStack}>
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+              {t("signInSheet.usernameHeading")}
+            </p>
+
+            {/* Warnings - shown only in sign-up mode */}
+            {usernameMode === "signup" && (
+              <div className={colStack}>
+                <p
+                  role="note"
+                  className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                >
+                  {t("signInSheet.username.warningNoReset")}
+                </p>
+                <p
+                  role="note"
+                  className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                >
+                  {t("signInSheet.username.warningNoRealName")}
+                </p>
+              </div>
+            )}
+
+            {/* Form */}
+            <form
+              onSubmit={handleUsernameSubmit}
+              noValidate
+              className="flex flex-col gap-3"
+            >
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="username-input"
+                  className="text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                >
+                  {t("signInSheet.username.usernameLabel")}
+                </label>
+                <input
+                  id="username-input"
+                  type="text"
+                  name="username"
+                  autoComplete="username"
+                  placeholder={t("signInSheet.username.usernamePlaceholder")}
+                  value={usernameValue}
+                  onChange={(e) => setUsernameValue(e.target.value)}
+                  disabled={isSubmitting || isPending}
+                  className="min-h-[44px] rounded-lg border border-zinc-200 bg-background px-3 py-2 text-sm text-foreground placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-foreground disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:placeholder:text-zinc-500"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="password-input"
+                  className="text-xs font-medium text-zinc-700 dark:text-zinc-300"
+                >
+                  {t("signInSheet.username.passwordLabel")}
+                </label>
+                <input
+                  id="password-input"
+                  type="password"
+                  name="password"
+                  autoComplete={
+                    usernameMode === "signup"
+                      ? "new-password"
+                      : "current-password"
+                  }
+                  placeholder={t("signInSheet.username.passwordPlaceholder")}
+                  value={passwordValue}
+                  onChange={(e) => setPasswordValue(e.target.value)}
+                  disabled={isSubmitting || isPending}
+                  className="min-h-[44px] rounded-lg border border-zinc-200 bg-background px-3 py-2 text-sm text-foreground placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-foreground disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:placeholder:text-zinc-500"
+                />
+              </div>
+
+              {/* Inline error */}
+              {formError && (
+                <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+                  {formError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSubmitting || isPending}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting
+                  ? t("signInSheet.username.submitting")
+                  : usernameMode === "signup"
+                    ? t("signInSheet.username.submitSignUp")
+                    : t("signInSheet.username.submitSignIn")}
+              </button>
+            </form>
+
+            {/* Mode toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                setUsernameMode((m) => (m === "signup" ? "signin" : "signup"));
+                setFormError(null);
+              }}
+              disabled={isSubmitting || isPending}
+              className="text-xs text-zinc-500 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground disabled:opacity-60 dark:text-zinc-400"
+            >
+              {usernameMode === "signup"
+                ? t("signInSheet.signInInstead")
+                : t("signInSheet.signUpInstead")}
+            </button>
+          </div>
         </div>
       </dialog>
     </div>,
