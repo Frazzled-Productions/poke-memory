@@ -989,7 +989,7 @@
     },
     "guestSignUpNudge": {
       "heading": "Your progress is at risk",
-      "body": "You have mastered {count, number} {count, plural, one {Pokémon} other {Pokémon}} on this device. If you clear your browser data or switch devices, that progress is gone. Create a free account to save it online.",
+      "body": "You have mastered {count, number} Pokémon on this device. If you clear your browser data or switch devices, that progress is gone. Create a free account to save it online.",
       "bodyLowMastery": "Your practice history is only on this device. If you clear your browser data or switch devices, that progress is gone. Create a free account to save it online.",
       "cta": "Create a free account"
     },

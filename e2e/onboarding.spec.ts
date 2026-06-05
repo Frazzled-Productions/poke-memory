@@ -771,11 +771,77 @@ test.describe("Higher-or-Lower signpost nudge (#1573)", () => {
 // Tests cover:
 //  - Nudge renders on Stats when practiceSessionsCount >= 3 (sessions gate).
 //  - Nudge renders on Journey when practiceSessionsCount >= 3.
+//  - Nudge renders on Stats when masteredSpecies >= 10 (mastered-species gate).
+//  - Nudge renders on Journey when masteredSpecies >= 10 (mastered-species gate).
 //  - Nudge absent when below both thresholds (fresh session).
 //  - Nudge absent when guestSignUpNudgeDismissed is true.
 //  - CTA opens the sign-in provider picker.
 //  - Nudge is dismissible and absent after dismissal.
+//
+// Seeding masteredSpecies >= 10: a session JSON is injected into IndexedDB
+// (via seedSessionIdb/awaitSeedIdb) with 10 species each having a paired name
+// card (id = N) and reverse card (id = N + 2_000_000), both carrying mastered
+// FSRS state (reps=3, scheduledDays=21). hydrateSession overlays real seed
+// fields so only the minimal identity + state fields are required here.
 // ---------------------------------------------------------------------------
+
+// Mastered FSRS state: reps >= 3 and scheduledDays >= 21.
+const MASTERED_STATE = {
+  stability: 30,
+  difficulty: 5,
+  elapsedDays: 21,
+  scheduledDays: 21,
+  reps: 3,
+  lapses: 0,
+  fsrsState: "review",
+  dueDate: "2026-06-05",
+  lastReview: "2026-05-15",
+  firstSeen: "2026-04-01",
+  learningStep: null,
+  stepStartedAt: null,
+  hiddenSince: null,
+  seenInPasture: false,
+};
+
+// REVERSE_ID_OFFSET = 2_000_000 (lib/pokemon/seed.ts)
+const REVERSE_ID_OFFSET = 2_000_000;
+
+/**
+ * Builds a session JSON with `count` mastered species (species IDs 1..count).
+ * Each species gets a name card (id = N) and a reverse card (id = N + 2_000_000).
+ * hydrateSession will overlay real SeedPokemon fields; only id/cardType/
+ * pokemonId/name/spriteUrl/state need to be valid for parseSession to accept
+ * the blob.
+ */
+function masteredSpeciesSession(count: number): object {
+  const cards = [];
+  for (let n = 1; n <= count; n++) {
+    cards.push({
+      id: n,
+      cardType: "name",
+      name: `Pokemon ${n}`,
+      spriteUrl: `/sprites/pokemon/${n}.png`,
+      state: { ...MASTERED_STATE },
+    });
+    cards.push({
+      id: n + REVERSE_ID_OFFSET,
+      cardType: "reverse",
+      pokemonId: n,
+      name: `Pokemon ${n}`,
+      spriteUrl: `/sprites/pokemon/${n}.png`,
+      state: { ...MASTERED_STATE },
+    });
+  }
+  return {
+    cards,
+    limits: {
+      name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+      reverse: { maxNewPerDay: 0, maxReviewsPerDay: 100 },
+      cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+    },
+  };
+}
 
 test.describe("Guest sign-up nudge (#1668)", () => {
   test("nudge renders on Stats page when sessions threshold is met (sessions >= 3)", async ({
@@ -929,5 +995,71 @@ test.describe("Guest sign-up nudge (#1668)", () => {
       try { return JSON.parse(raw); } catch { return null; }
     }, SETTINGS_KEY);
     expect(stored?.onboarding?.guestSignUpNudgeDismissed).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Mastered-species axis (masteredSpecies >= 10, practiceSessionsCount < 3)
+  // Seeds 10 mastered species pairs via IndexedDB so the snapshot derives a
+  // real mastered count without relying on the sessions gate.
+  // ---------------------------------------------------------------------------
+
+  test("nudge renders on Stats page when masteredSpecies >= 10 (mastered-species gate)", async ({
+    page,
+  }) => {
+    // Sessions count below threshold (0) - only the mastered-species gate fires.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceSessionsCount: 0,
+            // guestSignUpNudgeDismissed absent (= false)
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    // Seed 10 mastered species into IndexedDB.
+    await seedSessionIdb(page, masteredSpeciesSession(10));
+
+    await page.goto("/stats");
+    await awaitSeedIdb(page);
+
+    // The nudge body shows the mastered-count variant when masteredSpecies >= 10.
+    const nudge = page.locator(`[role="note"]`, { hasText: /your progress is at risk/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
+
+    // Verify the mastered-count body is shown (not the low-mastery variant).
+    await expect(
+      nudge.getByText(/mastered.*pokémon.*on this device/i),
+    ).toBeVisible();
+  });
+
+  test("nudge renders on Journey page when masteredSpecies >= 10 (mastered-species gate)", async ({
+    page,
+  }) => {
+    // Sessions count below threshold (0) - only the mastered-species gate fires.
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceSessionsCount: 0,
+            // guestSignUpNudgeDismissed absent (= false)
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    // Seed 10 mastered species into IndexedDB.
+    await seedSessionIdb(page, masteredSpeciesSession(10));
+
+    await page.goto("/journey");
+    await awaitSeedIdb(page);
+
+    const nudge = page.locator(`[role="note"]`, { hasText: /your progress is at risk/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
   });
 });
