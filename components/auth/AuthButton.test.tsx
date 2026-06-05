@@ -6,9 +6,10 @@
  * Next.js Server Action infrastructure is exercised.
  *
  * Coverage:
- *  - Provider-picker open / close via the trigger button
- *  - Escape key closes the picker
- *  - Outside-click (pointerdown) closes the picker
+ *  - Sign-in trigger button renders in guest state
+ *  - Clicking trigger opens the SignInSheet dialog (#1669 - replaced the old
+ *    SignInPicker dropdown)
+ *  - Escape key closes the SignInSheet
  *  - signIn pending transition renders "Signing in…" and disables the button
  *  - signOut pending transition renders "Signing out…"
  *  - Signed-in: avatar rendered when avatar_url is set
@@ -86,42 +87,31 @@ describe("AuthButton - guest state (not signed in)", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  // ── Provider picker open / close ────────────────────────────────────────
+  // ── SignInSheet open / close (#1669) ────────────────────────────────────
 
-  it("opens the provider picker when the trigger is clicked", async () => {
+  it("opens the SignInSheet dialog when the trigger is clicked", async () => {
     const user = userEvent.setup();
     renderWithIntl(<AuthButton />);
 
     const trigger = screen.getByRole("button", { name: /sign in/i });
     await user.click(trigger);
 
-    expect(screen.getByRole("menu", { name: /choose a sign-in provider/i })).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
-  it("closes the provider picker when the trigger is clicked again", async () => {
-    const user = userEvent.setup();
-    renderWithIntl(<AuthButton />);
-
-    const trigger = screen.getByRole("button", { name: /sign in/i });
-    await user.click(trigger);
-    await user.click(trigger);
-
-    expect(screen.queryByRole("menu")).toBeNull();
-  });
-
-  it("closes the provider picker when Escape is pressed", async () => {
+  it("closes the SignInSheet when Escape is pressed", async () => {
     const user = userEvent.setup();
     renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
-    expect(screen.getByRole("menu")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
 
     await user.keyboard("{Escape}");
 
-    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("returns focus to the trigger after closing with Escape", async () => {
+  it("returns focus to the trigger after closing the SignInSheet with Escape", async () => {
     const user = userEvent.setup();
     renderWithIntl(<AuthButton />);
 
@@ -132,34 +122,15 @@ describe("AuthButton - guest state (not signed in)", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("closes the picker on outside pointerdown", async () => {
-    const user = userEvent.setup();
-    renderWithIntl(
-      <div>
-        <AuthButton />
-        <div data-testid="outside">Outside</div>
-      </div>,
-    );
-
-    await user.click(screen.getByRole("button", { name: /sign in/i }));
-    expect(screen.getByRole("menu")).toBeTruthy();
-
-    // Fire a pointerdown event on an element outside the picker.
-    fireEvent.pointerDown(screen.getByTestId("outside"));
-
-    // Picker should now be gone.
-    expect(screen.queryByRole("menu")).toBeNull();
-  });
-
   // ── Provider branch: GitHub ──────────────────────────────────────────────
 
-  it("renders 'Continue with GitHub' inside the picker", async () => {
+  it("renders 'Continue with GitHub' inside the SignInSheet", async () => {
     const user = userEvent.setup();
     renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
-    expect(screen.getByRole("menuitem", { name: /continue with github/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /continue with github/i })).toBeTruthy();
   });
 
   it("calls signIn with 'github' when the GitHub option is chosen", async () => {
@@ -167,30 +138,20 @@ describe("AuthButton - guest state (not signed in)", () => {
     renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
-    await user.click(screen.getByRole("menuitem", { name: /continue with github/i }));
+    await user.click(screen.getByRole("button", { name: /continue with github/i }));
 
     expect(mockSignIn).toHaveBeenCalledWith("github");
   });
 
-  it("closes the picker after choosing GitHub", async () => {
-    const user = userEvent.setup();
-    renderWithIntl(<AuthButton />);
-
-    await user.click(screen.getByRole("button", { name: /sign in/i }));
-    await user.click(screen.getByRole("menuitem", { name: /continue with github/i }));
-
-    expect(screen.queryByRole("menu")).toBeNull();
-  });
-
   // ── Provider branch: Google ──────────────────────────────────────────────
 
-  it("renders 'Continue with Google' inside the picker", async () => {
+  it("renders 'Continue with Google' inside the SignInSheet", async () => {
     const user = userEvent.setup();
     renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
-    expect(screen.getByRole("menuitem", { name: /continue with google/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /continue with google/i })).toBeTruthy();
   });
 
   it("calls signIn with 'google' when the Google option is chosen", async () => {
@@ -198,52 +159,21 @@ describe("AuthButton - guest state (not signed in)", () => {
     renderWithIntl(<AuthButton />);
 
     await user.click(screen.getByRole("button", { name: /sign in/i }));
-    await user.click(screen.getByRole("menuitem", { name: /continue with google/i }));
+    await user.click(screen.getByRole("button", { name: /continue with google/i }));
 
     expect(mockSignIn).toHaveBeenCalledWith("google");
   });
 
-  it("closes the picker after choosing Google", async () => {
-    const user = userEvent.setup();
-    renderWithIntl(<AuthButton />);
-
-    await user.click(screen.getByRole("button", { name: /sign in/i }));
-    await user.click(screen.getByRole("menuitem", { name: /continue with google/i }));
-
-    expect(screen.queryByRole("menu")).toBeNull();
-  });
-
   // ── Pending transition ───────────────────────────────────────────────────
-  // useTransition's isPending is true during the async Server Action call.
+  // The trigger button in AuthButton is no longer responsible for isPending -
+  // that state is now inside SignInSheet (which manages its own useTransition).
+  // SignInSheet.test.tsx covers the pending / disabled state of provider buttons.
+  // AuthButton is responsible only for the sign-out pending state.
 
   it("trigger button is not disabled before any action is triggered", () => {
     renderWithIntl(<AuthButton />);
     const trigger = screen.getByRole("button", { name: /sign in/i });
     expect(trigger).not.toBeDisabled();
-  });
-
-  it("renders 'Signing in…' and disables the trigger while signIn is pending", async () => {
-    // Hold the signIn promise open so isPending stays true during the check.
-    let resolveSignIn!: () => void;
-    mockSignIn.mockReturnValue(new Promise<void>((res) => { resolveSignIn = res; }));
-
-    const user = userEvent.setup();
-    renderWithIntl(<AuthButton />);
-
-    // Open the picker and click a provider inside an act block so React
-    // processes the transition start synchronously.
-    await act(async () => {
-      await user.click(screen.getByRole("button", { name: /sign in/i }));
-      await user.click(screen.getByRole("menuitem", { name: /continue with github/i }));
-    });
-
-    // While the transition is pending, the trigger should show the loading label
-    // and be disabled.
-    expect(screen.getByRole("button", { name: /signing in/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /signing in/i })).toBeDisabled();
-
-    // Let the action finish so React can clean up the transition state.
-    await act(async () => { resolveSignIn(); });
   });
 });
 

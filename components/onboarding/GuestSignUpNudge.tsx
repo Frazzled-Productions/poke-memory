@@ -1,10 +1,9 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { signIn } from "@/lib/auth/actions";
-import type { AuthProvider } from "@/lib/auth/types";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
+import { SignInSheet } from "@/components/auth/SignInSheet";
 
 /** Minimum mastered-species count to trigger the nudge (#1668). */
 export const GUEST_NUDGE_MASTERED_THRESHOLD = 10;
@@ -38,14 +37,13 @@ type Props = {
  * - Progress threshold met: `masteredSpecies >= 10 OR practiceSessionsCount >= 3`.
  * - The flag `guestSignUpNudgeDismissed` is still false.
  *
- * The CTA opens an inline sign-in provider picker. A dedicated sign-in sheet
- * is handled by #1669 - this component uses the minimal existing affordance.
+ * The CTA opens the shared SignInSheet (#1669). The previous hand-rolled
+ * inline provider picker has been removed in favour of the single sign-in
+ * surface.
  */
 export function GuestSignUpNudge({ masteredSpecies, practiceSessionsCount }: Props) {
   const t = useTranslations("onboarding");
-  const tAuth = useTranslations("auth");
-  const [isPending, startTransition] = useTransition();
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Do not render until data is loaded.
   if (masteredSpecies === null || practiceSessionsCount === null) return null;
@@ -58,46 +56,22 @@ export function GuestSignUpNudge({ masteredSpecies, practiceSessionsCount }: Pro
 
   const hasMastered = masteredSpecies >= GUEST_NUDGE_MASTERED_THRESHOLD;
 
-  function handleSignIn(provider: AuthProvider) {
-    setPickerOpen(false);
-    startTransition(() => signIn(provider));
-  }
-
-  const ctaContent = pickerOpen ? (
-    <div className="mt-3 flex flex-col gap-1">
-      <button
-        type="button"
-        onClick={() => handleSignIn("github")}
-        disabled={isPending}
-        className="inline-flex min-h-[36px] items-center rounded-lg border border-zinc-200 bg-background px-4 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-900"
-      >
-        {tAuth("continueWithGitHub")}
-      </button>
-      <button
-        type="button"
-        onClick={() => handleSignIn("google")}
-        disabled={isPending}
-        className="inline-flex min-h-[36px] items-center rounded-lg border border-zinc-200 bg-background px-4 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-900"
-      >
-        {tAuth("continueWithGoogle")}
-      </button>
-    </div>
-  ) : undefined;
-
   const bodyText = hasMastered
     ? t("guestSignUpNudge.body", { count: masteredSpecies })
     : t("guestSignUpNudge.bodyLowMastery");
 
   return (
-    <OnboardingHint
-      id="guestSignUpNudgeDismissed"
-      title={t("guestSignUpNudge.heading")}
-      tone="callout"
-      ctaLabel={pickerOpen ? undefined : t("guestSignUpNudge.cta")}
-      ctaOnClick={pickerOpen ? undefined : () => setPickerOpen(true)}
-    >
-      <p>{bodyText}</p>
-      {ctaContent}
-    </OnboardingHint>
+    <>
+      <OnboardingHint
+        id="guestSignUpNudgeDismissed"
+        title={t("guestSignUpNudge.heading")}
+        tone="callout"
+        ctaLabel={t("guestSignUpNudge.cta")}
+        ctaOnClick={() => setSheetOpen(true)}
+      >
+        <p>{bodyText}</p>
+      </OnboardingHint>
+      <SignInSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
+    </>
   );
 }

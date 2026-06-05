@@ -41,7 +41,13 @@
     "connectProviderAriaLabel": "連結 {provider}",
     "connectedProvidersAriaLabel": "已連結的登入方式",
     "providerConnectedAriaLabel": "{provider} 已連結",
-    "checkingSyncStatusAriaLabel": "正在檢查同步狀態"
+    "checkingSyncStatusAriaLabel": "正在檢查同步狀態",
+    "signInSheet": {
+      "heading": "保護你的學習進度",
+      "body": "登入一次，即可在所有裝置上備份資料。免費，無垃圾郵件。",
+      "signInInstead": "已有帳號？直接登入。",
+      "closeAriaLabel": "關閉登入面板"
+    }
   },
   "settings": {
     "heading": "設定",
