@@ -43,6 +43,13 @@ export type ThemeIntensity = "accents" | "tinted" | "full";
 /**
  * Per-surface dismissal flags for the first-run onboarding hints (#433).
  * `false` = hint still shows; `true` = user dismissed it.
+ *
+ * IMPORTANT: the boolean dismissal flags listed here are mirrored in the
+ * `user_settings_reject_regression` trigger (migration 038). When adding a
+ * new boolean dismissal flag, add it to the ARRAY[] list in that trigger
+ * function as well, so the DB enforces the one-shot invariant at the data layer.
+ * Numeric counters (practiceSessionsCount, slowSpriteLoadCount) are also
+ * mirrored in a separate section of that trigger (monotonic counter guard).
  */
 export type OnboardingFlags = {
   /**
@@ -114,6 +121,9 @@ export type OnboardingFlags = {
    * absent in pre-#1482 blobs resolves to `0` (below threshold) via
    * integer coercion.
    */
+  // NOTE: this counts completed practice sessions since the field shipped
+  // (#1505 / 2026-06-01), NOT lifetime sessions. A low value on an older
+  // account is expected and is NOT a sign that progress was wiped.
   practiceSessionsCount: number;
   /**
    * One-time dismissal flag for the offline-download discovery nudge (#1538).
@@ -158,6 +168,18 @@ export type OnboardingFlags = {
    * → every existing user sees the hint once on their next practice session.
    */
   higherOrLowerNudgeDismissed: boolean;
+  /**
+   * One-shot value-prop nudge for guest sign-up (#1668). Shown on Stats and
+   * Journey pages for guests who have reached a meaningful progress threshold
+   * (`masteredSpecies >= 10` OR `practiceSessionsCount >= 3`). Uses
+   * loss-aversion copy to surface the risk of losing local-only progress.
+   * `true` = user dismissed it.
+   *
+   * `=== true` coercion: absent key in pre-#1668 blobs resolves to `false`
+   * → every existing guest who meets the threshold sees it once on their next
+   * Stats or Journey visit.
+   */
+  guestSignUpNudgeDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -193,6 +215,10 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   // Default false: absent in pre-#1573 blobs resolves to false (not dismissed;
   // hint shows on next active-practice session for every existing user).
   higherOrLowerNudgeDismissed: false,
+  // Default false: absent in pre-#1668 blobs resolves to false (not dismissed;
+  // nudge shows on next Stats or Journey visit for existing guests who meet the
+  // progress threshold).
+  guestSignUpNudgeDismissed: false,
 };
 
 /**
@@ -462,6 +488,15 @@ export type UserSettings = {
    * timestamps). Rare and recoverable by re-enrolling.
    */
   removedLocales: AppLocale[];
+  /**
+   * ISO timestamp of the last user-triggered onboarding reset ("Show onboarding
+   * again" button in Settings). Used as a tombstone by the DB regression trigger
+   * (migration 038, predicate 4/6): a strictly-newer value signals that the flag
+   * resets and counter decreases are user-intentional, not a stale-client clobber.
+   * Absent in pre-reset records and in the DEFAULT_SETTINGS shape; back-fills to
+   * undefined on read (trigger treats absent OLD as '' for the comparison).
+   */
+  onboardingResetAt?: string;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -792,6 +827,9 @@ function parseStoredSettings(raw: string | null): UserSettings {
     dismissedMtBannerLocales: validateDismissedMtBannerLocales(obj.dismissedMtBannerLocales),
     // Default []: absent in pre-#1568 records. Deduped; "en" always dropped.
     removedLocales: validateRemovedLocales(obj.removedLocales),
+    // Absent in records that predate the first onboarding reset; back-fills to
+    // undefined so the trigger treats it as '' (no bypass).
+    onboardingResetAt: typeof obj.onboardingResetAt === 'string' ? obj.onboardingResetAt : undefined,
   };
 }
 
@@ -836,6 +874,9 @@ export function validateOnboarding(value: unknown): OnboardingFlags {
     pastureLongPressHintDismissed: v.pastureLongPressHintDismissed === true,
     // === true coercion: absent key in pre-#1573 blobs resolves to false (hint shows).
     higherOrLowerNudgeDismissed: v.higherOrLowerNudgeDismissed === true,
+    // === true coercion: absent key in pre-#1668 blobs resolves to false (nudge shows
+    // for existing guests who meet the progress threshold on their next visit).
+    guestSignUpNudgeDismissed: v.guestSignUpNudgeDismissed === true,
   };
 }
 

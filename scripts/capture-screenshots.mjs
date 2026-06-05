@@ -190,6 +190,9 @@ async function writeSeedToPage(page, seed) {
         // Dismiss the Higher-or-Lower signpost nudge (#1573) so it does not
         // appear in the practice screenshot and pollute the captured image.
         higherOrLowerNudgeDismissed: true,
+        // Dismiss the guest sign-up nudge (#1668) so it does not appear on
+        // the Stats and Journey screenshots for the guest seed state.
+        guestSignUpNudgeDismissed: true,
       },
     }));
 

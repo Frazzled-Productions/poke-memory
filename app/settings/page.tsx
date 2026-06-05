@@ -1684,7 +1684,14 @@ export default function SettingsPage() {
                         // DEFAULT_ONBOARDING resets all flags including
                         // firstVisitOnboardingDismissed (#1103) and
                         // installNudgeDismissed (#701).
-                        const next = { ...settings, onboarding: { ...DEFAULT_ONBOARDING } };
+                        // onboardingResetAt is a tombstone for the DB regression
+                        // trigger (migration 038): a strictly-newer timestamp
+                        // signals the reset is user-intentional, not a stale clobber.
+                        const next = {
+                          ...settings,
+                          onboarding: { ...DEFAULT_ONBOARDING },
+                          onboardingResetAt: new Date().toISOString(),
+                        };
                         setSettings(next);
                         saveSettings(next);
                       }}

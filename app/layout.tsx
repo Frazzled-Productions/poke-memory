@@ -19,6 +19,7 @@ import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
 import { DashboardSnapshotProvider } from "@/components/stats/DashboardSnapshotContext";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { FunnelTracker } from "@/components/analytics/FunnelTracker";
 import { IdbMigration } from "@/components/IdbMigration";
 import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
 import { MachineTranslationBanner } from "@/components/i18n/MachineTranslationBanner";
@@ -243,6 +244,13 @@ export default function RootLayout({
                       <AutoSyncOnChange />
                       <OnlineReconnectSync />
                       <PwaInstallNudge />
+                      {/*
+                        FunnelTracker fires a single `app_open` custom event after auth
+                        resolves. Properties are strictly bucketed (non-PII): userType
+                        and progressBucket. Provides guest-to-account funnel visibility
+                        without collecting raw counts or user IDs (#1667).
+                      */}
+                      <FunnelTracker />
                       {/*
                         MobileNavPaddingWrapper adds bottom padding on mobile only when
                         the bottom tab bar is active, so the fixed bar never overlaps content.

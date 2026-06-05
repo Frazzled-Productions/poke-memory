@@ -192,6 +192,10 @@ vi.mock("@/lib/settings/persistence", () => ({
       daysSinceLastEarn: 0,
       lastEarnCheckDate: null,
     },
+    onboarding: {
+      practiceSessionsCount: 0,
+      guestSignUpNudgeDismissed: false,
+    },
   })),
   saveSettings: vi.fn(),
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
