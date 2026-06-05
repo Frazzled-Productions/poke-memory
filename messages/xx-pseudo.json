@@ -45,7 +45,31 @@
     "signInSheet": {
       "heading": "[Keep your progress safe]",
       "body": "[Sign in once to back up your data across all your devices. Free, no spam.]",
-      "closeAriaLabel": "[Close sign-in sheet]"
+      "closeAriaLabel": "[Close sign-in sheet]",
+      "socialHeading": "[Quick, no extra account]",
+      "usernameHeading": "[Quicker, but limited]",
+      "usernameDivider": "[or]",
+      "signInInstead": "[Already have an account? Sign in]",
+      "signUpInstead": "[New here? Create an account]",
+      "username": {
+        "usernamePlaceholder": "[Username]",
+        "usernameLabel": "[Username]",
+        "passwordPlaceholder": "[Password]",
+        "passwordLabel": "[Password]",
+        "submitSignUp": "[Create account]",
+        "submitSignIn": "[Sign in]",
+        "submitting": "[Please wait…]",
+        "warningNoReset": "[There is no password reset. Save your password in a password manager, or you will lose access permanently.]",
+        "warningNoRealName": "[Do not use your real name or personal information as your username.]",
+        "errorUsernameTooShort": "[Username must be at least 3 characters.]",
+        "errorUsernameTooLong": "[Username must be at most 30 characters.]",
+        "errorUsernameInvalidChars": "[Username may only contain letters, numbers, underscores, and hyphens.]",
+        "errorPasswordTooShort": "[Password must be at least 8 characters.]",
+        "errorUsernameTaken": "[That username is already taken. Please choose another.]",
+        "errorInvalidCredentials": "[Incorrect username or password.]",
+        "errorSignupFailed": "[Sign-up failed. Please try again.]",
+        "errorSigninFailed": "[Sign-in failed. Please try again.]"
+      }
     }
   },
   "settings": {
