@@ -81,6 +81,8 @@ vi.mock("@/lib/settings/persistence", () => ({
       installNudgeDismissed: true,
       audioHintDismissed: true,
       cardTypesHintDismissed: true,
+      practiceSessionsCount: 0,
+      guestSignUpNudgeDismissed: false,
     },
   })),
   saveSettings: vi.fn(),

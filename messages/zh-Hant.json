@@ -33,7 +33,7 @@
     "signOut": "登出",
     "continueWithGitHub": "使用 GitHub 繼續",
     "continueWithGoogle": "使用 Google 繼續",
-    "providerHint": "請使用註冊時所用的登入方式，以保留您的進度。",
+    "providerHint": "已有帳號？請使用註冊時所用的登入方式。",
     "chooseProvider": "選擇登入方式",
     "cardsReviewed": "{count, plural, other {已複習 # 張卡片}}",
     "streakDaysCount": "{count, plural, other {# 天連續}}",
@@ -984,8 +984,14 @@
       "openAudioSettings": "開啟音訊設定"
     },
     "guestStorage": {
-      "heading": "你的進度儲存在此裝置上",
-      "body": "你的進度儲存在此裝置上。在 iPhone 和 iPad 上，如果 7 天沒有使用，Safari 可能會清除已儲存的資料。將此頁面新增到主畫面可以防止這種情況。如果你登入，進度還會在線上儲存，以便在其他裝置上使用。"
+      "heading": "你的進度僅儲存在此裝置上",
+      "body": "清除瀏覽器資料或切換裝置後，你的進度將會遺失。建立免費帳號即可在線上儲存。在 iPhone 和 iPad 上，將此頁面新增到主畫面還可以防止 Safari 在 7 天後清除本機資料。"
+    },
+    "guestSignUpNudge": {
+      "heading": "你的進度面臨風險",
+      "body": "你已在此裝置上習得了 {count, number} 隻寶可夢。清除瀏覽器資料或切換裝置後，這些進度將會遺失。建立免費帳號即可在線上儲存。",
+      "bodyLowMastery": "你的練習記錄僅儲存在此裝置上。清除瀏覽器資料或切換裝置後，進度將會遺失。建立免費帳號即可在線上儲存。",
+      "cta": "建立免費帳號"
     },
     "getStarted": "開始",
     "pwaInstallNudge": {

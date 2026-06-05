@@ -158,6 +158,18 @@ export type OnboardingFlags = {
    * → every existing user sees the hint once on their next practice session.
    */
   higherOrLowerNudgeDismissed: boolean;
+  /**
+   * One-shot value-prop nudge for guest sign-up (#1668). Shown on Stats and
+   * Journey pages for guests who have reached a meaningful progress threshold
+   * (`masteredSpecies >= 10` OR `practiceSessionsCount >= 3`). Uses
+   * loss-aversion copy to surface the risk of losing local-only progress.
+   * `true` = user dismissed it.
+   *
+   * `=== true` coercion: absent key in pre-#1668 blobs resolves to `false`
+   * → every existing guest who meets the threshold sees it once on their next
+   * Stats or Journey visit.
+   */
+  guestSignUpNudgeDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -193,6 +205,10 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   // Default false: absent in pre-#1573 blobs resolves to false (not dismissed;
   // hint shows on next active-practice session for every existing user).
   higherOrLowerNudgeDismissed: false,
+  // Default false: absent in pre-#1668 blobs resolves to false (not dismissed;
+  // nudge shows on next Stats or Journey visit for existing guests who meet the
+  // progress threshold).
+  guestSignUpNudgeDismissed: false,
 };
 
 /**
@@ -836,6 +852,9 @@ export function validateOnboarding(value: unknown): OnboardingFlags {
     pastureLongPressHintDismissed: v.pastureLongPressHintDismissed === true,
     // === true coercion: absent key in pre-#1573 blobs resolves to false (hint shows).
     higherOrLowerNudgeDismissed: v.higherOrLowerNudgeDismissed === true,
+    // === true coercion: absent key in pre-#1668 blobs resolves to false (nudge shows
+    // for existing guests who meet the progress threshold on their next visit).
+    guestSignUpNudgeDismissed: v.guestSignUpNudgeDismissed === true,
   };
 }
 

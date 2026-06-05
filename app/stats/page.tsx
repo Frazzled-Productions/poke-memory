@@ -44,6 +44,7 @@ import { ReviewHeatmap } from "@/components/stats/ReviewHeatmap";
 import { computeReviewHeatmap } from "@/lib/stats/heatmap";
 import { computeActivityHistory } from "@/lib/stats/activity-history";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
+import { GuestSignUpNudge } from "@/components/onboarding/GuestSignUpNudge";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useRetryPush } from "@/lib/sync/useRetryPush";
@@ -379,6 +380,7 @@ export default function StatsPage() {
   const [accuracyPoints365, setAccuracyPoints365] = useState<AccuracyPoint[]>([]);
   const [gradeLog, setGradeLog] = useState<Awaited<ReturnType<typeof loadGradeLog>>>([]);
   const [retentionTarget, setRetentionTarget] = useState(0.9);
+  const [practiceSessionsCount, setPracticeSessionsCount] = useState<number | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -426,6 +428,8 @@ export default function StatsPage() {
         cry: { maxNewPerDay: settings.maxNewCryPerDay, maxReviewsPerDay: settings.maxReviewsCryPerDay },
       });
       setRetentionTarget(settings.retentionTarget);
+      // Defensive: older mocks and pre-#1668 settings blobs may omit `onboarding`.
+      setPracticeSessionsCount(settings.onboarding?.practiceSessionsCount ?? 0);
       const tz = settings.timezone ?? "UTC";
       const today = todayString(new Date(), tz);
       const log = await loadGradeLog();
@@ -573,6 +577,15 @@ export default function StatsPage() {
               retryState={retryState}
               retryNow={retryNow}
               superuserPaused={anyFlagOn}
+            />
+          </div>
+        )}
+
+        {user === null && !flags.pretendAllMastered && (
+          <div className="mb-8">
+            <GuestSignUpNudge
+              masteredSpecies={snapshot?.mastery?.mastered ?? null}
+              practiceSessionsCount={practiceSessionsCount}
             />
           </div>
         )}

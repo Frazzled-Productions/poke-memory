@@ -36,6 +36,7 @@ import { deriveCloseToMastery, type CloseToMasteryEntry } from "@/lib/journey/cl
 import { CloseToMastery } from "@/components/journey/CloseToMastery";
 import { LanguageBreakdown } from "@/components/journey/LanguageBreakdown";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
+import { GuestSignUpNudge } from "@/components/onboarding/GuestSignUpNudge";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { cardPanel, cardPanelPadded, mutedText, sectionLabel } from "@/lib/utils/class-names";
@@ -422,6 +423,7 @@ export default function JourneyPage() {
   const [timeline, setTimeline] = useState<CollectionTimeline | null>(null);
   const [evolutionFamilies, setEvolutionFamilies] = useState<EvolutionFamily[] | null>(null);
   const [closeToMasteryEntries, setCloseToMasteryEntries] = useState<readonly CloseToMasteryEntry[] | null>(null);
+  const [practiceSessionsCount, setPracticeSessionsCount] = useState<number | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -443,6 +445,8 @@ export default function JourneyPage() {
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
       setPokemonNameLocale(settings.pokemonNameLocale);
+      // Defensive: older mocks and pre-#1668 settings blobs may omit `onboarding`.
+      setPracticeSessionsCount(settings.onboarding?.practiceSessionsCount ?? 0);
       setEligibilitySettings({
         evolutionCardsEnabled: settings.evolutionCardsEnabled,
         reverseEvolutionCardsEnabled: settings.reverseEvolutionCardsEnabled,
@@ -723,6 +727,16 @@ export default function JourneyPage() {
 
             {/* Records */}
             {records !== null ? <RecordsCard records={records} /> : null}
+
+            {/* Guest sign-up value-prop nudge - shown to guests with real progress,
+                before the mastery-rings detail so it catches the eye. Hidden for
+                signed-in users; gate is masteredSpecies >= 10 OR sessions >= 3 (#1668). */}
+            {user === null && !flags.pretendAllMastered && (
+              <GuestSignUpNudge
+                masteredSpecies={masterySnapshot.mastered}
+                practiceSessionsCount={practiceSessionsCount}
+              />
+            )}
 
             {/* Mastery rings */}
             <MasteryRings stats={masterySnapshot} />

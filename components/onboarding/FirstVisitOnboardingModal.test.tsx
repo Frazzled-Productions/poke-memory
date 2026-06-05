@@ -294,35 +294,36 @@ describe("FirstVisitOnboardingModal", () => {
     });
   });
 
-  describe("i18n locale coverage: guestStorage.body (#1431)", () => {
-    it("en: renders updated guest storage body ('kept on this device')", async () => {
+  describe("i18n locale coverage: guestStorage.body (#1431, updated #1668)", () => {
+    it("en: renders updated guest storage body (loss-aversion copy)", async () => {
       renderWithIntl(<FirstVisitOnboardingModal />);
       await screen.findByRole("dialog");
-      expect(screen.getByText(/kept on this device/i)).toBeInTheDocument();
+      // Updated in #1668: lead with the loss-aversion constraint.
+      expect(screen.getByText(/clear your browser data or switch devices/i)).toBeInTheDocument();
     });
 
     it("ja: renders updated guest storage body in Japanese", async () => {
       vi.mocked(useAppLocale).mockReturnValue("ja");
       renderJa(<FirstVisitOnboardingModal />);
       await screen.findByRole("dialog");
-      // ja guestStorage.body distinctive phrase: 他のデバイスでも使えるようになります
-      expect(screen.getByText(/他のデバイスでも使えるようになります/)).toBeInTheDocument();
+      // ja guestStorage.body distinctive phrase (updated #1668)
+      expect(screen.getByText(/ブラウザのデータを削除したり別のデバイスに切り替えると/)).toBeInTheDocument();
     });
 
     it("zh-Hans: renders updated guest storage body in Simplified Chinese", async () => {
       vi.mocked(useAppLocale).mockReturnValue("zh-Hans");
       renderZhHans(<FirstVisitOnboardingModal />);
       await screen.findByRole("dialog");
-      // Distinctive phrase from zh-Hans guestStorage.body: 在其他设备上使用
-      expect(screen.getByText(/在其他设备上使用/)).toBeInTheDocument();
+      // Distinctive phrase from zh-Hans guestStorage.body (updated #1668)
+      expect(screen.getByText(/清除浏览器数据或切换设备后/)).toBeInTheDocument();
     });
 
     it("zh-Hant: renders updated guest storage body in Traditional Chinese", async () => {
       vi.mocked(useAppLocale).mockReturnValue("zh-Hant");
       renderZhHant(<FirstVisitOnboardingModal />);
       await screen.findByRole("dialog");
-      // Distinctive phrase from zh-Hant guestStorage.body: 在其他裝置上使用
-      expect(screen.getByText(/在其他裝置上使用/)).toBeInTheDocument();
+      // Distinctive phrase from zh-Hant guestStorage.body (updated #1668)
+      expect(screen.getByText(/清除瀏覽器資料或切換裝置後/)).toBeInTheDocument();
     });
   });
 
