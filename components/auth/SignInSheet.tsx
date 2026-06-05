@@ -19,7 +19,7 @@
  *   BottomTabBar).
  */
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
 import { signIn } from "@/lib/auth/actions";
@@ -68,6 +68,13 @@ export function SignInSheet({ open, onClose }: Props) {
     };
   }, [open]);
 
+  const handleClose = useCallback(() => {
+    onClose();
+    if (prevFocusRef.current && prevFocusRef.current !== document.body) {
+      prevFocusRef.current.focus();
+    }
+  }, [onClose]);
+
   // Lock scroll + Escape to close + focus trap.
   useEffect(() => {
     if (!open) return;
@@ -112,16 +119,7 @@ export function SignInSheet({ open, onClose }: Props) {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKey);
     };
-    // handleClose is stable across renders (defined below with no deps).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  function handleClose() {
-    onClose();
-    if (prevFocusRef.current && prevFocusRef.current !== document.body) {
-      prevFocusRef.current.focus();
-    }
-  }
+  }, [open, handleClose]);
 
   function handleSignIn(provider: AuthProvider) {
     startTransition(() => signIn(provider));
@@ -200,10 +198,6 @@ export function SignInSheet({ open, onClose }: Props) {
             </button>
           </div>
 
-          {/* Returning-user affordance */}
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            {t("signInSheet.signInInstead")}
-          </p>
         </div>
       </dialog>
     </div>,

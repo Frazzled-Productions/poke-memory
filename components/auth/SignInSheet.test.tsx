@@ -7,10 +7,11 @@
  *
  * Coverage:
  *  - Sheet is absent when `open` is false.
- *  - Sheet renders the heading, body, provider buttons, and returning-user text when open.
- *  - Clicking Close button calls onClose.
- *  - Escape key calls onClose.
+ *  - Sheet renders the heading, body, and provider buttons when open.
+ *  - Clicking Close button calls onClose and restores focus (WCAG 2.4.3).
+ *  - Escape key calls onClose and restores focus (WCAG 2.4.3).
  *  - Backdrop click calls onClose.
+ *  - Backdrop pointer-down inside the dialog does NOT close.
  *  - Tab focus trap keeps focus inside the dialog.
  *  - GitHub button triggers signIn("github").
  *  - Google button triggers signIn("google").
@@ -93,11 +94,6 @@ describe("SignInSheet - open state", () => {
     expect(screen.getByRole("button", { name: /continue with google/i })).toBeTruthy();
   });
 
-  it("renders the returning-user sign-in-instead text", () => {
-    renderSheet();
-    expect(screen.getByText(/already have an account/i)).toBeTruthy();
-  });
-
   it("renders a close button with an aria-label", () => {
     renderSheet();
     expect(screen.getByRole("button", { name: /close sign-in sheet/i })).toBeTruthy();
@@ -115,6 +111,28 @@ describe("SignInSheet - close interactions", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("close button restores focus to the triggering element (WCAG 2.4.3)", async () => {
+    // Place a button in the document and focus it before the sheet opens.
+    const trigger = document.createElement("button");
+    trigger.textContent = "Open sheet";
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    const onClose = vi.fn();
+    const { unmount } = renderWithIntl(<SignInSheet open onClose={onClose} />);
+
+    const closeBtn = screen.getByRole("button", { name: /close sign-in sheet/i });
+    await userEvent.click(closeBtn);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    // Focus must have returned to the element that was focused before the sheet opened.
+    expect(document.activeElement).toBe(trigger);
+
+    unmount();
+    trigger.remove();
+  });
+
   it("pressing Escape calls onClose", async () => {
     const onClose = vi.fn();
     renderWithIntl(<SignInSheet open onClose={onClose} />);
@@ -122,6 +140,25 @@ describe("SignInSheet - close interactions", () => {
     await userEvent.keyboard("{Escape}");
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("Escape restores focus to the triggering element (WCAG 2.4.3)", async () => {
+    const trigger = document.createElement("button");
+    trigger.textContent = "Open sheet";
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    const onClose = vi.fn();
+    const { unmount } = renderWithIntl(<SignInSheet open onClose={onClose} />);
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(trigger);
+
+    unmount();
+    trigger.remove();
   });
 
   it("clicking the backdrop (outside the dialog panel) calls onClose", () => {
@@ -138,6 +175,16 @@ describe("SignInSheet - close interactions", () => {
 
     fireEvent.pointerDown(backdrop!, { target: backdrop });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("pointer-down inside the dialog panel does NOT close the sheet", () => {
+    const onClose = vi.fn();
+    renderWithIntl(<SignInSheet open onClose={onClose} />);
+
+    const dialog = screen.getByRole("dialog");
+    // Simulate a pointer-down on the dialog panel itself - target !== backdrop.
+    fireEvent.pointerDown(dialog);
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 
