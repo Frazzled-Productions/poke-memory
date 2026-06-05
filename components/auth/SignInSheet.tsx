@@ -192,7 +192,9 @@ export function SignInSheet({ open, onClose }: Props) {
               ? t("signInSheet.username.errorInvalidCredentials")
               : errKey === "password_too_short"
                 ? t("signInSheet.username.errorPasswordTooShort")
-                : t("signInSheet.username.errorSignupFailed"),
+                : usernameMode === "signup"
+                  ? t("signInSheet.username.errorSignupFailed")
+                  : t("signInSheet.username.errorSigninFailed"),
         );
       } else {
         // Success - the session is now set. Close the sheet; the page will
@@ -200,7 +202,11 @@ export function SignInSheet({ open, onClose }: Props) {
         handleClose();
       }
     } catch {
-      setFormError(t("signInSheet.username.errorSignupFailed"));
+      setFormError(
+        usernameMode === "signup"
+          ? t("signInSheet.username.errorSignupFailed")
+          : t("signInSheet.username.errorSigninFailed"),
+      );
     } finally {
       setIsSubmitting(false);
     }

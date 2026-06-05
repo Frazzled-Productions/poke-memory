@@ -67,7 +67,8 @@
         "errorPasswordTooShort": "Password must be at least 8 characters.",
         "errorUsernameTaken": "That username is already taken. Please choose another.",
         "errorInvalidCredentials": "Incorrect username or password.",
-        "errorSignupFailed": "Sign-up failed. Please try again."
+        "errorSignupFailed": "Sign-up failed. Please try again.",
+        "errorSigninFailed": "Sign-in failed. Please try again."
       }
     }
   },

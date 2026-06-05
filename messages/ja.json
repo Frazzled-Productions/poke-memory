@@ -67,7 +67,8 @@
         "errorPasswordTooShort": "パスワードは8文字以上にしてください。",
         "errorUsernameTaken": "そのユーザー名はすでに使用されています。別のユーザー名を選んでください。",
         "errorInvalidCredentials": "ユーザー名またはパスワードが正しくありません。",
-        "errorSignupFailed": "サインアップに失敗しました。もう一度お試しください。"
+        "errorSignupFailed": "サインアップに失敗しました。もう一度お試しください。",
+        "errorSigninFailed": "サインインに失敗しました。もう一度お試しください。"
       }
     }
   },

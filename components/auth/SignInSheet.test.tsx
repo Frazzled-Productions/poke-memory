@@ -418,6 +418,46 @@ describe("SignInSheet - username/password door (sign-in mode)", () => {
       expect(screen.getByText(/incorrect username or password/i)).toBeTruthy();
     });
   });
+
+  it("shows sign-in error copy (not sign-up copy) on generic server error in sign-in mode", async () => {
+    mockSignInWithUsername.mockResolvedValueOnce({ ok: false, error: "unexpected_error" });
+
+    renderSignIn();
+    await switchToSignIn();
+
+    await userEvent.type(screen.getByLabelText(/username/i), "trainer99");
+    await userEvent.type(screen.getByLabelText(/password/i), "correct-horse-battery");
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+      expect(screen.getByText(/sign-in failed/i)).toBeTruthy();
+      expect(screen.queryByText(/sign-up failed/i)).toBeNull();
+    });
+  });
+
+  it("shows sign-in error copy (not sign-up copy) on network exception in sign-in mode", async () => {
+    mockSignInWithUsername.mockRejectedValueOnce(new Error("Network error"));
+
+    renderSignIn();
+    await switchToSignIn();
+
+    await userEvent.type(screen.getByLabelText(/username/i), "trainer99");
+    await userEvent.type(screen.getByLabelText(/password/i), "correct-horse-battery");
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+      expect(screen.getByText(/sign-in failed/i)).toBeTruthy();
+      expect(screen.queryByText(/sign-up failed/i)).toBeNull();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

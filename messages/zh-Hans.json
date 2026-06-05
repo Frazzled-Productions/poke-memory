@@ -67,7 +67,8 @@
         "errorPasswordTooShort": "密码至少需要8个字符。",
         "errorUsernameTaken": "该用户名已被使用，请选择其他用户名。",
         "errorInvalidCredentials": "用户名或密码不正确。",
-        "errorSignupFailed": "注册失败，请重试。"
+        "errorSignupFailed": "注册失败，请重试。",
+        "errorSigninFailed": "登录失败，请重试。"
       }
     }
   },

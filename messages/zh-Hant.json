@@ -67,7 +67,8 @@
         "errorPasswordTooShort": "密碼至少需要8個字元。",
         "errorUsernameTaken": "該使用者名稱已被使用，請選擇其他名稱。",
         "errorInvalidCredentials": "使用者名稱或密碼不正確。",
-        "errorSignupFailed": "註冊失敗，請重試。"
+        "errorSignupFailed": "註冊失敗，請重試。",
+        "errorSigninFailed": "登入失敗，請重試。"
       }
     }
   },
