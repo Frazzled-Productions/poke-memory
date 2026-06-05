@@ -258,8 +258,8 @@ test.describe("Guest storage section in onboarding modal (#1057)", () => {
     await expect(modal).toBeVisible();
 
     // Guest storage info must be present inside the modal.
-    await expect(modal.getByText(/your progress is saved on this device/i)).toBeVisible();
-    await expect(modal.getByText(/kept on this device/i)).toBeVisible();
+    await expect(modal.getByText(/your progress is only on this device/i)).toBeVisible();
+    await expect(modal.getByText(/clear your browser data/i)).toBeVisible();
   });
 
   test("guest storage section is absent after the modal is dismissed", async ({
@@ -272,9 +272,9 @@ test.describe("Guest storage section in onboarding modal (#1057)", () => {
     await modal.getByRole("button", { name: /get started/i }).click();
     await expect(modal).toHaveCount(0);
 
-    // No standalone storage notice should appear - info was in the modal.
+    // No sign-up nudge should appear for a fresh user below both thresholds.
     await expect(
-      page.getByRole("note", { name: /your progress is saved on this device/i }),
+      page.locator(`[role="note"]`, { hasText: /your progress is at risk/i }),
     ).toHaveCount(0);
   });
 });

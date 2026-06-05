@@ -731,7 +731,7 @@ export default function JourneyPage() {
             {/* Guest sign-up value-prop nudge - shown to guests with real progress,
                 before the mastery-rings detail so it catches the eye. Hidden for
                 signed-in users; gate is masteredSpecies >= 10 OR sessions >= 3 (#1668). */}
-            {user === null && (
+            {user === null && !flags.pretendAllMastered && (
               <GuestSignUpNudge
                 masteredSpecies={masterySnapshot.mastered}
                 practiceSessionsCount={practiceSessionsCount}

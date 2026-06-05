@@ -581,7 +581,7 @@ export default function StatsPage() {
           </div>
         )}
 
-        {user === null && (
+        {user === null && !flags.pretendAllMastered && (
           <div className="mb-8">
             <GuestSignUpNudge
               masteredSpecies={snapshot?.mastery?.mastered ?? null}
