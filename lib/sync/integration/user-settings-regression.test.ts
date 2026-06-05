@@ -884,7 +884,7 @@ describe("user_settings_reject_regression_trigger (integration)", () => {
 
     it("rejects onboarding flag reset when onboardingResetAt is absent (no tombstone)", async () => {
       // Without the tombstone, a true->false flip is still blocked even if the
-      // caller is sending the same values as the reset button — there's no signal
+      // caller is sending the same values as the reset button; there's no signal
       // that this is user-intentional.
       await seedSettings({
         streakProtection: ZERO_STREAK,
@@ -922,7 +922,7 @@ describe("user_settings_reject_regression_trigger (integration)", () => {
 
     it("rejects onboarding flag reset when onboardingResetAt is the same as existing (not strictly newer)", async () => {
       // A stale client replaying an old reset (same timestamp) must not bypass
-      // the guard — the tombstone check requires a strictly-newer value.
+      // the guard: the tombstone check requires a strictly-newer value.
       await seedSettings({
         streakProtection: ZERO_STREAK,
         earnedBadges: [],
