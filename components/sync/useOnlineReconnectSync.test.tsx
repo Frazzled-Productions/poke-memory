@@ -3,11 +3,11 @@
  *
  * The hook listens for the browser `online` event and performs a
  * pull-then-push catch-up:
- *   1. `pullAndMerge` — brings local state up to date with cloud.
+ *   1. `pullAndMerge` - brings local state up to date with cloud.
  *   2. Push reviewed cards that failed offline (mirrors useRetryPush selection).
  *
  * File lives under components/ (not lib/) because it calls renderHook, which
- * requires jsdom — the vitest jsdom project covers components/**\/*.test.tsx.
+ * requires jsdom - the vitest jsdom project covers components/**\/*.test.tsx.
  */
 
 import { renderHook, act, waitFor } from "@testing-library/react";
@@ -292,7 +292,7 @@ describe("useOnlineReconnectSync", () => {
   });
 
   // 10. Partial success: when some cards succeed and some fail, lastPushFailed
-  //     must stay true — markPushSucceeded must NOT be called.
+  //     must stay true - markPushSucceeded must NOT be called.
   it("does not call markPushSucceeded on partial push success (some cards failed)", async () => {
     vi.mocked(pullAndMerge).mockResolvedValue("ok");
     vi.mocked(loadSyncStatus).mockReturnValue(FAILED_STATUS);
@@ -302,7 +302,7 @@ describe("useOnlineReconnectSync", () => {
       cards: [card1, card2],
       limits: LIMITS,
     });
-    // First card succeeds, second fails — partial success.
+    // First card succeeds, second fails - partial success.
     vi.mocked(pushSingleCard)
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(false);
@@ -326,8 +326,8 @@ describe("useOnlineReconnectSync", () => {
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 
-    act(() => fireOnline()); // first fire — stalls
-    act(() => fireOnline()); // second fire — should be ignored
+    act(() => fireOnline()); // first fire - stalls
+    act(() => fireOnline()); // second fire - should be ignored
 
     // Resolve the stalled pull.
     resolvePull("ok");
@@ -337,7 +337,7 @@ describe("useOnlineReconnectSync", () => {
     expect(pullAndMerge).toHaveBeenCalledTimes(1);
   });
 
-  // 12. Listener is removed on unmount — no calls after cleanup.
+  // 12. Listener is removed on unmount - no calls after cleanup.
   it("removes the online listener on unmount", async () => {
     vi.mocked(pullAndMerge).mockResolvedValue("ok");
     vi.mocked(loadSyncStatus).mockReturnValue(NO_FAILURE_STATUS);
@@ -364,7 +364,7 @@ describe("useOnlineReconnectSync", () => {
   // a real EventTarget so `addEventListener` / `removeEventListener` work.
 });
 
-describe("useOnlineReconnectSync — Background Sync SW message listener (#1054)", () => {
+describe("useOnlineReconnectSync - Background Sync SW message listener (#1054)", () => {
   // jsdom does not have navigator.serviceWorker; stub a real EventTarget so
   // the hook can attach its message listener.
   let swTarget: EventTarget;

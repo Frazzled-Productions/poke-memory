@@ -1,5 +1,5 @@
 /**
- * computeDashboardSnapshot — single source of truth for derived card/session data.
+ * computeDashboardSnapshot - single source of truth for derived card/session data.
  *
  * Introduced in #1121 to eliminate the `patchForecastTodayBar` page-layer
  * workaround and unify the Stats and Journey pages behind one derivation call.
@@ -81,7 +81,7 @@ export type DashboardSnapshot = {
   today: string;
   /** Whether `forceAllMastered` was on when this snapshot was computed. */
   forceAllMastered: boolean;
-  /** Queue breakdown (new / learning / review) — null when axis excluded. */
+  /** Queue breakdown (new / learning / review) - null when axis excluded. */
   queue: QueueCounts | null;
   /**
    * 14-entry due-forecast array, today first. Day 0 count is the exact queue
@@ -89,18 +89,18 @@ export type DashboardSnapshot = {
    * are exact dueDate matches on future dates. Null when axis excluded.
    */
   dueForecast: readonly DueForecastDay[] | null;
-  /** Mastery counts + per-gen + per-type breakdown — null when axis excluded. */
+  /** Mastery counts + per-gen + per-type breakdown - null when axis excluded. */
   mastery: MasterySnapshot | null;
-  /** Introduced cards that pass the struggling gates — null when axis excluded. */
+  /** Introduced cards that pass the struggling gates - null when axis excluded. */
   struggling: readonly StrugglingCard[] | null;
-  /** Completion projection — null when axis excluded. */
+  /** Completion projection - null when axis excluded. */
   projection: CompletionProjection | null;
   /**
-   * Projected days to first mastery — null when axis excluded, or when no
+   * Projected days to first mastery - null when axis excluded, or when no
    * introduced-but-not-yet-mastered cards exist, or when `forceAllMastered`.
    */
   firstMasteryDays: number | null;
-  /** Difficulty histogram + mean — null when axis excluded. */
+  /** Difficulty histogram + mean - null when axis excluded. */
   difficulty: DifficultySnapshot | null;
 };
 
@@ -110,9 +110,9 @@ export type DashboardSnapshotOptions = {
    * not in the list are skipped (set to null) for performance.
    */
   include?: SnapshotAxis[];
-  /** Passed to `computeStats` — defaults to 10. */
+  /** Passed to `computeStats` - defaults to 10. */
   strugglingLimit?: number;
-  /** Mastery-repetitions threshold — defaults to MASTERY_REPETITIONS (3). */
+  /** Mastery-repetitions threshold - defaults to MASTERY_REPETITIONS (3). */
   masteryRepetitions?: number;
   /**
    * Superuser `pretendAllMastered` flag. Flows into every helper that accepts
@@ -153,7 +153,7 @@ export type DashboardSnapshotOptions = {
  * `computeEligibleCardIds` pass when the snapshot path shares the result
  * across the queue and forecast axes (#1158).
  *
- * Pure — no I/O, no DOM access, no hooks.
+ * Pure - no I/O, no DOM access, no hooks.
  *
  * @param cards          Full card array from the saved session.
  * @param eligibleCardIds Pre-computed set from `computeEligibleCardIds`.
@@ -193,11 +193,11 @@ export function computeQueueCountFromEligible(
 /**
  * Compute the total number of cards due today for a given session, applying
  * the same eligibility gate and daily caps as `buildSessionQueues` (which the
- * Practice page uses). This is the single shared helper for badge surfaces —
+ * Practice page uses). This is the single shared helper for badge surfaces - 
  * `usePwaBadge`, `useDocumentTitleBadge`, and the Stats dashboard's `queue`
  * axis all delegate here so they can never disagree on the count.
  *
- * Pure — no I/O, no DOM access, no hooks.
+ * Pure - no I/O, no DOM access, no hooks.
  *
  * @param cards    Full card array from the saved session.
  * @param settings Eligibility settings (card-type toggles + practice scope).
@@ -224,11 +224,11 @@ export function computeQueueCount(
 
 /**
  * Derive all dashboard stats from the full card array plus scheduling
- * parameters. Pure — no I/O, no side effects.
+ * parameters. Pure - no I/O, no side effects.
  *
  * @param cards     Full mixed-type card array from the session.
  * @param settings  Eligibility settings (card-type toggles + practice scope).
- * @param limits    Daily new/review limits — used for queue + forecast axes.
+ * @param limits    Daily new/review limits - used for queue + forecast axes.
  * @param today     UTC YYYY-MM-DD string. Caller owns timezone resolution.
  * @param options   Optional axis selection and per-helper overrides.
  */
@@ -253,7 +253,7 @@ export function computeDashboardSnapshot(
     return include === undefined || include.includes(axis);
   }
 
-  // Split name cards once — `computeStats` and several other helpers operate
+  // Split name cards once - `computeStats` and several other helpers operate
   // only on name cards. This is O(n) and the cheapest shared work.
   const nameCards = cards.filter(
     (c): c is NameReviewCard => c.cardType === "name",
@@ -309,7 +309,7 @@ export function computeDashboardSnapshot(
       //
       // Days 1–13 ("future"): a count of eligible cards whose dueDate exactly
       // matches that future date. New cards (lastReview === null) are excluded
-      // — they enter the queue on the day they are introduced, not on their
+      // - they enter the queue on the day they are introduced, not on their
       // default dueDate. Cards are filtered through the same eligibility gate
       // (eligible card IDs) as the queue so disabled card types and out-of-scope
       // cards are absent from the future bars too. This fixes #1138, where the
@@ -324,17 +324,17 @@ export function computeDashboardSnapshot(
       const futureDateIndex = new Map<string, number>();
       futureDates.forEach((d, i) => futureDateIndex.set(d, i + 1)); // offset by 1 (index 0 = today)
 
-      // eligibleCardIds already computed above — reused here.
+      // eligibleCardIds already computed above - reused here.
       const futureCounts = new Array<number>(DUE_FORECAST_DAYS).fill(0);
 
       for (const card of cards) {
         // Scope the forecast to the active locale (#1562), matching the day-0
         // bar (which comes from the locale-filtered session queues). Applies to
-        // every card type — evolution cards are per-locale too.
+        // every card type - evolution cards are per-locale too.
         if ((card.locale ?? "en") !== locale) continue;
         // Exclude ineligible cards (disabled card type, out-of-scope, etc.).
         if (!eligibleCardIds.has(card.id)) continue;
-        // Exclude never-reviewed cards — they are new-card candidates, not
+        // Exclude never-reviewed cards - they are new-card candidates, not
         // scheduled reviews, and are accounted for in the today bar via the queue.
         if (card.state.lastReview === null) continue;
         // Map the card's dueDate to a future bar index (1–13). Dates outside
@@ -355,7 +355,7 @@ export function computeDashboardSnapshot(
     }
   }
 
-  // Mastery axis — pulled from statsResult.
+  // Mastery axis - pulled from statsResult.
   let mastery: MasterySnapshot | null = null;
   if (wants("mastery") && statsResult !== null) {
     mastery = {
@@ -369,13 +369,13 @@ export function computeDashboardSnapshot(
     };
   }
 
-  // Struggling axis — pulled from statsResult.
+  // Struggling axis - pulled from statsResult.
   let struggling: readonly StrugglingCard[] | null = null;
   if (wants("struggling") && statsResult !== null) {
     struggling = statsResult.struggling;
   }
 
-  // Projection axis — pass the FULL card array so computeCompletionProjection
+  // Projection axis - pass the FULL card array so computeCompletionProjection
   // can apply the species-level (both-legs) mastery rule (#1448).
   let projection: CompletionProjection | null = null;
   if (wants("projection")) {
@@ -425,7 +425,7 @@ export function computeDashboardSnapshot(
     }
   }
 
-  // Difficulty axis — operates on the FULL cards array (all card types),
+  // Difficulty axis - operates on the FULL cards array (all card types),
   // not just name cards. This distinction is intentional (plan spec).
   let difficulty: DifficultySnapshot | null = null;
   if (wants("difficulty")) {

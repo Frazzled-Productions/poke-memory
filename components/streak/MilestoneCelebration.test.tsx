@@ -13,7 +13,7 @@ afterEach(() => {
 // Copy and ARIA
 // ---------------------------------------------------------------------------
 
-describe("MilestoneCelebration — copy", () => {
+describe("MilestoneCelebration - copy", () => {
   it("shows the milestone number in the headline for light milestones", () => {
     render(<MilestoneCelebration milestone={3} onDismiss={() => {}} />);
     expect(screen.getByText("3-day streak!")).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe("MilestoneCelebration — copy", () => {
   });
 
   it("falls back to the major-tier sub-copy for a major milestone with no keyed copy", () => {
-    // 665 is major-tier but has no entry in MILESTONE_SUB — exercises the fallback.
+    // 665 is major-tier but has no entry in MILESTONE_SUB - exercises the fallback.
     render(<MilestoneCelebration milestone={665} onDismiss={() => {}} />);
     expect(screen.getByText("665-day streak!")).toBeInTheDocument();
     expect(screen.getByText("That is seriously impressive.")).toBeInTheDocument();
@@ -57,7 +57,7 @@ describe("MilestoneCelebration — copy", () => {
 // Tier-specific rendering
 // ---------------------------------------------------------------------------
 
-describe("MilestoneCelebration — tiers", () => {
+describe("MilestoneCelebration - tiers", () => {
   it("applies the light tier class for milestone 3", () => {
     const { container } = render(
       <MilestoneCelebration milestone={3} onDismiss={() => {}} />,
@@ -107,7 +107,7 @@ describe("MilestoneCelebration — tiers", () => {
 // Auto-dismiss
 // ---------------------------------------------------------------------------
 
-describe("MilestoneCelebration — timing", () => {
+describe("MilestoneCelebration - timing", () => {
   it("auto-dismisses after 4500 ms", () => {
     const onDismiss = vi.fn();
     render(<MilestoneCelebration milestone={30} onDismiss={onDismiss} />);

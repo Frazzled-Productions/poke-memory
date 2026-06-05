@@ -12,7 +12,7 @@
  *
  * If any count-deriving helper bypasses the species-level check, it will return
  * a non-zero count for the name-only or reverse-only species and this test
- * will fail — surfacing the fragmentation before it reaches production.
+ * will fail - surfacing the fragmentation before it reaches production.
  *
  * Component surfaces (`useCardClass`, `ReviewSession.speciesBecameMastered`)
  * require DOM/hook rendering and are covered in their own test files.
@@ -131,11 +131,11 @@ function buildFixture(): ReviewableCard[] {
     makeNameCard(1, masteredState("2026-05-10")),
 
     // Species 2: no name card; reverse mastered. (In practice the name card
-    // exists in the session but is unmastered — simulate with an unmastered name.)
+    // exists in the session but is unmastered - simulate with an unmastered name.)
     makeNameCard(2, unmasteredState()),
     makeReverseCard(2, masteredState("2026-05-15")),
 
-    // Species 3: BOTH legs mastered — the only fully-mastered species.
+    // Species 3: BOTH legs mastered - the only fully-mastered species.
     makeNameCard(3, masteredState("2026-05-12")),
     makeReverseCard(3, masteredState("2026-05-20")),
 
@@ -200,7 +200,7 @@ describe("species-level mastery contract (#1448)", () => {
   it("computeCompletionProjection remaining = total name cards - mastered species", () => {
     // 4 name cards, 1 mastered species → 3 remaining.
     // With only 1 mastery event in the window, there may not be enough history
-    // for a projection (depends on window timing) — check at least it is not "complete".
+    // for a projection (depends on window timing) - check at least it is not "complete".
     const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
     expect(result.kind).not.toBe("complete");
     // If projected, remaining must be 3 (name cards - mastered species).
@@ -214,7 +214,7 @@ describe("species-level mastery contract (#1448)", () => {
   // ---------------------------------------------------------------------------
 
   it("zero-mastered: all helpers return zero / empty / null when no species is mastered", () => {
-    // Only name-card mastered species (no reverse legs) — zero species-mastered.
+    // Only name-card mastered species (no reverse legs) - zero species-mastered.
     const nameOnlyCards: ReviewableCard[] = [
       makeNameCard(1, masteredState()),
       makeNameCard(2, masteredState()),

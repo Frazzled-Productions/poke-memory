@@ -1,7 +1,7 @@
 /**
  * Component tests for the Settings page card-type toggle flow (#835).
  *
- * Focus: the re-enable dialog wiring introduced in #835 —
+ * Focus: the re-enable dialog wiring introduced in #835 - 
  *   - Disabling a card type is non-destructive (no confirm dialog).
  *   - Re-enabling shows the ReenableCardTypeDialog.
  *   - Choosing "Reuse my saved progress" enables the type and closes the dialog.
@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { AppLocale } from "@/i18n/locales";
 
 // ---------------------------------------------------------------------------
-// Module mocks — declared before any imports so vi.mock hoisting works.
+// Module mocks - declared before any imports so vi.mock hoisting works.
 // ---------------------------------------------------------------------------
 
 vi.mock("next/image", () => ({
@@ -54,7 +54,7 @@ vi.mock("@/lib/review/persistence", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Settings persistence — provide a realistic default and track saveSettings calls.
+// Settings persistence - provide a realistic default and track saveSettings calls.
 // ---------------------------------------------------------------------------
 
 const { mockLoadSettings, mockSaveSettings } = vi.hoisted(() => ({
@@ -224,7 +224,7 @@ vi.mock("@/components/settings/OfflineSection", () => ({
   OfflineSection: () => <div data-testid="offline-section" />,
 }));
 
-// Stub next-intl — t() resolves keys against the real en.json catalogue so
+// Stub next-intl - t() resolves keys against the real en.json catalogue so
 // tests can match on English strings without caring about translation internals.
 // The mock also accepts string-valued parameters ({percent}, {query}).
 const { mockT } = vi.hoisted(() => {
@@ -321,7 +321,7 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Default settings fixture — evolutionCardsEnabled:false so we can exercise
+// Default settings fixture - evolutionCardsEnabled:false so we can exercise
 // toggling-on. Name and reverse are always on since #1234; they have no toggles.
 // ---------------------------------------------------------------------------
 
@@ -406,7 +406,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 // Helpers: find card-type toggle switches by nearby label text.
 //
-// Name and reverse toggles have been removed since #1234 — those directions
+// Name and reverse toggles have been removed since #1234 - those directions
 // are always on. Only the opt-in card types (evolution, reverse-evolution, cry)
 // have toggles.
 // ---------------------------------------------------------------------------
@@ -424,7 +424,7 @@ function getEvolutionCardsSwitch() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — card-type toggle: disable (non-destructive, #835)", () => {
+describe("SettingsPage - card-type toggle: disable (non-destructive, #835)", () => {
   it("disabling an opt-in card type updates the toggle without a confirm dialog", async () => {
     // Use evolution cards since name/reverse no longer have toggles (#1234).
     mockLoadSettings.mockReturnValue({
@@ -443,7 +443,7 @@ describe("SettingsPage — card-type toggle: disable (non-destructive, #835)", (
     // Evolution cards start enabled.
     expect(evoSwitchEl).toHaveAttribute("aria-checked", "true");
 
-    // No window.confirm stub — the test would throw if confirm was called.
+    // No window.confirm stub - the test would throw if confirm was called.
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     await user.click(evoSwitchEl);
 
@@ -458,7 +458,7 @@ describe("SettingsPage — card-type toggle: disable (non-destructive, #835)", (
   });
 });
 
-describe("SettingsPage — card-type toggle: re-enable dialog (#835)", () => {
+describe("SettingsPage - card-type toggle: re-enable dialog (#835)", () => {
   it("opening a disabled card type shows the ReenableCardTypeDialog", async () => {
     const user = userEvent.setup();
     render(<SettingsPage />);
@@ -647,14 +647,14 @@ describe("SettingsPage — card-type toggle: re-enable dialog (#835)", () => {
       ).not.toBeInTheDocument();
     });
 
-    // The switch must still be unchecked — cancel aborted the re-enable.
+    // The switch must still be unchecked - cancel aborted the re-enable.
     expect(getEvolutionCardsSwitch()).toHaveAttribute("aria-checked", "false");
   });
 });
 
-describe("SettingsPage — multiple card-type re-enables (#835)", () => {
+describe("SettingsPage - multiple card-type re-enables (#835)", () => {
   it("re-enabling reverse-evolution cards (an opt-in type) shows the dialog", async () => {
-    // Name and reverse no longer have toggles since #1234 — they are always on.
+    // Name and reverse no longer have toggles since #1234 - they are always on.
     // Verify the re-enable flow still works for an opt-in type (reverse-evolution).
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
@@ -687,7 +687,7 @@ describe("SettingsPage — multiple card-type re-enables (#835)", () => {
   });
 });
 
-describe("SettingsPage — updated descriptive copy (#835)", () => {
+describe("SettingsPage - updated descriptive copy (#835)", () => {
   it("renders the non-destructive disable copy for at least one card type", async () => {
     render(<SettingsPage />);
 
@@ -705,7 +705,7 @@ describe("SettingsPage — updated descriptive copy (#835)", () => {
 // Touch 1 + 2: inline help text and first-enable banner (#1271)
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — typed-entry onboarding (#1271)", () => {
+describe("SettingsPage - typed-entry onboarding (#1271)", () => {
   it("always renders the inline MC-ramp help text under the toggle", async () => {
     render(<SettingsPage />);
 
@@ -773,7 +773,7 @@ describe("SettingsPage — typed-entry onboarding (#1271)", () => {
 
     await user.click(screen.getByRole("switch", { name: /verified typed entry/i }));
 
-    // Banner must not appear — it was already shown once.
+    // Banner must not appear - it was already shown once.
     await waitFor(() => {
       expect(
         screen.queryByText(/verified typed entry is on/i),
@@ -821,11 +821,11 @@ describe("SettingsPage — typed-entry onboarding (#1271)", () => {
 // the real catalogues and (b) a representative Japanese string is returned
 // when the locale is Japanese. Because the page mock wires t() to the real
 // en.json, we verify the Japanese catalogue separately via the catalogue JSON
-// directly — this is consistent with how other component tests exercise locale
+// directly - this is consistent with how other component tests exercise locale
 // correctness without a full browser environment.
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — i18n key resolution (#1369)", () => {
+describe("SettingsPage - i18n key resolution (#1369)", () => {
   it("settings.save resolves to 'Save' in English and '保存' in Japanese", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const en = require("../../messages/en.json") as Record<string, Record<string, string>>;
@@ -891,11 +891,11 @@ describe("SettingsPage — i18n key resolution (#1369)", () => {
 //
 // Asserts that both locale-picker <select> elements show each language in
 // its own script (endonym) rather than the English translation.
-// The LOCALE_ENDONYMS constant must NOT route through t() — these labels are
+// The LOCALE_ENDONYMS constant must NOT route through t() - these labels are
 // locale-invariant by design.
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — locale picker endonyms", () => {
+describe("SettingsPage - locale picker endonyms", () => {
   it("shows each language in its own script in the app-language picker", async () => {
     // The Pokémon-name-language picker was relocated to the status-bar pill
     // (#1484 Phase 2); only the app-language selector remains in Settings. The
@@ -918,7 +918,7 @@ describe("SettingsPage — locale picker endonyms", () => {
     const texts = options.map((o) => o.textContent ?? "");
 
     // The picker must show endonyms (native script), not English translations.
-    // Non-English locales are marked "(preview)" — the endonym must still appear
+    // Non-English locales are marked "(preview)" - the endonym must still appear
     // as a substring of each option.
     expect(texts.some((t) => t.startsWith("日本語"))).toBe(true);
     expect(texts.some((t) => t.startsWith("简体中文"))).toBe(true);
@@ -944,7 +944,7 @@ describe("SettingsPage — locale picker endonyms", () => {
 // pointing to the ts-fsrs GitHub repository.
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — FSRS link in How this works", () => {
+describe("SettingsPage - FSRS link in How this works", () => {
   it("renders an anchor linking to the FSRS GitHub repo inside the How this works body", async () => {
     mockLoadSettings.mockReturnValue(defaultSettings());
     render(<SettingsPage />);
@@ -974,7 +974,7 @@ describe("SettingsPage — FSRS link in How this works", () => {
 // in the Japanese catalog.
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — preview suffix from catalog", () => {
+describe("SettingsPage - preview suffix from catalog", () => {
   it("preview suffix on locale picker options is sourced from the catalog (en)", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
@@ -1021,7 +1021,7 @@ describe("SettingsPage — preview suffix from catalog", () => {
 // When pretendAllMastered is on (or mastered entries exist), the picker renders.
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — theme picker locked state (#1440)", () => {
+describe("SettingsPage - theme picker locked state (#1440)", () => {
   // Helper to get the settings page rendered, waiting for load.
   async function renderAndWait() {
     render(<SettingsPage />);
@@ -1089,7 +1089,7 @@ describe("SettingsPage — theme picker locked state (#1440)", () => {
 // Mark-what-I-know discovery nudge auto-dismiss (#1443)
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — mark-what-I-know nudge (#1443)", () => {
+describe("SettingsPage - mark-what-I-know nudge (#1443)", () => {
   it("opening the Quickstart quiz persists markWhatIKnowNudgeDismissed", async () => {
     // defaultSettings() omits the flag → the nudge is shown (absent → false).
     mockLoadSettings.mockReturnValue(defaultSettings());
@@ -1138,7 +1138,7 @@ describe("SettingsPage — mark-what-I-know nudge (#1443)", () => {
   });
 });
 
-describe("SettingsPage — forceTokenToast developer toggle (#1443)", () => {
+describe("SettingsPage - forceTokenToast developer toggle (#1443)", () => {
   beforeEach(() => {
     mockSuperuserState.unlocked = true;
     mockSuperuserFlags.forceTokenToast = false;
@@ -1168,7 +1168,7 @@ describe("SettingsPage — forceTokenToast developer toggle (#1443)", () => {
 // Item 1: Settings relabelling (clarity polish)
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — clarity polish: Settings labels (item 1)", () => {
+describe("SettingsPage - clarity polish: Settings labels (item 1)", () => {
   it("app-language heading reads 'App interface language'", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
@@ -1216,7 +1216,7 @@ describe("SettingsPage — clarity polish: Settings labels (item 1)", () => {
 // Item 2: pretendAllMastered guard on enrolment mastery counts (clarity polish)
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — clarity polish: enrolment mastery count respects pretendAllMastered (item 2)", () => {
+describe("SettingsPage - clarity polish: enrolment mastery count respects pretendAllMastered (item 2)", () => {
   // The settings page shows a per-locale mastered count badge next to each
   // enrolled locale in the enrolment list (e.g. "5 mastered"). When the
   // pretendAllMastered flag is on it must show the full SEED_POKEMON.length
@@ -1300,7 +1300,7 @@ describe("SettingsPage — clarity polish: enrolment mastery count respects pret
 // Item 3: Unenrol-active-language confirmation (clarity polish)
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — clarity polish: unenrol active language confirm (item 3)", () => {
+describe("SettingsPage - clarity polish: unenrol active language confirm (item 3)", () => {
   function settingsWithJaActive() {
     return {
       ...defaultSettings(),
@@ -1425,7 +1425,7 @@ describe("SettingsPage — clarity polish: unenrol active language confirm (item
 // removedLocales tombstone maintenance (#1568)
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage — enrolment maintains removedLocales tombstone (#1568)", () => {
+describe("SettingsPage - enrolment maintains removedLocales tombstone (#1568)", () => {
   function settingsWithJaActive() {
     return {
       ...defaultSettings(),

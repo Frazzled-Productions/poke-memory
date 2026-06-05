@@ -6,10 +6,10 @@
 // badge fresh. See #400.
 //
 // Required env vars:
-//   SUPABASE_ACCESS_TOKEN — personal access token with read access to the
+//   SUPABASE_ACCESS_TOKEN - personal access token with read access to the
 //     project's database. In CI this comes from the repo secret of the
 //     same name (already used by migration-check.yml).
-//   SUPABASE_PROJECT_REF  — the project ref (the slug in the dashboard URL).
+//   SUPABASE_PROJECT_REF - the project ref (the slug in the dashboard URL).
 
 import { writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -38,7 +38,7 @@ async function fetchUserCount(projectRef, token) {
   const rows = Array.isArray(body) ? body : body.result;
   if (!Array.isArray(rows) || rows.length === 0 || typeof rows[0].n !== "number") {
     throw new Error(
-      `Unexpected response shape — expected [{ n: <number> }], got: ${JSON.stringify(body).slice(0, 200)}`,
+      `Unexpected response shape - expected [{ n: <number> }], got: ${JSON.stringify(body).slice(0, 200)}`,
     );
   }
   return rows[0].n;

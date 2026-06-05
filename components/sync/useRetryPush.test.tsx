@@ -226,7 +226,7 @@ describe("useRetryPush", () => {
     });
 
     // The failure-path saveSyncStatus call re-reads the latest sync status and
-    // only updates lastPushAttemptAt — lastPushFailed: true / failedCardCount: 2
+    // only updates lastPushAttemptAt - lastPushFailed: true / failedCardCount: 2
     // are preserved from whatever the latest read returned.
     expect(vi.mocked(saveSyncStatus)).toHaveBeenCalled();
     const lastSaved = vi.mocked(saveSyncStatus).mock.calls.at(-1)?.[0];
@@ -237,7 +237,7 @@ describe("useRetryPush", () => {
   // 6. Day-boundary fall-back: positive failedCardCount but today-filter is empty.
   it("falls back to all reviewed cards when failedCardCount > 0 but no cards were reviewed today", async () => {
     // Beacon failed yesterday at 23:59; user returns the next day. The
-    // today-filter matches nothing — we must NOT silently clear the failure.
+    // today-filter matches nothing - we must NOT silently clear the failure.
     vi.mocked(loadSyncStatus).mockReturnValue({
       ...FAILED_STATUS,
       failedCardCount: 3,

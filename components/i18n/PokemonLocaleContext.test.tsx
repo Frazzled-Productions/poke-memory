@@ -18,7 +18,7 @@ import {
 } from "@/lib/i18n/PokemonLocaleContext";
 import { SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 
-// Settings mock — controlled per-test via `mockSettingsStore`. learningLocales
+// Settings mock - controlled per-test via `mockSettingsStore`. learningLocales
 // is optional so tests can omit it to exercise the back-compat (pre-#1484)
 // path, where readLocaleState falls back to the default set.
 let mockSettingsStore: {
@@ -55,7 +55,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("PokemonLocaleProvider — initial state", () => {
+describe("PokemonLocaleProvider - initial state", () => {
   it("reads locale en + flag false from settings on mount", async () => {
     mockSettingsStore = {
       labsFlags: { languages: false },
@@ -120,7 +120,7 @@ describe("PokemonLocaleProvider — initial state", () => {
   });
 });
 
-describe("PokemonLocaleProvider — reactive updates", () => {
+describe("PokemonLocaleProvider - reactive updates", () => {
   it("updates when SETTINGS_SAVED_EVENT fires (same-tab save)", async () => {
     mockSettingsStore = { labsFlags: { languages: true }, pokemonNameLocale: "en" };
     const { result } = renderHook(() => usePokemonLocaleContext(), { wrapper });
@@ -189,7 +189,7 @@ describe("PokemonLocaleProvider — reactive updates", () => {
   });
 
   it("reads pokemonNameLocale from settings, NOT from the locale cookie", async () => {
-    // The cookie (app UI locale) is independent of pokemonNameLocale — they
+    // The cookie (app UI locale) is independent of pokemonNameLocale - they
     // can disagree (UI in English while practising names in Japanese, or vice
     // versa). The Provider must read from settings only.
     document.cookie = "poke-memory:locale=ja";
@@ -212,7 +212,7 @@ describe("PokemonLocaleProvider — reactive updates", () => {
   });
 });
 
-describe("PokemonLocaleProvider — single subscription regardless of consumer count", () => {
+describe("PokemonLocaleProvider - single subscription regardless of consumer count", () => {
   it("registers exactly one SETTINGS_SAVED_EVENT and one storage listener for N consumers", async () => {
     mockSettingsStore = { labsFlags: { languages: true }, pokemonNameLocale: "en" };
     const addSpy = vi.spyOn(window, "addEventListener");
@@ -233,7 +233,7 @@ describe("PokemonLocaleProvider — single subscription regardless of consumer c
     );
 
     // Wait explicitly for the effect-scheduled listeners. Without waitFor the
-    // assertion would race React's effect flush — false-passing if effects
+    // assertion would race React's effect flush - false-passing if effects
     // ever moved to a later phase. With waitFor it false-fails (preferable)
     // if a future regression makes listener registration consumer-driven.
     await waitFor(() => {

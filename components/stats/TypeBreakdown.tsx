@@ -22,7 +22,7 @@ function pct(num: number, den: number): number {
  *
  * Counts agree with the per-type filter on `/pokedex`: a dual-type card
  * appears in both buckets here and is also matched by either type's
- * filter — matches the Pokédex's existing intersection semantics.
+ * filter - matches the Pokédex's existing intersection semantics.
  */
 export function TypeBreakdown({ perType }: Props) {
   const tTB = useTranslations("stats.typeBreakdown");

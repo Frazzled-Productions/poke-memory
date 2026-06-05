@@ -6,7 +6,7 @@
  * directive that the loader file requires.
  *
  * Source PNGs are ~475 px wide (official-artwork resolution). We do not
- * generate variants wider than the source — a request for a larger width
+ * generate variants wider than the source - a request for a larger width
  * snaps to the largest available generated width (320 px). This is not a
  * regression: Vercel's `/_next/image` endpoint also cannot add detail beyond
  * the source resolution.
@@ -30,7 +30,7 @@ import {
  * size constants. Each element corresponds to a width folder produced by
  * `npm run seed:sprites` (e.g. `public/sprites/pokemon/webp/<id>/<w>.webp`).
  *
- * Must be kept in ascending order — `snapToGeneratedWidth` relies on sorted
+ * Must be kept in ascending order - `snapToGeneratedWidth` relies on sorted
  * order to find the nearest match.
  */
 export const GENERATED_SPRITE_WIDTHS: readonly number[] = [
@@ -52,11 +52,11 @@ export const GENERATED_SPRITE_WIDTHS: readonly number[] = [
  * Snap a requested width to the nearest available generated width.
  *
  * Strategy:
- * 1. Exact match — return the width unchanged.
+ * 1. Exact match - return the width unchanged.
  * 2. Round up to the next larger generated width (serves the smallest
  *    variant that is at least as large as requested, preserving quality).
  * 3. If the request exceeds the largest generated width, return the
- *    largest available (source-resolution cap — see module comment).
+ *    largest available (source-resolution cap - see module comment).
  *
  * @param requested  The width value from `ImageLoaderProps.width`.
  * @returns          A width that exists in `GENERATED_SPRITE_WIDTHS`.
@@ -66,6 +66,6 @@ export function snapToGeneratedWidth(requested: number): number {
   for (const w of GENERATED_SPRITE_WIDTHS) {
     if (w >= requested) return w;
   }
-  // requested > largest available — cap at the maximum.
+  // requested > largest available - cap at the maximum.
   return GENERATED_SPRITE_WIDTHS[GENERATED_SPRITE_WIDTHS.length - 1]!;
 }

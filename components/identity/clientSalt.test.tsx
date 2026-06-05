@@ -2,7 +2,7 @@
  * Tests for getOrCreateClientSalt.
  *
  * The source lives in lib/identity/clientSalt.ts, but this test file must
- * live under components/ so vitest picks it up with the jsdom project — the
+ * live under components/ so vitest picks it up with the jsdom project - the
  * node project has no DOM and localStorage would be undefined.  See AGENTS.md
  * "Testing" for the jsdom vs node project split.
  */
@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { KEY_CLIENT_SALT } from "@/lib/storage/keys";
 
 // ---------------------------------------------------------------------------
-// localStorage stub — jsdom on this Node version does not provide a real
+// localStorage stub - jsdom on this Node version does not provide a real
 // localStorage by default, so we install our own in-memory implementation,
 // matching the pattern from deleteAccount-local.test.tsx.
 // ---------------------------------------------------------------------------
@@ -41,7 +41,7 @@ function makeLocalStorage(): Storage {
 // carried between tests.
 // ---------------------------------------------------------------------------
 
-describe("getOrCreateClientSalt — normal path", () => {
+describe("getOrCreateClientSalt - normal path", () => {
   beforeEach(() => {
     vi.resetModules();
     Object.defineProperty(window, "localStorage", {
@@ -77,12 +77,12 @@ describe("getOrCreateClientSalt — normal path", () => {
 
     const salt = getOrCreateClientSalt();
     expect(salt).toBe("persisted-uuid-value");
-    // randomUUID should not have been called — the existing value was returned.
+    // randomUUID should not have been called - the existing value was returned.
     expect(crypto.randomUUID).not.toHaveBeenCalled();
   });
 });
 
-describe("getOrCreateClientSalt — SSR / no window", () => {
+describe("getOrCreateClientSalt - SSR / no window", () => {
   let originalWindow: typeof globalThis.window;
 
   beforeEach(() => {
@@ -105,7 +105,7 @@ describe("getOrCreateClientSalt — SSR / no window", () => {
   });
 });
 
-describe("getOrCreateClientSalt — quota-exceeded path", () => {
+describe("getOrCreateClientSalt - quota-exceeded path", () => {
   beforeEach(() => {
     vi.resetModules();
     const ls = makeLocalStorage();

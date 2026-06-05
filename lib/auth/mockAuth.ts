@@ -8,7 +8,7 @@
  * whose `.from()` calls resolve from an in-memory fixture instead of the
  * network.
  *
- * SECURITY-CRITICAL — this seam is an auth bypass if it ever leaks into a
+ * SECURITY-CRITICAL - this seam is an auth bypass if it ever leaks into a
  * production build. It is gated two ways and CANNOT activate in production:
  *
  *   1. `NEXT_PUBLIC_E2E_AUTH_MOCK` must be exactly `"1"`.
@@ -19,7 +19,7 @@
  * set there the seam would stay inert. As defence-in-depth,
  * `assertMockAuthNotInProduction()` is invoked from `next.config.ts` and fails
  * the build loudly if both the flag and a production `NODE_ENV` are present at
- * build time. The flag is never set in any production Vercel environment — it
+ * build time. The flag is never set in any production Vercel environment - it
  * is set only by `e2e.yml`, only against preview deployments.
  *
  * See `lib/auth/mockAuth.test.ts` for the assertion proving the seam is
@@ -43,23 +43,23 @@ export const MOCK_AUTH_ENABLED_VALUE = "1";
  * Both `process.env` reads here are LITERAL static member expressions
  * (`process.env.NODE_ENV`, `process.env.NEXT_PUBLIC_E2E_AUTH_MOCK`). Next.js
  * only inlines `NEXT_PUBLIC_*` vars when they are accessed as a literal static
- * member — bracket notation with a variable (`process.env[someVar]`) is NOT
+ * member - bracket notation with a variable (`process.env[someVar]`) is NOT
  * inlined. With the literal form, a production bundle collapses this function
  * to `false` and the mock code becomes dead code the minifier can drop. The
  * `MOCK_AUTH_ENV_VAR` constant below still names the var for tests and docs,
  * but the actual reads must stay literal for inlining to happen.
  */
 export function isMockAuthEnabled(): boolean {
-  // Production short-circuit FIRST — this is the security gate. Even if the
+  // Production short-circuit FIRST - this is the security gate. Even if the
   // flag is somehow set, a production build can never enable the seam.
   if (process.env.NODE_ENV === "production") return false;
-  // Literal static access — see the dead-code-elimination note above.
+  // Literal static access - see the dead-code-elimination note above.
   return process.env.NEXT_PUBLIC_E2E_AUTH_MOCK === MOCK_AUTH_ENABLED_VALUE;
 }
 
 /**
  * Build-time guard. Throws loudly when a production build is configured with
- * the mock-auth flag set — a misconfiguration that must never ship. Invoked
+ * the mock-auth flag set - a misconfiguration that must never ship. Invoked
  * from `next.config.ts` so `next build` fails before producing an artefact.
  *
  * This is defence-in-depth: `isMockAuthEnabled()` already returns false in
@@ -141,7 +141,7 @@ const EMPTY_FIXTURE: MockCloudFixture = {
  * the object is thenable so `await client.from(...).select(...)` resolves.
  *
  * Reads resolve from the in-memory fixture. Writes (`upsert` / `update`)
- * resolve successfully without doing anything — the seam never persists.
+ * resolve successfully without doing anything - the seam never persists.
  */
 class MockQueryBuilder<Row extends Record<string, unknown>>
   implements PromiseLike<{ data: Row[] | Row | null; error: null; count: number }>
@@ -175,7 +175,7 @@ class MockQueryBuilder<Row extends Record<string, unknown>>
     return this;
   }
   insert(): this {
-    // Same shape as upsert above — no-op success. Added for the Web Push
+    // Same shape as upsert above - no-op success. Added for the Web Push
     // opt-in path which uses delete-then-insert against `push_subscriptions`
     // (see lib/push/subscribe.ts).
     this.rows = [];
@@ -190,7 +190,7 @@ class MockQueryBuilder<Row extends Record<string, unknown>>
     return this;
   }
 
-  /** Resolves to a single row (or null) — mirrors PostgREST `.maybeSingle()`. */
+  /** Resolves to a single row (or null) - mirrors PostgREST `.maybeSingle()`. */
   maybeSingle(): Promise<{ data: Row | null; error: null }> {
     return Promise.resolve({ data: this.rows[0] ?? null, error: null });
   }
@@ -241,7 +241,7 @@ function readFixtureOverride(): Partial<MockCloudFixture> {
  *
  * `.auth.getUser()` resolves to {@link MOCK_USER}. `.auth.onAuthStateChange()`
  * returns an inert subscription. `.from(table)` returns a {@link MockQueryBuilder}
- * backed by the fixture for that table — no network call is ever made.
+ * backed by the fixture for that table - no network call is ever made.
  *
  * The cloud fixture is, in priority order: the explicit `fixture` argument,
  * then a localStorage override (see {@link MOCK_CLOUD_FIXTURE_STORAGE_KEY}),
@@ -290,7 +290,7 @@ export function createMockClient(
   };
 
   // Cast via `unknown` to sidestep the deep generic signature of
-  // SupabaseClient<Database, ...> — the same pattern the sync test suite uses
+  // SupabaseClient<Database, ...> - the same pattern the sync test suite uses
   // (FAKE_CLIENT = {} as unknown as SupabaseClient).
   return client as unknown as SupabaseClient;
 }

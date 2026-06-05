@@ -37,7 +37,7 @@ const PILL_BASE =
 
 /**
  * Version-group slugs present in the seed, grouped by generation number and
- * sorted for display. Computed once at module load — the seed is a build-time
+ * sorted for display. Computed once at module load - the seed is a build-time
  * constant so the result is stable for the module lifetime (mirrors the
  * `_seedById` / `_legendaryIds` pattern in `scope.ts`).
  *

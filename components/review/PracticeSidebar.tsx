@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * PracticeSidebar — shown alongside the review card at lg: breakpoints.
+ * PracticeSidebar - shown alongside the review card at lg: breakpoints.
  *
  * Displays session-local counters only: grades completed today and a compact
  * grade-colour legend. This data comes from the grade log, not from mastery
@@ -23,7 +23,7 @@ import { KEY_GRADE_LOG } from "@/lib/storage/keys";
 import { todayString } from "@/lib/review/session";
 import { cardPanel, colStack, mutedText, colStackLg } from "@/lib/utils/class-names";
 
-// Grade colour mapping — colours only; labels are resolved via t() at render.
+// Grade colour mapping - colours only; labels are resolved via t() at render.
 const GRADE_COLOURS: Record<number, { dot: string; text: string }> = {
   1: { dot: "bg-rose-500",    text: "text-rose-600 dark:text-rose-400" },
   2: { dot: "bg-amber-500",   text: "text-amber-600 dark:text-amber-400" },
@@ -90,7 +90,7 @@ function GradeTallyRow({
 /**
  * `PracticeSidebar` takes no props from the parent, so wrapping in `memo`
  * prevents spurious re-renders triggered by `setCards` and other state
- * updates in `ReviewSession` — the sidebar manages its own state via the
+ * updates in `ReviewSession` - the sidebar manages its own state via the
  * `GRADE_LOG_APPENDED_EVENT` listener (#1191 Class B item 8).
  */
 export const PracticeSidebar = memo(function PracticeSidebar() {
@@ -118,7 +118,7 @@ export const PracticeSidebar = memo(function PracticeSidebar() {
 
     // Re-read when reset-all-progress wipes the grade log. reset.ts dispatches
     // a synthetic StorageEvent keyed to KEY_GRADE_LOG so same-tab listeners
-    // pick up the cleared state without a full reload — mirror the pattern in
+    // pick up the cleared state without a full reload - mirror the pattern in
     // ReviewSession.tsx and Stats/Pasture/Pokédex pages.
     function handleStorage(e: StorageEvent) {
       if (e.key === KEY_GRADE_LOG) {
@@ -135,7 +135,7 @@ export const PracticeSidebar = memo(function PracticeSidebar() {
 
   const total = todayGrades.length;
 
-  // Grade tally — count each grade value.
+  // Grade tally - count each grade value.
   const tally: Record<number, number> = { 1: 0, 2: 0, 4: 0, 5: 0 };
   for (const g of todayGrades) {
     if (g in tally) tally[g]++;

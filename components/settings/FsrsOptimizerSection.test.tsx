@@ -10,7 +10,7 @@ import { loadSettings } from "@/lib/settings/persistence";
 // Mocks
 // ---------------------------------------------------------------------------
 
-// loadSettings / saveSettings — no-op for unit tests; FsrsOptimizerSection
+// loadSettings / saveSettings - no-op for unit tests; FsrsOptimizerSection
 // reads loadSettings() on a successful optimize call to merge weights in.
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: vi.fn(() => ({
@@ -134,7 +134,7 @@ describe("FsrsOptimizerSection", () => {
     });
   });
 
-  describe("signed in — not enough reviews", () => {
+  describe("signed in - not enough reviews", () => {
     it("shows disabled button and review-count help text", () => {
       renderWithIntl(
         <FsrsOptimizerSection
@@ -162,7 +162,7 @@ describe("FsrsOptimizerSection", () => {
     });
   });
 
-  describe("signed in — enough reviews", () => {
+  describe("signed in - enough reviews", () => {
     it("renders an enabled Optimise now button", () => {
       renderWithIntl(
         <FsrsOptimizerSection

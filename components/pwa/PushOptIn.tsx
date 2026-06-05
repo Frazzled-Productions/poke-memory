@@ -28,7 +28,7 @@ import { cardPanelPadded, mutedTextXs } from "@/lib/utils/class-names";
  *     to create push subscriptions outside of an installed app; showing a
  *     toggle that always fails is worse than hiding it.
  *
- * When any of those is false we render nothing — the parent's collapsible
+ * When any of those is false we render nothing - the parent's collapsible
  * section is unaffected and shows the other Account & Data controls as
  * normal.
  *

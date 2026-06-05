@@ -9,7 +9,7 @@
  * language due badge without re-parsing the full ~1025-card array on every
  * render (#1234 perf concern).
  *
- * Counts DUE REVIEWS only (graduated cards past their due date) — not new cards,
+ * Counts DUE REVIEWS only (graduated cards past their due date) - not new cards,
  * which are a setting-driven cap rather than a concrete backlog.
  *
  * Local-only derived state, recomputable from the card array. No migration, no
@@ -41,7 +41,7 @@ const EMPTY_COUNTS: DueCountByLocale = {
 
 /**
  * Read the cached per-locale due counts from localStorage. Returns all-zero
- * when absent or malformed — callers should treat that as "not yet populated".
+ * when absent or malformed - callers should treat that as "not yet populated".
  */
 export function readDueCountCache(): DueCountByLocale {
   return readLocalStorage(
@@ -84,7 +84,7 @@ export function writeDueCountForLocale(locale: AppLocale, count: number): void {
 
 /**
  * Per-locale "has review history" flags. `true` means the locale has at least
- * one card with `state.lastReview !== null` — i.e. the user has done at least
+ * one card with `state.lastReview !== null` - i.e. the user has done at least
  * one review in that language. Used to distinguish "Caught up" from "No cards
  * yet" in the LanguageSwitcher due-badge.
  */

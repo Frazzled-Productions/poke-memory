@@ -84,7 +84,7 @@ export function extractFlavorTexts(
         existing.versions.push(versionSlug);
       }
     } else {
-      // New distinct text — insert with this game as the first version.
+      // New distinct text - insert with this game as the first version.
       byText.set(normalized, {
         text: normalized,
         versions: versionSlug ? [versionSlug] : [],

@@ -132,7 +132,7 @@ function GenAccordion({ group }: { group: GenGroup }) {
 }
 
 // ---------------------------------------------------------------------------
-// GameBreakdown — public component
+// GameBreakdown - public component
 // ---------------------------------------------------------------------------
 
 type Props = {

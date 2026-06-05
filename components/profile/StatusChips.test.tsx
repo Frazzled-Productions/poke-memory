@@ -1,5 +1,5 @@
 /**
- * StatusChips tests — the shared streak / token / mastery pills used by both
+ * StatusChips tests - the shared streak / token / mastery pills used by both
  * ProfileStatusBar and StreakBadge (single source of truth).
  *
  * Covers:
@@ -73,7 +73,7 @@ describe("MasteryChip", () => {
 
 // ─── Locale: original label rendering ───────────────────────────────────────
 
-describe("StatusChips — locale", () => {
+describe("StatusChips - locale", () => {
   it("ja: token aria-label renders in Japanese", () => {
     renderJa(<TokenChip tokenBalance={2} />);
     // tokenChipAriaLabel (ja) contains "保護トークン".
@@ -90,7 +90,7 @@ describe("StatusChips — locale", () => {
 
 // ─── Popover: open on click (tap) ───────────────────────────────────────────
 
-describe("StatusChips — popover open/close on click (#1556)", () => {
+describe("StatusChips - popover open/close on click (#1556)", () => {
   it("StreakChip: click opens the popover showing the aria-label text", () => {
     renderWithIntl(<StreakChip streak={7} />);
     const btn = screen.getByRole("button", { name: /7 days streak/i });
@@ -158,7 +158,7 @@ describe("StatusChips — popover open/close on click (#1556)", () => {
 
 // ─── Popover: keyboard focus opens the popover ──────────────────────────────
 
-describe("StatusChips — popover opens on keyboard focus (#1556)", () => {
+describe("StatusChips - popover opens on keyboard focus (#1556)", () => {
   it("StreakChip: focus opens the popover", () => {
     renderWithIntl(<StreakChip streak={5} />);
     const btn = screen.getByRole("button", { name: /5 days streak/i });
@@ -201,7 +201,7 @@ describe("StatusChips — popover opens on keyboard focus (#1556)", () => {
 
 // ─── Popover: Escape closes the popover ─────────────────────────────────────
 
-describe("StatusChips — popover closes on Escape (#1556)", () => {
+describe("StatusChips - popover closes on Escape (#1556)", () => {
   it("Escape closes an open popover", () => {
     renderWithIntl(<TokenChip tokenBalance={3} />);
     const btn = screen.getByRole("button", { name: /3 protection tokens/i });
@@ -216,7 +216,7 @@ describe("StatusChips — popover closes on Escape (#1556)", () => {
 
 // ─── Popover: click-outside (pointerdown) closes the popover ─────────────────
 
-describe("StatusChips — popover closes on click-outside (#1556)", () => {
+describe("StatusChips - popover closes on click-outside (#1556)", () => {
   it("pointerdown outside the wrapper closes an open popover", () => {
     renderWithIntl(<TokenChip tokenBalance={3} />);
     const btn = screen.getByRole("button", { name: /3 protection tokens/i });
@@ -231,7 +231,7 @@ describe("StatusChips — popover closes on click-outside (#1556)", () => {
 
 // ─── Forcing function: popover body equals button aria-label ─────────────────
 
-describe("StatusChips — single-source invariant: popover text === aria-label (#1556)", () => {
+describe("StatusChips - single-source invariant: popover text === aria-label (#1556)", () => {
   /**
    * This test is the forcing function for the single-source convention:
    * the popover body must be exactly the same string used as the button's
@@ -307,7 +307,7 @@ describe("StatusChips — single-source invariant: popover text === aria-label (
 
 // ─── Locale: popover renders in non-English locales (#1556) ──────────────────
 
-describe("StatusChips — popover locale rendering (#1556)", () => {
+describe("StatusChips - popover locale rendering (#1556)", () => {
   it("ja: TokenChip popover renders in Japanese", () => {
     renderJa(<TokenChip tokenBalance={2} />);
     const btn = screen.getByRole("button", { name: /保護トークン/ });

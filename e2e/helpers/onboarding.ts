@@ -13,7 +13,7 @@ import type { Page } from "@playwright/test";
  * 3. If the settings key was empty, also seeds `mobileNav: "bottom"` so the
  *    new-user footer-hidden default applies. This avoids the existing-user
  *    migration in `parseStoredSettings` (which defaults missing `mobileNav` to
- *    `"hamburger"` — intentional for users with pre-#661 records, but wrong for
+ *    `"hamburger"` - intentional for users with pre-#661 records, but wrong for
  *    a brand-new test context).
  *
  * SAFE ALONGSIDE OTHER `addInitScript` CALLS.
@@ -22,7 +22,7 @@ import type { Page } from "@playwright/test";
  * ordering rule: if a test registers a full settings-key overwrite AFTER
  * this helper (i.e. in the test body after a `beforeEach` that called this
  * function), call `addOnboardingPreDismiss` again after the overwrite so the
- * flag is merged into the final value. The helper is idempotent — calling it
+ * flag is merged into the final value. The helper is idempotent - calling it
  * multiple times is harmless.
  *
  * SURVIVAL ACROSS `localStorage.clear()`.
@@ -30,7 +30,7 @@ import type { Page } from "@playwright/test";
  * localStorage mid-test and then calls `page.goto` will re-seed the flag. A
  * `page.evaluate(() => localStorage.clear())` followed by a `page.reload()`
  * (which does NOT trigger `addInitScript` again) is the one case that is NOT
- * automatically covered — those tests must manually re-seed.
+ * automatically covered - those tests must manually re-seed.
  *
  * Specs that need to assert the modal appears (e.g. `e2e/onboarding.spec.ts`)
  * should NOT call this helper.
@@ -48,7 +48,7 @@ export async function addOnboardingPreDismiss(page: Page): Promise<void> {
             existing = parsed as Record<string, unknown>;
           }
         } catch {
-          /* malformed JSON — treat as empty */
+          /* malformed JSON - treat as empty */
         }
       }
       const merged: Record<string, unknown> =
@@ -63,7 +63,7 @@ export async function addOnboardingPreDismiss(page: Page): Promise<void> {
       };
       localStorage.setItem(KEY, JSON.stringify(merged));
     } catch {
-      /* localStorage unavailable — ignore */
+      /* localStorage unavailable - ignore */
     }
   });
 }

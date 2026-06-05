@@ -22,7 +22,7 @@ export function PwaInstallNudge() {
 
   // A single effect increments the per-session visit count and then reads
   // both pieces of state, so `dismissed` and `visitCount` always land in the
-  // same commit — no intermediate render where one is stale.
+  // same commit - no intermediate render where one is stale.
   useEffect(() => {
     if (!sessionStorage.getItem(VISIT_SESSION_KEY)) {
       sessionStorage.setItem(VISIT_SESSION_KEY, "1");

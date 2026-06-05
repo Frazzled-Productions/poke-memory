@@ -2,7 +2,7 @@
  * Component tests for PokedexFilterBar.
  *
  * Covers the sort control (new in #1314) and the existing filter controls at
- * a smoke level — verifying that user interactions call the correct handlers
+ * a smoke level - verifying that user interactions call the correct handlers
  * and that the sort select reflects the current sort state.
  *
  * Existing filter controls (type chips, gen pills, mastery buttons) are also
@@ -94,7 +94,7 @@ function renderBar(
 // Sort control tests
 // ---------------------------------------------------------------------------
 
-describe("PokedexFilterBar — sort control", () => {
+describe("PokedexFilterBar - sort control", () => {
   it("renders a labelled sort select", () => {
     renderBar();
     expect(screen.getByLabelText("Sort by")).toBeInTheDocument();
@@ -239,10 +239,10 @@ describe("PokedexFilterBar - closest-to-mastery InfoButton in Traditional Chines
 });
 
 // ---------------------------------------------------------------------------
-// Existing filter controls — smoke tests to confirm prop wiring is intact
+// Existing filter controls - smoke tests to confirm prop wiring is intact
 // ---------------------------------------------------------------------------
 
-describe("PokedexFilterBar — existing filter controls", () => {
+describe("PokedexFilterBar - existing filter controls", () => {
   it("renders the search input", () => {
     renderBar();
     expect(screen.getByRole("textbox", { name: "Search Pokémon" })).toBeInTheDocument();
@@ -319,10 +319,10 @@ describe("PokedexFilterBar — existing filter controls", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Japanese locale — chrome strings render in Japanese (#1369)
+// Japanese locale - chrome strings render in Japanese (#1369)
 // ---------------------------------------------------------------------------
 
-describe("PokedexFilterBar — Japanese locale", () => {
+describe("PokedexFilterBar - Japanese locale", () => {
   it("renders the sort label in Japanese", () => {
     renderJa(
       <PokedexFilterBar
@@ -394,10 +394,10 @@ describe("PokedexFilterBar — Japanese locale", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Type pill locale coverage (#1389) — type names must localise with appLocale
+// Type pill locale coverage (#1389) - type names must localise with appLocale
 // ---------------------------------------------------------------------------
 
-describe("PokedexFilterBar — type pills in Japanese locale", () => {
+describe("PokedexFilterBar - type pills in Japanese locale", () => {
   it("renders the Fire pill in Japanese as ほのお", () => {
     renderJa(
       <PokedexFilterBar
@@ -433,7 +433,7 @@ describe("PokedexFilterBar — type pills in Japanese locale", () => {
   });
 });
 
-describe("PokedexFilterBar — type pills in Simplified Chinese locale", () => {
+describe("PokedexFilterBar - type pills in Simplified Chinese locale", () => {
   it("renders the Fire pill in Simplified Chinese as 火", () => {
     renderWithIntl(
       <PokedexFilterBar
@@ -449,7 +449,7 @@ describe("PokedexFilterBar — type pills in Simplified Chinese locale", () => {
       { locale: "zh-Hans" },
     );
     // messages/zh-Hans.json types.fire = "火"
-    // Both fire and water are "火" and "水" in zh-Hans — spot-check fire
+    // Both fire and water are "火" and "水" in zh-Hans - spot-check fire
     const typeGroup = screen.getByRole("group", { name: "按属性筛选" });
     expect(typeGroup).toBeInTheDocument();
     // The fire button in zh-Hans is "火"
@@ -459,7 +459,7 @@ describe("PokedexFilterBar — type pills in Simplified Chinese locale", () => {
   });
 });
 
-describe("PokedexFilterBar — type pills in Traditional Chinese locale", () => {
+describe("PokedexFilterBar - type pills in Traditional Chinese locale", () => {
   it("renders the Dragon pill in Traditional Chinese as 龍", () => {
     renderWithIntl(
       <PokedexFilterBar

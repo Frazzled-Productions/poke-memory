@@ -117,7 +117,7 @@ describe("ReviewHeatmap", () => {
 
   // Locale-rendering tests for the date migration (#1456).
   // formatDate always uses en-GB ordering (day-month-year) regardless of
-  // appLocale — verifying the year appears in all four supported locales
+  // appLocale - verifying the year appears in all four supported locales
   // confirms the route through the shared helper is stable.
   describe("date tooltip renders in all supported locales", () => {
     function triggerTooltip() {

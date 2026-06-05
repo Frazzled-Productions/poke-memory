@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * `useProfileStatus` — shared, read-only hook producing the three glanceable
+ * `useProfileStatus` - shared, read-only hook producing the three glanceable
  * profile signals for any surface, per the single-source-of-truth convention.
  *
  * Returns `{ streak, tokenBalance, masteryCount, totalSpecies, masteryPercent }`.
@@ -9,10 +9,10 @@
  * mismatches (mirrors the `useStreakNavState` pattern).
  *
  * Composes:
- *   - `useStreakNavState()` for `streak` and `tokenBalance` — does NOT re-read
+ *   - `useStreakNavState()` for `streak` and `tokenBalance` - does NOT re-read
  *     streak/token storage directly.
  *   - The `KEY_MASTERED_COUNT_BY_LOCALE` localStorage cache (written by
- *     `ReviewSession`) for `masteryCount` — avoids a full ~1025-card parse on
+ *     `ReviewSession`) for `masteryCount` - avoids a full ~1025-card parse on
  *     non-Stats routes (#1234 perf concern).
  *   - `SEED_POKEMON.length` for `totalSpecies` (locale-independent seed count).
  *
@@ -48,7 +48,7 @@ export type ProfileStatus = {
   tokenBalance: number | null;
   /**
    * Number of mastered species for the current `pokemonNameLocale`.
-   * Drawn from the lightweight cache — NOT a full card-array parse.
+   * Drawn from the lightweight cache - NOT a full card-array parse.
    * `null` = not yet loaded.
    */
   masteryCount: number | null;

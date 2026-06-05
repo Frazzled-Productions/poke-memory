@@ -4,7 +4,7 @@ import { renderWithIntl, renderJa, screen } from "@/components/test-utils/render
 import { MilestoneShareButton } from "./MilestoneShareButton";
 import type { Milestone } from "@/lib/journey/milestones";
 
-// Mock the image generator — canvas is not available in jsdom.
+// Mock the image generator - canvas is not available in jsdom.
 vi.mock("@/lib/share/generateShareImage", () => ({
   generateMilestoneShareImage: vi.fn().mockResolvedValue(null),
 }));
@@ -12,7 +12,7 @@ vi.mock("@/lib/share/generateShareImage", () => ({
 import { generateMilestoneShareImage } from "@/lib/share/generateShareImage";
 
 // ---------------------------------------------------------------------------
-// Fixtures — use the flat Milestone shape produced by detectTopMilestone.
+// Fixtures - use the flat Milestone shape produced by detectTopMilestone.
 // ---------------------------------------------------------------------------
 
 const countMilestone: Milestone = {
@@ -41,7 +41,7 @@ const allMasteredMilestone: Milestone = {
 // Null guard
 // ---------------------------------------------------------------------------
 
-describe("MilestoneShareButton — null prop", () => {
+describe("MilestoneShareButton - null prop", () => {
   it("renders nothing when milestone is null", () => {
     const { container } = renderWithIntl(<MilestoneShareButton milestone={null} />);
     expect(container.firstChild).toBeNull();
@@ -52,7 +52,7 @@ describe("MilestoneShareButton — null prop", () => {
 // Rendering
 // ---------------------------------------------------------------------------
 
-describe("MilestoneShareButton — rendering", () => {
+describe("MilestoneShareButton - rendering", () => {
   it("shows the mastery-count label for a count milestone", () => {
     renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
     expect(screen.getByText("100 Pokémon mastered")).toBeInTheDocument();
@@ -93,7 +93,7 @@ describe("MilestoneShareButton — rendering", () => {
 // We use fake timers + fireEvent.click (not userEvent) to keep full control.
 // ---------------------------------------------------------------------------
 
-describe("MilestoneShareButton — clipboard fallback", () => {
+describe("MilestoneShareButton - clipboard fallback", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -108,7 +108,7 @@ describe("MilestoneShareButton — clipboard fallback", () => {
         configurable: true,
       });
     } catch {
-      // ignore — may not be configurable on some jsdom versions
+      // ignore - may not be configurable on some jsdom versions
     }
   });
 
@@ -154,7 +154,7 @@ describe("MilestoneShareButton — clipboard fallback", () => {
 // Web Share API file path (Path 1)
 // ---------------------------------------------------------------------------
 
-describe("MilestoneShareButton — Web Share API file path", () => {
+describe("MilestoneShareButton - Web Share API file path", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     // Remove navigator properties set via Object.defineProperty.
@@ -166,7 +166,7 @@ describe("MilestoneShareButton — Web Share API file path", () => {
           writable: true,
         });
       } catch {
-        // ignore — may not be configurable on all jsdom versions
+        // ignore - may not be configurable on all jsdom versions
       }
     }
   });
@@ -227,7 +227,7 @@ describe("MilestoneShareButton — Web Share API file path", () => {
 
     // share was called exactly once (Path 1 only) and no second sheet was opened.
     expect(shareFn).toHaveBeenCalledOnce();
-    // No status shown — treated as a user cancellation, not an error.
+    // No status shown - treated as a user cancellation, not an error.
     expect(screen.queryByRole("status")).toBeNull();
   });
 
@@ -262,7 +262,7 @@ describe("MilestoneShareButton — Web Share API file path", () => {
 // PNG download fallback (Path 3)
 // ---------------------------------------------------------------------------
 
-describe("MilestoneShareButton — PNG download fallback", () => {
+describe("MilestoneShareButton - PNG download fallback", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -271,7 +271,7 @@ describe("MilestoneShareButton — PNG download fallback", () => {
     const mockBlob = new Blob(["png"], { type: "image/png" });
     vi.mocked(generateMilestoneShareImage).mockResolvedValueOnce(mockBlob);
 
-    // No navigator.share or navigator.canShare — fall through to Path 3.
+    // No navigator.share or navigator.canShare - fall through to Path 3.
     const mockUrl = "blob:mock-url";
     const createObjectURL = vi.fn().mockReturnValue(mockUrl);
     const revokeObjectURL = vi.fn();
@@ -314,10 +314,10 @@ describe("MilestoneShareButton — PNG download fallback", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Locale coverage (mandatory per AGENTS.md — #1393)
+// Locale coverage (mandatory per AGENTS.md - #1393)
 // ---------------------------------------------------------------------------
 
-describe("MilestoneShareButton — Japanese locale (#1393)", () => {
+describe("MilestoneShareButton - Japanese locale (#1393)", () => {
   it("renders the Japanese Share button label in ja locale", () => {
     renderJa(<MilestoneShareButton milestone={countMilestone} />);
     // ja journey.milestoneShare.share = "シェア"

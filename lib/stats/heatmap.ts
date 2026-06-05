@@ -12,7 +12,7 @@ export type HeatmapCell = {
  * index (0 = oldest) and `row` is the weekday index. Empty cells (dates
  * before the user's history begins) are filled with `count: 0`.
  *
- * Weeks are aligned to the user's local week — column N covers Sun…Sat
+ * Weeks are aligned to the user's local week - column N covers Sun…Sat
  * (Sunday-start) when `weekStart === 0`, Mon…Sun when `weekStart === 1`.
  * The default is 0 (Sunday-start) which matches the GitHub layout.
  */

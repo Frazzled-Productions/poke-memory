@@ -191,7 +191,7 @@ describe("pushGradeLog learning_step / step_started_at (#1416)", () => {
     expect(row.step_started_at).toBeNull();
   });
 
-  it("sends null for both when neither field is set (legacy call site — pre-migration entries)", async () => {
+  it("sends null for both when neither field is set (legacy call site - pre-migration entries)", async () => {
     const { client, upsert } = makeClientWithUpsert();
     const entries = [makeEntry(900)]; // no learningStep / stepStartedAt
     await pushGradeLog(client, "u", entries);

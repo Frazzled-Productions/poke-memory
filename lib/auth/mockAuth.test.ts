@@ -6,7 +6,7 @@
  * whenever `NODE_ENV === "production"`, regardless of the flag, and
  * `assertMockAuthNotInProduction()` must throw when both are set together.
  *
- * Runs in the `node` vitest project — pure logic, no DOM.
+ * Runs in the `node` vitest project - pure logic, no DOM.
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
@@ -29,7 +29,7 @@ function setEnv(nodeEnv: string | undefined, flag: string | undefined): void {
   else env[MOCK_AUTH_ENV_VAR] = flag;
 }
 
-describe("isMockAuthEnabled — production unreachability (SECURITY)", () => {
+describe("isMockAuthEnabled - production unreachability (SECURITY)", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     setEnv("test", undefined);
@@ -60,7 +60,7 @@ describe("isMockAuthEnabled — production unreachability (SECURITY)", () => {
     expect(isMockAuthEnabled()).toBe(false);
   });
 
-  it("requires the flag to be exactly \"1\" — other truthy values do not enable it", () => {
+  it("requires the flag to be exactly \"1\" - other truthy values do not enable it", () => {
     for (const value of ["0", "true", "yes", "", "01", " 1"]) {
       setEnv("development", value);
       expect(isMockAuthEnabled()).toBe(false);
@@ -68,7 +68,7 @@ describe("isMockAuthEnabled — production unreachability (SECURITY)", () => {
   });
 });
 
-describe("assertMockAuthNotInProduction — build-time guard (SECURITY)", () => {
+describe("assertMockAuthNotInProduction - build-time guard (SECURITY)", () => {
   afterEach(() => {
     setEnv("test", undefined);
   });
@@ -130,7 +130,7 @@ describe("createMockClient", () => {
       .limit(1);
     expect(error).toBeNull();
     expect(count).toBe(0);
-    // head:true read returns null data — matches PostgREST head-select.
+    // head:true read returns null data - matches PostgREST head-select.
     expect(data).toBeNull();
   });
 

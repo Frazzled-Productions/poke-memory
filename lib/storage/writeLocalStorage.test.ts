@@ -27,9 +27,9 @@ afterEach(() => {
 
 // ─── SSR guard ───────────────────────────────────────────────────────────────
 
-describe("writeLocalStorage — SSR guard (window undefined)", () => {
+describe("writeLocalStorage - SSR guard (window undefined)", () => {
   it("is a no-op when window is undefined", () => {
-    // window is not stubbed in the node environment — this must not throw.
+    // window is not stubbed in the node environment - this must not throw.
     expect(() => writeLocalStorage("k", "v")).not.toThrow();
   });
 
@@ -40,7 +40,7 @@ describe("writeLocalStorage — SSR guard (window undefined)", () => {
   });
 });
 
-describe("writeLocalStorageRaw — SSR guard (window undefined)", () => {
+describe("writeLocalStorageRaw - SSR guard (window undefined)", () => {
   it("is a no-op when window is undefined", () => {
     expect(() => writeLocalStorageRaw("k", "raw-value")).not.toThrow();
   });
@@ -48,7 +48,7 @@ describe("writeLocalStorageRaw — SSR guard (window undefined)", () => {
 
 // ─── Happy path ──────────────────────────────────────────────────────────────
 
-describe("writeLocalStorage — happy path", () => {
+describe("writeLocalStorage - happy path", () => {
   it("serialises the value and stores it under the key", () => {
     const store = makeStorage();
     vi.stubGlobal("window", { localStorage: store, dispatchEvent: vi.fn() });
@@ -85,7 +85,7 @@ describe("writeLocalStorage — happy path", () => {
   });
 });
 
-describe("writeLocalStorageRaw — happy path", () => {
+describe("writeLocalStorageRaw - happy path", () => {
   it("stores a raw string without double-encoding", () => {
     const store = makeStorage();
     vi.stubGlobal("window", { localStorage: store, dispatchEvent: vi.fn() });
@@ -103,7 +103,7 @@ describe("writeLocalStorageRaw — happy path", () => {
 
 // ─── notify: false (default) ─────────────────────────────────────────────────
 
-describe("writeLocalStorage — notify off (default)", () => {
+describe("writeLocalStorage - notify off (default)", () => {
   it("does not dispatch a StorageEvent when notify is not set", () => {
     const store = makeStorage();
     const dispatch = vi.fn();
@@ -123,7 +123,7 @@ describe("writeLocalStorage — notify off (default)", () => {
 
 // ─── notify: true ────────────────────────────────────────────────────────────
 
-describe("writeLocalStorage — notify on", () => {
+describe("writeLocalStorage - notify on", () => {
   it("dispatches a StorageEvent with the key and serialised newValue", () => {
     const store = makeStorage();
     let capturedEvent: StorageEvent | null = null;
@@ -165,14 +165,14 @@ describe("writeLocalStorage — notify on", () => {
         this.newValue = init.newValue ?? null;
       }
     });
-    // Should not throw — dispatch errors are swallowed.
+    // Should not throw - dispatch errors are swallowed.
     expect(() => writeLocalStorage("k", "v", { notify: true })).not.toThrow();
     // The value is still written.
     expect(store.getItem("k")).toBe('"v"');
   });
 });
 
-describe("writeLocalStorageRaw — notify on", () => {
+describe("writeLocalStorageRaw - notify on", () => {
   it("dispatches a StorageEvent with the raw string as newValue", () => {
     const store = makeStorage();
     let capturedEvent: StorageEvent | null = null;
@@ -198,7 +198,7 @@ describe("writeLocalStorageRaw — notify on", () => {
 
 // ─── Quota / write error swallowing ──────────────────────────────────────────
 
-describe("writeLocalStorage — quota error swallowing", () => {
+describe("writeLocalStorage - quota error swallowing", () => {
   it("does not throw when setItem throws QuotaExceededError", () => {
     const brokenStorage = {
       setItem: () => {
@@ -246,7 +246,7 @@ describe("writeLocalStorage — quota error swallowing", () => {
 
 // ─── JSON.stringify failure ───────────────────────────────────────────────────
 
-describe("writeLocalStorage — JSON.stringify failure", () => {
+describe("writeLocalStorage - JSON.stringify failure", () => {
   it("does not throw when JSON.stringify throws (circular reference)", () => {
     const store = makeStorage();
     vi.stubGlobal("window", { localStorage: store, dispatchEvent: vi.fn() });

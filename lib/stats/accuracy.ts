@@ -20,7 +20,7 @@ const DAY_MS = 86_400_000;
 
 /**
  * Build a per-day accuracy series ending on `today` and stretching back
- * `windowDays - 1` days. Pure — no I/O. Days with zero reviews keep
+ * `windowDays - 1` days. Pure - no I/O. Days with zero reviews keep
  * `accuracy: null` so a sparkline can render a gap.
  */
 export function computeAccuracySparkline(
@@ -57,7 +57,7 @@ export function computeAccuracySparkline(
 /**
  * Returns the rolling accuracy over the last `windowDays` ending on
  * `today` (inclusive). Computed as `passes / total` aggregated over the
- * whole window — not the mean of per-day accuracies, so a single-review
+ * whole window - not the mean of per-day accuracies, so a single-review
  * day doesn't get weighted the same as a 100-review day. Returns `null`
  * when the window contains zero reviews.
  */

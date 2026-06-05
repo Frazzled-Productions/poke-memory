@@ -6,7 +6,7 @@ import {
   type DailySummaryRecord,
 } from "./dailySummaryPersistence";
 
-// Fixed synthetic "today" used throughout — deliberately not the real date so
+// Fixed synthetic "today" used throughout - deliberately not the real date so
 // the fixture intent is obvious and git history stays stable over time.
 const TODAY = "2025-01-01";
 
@@ -15,7 +15,7 @@ vi.mock("@/lib/utils/format-date", () => ({
   todayInTimezone: (_tz: string, _now?: Date) => TODAY,
 }));
 
-// Node environment — polyfill localStorage.
+// Node environment - polyfill localStorage.
 const store: Record<string, string> = {};
 const localStorageMock = {
   getItem: (k: string) => store[k] ?? null,

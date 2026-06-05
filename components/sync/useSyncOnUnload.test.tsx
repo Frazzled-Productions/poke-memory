@@ -67,7 +67,7 @@ function firePagehide() {
   window.dispatchEvent(new Event("pagehide"));
 }
 
-describe("useSyncOnUnload — pagehide path (sendBeacon)", () => {
+describe("useSyncOnUnload - pagehide path (sendBeacon)", () => {
   let beacon: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -129,7 +129,7 @@ describe("useSyncOnUnload — pagehide path (sendBeacon)", () => {
   });
 });
 
-describe("useSyncOnUnload — visibilitychange path (fetch+keepalive)", () => {
+describe("useSyncOnUnload - visibilitychange path (fetch+keepalive)", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -173,7 +173,7 @@ describe("useSyncOnUnload — visibilitychange path (fetch+keepalive)", () => {
         }),
       ),
     );
-    // lastPushAt must NOT be stamped on failure — UI would otherwise show
+    // lastPushAt must NOT be stamped on failure - UI would otherwise show
     // "Last synced: just now" while cloud is still inconsistent.
     const call = vi.mocked(saveSyncStatus).mock.calls.at(-1)?.[0];
     expect(call?.lastPushAt).toBe(null);
@@ -237,7 +237,7 @@ describe("useSyncOnUnload — visibilitychange path (fetch+keepalive)", () => {
     //
     // This test simulates the sequence by configuring loadSyncStatus to return
     // the updated value (with structuralSyncError set) AFTER markStructuralSyncError
-    // has run — exactly what a fresh re-read of localStorage would return. If the
+    // has run - exactly what a fresh re-read of localStorage would return. If the
     // production code still spreads the stale `prev` instead of calling
     // loadSyncStatus() after the mark, this assertion fails.
     fetchSpy.mockResolvedValue(
@@ -263,7 +263,7 @@ describe("useSyncOnUnload — visibilitychange path (fetch+keepalive)", () => {
 
     await waitFor(() => expect(vi.mocked(saveSyncStatus)).toHaveBeenCalled());
 
-    // The payload passed to saveSyncStatus must carry the structural code — it
+    // The payload passed to saveSyncStatus must carry the structural code - it
     // came from the fresh loadSyncStatus() re-read, not the stale pre-fetch prev.
     const lastCall = vi.mocked(saveSyncStatus).mock.calls.at(-1)?.[0];
     expect(lastCall?.structuralSyncError).toBe("42P10");
@@ -287,7 +287,7 @@ describe("useSyncOnUnload — visibilitychange path (fetch+keepalive)", () => {
 // OS kills the page before the 500 ms debounce or React cleanup runs, the cards
 // survive in the persisted queue for useOnlineReconnectSync on the next open.
 
-describe("useSyncOnUnload — pre-beacon queue persistence (#1288)", () => {
+describe("useSyncOnUnload - pre-beacon queue persistence (#1288)", () => {
   let beacon: ReturnType<typeof vi.fn>;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
@@ -380,7 +380,7 @@ describe("useSyncOnUnload — pre-beacon queue persistence (#1288)", () => {
 // a beacon or fetch during a QA session. These tests verify the null short-circuit
 // holds for both transport paths.
 
-describe("useSyncOnUnload — superuser write-guard (null client/userId)", () => {
+describe("useSyncOnUnload - superuser write-guard (null client/userId)", () => {
   let beacon: ReturnType<typeof vi.fn>;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
@@ -440,7 +440,7 @@ describe("useSyncOnUnload — superuser write-guard (null client/userId)", () =>
 
     act(() => fireVisibilityHidden());
 
-    // Settle any microtasks — the hook should not have started an async path.
+    // Settle any microtasks - the hook should not have started an async path.
     await Promise.resolve();
 
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -464,7 +464,7 @@ describe("useSyncOnUnload — superuser write-guard (null client/userId)", () =>
 // When a push fails, useSyncOnUnload should register the Background Sync tag
 // so the service worker can replay the queue after the app is closed.
 
-describe("useSyncOnUnload — Background Sync registration (#1054)", () => {
+describe("useSyncOnUnload - Background Sync registration (#1054)", () => {
   let beacon: ReturnType<typeof vi.fn>;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 

@@ -12,11 +12,11 @@ import {
 } from "@/lib/sprites/sizes";
 
 describe("sprite size constants", () => {
-  it("PRACTICE_SPRITE_SIZE is 320 — must match flip-card <Image width> in PokemonCard/EvolutionCard", () => {
+  it("PRACTICE_SPRITE_SIZE is 320 - must match flip-card <Image width> in PokemonCard/EvolutionCard", () => {
     expect(PRACTICE_SPRITE_SIZE).toBe(320);
   });
 
-  it("PICKER_SPRITE_SIZE is 150 — must match SpritePicker <Image width>", () => {
+  it("PICKER_SPRITE_SIZE is 150 - must match SpritePicker <Image width>", () => {
     expect(PICKER_SPRITE_SIZE).toBe(150);
   });
 

@@ -5,12 +5,12 @@
  * the Pasture. The ranking uses a composite score: higher reps first, then
  * nearest (earliest) due date to break ties.
  *
- * Only name-type cards are considered — the strip shows one entry per species,
+ * Only name-type cards are considered - the strip shows one entry per species,
  * consistent with the pasture itself. The locale parameter ensures we rank
  * cards in the user's current locale, matching the filterMastered convention.
  *
  * When forceAllMastered is true (superuser pretendAllMastered flag), every
- * species is already mastered so there are no arrivals — the function returns
+ * species is already mastered so there are no arrivals - the function returns
  * an empty array and the UI renders an all-caught-up state.
  */
 
@@ -24,7 +24,7 @@ import type { AppLocale } from "@/i18n/locales";
 const REVERSE_ID_OFFSET = 2_000_000;
 
 /**
- * A minimal descriptor for a "next arrival" species — only the fields the
+ * A minimal descriptor for a "next arrival" species - only the fields the
  * strip component needs to render a sprite and name.
  */
 export type NextArrival = {
@@ -40,9 +40,9 @@ export type NextArrival = {
  * Returns up to `limit` upcoming species sorted by proximity to mastery:
  *
  * 1. Must be a name-type card in the given locale.
- * 2. Must have been seen at least once (firstSeen !== null) — "reviewed/seen".
+ * 2. Must have been seen at least once (firstSeen !== null) - "reviewed/seen".
  * 3. Must not already be mastered (honours masteryRepetitions threshold).
- * 4. Must not have a mastered reverse card — once both legs are mastered the
+ * 4. Must not have a mastered reverse card - once both legs are mastered the
  *    species is in the Pasture, not the arrivals list.
  *
  * Sort order: highest reps first; for equal reps, earliest dueDate first
@@ -85,7 +85,7 @@ export function nextArrivals(
     // Skip already-mastered name cards.
     if (isMastered(card.state, masteryRepetitions)) continue;
 
-    // Skip species where the reverse is also mastered — that species is fully
+    // Skip species where the reverse is also mastered - that species is fully
     // mastered and belongs in the Pasture, not the arrivals list.
     if (masteredReverseSpecies.has(card.id)) continue;
 

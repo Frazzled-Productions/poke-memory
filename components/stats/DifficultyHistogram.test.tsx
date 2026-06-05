@@ -20,7 +20,7 @@ import { DifficultyHistogram } from "@/components/stats/DifficultyHistogram";
 import type { DifficultyBucket } from "@/lib/stats/difficulty-histogram";
 
 // ---------------------------------------------------------------------------
-// Recharts mock — lightweight stubs so the component can render in jsdom.
+// Recharts mock - lightweight stubs so the component can render in jsdom.
 // The Tooltip mock fires its content prop so TooltipBody runs.
 // ---------------------------------------------------------------------------
 

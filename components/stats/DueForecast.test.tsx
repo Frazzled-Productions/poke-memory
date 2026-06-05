@@ -172,7 +172,7 @@ describe("DueForecast", () => {
     // Open via click (lastInteraction = "click")
     fireEvent.click(bar);
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
-    // Simulate mouse leaving the bar — should NOT dismiss
+    // Simulate mouse leaving the bar - should NOT dismiss
     fireEvent.mouseLeave(bar);
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
   });
@@ -185,7 +185,7 @@ describe("DueForecast", () => {
     // Simulate the WebKit synthetic-event sequence: mouseenter fires first
     fireEvent.mouseEnter(bar);
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
-    // Then click fires — without the guard, this would close the tooltip
+    // Then click fires - without the guard, this would close the tooltip
     fireEvent.click(bar);
     // Tooltip should remain open
     expect(screen.getByRole("tooltip")).toBeInTheDocument();

@@ -8,14 +8,14 @@ import { writeLocalStorage } from "@/lib/storage/writeLocalStorage";
  * so `AutoSyncOnChange.handleSettings` can compute a top-level-key diff and
  * send only the keys that actually changed. Without this, every settings
  * save pushes the whole JSONB blob and `merge_user_settings`'s `||` overlay
- * silently last-write-wins every key — meaning a device that has slightly
+ * silently last-write-wins every key - meaning a device that has slightly
  * stale settings would clobber another device's per-field changes on the
  * next unrelated save (#583).
  *
  * Stored under `poke-memory:settings:*` so `clearLocalProgress` preserves it
  * (the snapshot is a sync-tracking concern, not user progress). If the
  * snapshot is missing / corrupted, the diff falls back to "everything" and
- * the next push behaves the same as before this change — safe regression
+ * the next push behaves the same as before this change - safe regression
  * floor.
  */
 
@@ -30,11 +30,11 @@ export function saveLastPushedSettings(settings: UserSettings): void {
 }
 
 // Keys that are device-local and must never cross the sync boundary in either
-// direction. appVisitCount is guarded by sessionStorage — it increments once
+// direction. appVisitCount is guarded by sessionStorage - it increments once
 // per device session and is only meaningful on the device that recorded it.
 // Syncing it would inflate the PWA nudge threshold on other devices.
 // activePokemonNameLocale is the per-device active selection from the enrolled
-// learning set (#1568) — each device tracks its own active language independently;
+// learning set (#1568) - each device tracks its own active language independently;
 // syncing it would clobber deliberate per-device choices (e.g. practising
 // Japanese on a phone while using Chinese on a tablet).
 export const DEVICE_LOCAL_KEYS: ReadonlySet<keyof UserSettings> =
@@ -61,7 +61,7 @@ export function preserveDeviceLocalKeys(
  *   1. `merge_user_settings`'s `||` JSONB overlay merges at the same depth,
  *      so a deeper diff would be wasted precision.
  *   2. Settings sub-objects (onboarding, practiceScope, favouriteTheme,
- *      earnedBadges) are written atomically by their UI code — the consumer
+ *      earnedBadges) are written atomically by their UI code - the consumer
  *      always replaces the whole sub-object, not individual keys inside it.
  *
  * Returns the full `next` (minus device-local keys) when `prev` is null

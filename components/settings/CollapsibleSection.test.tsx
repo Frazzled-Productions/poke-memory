@@ -138,7 +138,7 @@ describe("CollapsibleSection", () => {
 
     unmount();
 
-    // Re-mount — state should survive across the unmount/remount cycle.
+    // Re-mount - state should survive across the unmount/remount cycle.
     render(
       <CollapsibleSection sectionId="test-section" heading="Test Section">
         <p>Content</p>
@@ -176,7 +176,7 @@ describe("CollapsibleSection", () => {
     expect(window.localStorage.getItem(STORAGE_KEY)).toBe("1");
   });
 
-  // transientOpen — search-driven expansion that must NOT pollute localStorage
+  // transientOpen - search-driven expansion that must NOT pollute localStorage
   describe("transientOpen", () => {
     it("expands the section when transientOpen is true", () => {
       render(
@@ -197,7 +197,7 @@ describe("CollapsibleSection", () => {
         </CollapsibleSection>,
       );
 
-      // localStorage must remain untouched — no entry should exist.
+      // localStorage must remain untouched - no entry should exist.
       expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
     });
 

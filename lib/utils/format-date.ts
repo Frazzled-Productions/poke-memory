@@ -13,7 +13,7 @@ export type DateFormat = "iso" | "dmy" | "mdy" | "dmy-year" | "mdy-year";
  * Format a `Date` as a UTC `YYYY-MM-DD` string.
  *
  * Canonical single implementation of the `.toISOString().slice(0, 10)` idiom
- * so callers don't hand-roll it. UTC-based — no local-timezone drift.
+ * so callers don't hand-roll it. UTC-based - no local-timezone drift.
  */
 export function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -32,17 +32,17 @@ export function todayInTimezone(tz: string, now: Date = new Date()): string {
   try {
     return new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(now);
   } catch {
-    // Unknown / invalid timezone — fall back to UTC.
+    // Unknown / invalid timezone - fall back to UTC.
     return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(now);
   }
 }
 
 /**
- * Long-form date — weekday + day + month, always English (en-GB locale).
+ * Long-form date - weekday + day + month, always English (en-GB locale).
  * Example outputs:
  *   dmy → "Tue, 14 May"   (day-first)
  *   mdy → "Tue, May 14"   (month-first)
- *   iso → "Tue, 2026-05-14" (ISO order — year included for clarity)
+ *   iso → "Tue, 2026-05-14" (ISO order - year included for clarity)
  *
  * `tz` is accepted so the rendered date can be aligned to the user's timezone
  * when the ISO string was produced by todayInTimezone / other UTC-safe paths.
@@ -62,7 +62,7 @@ export function formatDate(iso: string, fmt: DateFormat, tz: string): string {
     }
     // dmy-year / mdy-year: short-month + year, no weekday.
     // Matches the output of toLocaleDateString("en-GB", { day, month: "short", year }),
-    // which existing call sites produced — centralised here to remove raw Intl calls
+    // which existing call sites produced - centralised here to remove raw Intl calls
     // from components (#1456).
     if (fmt === "dmy-year") {
       return new Intl.DateTimeFormat("en-GB", {
@@ -90,7 +90,7 @@ export function formatDate(iso: string, fmt: DateFormat, tz: string): string {
       // en-GB naturally orders day before month.
       return new Intl.DateTimeFormat("en-GB", opts).format(d);
     }
-    // mdy — en-US orders month before day.
+    // mdy - en-US orders month before day.
     return new Intl.DateTimeFormat("en-US", { ...opts, month: "short" }).format(d);
   } catch {
     return iso;
@@ -105,7 +105,7 @@ export function formatDate(iso: string, fmt: DateFormat, tz: string): string {
  */
 export function formatShortDate(iso: string, fmt: DateFormat): string {
   if (fmt === "iso") return iso;
-  // Parse fields from the ISO string directly — no Date constructor needed
+  // Parse fields from the ISO string directly - no Date constructor needed
   // and no timezone ambiguity.
   const [year, month, day] = iso.split("-");
   if (!year || !month || !day) return iso;
@@ -121,12 +121,12 @@ export function formatShortDate(iso: string, fmt: DateFormat): string {
  *   - If month comes before day → 'mdy'
  *   - Otherwise → 'dmy'
  *
- * Safe to call on the server — falls back to 'dmy' when Intl or navigator
+ * Safe to call on the server - falls back to 'dmy' when Intl or navigator
  * is unavailable.
  */
 export function detectDateFormat(): DateFormat {
   try {
-    // Use a fixed unambiguous date: 2001-02-03 (month=2, day=3 — unambiguous
+    // Use a fixed unambiguous date: 2001-02-03 (month=2, day=3 - unambiguous
     // because 3 cannot be a month, so the first number in DD/MM vs MM/DD output
     // tells us the order).
     const probe = new Date("2001-02-03T12:00:00Z");

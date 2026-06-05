@@ -18,7 +18,7 @@ export function isMobileProject(testInfo: TestInfo): boolean {
  *
  * - Desktop (chromium, desktop-webkit): the header
  *   `<nav aria-label="Main navigation">` row.
- * - Mobile (mobile-safari, mobile-chrome — bottom tab bar default): the fixed
+ * - Mobile (mobile-safari, mobile-chrome - bottom tab bar default): the fixed
  *   `<nav aria-label="Mobile tab navigation">` bottom bar.
  *
  * Use this helper whenever a spec needs to click a nav link and must work

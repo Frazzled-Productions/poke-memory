@@ -23,7 +23,7 @@ type Props = {
   points: readonly AccuracyPoint[];
   /**
    * Rolling 7-day aggregate accuracy (0..1). `null` when the window has
-   * no recorded reviews — in that case the headline reads "—".
+   * no recorded reviews - in that case the headline reads " - ".
    */
   rolling7d: number | null;
   /**
@@ -125,7 +125,7 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
         >
           {t("heading")}
         </h2>
-        {/* Window selector — mutually exclusive, so tablist/tab/aria-selected */}
+        {/* Window selector - mutually exclusive, so tablist/tab/aria-selected */}
         <div
           role="tablist"
           aria-label={t("windowAriaLabel")}

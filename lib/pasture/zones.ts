@@ -77,7 +77,7 @@ function gridSlots(
 
 export const HABITAT_ZONES: readonly HabitatZone[] = [
   // -------------------------------------------------------------------
-  // Grassland — 80 species → 90 slots, clustered in the ground band of
+  // Grassland - 80 species → 90 slots, clustered in the ground band of
   // the illustrated biome scene. Five horizontal sub-bands sit at the
   // depths of the SVG terrain layers (distant hills → mid hills →
   // foreground ground), so sprites stand on terrain instead of floating
@@ -116,7 +116,7 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
   },
 
   // -------------------------------------------------------------------
-  // Forest — 71 species → 80 slots clustered along the forest floor.
+  // Forest - 71 species → 80 slots clustered along the forest floor.
   // Bands map to ForestBiome layers: deepest = behind trunks, front =
   // by the fallen log and ferns.
   // -------------------------------------------------------------------
@@ -153,7 +153,7 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
   },
 
   // -------------------------------------------------------------------
-  // Sea — 40 species → 44 slots distributed through the water column
+  // Sea - 40 species → 44 slots distributed through the water column
   // (surface → mid → reef → deep). Sea is full-vertical, not ground-band.
   // -------------------------------------------------------------------
   {
@@ -184,7 +184,7 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
   },
 
   // -------------------------------------------------------------------
-  // Cave — 29 species → 35 slots clustered on the cavern floor with one
+  // Cave - 29 species → 35 slots clustered on the cavern floor with one
   // band near the crystal hollow further back.
   // -------------------------------------------------------------------
   {
@@ -215,7 +215,7 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
   },
 
   // -------------------------------------------------------------------
-  // Mountain — 45 species → 50 slots along the descending slopes and
+  // Mountain - 45 species → 50 slots along the descending slopes and
   // foreground ridge of MountainBiome.
   // -------------------------------------------------------------------
   {
@@ -246,7 +246,7 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
   },
 
   // -------------------------------------------------------------------
-  // Urban — 37 species → 45 slots along the sidewalk and street strip
+  // Urban - 37 species → 45 slots along the sidewalk and street strip
   // of UrbanBiome, with one back row near the skyline base.
   // -------------------------------------------------------------------
   {
@@ -277,7 +277,7 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
   },
 
   // -------------------------------------------------------------------
-  // Waters-edge — 47 species → 55 slots distributed along the far bank,
+  // Waters-edge - 47 species → 55 slots distributed along the far bank,
   // shallow marsh water, lily-pad row, and front shore of WatersEdgeBiome.
   // -------------------------------------------------------------------
   {
@@ -308,7 +308,7 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
   },
 
   // -------------------------------------------------------------------
-  // Rough-terrain — 27 species → 35 slots along the lower mesa ledges
+  // Rough-terrain - 27 species → 35 slots along the lower mesa ledges
   // and cracked-earth foreground of RoughTerrainBiome.
   // -------------------------------------------------------------------
   {
@@ -339,7 +339,7 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
   },
 
   // -------------------------------------------------------------------
-  // Rare — 10 species → 14 slots clustered on the Sanctuary floor with
+  // Rare - 10 species → 14 slots clustered on the Sanctuary floor with
   // one row near the shrine.
   // -------------------------------------------------------------------
   {
@@ -370,7 +370,7 @@ export const HABITAT_ZONES: readonly HabitatZone[] = [
   },
 
   // -------------------------------------------------------------------
-  // Unknown / null habitat — 639 species → 240 slots across 7 tightly
+  // Unknown / null habitat - 639 species → 240 slots across 7 tightly
   // stacked ground bands matching the layered hills of WildlandsBiome.
   // Overflow wraps modularly; with 240 slots, the first ~37% of mastery
   // covers without visual overlap.

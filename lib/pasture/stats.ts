@@ -13,7 +13,7 @@ import type { NameReviewCard } from "@/lib/review/session";
 const BIOME_TOTALS: Readonly<Record<string, number>> = (() => {
   const counts: Record<string, number> = {};
   for (const p of SEED_POKEMON) {
-    // Only default forms count toward the species total — regional variants and
+    // Only default forms count toward the species total - regional variants and
     // alternate formes are not independent species in the Pokédex sense.
     if (!p.isDefaultForm) continue;
     const habitat = p.habitat ?? "unknown";
@@ -31,7 +31,7 @@ export type BiomeStats = {
   capturedPercent: number;
   /**
    * Name of the most recently mastered Pokémon in this biome, or null if the
-   * biome has no mastered species. Sort key is `state.firstSeen` — an
+   * biome has no mastered species. Sort key is `state.firstSeen` - an
    * acceptable approximation noted in the issue; the precise mastery-transition
    * date is more expensive to derive.
    */

@@ -17,7 +17,7 @@ import { addOnboardingPreDismiss } from "./helpers/onboarding";
 //      find it and the practice page shows a Reveal button.
 //   3. Override localStorage.setItem for the session key to throw a
 //      QuotaExceededError, so saveSessionLS returns { ok: false, reason: "quota" }.
-//   4. Grade the card — saveSession calls saveSessionLS, which throws, and
+//   4. Grade the card - saveSession calls saveSessionLS, which throws, and
 //      notifySaveResult({ ok: false }) sets quotaExceeded=true, surfacing the banner.
 // ---------------------------------------------------------------------------
 
@@ -142,7 +142,7 @@ test.describe("StorageQuotaBanner (#766)", () => {
       return;
     }
 
-    // Reveal and grade — this triggers saveSession, which fails with a quota error.
+    // Reveal and grade - this triggers saveSession, which fails with a quota error.
     await reveal.click();
     const gradeGroup = page.getByRole("group", { name: "Grade your answer" });
     await expect(gradeGroup).toBeVisible();

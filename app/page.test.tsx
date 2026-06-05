@@ -1,7 +1,7 @@
 /**
  * Smoke tests for the Practice (Home) page.
  *
- * Covers the wide-viewport layout changes added in #1061 — specifically the
+ * Covers the wide-viewport layout changes added in #1061 - specifically the
  * three-column grid wrapper and the PracticeSidebar slot added to app/page.tsx.
  * The heavy child components are stubbed so the render is fast and focused on
  * the shell structure that the diff-coverage gate flags.
@@ -10,7 +10,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mocks — declared before the component import so vi.mock hoisting applies.
+// Mocks - declared before the component import so vi.mock hoisting applies.
 // ---------------------------------------------------------------------------
 
 vi.mock("next/image", () => ({
@@ -63,7 +63,7 @@ function pendingSearchParams() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("Practice page (Home) — layout shell", () => {
+describe("Practice page (Home) - layout shell", () => {
   it("renders the ReviewSession and PracticeSidebar slots", () => {
     render(<Home searchParams={pendingSearchParams()} />);
 
@@ -81,7 +81,7 @@ describe("Practice page (Home) — layout shell", () => {
   it("renders the PracticeSidebar inside the wide-viewport grid column", () => {
     const { container } = render(<Home searchParams={pendingSearchParams()} />);
 
-    // The sidebar wrapper uses `hidden lg:block` — it is always in the DOM.
+    // The sidebar wrapper uses `hidden lg:block` - it is always in the DOM.
     const sidebarWrapper = container.querySelector(".hidden.lg\\:block");
     expect(sidebarWrapper).not.toBeNull();
 

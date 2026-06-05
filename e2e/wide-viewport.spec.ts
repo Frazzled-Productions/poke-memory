@@ -3,7 +3,7 @@
  *
  * These tests verify that the large-breakpoint layouts are present and
  * render correctly on desktop. They run only on chromium (desktop viewport)
- * — the mobile-safari project uses an iPhone 14 viewport where the lg:
+ * - the mobile-safari project uses an iPhone 14 viewport where the lg:
  * layouts are not active, so the sidebar and multi-column grid are absent
  * by design.
  */
@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
 });
 
-test.describe("Practice page — session-progress sidebar (lg: layout)", () => {
+test.describe("Practice page - session-progress sidebar (lg: layout)", () => {
   // Only meaningful at desktop width (lg: ≥ 1024px). The chromium project
   // uses Desktop Chrome (1280px), so this runs as expected.
   test("session progress sidebar is visible on desktop", async ({ page }, testInfo) => {
@@ -52,7 +52,7 @@ test.describe("Practice page — session-progress sidebar (lg: layout)", () => {
     // sprite-picker, or a multiple-choice card depending on the deterministic
     // per-day shuffle; `practiceReadyLocator` matches every variant so a
     // calendar roll cannot reintroduce the #1370 date-dependent flake.
-    // 30 s: this is the narrowest path (mobile-safari only — see the
+    // 30 s: this is the narrowest path (mobile-safari only - see the
     // test.skip above), which combines the post-#1234 doubled card-set
     // hydration cost AND the #1260 next-intl Suspense boundary AND the
     // narrow-viewport-specific layout work. Other mobile-safari practice
@@ -66,7 +66,7 @@ test.describe("Practice page — session-progress sidebar (lg: layout)", () => {
   });
 });
 
-test.describe("Stats page — two-column layout (lg: layout)", () => {
+test.describe("Stats page - two-column layout (lg: layout)", () => {
   test("Accuracy and Activity sections both render", async ({ page }) => {
     await page.goto("/stats");
 
@@ -83,7 +83,7 @@ test.describe("Stats page — two-column layout (lg: layout)", () => {
   });
 });
 
-test.describe("Pokédex grid — xl: column layout", () => {
+test.describe("Pokédex grid - xl: column layout", () => {
   test("Pokédex grid renders with generation section headings", async ({ page }) => {
     await page.goto("/pokedex");
 
@@ -93,7 +93,7 @@ test.describe("Pokédex grid — xl: column layout", () => {
     ).toBeVisible({ timeout: 10_000 });
 
     // At least one generation section should be present. Use `.first()` because
-    // the regex /Generation I/ also matches Generation II, III, IV and IX —
+    // the regex /Generation I/ also matches Generation II, III, IV and IX - 
     // strict mode would otherwise fail on multiple resolved elements.
     await expect(
       page.getByRole("heading", { level: 2, name: /Generation I/ }).first(),

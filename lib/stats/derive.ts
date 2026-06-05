@@ -17,7 +17,7 @@ import type { AppLocale } from "@/i18n/locales";
 
 export type CardClass = "locked" | "learning" | "mastered";
 
-/** Minimum consecutive successful reviews for mastery — mastery also requires interval >= MASTERY_INTERVAL_DAYS. */
+/** Minimum consecutive successful reviews for mastery - mastery also requires interval >= MASTERY_INTERVAL_DAYS. */
 export const MASTERY_REPETITIONS = 3;
 /** A card is "mastered" once its projected review interval reaches this many days. */
 export const MASTERY_INTERVAL_DAYS = 21;
@@ -29,7 +29,7 @@ export const MASTERY_INTERVAL_DAYS = 21;
 /**
  * Minimum number of graduated reviews before a card is eligible for the
  * "Struggling cards" list. Graduated reviews (state.reps) are set only on
- * graduation or lapse — not on in-step learning touches — so a value of 3
+ * graduation or lapse - not on in-step learning touches - so a value of 3
  * means the card has completed at least three full FSRS review cycles. At
  * that point FSRS difficulty has stabilised enough to be a meaningful signal.
  * Matching MASTERY_REPETITIONS is intentional: a card needs the same number
@@ -44,14 +44,14 @@ export const STRUGGLING_MIN_REPS = 3;
  * a sustained run of Hard/Again responses because each "Good" pushes
  * difficulty back toward 5. A difficulty of 7+ puts the card in the "hard"
  * learning-step band (≥ 8) or approaching it, and corresponds to significantly
- * elevated scheduling cost — the card warrants attention even without a
+ * elevated scheduling cost - the card warrants attention even without a
  * recorded lapse.
  */
 export const STRUGGLING_DIFFICULTY_CUTOFF = 7;
 
 export function isMastered(state: ReviewState, masteryRepetitions = MASTERY_REPETITIONS): boolean {
   // FSRS swap: reps replaces repetitions, scheduledDays replaces interval.
-  // Mastery semantics are unchanged — N successful reviews and the next
+  // Mastery semantics are unchanged - N successful reviews and the next
   // scheduled interval is ≥ MASTERY_INTERVAL_DAYS.
   return state.reps >= masteryRepetitions && state.scheduledDays >= MASTERY_INTERVAL_DAYS;
 }
@@ -126,7 +126,7 @@ export type DueForecastDay = {
 };
 
 export type TypeStats = {
-  /** Lowercase canonical type slug (`fire`, `water`, ...) — same vocabulary as `POKEMON_TYPES`. */
+  /** Lowercase canonical type slug (`fire`, `water`, ...) - same vocabulary as `POKEMON_TYPES`. */
   type: string;
   total: number;       // name cards whose `types[]` includes this type
   introduced: number;
@@ -142,7 +142,7 @@ export type StatsResult = {
   /**
    * 14-entry array, today first then 13 future days. Day 0 ("today") is the
    * same population as the queue: introduced cards whose dueDate is <= today
-   * and that haven't been reviewed today yet — i.e. cards that will appear
+   * and that haven't been reviewed today yet - i.e. cards that will appear
    * for review right now. Days 1..13 are exact dueDate matches on that
    * future date, so the forecast surfaces clustering ahead.
    */
@@ -177,7 +177,7 @@ export const DUE_FORECAST_DAYS = 14;
 // ---------------------------------------------------------------------------
 
 /**
- * Compute all stats from the full card array. Pure — no I/O.
+ * Compute all stats from the full card array. Pure - no I/O.
  * `today` MUST be a UTC YYYY-MM-DD string (use `todayString(now)` with no
  * timezone argument from session.ts). Card `dueDate` and `lastReview` fields
  * are stored as UTC dates by the FSRS scheduler, so passing a user-timezone
@@ -200,7 +200,7 @@ export const DUE_FORECAST_DAYS = 14;
  * Since #1234 the function accepts the **full** mixed card array (all card
  * types), not just name cards. It filters internally and builds the set of
  * species IDs whose reverse card also passes the mastery gate before counting
- * a species as mastered — matching the rule in `filterMastered` and
+ * a species as mastered - matching the rule in `filterMastered` and
  * `masteredSpeciesIds`. Callers that previously filtered to name cards first
  * should now pass the full array; the stats figures will then correctly reflect
  * the both-legs-required mastery rule.
@@ -262,7 +262,7 @@ export function computeStats(
   let learning   = 0;
   let mastered   = 0;
 
-  // Cards eligible for "struggling" — introduced name cards only.
+  // Cards eligible for "struggling" - introduced name cards only.
   const introducedCards: NameReviewCard[] = [];
 
   for (const card of nameCards) {
@@ -292,7 +292,7 @@ export function computeStats(
     // that never-reviewed cards (which carry a default dueDate of today and
     // flow through the new-card queue, not the review queue) don't inflate
     // the chart. Day 0 ("today") additionally excludes anything already
-    // reviewed today — matches the queue policy in `buildSessionQueues`.
+    // reviewed today - matches the queue policy in `buildSessionQueues`.
     if (state.lastReview !== null) {
       if (state.dueDate <= today && state.lastReview !== today) {
         forecastCounts[0]++;
@@ -317,7 +317,7 @@ export function computeStats(
 
     // Per-type tallies. A dual-type card increments both buckets, so the
     // sum across types exceeds `totalCards` (≈1025 × ~1.7 types/card).
-    // Unknown / typo'd types are silently ignored — the buckets are
+    // Unknown / typo'd types are silently ignored - the buckets are
     // pre-seeded only with `POKEMON_TYPES`.
     for (const t of card.types) {
       const total = typeTotal.get(t);
@@ -328,7 +328,7 @@ export function computeStats(
     }
   }
 
-  // Build perGeneration array — all 9 gens always present.
+  // Build perGeneration array - all 9 gens always present.
   const perGeneration: GenerationStats[] = GEN_RANGES.map((range, idx) => ({
     gen:        range.gen,
     name:       range.name,
@@ -337,7 +337,7 @@ export function computeStats(
     mastered:   genMastered[idx],
   }));
 
-  // Build struggling list: cards that pass both gates —
+  // Build struggling list: cards that pass both gates - 
   //   1. Minimum reviews: state.reps >= STRUGGLING_MIN_REPS (enough FSRS cycles
   //      for difficulty to have stabilised; filters out freshly-introduced cards).
   //   2. Genuine-struggle signal: state.lapses > 0 (lapsed at least once) OR
@@ -345,7 +345,7 @@ export function computeStats(
   //      difficulty even without an explicit lapse).
   // Within the qualifying set, sort by FSRS difficulty descending (highest
   // difficulty first), tie-broken by fewer reps then lower id. The exported
-  // StrugglingCard keeps the legacy `easeFactor` / `repetitions` field names —
+  // StrugglingCard keeps the legacy `easeFactor` / `repetitions` field names - 
   // they are derived from the FSRS state so existing UI consumers continue to
   // work. (`easeFactor` here is the inverse of FSRS difficulty, mapped onto the
   // old SM-2 1.3..2.5 range.)

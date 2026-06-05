@@ -184,7 +184,7 @@ function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[]
 }
 
 // ---------------------------------------------------------------------------
-// ForcePullSection — recovery button visible only when signed in
+// ForcePullSection - recovery button visible only when signed in
 // ---------------------------------------------------------------------------
 
 type ForcePullStatus = "idle" | "pulling" | "success" | "error";
@@ -383,7 +383,7 @@ export default function StatsPage() {
   useEffect(() => {
     async function load() {
       // Load settings first so the protection pass can evaluate `today` in
-      // the user's timezone — the `streakDates` set is populated using the
+      // the user's timezone - the `streakDates` set is populated using the
       // user's local tz (see ReviewSession), so running protection against
       // UTC would cause off-by-one boundary errors at high UTC offsets.
       const settings = loadSettings();
@@ -439,7 +439,7 @@ export default function StatsPage() {
 
       // Retroactive badge award (#420). If a user already meets a badge's
       // criterion when the feature ships (or after a sync pull), award it
-      // silently — no toast. The reveal toast only fires on the grade event
+      // silently - no toast. The reveal toast only fires on the grade event
       // that crosses the threshold (`ReviewSession.handleGrade`). We never
       // award retroactively while a superuser flag is on; the catalog-wide
       // overlay on Journey covers that QA case without touching persisted state.
@@ -528,7 +528,7 @@ export default function StatsPage() {
 
   useProvideDashboardSnapshotInput(snapshotInput);
 
-  // Read the memoised snapshot from context — computed once per unique input set (#1139).
+  // Read the memoised snapshot from context - computed once per unique input set (#1139).
   const snapshot: DashboardSnapshot | null = useDashboardSnapshot();
 
   const reviewCharts =
@@ -649,7 +649,7 @@ export default function StatsPage() {
 
             </div>
 
-            {/* Progress section — per-game mastery breakdown, full width on all breakpoints */}
+            {/* Progress section - per-game mastery breakdown, full width on all breakpoints */}
             {perGame.length > 0 && (
               <section aria-labelledby="progress-section-heading" className="flex flex-col gap-6">
                 <SectionHeading>
@@ -670,7 +670,7 @@ export default function StatsPage() {
               />
             )}
 
-            {/* Scheduling section — full width on all breakpoints */}
+            {/* Scheduling section - full width on all breakpoints */}
             <section aria-labelledby="scheduling-section-heading" className="flex flex-col gap-6">
               <SectionHeading>
                 <span id="scheduling-section-heading">{t("schedulingHeading")}</span>

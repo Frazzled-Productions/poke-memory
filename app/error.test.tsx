@@ -16,7 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mock next/link — no App Router context available in jsdom.
+// Mock next/link - no App Router context available in jsdom.
 // ---------------------------------------------------------------------------
 
 vi.mock("next/link", () => ({
@@ -26,7 +26,7 @@ vi.mock("next/link", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock clearLocalProgress — avoid real IndexedDB/localStorage I/O in tests.
+// Mock clearLocalProgress - avoid real IndexedDB/localStorage I/O in tests.
 // ---------------------------------------------------------------------------
 
 vi.mock("@/lib/storage/reset", () => ({
@@ -34,7 +34,7 @@ vi.mock("@/lib/storage/reset", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock useAuth — default to guest (user: null) so most tests exercise the
+// Mock useAuth - default to guest (user: null) so most tests exercise the
 // guest path where the reset button is visible.
 // ---------------------------------------------------------------------------
 
@@ -74,7 +74,7 @@ afterEach(() => {
   mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
 });
 
-describe("Error page — online variant", () => {
+describe("Error page - online variant", () => {
   it("renders the generic red-box heading when online", () => {
     setOnline(true);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
@@ -121,7 +121,7 @@ describe("Error page — online variant", () => {
   });
 });
 
-describe("Error page — offline variant", () => {
+describe("Error page - offline variant", () => {
   it("renders the offline heading when navigator.onLine is false", () => {
     setOnline(false);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
@@ -218,7 +218,7 @@ describe("Error page — offline variant", () => {
   });
 });
 
-describe("Error page — Japanese locale", () => {
+describe("Error page - Japanese locale", () => {
   it("renders the error heading in Japanese", () => {
     setOnline(true);
     renderJa(<ErrorPage error={fakeError} reset={noop} />);
@@ -270,7 +270,7 @@ describe("Error page — Japanese locale", () => {
   });
 });
 
-describe("Error page — Simplified Chinese locale", () => {
+describe("Error page - Simplified Chinese locale", () => {
   it("renders the error heading in Simplified Chinese", () => {
     setOnline(true);
     renderZhHans(<ErrorPage error={fakeError} reset={noop} />);
@@ -292,7 +292,7 @@ describe("Error page — Simplified Chinese locale", () => {
   });
 });
 
-describe("Error page — Traditional Chinese locale", () => {
+describe("Error page - Traditional Chinese locale", () => {
   it("renders the error heading in Traditional Chinese", () => {
     setOnline(true);
     renderZhHant(<ErrorPage error={fakeError} reset={noop} />);
@@ -314,7 +314,7 @@ describe("Error page — Traditional Chinese locale", () => {
   });
 });
 
-describe("Error page — Reset local practice data button (guest user)", () => {
+describe("Error page - Reset local practice data button (guest user)", () => {
   it("renders the Reset local practice data button when online and guest", () => {
     mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
     setOnline(true);
@@ -389,7 +389,7 @@ describe("Error page — Reset local practice data button (guest user)", () => {
   });
 });
 
-describe("Error page — signed-in user (reset button hidden)", () => {
+describe("Error page - signed-in user (reset button hidden)", () => {
   it("does NOT render the Reset local practice data button for a signed-in user", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockUseAuth.mockReturnValue({ user: { id: "abc" } as any, loading: false, supabase: null });
@@ -413,7 +413,7 @@ describe("Error page — signed-in user (reset button hidden)", () => {
   });
 });
 
-describe("Error page — auth loading (indeterminate state)", () => {
+describe("Error page - auth loading (indeterminate state)", () => {
   it("renders NEITHER the reset button NOR the signed-in hint while auth is loading", () => {
     // While auth resolves (~100–500 ms), a signed-in user must not see the
     // destructive guest-only reset button. Neither UI branch should render

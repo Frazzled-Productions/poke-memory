@@ -3,7 +3,7 @@
 import { useDocumentTitleBadge } from "./useDocumentTitleBadge";
 
 /**
- * Mounts the document-title due-count badge hook. Renders nothing — its only
+ * Mounts the document-title due-count badge hook. Renders nothing - its only
  * role is keeping the browser tab title in sync with the number of cards due
  * today, by prepending a `(N)` prefix when cards are due and clearing it at
  * zero.

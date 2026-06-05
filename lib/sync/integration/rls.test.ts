@@ -2,9 +2,9 @@
  * Integration test: Row Level Security on card_reviews.
  *
  * Verifies the core RLS invariants:
- *   SELECT — user sees only their own rows.
- *   INSERT  — user cannot insert a row with another user's user_id.
- *   UPDATE  — user cannot update another user's rows.
+ *   SELECT - user sees only their own rows.
+ *   INSERT - user cannot insert a row with another user's user_id.
+ *   UPDATE - user cannot update another user's rows.
  *
  * All SQL is executed via direct `pg` queries with `set_config('request.jwt.claims', ...)`
  * inside transactions to simulate `auth.uid()`. Each test rolls back at the end.
@@ -161,7 +161,7 @@ describe("RLS policies (integration)", () => {
       return res.rows;
     });
 
-    // RLS returns an empty set — no error, but user B's row is invisible.
+    // RLS returns an empty set - no error, but user B's row is invisible.
     expect(rows).toHaveLength(0);
   });
 
@@ -191,7 +191,7 @@ describe("RLS policies (integration)", () => {
     // Seed a row for user B.
     await insertAsUser(adminPool, USER_B, "202");
 
-    // Try to update user B's row as user A — RLS silently matches zero rows.
+    // Try to update user B's row as user A - RLS silently matches zero rows.
     await asUser(USER_A, async (c) => {
       await c.query(
         `UPDATE card_reviews

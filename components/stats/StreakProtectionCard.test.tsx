@@ -50,7 +50,7 @@ describe("StreakProtectionCard", () => {
     expect(
       screen.getByRole("heading", { name: "Streak protection" }),
     ).toBeInTheDocument();
-    // 0 + "protection tokens" — verify via the explicit aria-label.
+    // 0 + "protection tokens" - verify via the explicit aria-label.
     expect(screen.getByLabelText("0 protection tokens")).toBeInTheDocument();
   });
 
@@ -133,7 +133,7 @@ describe("StreakProtectionCard", () => {
     expect(screen.getByText(/\(max\)/)).toBeInTheDocument();
   });
 
-  it("dispatches SETTINGS_SAVED_EVENT after saveSettings — guard for the refresh test", () => {
+  it("dispatches SETTINGS_SAVED_EVENT after saveSettings - guard for the refresh test", () => {
     const handler = vi.fn();
     window.addEventListener(SETTINGS_SAVED_EVENT, handler);
     saveSettings(loadSettings());
@@ -165,7 +165,7 @@ describe("StreakProtectionCard", () => {
     const eventsSection = screen.getByTestId("streak-protection-recent-events");
     expect(eventsSection).toBeInTheDocument();
     expect(eventsSection).toHaveTextContent("Recent protection");
-    // Most recent first — earned-and-spent then spent then earned.
+    // Most recent first - earned-and-spent then spent then earned.
     expect(eventsSection).toHaveTextContent("Earned + used");
     expect(eventsSection).toHaveTextContent("Used");
     expect(eventsSection).toHaveTextContent("Earned");
@@ -281,7 +281,7 @@ describe("StreakProtectionCard", () => {
 // Multi-day bridge rendering (#1399)
 // ---------------------------------------------------------------------------
 
-describe("StreakProtectionCard — multi-day bridge (#1399)", () => {
+describe("StreakProtectionCard - multi-day bridge (#1399)", () => {
   it("renders correctly after a 3-day bridge: balance, last-spend date, and spend event", () => {
     // Simulate the state after applyProtectionStep bridged a 3-day absence.
     // User had balance=3, missed days 05-02, 05-03, 05-04, opened on 05-05.
@@ -349,10 +349,10 @@ describe("StreakProtectionCard — multi-day bridge (#1399)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Locale coverage (mandatory per AGENTS.md — #1393)
+// Locale coverage (mandatory per AGENTS.md - #1393)
 // ---------------------------------------------------------------------------
 
-describe("StreakProtectionCard — Japanese locale (#1393)", () => {
+describe("StreakProtectionCard - Japanese locale (#1393)", () => {
   it("renders the Japanese heading in ja locale", () => {
     renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     // ja stats.streakProtection.heading = "連続記録の保護"
@@ -364,21 +364,21 @@ describe("StreakProtectionCard — Japanese locale (#1393)", () => {
   it("renders the Japanese token aria-label for zero balance in ja locale", () => {
     renderJa(<StreakProtectionCard dateFormat="iso" timezone="UTC" />);
     // ja stats.streakProtection.tokensRemaining (0 tokens) = "0 トークン残り"
-    // The aria-label is produced by the ICU plural — verify the section rendered correctly.
+    // The aria-label is produced by the ICU plural - verify the section rendered correctly.
     expect(
       screen.getByRole("heading", { name: "連続記録の保護" }),
     ).toBeInTheDocument();
-    // The token count region is present — check via the labelledby pattern.
+    // The token count region is present - check via the labelledby pattern.
     // The token label "0 トークン残り" is the aria-label on the count element.
     expect(screen.getByLabelText("0 トークン残り")).toBeInTheDocument();
   });
 });
 
 // ---------------------------------------------------------------------------
-// tokenCount ICU plural — count=1 and count>1 (Fix 2, #1408 review)
+// tokenCount ICU plural - count=1 and count>1 (Fix 2, #1408 review)
 // ---------------------------------------------------------------------------
 
-describe("StreakProtectionCard — tokenCount ICU plural (#1408)", () => {
+describe("StreakProtectionCard - tokenCount ICU plural (#1408)", () => {
   it("en: count=1 renders the singular 'token' label", () => {
     window.localStorage.setItem(
       STORAGE_KEY,

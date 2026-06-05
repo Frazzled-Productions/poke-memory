@@ -49,7 +49,7 @@ type SuperuserContextValue = {
   // Per-behaviour flags. Features should branch on these to decide whether
   // to render "fully mastered" state.
   flags: SuperuserFlags;
-  // True when any flag is on — sync paths check this to suppress writes.
+  // True when any flag is on - sync paths check this to suppress writes.
   anyFlagOn: boolean;
   // Toggle an individual flag. Resolves once any required exit cleanup
   // (cloud→local overwrite or guest reset prompt) has completed.
@@ -86,9 +86,9 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
 
   // Force-pull cloud over local on the "any flag was on → no flags on" transition.
   // Signed-in users get authoritative cloud state restored. Guests get a destructive
-  // confirm (there is no cloud to fall back to). After the cards path settles —
+  // confirm (there is no cloud to fall back to). After the cards path settles - 
   // and only when card state is trusted (pull succeeded, or guest confirmed the
-  // wipe) — re-validate the favourite theme so a cheat-selected one cannot
+  // wipe) - re-validate the favourite theme so a cheat-selected one cannot
   // survive the flag-off transition (#428). On the un-trusted paths (pull threw,
   // guest pressed Cancel) the local session still reflects cheat-inflated state,
   // so a mastery check would spuriously return earned; `FavouriteThemeProvider`'s
@@ -108,11 +108,11 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
       try {
         // QA-repudiate path: pull every user-visible cloud-backed table and
         // overwrite local. Cards are required (the historical contract); the
-        // other four are best-effort — a network blip on any of them leaves
+        // other four are best-effort - a network blip on any of them leaves
         // that table's local value untouched. Mirrors the recovery shape in
         // #573's ForcePullSection so both repudiation paths converge.
         // Each auxiliary pull logs on failure so a degraded cleanup is visible
-        // to QA — silent .catch(() => null) was the original pattern but masks
+        // to QA - silent .catch(() => null) was the original pattern but masks
         // partial-failure repudiation. Cards stay required: if pullSession
         // throws, the outer catch keeps cardsTrusted=false.
         const warn = (table: string) => (err: unknown) => {
@@ -142,7 +142,7 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
             // DEFAULT_SETTINGS ensures the stored blob is always complete.
             saveSettings({ ...DEFAULT_SETTINGS, ...pulledSettings.settings });
           }
-          // Regional prefs overlay runs ONLY if the JSONB pull succeeded —
+          // Regional prefs overlay runs ONLY if the JSONB pull succeeded - 
           // otherwise the loadSettings() base is the QA-dirty local snapshot,
           // and overlaying timezone/dateFormat onto it would persist all the
           // other QA-drifted fields. Degrade-together with the JSONB pull is
@@ -186,7 +186,7 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
           });
           // Synthetic StorageEvent: same-tab subscribers (useLocalStorageKey)
           // only re-render on this event. Dispatch ONLY when we actually wrote
-          // fresh data — pullSession returns null on error (not "no rows"; an
+          // fresh data - pullSession returns null on error (not "no rows"; an
           // empty dataset returns []), so dispatching in the null branch would
           // falsely signal freshness to subscribers while local QA-tainted
           // state is still in place.
@@ -196,8 +196,8 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
           cardsTrusted = true;
         } else {
           // pullSession returned null: the pull failed (network error / Supabase
-          // unreachable). Leave local state as-is — overwriting with no cloud
-          // data would be worse — and warn so QA can see the cleanup degraded.
+          // unreachable). Leave local state as-is - overwriting with no cloud
+          // data would be worse - and warn so QA can see the cleanup degraded.
           // cardsTrusted stays false so the favourite-theme re-validation below
           // skips, matching the catch branch's conservative posture.
           console.warn("[superuser] pullSession returned null during exit cleanup; local state preserved (cleanup degraded)");
@@ -227,7 +227,7 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
     const cards = (await loadSession())?.cards ?? [];
     if (!isFavouriteEarned(favourite, cards, settings.masteryRepetitions)) {
       // `saveFavourite` → `saveSettings` already fires `SETTINGS_SAVED_EVENT`,
-      // which `FavouriteThemeProvider` listens for — no synthetic StorageEvent
+      // which `FavouriteThemeProvider` listens for - no synthetic StorageEvent
       // is needed for same-tab refresh.
       saveFavourite(null);
     }

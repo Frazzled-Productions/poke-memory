@@ -27,7 +27,7 @@ vi.mock("@/lib/storage/keys", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// reload spy — jsdom's window.location is non-configurable, so we replace
+// reload spy - jsdom's window.location is non-configurable, so we replace
 // the property descriptor with a writable one before spying (#1520).
 // ---------------------------------------------------------------------------
 
@@ -50,7 +50,7 @@ afterEach(() => {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("useSessionReloadListeners — cross-tab storage event", () => {
+describe("useSessionReloadListeners - cross-tab storage event", () => {
   it("reloads when storage event fires with KEY_SETTINGS key", () => {
     renderHook(() => useSessionReloadListeners("en"));
 
@@ -72,7 +72,7 @@ describe("useSessionReloadListeners — cross-tab storage event", () => {
   });
 });
 
-describe("useSessionReloadListeners — same-tab locale switch", () => {
+describe("useSessionReloadListeners - same-tab locale switch", () => {
   it("reloads when SETTINGS_SAVED_EVENT fires and locale changed", () => {
     // Current locale is "en"; settings now return "ja".
     mockLoadSettings.mockReturnValue({ activePokemonNameLocale: "ja" });
@@ -93,7 +93,7 @@ describe("useSessionReloadListeners — same-tab locale switch", () => {
   });
 });
 
-describe("useSessionReloadListeners — sync pull applied", () => {
+describe("useSessionReloadListeners - sync pull applied", () => {
   it("reloads when SYNC_PULL_APPLIED_EVENT fires", () => {
     renderHook(() => useSessionReloadListeners("en"));
 
@@ -103,7 +103,7 @@ describe("useSessionReloadListeners — sync pull applied", () => {
   });
 });
 
-describe("useSessionReloadListeners — cleanup on unmount", () => {
+describe("useSessionReloadListeners - cleanup on unmount", () => {
   it("removes all listeners on unmount so no reload fires after unmount", () => {
     const { unmount } = renderHook(() => useSessionReloadListeners("en"));
 

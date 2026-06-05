@@ -5,7 +5,7 @@
  *
  * Uses supabase.auth.linkIdentity() which is currently in beta.
  * The no-beta-auth rule has been knowingly overridden by the repo owner for
- * this feature — see PR #362.
+ * this feature - see PR #362.
  *
  * Placed in components/auth/ to sit alongside AuthButton, the other
  * auth-surface component.
@@ -36,7 +36,7 @@ type Props = {
 
 /**
  * Returns the set of OAuth providers already linked to this user.
- * `user.identities` is undefined when the user has no linked identities —
+ * `user.identities` is undefined when the user has no linked identities - 
  * treat that as an empty list.
  */
 function linkedProviders(user: User): Set<AuthProvider> {

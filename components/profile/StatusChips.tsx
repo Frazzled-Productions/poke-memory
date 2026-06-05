@@ -1,21 +1,21 @@
 "use client";
 
 /**
- * Shared profile-status chips — the single source of truth for how the streak,
+ * Shared profile-status chips - the single source of truth for how the streak,
  * protection-token balance, and mastery figures render. Used by BOTH
  * `ProfileStatusBar` (the slim band below `<Nav>`) and `StreakBadge` (the
  * Practice screen, where the band is hidden on mobile so these chips surface
  * inline instead). Per the AGENTS.md single-source convention, do not re-inline
- * these chips at a new call site — import them here.
+ * these chips at a new call site - import them here.
  *
  * All three render as matching rounded-pill chips with a small lucide-style SVG
- * icon (consistent with the nav / bottom-tab icon language — no emoji, whose
+ * icon (consistent with the nav / bottom-tab icon language - no emoji, whose
  * size and glyph vary across platforms). Streak and token share the amber
  * "streak family" tone used by `StreakProtectionCard`; mastery is emerald.
  *
  * Interactive popover (#1556): each chip is a tappable button. Tapping (touch)
  * or hovering/focusing (desktop) opens a small popover with the chip's full
- * meaning — the same string already used as the chip's `aria-label`. The
+ * meaning - the same string already used as the chip's `aria-label`. The
  * popover body is computed ONCE from the same source so wording cannot diverge.
  *
  * Pure presentational: each takes already-resolved values as props (no storage
@@ -100,11 +100,11 @@ const TONE_CLASS = {
  * A small floating tooltip/popover anchored below a pill chip. Used by all
  * three chip variants (streak, token, mastery) to expose the chip's full
  * meaning to sighted users. The `description` prop MUST be exactly the same
- * string used as the chip button's `aria-label` — the ChipButton enforces this
+ * string used as the chip button's `aria-label` - the ChipButton enforces this
  * by passing the same resolved string to both.
  *
  * Dismissal: click/tap outside, Escape key, or Tab-away (blur when focus
- * leaves the wrapperRef element). Does NOT trap focus — it is informational
+ * leaves the wrapperRef element). Does NOT trap focus - it is informational
  * only, so the user can tab past naturally.
  */
 function PillPopover({
@@ -161,7 +161,7 @@ function PillPopover({
   );
 }
 
-// ─── ChipButton — the interactive wrapper ─────────────────────────────────────
+// ─── ChipButton - the interactive wrapper ─────────────────────────────────────
 
 /**
  * Wraps any chip in an interactive button that shows a `PillPopover` on:
@@ -170,7 +170,7 @@ function PillPopover({
  *   - Keyboard focus (desktop)
  *
  * The `ariaLabel` prop is used for BOTH the button's `aria-label` AND the
- * popover body — computed once so the two sources cannot diverge. This is the
+ * popover body - computed once so the two sources cannot diverge. This is the
  * forcing function that satisfies the single-source requirement (#1556).
  *
  * The wrapper `<span>` is `relative` so the popover anchors correctly and
@@ -312,7 +312,7 @@ export function StreakChip({ streak }: { streak: number }) {
 }
 
 /**
- * Protection-token chip. Renders nothing below 1 — a zero-token chip is noise.
+ * Protection-token chip. Renders nothing below 1 - a zero-token chip is noise.
  * Shows just the count; the shield icon carries the meaning.
  */
 export function TokenChip({ tokenBalance }: { tokenBalance: number }) {
@@ -331,7 +331,7 @@ export function TokenChip({ tokenBalance }: { tokenBalance: number }) {
 }
 
 /**
- * Mastery chip — always rendered (including the zero state, so a new user learns
+ * Mastery chip - always rendered (including the zero state, so a new user learns
  * the goal exists; the accessible label is encouraging). Shows the terse
  * percentage; the full "X of Y mastered" description lives in the aria-label
  * and the popover.

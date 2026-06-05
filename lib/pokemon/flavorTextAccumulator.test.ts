@@ -51,10 +51,10 @@ describe("normalizeFlavorText", () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractFlavorTexts — edge cases
+// extractFlavorTexts - edge cases
 // ---------------------------------------------------------------------------
 
-describe("extractFlavorTexts — empty / null inputs", () => {
+describe("extractFlavorTexts - empty / null inputs", () => {
   it("returns [] for null input", () => {
     expect(extractFlavorTexts(null)).toEqual([]);
   });
@@ -77,10 +77,10 @@ describe("extractFlavorTexts — empty / null inputs", () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractFlavorTexts — accumulation (the AC-targeted behaviour)
+// extractFlavorTexts - accumulation (the AC-targeted behaviour)
 // ---------------------------------------------------------------------------
 
-describe("extractFlavorTexts — dedup-accumulate", () => {
+describe("extractFlavorTexts - dedup-accumulate", () => {
   it("keeps one entry per distinct text, with its version", () => {
     const entries = [
       { flavor_text: "Sleeps a lot.", language: { name: "en" }, version: { name: "red" } },
@@ -147,17 +147,17 @@ describe("extractFlavorTexts — dedup-accumulate", () => {
       { flavor_text: "Text A.", language: { name: "en" } },
     ];
     const result = extractFlavorTexts(entries);
-    // Second entry has no slug — should not add a blank slug or crash.
+    // Second entry has no slug - should not add a blank slug or crash.
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ text: "Text A.", versions: ["red"] });
   });
 });
 
 // ---------------------------------------------------------------------------
-// extractFlavorTexts — FLAVOR_TEXTS_MAX cap
+// extractFlavorTexts - FLAVOR_TEXTS_MAX cap
 // ---------------------------------------------------------------------------
 
-describe("extractFlavorTexts — FLAVOR_TEXTS_MAX cap", () => {
+describe("extractFlavorTexts - FLAVOR_TEXTS_MAX cap", () => {
   it(`stops at ${FLAVOR_TEXTS_MAX} distinct entries`, () => {
     // Create FLAVOR_TEXTS_MAX + 2 distinct texts.
     const entries = Array.from({ length: FLAVOR_TEXTS_MAX + 2 }, (_, i) => ({
@@ -169,7 +169,7 @@ describe("extractFlavorTexts — FLAVOR_TEXTS_MAX cap", () => {
     expect(result).toHaveLength(FLAVOR_TEXTS_MAX);
   });
 
-  it("cap is on distinct texts — many identical entries don't consume the cap", () => {
+  it("cap is on distinct texts - many identical entries don't consume the cap", () => {
     // All entries share the same text, plus one genuinely distinct entry.
     const repeated = Array.from({ length: FLAVOR_TEXTS_MAX + 5 }, (_, i) => ({
       flavor_text: "Shared text.",
@@ -182,7 +182,7 @@ describe("extractFlavorTexts — FLAVOR_TEXTS_MAX cap", () => {
       version: { name: "game-last" },
     };
     const result = extractFlavorTexts([...repeated, distinct]);
-    // Both texts should be present — repeated entries share 1 slot.
+    // Both texts should be present - repeated entries share 1 slot.
     expect(result).toHaveLength(2);
     expect(result[0].text).toBe("Shared text.");
     expect(result[1].text).toBe("Distinct text.");

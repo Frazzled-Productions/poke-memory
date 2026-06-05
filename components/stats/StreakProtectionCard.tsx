@@ -133,7 +133,7 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
         </div>
         {/* Streak line removed: ProfileStatusBar carries streak on all routes
             (#1490 de-dup). The full token balance, earn rate, and event history
-            below are kept — those are Stats-specific context. */}
+            below are kept - those are Stats-specific context. */}
         <p className={cn("text-xs", mutedText)}>
           {t("earnDescription", { earnInterval: EARN_INTERVAL_DAYS, maxBalance: MAX_BALANCE })}
         </p>

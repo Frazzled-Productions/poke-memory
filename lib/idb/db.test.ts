@@ -3,7 +3,7 @@
  *
  * Placement rationale: the test file lives in lib/ so the "node" vitest
  * project picks it up. The node setup file (vitest.setup.node.ts) installs
- * fake-indexeddb/auto, which polyfills IndexedDB on globalThis — no DOM is
+ * fake-indexeddb/auto, which polyfills IndexedDB on globalThis - no DOM is
  * required and no new dev dependency is needed.
  *
  * Error-flip tests use vi.doMock to replace the idb module so we can simulate
@@ -139,10 +139,10 @@ describe("idbGet / idbSet / idbDelete (happy path)", () => {
 
 // ─── server-side guard (typeof window === "undefined") ───────────────────────
 
-describe("server-side guard — window undefined", () => {
+describe("server-side guard - window undefined", () => {
   beforeEach(async () => {
     vi.resetModules();
-    // Do NOT stub window — the node environment has no window global.
+    // Do NOT stub window - the node environment has no window global.
     vi.unstubAllGlobals();
   });
 
@@ -173,7 +173,7 @@ describe("server-side guard — window undefined", () => {
 // vi.doMock must be called BEFORE the dynamic import so the module loader
 // picks up the mock when resolving the idb dependency.
 
-describe("openAppDb failure — permanent-disable behaviour", () => {
+describe("openAppDb failure - permanent-disable behaviour", () => {
   beforeEach(() => {
     vi.resetModules();
     stubWindow();
@@ -209,7 +209,7 @@ describe("openAppDb failure — permanent-disable behaviour", () => {
   });
 });
 
-describe("idbGet failure — error-flip on db.get throw", () => {
+describe("idbGet failure - error-flip on db.get throw", () => {
   beforeEach(() => {
     vi.resetModules();
     stubWindow();
@@ -252,7 +252,7 @@ describe("idbGet failure — error-flip on db.get throw", () => {
   });
 });
 
-describe("idbSet failure — error-flip on db.put throw", () => {
+describe("idbSet failure - error-flip on db.put throw", () => {
   beforeEach(() => {
     vi.resetModules();
     stubWindow();
@@ -293,7 +293,7 @@ describe("idbSet failure — error-flip on db.put throw", () => {
   });
 });
 
-describe("idbDelete failure — error-flip on db.delete throw", () => {
+describe("idbDelete failure - error-flip on db.delete throw", () => {
   beforeEach(() => {
     vi.resetModules();
     stubWindow();
@@ -349,7 +349,7 @@ describe("__resetForTests", () => {
     await openAppDb().catch(() => {});
     expect(isIdbAvailable()).toBe(false);
 
-    // Now reset — isIdbAvailable should return true again.
+    // Now reset - isIdbAvailable should return true again.
     await __resetForTests();
     expect(isIdbAvailable()).toBe(true);
   });
@@ -424,7 +424,7 @@ describe("migrateFromLocalStorage (happy path)", () => {
     expect(store.has(GRADE_LOG_LS_KEY)).toBe(false);
   });
 
-  it("is idempotent — a second call does not overwrite IDB data", async () => {
+  it("is idempotent - a second call does not overwrite IDB data", async () => {
     store.set(SESSION_LS_KEY, "first-session");
     const { migrateFromLocalStorage, idbGet } = await import("./db");
     await migrateFromLocalStorage();
@@ -452,7 +452,7 @@ describe("migrateFromLocalStorage (happy path)", () => {
   });
 });
 
-describe("migrateFromLocalStorage — short-circuits when idbAvailable is false", () => {
+describe("migrateFromLocalStorage - short-circuits when idbAvailable is false", () => {
   beforeEach(() => {
     vi.resetModules();
     stubWindow();

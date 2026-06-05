@@ -1,5 +1,5 @@
 /**
- * Locale tests for ScopeControl — type pill names (#1389).
+ * Locale tests for ScopeControl - type pill names (#1389).
  *
  * Verifies that the type-filter pill labels localise correctly when the
  * app locale changes. The ScopeControl panel starts closed; tests click
@@ -18,7 +18,7 @@ import { ScopeControl } from "@/components/review/ScopeControl";
 import { EMPTY_SCOPE } from "@/lib/review/scope";
 
 // ---------------------------------------------------------------------------
-// Helper — render ScopeControl and open the scope panel
+// Helper - render ScopeControl and open the scope panel
 // ---------------------------------------------------------------------------
 
 /** Label for the scope toggle button per locale. */
@@ -42,10 +42,10 @@ async function renderAndOpen(locale: "en" | "ja" | "zh-Hans" | "zh-Hant" = "en")
 }
 
 // ---------------------------------------------------------------------------
-// English — baseline
+// English - baseline
 // ---------------------------------------------------------------------------
 
-describe("ScopeControl — type pills in English locale", () => {
+describe("ScopeControl - type pills in English locale", () => {
   it("renders the Fire pill as 'Fire'", async () => {
     await renderAndOpen("en");
     // The type section contains pills with localised names.
@@ -60,10 +60,10 @@ describe("ScopeControl — type pills in English locale", () => {
 });
 
 // ---------------------------------------------------------------------------
-// English — scope section legends
+// English - scope section legends
 // ---------------------------------------------------------------------------
 
-describe("ScopeControl — scope section legends in English locale (#1393)", () => {
+describe("ScopeControl - scope section legends in English locale (#1393)", () => {
   it("renders the Generation section legend as 'Generation'", async () => {
     await renderAndOpen("en");
     // practice.scope.generation = "Generation"
@@ -90,7 +90,7 @@ describe("ScopeControl — scope section legends in English locale (#1393)", () 
 // Japanese
 // ---------------------------------------------------------------------------
 
-describe("ScopeControl — type pills in Japanese locale", () => {
+describe("ScopeControl - type pills in Japanese locale", () => {
   it("renders the Fire pill as ほのお", async () => {
     await renderAndOpen("ja");
     // messages/ja.json types.fire = "ほのお"
@@ -104,7 +104,7 @@ describe("ScopeControl — type pills in Japanese locale", () => {
   });
 });
 
-describe("ScopeControl — scope section legends in Japanese locale (#1393)", () => {
+describe("ScopeControl - scope section legends in Japanese locale (#1393)", () => {
   it("renders the Japanese Scope label in ja locale", async () => {
     await renderAndOpen("ja");
     // ja practice.scope.label = "スコープ"
@@ -128,7 +128,7 @@ describe("ScopeControl — scope section legends in Japanese locale (#1393)", ()
 // Simplified Chinese
 // ---------------------------------------------------------------------------
 
-describe("ScopeControl — type pills in Simplified Chinese locale", () => {
+describe("ScopeControl - type pills in Simplified Chinese locale", () => {
   it("renders the Steel pill as 钢", async () => {
     await renderAndOpen("zh-Hans");
     // messages/zh-Hans.json types.steel = "钢"
@@ -136,7 +136,7 @@ describe("ScopeControl — type pills in Simplified Chinese locale", () => {
   });
 });
 
-describe("ScopeControl — scope section legends in Simplified Chinese locale (#1393)", () => {
+describe("ScopeControl - scope section legends in Simplified Chinese locale (#1393)", () => {
   it("renders the zh-Hans Generation legend", async () => {
     await renderAndOpen("zh-Hans");
     // messages/zh-Hans.json practice.scope.generation = "世代"
@@ -160,7 +160,7 @@ describe("ScopeControl — scope section legends in Simplified Chinese locale (#
 // Traditional Chinese
 // ---------------------------------------------------------------------------
 
-describe("ScopeControl — type pills in Traditional Chinese locale", () => {
+describe("ScopeControl - type pills in Traditional Chinese locale", () => {
   it("renders the Ghost pill as 幽靈", async () => {
     await renderAndOpen("zh-Hant");
     // messages/zh-Hant.json types.ghost = "幽靈"
@@ -168,7 +168,7 @@ describe("ScopeControl — type pills in Traditional Chinese locale", () => {
   });
 });
 
-describe("ScopeControl — scope section legends in Traditional Chinese locale (#1393)", () => {
+describe("ScopeControl - scope section legends in Traditional Chinese locale (#1393)", () => {
   it("renders the zh-Hant Generation legend", async () => {
     await renderAndOpen("zh-Hant");
     // messages/zh-Hant.json practice.scope.generation = "世代"

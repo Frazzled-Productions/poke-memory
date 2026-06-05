@@ -45,7 +45,7 @@ export default function Error({
   }, []);
 
   // Escape hatch for a persisted-state crash (#1506): clear local practice
-  // data and reload. This is intentionally guest-safe only — signed-in users
+  // data and reload. This is intentionally guest-safe only - signed-in users
   // should use Settings > Reset to avoid leaving cloud data out of sync.
   const handleResetLocalData = useCallback(async () => {
     if (!window.confirm(t("resetLocalDataConfirm"))) return;

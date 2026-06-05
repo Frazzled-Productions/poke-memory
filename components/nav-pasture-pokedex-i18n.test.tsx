@@ -11,7 +11,7 @@
  *   - PokemonDetailDisclosure: locked vs. mastered state
  *
  * (PwaInstallNudge locale coverage lives in its own file,
- *  components/onboarding/PwaInstallNudge.i18n.test.tsx — see #1464.)
+ *  components/onboarding/PwaInstallNudge.i18n.test.tsx - see #1464.)
  *
  * Refs: AGENTS.md "Mandatory coverage rules", closes #1434.
  */
@@ -27,7 +27,7 @@ import {
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// NavDrawer — locale coverage
+// NavDrawer - locale coverage
 // ---------------------------------------------------------------------------
 
 // Mocks for NavDrawer
@@ -67,7 +67,7 @@ vi.mock("@/components/auth/AuthButton", () => ({
 
 import { NavDrawer } from "@/components/NavDrawer";
 
-describe("NavDrawer — locale coverage", () => {
+describe("NavDrawer - locale coverage", () => {
   beforeEach(() => {
     mockPathname.value = "/";
   });
@@ -128,7 +128,7 @@ describe("NavDrawer — locale coverage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// NextArrivalsStrip — locale coverage (state in + out)
+// NextArrivalsStrip - locale coverage (state in + out)
 // ---------------------------------------------------------------------------
 
 vi.mock("next/image", () => ({
@@ -178,7 +178,7 @@ function makeArrival(id: number, name: string): NextArrival {
   };
 }
 
-describe("NextArrivalsStrip — locale coverage", () => {
+describe("NextArrivalsStrip - locale coverage", () => {
   it("en: empty state shows all-caught-up message", () => {
     renderWithIntl(<NextArrivalsStrip arrivals={[]} />);
     expect(
@@ -229,7 +229,7 @@ describe("NextArrivalsStrip — locale coverage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// BadgeGallery — locale coverage
+// BadgeGallery - locale coverage
 // ---------------------------------------------------------------------------
 
 import { BadgeGallery } from "@/components/badges/BadgeGallery";
@@ -243,7 +243,7 @@ const STUB_BADGE: BadgeDefinition = {
   criterion: { kind: "all-mastered", speciesIds: [74, 95] },
 };
 
-describe("BadgeGallery — locale coverage", () => {
+describe("BadgeGallery - locale coverage", () => {
   it("en: shows 'Gym badges' heading and no-badge message", () => {
     renderWithIntl(<BadgeGallery earnedBadges={[]} />);
     expect(
@@ -287,12 +287,12 @@ describe("BadgeGallery — locale coverage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// StorageQuotaBanner — locale coverage
+// StorageQuotaBanner - locale coverage
 // ---------------------------------------------------------------------------
 
 import { StorageQuotaBanner } from "@/components/review/StorageQuotaBanner";
 
-describe("StorageQuotaBanner — locale coverage", () => {
+describe("StorageQuotaBanner - locale coverage", () => {
   it("en: renders the banner text and dismiss button", () => {
     renderWithIntl(<StorageQuotaBanner onDismiss={vi.fn()} />);
     expect(
@@ -326,7 +326,7 @@ describe("StorageQuotaBanner — locale coverage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// PokemonDetailDisclosure — locale coverage (locked vs. mastered)
+// PokemonDetailDisclosure - locale coverage (locked vs. mastered)
 // ---------------------------------------------------------------------------
 
 const { mockDetailCardClass } = vi.hoisted(() => ({
@@ -388,12 +388,12 @@ function makeDetailPokemon(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
   };
 }
 
-describe("PokemonDetailDisclosure — locale coverage", () => {
+describe("PokemonDetailDisclosure - locale coverage", () => {
   beforeEach(() => {
     mockDetailCardClass.value = "mastered";
   });
 
-  it("en: mastered — renders Base Stats heading and localised type", () => {
+  it("en: mastered - renders Base Stats heading and localised type", () => {
     renderWithIntl(<PokemonDetailDisclosure pokemon={makeDetailPokemon()} />);
     expect(
       screen.getByRole("heading", { level: 2, name: "Base Stats" }),
@@ -402,7 +402,7 @@ describe("PokemonDetailDisclosure — locale coverage", () => {
     expect(screen.getByText("Grass")).toBeInTheDocument();
   });
 
-  it("en: locked — renders locked hint text", () => {
+  it("en: locked - renders locked hint text", () => {
     mockDetailCardClass.value = "locked";
     renderWithIntl(<PokemonDetailDisclosure pokemon={makeDetailPokemon()} />);
     expect(
@@ -410,14 +410,14 @@ describe("PokemonDetailDisclosure — locale coverage", () => {
     ).toBeInTheDocument();
   });
 
-  it("ja: mastered — renders Base Stats heading in Japanese", () => {
+  it("ja: mastered - renders Base Stats heading in Japanese", () => {
     renderJa(<PokemonDetailDisclosure pokemon={makeDetailPokemon()} />);
     expect(
       screen.getByRole("heading", { level: 2, name: "種族値" }),
     ).toBeInTheDocument();
   });
 
-  it("ja: locked — renders locked hint in Japanese", () => {
+  it("ja: locked - renders locked hint in Japanese", () => {
     mockDetailCardClass.value = "locked";
     renderJa(<PokemonDetailDisclosure pokemon={makeDetailPokemon()} />);
     expect(
@@ -425,14 +425,14 @@ describe("PokemonDetailDisclosure — locale coverage", () => {
     ).toBeInTheDocument();
   });
 
-  it("zh-Hans: mastered — renders Base Stats heading in Simplified Chinese", () => {
+  it("zh-Hans: mastered - renders Base Stats heading in Simplified Chinese", () => {
     renderZhHans(<PokemonDetailDisclosure pokemon={makeDetailPokemon()} />);
     expect(
       screen.getByRole("heading", { level: 2, name: "种族值" }),
     ).toBeInTheDocument();
   });
 
-  it("zh-Hant: mastered — renders Base Stats heading in Traditional Chinese", () => {
+  it("zh-Hant: mastered - renders Base Stats heading in Traditional Chinese", () => {
     renderZhHant(<PokemonDetailDisclosure pokemon={makeDetailPokemon()} />);
     expect(
       screen.getByRole("heading", { level: 2, name: "種族值" }),

@@ -24,7 +24,7 @@ type Props = {
   onChange: (next: PracticeScope) => void;
   /**
    * When false (the default), the "Alternate forms" section is hidden entirely
-   * — the gate in Settings is the master switch. When true, the per-category
+   * - the gate in Settings is the master switch. When true, the per-category
    * filter is rendered as normal (#658).
    */
   alternateFormsEnabled?: boolean;
@@ -42,7 +42,7 @@ const ROMAN: Record<number, string> = {
   1: "I", 2: "II", 3: "III", 4: "IV", 5: "V",
   6: "VI", 7: "VII", 8: "VIII", 9: "IX",
 };
-// Keys only — labels are resolved via t() at render time to support locale switching.
+// Keys only - labels are resolved via t() at render time to support locale switching.
 const PRESET_KEYS: PracticeScopePreset[] = ["starters", "legendaries", "incomplete-chains"];
 
 function toggleNum(arr: number[], v: number): number[] {
@@ -70,7 +70,7 @@ function presentFormCategories(seed: typeof SEED_POKEMON): FormCategory[] {
   return ORDER.filter((c) => seen.has(c));
 }
 
-// Form category labels are resolved via tScope() at render time — see ScopeControl.
+// Form category labels are resolved via tScope() at render time - see ScopeControl.
 
 const UNSELECTED_PILL =
   "border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900";
@@ -80,7 +80,7 @@ const PILL_BASE =
 
 /**
  * A collapsible section inside the scope panel (#1110). Uses `<details>` and
- * `<summary>` for accessibility-by-default expand/collapse — no JS state
+ * `<summary>` for accessibility-by-default expand/collapse - no JS state
  * needed. The surrounding `<div role="group">` preserves the ARIA group
  * semantics that E2E and assistive-technology selectors rely on.
  *
@@ -217,7 +217,7 @@ export function ScopeControl({
           id="scope-panel"
           className="mt-2 flex flex-col rounded-lg border border-zinc-200 bg-background p-3 text-sm dark:border-zinc-800"
         >
-          {/* Generation axis — filters by species introduction generation.
+          {/* Generation axis - filters by species introduction generation.
               Label reads "I"–"IX" so it is visually distinct from the
               games-axis bulk-action labels which spell out game names. */}
           <ScopeSection
@@ -312,7 +312,7 @@ export function ScopeControl({
             </div>
           </ScopeSection>
 
-          {/* Games axis — filters by appearance in a specific game's Pokédex.
+          {/* Games axis - filters by appearance in a specific game's Pokédex.
               Distinct from the gens axis: "Generation II games" (Gold/Silver/Crystal)
               includes many Gen I species via the Johto dex. The gens axis strictly
               filters by species introduction generation. Bulk-action labels spell
@@ -332,7 +332,7 @@ export function ScopeControl({
             />
           </ScopeSection>
 
-          {/* "Alternate forms" category filter — only shown when the master
+          {/* "Alternate forms" category filter - only shown when the master
               gate in Settings is on. When it is off, the section is hidden
               entirely because no form cards surface in practice (#658). */}
           {alternateFormsEnabled ? (

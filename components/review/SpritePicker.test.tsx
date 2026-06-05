@@ -80,7 +80,7 @@ const DISTRACTOR_C = makePokemon({ id: 4, name: "Charmander" });
 const DISTRACTORS = [DISTRACTOR_A, DISTRACTOR_B, DISTRACTOR_C] as const;
 
 // ---------------------------------------------------------------------------
-// fisherYatesShuffle — unit tests
+// fisherYatesShuffle - unit tests
 // ---------------------------------------------------------------------------
 
 describe("fisherYatesShuffle", () => {
@@ -106,7 +106,7 @@ describe("fisherYatesShuffle", () => {
   it("produces at least one distinct ordering across 20 independent calls", () => {
     // Statistical test: with 4 elements there are 24 possible orderings.
     // The probability that 20 independent shuffles all produce the same
-    // ordering is (1/24)^19 ≈ 10^-26 — effectively impossible with real randomness.
+    // ordering is (1/24)^19 ≈ 10^-26 - effectively impossible with real randomness.
     const input = [1, 2, 3, 4];
     const first = fisherYatesShuffle(input).join(",");
     const allSame = Array.from({ length: 19 }, () =>
@@ -117,7 +117,7 @@ describe("fisherYatesShuffle", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SpritePicker — component tests
+// SpritePicker - component tests
 // ---------------------------------------------------------------------------
 
 describe("SpritePicker", () => {
@@ -186,7 +186,7 @@ describe("SpritePicker", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SpritePicker — playCryOnAnswer tests (#707)
+// SpritePicker - playCryOnAnswer tests (#707)
 // ---------------------------------------------------------------------------
 
 describe("SpritePicker playCryOnAnswer", () => {
@@ -282,7 +282,7 @@ describe("SpritePicker playCryOnAnswer", () => {
     const correctTile = screen.getByRole("button", { name: "Bulbasaur" });
     act(() => { fireEvent.click(correctTile); });
 
-    // playCry is still called — with null — so the audio module handles the
+    // playCry is still called - with null - so the audio module handles the
     // null case itself (as it does on flip cards). No throw is expected.
     // speakNameOnAnswer is false (not passed), so speakAfterCry callback is undefined.
     expect(mockPlayCry).toHaveBeenCalledOnce();
@@ -291,7 +291,7 @@ describe("SpritePicker playCryOnAnswer", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SpritePicker — speakNameOnAnswer tests (#731)
+// SpritePicker - speakNameOnAnswer tests (#731)
 // ---------------------------------------------------------------------------
 
 import { speakName as mockSpeakName } from "@/lib/audio/tts";
@@ -346,7 +346,7 @@ describe("SpritePicker speakNameOnAnswer", () => {
     const [, , callbackArg] = (mockPlayCry as ReturnType<typeof vi.fn>).mock.calls[0] as [string, number, (() => void) | undefined];
     expect(typeof callbackArg).toBe("function");
 
-    // speakName is NOT called directly — it fires via the callback.
+    // speakName is NOT called directly - it fires via the callback.
     expect(mockSpeakName).not.toHaveBeenCalled();
 
     // Simulating the onEnded callback fires speakName.
@@ -372,7 +372,7 @@ describe("SpritePicker speakNameOnAnswer", () => {
 });
 
 // ---------------------------------------------------------------------------
-// resolveReverseFeedbackDelayMs — unit tests (#1200)
+// resolveReverseFeedbackDelayMs - unit tests (#1200)
 // ---------------------------------------------------------------------------
 
 describe("resolveReverseFeedbackDelayMs", () => {
@@ -394,10 +394,10 @@ describe("resolveReverseFeedbackDelayMs", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SpritePicker — locale-aware name display (#1260 followup)
+// SpritePicker - locale-aware name display (#1260 followup)
 // ---------------------------------------------------------------------------
 
-describe("SpritePicker — locale-aware names", () => {
+describe("SpritePicker - locale-aware names", () => {
   it("shows the locale-resolved target name in the prompt heading", async () => {
     vi.resetModules();
     vi.doMock("@/lib/i18n/useLocalePokemonName", () => ({

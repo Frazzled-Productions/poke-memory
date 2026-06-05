@@ -1,7 +1,7 @@
 /**
  * Component tests for OfflineSection.
  *
- * The downloadController singleton is tested via its real module — we
+ * The downloadController singleton is tested via its real module - we
  * mock precacheAll at the lib/pwa/precache level to avoid hitting the
  * real Cache API. We also test the remount-during-download scenario that
  * was the root cause of #1180.
@@ -19,7 +19,7 @@ import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 
 // ------------------------------------------------------------------
-// localStorage stub — jsdom does not always ship localStorage.
+// localStorage stub - jsdom does not always ship localStorage.
 // ------------------------------------------------------------------
 function makeLocalStorage(): Storage {
   const store = new Map<string, string>();
@@ -89,25 +89,25 @@ describe("OfflineSection", () => {
     // Regression guard for Finding 1 on PR #1185: getState() must seed from
     // localStorage so useState(getState) already returns { phase: "done" } on
     // the very first synchronous render. The "Download" button must never be
-    // committed to the DOM — not even as a transient state before effects run.
+    // committed to the DOM - not even as a transient state before effects run.
     //
     // In @testing-library/react, render() commits the initial tree
     // synchronously and then flushes effects. If getState() did NOT seed from
     // storage, the initial tree would contain "Download" and only flip to
-    // "Update" after the subscribe() effect fired — a visible label flash for
+    // "Update" after the subscribe() effect fired - a visible label flash for
     // real users. This test guards against that regression.
     window.localStorage.setItem(
       precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
       "2026-05-01T10:00:00.000Z",
     );
 
-    // Act without awaiting any async events — we are asserting the
+    // Act without awaiting any async events - we are asserting the
     // synchronously committed initial render, not a state transition.
     const { container } = renderWithIntl(<OfflineSection />);
 
     // "Update" must be present in the committed tree.
     expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
-    // "Download" must never appear — not even transiently.
+    // "Download" must never appear - not even transiently.
     expect(container.querySelector("button")).toHaveTextContent(/update/i);
   });
 
@@ -231,7 +231,7 @@ describe("OfflineSection", () => {
     // Simulates the caches API being unavailable: every URL counted as failed,
     // none downloaded. The component must transition to the error phase and must
     // NOT write a timestamp to localStorage (which would display "Downloaded on
-    // <date>" — a false success).
+    // <date>" - a false success).
     vi.spyOn(precacheModule, "precacheAll").mockResolvedValue({
       totalRequested: 100,
       downloaded: 0,
@@ -251,7 +251,7 @@ describe("OfflineSection", () => {
     // Must surface the user-facing error message.
     expect(screen.getByRole("alert")).toHaveTextContent(/download failed/i);
 
-    // Must NOT transition to "done" — no "Downloaded on" text, no Update button.
+    // Must NOT transition to "done" - no "Downloaded on" text, no Update button.
     expect(screen.queryByText(/downloaded on/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /update/i })).not.toBeInTheDocument();
 
@@ -322,7 +322,7 @@ describe("OfflineSection", () => {
     expect(screen.getByText(/update available.*new/i)).toBeInTheDocument();
   });
 
-  it("disables the Update button and shows 'Up to date' — locale: ja", () => {
+  it("disables the Update button and shows 'Up to date' - locale: ja", () => {
     const ids = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
     const urls = precacheModule.buildPrecacheUrls(ids);
     const sig = computeManifestSignature(urls);
@@ -342,7 +342,7 @@ describe("OfflineSection", () => {
     expect(screen.getByRole("button", { name: /更新/i })).toBeDisabled();
   });
 
-  it("enables the Update button when update available — locale: zh-Hans", () => {
+  it("enables the Update button when update available - locale: zh-Hans", () => {
     window.localStorage.setItem(
       precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
       "2026-05-01T10:00:00.000Z",
@@ -410,7 +410,7 @@ describe("OfflineSection", () => {
     await waitFor(() =>
       expect(screen.getByRole("progressbar")).toBeInTheDocument(),
     );
-    // The Stop button must be present — the download is still running.
+    // The Stop button must be present - the download is still running.
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
 
     // Resolve the download so the test doesn't leak a pending promise.

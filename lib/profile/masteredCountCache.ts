@@ -37,7 +37,7 @@ const EMPTY_COUNTS: MasteredCountByLocale = {
 /**
  * Read the cached per-locale mastered counts from localStorage.
  * Returns `{ en: 0, ja: 0, "zh-Hans": 0, "zh-Hant": 0 }` when absent or
- * malformed — callers should treat this as "not yet populated" rather than
+ * malformed - callers should treat this as "not yet populated" rather than
  * a definitive zero.
  */
 export function readMasteredCountCache(): MasteredCountByLocale {

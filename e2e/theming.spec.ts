@@ -8,7 +8,7 @@ async function seedSettings(
   intensity: "accents" | "tinted" | "full" | null,
 ): Promise<void> {
   await page.addInitScript((i) => {
-    // Minimal settings blob — only the fields the pre-paint script and
+    // Minimal settings blob - only the fields the pre-paint script and
     // FavouriteThemeProvider actually read.
     const blob: Record<string, unknown> = {};
     if (i !== null) {
@@ -24,7 +24,7 @@ async function seedSettings(
   await addOnboardingPreDismiss(page);
 }
 
-test.describe("Theme intensity — data-intensity attribute", () => {
+test.describe("Theme intensity - data-intensity attribute", () => {
   test("fresh visit has no data-intensity attribute on <html>", async ({
     page,
   }) => {
@@ -76,7 +76,7 @@ test.describe("Theme intensity — data-intensity attribute", () => {
   });
 });
 
-test.describe("Theme intensity — Settings page picker", () => {
+test.describe("Theme intensity - Settings page picker", () => {
   // NOTE: We do NOT use addInitScript for localStorage.clear() in beforeEach
   // because addInitScript runs on every navigation including page.reload(),
   // which would wipe settings the user just saved before the reload can read
@@ -91,7 +91,7 @@ test.describe("Theme intensity — Settings page picker", () => {
     // Wait for the skeleton to disappear (settings loaded).
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Expand the Appearance section — IntensityPicker lives inside it.
+    // Expand the Appearance section - IntensityPicker lives inside it.
     await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     // The section heading rendered by IntensityPicker.
@@ -118,7 +118,7 @@ test.describe("Theme intensity — Settings page picker", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Expand the Appearance section — radios live inside it.
+    // Expand the Appearance section - radios live inside it.
     await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     await expect(
@@ -139,13 +139,13 @@ test.describe("Theme intensity — Settings page picker", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Expand the Appearance section — radios live inside it.
+    // Expand the Appearance section - radios live inside it.
     await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     await page.getByRole("radio", { name: "Tinted backgrounds" }).click();
 
     // FavouriteThemeProvider receives SETTINGS_SAVED_EVENT and calls
-    // applyIntensity — wait for the DOM attribute to appear.
+    // applyIntensity - wait for the DOM attribute to appear.
     await expect
       .poll(
         () =>
@@ -163,7 +163,7 @@ test.describe("Theme intensity — Settings page picker", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Expand the Appearance section — radios live inside it.
+    // Expand the Appearance section - radios live inside it.
     await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     await page.getByRole("radio", { name: "Tinted backgrounds" }).click();
@@ -179,7 +179,7 @@ test.describe("Theme intensity — Settings page picker", () => {
       )
       .toBe("tinted");
 
-    // Reload — FavouriteThemeProvider.useEffect restores the attribute
+    // Reload - FavouriteThemeProvider.useEffect restores the attribute
     // synchronously from localStorage once effects fire after React's
     // singleton-element commit. Poll until present.
     await page.reload();
@@ -202,7 +202,7 @@ test.describe("Theme intensity — Settings page picker", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Expand the Appearance section — radios live inside it.
+    // Expand the Appearance section - radios live inside it.
     await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     // Confirm tinted is active.
@@ -230,7 +230,7 @@ test.describe("Theme watermark visibility", () => {
   }) => {
     await page.addInitScript(() => window.localStorage.clear());
     await page.goto("/");
-    // ThemeWatermark returns null when intensity is 'accents' — element should
+    // ThemeWatermark returns null when intensity is 'accents' - element should
     // not be in the DOM at all.
     await expect(page.locator('[data-testid="theme-watermark"]')).toHaveCount(
       0,
@@ -267,7 +267,7 @@ test.describe("Theme watermark visibility", () => {
       0,
     );
 
-    // Expand the Appearance section — radios live inside it.
+    // Expand the Appearance section - radios live inside it.
     await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     await page.getByRole("radio", { name: "Tinted backgrounds" }).click();

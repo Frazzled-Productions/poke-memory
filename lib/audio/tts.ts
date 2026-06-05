@@ -16,7 +16,7 @@ let _warmedUp = false;
  * autoplay/user-gesture requirement for `speechSynthesis.speak()`.
  *
  * Must be called synchronously inside a user-gesture handler (e.g. a click
- * handler) — calling it after an `await` loses the gesture context in
+ * handler) - calling it after an `await` loses the gesture context in
  * Chromium and WebKit.
  *
  * Idempotent: the second and subsequent calls are no-ops.
@@ -31,7 +31,7 @@ export function warmupTts(): void {
   window.speechSynthesis.speak(u);
 }
 
-// Apple's iOS/macOS voices include the tier in their `name` field —
+// Apple's iOS/macOS voices include the tier in their `name` field - 
 // "Daniel" (Compact), "Daniel (Enhanced)", "Daniel (Premium)", "Siri Voice 1".
 // Google's Chrome voices use "Neural" / "Standard". We detect these so a user
 // who has downloaded a higher-quality voice gets it picked automatically.
@@ -101,7 +101,7 @@ export function getPreferredVoice(): SpeechSynthesisVoice | null {
 }
 
 // ---------------------------------------------------------------------------
-// Audio element — static MP3 path
+// Audio element - static MP3 path
 // ---------------------------------------------------------------------------
 
 // Tracks the currently-playing Audio element so we can stop it before
@@ -119,8 +119,8 @@ function stopCurrentAudio(): void {
  * Returns a Promise that resolves when any in-flight TTS audio finishes.
  *
  * Covers two playback paths:
- *   1. Static MP3 (`_currentAudio`) — waits for `ended` or `error`.
- *   2. Web Speech API (`speechSynthesis.speaking`) — polls at 50 ms until
+ *   1. Static MP3 (`_currentAudio`) - waits for `ended` or `error`.
+ *   2. Web Speech API (`speechSynthesis.speaking`) - polls at 50 ms until
  *      the utterance queue drains, then resolves.
  *
  * Resolves immediately when neither path is active. A 5-second safety net
@@ -146,7 +146,7 @@ export function awaitTtsEnd(): Promise<void> {
       resolve();
     };
 
-    // Safety net — never stall longer than 5 s.
+    // Safety net - never stall longer than 5 s.
     const safetyTimer = setTimeout(finish, 5_000);
 
     if (audioPlaying && _currentAudio !== null) {
@@ -179,7 +179,7 @@ export function awaitTtsEnd(): Promise<void> {
  * element. On any playback error (missing file, decode failure, rejected
  * promise) the function falls back to the Web Speech API path.
  *
- * When `id` is null/undefined, the Web Speech API path is used directly —
+ * When `id` is null/undefined, the Web Speech API path is used directly - 
  * no regression from the prior behaviour.
  *
  * Settings (`ttsRate`, `ttsVolume`, `ttsVoice`) resolve from the `overrides`
@@ -190,7 +190,7 @@ export function speakName(
   id?: number | null,
   overrides?: { ttsVoice?: string | null; ttsRate?: number; ttsVolume?: number },
 ): void {
-  // Resolve settings synchronously — captures state at call time, avoids stale closure.
+  // Resolve settings synchronously - captures state at call time, avoids stale closure.
   let resolvedSettings: { ttsVoice: string | null; ttsRate: number; ttsVolume: number };
   if (overrides !== undefined) {
     resolvedSettings = { ttsVoice: overrides.ttsVoice ?? null, ttsRate: overrides.ttsRate ?? 1, ttsVolume: overrides.ttsVolume ?? 1 };
@@ -206,7 +206,7 @@ export function speakName(
   const { ttsVoice, ttsRate, ttsVolume } = resolvedSettings;
 
   // ---------------------------------------------------------------------------
-  // Audio element path — used when a numeric id is supplied and Audio exists.
+  // Audio element path - used when a numeric id is supplied and Audio exists.
   // ---------------------------------------------------------------------------
   if (typeof id === "number" && typeof Audio !== "undefined") {
     stopCurrentAudio();
@@ -224,7 +224,7 @@ export function speakName(
 
     let hasCalledFallback = false;
     const fallbackToSpeech = (): void => {
-      // A 404 fires both the 'error' event and rejects play() — guard so only
+      // A 404 fires both the 'error' event and rejects play() - guard so only
       // the first call reaches speakNameViaSpeech; the second would cancel the
       // utterance the first already queued.
       if (hasCalledFallback) return;
@@ -254,7 +254,7 @@ export function speakName(
   }
 
   // ---------------------------------------------------------------------------
-  // Web Speech API path — no id supplied, or Audio unavailable.
+  // Web Speech API path - no id supplied, or Audio unavailable.
   // ---------------------------------------------------------------------------
   speakNameViaSpeech(name, ttsVoice, ttsRate, ttsVolume);
 }

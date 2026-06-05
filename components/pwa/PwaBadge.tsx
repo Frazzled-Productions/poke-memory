@@ -3,7 +3,7 @@
 import { usePwaBadge } from "./usePwaBadge";
 
 /**
- * Mounts the Web Badging API badge-sync hook. Renders nothing — its only role
+ * Mounts the Web Badging API badge-sync hook. Renders nothing - its only role
  * is keeping the installed-PWA icon badge in sync with the number of cards due
  * today.
  *

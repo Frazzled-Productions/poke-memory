@@ -73,7 +73,7 @@ function writeStoredSort(value: PokedexSortOrder): void {
   try {
     localStorage.setItem(KEY_POKEDEX_SORT, value);
   } catch {
-    /* localStorage unavailable — gracefully ignore */
+    /* localStorage unavailable - gracefully ignore */
   }
 }
 
@@ -101,7 +101,7 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
     ? parseSort(searchParams.get("sort"))
     : readStoredSort();
 
-  // Disclosure state — collapsed by default so the grid is visible first.
+  // Disclosure state - collapsed by default so the grid is visible first.
   const [isOpen, setIsOpen] = useState(false);
   const panelId = useId();
 
@@ -211,7 +211,7 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
 
   // Apply sort. Memoised to avoid re-sorting 1025 items on every render when
   // only unrelated state changes. WebKit note: sort of 1025 items is O(n log n)
-  // and runs in <1 ms on modern devices — no measurable per-render cost.
+  // and runs in <1 ms on modern devices - no measurable per-render cost.
   const sorted = useMemo(
     () => sortPokemon(filtered, sort, flags.pretendAllMastered),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -229,7 +229,7 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
 
   return (
     <>
-      {/* Filter disclosure — collapsed by default so the grid is the first visible content */}
+      {/* Filter disclosure - collapsed by default so the grid is the first visible content */}
       <div className="mb-6">
         <button
           type="button"

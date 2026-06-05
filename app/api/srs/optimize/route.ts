@@ -3,7 +3,7 @@
  *
  * Runs the FSRS per-user weight optimizer (#268) server-side and persists the
  * resulting weight vector to `user_settings.settings`. Authenticated users
- * only — guests are not supported.
+ * only - guests are not supported.
  *
  * Flow:
  *  1. Authenticate via session cookie.
@@ -114,7 +114,7 @@ async function persistWeights(
     // The generated Supabase types don't yet know about `merge_user_settings`
     // (migration 011/014). Cast through `unknown` to the narrow MergeUserSettingsRpc
     // signature from rpc-types. The cast is kept on the *call expression* (not a
-    // separate const) so `this` stays bound to `client` — extracting client.rpc to
+    // separate const) so `this` stays bound to `client` - extracting client.rpc to
     // a local const would strip the binding and SupabaseClient.rpc reads `this.rest`.
     const { error } = await (client.rpc as unknown as MergeUserSettingsRpc)(
       "merge_user_settings",
@@ -195,7 +195,7 @@ async function postHandler(): Promise<NextResponse> {
   // Fetch grade log from Supabase.
   const entries = await fetchGradeLog(supabase, user.id);
   if (entries === null) {
-    // Supabase fetch failed — the client's reviews may not have synced yet.
+    // Supabase fetch failed - the client's reviews may not have synced yet.
     return NextResponse.json(
       { error: "reviews_unavailable" },
       { status: 503 },

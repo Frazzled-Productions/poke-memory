@@ -68,7 +68,7 @@ describe('filterPokemon', () => {
     expect(result).toHaveLength(0);
   });
 
-  it('type filter uses AND/intersection logic — pokemon must have all selected types', () => {
+  it('type filter uses AND/intersection logic - pokemon must have all selected types', () => {
     // fire + flying → only charizard (not mono-fire charmander/cyndaquil, not mono-water squirtle)
     const dualResult = filterPokemon(FIXTURES, { ...noFilters, types: ['fire', 'flying'] });
     expect(dualResult).toHaveLength(1);
@@ -122,7 +122,7 @@ describe('filterPokemon', () => {
   });
 });
 
-describe('filterPokemon — masteryStatus filter', () => {
+describe('filterPokemon - masteryStatus filter', () => {
   // Fixture set with varied cardClass values.
   const MASTERY_FIXTURES: PokemonCellData[] = [
     basePokemon({ id: 1, speciesId: 1, name: 'bulbasaur',  types: ['grass', 'poison'], cardClass: 'locked' }),
@@ -225,7 +225,7 @@ function filterWithForms(
   });
 }
 
-describe('filterPokemon — form-name search (unit via inline helper)', () => {
+describe('filterPokemon - form-name search (unit via inline helper)', () => {
   // Raichu (id=26, speciesId=26), Vulpix (id=37), Sandshrew (id=27)
   const FORM_FIXTURES: PokemonCellData[] = [
     basePokemon({ id: 26,  speciesId: 26, isDefaultForm: true, name: 'raichu',   displayName: 'Raichu',   types: ['electric'] }),

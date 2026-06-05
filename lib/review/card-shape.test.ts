@@ -104,7 +104,7 @@ describe("isEvolutionCardShaped", () => {
   });
 
   it("returns true for an empty evolvesInto array", () => {
-    // An empty array passes every() vacuously — the file still validates.
+    // An empty array passes every() vacuously - the file still validates.
     expect(isEvolutionCardShaped({ evolvesInto: [] })).toBe(true);
   });
 
@@ -149,7 +149,7 @@ describe("isEvolutionCardShaped", () => {
   });
 
   it("prefers postEvoId over other fields (short-circuits on first truthy shape)", () => {
-    // postEvoId takes priority — the presence of both is still valid.
+    // postEvoId takes priority - the presence of both is still valid.
     expect(
       isEvolutionCardShaped({
         postEvoId: 2,
@@ -163,7 +163,7 @@ describe("isEvolutionCardShaped", () => {
 // isBaseCardShaped
 // ---------------------------------------------------------------------------
 
-describe("isBaseCardShaped — basic invariants", () => {
+describe("isBaseCardShaped - basic invariants", () => {
   function validBase(): Record<string, unknown> {
     return { id: 1, state: { dueDate: "2026-05-02" } };
   }
@@ -245,7 +245,7 @@ describe("isBaseCardShaped — basic invariants", () => {
   });
 });
 
-describe("isBaseCardShaped — evolution card validation", () => {
+describe("isBaseCardShaped - evolution card validation", () => {
   function validBase(): Record<string, unknown> {
     return { id: 1, state: { dueDate: "2026-05-02" }, cardType: "evolution" };
   }
@@ -289,7 +289,7 @@ describe("isBaseCardShaped — evolution card validation", () => {
   });
 });
 
-describe("isBaseCardShaped — reverse-evolution does NOT require preEvoId/postEvoId", () => {
+describe("isBaseCardShaped - reverse-evolution does NOT require preEvoId/postEvoId", () => {
   // isBaseCardShaped is lenient on reverse-evolution; only isReviewCardShaped
   // in persistence.ts layers that extra strictness on top.
   it("accepts a reverse-evolution card without preEvoId or postEvoId", () => {

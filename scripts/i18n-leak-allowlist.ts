@@ -108,7 +108,7 @@ export const ALLOWLIST: Array<string | RegExp> = [
   // -------------------------------------------------------------------------
 
   // -------------------------------------------------------------------------
-  // Pokémon game title proper nouns (#1559) — intentionally English across all
+  // Pokémon game title proper nouns (#1559) - intentionally English across all
   // appLocales. Game names come from `lib/pokemon/versionNames.ts::VERSION_NAMES`
   // and are not routed through the message catalogue.
   // Matches display values like "Red", "FireRed", "Brilliant Diamond",

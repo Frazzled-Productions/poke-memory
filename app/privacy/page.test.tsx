@@ -22,7 +22,7 @@ import { describe, it, expect, vi } from "vitest";
 import PrivacyPage from "@/app/privacy/page";
 
 // ---------------------------------------------------------------------------
-// Stub ChildFriendlySummary — it is now async; stubbing avoids the suspended
+// Stub ChildFriendlySummary - it is now async; stubbing avoids the suspended
 // async component causing the page render to return an empty div. Locale
 // rendering is asserted in components/privacy/ChildFriendlySummary.test.tsx.
 // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ vi.mock("@/components/privacy/ChildFriendlySummary", () => ({
 
 // ---------------------------------------------------------------------------
 // Mock resolveLocale so the server-component locale gate is testable.
-// The default is "en" (authoritative locale — notice should be hidden).
+// The default is "en" (authoritative locale - notice should be hidden).
 // ---------------------------------------------------------------------------
 
 vi.mock("@/i18n/request", async (importOriginal) => {

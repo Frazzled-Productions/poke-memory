@@ -22,7 +22,7 @@ type Props = {
   spriteUrl: string;
   canonicalName: string;
   options: Option[];
-  /** Pokémon id — passed through to the Image alt text and locale resolution. */
+  /** Pokémon id - passed through to the Image alt text and locale resolution. */
   id?: number | null;
   onGrade: (grade: Grade) => void;
   /** While true option buttons are disabled (grade in flight). */
@@ -42,7 +42,7 @@ type NameOptionButtonProps = {
  * A single option button in the 2×2 name grid.
  *
  * Extracted as its own component so `useLocalePokemonName` can be called
- * unconditionally — hooks may not be called inside array maps (#1260 followup).
+ * unconditionally - hooks may not be called inside array maps (#1260 followup).
  */
 function NameOptionButton({
   option,
@@ -102,7 +102,7 @@ function NameOptionButton({
  *
  * The `options` prop must be pre-shuffled (use `buildMcOptions` from
  * `lib/srs/multipleChoiceDistractors.ts`). The component itself is stateless
- * with respect to ordering — the same `options` array order is always rendered,
+ * with respect to ordering - the same `options` array order is always rendered,
  * so the parent controls determinism.
  *
  * An always-present `aria-live` region announces the result to screen readers

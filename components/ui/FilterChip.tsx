@@ -1,5 +1,5 @@
 /**
- * FilterChip — a rounded-full pill toggle button.
+ * FilterChip - a rounded-full pill toggle button.
  *
  * Encapsulates the active/inactive class variants, aria-pressed, and the
  * --theme-accent focus-visible ring so a theme-token or a11y change propagates
@@ -14,9 +14,9 @@
  * padding pass `padding="px-2.5 py-0.5"` explicitly.
  *
  * Two colour variants are supported:
- *   - "default" (zinc-800/white active, zinc-100/zinc-700 inactive) — for
+ *   - "default" (zinc-800/white active, zinc-100/zinc-700 inactive) - for
  *     generation, mastery-status, and boolean-toggle pills.
- *   - "custom" — caller provides `activeClassName` for the coloured active
+ *   - "custom" - caller provides `activeClassName` for the coloured active
  *     state (e.g. Pokémon type chips where each type has its own bg+text).
  */
 
@@ -29,7 +29,7 @@ import type { ReactNode } from "react";
 type FilterChipProps = {
   /** Whether the chip is in its active/pressed state. */
   active: boolean;
-  /** Click handler — called when the chip is toggled. */
+  /** Click handler - called when the chip is toggled. */
   onClick: () => void;
   children: ReactNode;
   /**
@@ -55,7 +55,7 @@ type FilterChipProps = {
   className?: string;
   /** Whether the chip is disabled. */
   disabled?: boolean;
-  /** Tooltip title attribute — shown on hover. */
+  /** Tooltip title attribute - shown on hover. */
   title?: string;
 };
 
@@ -66,9 +66,9 @@ type FilterChipProps = {
 /** Structural classes that are always present, independent of state. */
 const BASE =
   "rounded-full text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-1";
-/** Inactive state — muted zinc tone. */
+/** Inactive state - muted zinc tone. */
 const INACTIVE = "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
-/** Default active state — inverted zinc (dark background). */
+/** Default active state - inverted zinc (dark background). */
 const ACTIVE_DEFAULT = "bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900";
 
 // ---------------------------------------------------------------------------

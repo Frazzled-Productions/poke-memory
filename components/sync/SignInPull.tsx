@@ -7,7 +7,7 @@ import { useSignInPull } from "@/lib/sync/useSignInPull";
 /**
  * Renders nothing. Mounted in the root layout so the sign-in pull runs once
  * on every cold load (when already authenticated) and on every fresh sign-in.
- * Parallel to <SyncOnVisible /> — same architecture, different trigger.
+ * Parallel to <SyncOnVisible /> - same architecture, different trigger.
  */
 export function SignInPull() {
   const { user, supabase } = useAuth();

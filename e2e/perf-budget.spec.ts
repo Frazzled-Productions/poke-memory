@@ -2,25 +2,25 @@
  * Fresh-visitor performance budget (#1268)
  *
  * Measures time-to-interactive on a clean session (no localStorage, no IndexedDB
- * pre-seed) on the practice page — the heaviest initial load because it parses
+ * pre-seed) on the practice page - the heaviest initial load because it parses
  * and hydrates the seed JSON before rendering the first card.
  *
  * The metric: navigation `loadEventEnd - startTime` (ms). This includes HTML
- * parse, all blocking resources, and the `load` event — a reliable proxy for
+ * parse, all blocking resources, and the `load` event - a reliable proxy for
  * "the page has finished its initial work". We then additionally wait until the
  * above-fold interactive element (Reveal button or end-state heading) is visible,
  * which exercises the React hydration + IDB seed path.
  *
- * Budget values — ratchet these DOWN as perf improves, never up:
+ * Budget values - ratchet these DOWN as perf improves, never up:
  */
 const BUDGETS = {
   /** Chromium (V8, fast JSON parse). */
   chromium: 5_000,
   /** WebKit (mobile-safari project, slower parse + smaller render pipeline). */
   "mobile-safari": 8_000,
-  /** desktop-webkit — same engine as mobile-safari, same budget. */
+  /** desktop-webkit - same engine as mobile-safari, same budget. */
   "desktop-webkit": 8_000,
-  /** mobile-chrome — same engine as chromium, same budget. */
+  /** mobile-chrome - same engine as chromium, same budget. */
   "mobile-chrome": 5_000,
 } as const;
 
@@ -32,7 +32,7 @@ import { practiceReadyLocator } from "./helpers/practiceCard";
 
 test.describe("Fresh-visitor performance budget (#1268)", () => {
   /**
-   * Both storage states start empty — no localStorage keys, no IDB entries.
+   * Both storage states start empty - no localStorage keys, no IDB entries.
    * The `storageState` override enforces this regardless of any global fixture.
    */
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -44,7 +44,7 @@ test.describe("Fresh-visitor performance budget (#1268)", () => {
     // ci.yml runs. A dedicated perf-budget.yml workflow runs it explicitly
     // with the env var set. Keeping it out of the required `e2e` matrix means
     // a flaky budget breach cannot block merges while the baseline is still
-    // stabilising — promotion to required is a separate decision (see
+    // stabilising - promotion to required is a separate decision (see
     // WORKFLOW.md "Perf budget gate" and #1268).
     test.skip(
       process.env.PERF_BUDGET !== "1",
@@ -58,7 +58,7 @@ test.describe("Fresh-visitor performance budget (#1268)", () => {
     // FirstVisitOnboardingModal.tsx reads it from
     // `settings.onboarding?.firstVisitOnboardingDismissed` (a nested path).
     // When the flag was at the wrong level the modal opened, applied `inert`
-    // to #app-root, and Playwright could not find the Reveal button — causing
+    // to #app-root, and Playwright could not find the Reveal button - causing
     // "perf budget exceeded" to measure "time to give up", not actual load
     // time. The helper nests the flag correctly under `onboarding`.
     await addOnboardingPreDismiss(page);
@@ -66,7 +66,7 @@ test.describe("Fresh-visitor performance budget (#1268)", () => {
     // Start the navigation timer from just before goto so we capture the
     // full round-trip including network. The `navigation` PerformanceTiming
     // entry's `loadEventEnd - startTime` measures the same wall-clock span
-    // inside the renderer — use that as the canonical figure.
+    // inside the renderer - use that as the canonical figure.
     const gotoStart = Date.now();
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -83,7 +83,7 @@ test.describe("Fresh-visitor performance budget (#1268)", () => {
     // time-to-interactive signal: the seed JSON has been parsed, IDB seeded,
     // and React has rendered a usable card or an end-state. The first card may
     // be a flip card, sprite-picker, or multiple-choice card depending on the
-    // deterministic per-day shuffle (#1370) — all three are equally
+    // deterministic per-day shuffle (#1370) - all three are equally
     // "interactive", so match every variant rather than only the Reveal flip.
     await expect(practiceReadyLocator(page)).toBeVisible({
       timeout: DEFAULT_BUDGET_MS + 2_000, // grace above budget so we can log the overrun

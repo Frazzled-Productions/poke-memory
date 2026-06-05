@@ -17,10 +17,10 @@
  *      column added in position 2 that shifts existing columns right.
  *
  * Tables covered:
- *   card_reviews   — PK   (user_id, card_type, subject_key, locale)  — migration 029
- *   streak_days    — UNIQUE (user_id, review_date)                    — migration 001
- *   grade_log      — UNIQUE (user_id, occurred_at)                    — migration 006
- *   user_settings  — PK   (user_id)  — note: no JS .upsert(); written via
+ *   card_reviews - PK   (user_id, card_type, subject_key, locale) - migration 029
+ *   streak_days - UNIQUE (user_id, review_date) - migration 001
+ *   grade_log - UNIQUE (user_id, occurred_at) - migration 006
+ *   user_settings - PK   (user_id) - note: no JS .upsert(); written via
  *                    merge_user_settings RPC. Verified here as a schema sanity
  *                    check so any future direct upsert path starts from known ground.
  */
@@ -44,7 +44,7 @@ let dbName: string;
  * Counts the number of constraints of a given type on a table.
  *
  * Used to assert that exactly one UNIQUE constraint exists before reading its
- * columns — a second UNIQUE constraint added in a future migration would otherwise
+ * columns - a second UNIQUE constraint added in a future migration would otherwise
  * cause `queryConstraintCols` to return a merged, unpredictable column list.
  *
  * @param tableName - public-schema table name, e.g. "streak_days"
@@ -118,7 +118,7 @@ afterAll(async () => {
 });
 
 describe("onConflict ↔ PK/UNIQUE parity (integration)", () => {
-  it("card_reviews: client CARD_REVIEWS_CONFLICT_COLS matches the live PK (migration 029 — 4 columns including locale)", async () => {
+  it("card_reviews: client CARD_REVIEWS_CONFLICT_COLS matches the live PK (migration 029 - 4 columns including locale)", async () => {
     // This is the exact check that would have caught the #1344 silent outage.
     // Migration 029 widened the PK from 3 to 4 columns. The client constant must
     // include locale as the 4th column; asserting 4 columns here means a future
@@ -130,7 +130,7 @@ describe("onConflict ↔ PK/UNIQUE parity (integration)", () => {
     expect(clientCols).toEqual(dbCols);
   });
 
-  it("streak_days: client STREAK_DAYS_CONFLICT_COLS matches the live UNIQUE constraint (migration 001 — 2 columns)", async () => {
+  it("streak_days: client STREAK_DAYS_CONFLICT_COLS matches the live UNIQUE constraint (migration 001 - 2 columns)", async () => {
     // Assert exactly one UNIQUE constraint: a second one added later would cause
     // queryConstraintCols to return a merged, non-deterministic column list.
     const constraintCount = await countConstraints("streak_days", "u");
@@ -143,7 +143,7 @@ describe("onConflict ↔ PK/UNIQUE parity (integration)", () => {
     expect(clientCols).toEqual(dbCols);
   });
 
-  it("grade_log: client GRADE_LOG_CONFLICT_COLS matches the live UNIQUE constraint (migration 006 — 2 columns)", async () => {
+  it("grade_log: client GRADE_LOG_CONFLICT_COLS matches the live UNIQUE constraint (migration 006 - 2 columns)", async () => {
     // Assert exactly one UNIQUE constraint: a second one added later would cause
     // queryConstraintCols to return a merged, non-deterministic column list.
     const constraintCount = await countConstraints("grade_log", "u");
@@ -156,9 +156,9 @@ describe("onConflict ↔ PK/UNIQUE parity (integration)", () => {
     expect(clientCols).toEqual(dbCols);
   });
 
-  it("user_settings: PK is (user_id) — schema sanity check (no direct JS .upsert(); written via merge_user_settings RPC)", async () => {
+  it("user_settings: PK is (user_id) - schema sanity check (no direct JS .upsert(); written via merge_user_settings RPC)", async () => {
     // user_settings is never written via a direct Supabase .upsert() call from
-    // the JS client — it goes through the merge_user_settings RPC which has its
+    // the JS client - it goes through the merge_user_settings RPC which has its
     // own ON CONFLICT (user_id) clause. We verify the live PK shape here as a
     // schema sanity check so any future direct upsert path starts from known ground
     // and knows what columns to include in its onConflict string.

@@ -1,7 +1,7 @@
 /**
  * Unit tests for the lib/pwa/downloadController module.
  *
- * Lives under components/ so the jsdom vitest project picks it up — the
+ * Lives under components/ so the jsdom vitest project picks it up - the
  * controller writes to window.localStorage which requires a DOM environment.
  * Per AGENTS.md: "A React hook can live in lib/, but if its test calls
  * renderHook, the test file must live under components/". The same reasoning
@@ -57,7 +57,7 @@ describe("downloadController", () => {
     it("returns { phase: 'done' } on first call when localStorage holds a prior-download timestamp", () => {
       // Regression guard for Finding 1 on PR #1185: getState() must seed from
       // localStorage so useState(getState) in OfflineSection already reflects a
-      // returning user's prior download on the very first render — no flash.
+      // returning user's prior download on the very first render - no flash.
       window.localStorage.setItem(
         precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
         "2026-05-01T10:00:00.000Z",

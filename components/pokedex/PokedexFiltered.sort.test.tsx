@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { KEY_POKEDEX_SORT } from "@/lib/storage/keys";
 
 // ---------------------------------------------------------------------------
-// localStorage stub — jsdom on this Node version does not ship localStorage.
+// localStorage stub - jsdom on this Node version does not ship localStorage.
 // ---------------------------------------------------------------------------
 
 function makeLocalStorage(): Storage {
@@ -30,7 +30,7 @@ function makeLocalStorage(): Storage {
 }
 
 // ---------------------------------------------------------------------------
-// next/navigation mocks — must be declared before the component import.
+// next/navigation mocks - must be declared before the component import.
 // ---------------------------------------------------------------------------
 
 const mockReplace = vi.fn();
@@ -56,7 +56,7 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// PokemonLocaleContext — return English locale (no locale names to load).
+// PokemonLocaleContext - return English locale (no locale names to load).
 // ---------------------------------------------------------------------------
 
 vi.mock("@/lib/i18n/PokemonLocaleContext", () => ({
@@ -64,7 +64,7 @@ vi.mock("@/lib/i18n/PokemonLocaleContext", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Stub PokedexFilterBar — captures onSortChange so tests can invoke it.
+// Stub PokedexFilterBar - captures onSortChange so tests can invoke it.
 // ---------------------------------------------------------------------------
 
 let capturedOnSortChange: ((sort: string) => void) | null = null;
@@ -156,7 +156,7 @@ const SAMPLE = [
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("PokedexFiltered — sort persistence", () => {
+describe("PokedexFiltered - sort persistence", () => {
   let storage: Storage;
 
   beforeEach(() => {

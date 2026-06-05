@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * LanguageSwitcher — a compact pill that opens a sheet for choosing the
+ * LanguageSwitcher - a compact pill that opens a sheet for choosing the
  * Pokémon-name language (`pokemonNameLocale`). It sits with the profile status
  * chips (in `ProfileStatusBar` and, on mobile Practice, in `StreakBadge`).
  *
  * Scope: this switches ONLY the Pokémon-name language, not the app/UI language
  * (that stays in Settings so a user cannot trap themselves in unreadable
  * chrome). Gated behind the `languages` Labs flag via `usePokemonLocaleContext`
- * — renders nothing until the flag is on.
+ * - renders nothing until the flag is on.
  *
  * Responsive: a bottom sheet on mobile, a centred modal on desktop. The a11y
  * contract (role="dialog" + aria-modal, focus move-in, focus trap, Escape +

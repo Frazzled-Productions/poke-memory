@@ -21,7 +21,7 @@ import {
 import type { AppLocale } from "@/i18n/locales";
 
 // ---------------------------------------------------------------------------
-// Mocks — vi.hoisted ensures the mock factory can reference these variables
+// Mocks - vi.hoisted ensures the mock factory can reference these variables
 // even after vi.mock hoisting.
 // ---------------------------------------------------------------------------
 
@@ -76,7 +76,7 @@ describe("SyncStatusLine", () => {
       />,
     );
 
-    // useLocalStorageKey must have been called — this is the line the gate needs.
+    // useLocalStorageKey must have been called - this is the line the gate needs.
     expect(useLocalStorageKey).toHaveBeenCalledWith("poke-memory:sync-status:v1");
   });
 
@@ -190,7 +190,7 @@ describe("SyncStatusLine", () => {
     expect(btn.textContent).toMatch(/再試行に失敗しました/);
   });
 
-  // ─── Cards out of sync — ICU plural ──────────────────────────────────────
+  // ─── Cards out of sync - ICU plural ──────────────────────────────────────
 
   it("en: count=1 renders singular 'card may be out of sync'", async () => {
     mockLoadSyncStatus.mockReturnValue({
@@ -345,7 +345,7 @@ describe("SyncStatusLine", () => {
   });
 
   it("does NOT render a Retry button when structuralSyncError is non-null", async () => {
-    // Retrying 42P10 always fails — the button must be absent.
+    // Retrying 42P10 always fails - the button must be absent.
     mockLoadSyncStatus.mockReturnValue({
       ...BASE_STATUS,
       lastPushFailed: true,
@@ -364,7 +364,7 @@ describe("SyncStatusLine", () => {
 
   it("renders the structural-error banner even when retryState is 'error' (structural takes priority)", async () => {
     // If the hook somehow fires an error after a structural state, the
-    // structural banner must still win — the user must not see a misleading
+    // structural banner must still win - the user must not see a misleading
     // "Retry failed · Try again" button for an unretryable error.
     mockLoadSyncStatus.mockReturnValue({
       ...BASE_STATUS,
@@ -451,7 +451,7 @@ describe("SyncStatusLine", () => {
       lastPushFailed: true,
       lastPushAttemptAt: "2026-05-30T10:00:00.000Z",
       failedCardCount: 0,
-      // structuralSyncError is null — auxiliary legs must not set it.
+      // structuralSyncError is null - auxiliary legs must not set it.
       structuralSyncError: null,
     });
 

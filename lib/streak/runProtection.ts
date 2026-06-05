@@ -3,7 +3,7 @@
  *
  * Reads the current streak dates and protection state, runs one
  * `applyProtectionStep` pass for today, and persists any changes back to
- * `user_settings`. Idempotent across same-day calls — the earn-leg guard
+ * `user_settings`. Idempotent across same-day calls - the earn-leg guard
  * (`lastEarnCheckDate`) and the spend-leg guard (yesterday already in
  * `spendDates`) both prevent double counting.
  *

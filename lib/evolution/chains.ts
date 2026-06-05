@@ -2,7 +2,7 @@
  * Derives evolution-family data for the Evolution Wall visualisation.
  *
  * Each "family" is a single evolution chain from the seed data. The wall
- * shows edge mastery — whether the user has mastered the evolution/reverse-
+ * shows edge mastery - whether the user has mastered the evolution/reverse-
  * evolution cards that correspond to each link in the chain.
  *
  * Mastery rule (from docs/srs.md + lib/stats/derive.ts):
@@ -97,7 +97,7 @@ export function deriveEvolutionFamilies(
   const reverseMasteredSet = new Set<number>();
 
   if (forceAllMastered) {
-    // All edges mastered — populate from SEED_EVOLUTION_CARDS edge ids.
+    // All edges mastered - populate from SEED_EVOLUTION_CARDS edge ids.
     for (const card of SEED_EVOLUTION_CARDS) {
       forwardMasteredSet.add(card.id);
       reverseMasteredSet.add(REVERSE_EDGE_ID_BASE + (card.id - EDGE_ID_BASE));
@@ -112,7 +112,7 @@ export function deriveEvolutionFamilies(
       } else if (card.cardType === "reverse-evolution") {
         const rc = card as ReverseEvolutionReviewCard;
         if (isMastered(rc.state, masteryRepetitions)) {
-          // Reverse card id — store as-is for lookup.
+          // Reverse card id - store as-is for lookup.
           reverseMasteredSet.add(rc.id);
         }
       }
@@ -131,7 +131,7 @@ export function deriveEvolutionFamilies(
 
   for (const pokemon of SEED_POKEMON) {
     if (!pokemon.isDefaultForm) continue;
-    if (pokemon.evolutionChain.length <= 1) continue; // Solo — no edges to display.
+    if (pokemon.evolutionChain.length <= 1) continue; // Solo - no edges to display.
 
     const key = chainKey(pokemon.evolutionChain);
     if (seenChainKeys.has(key)) continue;
@@ -182,7 +182,7 @@ export function deriveEvolutionFamilies(
   }
 
   // Sort: in-progress families first (at least one mastered edge, not completed),
-  // then untouched (nothing mastered yet), then fully completed last — so "still
+  // then untouched (nothing mastered yet), then fully completed last - so "still
   // to do" is never buried behind "done" in the default view. Within each group,
   // sort by rootId for stability.
   families.sort((a, b) => {
@@ -196,10 +196,10 @@ export function deriveEvolutionFamilies(
 }
 
 function familySortScore(f: EvolutionFamily): number {
-  if (f.completed) return 2; // done — sort last
+  if (f.completed) return 2; // done - sort last
   const anyMastered = f.edges.some((e) => e.forwardMastered || e.reverseMastered);
-  if (anyMastered) return 0; // in progress — sort first
-  return 1; // untouched — sort between in-progress and completed
+  if (anyMastered) return 0; // in progress - sort first
+  return 1; // untouched - sort between in-progress and completed
 }
 
 /** Computes headline stats for the wall. */
@@ -216,7 +216,7 @@ export function computeEvolutionWallStats(
  * True when an evolution family is "in progress": at least one edge has a
  * mastered direction (forward or reverse) but not every edge is fully
  * mastered. This is the exact predicate the Evolution Wall's "In progress"
- * filter uses (`matchesFilter` in `components/journey/EvolutionWall.tsx`) —
+ * filter uses (`matchesFilter` in `components/journey/EvolutionWall.tsx`) - 
  * keeping it here lets the "Incomplete evolution chains" practice preset
  * (#995) reuse the same definition so the wall and the preset never drift.
  */
@@ -226,7 +226,7 @@ export function familyInProgress(family: EvolutionFamily): boolean {
 }
 
 /**
- * Species ids that belong to an "incomplete evolution chain" — a chain the
+ * Species ids that belong to an "incomplete evolution chain" - a chain the
  * user has started but not finished mastering. Drives the "Incomplete
  * evolution chains" practice-scope preset (#995).
  *
@@ -242,7 +242,7 @@ export function familyInProgress(family: EvolutionFamily): boolean {
  * @param masteryRepetitions  The user's mastery-repetitions setting (default 3).
  * @param forceAllMastered    Honour the `pretendAllMastered` superuser flag.
  *   When true every edge is mastered, so every family is `completed` and none
- *   is in progress — the returned set is empty by design.
+ *   is in progress - the returned set is empty by design.
  */
 export function incompleteChainSpeciesIds(
   cards: readonly ReviewableCard[],

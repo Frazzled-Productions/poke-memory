@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * DashboardSnapshotContext — memoised, shared DashboardSnapshot computation.
+ * DashboardSnapshotContext - memoised, shared DashboardSnapshot computation.
  *
  * Both the Stats page and the Journey page independently computed a
  * DashboardSnapshot from the same card data. This context provider memoises
@@ -9,7 +9,7 @@
  * the same object without redundant work.
  *
  * Design: one input slot, one snapshot. Stats and Journey are different routes
- * so only one is ever mounted at a time — there is no multi-publisher
+ * so only one is ever mounted at a time - there is no multi-publisher
  * concurrency to solve. Each page calls useProvideDashboardSnapshotInput with
  * its full input on mount; the cleanup clears it on unmount.
  *
@@ -99,7 +99,7 @@ export function useDashboardSnapshot(): DashboardSnapshot | null {
 
 /**
  * Push the page's snapshot input into the context on mount and clear it on
- * unmount. Each page provides its full input — no axis filtering. Both pages
+ * unmount. Each page provides its full input - no axis filtering. Both pages
  * get the full snapshot and read the axes they need from it.
  *
  * Only one page is mounted at a time (Stats and Journey are separate routes),

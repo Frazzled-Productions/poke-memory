@@ -59,7 +59,7 @@ export const metadata: Metadata = {
         media:
           "(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
       },
-      // iPhone 16 Pro  (402 × 874 logical, 3×; 15 Pro / 14 Pro use 393 × 852 — see iphone16 entry)
+      // iPhone 16 Pro  (402 × 874 logical, 3×; 15 Pro / 14 Pro use 393 × 852 - see iphone16 entry)
       {
         url: "/splash/iphone16pro-portrait.png",
         media:
@@ -159,7 +159,7 @@ export default function RootLayout({
   // We default lang="en" on the <html> element here. The actual locale is
   // available to Server Components via setRequestLocale() inside LocaleProvider,
   // and to Client Components via NextIntlClientProvider. The lang attribute is
-  // an accessibility hint only — it does not need to be dynamic at the shell level.
+  // an accessibility hint only - it does not need to be dynamic at the shell level.
 
   return (
     <html
@@ -176,7 +176,7 @@ export default function RootLayout({
             __html: `try{var r=document.documentElement;var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var bg=d?'#111113':'#fafafa';r.style.background=bg;var s=JSON.parse(localStorage.getItem('poke-memory:settings:v1')||'null');if(s){var h=/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;var c=s.favouriteTheme&&s.favouriteTheme.colors;if(c&&h.test(c.primary))r.style.setProperty('--theme-primary',c.primary);if(c&&h.test(c.secondary))r.style.setProperty('--theme-secondary',c.secondary);if(c&&h.test(c.accent))r.style.setProperty('--theme-accent',c.accent);if(c&&h.test(c.fgOnPrimary))r.style.setProperty('--theme-fg-on-primary',c.fgOnPrimary);var i=s.themeIntensity;if(i==='tinted'||i==='full')r.setAttribute('data-intensity',i);}var ks=document.createElement('style');ks.textContent='@keyframes __pwa_b{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-18px) rotate(20deg)}}';document.head.appendChild(ks);var sk=d?'#555':'#1a1a1a';var sp=document.createElement('div');sp.id='pwa-splash';sp.setAttribute('aria-hidden','true');sp.style.cssText='position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;z-index:9999;pointer-events:none;background:'+bg+';color:'+(d?'#666':'#999')+';font-family:system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.06em;opacity:1;transition:opacity 0.2s ease-out;';sp.innerHTML='<div style="animation:__pwa_b 0.9s ease-in-out infinite"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="56" height="56" aria-hidden="true"><path d="M2 32A30 30 0 0 0 62 32Z" fill="#E01B2E"/><path d="M2 32A30 30 0 0 1 62 32Z" fill="white"/><circle cx="32" cy="32" r="30" fill="none" stroke="'+sk+'" stroke-width="2.5"/><line x1="2" y1="32" x2="62" y2="32" stroke="'+sk+'" stroke-width="2.5"/><circle cx="32" cy="32" r="9" fill="white" stroke="'+sk+'" stroke-width="2.5"/><circle cx="32" cy="32" r="5" fill="#e0e0e0"/></svg></div><span>Loading…</span>';r.appendChild(sp);}catch(e){}`,
           }}
         />
-        {/* Captures beforeinstallprompt synchronously — must run before React hydrates
+        {/* Captures beforeinstallprompt synchronously - must run before React hydrates
             so Chrome's mini-infobar is suppressed. The hook in PwaInstallNudge reads
             window.__pwaInstallPrompt after hydration. */}
         <script
@@ -254,7 +254,7 @@ export default function RootLayout({
                       {/*
                         BottomTabBar is always mounted but returns null internally when
                         mobileNav === 'hamburger'. The single Suspense boundary here is
-                        sufficient — the component has its own inner Suspense for the
+                        sufficient - the component has its own inner Suspense for the
                         async mastery check.
                       */}
                       <BottomTabBar />

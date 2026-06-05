@@ -115,7 +115,7 @@ export default function DueForecast({
     // On mobile WebKit, a tap fires synthetic mouseenter before onClick.
     // hoverOpenedIdx records the bar index that onMouseEnter just opened.
     // When click fires for the same bar, the tooltip is already open from
-    // hover — skip the toggle so we don't immediately close it again.
+    // hover - skip the toggle so we don't immediately close it again.
     if (hoverOpenedIdx.current === idx) {
       hoverOpenedIdx.current = null;
       lastInteraction.current = "click";
@@ -167,7 +167,7 @@ export default function DueForecast({
                   role="listitem"
                   className="group relative flex h-full flex-col justify-end"
                 >
-                  {/* Popup tooltip — shown on tap (mobile) or hover (desktop).
+                  {/* Popup tooltip - shown on tap (mobile) or hover (desktop).
                       Positioned with horizontal clamping so the tooltip never
                       bleeds off the panel edge on narrow viewports. */}
                   {isOpen && (
@@ -195,7 +195,7 @@ export default function DueForecast({
                     full date + count for screen readers; aria-describedby
                     references the tooltip when it is open, giving assistive
                     technology access to the supplementary popup content.
-                    aria-expanded is intentionally omitted — it signals an
+                    aria-expanded is intentionally omitted - it signals an
                     owned expandable region (accordion pattern), which does
                     not apply here; the tooltip is a sibling description, not
                     a controlled child.
@@ -213,7 +213,7 @@ export default function DueForecast({
                     }}
                     onMouseLeave={() => {
                       // Only dismiss on mouseleave when the tooltip was opened
-                      // by hovering — not by a tap. On hybrid touch+mouse
+                      // by hovering - not by a tap. On hybrid touch+mouse
                       // devices, tapping fires synthetic mouse events that
                       // would otherwise immediately close the popup.
                       hoverOpenedIdx.current = null;

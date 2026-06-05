@@ -244,7 +244,7 @@ describe("reconcile_grade_log_orphans (integration)", () => {
     const afterFirst = await getCardReviewRows(USER_ID, "4", "en");
     expect(afterFirst).toHaveLength(1);
 
-    // Run again — must not throw and must not change the row.
+    // Run again - must not throw and must not change the row.
     await callReconcile(false);
     const afterSecond = await getCardReviewRows(USER_ID, "4", "en");
     expect(afterSecond).toHaveLength(1);

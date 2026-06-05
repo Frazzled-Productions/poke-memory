@@ -75,7 +75,7 @@ import PokedexGrid from "@/components/pokedex/PokedexGrid";
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("PokedexGrid — locale name rendering", () => {
+describe("PokedexGrid - locale name rendering", () => {
   it("renders the English name when no localeNames map is supplied", () => {
     renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);
     expect(screen.getByText("Bulbasaur")).toBeInTheDocument();
@@ -172,7 +172,7 @@ describe("PokedexGrid — locale name rendering", () => {
   });
 
   it("distinguishes zh-Hans from zh-Hant by final character (种子 vs 種子)", () => {
-    // This test exists to ensure the two locales are genuinely distinct — a
+    // This test exists to ensure the two locales are genuinely distinct - a
     // renderer that collapses them would fail here.
     const hansMap: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "妙蛙种子", lang: "zh-Hans" }],
@@ -195,7 +195,7 @@ describe("PokedexGrid — locale name rendering", () => {
 // masteryCount label locale coverage (#1393)
 // ---------------------------------------------------------------------------
 
-describe("PokedexGrid — masteryCount label locale coverage (#1393)", () => {
+describe("PokedexGrid - masteryCount label locale coverage (#1393)", () => {
   it("renders the English mastery count label in en locale", () => {
     // BULBASAUR has cardClass: 'learning', so mastered=0, total=1
     renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);

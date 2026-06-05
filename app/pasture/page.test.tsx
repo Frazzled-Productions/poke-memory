@@ -1,7 +1,7 @@
 /**
  * Smoke tests for the Pasture page (#923).
  *
- * Covers lines 95 and 157 in app/pasture/page.tsx — both are the
+ * Covers lines 95 and 157 in app/pasture/page.tsx - both are the
  * useLocalStorageKey call and the handleMarkSeen callback body, which were
  * previously uninstrumented and failing the diff-coverage gate.
  */
@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithIntl, screen, waitFor } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
-// Mocks — declared before the component import.
+// Mocks - declared before the component import.
 // ---------------------------------------------------------------------------
 
 vi.mock("next/navigation", () => ({
@@ -175,7 +175,7 @@ import { loadSettings } from "@/lib/settings/persistence";
 
 /**
  * A minimal saved card as it exists in localStorage BEFORE hydration:
- * no habitat, no isDefaultForm — exactly the gap that caused the #1394
+ * no habitat, no isDefaultForm - exactly the gap that caused the #1394
  * regression where all species fell into the "unknown"/Wildlands bucket and
  * biomeStats reported 0 mastered per biome.
  */
@@ -197,7 +197,7 @@ const MASTERED_FSRS_STATE = {
 };
 
 /**
- * The card BEFORE hydration — minimal shape matching what QA-seed and
+ * The card BEFORE hydration - minimal shape matching what QA-seed and
  * localStorage store: no habitat, no isDefaultForm.
  */
 const RAW_SAVED_NAME_CARD = {
@@ -212,12 +212,12 @@ const RAW_SAVED_NAME_CARD = {
   speciesId: 25,
   spriteUrl: "/sprites/pokemon/25.png",
   types: ["electric"],
-  // The two fields that QA-seeded cards do NOT have — this is the gap:
+  // The two fields that QA-seeded cards do NOT have - this is the gap:
   // habitat and isDefaultForm are undefined here.
 };
 
 /**
- * The reverse card for the same species — also mastered. filterMastered
+ * The reverse card for the same species - also mastered. filterMastered
  * requires BOTH the name card and the reverse card to be mastered for a
  * species to appear in the pasture (since #1234).
  */
@@ -235,7 +235,7 @@ const RAW_SAVED_REVERSE_CARD = {
 };
 
 /**
- * The card AFTER hydration — hydrateSession backfills habitat and
+ * The card AFTER hydration - hydrateSession backfills habitat and
  * isDefaultForm from SEED_POKEMON so biomeStats and buildZoneData can
  * place the card in the correct biome bucket.
  */
@@ -289,7 +289,7 @@ describe("PasturePage", () => {
 
   it("renders the empty-pasture message when there are no mastered cards (line 157 path)", async () => {
     // With no session and no mastered cards the page shows the empty-state copy
-    // after loading — this exercises the loaded branch at line 157 onwards.
+    // after loading - this exercises the loaded branch at line 157 onwards.
     mockLoadSession.mockResolvedValue(null);
 
     renderWithIntl(<PasturePage />);
@@ -302,7 +302,7 @@ describe("PasturePage", () => {
   });
 
   /**
-   * Regression guard for #1394 — the hydrate→filter→count chain.
+   * Regression guard for #1394 - the hydrate→filter→count chain.
    *
    * Before the fix, the Pasture page called filterMastered on the raw saved
    * session (no habitat, no isDefaultForm). biomeStats then fell back to the
@@ -317,15 +317,15 @@ describe("PasturePage", () => {
    * 4. The mastered count in the page heading is non-zero.
    *
    * If someone removes the hydrateSession call, step 2 assertion fails and
-   * filterMastered receives the raw cards instead — the mock returns [] for
+   * filterMastered receives the raw cards instead - the mock returns [] for
    * non-hydrated input, making the heading disappear and step 4 fail too.
    */
-  it("hydrates saved cards before filtering — mastered count is non-zero (#1394 regression)", async () => {
+  it("hydrates saved cards before filtering - mastered count is non-zero (#1394 regression)", async () => {
     const rawCards = [RAW_SAVED_NAME_CARD, RAW_SAVED_REVERSE_CARD];
     const hydratedCards = [HYDRATED_NAME_CARD, HYDRATED_REVERSE_CARD];
 
     // Return a real session whose cards are in the un-hydrated shape
-    // (no habitat, no isDefaultForm) — exactly the QA-seed / localStorage shape.
+    // (no habitat, no isDefaultForm) - exactly the QA-seed / localStorage shape.
     mockLoadSession.mockResolvedValue({
       cards: rawCards,
       buildTimestamp: "2026-01-01T00:00:00.000Z",
@@ -339,8 +339,8 @@ describe("PasturePage", () => {
     // for masteredCards). Use mockImplementation (not Once) so both calls
     // return the mastered subset. The implementation is conditional: it returns
     // the mastered card only when the input has been hydrated (habitat === "forest"),
-    // so the test fails if hydrateSession is bypassed and the raw cards — which
-    // have no habitat — are passed to filterMastered instead.
+    // so the test fails if hydrateSession is bypassed and the raw cards - which
+    // have no habitat - are passed to filterMastered instead.
     vi.mocked(filterMastered).mockImplementation((cards) => {
       // Only return mastered cards when the input has been hydrated (has habitat).
       const firstCard = cards[0] as { habitat?: string; cardType: string };
@@ -352,7 +352,7 @@ describe("PasturePage", () => {
 
     renderWithIntl(<PasturePage />);
 
-    // Assert hydrateSession was called — removing it breaks this step.
+    // Assert hydrateSession was called - removing it breaks this step.
     await waitFor(() => {
       expect(hydrateSession).toHaveBeenCalled();
     });
@@ -367,7 +367,7 @@ describe("PasturePage", () => {
 
   /**
    * Inverse of the regression guard: if hydrateSession returns the raw
-   * (un-enriched) cards — as though the call were absent — the filterMastered
+   * (un-enriched) cards - as though the call were absent - the filterMastered
    * mock returns [] and the empty-state body is shown instead of the count.
    *
    * This makes the regression explicit: a reviewer can see exactly what breaks
@@ -381,7 +381,7 @@ describe("PasturePage", () => {
       buildTimestamp: "2026-01-01T00:00:00.000Z",
     });
 
-    // hydrateSession returns the raw cards unchanged — simulating its removal.
+    // hydrateSession returns the raw cards unchanged - simulating its removal.
     vi.mocked(hydrateSession).mockReturnValueOnce({ cards: rawCards as unknown as ReviewableCard[], anyHealed: false });
 
     // filterMastered returns [] for un-hydrated cards (no habitat).
@@ -395,7 +395,7 @@ describe("PasturePage", () => {
 
     renderWithIntl(<PasturePage />);
 
-    // Empty state is shown — the count heading is absent.
+    // Empty state is shown - the count heading is absent.
     await waitFor(() => {
       expect(screen.getByText(/master your first pokémon/i)).toBeInTheDocument();
     });
@@ -403,7 +403,7 @@ describe("PasturePage", () => {
   });
 
   /**
-   * Persistence fixed-point guard for #1506 — non-Practice entry paths.
+   * Persistence fixed-point guard for #1506 - non-Practice entry paths.
    *
    * When hydrateSession reports anyHealed:true, the Pasture page must call
    * saveSession with the healed cards so the fixed point is reached on the
@@ -425,7 +425,7 @@ describe("PasturePage", () => {
     renderWithIntl(<PasturePage />);
 
     // saveSession must be called with the healed cards so the corrected state
-    // persists — subsequent loads will find anyHealed:false and skip the write.
+    // persists - subsequent loads will find anyHealed:false and skip the write.
     await waitFor(() => {
       expect(saveSession).toHaveBeenCalledWith(
         expect.objectContaining({ cards: healedCards }),
@@ -441,7 +441,7 @@ describe("PasturePage", () => {
 // (mastered-collection view) in all four locales.
 // ---------------------------------------------------------------------------
 
-describe("PasturePage — empty state copy (#1440)", () => {
+describe("PasturePage - empty state copy (#1440)", () => {
   it("en: empty state explains the mastered-collection purpose", async () => {
     mockLoadSession.mockResolvedValue(null);
     renderWithIntl(<PasturePage />);

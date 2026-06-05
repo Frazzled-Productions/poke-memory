@@ -89,7 +89,7 @@ describe("useSignInPull", () => {
     expect(mockPullAndMerge).toHaveBeenCalledWith(CLIENT, USER_A, false);
   });
 
-  it("ignores promise rejection from pullAndMerge (defensive — real impl never rejects)", async () => {
+  it("ignores promise rejection from pullAndMerge (defensive - real impl never rejects)", async () => {
     mockPullAndMerge.mockRejectedValueOnce(new Error("network"));
     await act(async () => {
       renderHook(() => useSignInPull(CLIENT, USER_A));

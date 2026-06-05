@@ -1,5 +1,5 @@
 /**
- * Component tests for app/journey/page.tsx — i18n wiring (#1369).
+ * Component tests for app/journey/page.tsx - i18n wiring (#1369).
  *
  * Verifies that all user-facing strings flow through useTranslations() and
  * render the correct values in English and Japanese.
@@ -13,7 +13,7 @@ import { renderWithIntl, renderJa, screen, waitFor } from "@/components/test-uti
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Module mocks — declared before component imports.
+// Module mocks - declared before component imports.
 // ---------------------------------------------------------------------------
 
 vi.mock("next/link", () => ({
@@ -229,7 +229,7 @@ beforeEach(async () => {
   computeStreak.mockReturnValue(0);
 });
 
-describe("JourneyPage — English locale", () => {
+describe("JourneyPage - English locale", () => {
   it("renders the current streak heading", async () => {
     renderWithIntl(<JourneyPage />);
 
@@ -275,7 +275,7 @@ describe("JourneyPage — English locale", () => {
   });
 });
 
-describe("JourneyPage — with active streak", () => {
+describe("JourneyPage - with active streak", () => {
   beforeEach(async () => {
     const { computeStreak } = vi.mocked(
       await import("@/lib/streak"),
@@ -294,7 +294,7 @@ describe("JourneyPage — with active streak", () => {
   });
 });
 
-describe("JourneyPage — Japanese locale", () => {
+describe("JourneyPage - Japanese locale", () => {
   it("renders the current streak heading in Japanese", async () => {
     renderJa(<JourneyPage />);
 

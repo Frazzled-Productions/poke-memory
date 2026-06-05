@@ -40,7 +40,7 @@ import type { TypeStats } from "@/lib/stats/derive";
 import type { GradeDistribution } from "@/lib/stats/grade-distribution";
 
 // ---------------------------------------------------------------------------
-// Recharts mock — GradeDistributionChart (BarChart) and MasteryOverTimeChart
+// Recharts mock - GradeDistributionChart (BarChart) and MasteryOverTimeChart
 // (AreaChart) render through recharts, which needs ResizeObserver that jsdom
 // cannot satisfy. Lightweight stubs let both components run their own JSX.
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ const CASES: ReadonlyArray<{
 // Tests
 // ---------------------------------------------------------------------------
 
-describe.each(CASES)("$name — locale coverage", ({ render, headings }) => {
+describe.each(CASES)("$name - locale coverage", ({ render, headings }) => {
   it.each(LOCALES)("renders its heading in %s", (locale) => {
     LOCALE_RENDER[locale](render());
     expect(

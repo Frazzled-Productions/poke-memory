@@ -22,7 +22,7 @@ export const STORAGE_KEY = KEY_SYNC_STATUS;
  * (with a trailing debounce so rapid grading does not thrash storage) and
  * cleared after a fully-successful drain so stale data does not accumulate.
  *
- * Only written when a real (non-superuser) session is active — a null
+ * Only written when a real (non-superuser) session is active - a null
  * client/userId in `usePerGradeSync` causes the queue to be cleared rather
  * than persisted, ensuring a QA session never leaves fake state behind.
  */
@@ -38,13 +38,13 @@ export type SyncStatus = {
   lastPullAt: string | null;
   /** ISO timestamp of the last user_settings row this device applied (server updated_at). Tracked separately because settings live in a different table from cards and have an independent write cadence (#572). */
   lastSettingsPullAt: string | null;
-  /** ISO timestamp of the `user_settings.last_reset_at` this device has already reconciled. When cloud advances this past the local value, `pullAndMerge` calls `clearLocalProgress` before merging — that's how stale local stops resurrecting deleted rows (#576). Null = never seen a reset on this device. */
+  /** ISO timestamp of the `user_settings.last_reset_at` this device has already reconciled. When cloud advances this past the local value, `pullAndMerge` calls `clearLocalProgress` before merging - that's how stale local stops resurrecting deleted rows (#576). Null = never seen a reset on this device. */
   lastSeenResetAt: string | null;
   /**
    * SQLSTATE code of a structural (non-transient) error on the card_reviews
    * primary sync path (#1358). Set immediately on detection; never set by the
    * auxiliary legs (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs).
-   * Non-null means retrying is pointless — the error signals a deploy/schema
+   * Non-null means retrying is pointless - the error signals a deploy/schema
    * mismatch (e.g. 42P10: ON CONFLICT column list does not match any unique
    * constraint). Only cleared when a push subsequently succeeds (structural
    * fixes require a deploy, not a user action).
@@ -96,12 +96,12 @@ function parseSyncStatus(raw: string): SyncStatus {
  *   `lastPushFailed` to avoid showing a phantom failure count.
  * - `usePerGradeSync` stamps `lastPushAt` on *any-success*
  *   (`results.some(r => r.ok)`), not all-success. The "any progress is
- *   progress" semantic is deliberate — a partial-success debounced push still
- *   moved the cloud forward — and differs from the unload path, which flags
+ *   progress" semantic is deliberate - a partial-success debounced push still
+ *   moved the cloud forward - and differs from the unload path, which flags
  *   failure whenever `failedCardCount > 0`.
  * - `structuralSyncError` is deliberately NOT cleared here. A successful
  *   auxiliary-leg push (pushSettings, pushStreak, etc.) during a live 42P10
- *   incident must not clear the card_reviews structural banner — that would
+ *   incident must not clear the card_reviews structural banner - that would
  *   cause a false-clear flicker. Only a successful card_reviews push clears
  *   it, via clearStructuralSyncError in pushSingleCard / pushSession (#1358
  *   FIX 2). The Stats page banner correctly reads structuralSyncError from
@@ -118,7 +118,7 @@ export function markPushSucceeded(at = new Date().toISOString()): void {
  * lastPushAttemptAt so the Stats page banner renders. Called by the per-grade
  * path after N consecutive all-failure drains (#606).
  *
- * Intentionally does not clear lastPushAt — the last successful sync timestamp
+ * Intentionally does not clear lastPushAt - the last successful sync timestamp
  * should remain visible until the user retries.
  */
 export function markPushFailed(failedCardCount: number, at = new Date().toISOString()): void {
@@ -141,10 +141,10 @@ export function saveSyncStatus(status: SyncStatus): void {
   // writeLocalStorage handles SSR guard + try/catch. The StorageEvent dispatch
   // is kept explicit here because it re-reads the key after the write (so
   // newValue is always the serialised-and-stored form, not the pre-serialisation
-  // value) — a deliberately defensive convention in the sync layer.
+  // value) - a deliberately defensive convention in the sync layer.
   writeLocalStorage(STORAGE_KEY, status);
 
-  // Same-tab subscribers (useLocalStorageKey) require a synthetic StorageEvent —
+  // Same-tab subscribers (useLocalStorageKey) require a synthetic StorageEvent - 
   // the browser only fires the native event in *other* tabs. Centralising the
   // dispatch here means every writer satisfies the invariant without remembering
   // it explicitly. Mirrors the saveSession pattern in lib/review/persistence.ts.
@@ -179,7 +179,7 @@ export function saveSyncStatus(status: SyncStatus): void {
  * Loads the persisted pending-grade queue from localStorage.
  * Returns an empty array when the key is absent, malformed, or not an array.
  * Individual entries that are not plain objects are dropped rather than
- * rejecting the whole array — partial corruption is better than total loss.
+ * rejecting the whole array - partial corruption is better than total loss.
  */
 export function loadPendingQueue(): ReviewableCard[] {
   return readLocalStorage(PENDING_QUEUE_KEY, parsePendingQueue, []);
@@ -192,7 +192,7 @@ function parsePendingQueue(raw: string): ReviewableCard[] {
   // fields needed to push a card via pushSingleCard: `id` (dedup key),
   // `cardType` and `subjectKey` (the DB primary key alongside user_id), and
   // `state` (the FSRS payload). Entries missing any of these are dropped
-  // rather than rejecting the whole array — partial corruption is better
+  // rather than rejecting the whole array - partial corruption is better
   // than total loss. A full schema validation is intentionally omitted;
   // the data was written by this app so the risk is malformed storage,
   // not adversarial input.
@@ -214,7 +214,7 @@ function parsePendingQueue(raw: string): ReviewableCard[] {
 /**
  * Persists the pending-grade queue to localStorage AND mirrors it to
  * IndexedDB. The IDB mirror is the source the service worker reads on
- * Background Sync (#1054) — service workers cannot access localStorage, so the
+ * Background Sync (#1054) - service workers cannot access localStorage, so the
  * IDB copy is required for the offline-grade-replay path. Both writes are
  * best-effort; errors are swallowed so a quota-full condition never interrupts
  * the review session.

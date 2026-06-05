@@ -4,7 +4,7 @@ import { clearLocalProgress } from "@/lib/storage/reset";
 
 // Note: the tests that exercise the localStorage settings-key sweep inside
 // deleteAccountEverywhere live in components/settings/deleteAccount-local.test.tsx
-// — they need a DOM (jsdom), and lib/ tests run in the DOM-free `node` project.
+// - they need a DOM (jsdom), and lib/ tests run in the DOM-free `node` project.
 
 vi.mock("@/lib/storage/reset", () => ({
   clearLocalProgress: vi.fn(async () => {}),

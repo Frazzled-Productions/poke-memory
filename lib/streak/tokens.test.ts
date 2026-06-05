@@ -87,7 +87,7 @@ describe("validateStreakProtection", () => {
   });
 });
 
-describe("applyProtectionStep — earn leg", () => {
+describe("applyProtectionStep - earn leg", () => {
   it("increments daysSinceLastEarn when today is a review day", () => {
     const dates = ["2026-05-09"];
     const result = applyProtectionStep(blank(), dates, "2026-05-09");
@@ -136,7 +136,7 @@ describe("applyProtectionStep — earn leg", () => {
   });
 });
 
-describe("applyProtectionStep — earn-counter reset on streak break", () => {
+describe("applyProtectionStep - earn-counter reset on streak break", () => {
   // Build an ISO date sequence by offsetting from a base date.
   function isoOffset(base: string, days: number): string {
     const d = new Date(base + "T00:00:00Z");
@@ -147,7 +147,7 @@ describe("applyProtectionStep — earn-counter reset on streak break", () => {
   it("resets the earn counter when the streak is broken without a bridging spend", () => {
     // User reviews 20 consecutive days starting 2026-04-01, takes a 14-day
     // break, then reviews 10 more days. The earn counter must reflect only
-    // the latest 10 consecutive review days, not 30 — no token earned.
+    // the latest 10 consecutive review days, not 30 - no token earned.
     const base = "2026-04-01";
     const reviews: string[] = [];
     for (let i = 0; i < 20; i++) reviews.push(isoOffset(base, i));
@@ -196,7 +196,7 @@ describe("applyProtectionStep — earn-counter reset on streak break", () => {
   });
 
   it("does not reset when consecutive review days are unbroken", () => {
-    // Two adjacent review days — the chain is intact, no reset.
+    // Two adjacent review days - the chain is intact, no reset.
     const start: StreakProtection = {
       ...DEFAULT_STREAK_PROTECTION,
       daysSinceLastEarn: 5,
@@ -207,7 +207,7 @@ describe("applyProtectionStep — earn-counter reset on streak break", () => {
   });
 });
 
-describe("applyProtectionStep — spend leg", () => {
+describe("applyProtectionStep - spend leg", () => {
   it("auto-spends a token to bridge yesterday when balance >= 1", () => {
     const start: StreakProtection = { ...DEFAULT_STREAK_PROTECTION, balance: 2 };
     // Reviewed two days ago and today, missed yesterday. Today is NOT in the
@@ -253,7 +253,7 @@ describe("applyProtectionStep — spend leg", () => {
     // Walk through each resume day: each pass should spend one token.
     //
     // Setup: reviewed on 2026-05-04. Missed 05, 06, 07. Resumes 08.
-    // On 2026-05-08: yesterday (07) missing, day-before (06) missing — no spend (streak dead, gap > 1).
+    // On 2026-05-08: yesterday (07) missing, day-before (06) missing - no spend (streak dead, gap > 1).
     // So we simulate the typical case where each single-day gap gets bridged
     // at the resume of the *next* day, stepping through contiguous misses.
     //
@@ -319,7 +319,7 @@ describe("applyProtectionStep — spend leg", () => {
 
   it("a fresh-user single review day does not trigger a spend", () => {
     // The user just reviewed for the first time today. There is no prior
-    // streak to protect — day-before-yesterday is missing.
+    // streak to protect - day-before-yesterday is missing.
     const start: StreakProtection = { ...DEFAULT_STREAK_PROTECTION, balance: 3 };
     const result = applyProtectionStep(start, ["2026-05-09"], "2026-05-09");
     expect(result.spent).toBe(false);
@@ -327,7 +327,7 @@ describe("applyProtectionStep — spend leg", () => {
   });
 });
 
-describe("applyProtectionStep — multi-day bridge (#1399)", () => {
+describe("applyProtectionStep - multi-day bridge (#1399)", () => {
   // Helper: offset a date string by N days (UTC).
   function isoOffset(base: string, days: number): string {
     const d = new Date(base + "T00:00:00Z");
@@ -377,7 +377,7 @@ describe("applyProtectionStep — multi-day bridge (#1399)", () => {
   });
 
   it("does NOT spend when multi-day gap is larger than balance (all-or-nothing)", () => {
-    // 5-day gap, balance=3 — unsavable, preserve balance.
+    // 5-day gap, balance=3 - unsavable, preserve balance.
     const base = "2026-05-01";
     const start: StreakProtection = { ...DEFAULT_STREAK_PROTECTION, balance: 3 };
     const result = applyProtectionStep(start, [base], isoOffset(base, 6));
@@ -389,7 +389,7 @@ describe("applyProtectionStep — multi-day bridge (#1399)", () => {
   it("does NOT spend when gap == 1 but there is no anchor (new user, no prior streak)", () => {
     // A brand-new user with tokens who missed yesterday but has NO prior review.
     const start: StreakProtection = { ...DEFAULT_STREAK_PROTECTION, balance: 1 };
-    // No streakDates at all — there is nothing to anchor the gap.
+    // No streakDates at all - there is nothing to anchor the gap.
     const result = applyProtectionStep(start, [], "2026-05-09");
     expect(result.spent).toBe(false);
     expect(result.protection.balance).toBe(1);
@@ -397,10 +397,10 @@ describe("applyProtectionStep — multi-day bridge (#1399)", () => {
 
   it("bridges a 2-day gap when anchor is a prior SPEND date (not a review date)", () => {
     // Last review was day -4 (2026-04-27); spend already bridges day -3
-    // (2026-04-28); gap = days -2 (2026-04-29) and -1 (2026-04-30) — two
+    // (2026-04-28); gap = days -2 (2026-04-29) and -1 (2026-04-30) - two
     // missing days anchored by the spend on day -3.
     const base = "2026-05-01";
-    const spendAnchor = isoOffset(base, -3); // 2026-04-28 — the anchor
+    const spendAnchor = isoOffset(base, -3); // 2026-04-28 - the anchor
     const today = base; // 2026-05-01
     const start: StreakProtection = {
       ...DEFAULT_STREAK_PROTECTION,
@@ -424,7 +424,7 @@ describe("applyProtectionStep — multi-day bridge (#1399)", () => {
     //
     // Timeline: reviewed days base-1 (anchor) and today (base+4); missed base,
     // base+1, base+2, base+3 (four days). But today is base+4, so the gap
-    // seen by the walk-back is yesterday (base+3), base+2, base+1 — three days.
+    // seen by the walk-back is yesterday (base+3), base+2, base+1 - three days.
     // The anchor is base-1 (in reviewDays), which is at walk offset i=5 (i >
     // MAX_BALANCE=3 so it's beyond the scan range).
     //
@@ -432,7 +432,7 @@ describe("applyProtectionStep — multi-day bridge (#1399)", () => {
     // Use base as anchor day and base+1, base+2, base+3 as the 3-day gap.
     // today = base+4; reviewDays = [base-29..base-1, base, base+4].
     const base = "2026-05-01";
-    const today = isoOffset(base, 4); // 2026-05-05 — open after 3-day absence
+    const today = isoOffset(base, 4); // 2026-05-05 - open after 3-day absence
     // Build review days: anchor is base (2026-05-01) + 29 days before it.
     const reviewDays: string[] = [];
     for (let i = -29; i <= 0; i++) reviewDays.push(isoOffset(base, i));
@@ -488,7 +488,7 @@ describe("applyProtectionStep — multi-day bridge (#1399)", () => {
     const r1 = applyProtectionStep(start, [base], today);
     expect(r1.spent).toBe(true);
 
-    // Second call on the same today — bridged days are already in spendDates.
+    // Second call on the same today - bridged days are already in spendDates.
     const r2 = applyProtectionStep(r1.protection, [base], today);
     expect(r2.spent).toBe(false);
     expect(r2.protection.balance).toBe(r1.protection.balance);
@@ -497,7 +497,7 @@ describe("applyProtectionStep — multi-day bridge (#1399)", () => {
   });
 });
 
-describe("applyProtectionStep — earn counter preserved across multi-day bridge (#1399)", () => {
+describe("applyProtectionStep - earn counter preserved across multi-day bridge (#1399)", () => {
   function isoOffset(base: string, days: number): string {
     const d = new Date(base + "T00:00:00Z");
     d.setUTCDate(d.getUTCDate() + days);
@@ -506,7 +506,7 @@ describe("applyProtectionStep — earn counter preserved across multi-day bridge
 
   it("preserves daysSinceLastEarn across a 3-day bridge (no spurious reset)", () => {
     // User has 20 consecutive review days, misses 3, opens on day 24 with 3 tokens.
-    // After bridging, they practise on day 24 — daysSinceLastEarn should continue
+    // After bridging, they practise on day 24 - daysSinceLastEarn should continue
     // from 20, not reset to 0.
     const base = "2026-04-01";
     const reviewDays: string[] = [];
@@ -529,7 +529,7 @@ describe("applyProtectionStep — earn counter preserved across multi-day bridge
 
     // Now open on day 23 (today), which also has a review.
     // The spend leg fires first and bridges days 20, 21, 22.
-    // The earn leg then runs with spendSet updated — no reset expected.
+    // The earn leg then runs with spendSet updated - no reset expected.
     const result = applyProtectionStep(state, reviewDays, today);
     expect(result.spent).toBe(true);
     // daysSinceLastEarn should be 21 (20 + today's review), not reset to 0 or 1.
@@ -538,7 +538,7 @@ describe("applyProtectionStep — earn counter preserved across multi-day bridge
   });
 });
 
-describe("applyProtectionStep — combined earn + spend", () => {
+describe("applyProtectionStep - combined earn + spend", () => {
   it("can earn and spend in the same call if both conditions hold", () => {
     // Edge case: today is a review day (so counter increments), yesterday
     // was missed, day-before-yesterday was a review day. If the counter
@@ -561,7 +561,7 @@ describe("applyProtectionStep — combined earn + spend", () => {
   });
 });
 
-describe("applyProtectionStep — protection event recording", () => {
+describe("applyProtectionStep - protection event recording", () => {
   it("records an 'earned' event when a token is earned but not spent", () => {
     const start: StreakProtection = {
       ...DEFAULT_STREAK_PROTECTION,
@@ -656,7 +656,7 @@ describe("applyProtectionStep — protection event recording", () => {
     expect(result.protection.protectionEvents[0].date).toBe("2026-04-02");
   });
 
-  it("is idempotent — no duplicate event when the same day runs twice", () => {
+  it("is idempotent - no duplicate event when the same day runs twice", () => {
     // Earn fires once; a second call on the same day hits the
     // lastEarnCheckDate guard so no new event is appended.
     const start: StreakProtection = {
@@ -697,7 +697,7 @@ describe("integration: effectiveStreakDates + computeStreak", () => {
 
   it("a stale spend more than the grace window ago does not start a streak", () => {
     // If the only effective date is 3 days ago, the grace window does not
-    // bridge that gap — computeStreak returns 0.
+    // bridge that gap - computeStreak returns 0.
     const effective = effectiveStreakDates([], ["2026-05-06"]);
     expect(computeStreak(effective, "2026-05-09")).toBe(0);
   });

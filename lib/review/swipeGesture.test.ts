@@ -64,11 +64,11 @@ describe("resolveSwipe", () => {
       const angleRad = ((MAX_DIAGONAL_DEG - 1) * Math.PI) / 180;
       const dy = Math.round(Math.tan(angleRad) * 100);
       const result = resolveSwipe(100, dy);
-      expect(result).not.toBeNull(); // just within threshold — should resolve
+      expect(result).not.toBeNull(); // just within threshold - should resolve
     });
 
     it("accepts a nearly horizontal swipe", () => {
-      // 10° from horizontal — well within the horizontal band.
+      // 10° from horizontal - well within the horizontal band.
       const result = resolveSwipe(100, 18); // atan(18/100) ≈ 10°
       expect(result?.direction).toBe("right");
     });

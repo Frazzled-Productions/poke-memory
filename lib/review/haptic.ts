@@ -3,10 +3,10 @@
  *
  * Two progressive-enhancement paths:
  *
- * 1. Vibration API (Android / Chromium) — `navigator.vibrate(ms)`.
+ * 1. Vibration API (Android / Chromium) - `navigator.vibrate(ms)`.
  *    Feature-detected; no-ops when absent.
  *
- * 2. iOS switch technique (iOS 17.4+) — toggling an `<input type="checkbox"
+ * 2. iOS switch technique (iOS 17.4+) - toggling an `<input type="checkbox"
  *    switch>` via a programmatic label click triggers a system haptic in Mobile
  *    Safari. The hidden switch element is rendered by `useHapticSwitch` and
  *    passed in as `triggerIosHaptic`.
@@ -22,7 +22,7 @@ import type { Grade } from "@/lib/review/session";
  * Returns true when the `switch` attribute on `<input type="checkbox">` is
  * recognised by the current browser (iOS Safari 17.4+).
  *
- * Pure synchronous feature-detect — safe to call in any browser context.
+ * Pure synchronous feature-detect - safe to call in any browser context.
  */
 export function supportsSwitchHaptic(): boolean {
   if (typeof document === "undefined") return false;
@@ -42,7 +42,7 @@ export function supportsVibration(): boolean {
 
 /**
  * Returns true when the user has requested reduced motion.
- * Safe to call during SSR (returns false — no preference known).
+ * Safe to call during SSR (returns false - no preference known).
  */
 export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined") return false;
@@ -57,10 +57,10 @@ export function prefersReducedMotion(): boolean {
  * `Good` / `Easy` get a short, light pulse.
  */
 const VIBRATION_PATTERN: Record<Grade, number | number[]> = {
-  1: [30, 60, 30], // Again — double pulse
-  2: 40,           // Hard — moderate single
-  4: 20,           // Good — light single
-  5: 15,           // Easy — lightest single
+  1: [30, 60, 30], // Again - double pulse
+  2: 40,           // Hard - moderate single
+  4: 20,           // Good - light single
+  5: 15,           // Easy - lightest single
 };
 
 /**
@@ -68,7 +68,7 @@ const VIBRATION_PATTERN: Record<Grade, number | number[]> = {
  *
  * @param grade       The grade value (1 / 2 / 4 / 5).
  * @param triggerIos  Callback that performs the iOS switch toggle. Pass the
- *                    return value of `useHapticSwitch` — or `null` when the
+ *                    return value of `useHapticSwitch` - or `null` when the
  *                    hook is not yet mounted.
  */
 export function triggerHaptic(
@@ -77,7 +77,7 @@ export function triggerHaptic(
 ): void {
   if (prefersReducedMotion()) return;
 
-  // Prefer the Vibration API when available — works on Android / Chromium.
+  // Prefer the Vibration API when available - works on Android / Chromium.
   if (supportsVibration()) {
     navigator.vibrate(VIBRATION_PATTERN[grade]);
     return;

@@ -7,7 +7,7 @@ import type { RefObject } from "react";
  * Returns a ref whose `.current` is always in sync with `value`.
  *
  * A ref is created once on the first render and then `ref.current` is assigned
- * to `value` on every subsequent render — before any effects fire. This makes
+ * to `value` on every subsequent render - before any effects fire. This makes
  * the ref safe to read inside event-listener closures that are registered once
  * (empty-dependency `useEffect`) but need access to the latest props or state
  * without re-registering on every change.

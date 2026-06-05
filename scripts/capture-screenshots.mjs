@@ -47,7 +47,7 @@ const OUT_DIR = join(
   "screenshots",
 );
 
-// Locked viewport — iPhone 17 Pro CSS dimensions at 3× device-pixel ratio.
+// Locked viewport - iPhone 17 Pro CSS dimensions at 3× device-pixel ratio.
 // Don't change without also re-shooting all existing screenshots so the
 // README grid stays uniform.
 const VIEWPORT = { width: 402, height: 874 };

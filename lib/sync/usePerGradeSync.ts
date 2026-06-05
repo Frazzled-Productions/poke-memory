@@ -30,22 +30,22 @@ const PERSIST_DEBOUNCE_MS = 500;
 /**
  * Debounced per-grade sync hook. Returns { enqueueGrade, flushPending }.
  *
- * enqueueGrade(card) — fire-and-forget. Adds the card to the pending queue
+ * enqueueGrade(card) - fire-and-forget. Adds the card to the pending queue
  * and arms a 200 ms debounce. When the timer fires, all queued cards are
  * upserted one at a time; successes are drained, failures stay queued for
  * the next grade or the unload safety-net.
  *
- * flushPending() — returns a snapshot of the current unsynced queue; does not
+ * flushPending() - returns a snapshot of the current unsynced queue; does not
  * modify the queue or cancel any pending timer. Pass this to useSyncOnUnload
  * so it can batch only the cards that failed the per-grade path.
  *
- * Guest-mode guard runs on every enqueueGrade call — safe across sign-in
+ * Guest-mode guard runs on every enqueueGrade call - safe across sign-in
  * state changes mid-session.
  *
  * Persisted queue (#893): the pending queue is written to localStorage on a
  * 500 ms trailing debounce so rapid grading does not thrash storage. The key
  * is cleared after a fully-successful drain. When client/userId are null (guest
- * or superuser write-guard), the key is cleared rather than written — a QA
+ * or superuser write-guard), the key is cleared rather than written - a QA
  * session must never leave fake state behind.
  */
 export function usePerGradeSync(
@@ -64,14 +64,14 @@ export function usePerGradeSync(
   const consecutiveFailuresRef = useRef(0);
   // Separate debounce timer for localStorage persistence (#893). Using a
   // longer window (500 ms) than the push debounce (200 ms) so rapid grading
-  // does not thrash storage — a short burst of grades produces at most one
+  // does not thrash storage - a short burst of grades produces at most one
   // localStorage write.
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Flush the persist debounce on unmount so the last snapshot is written even
   // if the component tears down before the 500 ms window elapses. Flushing
   // (synchronous write) is preferable to dropping because the queue represents
-  // grades the user has already submitted — losing the persisted snapshot
+  // grades the user has already submitted - losing the persisted snapshot
   // between the grade and the network push would silently abandon those cards
   // if the tab is then force-killed. The existing push-debounce (timerRef) is
   // left to cancel naturally; it fires async network calls and it is safer to
@@ -107,7 +107,7 @@ export function usePerGradeSync(
         return;
       }
       markStructuralProbeAttempted();
-      // Fall through — allow the drain to proceed as the single probe attempt.
+      // Fall through - allow the drain to proceed as the single probe attempt.
       // pushSingleCard / pushSession will mark or clear structuralSyncError based
       // on the result, so this path self-heals automatically on success.
     }
@@ -119,7 +119,7 @@ export function usePerGradeSync(
     const cardLocaleKey = (card: (typeof toSend)[0]) => `${card.id}:${card.locale ?? "en"}`;
     const sentKeys = new Set(toSend.map(cardLocaleKey));
 
-    // No in-flight guard here — concurrent drains produce idempotent upserts,
+    // No in-flight guard here - concurrent drains produce idempotent upserts,
     // so the only shared-state risk is the pendingQueueRef filter below writing
     // on stale read. That outcome is benign: each drain removes its own sentKeys
     // independently, so no grade is permanently lost. A guard would add
@@ -132,7 +132,7 @@ export function usePerGradeSync(
     );
 
     // Check whether any push produced a new structural error (#1358). If so,
-    // markStructuralSyncError was already called inside pushSingleCard — persist
+    // markStructuralSyncError was already called inside pushSingleCard - persist
     // the queue so grades survive and return early. Further drains short-circuit
     // on the structuralSyncError guard above (or attempt a single probe next session).
     if (loadSyncStatus().structuralSyncError !== null && !results.some((r) => r.ok)) {
@@ -146,7 +146,7 @@ export function usePerGradeSync(
     // Keep a card in the queue if it wasn't part of this drain (a newer grade
     // arrived during the await window) or if it was sent but failed. If two
     // concurrent drains both attempted the same card, the queue entry at
-    // filter-time reflects the latest enqueued state — the newest version
+    // filter-time reflects the latest enqueued state - the newest version
     // survives either way.
     pendingQueueRef.current = pendingQueueRef.current.filter(
       (card) => !sentKeys.has(cardLocaleKey(card)) || failedKeys.has(cardLocaleKey(card)),
@@ -165,7 +165,7 @@ export function usePerGradeSync(
     if (anySucceeded) {
       consecutiveFailuresRef.current = 0;
       markPushSucceeded();
-      // If the queue is now empty every card made it to the cloud — clear the
+      // If the queue is now empty every card made it to the cloud - clear the
       // persisted queue so stale data does not accumulate (#893).
       if (pendingQueueRef.current.length === 0) {
         clearPendingQueue();
@@ -181,7 +181,7 @@ export function usePerGradeSync(
       // drains strongly suggests the push channel is broken.
       //
       // Use === (not >=) so markPushFailed fires exactly once per failure
-      // episode — only on the transition from threshold-1 to threshold. When
+      // episode - only on the transition from threshold-1 to threshold. When
       // failures resume after a successful drain resets the counter, the next
       // === hit naturally re-fires.
       consecutiveFailuresRef.current += 1;
@@ -195,7 +195,7 @@ export function usePerGradeSync(
         void registerBackgroundSync();
       }
       // Persist the still-queued cards so they survive a force-kill (#893).
-      // This write runs unconditionally on all-failure — the pending-queue
+      // This write runs unconditionally on all-failure - the pending-queue
       // persistence debounce in enqueueGrade catches the common hot path;
       // this is the safety-net for the drain's own updated state.
       savePendingQueue(pendingQueueRef.current);
@@ -210,14 +210,14 @@ export function usePerGradeSync(
       //
       // When client/userId are null the session is either guest-mode or a
       // superuser write-guarded session. In either case, clear the persisted
-      // queue rather than writing to it — a QA session must never leave fake
+      // queue rather than writing to it - a QA session must never leave fake
       // card state behind (#893 superuser guard).
       if (!clientRef.current || !userIdRef.current) {
         clearPendingQueue();
         return;
       }
 
-      // Skip in-step cards entirely — they are not safe to write to the cloud
+      // Skip in-step cards entirely - they are not safe to write to the cloud
       // until they graduate (lastReview set). Enqueuing them would cause
       // pushSingleCard to return false and keep them in the retry queue forever.
       if (!isSyncSafe(card)) return;

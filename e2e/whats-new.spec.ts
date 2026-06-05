@@ -23,7 +23,7 @@ test.describe("What's new page", () => {
   }) => {
     // Simulate a first-time user with a stale last-seen marker so the
     // indicator is guaranteed to render. We use evaluate() after the first
-    // goto() rather than addInitScript() — addInitScript registers a callback
+    // goto() rather than addInitScript() - addInitScript registers a callback
     // that fires on every navigation, so it would re-seed 0.0.1 on the final
     // goto("/") and undo MarkVisited's write, causing a false failure.
     await page.goto("/");
@@ -34,7 +34,7 @@ test.describe("What's new page", () => {
 
     // In bottom tab bar mode (the default for fresh users), the What's new
     // indicator is rendered directly in the header inside the main nav landmark.
-    // In hamburger mode it lives inside the NavDrawer — also inside the main nav
+    // In hamburger mode it lives inside the NavDrawer - also inside the main nav
     // container, so scoping to "Main navigation" works for both modes.
     const mainNav = page.getByRole("navigation", { name: "Main navigation" });
     const indicator = mainNav.getByRole("link", { name: "What's new" });

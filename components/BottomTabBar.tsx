@@ -23,7 +23,7 @@ function PracticeIcon({ className }: { className?: string }) {
       strokeLinejoin="round"
       className={className}
     >
-      {/* Pokéball silhouette — simplified as a card/book icon */}
+      {/* Pokéball silhouette - simplified as a card/book icon */}
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <line x1="3" y1="12" x2="21" y2="12" />
       <circle cx="12" cy="12" r="2" />
@@ -174,7 +174,7 @@ function BottomTabBarInner() {
     return () => window.removeEventListener(SETTINGS_SAVED_EVENT, onSaved);
   }, []);
 
-  // Hidden in hamburger mode — the NavDrawer handles navigation instead.
+  // Hidden in hamburger mode - the NavDrawer handles navigation instead.
   // While mobileNav is null (pre-mount), render the bottom bar to match the
   // server render and avoid a hydration mismatch.
   if (mobileNav === "hamburger") return null;
@@ -213,7 +213,7 @@ function BottomTabBarInner() {
                 aria-current={isActive ? "page" : undefined}
                 className={[
                   // py-3 top padding + safe-area-aware bottom padding so the
-                  // interactive area extends into the iOS home-indicator strip —
+                  // interactive area extends into the iOS home-indicator strip - 
                   // no dead tap zone below the visible icons.
                   // min-h-[44px] ensures the Apple HIG 44pt minimum above the
                   // safe-area inset (the inset itself is additional space).
@@ -241,7 +241,7 @@ function BottomTabBarInner() {
  * Static fallback rendered while the client bundle is loading. Shows
  * the same tab positions so the layout does not shift during hydration.
  * Uses a plain `<div>` with `aria-hidden` rather than a `<nav>` because a
- * hidden landmark is semantically odd — assistive technology should not
+ * hidden landmark is semantically odd - assistive technology should not
  * discover a nav that provides no interactive content.
  *
  * Exported for direct unit testing (coverage of the fallback render path).
@@ -273,7 +273,7 @@ export function BottomTabBarFallback() {
 }
 
 /**
- * Fixed bottom tab bar — visible only on mobile (below the `md` breakpoint).
+ * Fixed bottom tab bar - visible only on mobile (below the `md` breakpoint).
  *
  * Tabs: Practice / Stats / Pokédex / [Pasture when mastered] / Settings.
  * Active tab is indicated with `aria-current="page"` and full opacity.

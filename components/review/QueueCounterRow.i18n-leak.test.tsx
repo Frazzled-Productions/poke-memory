@@ -27,7 +27,7 @@ function collectLeaks(container: HTMLElement): string[] {
   return leaks;
 }
 
-describe("QueueCounterRow — i18n leak", () => {
+describe("QueueCounterRow - i18n leak", () => {
   it("has no untranslated English strings when rendered under pseudo-locale", () => {
     const { container } = renderPseudo(
       <QueueCounterRow newCount={3} learningCount={5} reviewCount={10} />,

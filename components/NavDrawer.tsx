@@ -19,7 +19,7 @@ const NAV_LINKS_HREFS = [
 const LINK_BASE =
   "block rounded px-4 py-3 text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 [@media(hover:hover)]:hover:bg-white/20";
 
-/** Hamburger icon — three horizontal bars. */
+/** Hamburger icon - three horizontal bars. */
 function HamburgerIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -181,7 +181,7 @@ export function NavDrawer() {
 
   return (
     <>
-      {/* Hamburger trigger — visible only below md breakpoint */}
+      {/* Hamburger trigger - visible only below md breakpoint */}
       <button
         ref={triggerRef}
         type="button"
@@ -194,7 +194,7 @@ export function NavDrawer() {
         {open ? <CloseIcon /> : <HamburgerIcon />}
       </button>
 
-      {/* Backdrop — fixed overlay behind the drawer */}
+      {/* Backdrop - fixed overlay behind the drawer */}
       {open && (
         <div
           aria-hidden="true"
@@ -202,7 +202,7 @@ export function NavDrawer() {
         />
       )}
 
-      {/* Drawer panel — always in the DOM so the slide transition runs.
+      {/* Drawer panel - always in the DOM so the slide transition runs.
           Closed state: translate-x-full keeps it off-screen; inert + aria-hidden
           prevent focus/announcement by AT while hidden. */}
       <div

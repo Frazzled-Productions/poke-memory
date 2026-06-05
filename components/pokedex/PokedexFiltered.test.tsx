@@ -21,7 +21,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// next/navigation mocks — must be declared before the component import.
+// next/navigation mocks - must be declared before the component import.
 // ---------------------------------------------------------------------------
 
 const mockReplace = vi.fn();
@@ -164,10 +164,10 @@ function setSearchParams(params: Record<string, string>) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests — filter disclosure
+// Tests - filter disclosure
 // ---------------------------------------------------------------------------
 
-describe("PokedexFiltered — filter disclosure", () => {
+describe("PokedexFiltered - filter disclosure", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams.value = new URLSearchParams();
@@ -233,10 +233,10 @@ describe("PokedexFiltered — filter disclosure", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — active-filter count badge
+// Tests - active-filter count badge
 // ---------------------------------------------------------------------------
 
-describe("PokedexFiltered — active-filter count badge", () => {
+describe("PokedexFiltered - active-filter count badge", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFlags.pretendAllMastered = false;
@@ -245,7 +245,7 @@ describe("PokedexFiltered — active-filter count badge", () => {
   it("badge is not shown when no filters are active", () => {
     mockSearchParams.value = new URLSearchParams();
     renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
-    // No badge element — aria-label pattern "N active filter"
+    // No badge element - aria-label pattern "N active filter"
     expect(screen.queryByLabelText(/active filter/i)).not.toBeInTheDocument();
   });
 
@@ -321,10 +321,10 @@ describe("PokedexFiltered — active-filter count badge", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — grid rendering / filter application
+// Tests - grid rendering / filter application
 // ---------------------------------------------------------------------------
 
-describe("PokedexFiltered — grid receives filtered pokemon", () => {
+describe("PokedexFiltered - grid receives filtered pokemon", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams.value = new URLSearchParams();
@@ -380,10 +380,10 @@ describe("PokedexFiltered — grid receives filtered pokemon", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — URL updates via FilterBar callbacks
+// Tests - URL updates via FilterBar callbacks
 // ---------------------------------------------------------------------------
 
-describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
+describe("PokedexFiltered - URL updates from FilterBar callbacks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams.value = new URLSearchParams();
@@ -535,10 +535,10 @@ describe("PokedexFiltered — URL updates from FilterBar callbacks", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — sort state passed to FilterBar
+// Tests - sort state passed to FilterBar
 // ---------------------------------------------------------------------------
 
-describe("PokedexFiltered — sort state", () => {
+describe("PokedexFiltered - sort state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams.value = new URLSearchParams();
@@ -573,10 +573,10 @@ describe("PokedexFiltered — sort state", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests — Japanese locale chrome (#1369)
+// Tests - Japanese locale chrome (#1369)
 // ---------------------------------------------------------------------------
 
-describe("PokedexFiltered — Japanese locale", () => {
+describe("PokedexFiltered - Japanese locale", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearchParams.value = new URLSearchParams();
@@ -590,7 +590,7 @@ describe("PokedexFiltered — Japanese locale", () => {
   });
 
   it("renders the activeFilters badge using simple {count} substitution in Japanese (count=1)", () => {
-    // ja.json uses simple substitution: "{count}件のフィルター適用中" — no plural form.
+    // ja.json uses simple substitution: "{count}件のフィルター適用中" - no plural form.
     // This verifies the Japanese ICU format produces the correct label for count=1,
     // where English would use the singular plural branch ("1 active filter").
     setSearchParams({ gen: "1" });

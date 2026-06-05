@@ -73,7 +73,7 @@ export function shufflePair(
 }
 
 /**
- * Returns whether the guess is correct. Ties are always correct — there
+ * Returns whether the guess is correct. Ties are always correct - there
  * is no wrong answer when the values are equal.
  */
 export function scoreGuess(

@@ -7,7 +7,7 @@ import { isoMinusDays } from "@/lib/stats/date";
  * `date` is a YYYY-MM-DD string.
  * `reviews` is the total number of grade events recorded on that day.
  * `introduced` is the number of cards graded for the very first time on that
- * day. Only entries with a `subjectKey` are counted — legacy entries without
+ * day. Only entries with a `subjectKey` are counted - legacy entries without
  * one are excluded from the introduction count so the number is never inflated
  * by unreliable data.
  */
@@ -21,10 +21,10 @@ export type ActivityPoint = {
  * Compute daily review counts and new-cards-introduced counts over the
  * rolling `windowDays` ending on `today` (inclusive).
  *
- * Pure — no I/O.
+ * Pure - no I/O.
  *
  * **Reviews per day**: total grade-log entries whose `date` falls within the
- * window. All card types are included — this is an activity-volume metric.
+ * window. All card types are included - this is an activity-volume metric.
  *
  * **Cards introduced per day**: for every entry that has a `subjectKey`, we
  * record the first date that key appears in the log (scanning the full log, not
@@ -36,7 +36,7 @@ export type ActivityPoint = {
  * state, so it is intentionally NOT affected by the `pretendAllMastered`
  * superuser flag. The caller must not pass a mutated or synthetic log.
  *
- * **Guest mode**: an empty `log` returns all-zero rows — the UI renders an
+ * **Guest mode**: an empty `log` returns all-zero rows - the UI renders an
  * empty state when every `reviews` value is 0.
  *
  * **Guest-mode pruning caveat**: `appendGradeEntry` prunes the local grade log

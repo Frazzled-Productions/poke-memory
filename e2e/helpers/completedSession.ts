@@ -102,7 +102,7 @@ export function buildCompletedSession(args: {
 
   const cards: object[] = [];
 
-  // Name cards — one per actual species ID in SEED_POKEMON (including
+  // Name cards - one per actual species ID in SEED_POKEMON (including
   // alternate forms with IDs like 10001+). Using the real IDs ensures
   // hydrateSession finds every card in savedIds and adds no new entries,
   // which is the necessary condition for SESSION_COMPLETE.
@@ -119,12 +119,12 @@ export function buildCompletedSession(args: {
     });
   }
 
-  // Evolution edge cards — use the deduplicated edgeIds from EVOLUTION_CARD_IDS
+  // Evolution edge cards - use the deduplicated edgeIds from EVOLUTION_CARD_IDS
   // which mirrors SEED_EVOLUTION_CARDS exactly (parent-only, in-range, unique).
   for (const id of evolutionCardIds) {
     cards.push({
       id,
-      // Minimal shape that passes isReviewCardShaped — validator checks postEvoId
+      // Minimal shape that passes isReviewCardShaped - validator checks postEvoId
       cardType: "evolution",
       preEvoId: 1,
       postEvoId: 2,
@@ -137,7 +137,7 @@ export function buildCompletedSession(args: {
     });
   }
 
-  // Reverse cards — one per species ID (including alternate forms). Since #1234
+  // Reverse cards - one per species ID (including alternate forms). Since #1234
   // reverse cards are always enabled: hydrateSession adds a reverse card for
   // every species whose REVERSE_ID_OFFSET + id is not already in savedIds. Seed
   // them all as future-due so none enter the new or review queue, which is the
@@ -179,7 +179,7 @@ export function buildCompletedSession(args: {
  * appear in buildSessionQueues' newQueue on the first load.
  *
  * Callers must also seed the extra cards from `extraCards` (e.g. mastered
- * evolution edges needed for preset logic) — pass them and they will be
+ * evolution edges needed for preset logic) - pass them and they will be
  * merged in, overriding any existing card with the same ID.
  */
 export function buildActiveSession(args: {
@@ -200,7 +200,7 @@ export function buildActiveSession(args: {
 
   // The "new" state has no lastReview and no firstSeen, so buildSessionQueues
   // treats it as an unseen new candidate. dueDate must be a string (not null)
-  // to pass isBaseCardShaped — use a past date so new cards are immediately due.
+  // to pass isBaseCardShaped - use a past date so new cards are immediately due.
   const newState = {
     stability: 0,
     difficulty: 5,

@@ -77,7 +77,7 @@ describe("recordReview", () => {
     expect(loadStreakData()).toEqual(["2026-05-09"]);
   });
 
-  it("is idempotent — calling twice with the same date stores it once", () => {
+  it("is idempotent - calling twice with the same date stores it once", () => {
     recordReview("2026-05-09", MIN, false);
     recordReview("2026-05-09", MIN, false);
     expect(loadStreakData()).toEqual(["2026-05-09"]);

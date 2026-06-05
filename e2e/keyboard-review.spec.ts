@@ -58,7 +58,7 @@ const SETTINGS_KEY = "poke-memory:settings:v1";
 
 // Seed the session and navigate to the practice page. All non-Bulbasaur cards
 // are already future-due so hydrateSession finds every id in savedIds and adds
-// no new cards — the only card served is the review-due Bulbasaur.
+// no new cards - the only card served is the review-due Bulbasaur.
 // The first-visit modal is pre-dismissed so it doesn't block keyboard events.
 async function seedAndGo(page: Parameters<typeof seedSessionIdb>[0]) {
   await addOnboardingPreDismiss(page);
@@ -68,7 +68,7 @@ async function seedAndGo(page: Parameters<typeof seedSessionIdb>[0]) {
 }
 
 test.describe("Keyboard-driven review (#1060)", () => {
-  // Only run on chromium — keyboard events are identical across engines and
+  // Only run on chromium - keyboard events are identical across engines and
   // running on both would double CI time for no extra coverage.
   test.skip(({ browserName }) => browserName !== "chromium", "chromium only");
 
@@ -78,7 +78,7 @@ test.describe("Keyboard-driven review (#1060)", () => {
     const reveal = page.getByRole("button", { name: "Reveal" });
     await expect(reveal).toBeVisible({ timeout: 10_000 });
 
-    // Press Space — the card should reveal.
+    // Press Space - the card should reveal.
     await page.keyboard.press("Space");
 
     const gradeGroup = page.getByRole("group", { name: "Grade your answer" });
@@ -106,7 +106,7 @@ test.describe("Keyboard-driven review (#1060)", () => {
       timeout: 10_000,
     });
 
-    // Press grade key before revealing — the grade group must NOT appear.
+    // Press grade key before revealing - the grade group must NOT appear.
     await page.keyboard.press("4");
 
     await expect(
@@ -154,7 +154,7 @@ test.describe("Keyboard-driven review (#1060)", () => {
 
     await page.keyboard.press("1");
 
-    // Again keeps the card in the learning queue — the Reveal button reappears.
+    // Again keeps the card in the learning queue - the Reveal button reappears.
     await expect(page.getByRole("button", { name: "Reveal" })).toBeVisible({
       timeout: 10_000,
     });
@@ -174,7 +174,7 @@ test.describe("Keyboard-driven review (#1060)", () => {
 
     await page.keyboard.press("5");
 
-    // Easy graduates the card — session completes.
+    // Easy graduates the card - session completes.
     await expect(page.getByText("All caught up!")).toBeVisible({
       timeout: 10_000,
     });
@@ -217,7 +217,7 @@ test.describe("Keyboard-driven review (#1060)", () => {
       timeout: 10_000,
     });
 
-    // Press ? — the overlay should appear even before the card is revealed.
+    // Press ? - the overlay should appear even before the card is revealed.
     await page.keyboard.press("?");
 
     const overlay = page.getByRole("dialog", { name: "Keyboard shortcuts" });

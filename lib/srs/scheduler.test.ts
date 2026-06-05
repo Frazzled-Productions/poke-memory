@@ -153,7 +153,7 @@ describe("Case A3: graduated card graded Again (lapse)", () => {
     expect(next.lastReview).toBe(TODAY);
     expect(next.dueDate).toBe(TODAY);
     expect(next.fsrsState).toBe("relearning");
-    // FSRS records the lapse in stability/difficulty — values move, exact
+    // FSRS records the lapse in stability/difficulty - values move, exact
     // numbers are FSRS-parameter-dependent so we only assert directionality.
     expect(next.stability).toBeLessThan(graduated.stability + 1);
     expect(next.difficulty).toBeGreaterThanOrEqual(graduated.difficulty);
@@ -315,7 +315,7 @@ describe("Full scenario: graduated → lapse → relearning Good → graduate", 
     state = nextReview(state, 1, NOW); // lapse → relearning step 0
     expect(state.learningStep).toBe(0);
     expect(state.fsrsState).toBe("relearning");
-    // Walk the relearning ladder until graduation — the ladder length
+    // Walk the relearning ladder until graduation - the ladder length
     // depends on FSRS's post-lapse difficulty (medium = 1 step, hard = 2).
     // Cap at 5 to fail fast if the loop never terminates.
     for (let i = 0; i < 5 && state.learningStep !== null; i++) {
@@ -587,7 +587,7 @@ describe("invalid grade at runtime", () => {
   // at runtime. nextReview now guards this at the top of the function with a
   // VALID_GRADES set check, throwing a RangeError before any FSRS logic runs.
   //
-  // Design choice — reject (throw) rather than clamp:
+  // Design choice - reject (throw) rather than clamp:
   //   Silently mapping an invalid grade to the nearest valid one would
   //   mis-schedule the card without any signal to the caller. A RangeError
   //   surfaces the corruption at the call site, where the caller can skip the
@@ -620,7 +620,7 @@ describe("invalid grade at runtime", () => {
   });
 
   it("grade 3 on a card in a learning step throws a RangeError", () => {
-    // Previously fell through silently to the B4 (Easy) branch — now rejected.
+    // Previously fell through silently to the B4 (Easy) branch - now rejected.
     const inStep = cardInStep(0);
     expect(() => nextReview(inStep, 3 as Grade, NOW)).toThrowError(
       /nextReview: invalid grade 3/,
@@ -653,7 +653,7 @@ describe("invalid grade at runtime", () => {
 });
 
 // ============================================================
-// Mastery boundary — reps and scheduledDays thresholds
+// Mastery boundary - reps and scheduledDays thresholds
 // ============================================================
 describe("mastery boundary (isMastered)", () => {
   // isMastered lives in lib/stats/derive.ts and is the canonical gate. These
@@ -732,7 +732,7 @@ describe("mastery boundary (isMastered)", () => {
   });
 
   it("isMastered does not gate on learningStep: a card mid-step with threshold-meeting reps/scheduledDays returns true", () => {
-    // isMastered checks reps and scheduledDays only — it does not inspect
+    // isMastered checks reps and scheduledDays only - it does not inspect
     // learningStep. A card in a learning step should never carry reps >=
     // MASTERY_REPETITIONS in normal practice, but the function does not enforce
     // that constraint. This test pins the current behaviour and will fail
@@ -757,9 +757,9 @@ describe("mastery boundary (isMastered)", () => {
 });
 
 // ============================================================
-// DST / timezone boundary — addDays uses millisecond arithmetic
+// DST / timezone boundary - addDays uses millisecond arithmetic
 // ============================================================
-describe("DST / timezone boundary — addDays millisecond arithmetic", () => {
+describe("DST / timezone boundary - addDays millisecond arithmetic", () => {
   // isoDate() calls todayInTimezone("UTC", date) so all scheduling arithmetic
   // is UTC-based. Crossing a DST boundary in a local timezone should never
   // affect the UTC-based scheduled due date. We verify this by anchoring `now`
@@ -814,7 +814,7 @@ describe("DST / timezone boundary — addDays millisecond arithmetic", () => {
       stability: 30,
       reps: 5,
     });
-    // Grade Good on a well-established card — FSRS should schedule ≥ 1 day out.
+    // Grade Good on a well-established card - FSRS should schedule ≥ 1 day out.
     const result = nextReview(base, 4, DST_FALL_BACK);
     // dueDate must be strictly after 2026-11-01 and must be a valid YYYY-MM-DD.
     expect(result.dueDate > "2026-11-01").toBe(true);
@@ -878,7 +878,7 @@ describe("isFsrsInvalidState", () => {
     expect(isFsrsInvalidState(state)).toBe(true);
   });
 
-  it("returns true for a brand-new card (stability 0, difficulty 0) — the predicate flags zero-stability regardless of state label", () => {
+  it("returns true for a brand-new card (stability 0, difficulty 0) - the predicate flags zero-stability regardless of state label", () => {
     // isFsrsInvalidState checks the numeric fields in isolation. A raw new-card
     // state (stability:0) triggers the predicate, BUT the callers are protected:
     //   • toFsrsCard short-circuits to createEmptyCard for fsrsState="new" &&
@@ -911,9 +911,9 @@ describe("isFsrsInvalidState", () => {
 // ============================================================
 // Invalid-state healing in nextReview (#1506)
 // ============================================================
-describe("nextReview — invalid FSRS state healing via toFsrsCard", () => {
+describe("nextReview - invalid FSRS state healing via toFsrsCard", () => {
   // T1: review card, lastReview set, stability:0, difficulty:5, grade Good
-  it("T1: review card with stability:0 — grade Good does not throw and produces valid stability", () => {
+  it("T1: review card with stability:0 - grade Good does not throw and produces valid stability", () => {
     const state = graduatedCard({ stability: 0, difficulty: 5 });
     expect(() => nextReview(state, 4, NOW)).not.toThrow();
     const result = nextReview(state, 4, NOW);
@@ -923,18 +923,18 @@ describe("nextReview — invalid FSRS state healing via toFsrsCard", () => {
   });
 
   // T2: relearning card (learningStep set, lastReview set), stability:0, grade Good
-  it("T2: relearning card with stability:0 — grade Good on last step does not throw", () => {
+  it("T2: relearning card with stability:0 - grade Good on last step does not throw", () => {
     // A relearning card has lastReview set and learningStep:0 (one relearning step).
     // Good on the last step triggers FSRS via toFsrsCard.
     const state = cardInStep(0, "2026-05-02", { stability: 0, difficulty: 5 });
     expect(() => nextReview(state, 4, NOW)).not.toThrow();
     const result = nextReview(state, 4, NOW);
-    // Card graduates (exits the learning step) — stability must be positive.
+    // Card graduates (exits the learning step) - stability must be positive.
     expect(result.stability).toBeGreaterThan(0);
   });
 
   // T3: review card, stability:0, difficulty:0, grade Again → enters relearning
-  it("T3: review card with stability:0, difficulty:0 — grade Again does not throw", () => {
+  it("T3: review card with stability:0, difficulty:0 - grade Again does not throw", () => {
     const state = graduatedCard({ stability: 0, difficulty: 0 });
     expect(() => nextReview(state, 1, NOW)).not.toThrow();
     const result = nextReview(state, 1, NOW);
@@ -943,7 +943,7 @@ describe("nextReview — invalid FSRS state healing via toFsrsCard", () => {
   });
 
   // T4: review card, stability:NaN, difficulty:5, grade Good
-  it("T4: review card with stability:NaN — grade Good does not throw", () => {
+  it("T4: review card with stability:NaN - grade Good does not throw", () => {
     const state = graduatedCard({ stability: NaN, difficulty: 5 });
     expect(() => nextReview(state, 4, NOW)).not.toThrow();
     const result = nextReview(state, 4, NOW);
@@ -952,7 +952,7 @@ describe("nextReview — invalid FSRS state healing via toFsrsCard", () => {
   });
 
   // T5: review card, stability:1.5, difficulty:0.5 (< 1), grade Good
-  it("T5: review card with difficulty:0.5 (< 1) — grade Good does not throw", () => {
+  it("T5: review card with difficulty:0.5 (< 1) - grade Good does not throw", () => {
     const state = graduatedCard({ stability: 1.5, difficulty: 0.5 });
     expect(() => nextReview(state, 4, NOW)).not.toThrow();
     const result = nextReview(state, 4, NOW);
@@ -961,8 +961,8 @@ describe("nextReview — invalid FSRS state healing via toFsrsCard", () => {
     expect(result.difficulty).toBeLessThanOrEqual(10);
   });
 
-  // T6: review card, stability:1.5, difficulty:5 — NOT healed, normal FSRS output
-  it("T6: review card with valid stability:1.5, difficulty:5 — NOT healed, uses real FSRS output", () => {
+  // T6: review card, stability:1.5, difficulty:5 - NOT healed, normal FSRS output
+  it("T6: review card with valid stability:1.5, difficulty:5 - NOT healed, uses real FSRS output", () => {
     const state = graduatedCard({ stability: 1.5, difficulty: 5 });
     expect(isFsrsInvalidState(state)).toBe(false);
     expect(() => nextReview(state, 4, NOW)).not.toThrow();

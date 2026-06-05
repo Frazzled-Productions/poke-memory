@@ -26,7 +26,11 @@ const SECTION_ORDER: ChangelogSectionKind[] = [
 
 const SECTION_SET = new Set<string>(SECTION_ORDER);
 
-const VERSION_HEADING_RE = /^##\s+\[(\d+\.\d+\.\d+)\]\s+[—-]\s+(\d{4}-\d{2}-\d{2})\s*$/;
+// The separator is a hyphen on current headings; a U+2014 em dash is also
+// accepted so legacy headings predating the no-em-dash rule still parse. The
+// char class uses the U+2014 escape (not the literal glyph) so the no-em-dash
+// gate does not flag this line.
+const VERSION_HEADING_RE = /^##\s+\[(\d+\.\d+\.\d+)\]\s+[\u2014-]\s+(\d{4}-\d{2}-\d{2})\s*$/;
 const SECTION_HEADING_RE = /^###\s+(\S.*?)\s*$/;
 const BULLET_RE = /^-\s+(\S.+)$/;
 const CONTINUATION_RE = /^  \S/;
@@ -99,7 +103,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
         continue;
       }
       // Indented continuation lines extend the preceding bullet. A blank
-      // line — or any non-indented non-bullet line — terminates the
+      // line - or any non-indented non-bullet line - terminates the
       // continuation window so wrapping doesn't accidentally swallow
       // unrelated prose.
       if (pendingBullet !== null) {

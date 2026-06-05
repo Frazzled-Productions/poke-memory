@@ -1,5 +1,5 @@
 /**
- * Unit tests for lib/pasture/behavior.ts — node project (no DOM).
+ * Unit tests for lib/pasture/behavior.ts - node project (no DOM).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
@@ -31,7 +31,7 @@ function makeState(now = 0) {
 // Throttle gate
 // ---------------------------------------------------------------------------
 
-describe("tickSprite — throttle gate", () => {
+describe("tickSprite - throttle gate", () => {
   it("returns changed: false within TICK_INTERVAL_MS", () => {
     const now = 1000;
     const state = makeState(now);
@@ -49,10 +49,10 @@ describe("tickSprite — throttle gate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Wander — band bounds
+// Wander - band bounds
 // ---------------------------------------------------------------------------
 
-describe("tickSprite — wander stays within band", () => {
+describe("tickSprite - wander stays within band", () => {
   beforeEach(() => {
     // Make Math.random always return 1.0 (forces extreme target picks).
     vi.spyOn(Math, "random").mockReturnValue(0.999);
@@ -89,10 +89,10 @@ describe("tickSprite — wander stays within band", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Wander — easing convergence
+// Wander - easing convergence
 // ---------------------------------------------------------------------------
 
-describe("tickSprite — easing converges to target", () => {
+describe("tickSprite - easing converges to target", () => {
   it("x approaches targetX over many ticks", () => {
     const state = makeState(0);
     // Set a fixed target and prevent it from changing.
@@ -126,7 +126,7 @@ describe("tickSprite — easing converges to target", () => {
 // Jump phases
 // ---------------------------------------------------------------------------
 
-describe("tickSprite — jump phase sequencing", () => {
+describe("tickSprite - jump phase sequencing", () => {
   it("transitions grounded → rising → falling → squash → grounded", () => {
     const now = 0;
     const state = makeState(now);
@@ -134,7 +134,7 @@ describe("tickSprite — jump phase sequencing", () => {
     state.nextJumpAt = 0;
     state.nextTargetAt = Number.POSITIVE_INFINITY;
 
-    // Tick 1 — should enter rising.
+    // Tick 1 - should enter rising.
     tickSprite(state, now + TICK_INTERVAL_MS);
     expect(state.jumpPhase).toBe("rising");
     expect(state.jumpOffsetPx).toBeLessThanOrEqual(0); // negative = upward
@@ -167,7 +167,7 @@ describe("tickSprite — jump phase sequencing", () => {
     tickSprite(state, now + TICK_INTERVAL_MS);
     expect(state.jumpPhase).toBe("rising");
 
-    // Mid-rise — offset should be negative.
+    // Mid-rise - offset should be negative.
     tickSprite(state, now + TICK_INTERVAL_MS + 140);
     expect(state.jumpOffsetPx).toBeLessThan(0);
   });
@@ -182,7 +182,7 @@ describe("tickSprite — jump phase sequencing", () => {
     tickSprite(state, now + TICK_INTERVAL_MS);
     expect(state.jumpPhase).toBe("rising");
 
-    // Set nextJumpAt in the past — should not interrupt current jump.
+    // Set nextJumpAt in the past - should not interrupt current jump.
     state.nextJumpAt = 0;
     tickSprite(state, now + TICK_INTERVAL_MS * 2);
     // Phase must not reset to grounded (or re-trigger rising) mid-sequence.
@@ -201,10 +201,10 @@ describe("tickSprite — jump phase sequencing", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Anchor reference — translate delta must be zero at rest
+// Anchor reference - translate delta must be zero at rest
 // ---------------------------------------------------------------------------
 
-describe("tickSprite — zero translate delta at rest", () => {
+describe("tickSprite - zero translate delta at rest", () => {
   it("x and y match anchorX/anchorY when sprite has not moved", () => {
     const now = 0;
     const state = makeState(now);
@@ -231,10 +231,10 @@ describe("tickSprite — zero translate delta at rest", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Jump continuity — no pop at rising → falling transition
+// Jump continuity - no pop at rising → falling transition
 // ---------------------------------------------------------------------------
 
-describe("tickSprite — jump apex continuity", () => {
+describe("tickSprite - jump apex continuity", () => {
   it("jumpOffsetPx has no discontinuity at the rising → falling boundary", () => {
     const now = 0;
     const state = makeState(now);
@@ -254,14 +254,14 @@ describe("tickSprite — jump apex continuity", () => {
     expect(state.jumpPhase).toBe("rising");
     const offsetBeforeTransition = state.jumpOffsetPx;
 
-    // Next tick — at elapsed >= 280 the transition fires.
+    // Next tick - at elapsed >= 280 the transition fires.
     const transitionT = preTransitionT + TICK_INTERVAL_MS; // elapsed = 360 > 280
     tickSprite(state, transitionT);
     expect(state.jumpPhase).toBe("falling");
     const offsetAtTransition = state.jumpOffsetPx;
 
     // The snap from the last rising offset to the falling start should be < 5 px.
-    // With the old code, rising reset jumpOffsetPx to 0 at transition — a ~17 px
+    // With the old code, rising reset jumpOffsetPx to 0 at transition - a ~17 px
     // snap when the sprite was near peak. With the fix it carries the peak value
     // into falling, so the transition is seamless.
     expect(Math.abs(offsetAtTransition - offsetBeforeTransition)).toBeLessThan(5);

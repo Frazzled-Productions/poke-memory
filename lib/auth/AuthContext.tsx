@@ -25,14 +25,14 @@ function tryCreateClient(): ReturnType<typeof createClient> | null {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Test-only mock-auth seam (issue #751). `isMockAuthEnabled()` is false in
-  // every production build — it short-circuits on `NODE_ENV === "production"`
-  // — so this branch is dead code in production. See lib/auth/mockAuth.ts.
+  // every production build - it short-circuits on `NODE_ENV === "production"`
+  // - so this branch is dead code in production. See lib/auth/mockAuth.ts.
   const [mockEnabled] = useState(() => isMockAuthEnabled());
   const [supabase] = useState(() =>
     mockEnabled ? createMockClient() : tryCreateClient(),
   );
   // When the seam is on, start signed-in immediately with the fake user and
-  // no loading flicker — there is no async getUser round-trip to wait on.
+  // no loading flicker - there is no async getUser round-trip to wait on.
   const [user, setUser] = useState<User | null>(mockEnabled ? MOCK_USER : null);
   const [loading, setLoading] = useState(mockEnabled ? false : supabase !== null);
 

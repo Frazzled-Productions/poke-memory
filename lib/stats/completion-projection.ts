@@ -13,9 +13,9 @@ import { masteredSpeciesEvents, nameCardsForLocale } from "./mastery-species-eve
  * Result of the Pokédex-completion projection (issue #803).
  *
  * Three possible outcomes:
- *   - `"complete"` — all species are mastered (or `forceAllMastered` is on).
- *   - `"insufficient-history"` — not enough history to make a reliable estimate.
- *   - `"projected"` — a plausible completion date is available.
+ *   - `"complete"` - all species are mastered (or `forceAllMastered` is on).
+ *   - `"insufficient-history"` - not enough history to make a reliable estimate.
+ *   - `"projected"` - a plausible completion date is available.
  */
 export type CompletionProjection =
   | { kind: "complete" }
@@ -44,7 +44,7 @@ export const PROJECTION_WINDOW_DAYS = 28;
 /**
  * Minimum number of days that must have elapsed since the earliest mastery
  * event within the trailing window before we show a projection. At 7 days the
- * user has had at least a full week of data — enough to avoid a wildly
+ * user has had at least a full week of data - enough to avoid a wildly
  * optimistic single-session estimate, while not requiring weeks of patience
  * before seeing anything useful.
  *
@@ -55,7 +55,7 @@ export const MIN_HISTORY_DAYS = 7;
 
 /**
  * Cap on the projected completion date. Projections more than this many days
- * in the future are replaced with `"insufficient-history"` — they are
+ * in the future are replaced with `"insufficient-history"` - they are
  * effectively meaningless and could be demoralising. 10 years is a generous
  * but finite ceiling.
  */
@@ -85,7 +85,7 @@ export const MAX_PROJECTION_DAYS = 365 * 10;
  * @param cards              Full mixed-type card array from the session.
  * @param today              Today's date as YYYY-MM-DD.
  * @param masteryRepetitions Mastery threshold (matches the user's setting).
- * @param forceAllMastered   Superuser flag — when on, returns `"complete"`.
+ * @param forceAllMastered   Superuser flag - when on, returns `"complete"`.
  */
 export function computeCompletionProjection(
   cards: readonly ReviewableCard[],

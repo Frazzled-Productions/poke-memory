@@ -25,7 +25,7 @@ const require = createRequire(import.meta.url);
 function resolveSharp() {
   const candidate = path.join(projectRoot, 'node_modules', 'sharp');
   if (fs.existsSync(candidate)) return require(candidate);
-  throw new Error('sharp not found — run `npm ci` in the project root first');
+  throw new Error('sharp not found - run `npm ci` in the project root first');
 }
 const sharp = resolveSharp();
 
@@ -45,7 +45,7 @@ const ICON_SIZE = 180;        // rendered icon diameter (matches apple-icon.tsx)
 const DEVICES = [
   // iPhone 16 Pro Max
   { label: 'iphone16promax', w: 440, h: 956, scale: 3 },
-  // iPhone 16 Pro  (402 × 874 logical, 3×; 15 Pro / 14 Pro use 393 × 852 — see iphone16 entry)
+  // iPhone 16 Pro  (402 × 874 logical, 3×; 15 Pro / 14 Pro use 393 × 852 - see iphone16 entry)
   { label: 'iphone16pro',    w: 402, h: 874, scale: 3 },
   // iPhone 16 Plus / 15 Plus / 14 Plus
   { label: 'iphone16plus',   w: 430, h: 932, scale: 3 },

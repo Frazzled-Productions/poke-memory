@@ -27,7 +27,7 @@ import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl
 // Mocks
 // ---------------------------------------------------------------------------
 
-// next/image renders a real <img> in tests — no special optimisation needed.
+// next/image renders a real <img> in tests - no special optimisation needed.
 vi.mock("next/image", () => ({
   default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
@@ -35,7 +35,7 @@ vi.mock("next/image", () => ({
   ),
 }));
 
-// Stub the server actions — they would call `redirect()` in a real environment.
+// Stub the server actions - they would call `redirect()` in a real environment.
 const mockSignIn = vi.fn(async (_provider: string) => {});
 const mockSignOut = vi.fn(async () => {});
 
@@ -68,7 +68,7 @@ function makeUser(meta: Record<string, string | undefined> = {}): Partial<User> 
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("AuthButton — guest state (not signed in)", () => {
+describe("AuthButton - guest state (not signed in)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: guest, not loading.
@@ -251,7 +251,7 @@ describe("AuthButton — guest state (not signed in)", () => {
 // Signed-in state
 // ---------------------------------------------------------------------------
 
-describe("AuthButton — signed-in state", () => {
+describe("AuthButton - signed-in state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -385,7 +385,7 @@ describe("AuthButton — signed-in state", () => {
 // Japanese locale
 // ---------------------------------------------------------------------------
 
-describe("AuthButton — Japanese locale", () => {
+describe("AuthButton - Japanese locale", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseAuth.mockReturnValue({ user: null, loading: false });

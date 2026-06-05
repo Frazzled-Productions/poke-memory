@@ -17,7 +17,7 @@ import { GradeDistributionChart } from "@/components/stats/GradeDistributionChar
 import type { GradeDistribution, GradeTrendPoint } from "@/lib/stats/grade-distribution";
 
 // ---------------------------------------------------------------------------
-// Recharts mock — lightweight stubs so the component can render in jsdom.
+// Recharts mock - lightweight stubs so the component can render in jsdom.
 // The Tooltip mock fires its content prop so ChartTooltip runs.
 // ---------------------------------------------------------------------------
 
@@ -103,7 +103,7 @@ describe("GradeDistributionChart", () => {
 
   it("renders the ChartTooltip content (statValue line) via the mocked Tooltip", () => {
     renderWithIntl(<GradeDistributionChart distribution={DISTRIBUTION} trend={TREND} />);
-    // ChartTooltip renders grade rows with statValue class — "Again: 2" should appear.
+    // ChartTooltip renders grade rows with statValue class - "Again: 2" should appear.
     expect(screen.getByText(/again: 2/i)).toBeInTheDocument();
   });
 

@@ -13,7 +13,7 @@ import type { AppLocale } from "@/i18n/locales";
  * prefix when no cards are due. This gives desktop users a tab-level due-count
  * indicator without needing the app to be installed as a PWA.
  *
- * The prefix composes with whatever the current route's title is — it reads
+ * The prefix composes with whatever the current route's title is - it reads
  * the base title from `document.title`, strips any existing `(N)` prefix, and
  * prepends the new count. A MutationObserver on the `<title>` element detects
  * Next.js route-level title changes so the prefix is re-applied after
@@ -24,12 +24,12 @@ import type { AppLocale } from "@/i18n/locales";
  * the session the user is about to open (#1137).
  *
  * The hook also subscribes to `SESSION_CHANGED_EVENT` (`poke-memory:session-changed`)
- * so it updates reactively after every IDB write — including on WebKit (mobile Safari),
+ * so it updates reactively after every IDB write - including on WebKit (mobile Safari),
  * where synthetic StorageEvents are not reliably propagated to same-tab listeners
  * (#1134). The existing `useLocalStorageKey` dependency handles the desktop/non-WebKit
  * path; the CustomEvent subscription covers WebKit.
  *
- * Superuser flags are deliberately not plumbed here — the title badge should
+ * Superuser flags are deliberately not plumbed here - the title badge should
  * reflect the user's real card state, consistent with `usePwaBadge`.
  */
 export function useDocumentTitleBadge(): void {
@@ -70,7 +70,7 @@ export function useDocumentTitleBadge(): void {
       // Note: the incomplete-chains context is omitted here because the
       // badge hook does not have access to mastery/repetition state. The
       // preset will simply match nothing when active, which is acceptable
-      // — the badge count may be slightly conservative in that edge case.
+      // - the badge count may be slightly conservative in that edge case.
       const { totalCount } = computeQueueCount(
         session.cards,
         {

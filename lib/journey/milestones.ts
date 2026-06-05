@@ -18,7 +18,7 @@ export const MASTERY_COUNT_MILESTONES = [
 export type MilestoneKind = "mastery-count" | "gen-complete" | "all-mastered";
 
 export type Milestone = {
-  /** Stable identifier — used for deduplication, analytics, and test assertions. */
+  /** Stable identifier - used for deduplication, analytics, and test assertions. */
   id: string;
   kind: MilestoneKind;
   /** Human-readable label shown on the banner. */
@@ -59,7 +59,7 @@ function toRoman(n: number): string {
  *   2. Most recently completed generation (highest gen number with mastered === total).
  *   3. Highest crossed round-number mastery count.
  *
- * This function is pure — it has no side effects and performs no I/O.
+ * This function is pure - it has no side effects and performs no I/O.
  */
 export function detectTopMilestone(
   totalMastered: number,

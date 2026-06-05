@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Per docs/sync.md "Auxiliary sync legs are best-effort": this whole module
  * is sidecar to the cards sync contract. Push subscriptions are device-
  * specific (each browser/PWA install has its own endpoint), so the most
- * useful cross-device signal is "this user is subscribed somewhere" — not
+ * useful cross-device signal is "this user is subscribed somewhere" - not
  * the full row list. The pull leg's only job is to surface whether the
  * caller currently has at least one row server-side; the UI uses that to
  * render an accurate initial toggle state on a fresh device that has not
@@ -25,7 +25,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * from "we don't know" (null).
  *
  * Best-effort: never throws. Errors are reported via the null return and
- * a console.warn — they must not flip overall sync into the error state.
+ * a console.warn - they must not flip overall sync into the error state.
  */
 export async function pullPushSubscriptionCount(
   client: SupabaseClient,

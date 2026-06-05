@@ -6,7 +6,7 @@ import { BiomeFloor } from "./BiomeFloor";
  * Illustrated backdrop for the Grasslands habitat zone. Layered SVG scene
  * (sky, sun, cell-shaded clouds, three hill layers, chunky trees, pond,
  * grass tufts, flowers, Pokéball detail) sized to fill its parent.
- * Decorative only — aria-hidden and pointer-events disabled.
+ * Decorative only - aria-hidden and pointer-events disabled.
  *
  * Hill profile coordinates (in 1600×600 viewBox) match the anchor bands
  * defined for "grassland" in lib/pasture/zones.ts so sprites stand on
@@ -43,7 +43,7 @@ export function GrasslandsBiome() {
       <circle cx="1340" cy="130" r="62"  fill="#fff5a0" />
       <circle cx="1340" cy="130" r="62"  fill="none" stroke="#ffd84a" strokeWidth="3" opacity="0.6" />
 
-      {/* Cell-shaded clouds — multi-lobe with subtle outline */}
+      {/* Cell-shaded clouds - multi-lobe with subtle outline */}
       <g stroke="#cfe8ff" strokeWidth="2.5">
         {/* Cloud 1 */}
         <g fill="#ffffff">
@@ -89,7 +89,7 @@ export function GrasslandsBiome() {
         stroke="#4f9a44" strokeWidth="3" fill="none" opacity="0.6"
       />
 
-      {/* Foreground ground — main playing field */}
+      {/* Foreground ground - main playing field */}
       <BiomeFloor
         curvePath="M0,470 C200,450 400,478 700,462 C1000,448 1300,478 1600,458"
         fill="#5dba4f"
@@ -98,7 +98,7 @@ export function GrasslandsBiome() {
         strokeOpacity={0.7}
       />
 
-      {/* Foreground ground highlight band — adds painterly depth */}
+      {/* Foreground ground highlight band - adds painterly depth */}
       <path
         d="M0,475 C200,455 400,483 700,467 C1000,453 1300,483 1600,463 L1600,520 L0,520 Z"
         fill="#7bd06b" opacity="0.5"
@@ -131,7 +131,7 @@ export function GrasslandsBiome() {
         ))}
       </g>
 
-      {/* Foreground tree — left (chunky, multi-bushel canopy) */}
+      {/* Foreground tree - left (chunky, multi-bushel canopy) */}
       <g>
         <rect x="78" y="500" width="20" height="60" fill="#7a4a22" />
         <rect x="78" y="500" width="20" height="60" fill="none" stroke="#5a341a" strokeWidth="2" />
@@ -149,7 +149,7 @@ export function GrasslandsBiome() {
         />
       </g>
 
-      {/* Foreground tree — right */}
+      {/* Foreground tree - right */}
       <g>
         <rect x="1488" y="505" width="22" height="62" fill="#7a4a22" />
         <rect x="1488" y="505" width="22" height="62" fill="none" stroke="#5a341a" strokeWidth="2" />
@@ -163,7 +163,7 @@ export function GrasslandsBiome() {
         </g>
       </g>
 
-      {/* Pokéball detail — sitting on the grass, left of pond */}
+      {/* Pokéball detail - sitting on the grass, left of pond */}
       <g transform="translate(330 575)">
         {/* shadow */}
         <ellipse cx="0" cy="14" rx="20" ry="3.5" fill="#2e7a25" opacity="0.45" />
@@ -177,7 +177,7 @@ export function GrasslandsBiome() {
         <ellipse cx="-5" cy="-6" rx="3" ry="2" fill="#ffffff" opacity="0.85" />
       </g>
 
-      {/* Grass tufts — denser, more saturated, scattered */}
+      {/* Grass tufts - denser, more saturated, scattered */}
       <g stroke="#2a6a22" strokeWidth="2.8" strokeLinecap="round" fill="none">
         {[
           [50, 562], [110, 580], [170, 555], [240, 583], [310, 562],
@@ -193,7 +193,7 @@ export function GrasslandsBiome() {
         ))}
       </g>
 
-      {/* Flowers — red */}
+      {/* Flowers - red */}
       <g>
         {[
           [200, 568], [400, 575], [620, 568], [860, 572], [1050, 575], [1410, 572],
@@ -208,7 +208,7 @@ export function GrasslandsBiome() {
         ))}
       </g>
 
-      {/* Flowers — yellow */}
+      {/* Flowers - yellow */}
       <g>
         {[
           [280, 580], [540, 565], [800, 578], [1020, 565], [1340, 580],
@@ -223,7 +223,7 @@ export function GrasslandsBiome() {
         ))}
       </g>
 
-      {/* Flowers — pink */}
+      {/* Flowers - pink */}
       <g>
         {[
           [150, 572], [480, 580], [710, 568], [970, 580], [1110, 568],

@@ -13,7 +13,7 @@ interface Props {
 /**
  * Type-to-confirm modal for the irreversible "Delete account" action. Modelled
  * on ResetProgressDialog, but the confirmation word is DELETE and the copy
- * makes clear this erases the account identity itself — not just progress.
+ * makes clear this erases the account identity itself - not just progress.
  *
  * There is no PITR (#298), so deletion is genuinely unrecoverable; the
  * type-to-confirm gate is the deliberate friction.

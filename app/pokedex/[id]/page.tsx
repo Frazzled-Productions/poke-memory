@@ -4,7 +4,7 @@ import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { PokemonDetailDisclosure } from "@/components/pokedex/PokemonDetailDisclosure";
 
 export function generateStaticParams() {
-  // One route per species — use only default forms (or all entries when the
+  // One route per species - use only default forms (or all entries when the
   // seed hasn't been re-run with #445 fields yet). Alt-form ids (10001+) are
   // still resolvable via a post-lookup null check in the page component.
   const defaultForms = SEED_POKEMON.filter(

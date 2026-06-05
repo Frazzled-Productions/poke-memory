@@ -9,14 +9,14 @@ type Props = {
   onDismiss: () => void;
 };
 
-// Confetti piece counts by tier — more pieces for rarer milestones.
+// Confetti piece counts by tier - more pieces for rarer milestones.
 const CONFETTI_COUNT: Record<MilestoneTier, number> = {
   light: 8,
   standard: 14,
   major: 22,
 };
 
-// Burst radius by tier — majors scatter further.
+// Burst radius by tier - majors scatter further.
 const BURST_RADIUS: Record<MilestoneTier, number> = {
   light: 110,
   standard: 140,
@@ -32,7 +32,7 @@ const COLORS = [
   "#a855f7", // purple-500
 ];
 
-// Warm golden palette for major milestones — richer than the standard burst.
+// Warm golden palette for major milestones - richer than the standard burst.
 const MAJOR_COLORS = [
   "#fbbf24", // amber-400
   "#f59e0b", // amber-500
@@ -57,7 +57,7 @@ const TIER_SUB: Record<MilestoneTier, string> = {
   major: "That is seriously impressive.",
 };
 
-// Headline copy — majors get a custom line; others use the numeric default.
+// Headline copy - majors get a custom line; others use the numeric default.
 const MILESTONE_HEADLINE: Partial<Record<number, string>> = {
   365: "One year.",
 };

@@ -16,12 +16,12 @@ test.beforeEach(async ({ page }) => {
  *
  * The seam (`lib/auth/mockAuth.ts`) is activated by `NEXT_PUBLIC_E2E_AUTH_MOCK=1`,
  * set ONLY against preview deployments by `e2e.yml`. It is provably unreachable
- * in production builds — `isMockAuthEnabled()` short-circuits on
+ * in production builds - `isMockAuthEnabled()` short-circuits on
  * `NODE_ENV === "production"`, and `next.config.ts` fails the build loudly if
  * the flag is ever set in a production build. See `lib/auth/mockAuth.test.ts`.
  *
  * When the seam is inactive (no flag, e.g. a local run without it) the app
- * renders guest-mode and these specs are skipped at runtime — see `skipUnless`.
+ * renders guest-mode and these specs are skipped at runtime - see `skipUnless`.
  *
  * The mock cloud fixture defaults to an entirely empty cloud. The conflict
  * spec seeds a non-empty `card_reviews` fixture into localStorage so one

@@ -6,7 +6,7 @@
  * API calls, no Supabase branch quota.
  *
  * Required env var (defaults work for the GHA service container):
- *   DATABASE_URL  — connection string, default:
+ *   DATABASE_URL - connection string, default:
  *                   postgres://postgres:testpass@localhost:5432/poke_memory_test
  *
  * Each test file gets its own isolated database created from DATABASE_URL at
@@ -71,7 +71,7 @@ export async function createTestDatabase(): Promise<{
 
 /**
  * Drops the isolated test database created by `createTestDatabase`.
- * Safe to call from `afterAll` — it ends the pool and drops the DB.
+ * Safe to call from `afterAll` - it ends the pool and drops the DB.
  */
 export async function dropTestDatabase(
   pool: pg.Pool,
@@ -100,8 +100,8 @@ export async function dropTestDatabase(
  * objects that vanilla Postgres does not include:
  *
  *   - `auth` schema
- *   - `auth.users` table (minimal — FK target for card_reviews etc.)
- *   - `auth.uid()` function — polyfill that reads `request.jwt.claims` and
+ *   - `auth.users` table (minimal - FK target for card_reviews etc.)
+ *   - `auth.uid()` function - polyfill that reads `request.jwt.claims` and
  *     returns the `sub` claim as a uuid. Matches what Supabase's GoTrue sets.
  *   - `anon` role (for REVOKE statements in migrations 018 / 025)
  *   - `authenticated` role (for GRANT/REVOKE in migrations 018 / 025)
@@ -115,7 +115,7 @@ export async function dropTestDatabase(
 export async function applyPreMigrationFixture(pool: pg.Pool): Promise<void> {
   const client = await pool.connect();
   try {
-    // Roles — shared cluster-level objects; use DO block to guard duplicates.
+    // Roles - shared cluster-level objects; use DO block to guard duplicates.
     await client.query(`
       DO $$
       BEGIN

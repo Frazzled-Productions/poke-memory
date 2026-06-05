@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useHapticSwitch } from "@/components/review/useHapticSwitch";
 
 // ---------------------------------------------------------------------------
-// Helpers — stub document.createElement so supportsSwitchHaptic() is
+// Helpers - stub document.createElement so supportsSwitchHaptic() is
 // controllable in the jsdom environment.
 // ---------------------------------------------------------------------------
 
@@ -66,7 +66,7 @@ describe("useHapticSwitch", () => {
       // Attach a mock label element to the ref.
       const label = document.createElement("label");
       const clickSpy = vi.spyOn(label, "click");
-      // Assign directly — React's useRef returns a mutable ref object.
+      // Assign directly - React's useRef returns a mutable ref object.
       (result.current.labelRef as React.MutableRefObject<HTMLLabelElement>).current = label;
 
       result.current.triggerIosHaptic!();

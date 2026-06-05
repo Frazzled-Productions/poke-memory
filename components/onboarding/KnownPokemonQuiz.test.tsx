@@ -82,7 +82,7 @@ vi.mock("@/lib/sync/usePerGradeSync", () => ({
   }),
 }));
 
-// Bypass next/image — render a plain img so jsdom does not need an HTTP
+// Bypass next/image - render a plain img so jsdom does not need an HTTP
 // server for the sprite URLs.
 vi.mock("next/image", () => ({
   // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
@@ -113,7 +113,7 @@ vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
 
 const NOW = new Date("2026-05-20T12:00:00Z");
 
-// Alolan Raichu — PokéAPI species id >= 10000 marks it as an alternate form.
+// Alolan Raichu - PokéAPI species id >= 10000 marks it as an alternate form.
 const ALT_FORM_ID = 10100;
 
 function makeNameCard(
@@ -159,7 +159,7 @@ function makeNameCard(
  * Alternate-form card fixture (Alolan Raichu).
  *
  * Real seed shape: `id=10100` (pokemon id), `speciesId=26` (parent species),
- * `subjectKey="10100"` (id as text — the eligibility-gate key). The
+ * `subjectKey="10100"` (id as text - the eligibility-gate key). The
  * generationOf(speciesId=26) = 1, so it lands on the Gen I tab.
  */
 function makeAltFormCard(state: ReviewState = initialReviewState(NOW)): NameReviewCard {
@@ -366,7 +366,7 @@ describe("KnownPokemonQuiz", () => {
     currentSession = {
       cards: [
         makeNameCard(1, "Bulbasaur"),
-        makeAltFormCard(), // Alolan Raichu — id=10100, should be hidden
+        makeAltFormCard(), // Alolan Raichu - id=10100, should be hidden
       ],
       limits: { name: {}, evolution: {}, reverse: {}, cry: {} },
     };
@@ -378,7 +378,7 @@ describe("KnownPokemonQuiz", () => {
       await screen.findByRole("checkbox", { name: /i already know Bulbasaur/i }),
     ).toBeInTheDocument();
 
-    // Alternate-form card must NOT appear — it is excluded from the eligible
+    // Alternate-form card must NOT appear - it is excluded from the eligible
     // set when alternateFormsEnabled is false, matching the practice-queue gate.
     expect(
       screen.queryByRole("checkbox", { name: /i already know Alolan Raichu/i }),
@@ -390,7 +390,7 @@ describe("KnownPokemonQuiz", () => {
     currentSession = {
       cards: [
         makeNameCard(1, "Bulbasaur"),
-        makeAltFormCard(), // Alolan Raichu — id=10100, should now be shown
+        makeAltFormCard(), // Alolan Raichu - id=10100, should now be shown
       ],
       limits: { name: {}, evolution: {}, reverse: {}, cry: {} },
     };
@@ -422,7 +422,7 @@ describe("KnownPokemonQuiz", () => {
 
     render(<KnownPokemonQuiz client={null} userId={null} superuserPaused={false} />);
 
-    // The Japanese name must appear in the tile's aria-label and visible text —
+    // The Japanese name must appear in the tile's aria-label and visible text - 
     // confirming KnownPokemonCard routes through useLocalePokemonName rather
     // than rendering card.displayName directly.
     expect(

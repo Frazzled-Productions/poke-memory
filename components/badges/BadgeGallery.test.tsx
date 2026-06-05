@@ -40,7 +40,7 @@ describe("BadgeGallery proximity hint", () => {
 
   it("shows the hint with the nearest unearned badge", () => {
     // Boulder Badge requires species 74 and 95. Mastering 74 leaves 1 remaining,
-    // which is fewer than any other unearned badge — so Boulder Badge is the
+    // which is fewer than any other unearned badge - so Boulder Badge is the
     // nearest target.
     render(
       <BadgeGallery
@@ -56,7 +56,7 @@ describe("BadgeGallery proximity hint", () => {
   });
 
   it("uses singular phrasing for 1 remaining", () => {
-    // Master species 74 — Boulder Badge needs only 95 still remaining.
+    // Master species 74 - Boulder Badge needs only 95 still remaining.
     render(
       <BadgeGallery
         earnedBadges={[]}
@@ -69,7 +69,7 @@ describe("BadgeGallery proximity hint", () => {
   });
 
   it("uses plural phrasing for 2+ remaining", () => {
-    // Empty mastered set — Boulder Badge needs 2 species, which is the minimum
+    // Empty mastered set - Boulder Badge needs 2 species, which is the minimum
     // across all real-catalog badges with size 2.
     render(
       <BadgeGallery
@@ -129,7 +129,7 @@ describe("BadgeGallery accordion", () => {
 
   it("hides locked badge tiles by default", () => {
     render(<BadgeGallery earnedBadges={[BOULDER]} />);
-    // Cascade is not earned — its tile should not be in the document yet.
+    // Cascade is not earned - its tile should not be in the document yet.
     expect(
       screen.queryByRole("listitem", { name: /Cascade Badge \(locked\)/i }),
     ).not.toBeInTheDocument();

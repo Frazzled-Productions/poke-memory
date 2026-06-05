@@ -4,7 +4,7 @@
  * Graduated cards delegate the interval math to `ts-fsrs` (see
  * https://github.com/open-spaced-repetition/ts-fsrs). The Anki-style
  * learning-step layer (`learningStep`, `stepStartedAt`, LEARNING_STEPS_MS,
- * RELEARNING_STEPS_MS) is preserved — FSRS schedules graduated cards only;
+ * RELEARNING_STEPS_MS) is preserved - FSRS schedules graduated cards only;
  * the learning loop is the same wall-clock-driven flow it has always been.
  *
  * Grade mapping
@@ -17,14 +17,14 @@
  * 1/2/3/4; the mapping is applied at the FSRS boundary.
  *
  * `learningStep` meanings
- *   null           — graduated card (or brand-new before first touch)
- *   0, 1, 2, …    — current step index in the applicable steps array
+ *   null           - graduated card (or brand-new before first touch)
+ *   0, 1, 2, …    - current step index in the applicable steps array
  *
  * Distinguishing new-card learning from relearning (no extra flag needed):
  *   new-card learning:  lastReview === null  (never graduated)
  *   relearning:         lastReview !== null  (lapsed after graduating)
  *
- * `lastReview` is set only on graduation or lapse — NOT on in-step touches.
+ * `lastReview` is set only on graduation or lapse - NOT on in-step touches.
  * This keeps `firstSeen === today` as the sole gate for `newIntroducedToday`
  * and `lastReview === today && firstSeen !== today` as the sole gate for
  * `reviewsDoneToday`.
@@ -247,7 +247,7 @@ function fromFsrsCard(card: FsrsCard): FsrsResult {
  *   B3. Good  → advance one step, or graduate via FSRS if at the last step.
  *   B4. Easy  → graduate immediately via FSRS.
  *
- * FSRS is never called for B1, B2, or A1 — those touches stay inside the
+ * FSRS is never called for B1, B2, or A1 - those touches stay inside the
  * in-step / brand-new layer and don't affect stability/difficulty.
  */
 export type NextReviewOptions = {
@@ -265,7 +265,7 @@ export type NextReviewOptions = {
   weights?: number[];
 };
 
-/** Valid grade values — 1 (Again), 2 (Hard), 4 (Good), 5 (Easy). */
+/** Valid grade values - 1 (Again), 2 (Hard), 4 (Good), 5 (Easy). */
 const VALID_GRADES: ReadonlySet<number> = new Set([1, 2, 4, 5]);
 
 export function nextReview(

@@ -19,7 +19,7 @@ import type { AppLocale } from "@/i18n/locales";
  * dashboard), so the badge count always agrees with the Stats page (#1137).
  *
  * The hook also subscribes to `SESSION_CHANGED_EVENT` (`poke-memory:session-changed`)
- * so it updates reactively after every IDB write — including on WebKit (mobile Safari),
+ * so it updates reactively after every IDB write - including on WebKit (mobile Safari),
  * where synthetic StorageEvents are not reliably propagated to same-tab listeners
  * (#1134). The existing `useLocalStorageKey` dependency handles the desktop/non-WebKit
  * path; the CustomEvent subscription covers WebKit.
@@ -51,7 +51,7 @@ export function usePwaBadge(): void {
         try {
           await navigator.clearAppBadge();
         } catch {
-          // Silently ignore — badge API may not be permitted in this context.
+          // Silently ignore - badge API may not be permitted in this context.
         }
         return;
       }
@@ -64,7 +64,7 @@ export function usePwaBadge(): void {
       // Note: the incomplete-chains context is omitted here because the
       // badge hook does not have access to mastery/repetition state. The
       // preset will simply match nothing when active, which is acceptable
-      // — the badge count may be slightly conservative in that edge case.
+      // - the badge count may be slightly conservative in that edge case.
       const { totalCount } = computeQueueCount(
         session.cards,
         {
@@ -86,7 +86,7 @@ export function usePwaBadge(): void {
           await navigator.clearAppBadge();
         }
       } catch {
-        // Silently ignore — badge API may not be permitted in this context.
+        // Silently ignore - badge API may not be permitted in this context.
       }
     }
 

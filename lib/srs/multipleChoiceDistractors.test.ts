@@ -60,7 +60,7 @@ describe("pickMcDistractors", () => {
 
   it("prefers same-generation distractors", () => {
     const result = pickMcDistractors(target.id, target, POOL, "seed");
-    // Pool has 4 other Gen-I entries — all 3 distractors should be Gen-I.
+    // Pool has 4 other Gen-I entries - all 3 distractors should be Gen-I.
     expect(result.every((p) => p.generation === "generation-i")).toBe(true);
   });
 
@@ -157,7 +157,7 @@ describe("buildMcOptions", () => {
 
   it("correct option is not always first (shuffle distributes it)", () => {
     // Run across 10 different seeds and assert the correct option appears at
-    // different positions — a purely unshuffled array would always put it first.
+    // different positions - a purely unshuffled array would always put it first.
     const positions = new Set<number>();
     for (let i = 0; i < 20; i++) {
       const opts = buildMcOptions(target.id, target, POOL, `shuffle-test-${i}`);

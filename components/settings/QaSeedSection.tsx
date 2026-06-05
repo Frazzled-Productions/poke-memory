@@ -40,7 +40,7 @@ export function QaSeedSection() {
       const stored = window.localStorage.getItem(KEY_QA_SEED_ACTIVE);
       setActiveSeedSlug(stored ?? null);
     } catch {
-      // Private browsing / storage quota — non-fatal.
+      // Private browsing / storage quota - non-fatal.
     }
   }, []);
 

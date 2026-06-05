@@ -36,7 +36,7 @@ export function isPushSupported(): boolean {
  * True when the document is running as an installed PWA (display-mode:
  * standalone on Chromium/most browsers; `navigator.standalone` on iOS Safari).
  * iOS specifically REQUIRES the app to be installed to the Home Screen
- * before push subscriptions can be created — a regular Safari tab cannot
+ * before push subscriptions can be created - a regular Safari tab cannot
  * subscribe even with permission granted. The Settings page uses this to
  * hide the toggle outside standalone mode entirely; rendering the toggle
  * would just lead to a "Permission denied" error users could not act on.
@@ -59,7 +59,7 @@ export function isStandalone(): boolean {
  * either a string or a buffer; older browsers (pre-Chrome 109) require
  * the buffer shape, so we always convert.
  *
- * The function is pure and exported for unit testing — it's the kind of
+ * The function is pure and exported for unit testing - it's the kind of
  * thing that silently produces a wrong-shape key without complaint and
  * then PushManager.subscribe errors with a useless "Invalid raw ECDSA
  * P-256 public key" much later.
@@ -93,12 +93,12 @@ export type UnsubscribeResult =
  * Behaviour notes:
  * - Permission is requested via `Notification.requestPermission()`. On iOS
  *   Safari this MUST run inside a user-gesture handler (the toggle click)
- *   or the prompt is suppressed without a "denied" reason — the caller
+ *   or the prompt is suppressed without a "denied" reason - the caller
  *   must keep this call on the synchronous handler path.
  * - If the user has previously subscribed from this device, we reuse the
  *   existing PushManager subscription rather than tearing it down. The DB
  *   row for that (user_id, endpoint) pair is deleted and reinserted on every
- *   call so the operation stays inside the INSERT/DELETE policies — there
+ *   call so the operation stays inside the INSERT/DELETE policies - there
  *   is no UPDATE policy on push_subscriptions (see the persist block below).
  * - The DB row is keyed by (user_id, endpoint). One device that switches
  *   accounts therefore creates a second row; the new user owns the new
@@ -177,7 +177,7 @@ export async function subscribeToPush(
   // append-only baseline). Postgres treats INSERT ... ON CONFLICT DO UPDATE
   // as an UPDATE for RLS purposes, so a Supabase-client `.upsert(...)` on the
   // (user_id, endpoint) conflict key would silently fail every time a device
-  // re-subscribes after the first one — the conflict branch is denied by RLS.
+  // re-subscribes after the first one - the conflict branch is denied by RLS.
   // Removing the existing row first and inserting a fresh one keeps the
   // operation inside the SELECT/INSERT/DELETE policies that DO exist, and
   // sidesteps the missing UPDATE policy entirely. The cost is that a
@@ -226,7 +226,7 @@ export async function unsubscribeFromPush(
 ): Promise<UnsubscribeResult> {
   if (!isPushSupported()) return { ok: false, reason: "unsupported" };
 
-  // DB-side deletion first. If this fails we don't unsubscribe locally —
+  // DB-side deletion first. If this fails we don't unsubscribe locally - 
   // doing so would leave a row that the daily route would push to until
   // the OS returned 410, which is a wasted notification.
   try {
@@ -240,7 +240,7 @@ export async function unsubscribeFromPush(
   }
 
   // Local-side: drop any active subscription so the OS / browser releases
-  // the channel. Errors here are non-fatal — the DB row is gone, the
+  // the channel. Errors here are non-fatal - the DB row is gone, the
   // daily route will never target this device again, and the next
   // subscribeToPush call will rebuild fresh.
   try {
@@ -250,7 +250,7 @@ export async function unsubscribeFromPush(
       await subscription.unsubscribe();
     }
   } catch {
-    // Swallow — DB state is authoritative.
+    // Swallow - DB state is authoritative.
   }
 
   return { ok: true };
@@ -273,7 +273,7 @@ export async function hasLocalSubscription(): Promise<boolean> {
 }
 
 /**
- * Encodes an ArrayBuffer as base64url (no padding) — the canonical
+ * Encodes an ArrayBuffer as base64url (no padding) - the canonical
  * encoding for VAPID keys both on the wire and in storage. The web-push
  * library accepts this shape directly when sending.
  */

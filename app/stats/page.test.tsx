@@ -1,5 +1,5 @@
 /**
- * Component tests for app/stats/page.tsx — i18n wiring (#1369).
+ * Component tests for app/stats/page.tsx - i18n wiring (#1369).
  *
  * Verifies that all user-facing strings flow through useTranslations() and
  * render the correct values in English and Japanese.
@@ -13,7 +13,7 @@ import { renderWithIntl, renderJa, screen, waitFor } from "@/components/test-uti
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Module mocks — declared before component imports so vi.mock hoisting works.
+// Module mocks - declared before component imports so vi.mock hoisting works.
 // ---------------------------------------------------------------------------
 
 vi.mock("next/image", () => ({
@@ -310,7 +310,7 @@ beforeEach(() => {
   mockLoadSession.mockResolvedValue(null);
 });
 
-describe("StatsPage — English locale", () => {
+describe("StatsPage - English locale", () => {
   it("renders the loading skeleton aria-label initially then section headings after data loads", async () => {
     renderWithIntl(<StatsPage />);
 
@@ -365,7 +365,7 @@ describe("StatsPage — English locale", () => {
   });
 });
 
-describe("StatsPage — Japanese locale", () => {
+describe("StatsPage - Japanese locale", () => {
   it("renders section headings in Japanese", async () => {
     renderJa(<StatsPage />);
 
@@ -407,7 +407,7 @@ describe("StatsPage — Japanese locale", () => {
   });
 });
 
-describe("StatsPage — masteryMeaning.body em emphasis", () => {
+describe("StatsPage - masteryMeaning.body em emphasis", () => {
   it("renders the mastery meaning body with <em> emphasis around 'and'", async () => {
     renderWithIntl(<StatsPage />);
 

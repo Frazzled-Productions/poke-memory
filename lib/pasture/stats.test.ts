@@ -41,7 +41,7 @@ function masteredState(firstSeen = "2026-04-01"): ReviewState {
 
 /**
  * A state mastered at threshold 2 but not at threshold 3.
- * reps=2, scheduledDays=21 — passes filterMastered(masteryRepetitions=2),
+ * reps=2, scheduledDays=21 - passes filterMastered(masteryRepetitions=2),
  * but would fail isMastered() with the default MASTERY_REPETITIONS=3.
  */
 function masteredAtThreshold2State(firstSeen = "2026-04-01"): ReviewState {
@@ -125,7 +125,7 @@ function makeReverseCard(speciesId: number, state: ReviewState): ReviewableCard 
 }
 
 // ---------------------------------------------------------------------------
-// biomeStats — basic operation
+// biomeStats - basic operation
 // ---------------------------------------------------------------------------
 
 describe("biomeStats", () => {
@@ -166,7 +166,7 @@ describe("biomeStats", () => {
   });
 
   it("counts all cards passed in allMasteredCards (caller pre-filters mastery)", () => {
-    // biomeStats trusts the caller to pass only mastered cards — it does not
+    // biomeStats trusts the caller to pass only mastered cards - it does not
     // re-apply an isMastered() predicate. Both cards are counted.
     const cards = [
       makeCard(10, "Caterpie", "forest", masteredState()),
@@ -202,7 +202,7 @@ describe("biomeStats", () => {
     // This test documents the expected (post-hydration) behaviour: only cards with
     // isDefaultForm=true are counted.
     const cards = [
-      makeCard(10, "Caterpie", "forest"), // isDefaultForm: true — should count
+      makeCard(10, "Caterpie", "forest"), // isDefaultForm: true - should count
     ];
     const stats = biomeStats("forest", cards);
     expect(stats.masteredCount).toBe(1);
@@ -226,14 +226,14 @@ describe("biomeStats", () => {
 });
 
 // ---------------------------------------------------------------------------
-// biomeStats — masteryRepetitions below default (regression: #1013)
+// biomeStats - masteryRepetitions below default (regression: #1013)
 // ---------------------------------------------------------------------------
 
-describe("biomeStats — masteryRepetitions < 3 (regression #1013)", () => {
+describe("biomeStats - masteryRepetitions < 3 (regression #1013)", () => {
   it("counts a card with reps=2 when the caller pre-filters at masteryRepetitions=2", () => {
     // This is the exact scenario that was broken: a user sets masteryRepetitions=2.
     // filterMastered passes the card (reps >= 2 && scheduledDays >= 21).
-    // biomeStats must count it — not silently drop it via a hardcoded isMastered() re-check.
+    // biomeStats must count it - not silently drop it via a hardcoded isMastered() re-check.
     // Since #1234, both name AND reverse must pass the threshold for species mastery.
     const threshold2State = masteredAtThreshold2State();
     const allCards: ReviewableCard[] = [
@@ -279,12 +279,12 @@ describe("biomeStats — masteryRepetitions < 3 (regression #1013)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// biomeStats — forceAllMastered (superuser flag)
+// biomeStats - forceAllMastered (superuser flag)
 // ---------------------------------------------------------------------------
 
-describe("biomeStats — forceAllMastered", () => {
+describe("biomeStats - forceAllMastered", () => {
   it("sets masteredCount equal to totalCount when forceAllMastered is true", () => {
-    const cards: NameReviewCard[] = []; // empty — QA mode supplies the total
+    const cards: NameReviewCard[] = []; // empty - QA mode supplies the total
     const stats = biomeStats("forest", cards, true);
     expect(stats.masteredCount).toBe(stats.totalCount);
     expect(stats.masteredCount).toBeGreaterThan(0);

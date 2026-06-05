@@ -1,5 +1,5 @@
 /**
- * masteredCountCache tests (#1608). jsdom (needs localStorage) — mirrors the
+ * masteredCountCache tests (#1608). jsdom (needs localStorage) - mirrors the
  * pattern in dueCountCache.test.tsx.
  *
  * Most tests use a custom in-memory localStorage stub (fast, no cross-test
@@ -165,7 +165,7 @@ describe("readMasteredCountCache", () => {
   });
 
   it("falls back to 0 for all locales when their values are missing from the stored object", () => {
-    // An object with completely different keys — every locale key is absent.
+    // An object with completely different keys - every locale key is absent.
     window.localStorage.setItem(
       KEY_MASTERED_COUNT_BY_LOCALE,
       JSON.stringify({ unexpected: 99 }),
@@ -193,7 +193,7 @@ describe("readMasteredCountCache", () => {
 });
 
 // ---------------------------------------------------------------------------
-// writeMasteredCountForLocale — correctness (stub localStorage)
+// writeMasteredCountForLocale - correctness (stub localStorage)
 // ---------------------------------------------------------------------------
 
 describe("writeMasteredCountForLocale", () => {
@@ -286,7 +286,7 @@ describe("writeMasteredCountForLocale", () => {
 });
 
 // ---------------------------------------------------------------------------
-// writeMasteredCountForLocale — StorageEvent dispatch (real jsdom localStorage)
+// writeMasteredCountForLocale - StorageEvent dispatch (real jsdom localStorage)
 //
 // jsdom's StorageEvent constructor validates that storageArea is a real Storage
 // instance. The custom in-memory stub is not a Storage instance, so
@@ -295,7 +295,7 @@ describe("writeMasteredCountForLocale", () => {
 // so the dispatch path executes correctly.
 // ---------------------------------------------------------------------------
 
-describe("writeMasteredCountForLocale — notify dispatch", () => {
+describe("writeMasteredCountForLocale - notify dispatch", () => {
   // Restore the real jsdom Storage so jsdom's StorageEvent constructor accepts
   // storageArea (it rejects non-Storage objects and the write helper swallows
   // the error, causing the dispatch to be silently skipped).

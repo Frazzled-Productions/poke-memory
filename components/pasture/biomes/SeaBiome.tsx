@@ -2,12 +2,12 @@ import { BiomeSvg } from "./BiomeSvg";
 import { BiomeFloor } from "./BiomeFloor";
 
 /**
- * Open Sea habitat backdrop — sky horizon at top, sunlit water column,
+ * Open Sea habitat backdrop - sky horizon at top, sunlit water column,
  * sandy seafloor with coral and kelp at the bottom. Anchor bands span
  * surface → reef → deep so water Pokémon distribute through the column.
  *
  * The sky here is only a 100 px band at the top rather than the full-bleed
- * background used by other biomes, so BiomeSky does not apply — the sky
+ * background used by other biomes, so BiomeSky does not apply - the sky
  * rect and gradient are defined inline. BiomeFloor handles the seafloor.
  */
 export function SeaBiome() {
@@ -33,7 +33,7 @@ export function SeaBiome() {
         </radialGradient>
       </defs>
 
-      {/* Sky band — 100 px only; the rest is water, so BiomeSky does not apply */}
+      {/* Sky band - 100 px only; the rest is water, so BiomeSky does not apply */}
       <rect width="1600" height="100" fill="url(#sea-sky)" />
       {/* Sun on horizon */}
       <circle cx="1320" cy="70" r="80" fill="url(#sea-sundisk)" />
@@ -82,7 +82,7 @@ export function SeaBiome() {
         strokeOpacity={0.55}
       />
 
-      {/* Kelp forest — back row */}
+      {/* Kelp forest - back row */}
       <g stroke="#2e7a3a" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.85">
         <path d="M120,500 Q110,440 130,380 Q150,320 130,260 Q110,200 130,150" />
         <path d="M170,510 Q190,450 170,390 Q150,330 170,270 Q190,210 170,170" />
@@ -90,7 +90,7 @@ export function SeaBiome() {
         <path d="M1500,510 Q1480,450 1500,390 Q1520,330 1500,270 Q1480,210 1500,200" />
       </g>
 
-      {/* Coral cluster — left */}
+      {/* Coral cluster - left */}
       <g>
         <ellipse cx="350" cy="540" rx="60" ry="6" fill="#1f140a" opacity="0.35" />
         <g fill="#ff6b8e">
@@ -111,7 +111,7 @@ export function SeaBiome() {
         </g>
       </g>
 
-      {/* Coral cluster — right */}
+      {/* Coral cluster - right */}
       <g>
         <ellipse cx="1180" cy="544" rx="70" ry="6" fill="#1f140a" opacity="0.35" />
         <g fill="#9b6cff">
@@ -126,7 +126,7 @@ export function SeaBiome() {
         </g>
       </g>
 
-      {/* Sea anemones — small front */}
+      {/* Sea anemones - small front */}
       <g>
         {[
           [520, 538], [780, 542], [1000, 538], [1330, 542],

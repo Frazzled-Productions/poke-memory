@@ -9,7 +9,7 @@
  *      client/userId → clearPendingQueue on every enqueueGrade call).
  *
  * File lives under components/ (not lib/) because it calls renderHook, which
- * requires jsdom — the vitest jsdom project covers components/**\/*.test.tsx.
+ * requires jsdom - the vitest jsdom project covers components/**\/*.test.tsx.
  */
 
 import { renderHook, act, waitFor } from "@testing-library/react";
@@ -159,9 +159,9 @@ function fireOnline() {
   window.dispatchEvent(new Event("online"));
 }
 
-// ─── Part 1: usePerGradeSync — queue persistence ───────────────────────────────
+// ─── Part 1: usePerGradeSync - queue persistence ───────────────────────────────
 
-describe("usePerGradeSync — persisted queue (#893)", () => {
+describe("usePerGradeSync - persisted queue (#893)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -309,7 +309,7 @@ describe("usePerGradeSync — persisted queue (#893)", () => {
       result.current.enqueueGrade(makeCard(1));
     });
 
-    // Do NOT advance timers — the persist debounce has not fired yet.
+    // Do NOT advance timers - the persist debounce has not fired yet.
     // Unmounting should flush it synchronously.
     act(() => {
       unmount();
@@ -336,9 +336,9 @@ describe("usePerGradeSync — persisted queue (#893)", () => {
   });
 });
 
-// ─── Part 2: useRetryPush — persisted queue preferred over heuristic ───────────
+// ─── Part 2: useRetryPush - persisted queue preferred over heuristic ───────────
 
-describe("useRetryPush — prefers persisted queue when non-empty (#893)", () => {
+describe("useRetryPush - prefers persisted queue when non-empty (#893)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -467,7 +467,7 @@ describe("useRetryPush — prefers persisted queue when non-empty (#893)", () =>
   });
 
   it("falls back to the session-card heuristic when the persisted queue is empty", async () => {
-    // Empty persisted queue — hook must use the heuristic.
+    // Empty persisted queue - hook must use the heuristic.
     vi.mocked(loadPendingQueue).mockReturnValue([]);
     vi.mocked(loadSyncStatus).mockReturnValue({ ...FAILED_STATUS, failedCardCount: 1 });
     const todayCard = makeCard(7, "2026-05-17");
@@ -489,9 +489,9 @@ describe("useRetryPush — prefers persisted queue when non-empty (#893)", () =>
   });
 });
 
-// ─── Part 3: useOnlineReconnectSync — persisted queue preferred ────────────────
+// ─── Part 3: useOnlineReconnectSync - persisted queue preferred ────────────────
 
-describe("useOnlineReconnectSync — prefers persisted queue when non-empty (#893)", () => {
+describe("useOnlineReconnectSync - prefers persisted queue when non-empty (#893)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(isSyncSafe).mockReturnValue(true);
@@ -617,7 +617,7 @@ describe("useOnlineReconnectSync — prefers persisted queue when non-empty (#89
     expect(pushSingleCard).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER, todayCard);
   });
 
-  // Superuser guard: when client/userId are null, nothing is pushed — including
+  // Superuser guard: when client/userId are null, nothing is pushed - including
   // persisted-queue cards. The guard is enforced at the top of handleOnline
   // (not here in the hook; OnlineReconnectSync.tsx passes null when superuser),
   // so this test validates the contract the hook exposes to its call site.

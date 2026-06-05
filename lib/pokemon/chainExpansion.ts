@@ -4,7 +4,7 @@
  * PokéAPI encodes regional evolution branches directly in the chain JSON:
  * `evolution_details[].region` is non-null when a `(parent, child)` edge leads
  * to a regional variant of the child species. For example, the Pikachu chain
- * contains two Raichu child entries under Pikachu — one with `region: null`
+ * contains two Raichu child entries under Pikachu - one with `region: null`
  * (default Raichu) and one with `region: {name: "alola"}` (Alolan Raichu).
  *
  * This module implements the post-processing step that turns those region tags
@@ -18,7 +18,7 @@
 /**
  * A chain node as produced by flattenChain in the seed script.
  * The `region` field is populated during seed processing but is not persisted
- * to generated.json — the form IDs already encode the regional information.
+ * to generated.json - the form IDs already encode the regional information.
  */
 export type ChainNode = {
   /** Species ID (or form pokemon ID for form-aware nodes). */
@@ -70,7 +70,7 @@ export function buildVarietiesLookup(
   const lookup: VarietiesLookup = new Map();
   for (const rec of records) {
     if (rec.isDefaultForm || !rec.formSlug) continue;
-    // Only index regional slugs — the ones PokéAPI uses in evolution_details.region.
+    // Only index regional slugs - the ones PokéAPI uses in evolution_details.region.
     if (!/^(alola|galar|hisui|paldea)/.test(rec.formSlug)) continue;
     if (!lookup.has(rec.speciesId)) {
       lookup.set(rec.speciesId, new Map());
@@ -105,7 +105,7 @@ export function buildVarietiesLookup(
  * combined (input + emitted) set.
  *
  * @param nodes   Flat chain nodes from flattenChain (may include duplicates
- *                when the same chain is shared across species — e.g. both the
+ *                when the same chain is shared across species - e.g. both the
  *                default and regional Raichu node appear under the Pikachu
  *                chain).
  * @param lookup  VarietiesLookup built from the seed's partial records.
@@ -139,12 +139,12 @@ export function addFormEdges(
     const parentSpeciesId = node.evolvesFromId; // species ID of the parent
     const childSpeciesId = node.speciesId;
 
-    // Child form: required — skip if the child has no such regional variant.
+    // Child form: required - skip if the child has no such regional variant.
     const childVarieties = lookup.get(childSpeciesId);
     const childEntry = childVarieties?.get(region);
     if (!childEntry) continue;
 
-    // Parent form: optional — fall back to default pokemonId (= speciesId for
+    // Parent form: optional - fall back to default pokemonId (= speciesId for
     // default forms whose id matches their speciesId).
     const parentVarieties = lookup.get(parentSpeciesId);
     const parentEntry = parentVarieties?.get(region);

@@ -39,7 +39,7 @@ const tZhHant = makeT(zhHantMessages as { types: Record<string, string> });
 // Spot-check each locale with a representative type (Fire)
 // ---------------------------------------------------------------------------
 
-describe("getTypeName — locale coverage (fire)", () => {
+describe("getTypeName - locale coverage (fire)", () => {
   it("returns 'Fire' in English", () => {
     expect(getTypeName("fire", tEn)).toBe("Fire");
   });
@@ -58,10 +58,10 @@ describe("getTypeName — locale coverage (fire)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// All 18 types — English catalogue completeness
+// All 18 types - English catalogue completeness
 // ---------------------------------------------------------------------------
 
-describe("getTypeName — all 18 types in English", () => {
+describe("getTypeName - all 18 types in English", () => {
   const expected: Record<string, string> = {
     bug: "Bug", dark: "Dark", dragon: "Dragon", electric: "Electric",
     fairy: "Fairy", fighting: "Fighting", fire: "Fire", flying: "Flying",
@@ -77,10 +77,10 @@ describe("getTypeName — all 18 types in English", () => {
 });
 
 // ---------------------------------------------------------------------------
-// All 18 types — Japanese catalogue completeness
+// All 18 types - Japanese catalogue completeness
 // ---------------------------------------------------------------------------
 
-describe("getTypeName — all 18 types in Japanese", () => {
+describe("getTypeName - all 18 types in Japanese", () => {
   const expected: Record<string, string> = {
     bug: "むし", dark: "あく", dragon: "ドラゴン", electric: "でんき",
     fairy: "フェアリー", fighting: "かくとう", fire: "ほのお", flying: "ひこう",
@@ -96,10 +96,10 @@ describe("getTypeName — all 18 types in Japanese", () => {
 });
 
 // ---------------------------------------------------------------------------
-// All 18 types — Simplified Chinese catalogue completeness
+// All 18 types - Simplified Chinese catalogue completeness
 // ---------------------------------------------------------------------------
 
-describe("getTypeName — all 18 types in Simplified Chinese", () => {
+describe("getTypeName - all 18 types in Simplified Chinese", () => {
   const expected: Record<string, string> = {
     bug: "虫", dark: "恶", dragon: "龙", electric: "电",
     fairy: "妖精", fighting: "格斗", fire: "火", flying: "飞行",
@@ -115,10 +115,10 @@ describe("getTypeName — all 18 types in Simplified Chinese", () => {
 });
 
 // ---------------------------------------------------------------------------
-// All 18 types — Traditional Chinese catalogue completeness
+// All 18 types - Traditional Chinese catalogue completeness
 // ---------------------------------------------------------------------------
 
-describe("getTypeName — all 18 types in Traditional Chinese", () => {
+describe("getTypeName - all 18 types in Traditional Chinese", () => {
   const expected: Record<string, string> = {
     bug: "蟲", dark: "惡", dragon: "龍", electric: "電",
     fairy: "妖精", fighting: "格鬥", fire: "火", flying: "飛行",

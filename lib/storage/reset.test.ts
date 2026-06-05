@@ -13,7 +13,7 @@ import { idbGet, idbSet, __resetForTests } from "@/lib/idb/db";
 // vitest.setup.node.ts).
 
 // Real browser localStorage exposes entries both via the Storage methods
-// AND as enumerable own properties — `Object.keys(localStorage)` walks the
+// AND as enumerable own properties - `Object.keys(localStorage)` walks the
 // stored keys directly. The function under test uses that idiom, so the
 // stub must too. A Proxy bridges Map storage to property access.
 function makeStubStorage(): Storage {
@@ -92,7 +92,7 @@ describe("clearLocalProgress", () => {
     // because window.localStorage and globalThis.localStorage are the
     // same reference in the browser. Mirror that here.
     vi.stubGlobal("localStorage", stubLocalStorage);
-    // StorageEvent isn't a built-in in node — provide a minimal
+    // StorageEvent isn't a built-in in node - provide a minimal
     // constructor that captures the key, since the function uses
     // `new StorageEvent("storage", { key })`.
     // lib/review/persistence.test.ts has a similar stub that also extends
@@ -136,7 +136,7 @@ describe("clearLocalProgress", () => {
     await idbSet("poke-memory:review-session:v1", '{"cards":[]}');
     await idbSet("poke-memory:grade-log:v1", '[{"grade":4}]');
     // The real migrateFromLocalStorage stores the flag as a native boolean via
-    // a transaction in lib/idb/db.ts, but idbSet/idbGet only handle strings —
+    // a transaction in lib/idb/db.ts, but idbSet/idbGet only handle strings - 
     // idbGet returns null for non-string values. We seed a string here so idbGet
     // can verify presence; the production delete path doesn't care about the
     // stored type, so this test exercises the right code path.
@@ -156,7 +156,7 @@ describe("clearLocalProgress", () => {
     await clearLocalProgress();
     const keys = events.map((e) => e.key);
     expect(keys).toContain("poke-memory:review-session:v1");
-    // The grade-log dispatch is the explicit delete signal — without it, same-
+    // The grade-log dispatch is the explicit delete signal - without it, same-
     // tab subscribers that read grade-log independently of the session would
     // not pick up the reset.
     expect(keys).toContain("poke-memory:grade-log:v1");

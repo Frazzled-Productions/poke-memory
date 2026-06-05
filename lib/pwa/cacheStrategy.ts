@@ -1,5 +1,5 @@
 /**
- * Service-worker runtime caching policy — pure, framework-free classification.
+ * Service-worker runtime caching policy - pure, framework-free classification.
  *
  * The service worker itself (`app/sw.ts`) imports {@link classifyRequest} to
  * decide which caching strategy to apply to a given request. Keeping the
@@ -9,21 +9,21 @@
  *
  * Strategies (named after their `serwist` handler counterparts):
  *
- * - `cache-first`   — serve from cache, only hit the network on a miss. Used
+ * - `cache-first` - serve from cache, only hit the network on a miss. Used
  *                     for immutable, content-addressed assets: sprites under
  *                     `public/sprites/**`, cries under `public/cries/**`, and
  *                     Next.js build output under `/_next/static/**`. These
  *                     never change for a given URL, so a cached copy is always
  *                     correct and an offline practice session can render every
  *                     sprite and play every cry.
- * - `network-first` — try the network, fall back to cache when offline. Used
+ * - `network-first` - try the network, fall back to cache when offline. Used
  *                     for navigations and same-origin data so a connected user
  *                     always sees fresh content but an offline user still gets
  *                     the last-known app shell.
- * - `stale-while-revalidate` — serve the cached copy immediately and refresh
+ * - `stale-while-revalidate` - serve the cached copy immediately and refresh
  *                     it in the background. Used for fonts and other static
  *                     assets where instant render matters more than freshness.
- * - `network-only`  — never cache. Used for cross-origin requests (e.g. the
+ * - `network-only` - never cache. Used for cross-origin requests (e.g. the
  *                     Supabase sync endpoint) so offline reads never return a
  *                     stale cloud response and sync semantics are unchanged.
  *
@@ -33,8 +33,8 @@
  *   under `/sprites/pokemon/<id>.png`, plus pre-generated static WebP variants
  *   at `/sprites/pokemon/webp/<id>/<width>.webp` (10 width variants per sprite,
  *   ~12,914 entries total when the full offline pack is downloaded). Sprites
- *   are served directly as static files — the `/_next/image` endpoint is no
- *   longer used for sprites. The entry cap must exceed the offline pack size —
+ *   are served directly as static files - the `/_next/image` endpoint is no
+ *   longer used for sprites. The entry cap must exceed the offline pack size - 
  *   see {@link SPRITE_CACHE_MAX_ENTRIES}.
  * - **Cries** (`poke-memory-cries-v2`): self-hosted OGG audio under
  *   `/cries/<id>.ogg`, one file per species (~1,025 entries plus regional forms).
@@ -96,7 +96,7 @@ export type CacheName = (typeof CACHE_NAMES)[keyof typeof CACHE_NAMES];
  * (`/sprites/pokemon/<id>.png`) per species, across ~1,174 species/forms
  * (11 URLs × 1,174 IDs = 12,914 entries).
  * The cap must comfortably exceed that pack size so that `ExpirationPlugin`
- * does not evict offline-downloaded sprites as the user practises — culled
+ * does not evict offline-downloaded sprites as the user practises - culled
  * entries become permanent cache misses and broken images for the remainder
  * of an offline session.
  *
@@ -111,7 +111,7 @@ export const SPRITE_CACHE_MAX_ENTRIES = 15_000;
 export const SPRITE_CACHE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days
 
 /**
- * Up to 1025 species cries plus regional forms — cap generously.
+ * Up to 1025 species cries plus regional forms - cap generously.
  * Mirrors the sprite cap since the species count is the same.
  */
 export const CRY_CACHE_MAX_ENTRIES = 1300;
@@ -126,7 +126,7 @@ const FONT_EXTENSION = /\.(?:woff2?|ttf|otf|eot)$/i;
  *
  * This helper is intentionally path-only so that {@link classifyRequest} can
  * call it once for the raw request path and again for the decoded `url` query
- * param of `/_next/image` requests — without duplicating the rule set and
+ * param of `/_next/image` requests - without duplicating the rule set and
  * without risking infinite recursion (it never calls back into
  * `classifyRequest`).
  *
@@ -135,13 +135,13 @@ const FONT_EXTENSION = /\.(?:woff2?|ttf|otf|eot)$/i;
  *              matches (caller should fall back to the pages bucket).
  */
 function classifyPath(path: string): { strategy: CacheStrategy; cacheName: CacheName } | null {
-  // Self-hosted sprite art — immutable per URL. Cache-first so an offline
+  // Self-hosted sprite art - immutable per URL. Cache-first so an offline
   // practice session renders every card.
   if (path.startsWith("/sprites/")) {
     return { strategy: "cache-first", cacheName: CACHE_NAMES.sprites };
   }
 
-  // Self-hosted cry audio — immutable per URL. Cache-first so offline practice
+  // Self-hosted cry audio - immutable per URL. Cache-first so offline practice
   // can play every cry without a network request.
   if (path.startsWith("/cries/")) {
     return { strategy: "cache-first", cacheName: CACHE_NAMES.cries };
@@ -152,7 +152,7 @@ function classifyPath(path: string): { strategy: CacheStrategy; cacheName: Cache
     return { strategy: "cache-first", cacheName: CACHE_NAMES.static };
   }
 
-  // Fonts — render instantly from cache, refresh in the background.
+  // Fonts - render instantly from cache, refresh in the background.
   if (FONT_EXTENSION.test(path)) {
     return { strategy: "stale-while-revalidate", cacheName: CACHE_NAMES.fonts };
   }
@@ -169,14 +169,14 @@ function classifyPath(path: string): { strategy: CacheStrategy; cacheName: Cache
  * route to the sprites cache rather than the network-first pages bucket, so
  * offline practice correctly serves cached sprites.
  *
- * One level of indirection only — the decoded `url` is classified via
+ * One level of indirection only - the decoded `url` is classified via
  * {@link classifyPath}, not via a recursive `classifyRequest` call, so there
  * is no possibility of a recursion bomb.
  *
  * @param url        The fully-qualified request URL.
  * @param origin     The app's own origin (e.g. `https://pokememory.com`).
  *                   Cross-origin requests are never cached.
- * @param requestMode The Fetch API request `mode` — `"navigate"` for top-level
+ * @param requestMode The Fetch API request `mode` - `"navigate"` for top-level
  *                   document navigations. Optional; defaults to a non-navigation.
  */
 export function classifyRequest(
@@ -194,7 +194,7 @@ export function classifyRequest(
 
   // Cross-origin requests (Supabase sync, GitHub avatars, analytics) bypass the
   // cache entirely. This keeps the best-effort sync model in docs/sync.md
-  // intact — an offline read can never return a stale cloud response.
+  // intact - an offline read can never return a stale cloud response.
   if (parsed.origin !== origin) {
     return { strategy: "network-only" };
   }
@@ -210,7 +210,7 @@ export function classifyRequest(
   // Only one level of indirection: we call `classifyPath`, not `classifyRequest`,
   // so there is no recursion risk. Cross-origin optimiser URLs (e.g. GitHub
   // avatars) resolve to `null` from `classifyPath` and fall through to the
-  // pages bucket — which is fine, because the outer cross-origin guard above
+  // pages bucket - which is fine, because the outer cross-origin guard above
   // has already handled the case where the *request itself* is cross-origin;
   // here the request is same-origin (`/_next/image` is served by our app) but
   // the underlying image source may be external.
@@ -221,14 +221,14 @@ export function classifyRequest(
       try {
         innerParsed = new URL(decodeURIComponent(rawParam), origin);
       } catch {
-        // Malformed url param — fall through to pages bucket.
+        // Malformed url param - fall through to pages bucket.
       }
       // Same-origin guard: only route to an immutable-asset bucket when the
       // decoded source URL belongs to our own origin. A future `remotePatterns`
       // entry whose path happens to start with `/sprites/` or `/cries/` must
       // not be mis-classified into our local sprite or cry bucket. Cross-origin
       // optimiser URLs (e.g. GitHub avatars, external CDNs) fall through to
-      // the pages bucket — they are already handled as network-first there,
+      // the pages bucket - they are already handled as network-first there,
       // which is the correct behaviour for mutable remote assets.
       if (innerParsed !== null && innerParsed.origin === origin) {
         const innerResult = classifyPath(innerParsed.pathname);
@@ -238,7 +238,7 @@ export function classifyRequest(
       }
     }
     // Non-sprite optimiser request (other same-origin assets, cross-origin
-    // image sources) — fall through to the pages bucket below.
+    // image sources) - fall through to the pages bucket below.
   }
 
   // Apply path-based classification for all other same-origin paths.
@@ -247,13 +247,13 @@ export function classifyRequest(
     return pathResult;
   }
 
-  // Top-level navigations — network-first so a connected user gets fresh
+  // Top-level navigations - network-first so a connected user gets fresh
   // pages, an offline user falls back to the cached app shell.
   if (requestMode === "navigate") {
     return { strategy: "network-first", cacheName: CACHE_NAMES.pages };
   }
 
-  // Everything else same-origin (data fetches, RSC payloads) — network-first.
+  // Everything else same-origin (data fetches, RSC payloads) - network-first.
   return { strategy: "network-first", cacheName: CACHE_NAMES.pages };
 }
 

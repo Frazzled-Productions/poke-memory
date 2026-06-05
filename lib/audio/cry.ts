@@ -10,7 +10,7 @@ let pendingEndedListener: (() => void) | null = null;
  *
  * Otherwise, the Promise resolves on the next `ended` or `error` event.
  * A 5-second fallback timer guarantees resolution even if the event never
- * fires (e.g. a decoding stall) — so the card transition cannot hang forever.
+ * fires (e.g. a decoding stall) - so the card transition cannot hang forever.
  */
 export function awaitCryEnd(): Promise<void> {
   if (audioEl === null || audioEl.paused) return Promise.resolve();
@@ -45,7 +45,7 @@ export function awaitCryEnd(): Promise<void> {
  *   - immediately if there's nothing to play (null url / no audio support), or
  *   - immediately if `play()` rejects with NotAllowedError (autoplay blocked).
  *
- * It does NOT fire when a new `playCry` call interrupts an in-flight cry — the
+ * It does NOT fire when a new `playCry` call interrupts an in-flight cry - the
  * prior call is dropped in favour of the latest one, which sets up its own listener.
  */
 export function playCry(url: string | null, volume = 0.6, onEnded?: () => void): void {
@@ -82,7 +82,7 @@ export function playCry(url: string | null, volume = 0.6, onEnded?: () => void):
     if (err instanceof Error && err.name !== "NotAllowedError") {
       console.error("[cry] play failed:", err);
     }
-    // Cry didn't actually start — fire the chained callback so TTS still happens.
+    // Cry didn't actually start - fire the chained callback so TTS still happens.
     if (onEnded !== undefined && pendingEndedListener !== null) {
       audioEl?.removeEventListener("ended", pendingEndedListener);
       pendingEndedListener = null;

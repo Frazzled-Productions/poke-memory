@@ -64,7 +64,7 @@ describe("useLocalStorageKey", () => {
       dispatchStorageEvent("poke-memory:unmount-key");
     });
 
-    // Counter should remain at 0 — listener was cleaned up.
+    // Counter should remain at 0 - listener was cleaned up.
     expect(result.current).toBe(0);
   });
 });

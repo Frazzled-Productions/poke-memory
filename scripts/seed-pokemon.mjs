@@ -2,7 +2,7 @@
 // Fetches all canonical Pokémon species from PokéAPI and writes
 // lib/pokemon/generated.json + lib/pokemon/generated-locale-names.json.
 // Run with: node scripts/seed-pokemon.mjs
-// Node 20+ — uses global fetch, node:fs/promises, node:path, node:url.
+// Node 20+ - uses global fetch, node:fs/promises, node:path, node:url.
 
 import { writeFile, mkdir, readFile, rename } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 
 // Build-time transliteration: pinyin-pro (zh-Hans / zh-Hant) and wanakana
-// (ja rōmaji fallback).  Both are devDependencies — never imported at runtime.
+// (ja rōmaji fallback).  Both are devDependencies - never imported at runtime.
 import { pinyin as pinyinPro } from "pinyin-pro";
 import { toRomaji } from "wanakana";
 
@@ -23,7 +23,7 @@ function generatePinyin(name) {
 /** Normalise a PokéAPI ja-roma string; fall back to wanakana if absent. */
 function normaliseRomaji(jaRoma, jaKana) {
   if (jaRoma) return jaRoma.replace(/\s+/g, " ").trim();
-  // Defensive fallback — research confirms full Gen 1-9 coverage, but we
+  // Defensive fallback - research confirms full Gen 1-9 coverage, but we
   // should not crash for any future species that might be missing ja-roma.
   return toRomaji(jaKana).trim();
 }
@@ -57,7 +57,7 @@ function sleep(ms) {
  * Write `buffer` to `destPath` atomically: write to a unique sibling temp file
  * first, then rename it into place. `rename` on the same filesystem is atomic,
  * so a concurrent reader sees either the old file or the fully-written new one
- * — never a partial write. This also closes the check-then-write race between
+ * - never a partial write. This also closes the check-then-write race between
  * the `existsSync` skip-guard and the write itself.
  */
 async function writeFileAtomic(destPath, buffer) {
@@ -71,7 +71,7 @@ async function writeFileAtomic(destPath, buffer) {
       const { unlink } = await import("node:fs/promises");
       await unlink(tmpPath);
     } catch {
-      // ignore — temp file may not exist
+      // ignore - temp file may not exist
     }
     throw err;
   }
@@ -124,7 +124,7 @@ async function fetchWithRetry(url, label) {
     }
 
     if (!res.ok) {
-      // 4xx other than 429 — non-retryable
+      // 4xx other than 429 - non-retryable
       process.stderr.write(
         `[seed] WARN: HTTP ${res.status} for ${label}, skipping\n`
       );
@@ -297,7 +297,7 @@ function extractFlavorTexts(flavorTextEntries) {
         existing.versions.push(versionSlug);
       }
     } else if (byText.size < FLAVOR_TEXTS_MAX) {
-      // New distinct text — insert with this game as the first version.
+      // New distinct text - insert with this game as the first version.
       // The loop continues even after reaching the cap so that later entries
       // whose text matches an already-collected entry can still accumulate
       // version slugs into the existing record above.
@@ -328,7 +328,7 @@ function normalizeFlavorText(text) {
 //
 // `region` is included here for use during chain post-processing
 // (addFormEdges). It is stripped from the final persisted chain node before
-// writing generated.json — see addFormEdges below.
+// writing generated.json - see addFormEdges below.
 function trimDetail(d) {
   if (!d) return null;
   return {
@@ -340,7 +340,7 @@ function trimDetail(d) {
     min_move_count: d.min_move_count ?? null,
     min_steps: d.min_steps ?? null,
     min_damage_taken: d.min_damage_taken ?? null,
-    // PokéAPI uses "" as the "any time" sentinel — normalise to null.
+    // PokéAPI uses "" as the "any time" sentinel - normalise to null.
     time_of_day: d.time_of_day === "" || d.time_of_day == null ? null : d.time_of_day,
     location: d.location?.name ?? null,
     known_move: d.known_move?.name ?? null,
@@ -380,7 +380,7 @@ function buildVarietiesLookup(records) {
   const lookup = new Map();
   for (const rec of records) {
     if (rec.isDefaultForm || !rec.formSlug) continue;
-    // Only index regional slugs — the ones PokéAPI uses in evolution_details.region.
+    // Only index regional slugs - the ones PokéAPI uses in evolution_details.region.
     if (!/^(alola|galar|hisui|paldea)/.test(rec.formSlug)) continue;
     if (!lookup.has(rec.speciesId)) {
       lookup.set(rec.speciesId, new Map());
@@ -436,12 +436,12 @@ function addFormEdges(nodes, lookup) {
     const parentSpeciesId = node.evolvesFromId;
     const childSpeciesId = node.speciesId;
 
-    // Child form: required — skip if the child has no such regional variant.
+    // Child form: required - skip if the child has no such regional variant.
     const childVarieties = lookup.get(childSpeciesId);
     const childEntry = childVarieties?.get(region);
     if (!childEntry) continue;
 
-    // Parent form: optional — fall back to default pokemonId (= speciesId
+    // Parent form: optional - fall back to default pokemonId (= speciesId
     // for default forms whose id matches their speciesId).
     const parentVarieties = lookup.get(parentSpeciesId);
     const parentEntry = parentVarieties?.get(region);
@@ -468,7 +468,7 @@ function addFormEdges(nodes, lookup) {
 // One node per (parent, child) in evolves_to[]. Multiple evolution_details[]
 // entries on a single child (e.g. Urshifu has tower-of-darkness AND
 // use-item:scroll-of-darkness on Single-Strike Urshifu) collapse to the first
-// detail — picking deduplicates the "alternative paths to the same child" case
+// detail - picking deduplicates the "alternative paths to the same child" case
 // without losing branching, which is encoded as separate evolves_to[] entries.
 function flattenChain(node, evolvesFromId, idToName) {
   const url = node.species?.url ?? "";
@@ -521,7 +521,7 @@ function isWorthLearning(formData, pokemonData) {
  * Classifies a form into a broad category for scope-toggle filtering.
  *
  * This function is only called for alternate varieties (varieties[1..n]), so
- * `form_name` will never be empty for a valid entry — `isWorthLearning` already
+ * `form_name` will never be empty for a valid entry - `isWorthLearning` already
  * rejects entries with an empty `form_name`.  The `formData.is_default` field
  * is deliberately ignored here: PokéAPI sometimes sets `is_default: true` on
  * non-default varieties (e.g. Small Pumpkaboo, Therian formes), which would
@@ -554,7 +554,7 @@ function slugToDisplayName(slug) {
 //
 // Sub-range carve-out inside the evolution namespace [1_000_001, 1_999_999]:
 //   [1_000_001, 1_500_000]  reserved for legacy per-pre-evo cloud rows (#262
-//                            orphans; never re-issued — see supabase-expert
+//                            orphans; never re-issued - see supabase-expert
 //                            recommendation in the #262 plan).
 //   [1_500_001, 1_999_999]  edge cards.
 //
@@ -628,7 +628,7 @@ async function allocateEdgeIds(records, outputPath) {
     }
   }
 
-  // Validate every ID is in-range. Defensive — also catches corrupt priors.
+  // Validate every ID is in-range. Defensive - also catches corrupt priors.
   for (const id of edgeIdByKey.values()) {
     if (id <= EDGE_ID_BASE || id >= EVOLUTION_ID_MAX) {
       throw new Error(
@@ -638,7 +638,7 @@ async function allocateEdgeIds(records, outputPath) {
   }
 
   // Attach to each chain node. The same edge appears in every species record
-  // within its chain (Eevee's chain has 8 edges; each is referenced 9× — once
+  // within its chain (Eevee's chain has 8 edges; each is referenced 9× - once
   // per species in the chain). Same ID, every time.
   for (const rec of records) {
     for (const node of rec.evolutionChain ?? []) {
@@ -656,7 +656,7 @@ async function allocateEdgeIds(records, outputPath) {
 /**
  * Process a single species ID.
  *
- * Returns an array of partial records — one for the default form plus one per
+ * Returns an array of partial records - one for the default form plus one per
  * included alternate form. Returns an empty array if the default form should
  * be skipped entirely (e.g. missing sprite).
  *
@@ -688,7 +688,7 @@ async function processSpecies(speciesId) {
   }
   const speciesDisplayName = englishEntry.name;
   const flavorTexts = extractFlavorTexts(speciesData.flavor_text_entries);
-  // flavorText (singular) is the headline italic blurb — plain string, first entry's text.
+  // flavorText (singular) is the headline italic blurb - plain string, first entry's text.
   const flavorText = flavorTexts[0]?.text ?? "";
   const evolutionChainUrl = speciesData.evolution_chain?.url ?? null;
 
@@ -950,10 +950,10 @@ async function processSpecies(speciesId) {
 
 /**
  * Split the full records array into four smaller files:
- *   generated-core.json         — all fields except flavorTexts and evolutionChain
- *   generated-chains.json       — deduplicated evolution chains + pokemon→chain refs
- *   generated-flavor.json       — id + flavorTexts (copied to public/ for lazy fetch)
- *   generated-locale-names.json — per-species locale names + transliterations (#1259)
+ *   generated-core.json - all fields except flavorTexts and evolutionChain
+ *   generated-chains.json - deduplicated evolution chains + pokemon→chain refs
+ *   generated-flavor.json - id + flavorTexts (copied to public/ for lazy fetch)
+ *   generated-locale-names.json - per-species locale names + transliterations (#1259)
  */
 async function writeSplitSeedFiles(records, outputPath) {
   const { createHash } = await import("node:crypto");
@@ -1289,9 +1289,9 @@ async function main() {
   // the critical-path chunk from ~2.9 MB to ~1.3 MB brings first-paint below
   // 5 s on WebKit (previously 8-15 s).
   //
-  // generated-core.json    — all fields except flavorTexts and evolutionChain
-  // generated-chains.json  — deduplicated evolution chains + id→hash refs
-  // generated-flavor.json  — id + flavorTexts (served from public/ at runtime)
+  // generated-core.json - all fields except flavorTexts and evolutionChain
+  // generated-chains.json - deduplicated evolution chains + id→hash refs
+  // generated-flavor.json - id + flavorTexts (served from public/ at runtime)
   // -------------------------------------------------------------------------
   await writeSplitSeedFiles(records, outputPath);
   process.stderr.write("[seed] Wrote split seed files (core / chains / flavor / locale-names)\n");

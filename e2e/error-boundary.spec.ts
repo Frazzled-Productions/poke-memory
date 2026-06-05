@@ -8,8 +8,8 @@ import { addOnboardingPreDismiss } from "./helpers/onboarding";
 // PR #1513 added a guest-only "Reset local practice data" button as an escape
 // hatch for persisted-state crashes (#1506).
 //
-// Tests navigate to /test-error — a minimal "use client" page that
-// unconditionally throws — so the error boundary renders in a reproducible,
+// Tests navigate to /test-error - a minimal "use client" page that
+// unconditionally throws - so the error boundary renders in a reproducible,
 // stable state without depending on real data or timing.
 // ---------------------------------------------------------------------------
 
@@ -86,7 +86,7 @@ test.describe("Error boundary (#1533)", () => {
 
     // Accept the confirm dialog so clearLocalProgress() runs and
     // window.location.reload() fires. Because /test-error always throws, the
-    // error boundary will be visible again after the reload — providing
+    // error boundary will be visible again after the reload - providing
     // end-to-end confirmation that the reset path executes without crashing.
     page.on("dialog", (dialog) => void dialog.accept());
 

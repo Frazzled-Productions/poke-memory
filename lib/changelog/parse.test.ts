@@ -9,7 +9,7 @@ describe("parseChangelog", () => {
       "",
       "## [Unreleased]",
       "",
-      "## [1.2.3] — 2026-05-14",
+      "## [1.2.3] - 2026-05-14",
       "",
       "### Fixed",
       "",
@@ -33,13 +33,13 @@ describe("parseChangelog", () => {
 
   it("parses multiple releases preserving order", () => {
     const md = [
-      "## [0.9.55] — 2026-05-14",
+      "## [0.9.55] - 2026-05-14",
       "",
       "### Fixed",
       "",
       "- Latest fix.",
       "",
-      "## [0.9.54] — 2026-05-13",
+      "## [0.9.54] - 2026-05-13",
       "",
       "### Added",
       "",
@@ -56,7 +56,7 @@ describe("parseChangelog", () => {
 
   it("supports both em-dash and hyphen between version and date", () => {
     const md = [
-      "## [1.0.0] — 2026-05-14",
+      "## [1.0.0] - 2026-05-14",
       "",
       "### Added",
       "",
@@ -74,7 +74,7 @@ describe("parseChangelog", () => {
 
   it("sorts sections within a release into canonical order", () => {
     const md = [
-      "## [1.0.0] — 2026-05-14",
+      "## [1.0.0] - 2026-05-14",
       "",
       "### Fixed",
       "",
@@ -98,7 +98,7 @@ describe("parseChangelog", () => {
 
   it("filters out 'Internal:' bullets", () => {
     const md = [
-      "## [1.0.0] — 2026-05-14",
+      "## [1.0.0] - 2026-05-14",
       "",
       "### Changed",
       "",
@@ -115,7 +115,7 @@ describe("parseChangelog", () => {
 
   it("drops releases that contain only filtered or empty sections", () => {
     const md = [
-      "## [1.0.0] — 2026-05-14",
+      "## [1.0.0] - 2026-05-14",
       "",
       "### Changed",
       "",
@@ -130,7 +130,7 @@ describe("parseChangelog", () => {
       "",
       "<!-- Add entries to changelog.d/unreleased/ -->",
       "",
-      "## [1.0.0] — 2026-05-14",
+      "## [1.0.0] - 2026-05-14",
       "",
       "### Added",
       "",
@@ -146,7 +146,7 @@ describe("parseChangelog", () => {
 
   it("joins indented continuation lines into the preceding bullet", () => {
     const md = [
-      "## [1.0.0] — 2026-05-14",
+      "## [1.0.0] - 2026-05-14",
       "",
       "### Added",
       "",
@@ -163,7 +163,7 @@ describe("parseChangelog", () => {
 
   it("ignores unknown ### subheadings inside a release", () => {
     const md = [
-      "## [1.0.0] — 2026-05-14",
+      "## [1.0.0] - 2026-05-14",
       "",
       "### Bogus",
       "",
@@ -181,7 +181,7 @@ describe("parseChangelog", () => {
 
   it("flushes the pending bullet of a known section before an unknown ### subheading", () => {
     const md = [
-      "## [1.0.0] — 2026-05-14",
+      "## [1.0.0] - 2026-05-14",
       "",
       "### Added",
       "",
@@ -207,7 +207,7 @@ describe("parseChangelog", () => {
 
   it("does not extend a bullet across a blank line", () => {
     const md = [
-      "## [1.0.0] — 2026-05-14",
+      "## [1.0.0] - 2026-05-14",
       "",
       "### Added",
       "",
@@ -217,7 +217,7 @@ describe("parseChangelog", () => {
     ].join("\n");
     const [release] = parseChangelog(md);
     // The indented prose after the blank line is not a continuation of the
-    // preceding bullet — the blank line terminates the continuation window.
+    // preceding bullet - the blank line terminates the continuation window.
     expect(release.sections).toEqual([
       { kind: "Added", bullets: ["First bullet."] },
     ]);
@@ -225,7 +225,7 @@ describe("parseChangelog", () => {
 
   it("merges bullets when the same section kind appears twice in one release", () => {
     const md = [
-      "## [1.0.0] — 2026-05-14",
+      "## [1.0.0] - 2026-05-14",
       "",
       "### Fixed",
       "",

@@ -142,7 +142,7 @@ function reverseEvoCard(
 //   Bulbasaur  (1)  Grass/Poison → Ivysaur (2)
 //   Snivy      (495) Grass  → Servine   (496) Grass  [Gen V]
 
-describe("cardMatchesScope — evolution cards — gens axis", () => {
+describe("cardMatchesScope - evolution cards - gens axis", () => {
   it("gens:[1] includes a Gen-I evolution card (Charmander → Charmeleon)", () => {
     const card = evoCard(1500011, 4, 5);
     expect(cardMatchesScope(card, { gens: [1], types: [], presets: [] })).toBe(true);
@@ -162,7 +162,7 @@ describe("cardMatchesScope — evolution cards — gens axis", () => {
   });
 });
 
-describe("cardMatchesScope — evolution cards — types axis (new behaviour #426)", () => {
+describe("cardMatchesScope - evolution cards - types axis (new behaviour #426)", () => {
   it("types:[fire] includes Charmander→Charmeleon (Charmander is Fire)", () => {
     const card = evoCard(1500011, 4, 5);
     expect(cardMatchesScope(card, { gens: [], types: ["fire"], presets: [] })).toBe(true);
@@ -200,7 +200,7 @@ describe("cardMatchesScope — evolution cards — types axis (new behaviour #42
   });
 });
 
-describe("cardMatchesScope — evolution cards — presets axis", () => {
+describe("cardMatchesScope - evolution cards - presets axis", () => {
   it("starters preset includes a Bulbasaur→Ivysaur card (Bulbasaur is a starter)", () => {
     const card = evoCard(1500001, 1, 2);
     expect(cardMatchesScope(card, { gens: [], types: [], presets: ["starters"] })).toBe(true);
@@ -212,7 +212,7 @@ describe("cardMatchesScope — evolution cards — presets axis", () => {
   });
 });
 
-describe("cardMatchesScope — evolution cards — combined axes", () => {
+describe("cardMatchesScope - evolution cards - combined axes", () => {
   it("types:[fire] AND gens:[1] includes a Fire/Gen-I evolution (Charmander→Charmeleon)", () => {
     const card = evoCard(1500011, 4, 5);
     expect(cardMatchesScope(card, { gens: [1], types: ["fire"], presets: [] })).toBe(true);
@@ -237,7 +237,7 @@ describe("cardMatchesScope — evolution cards — combined axes", () => {
 // supplies the incomplete-chain species ids. With no context (or an empty set)
 // the preset matches nothing; with a populated set it matches exactly those ids.
 
-describe("cardMatchesScope — incomplete-chains preset (#995)", () => {
+describe("cardMatchesScope - incomplete-chains preset (#995)", () => {
   const scope = { gens: [], types: [], presets: ["incomplete-chains" as const] };
 
   it("matches a name card whose species is in the incomplete-chain set", () => {
@@ -415,8 +415,8 @@ describe("countMatchingSpecies", () => {
     expect(countMatchingSpecies(SEED, { gens: [], types: ["grass"], presets: [] })).toBe(3);
   });
 
-  it("OR's gens and types — a Pokemon need only match one active axis", () => {
-    // Gen I (3) OR Fire (2) — Charmander overlaps, so the union is 4.
+  it("OR's gens and types - a Pokemon need only match one active axis", () => {
+    // Gen I (3) OR Fire (2) - Charmander overlaps, so the union is 4.
     expect(countMatchingSpecies(SEED, { gens: [1], types: ["fire"], presets: [] })).toBe(4);
   });
 
@@ -424,7 +424,7 @@ describe("countMatchingSpecies", () => {
     // The starter preset hard-codes the Gen I/II/III/IV/.../IX trios; the
     // SEED above is composed entirely of starter ids, so the count equals
     // SEED.length. Using a mixed pool with a non-starter would test the
-    // *negative* side of the filter — covered by the next case.
+    // *negative* side of the filter - covered by the next case.
     expect(
       countMatchingSpecies(SEED, { gens: [], types: [], presets: ["starters"] }),
     ).toBe(SEED.length);
@@ -615,7 +615,7 @@ describe("formCategories: persisted scope without field migrates to mode:'all'",
     // Pre-#450 scope objects omit the formCategories field.
     const legacyScope = { gens: [1], types: [], presets: [] };
     const alolan = formCard(10100, 26, "regional");
-    // scope has gens:[1]; Raichu is Gen 1 — even the form card should pass.
+    // scope has gens:[1]; Raichu is Gen 1 - even the form card should pass.
     expect(cardMatchesScope(alolan, legacyScope)).toBe(true);
   });
 
@@ -707,10 +707,10 @@ describe("formCategories: mode:'all' (passthrough)", () => {
   });
 });
 
-// ─── cardIsEligible — alternateFormsEnabled gate (#658) ─────────────────────
+// ─── cardIsEligible - alternateFormsEnabled gate (#658) ─────────────────────
 
 describe("cardIsEligible: alternateFormsEnabled gate", () => {
-  const defaultCard = nameCard(26); // Raichu — default form
+  const defaultCard = nameCard(26); // Raichu - default form
   const formCardAlolan = formCard(10100, 26, "regional"); // Alolan Raichu
 
   describe("gate OFF (alternateFormsEnabled: false)", () => {
@@ -719,7 +719,7 @@ describe("cardIsEligible: alternateFormsEnabled gate", () => {
     });
 
     it("form card is ineligible when gate is off, regardless of scope", () => {
-      // Empty scope — normally passes everything.
+      // Empty scope - normally passes everything.
       expect(cardIsEligible(formCardAlolan, EMPTY_SCOPE, false)).toBe(false);
     });
 
@@ -761,7 +761,7 @@ describe("cardIsEligible: alternateFormsEnabled gate", () => {
     });
 
     it("form card is excluded by scope filter when gate is on but scope excludes it", () => {
-      // Alolan Raichu (Gen I) — excluded by gens:[2]
+      // Alolan Raichu (Gen I) - excluded by gens:[2]
       const scope = {
         gens: [2],
         types: [] as string[],
@@ -1023,7 +1023,7 @@ describe("cardIsEligible: size-variant formCategory regression (#837)", () => {
 // computeEligibleCardIds (#1108)
 // ---------------------------------------------------------------------------
 
-/** Minimal settings for computeEligibleCardIds tests — enrichment off,
+/** Minimal settings for computeEligibleCardIds tests - enrichment off,
  *  alternate forms off, empty scope. Name and reverse are always on (#1234). */
 function defaultSettings() {
   return {

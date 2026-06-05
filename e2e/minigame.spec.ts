@@ -17,7 +17,7 @@ import { REVERSE_ID_OFFSET } from "./helpers/mastery";
 //     hasMoreNewCardsOf(name) is true → the new-cards wall fires.
 //   - All other IDs are already-reviewed, not-due-today (no contribution to
 //     either counter) so they don't accidentally trigger the review soft-wall.
-//   - Evolution cards are seeded as reviewed, not-due — no evo queues populate.
+//   - Evolution cards are seeded as reviewed, not-due - no evo queues populate.
 //   - Reverse cards for ALL species are seeded as reviewed, future-due so that
 //     hydrateSession (which now always runs with reverseEnabled=true after
 //     #1234) does not add them as new cards and break the locked state.
@@ -67,7 +67,7 @@ function buildNewCardsLockedSession(args: {
     });
   }
 
-  // Last species ID: fresh new card — satisfies hasMoreNewCardsOf("name") so
+  // Last species ID: fresh new card - satisfies hasMoreNewCardsOf("name") so
   // the new-cards wall fires even though daily caps are already hit.
   const lastId = pokemonIds[pokemonIds.length - 1];
   cards.push({
@@ -99,7 +99,7 @@ function buildNewCardsLockedSession(args: {
   }
 
   // Seed all reverse cards as already-reviewed with a far-future due date.
-  // Since #1234 hydrateSession always runs with reverseEnabled=true — without
+  // Since #1234 hydrateSession always runs with reverseEnabled=true - without
   // these entries it would add every species as a fresh new reverse card,
   // breaking the NEW_CARDS_LOCKED state by making new reverse cards available.
   for (const id of pokemonIds) {
@@ -173,7 +173,7 @@ test.describe("Higher-or-Lower mini-game", () => {
     });
     await expect(gameRegion).toBeVisible();
 
-    // Click the first tile — any outcome (correct / tie / game over) is valid
+    // Click the first tile - any outcome (correct / tie / game over) is valid
     await gameRegion.getByRole("button").first().click();
 
     // Result banner appears after pick; regex covers all three outcome strings
@@ -215,7 +215,7 @@ test.describe("Higher-or-Lower mini-game", () => {
     // Regression: on tall mobile viewports (iPhone 17 Pro) the result block
     // rendered below the fold after a guess, requiring manual scroll. The fix
     // scrolls the result block into view on reveal. We assert the button is
-    // visible (in the viewport) and clickable — not just present in the DOM.
+    // visible (in the viewport) and clickable - not just present in the DOM.
     await seedSessionIdb(page, buildCompletedSession({
       pokemonIds: SEED_POKEMON_IDS,
       evolutionCardIds: EVOLUTION_CARD_IDS,
@@ -230,12 +230,12 @@ test.describe("Higher-or-Lower mini-game", () => {
     });
     await expect(gameRegion).toBeVisible();
 
-    // Click the first Pokémon tile — the outcome (correct, tie, or wrong) does
+    // Click the first Pokémon tile - the outcome (correct, tie, or wrong) does
     // not matter; all three result states show an action button.
     await gameRegion.getByRole("button").first().click();
 
     // The action button ("Next pair" or "Play again") must be visible in the
-    // viewport — not merely present in the DOM — so the user can reach it
+    // viewport - not merely present in the DOM - so the user can reach it
     // without manual scrolling on a mobile viewport.
     const actionButton = page.getByRole("button", { name: /next pair|play again/i });
     await expect(actionButton).toBeInViewport();
@@ -272,7 +272,7 @@ test.describe("Higher-or-Lower mini-game", () => {
     });
     await expect(gameRegion).toBeVisible();
 
-    // The Stats nav link must be clickable — not blocked by any overlay or scroll state.
+    // The Stats nav link must be clickable - not blocked by any overlay or scroll state.
     const statsLink = page.getByRole("navigation").getByRole("link", { name: "Stats" }).first();
     await statsLink.click();
     await expect(page).toHaveURL("/stats");

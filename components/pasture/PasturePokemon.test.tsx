@@ -132,7 +132,7 @@ beforeEach(() => {
 // Tests - sprite rendering
 // ---------------------------------------------------------------------------
 
-describe("PasturePokemon — sprite rendering", () => {
+describe("PasturePokemon - sprite rendering", () => {
   it("renders a sprite image with the locale-resolved name as alt text", () => {
     render(<PasturePokemon card={makeCard()} onMarkSeen={vi.fn()} />);
     const img = screen.getByAltText("Bulbasaur");
@@ -159,7 +159,7 @@ describe("PasturePokemon — sprite rendering", () => {
 // Tests - arrival sparkle / suffix (state coverage: seenInPasture in/out)
 // ---------------------------------------------------------------------------
 
-describe("PasturePokemon — arrival sparkle", () => {
+describe("PasturePokemon - arrival sparkle", () => {
   it("shows an arrival sparkle and suffixed aria-label when seenInPasture is false", () => {
     const card = makeCard({ state: makeReviewState({ seenInPasture: false }) });
     render(<PasturePokemon card={card} onMarkSeen={vi.fn()} />);
@@ -184,7 +184,7 @@ describe("PasturePokemon — arrival sparkle", () => {
 // not the raw English card.name.
 // ---------------------------------------------------------------------------
 
-describe("PasturePokemon — locale-resolved name: button aria-label", () => {
+describe("PasturePokemon - locale-resolved name: button aria-label", () => {
   it("uses the English locale name in aria-label (en)", () => {
     render(<PasturePokemon card={makeCard()} onMarkSeen={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Bulbasaur" })).toBeInTheDocument();
@@ -212,7 +212,7 @@ describe("PasturePokemon — locale-resolved name: button aria-label", () => {
   });
 });
 
-describe("PasturePokemon — locale-resolved name: image alt", () => {
+describe("PasturePokemon - locale-resolved name: image alt", () => {
   it("uses the English locale name as image alt (en)", () => {
     render(<PasturePokemon card={makeCard()} onMarkSeen={vi.fn()} />);
     expect(screen.getByAltText("Bulbasaur")).toBeInTheDocument();
@@ -240,7 +240,7 @@ describe("PasturePokemon — locale-resolved name: image alt", () => {
   });
 });
 
-describe("PasturePokemon — locale suffix in aria-label with seenInPasture: false", () => {
+describe("PasturePokemon - locale suffix in aria-label with seenInPasture: false", () => {
   it("includes the Japanese new-arrival suffix with the locale name (ja)", () => {
     mockPokemonLocale = "ja";
     mockUseLocalePokemonName.mockReturnValue({ name: LOCALE_NAMES["ja"], transliteration: null });
@@ -268,7 +268,7 @@ describe("PasturePokemon — locale suffix in aria-label with seenInPasture: fal
 // Tests - popover locale name (aria-label + visible text + lang attribute)
 // ---------------------------------------------------------------------------
 
-describe("PasturePokemon — popover locale names", () => {
+describe("PasturePokemon - popover locale names", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });

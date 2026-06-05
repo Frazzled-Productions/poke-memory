@@ -85,13 +85,13 @@ describe("PokedexGrid", () => {
     // When no activeGen is set the grid renders a flat list.
     // The cell uses the name as aria-label when not locked; locked cells use
     // "Pokémon #NNN". CELL has cardClass "locked" so an aria-label link is
-    // rendered — we simply confirm a link pointing to the detail page exists.
+    // rendered - we simply confirm a link pointing to the detail page exists.
     expect(screen.getByRole("link", { name: /001/i })).toBeInTheDocument();
   });
 });
 
 // ---------------------------------------------------------------------------
-// LoadingSkeleton — exercises the useTranslations call and the
+// LoadingSkeleton - exercises the useTranslations call and the
 // localised aria-label added in #1607.
 // ---------------------------------------------------------------------------
 

@@ -105,7 +105,7 @@ function masteredPair(id: number, daysAgo: number): ReviewableCard[] {
   ];
 }
 
-/** A name card that has not been seen at all (locked). No reverse needed — still not mastered. */
+/** A name card that has not been seen at all (locked). No reverse needed - still not mastered. */
 function lockedCard(id: number): NameReviewCard {
   return nameCard(id);
 }
@@ -145,7 +145,7 @@ describe("all species mastered", () => {
   });
 
   it("returns insufficient-history when name leg is mastered but reverse is absent", () => {
-    // Only the name leg exists — species not species-mastered → remaining = 1.
+    // Only the name leg exists - species not species-mastered → remaining = 1.
     const cards: ReviewableCard[] = [
       nameCard(1, {
         reps: MASTERY_REPETITIONS,
@@ -175,7 +175,7 @@ describe("insufficient history", () => {
   });
 
   it("returns insufficient-history when mastery events are all outside the trailing window", () => {
-    // Mastered long ago — beyond PROJECTION_WINDOW_DAYS.
+    // Mastered long ago - beyond PROJECTION_WINDOW_DAYS.
     const oldDate = isoMinusDays(TODAY, PROJECTION_WINDOW_DAYS + 5);
     const cards: ReviewableCard[] = [
       nameCard(1, {

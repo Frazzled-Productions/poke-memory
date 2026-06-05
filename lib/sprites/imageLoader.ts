@@ -23,7 +23,7 @@
  * - All other paths → returned unchanged. Returning `src` unchanged tells
  *   `next/image` to treat the URL as-is (same effect as `unoptimized` for
  *   that one image). This is the safe fallback for any future image surface
- *   not yet in the allowlist above — it never generates a broken URL.
+ *   not yet in the allowlist above - it never generates a broken URL.
  */
 
 import type { ImageLoaderProps } from 'next/image';
@@ -47,7 +47,7 @@ function extractSpriteId(src: string): number | null {
 
 export default function imageLoader({ src, width }: ImageLoaderProps): string {
   // -----------------------------------------------------------------------
-  // Sprite path — redirect to pre-generated WebP variant.
+  // Sprite path - redirect to pre-generated WebP variant.
   // -----------------------------------------------------------------------
   if (src.startsWith('/sprites/pokemon/') && !src.includes('/webp/')) {
     const id = extractSpriteId(src);
@@ -58,7 +58,7 @@ export default function imageLoader({ src, width }: ImageLoaderProps): string {
   }
 
   // -----------------------------------------------------------------------
-  // GitHub avatar (user-controlled, mutable) — pass through unchanged.
+  // GitHub avatar (user-controlled, mutable) - pass through unchanged.
   // The remotePatterns entry in next.config.ts is kept for defence-in-depth.
   // -----------------------------------------------------------------------
   if (src.startsWith('https://avatars.githubusercontent.com/')) {
@@ -66,7 +66,7 @@ export default function imageLoader({ src, width }: ImageLoaderProps): string {
   }
 
   // -----------------------------------------------------------------------
-  // Everything else — pass through unchanged.
+  // Everything else - pass through unchanged.
   // -----------------------------------------------------------------------
   return src;
 }

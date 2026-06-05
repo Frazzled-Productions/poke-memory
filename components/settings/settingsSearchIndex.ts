@@ -2,18 +2,18 @@
  * Static search index for the Settings page.
  *
  * Each entry describes one top-level CollapsibleSection. The `terms` array
- * is the set of strings that a query is matched against — it includes the
+ * is the set of strings that a query is matched against - it includes the
  * section heading, the labels and helper text of every control inside it,
  * and a handful of keyword aliases so common synonyms resolve correctly
  * (e.g. "dark mode" → Appearance, "spaced repetition" → Practice).
  *
- * Matching is case-insensitive substring — if any term contains the query
+ * Matching is case-insensitive substring - if any term contains the query
  * the section is considered a match.
  */
 export type SectionSearchEntry = {
   /** The sectionId prop passed to CollapsibleSection. */
   sectionId: string;
-  /** Terms searched against. Lower-case is fine — matching is .toLowerCase(). */
+  /** Terms searched against. Lower-case is fine - matching is .toLowerCase(). */
   terms: string[];
 };
 

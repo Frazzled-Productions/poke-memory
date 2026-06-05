@@ -45,12 +45,12 @@ export type CloseToMasteryEntry = {
 
 /**
  * Returns the list of species where the name card has reached mastery but
- * the reverse card has not. Sorted by "closest first" — species whose
+ * the reverse card has not. Sorted by "closest first" - species whose
  * reverse card has the highest scheduledDays come first, so the user can
  * immediately see which are almost done.
  *
  * When `forceAllMastered` is true (superuser pretendAllMastered mode) the
- * list is always empty — there is nothing left to close the gap on.
+ * list is always empty - there is nothing left to close the gap on.
  *
  * @param cards               Full card array (all card types).
  * @param masteryRepetitions  Minimum reps for the mastery gate (default: MASTERY_REPETITIONS = 3).

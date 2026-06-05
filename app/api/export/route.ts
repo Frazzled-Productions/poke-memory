@@ -3,7 +3,7 @@
  *
  * Exports the authenticated user's review history as a CSV file, satisfying
  * GDPR's right to data portability. Reads from the `grade_log` table via the
- * RLS-protected Supabase client — only the requesting user's own rows are
+ * RLS-protected Supabase client - only the requesting user's own rows are
  * returned.
  *
  * CSV columns: date, pokemon, card_type, grade, grade_label
@@ -23,7 +23,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { Subject } from "@/lib/cards/subjectKey";
 
-// Build a lookup map once at module load — derived from static seed data so
+// Build a lookup map once at module load - derived from static seed data so
 // the cost is paid once per cold start, not per request.
 const nameById = new Map<number, string>(
   SEED_POKEMON.map((p) => [p.id, p.displayName]),
@@ -139,7 +139,7 @@ export async function GET(): Promise<NextResponse> {
   // Build the CSV content.
   const lines: string[] = [];
 
-  // Header row — snake_case column names for machine readability.
+  // Header row - snake_case column names for machine readability.
   lines.push("date,pokemon,card_type,grade,grade_label");
 
   for (const row of rows) {
@@ -180,7 +180,7 @@ export async function GET(): Promise<NextResponse> {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
-      // Do not cache — each request should reflect the user's latest data.
+      // Do not cache - each request should reflect the user's latest data.
       "Cache-Control": "no-store",
     },
   });

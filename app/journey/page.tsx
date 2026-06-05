@@ -466,7 +466,7 @@ export default function JourneyPage() {
       const log = await loadGradeLog();
       setGradeLog(log);
 
-      // Retroactive badge award — mirrors the same logic in stats/page.tsx.
+      // Retroactive badge award - mirrors the same logic in stats/page.tsx.
       // Never award retroactively while a superuser flag is on.
       if (!anyFlagOn) {
         const masteredIds = masteredSpeciesIds(
@@ -552,7 +552,7 @@ export default function JourneyPage() {
 
   // Provide the full snapshot input to the shared DashboardSnapshotContext.
   // Journey reads only the mastery axis from the returned snapshot (#1139,
-  // simplified in #1151 — the include-filter abstraction was dropped).
+  // simplified in #1151 - the include-filter abstraction was dropped).
   const snapshotOptions = useMemo(() => ({
     masteryRepetitions: masteryRepetitions ?? undefined,
     forceAllMastered: flags.pretendAllMastered,
@@ -633,7 +633,7 @@ export default function JourneyPage() {
               earnedBadges={badgesToShow}
             />
 
-            {/* Milestone share — hidden during superuser sessions so fake
+            {/* Milestone share - hidden during superuser sessions so fake
                 mastery cannot produce a real share card (#917). */}
             <MilestoneShareButton
               milestone={
@@ -643,7 +643,7 @@ export default function JourneyPage() {
               }
             />
 
-            {/* Collection timeline — the hero scrubber.
+            {/* Collection timeline - the hero scrubber.
                 Show a placeholder while the cloud pull is in flight so the
                 section's layout slot is reserved and nothing shifts when the
                 data lands (fixes #961). */}
@@ -679,7 +679,7 @@ export default function JourneyPage() {
             )}
 
             {/* Close to mastery.
-                Shown whenever the entries are loaded (even if empty — the
+                Shown whenever the entries are loaded (even if empty - the
                 empty state is informative). Same skeleton approach used for
                 other deferred sections to avoid layout shift. */}
             {closeToMasteryEntries !== null ? (
@@ -727,7 +727,7 @@ export default function JourneyPage() {
             {/* Mastery rings */}
             <MasteryRings stats={masterySnapshot} />
 
-            {/* Mastery-explainer hint — renders for all users (empty and populated)
+            {/* Mastery-explainer hint - renders for all users (empty and populated)
                 until explicitly dismissed. Uses a dedicated flag so existing users
                 who pre-date this feature see it on their next Journey visit (#1441). */}
             <OnboardingHint
@@ -751,7 +751,7 @@ export default function JourneyPage() {
             {/* Type breakdown */}
             <TypeBreakdown perType={masterySnapshot.perType} />
 
-            {/* Language breakdown — only renders when >1 locale enrolled */}
+            {/* Language breakdown - only renders when >1 locale enrolled */}
             {cards !== null && masteryRepetitions !== null ? (
               <LanguageBreakdown
                 cards={cards}

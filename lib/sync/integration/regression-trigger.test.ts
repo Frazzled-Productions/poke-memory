@@ -133,7 +133,7 @@ describe("regression trigger (integration)", () => {
     try {
       await withUser(client, USER_ID, async (c) => {
         await insertCard(c, "104");
-        // last_review is 2026-05-20; move forward to 2026-06-01 — should succeed.
+        // last_review is 2026-05-20; move forward to 2026-06-01 - should succeed.
         await expect(
           c.query(
             `UPDATE card_reviews
@@ -283,7 +283,7 @@ describe("regression trigger (integration)", () => {
     try {
       await withUser(client, USER_ID, async (c) => {
         // Attempting to flip seen_in_pasture from true back to false must be
-        // rejected — once a user has acknowledged a pasture entry it is permanent.
+        // rejected - once a user has acknowledged a pasture entry it is permanent.
         await expect(
           c.query(
             `UPDATE card_reviews
@@ -634,7 +634,7 @@ describe("regression trigger (integration)", () => {
   it("allows two rows differing only by locale (migration 029 PK includes locale)", async () => {
     // After migration 029, the PK is (user_id, card_type, subject_key, locale).
     // The same (user, card_type, subject_key) in "en" and "ja" must coexist as
-    // independent rows — this is the key correctness guarantee for per-locale FSRS.
+    // independent rows - this is the key correctness guarantee for per-locale FSRS.
     //
     // Both inserts go through pool.query (not withUser) so the rows are committed
     // and visible to the subsequent SELECT. withUser always rolls back its
@@ -644,9 +644,9 @@ describe("regression trigger (integration)", () => {
     // trigger does not fire: a prior migration-022 test stamps last_reset_at=now(),
     // and the trigger rejects any first_seen < last_reset_at. current_date resolves
     // to midnight UTC which is earlier than now() whenever the DB clock is past
-    // midnight — i.e. always.
+    // midnight - i.e. always.
 
-    // Insert the "en" row — locale defaults to "en".
+    // Insert the "en" row - locale defaults to "en".
     await pool.query(
       `INSERT INTO card_reviews
          (user_id, card_type, subject_key,
@@ -662,7 +662,7 @@ describe("regression trigger (integration)", () => {
       [USER_ID],
     );
 
-    // Insert the "ja" row — same identity except locale.
+    // Insert the "ja" row - same identity except locale.
     await pool.query(
       `INSERT INTO card_reviews
          (user_id, card_type, subject_key, locale,

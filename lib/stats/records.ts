@@ -16,7 +16,7 @@ export type Records = {
    * species-level mastery date. Computed across currently species-mastered
    * pairs as `avg(masteredDate - nameCard.firstSeen)`, where `masteredDate`
    * is the later of the name and reverse cards' `lastReview` dates. This is
-   * an upper bound — a species might have crossed the threshold earlier —
+   * an upper bound - a species might have crossed the threshold earlier - 
    * but without a persisted "first mastered at" we trade exactness for no
    * schema migration. Null when no species is mastered yet.
    */
@@ -36,8 +36,8 @@ export function computeLongestStreak(dates: readonly string[]): number {
   const set = new Set(dates);
   let longest = 0;
   for (const d of set) {
-    // Only walk from "start of a run" days — i.e. ones whose predecessor
-    // is missing — so each run is counted once in O(n) total.
+    // Only walk from "start of a run" days - i.e. ones whose predecessor
+    // is missing - so each run is counted once in O(n) total.
     const prev = new Date(d + "T00:00:00Z");
     prev.setUTCDate(prev.getUTCDate() - 1);
     const prevIso = isoDate(prev);
@@ -101,7 +101,7 @@ export function computeRecords(
 ): Records {
   // Superuser pretendAllMastered: project the mastery-derived metrics onto
   // "you've mastered everything". longestStreak / bestReviewDay derive from
-  // grade-log/streak data and stay honest — pretend-mastered doesn't change
+  // grade-log/streak data and stay honest - pretend-mastered doesn't change
   // your actual review history.
   const nameCards = nameCardsForLocale(cards, locale);
   if (forceAllMastered && nameCards.length > 0) {

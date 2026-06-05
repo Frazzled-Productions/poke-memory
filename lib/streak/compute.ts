@@ -2,7 +2,7 @@ import { isoDate } from "@/lib/utils/format-date";
 
 /**
  * Count the current streak from an array of reviewed dates. Order and
- * duplicates don't matter — the function builds a Set internally.
+ * duplicates don't matter - the function builds a Set internally.
  *
  * Grace window: if today has no entry but yesterday does, the streak is
  * still alive (the user hasn't reviewed yet today).

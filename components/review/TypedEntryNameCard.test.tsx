@@ -71,7 +71,7 @@ describe("TypedEntryNameCard", () => {
     // so change vs keystroke-by-keystroke makes no difference here.
     fireEvent.change(input, { target: { value: "Pikachu" } });
     fireEvent.click(screen.getByRole("button", { name: /submit/i }));
-    // onGrade is delayed by FEEDBACK_HOLD_MS — advance fake timers.
+    // onGrade is delayed by FEEDBACK_HOLD_MS - advance fake timers.
     act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
     expect(onGrade).toHaveBeenCalledWith(4);
   });
@@ -133,7 +133,7 @@ describe("TypedEntryNameCard", () => {
     fireEvent.click(screen.getByRole("button", { name: /submit/i }));
     act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
     // After submit the input form is gone; clicking again would have to
-    // happen via the grade buttons which no longer exist — this mainly
+    // happen via the grade buttons which no longer exist - this mainly
     // verifies that onGrade is called exactly once.
     expect(onGrade).toHaveBeenCalledTimes(1);
   });
@@ -145,7 +145,7 @@ describe("TypedEntryNameCard", () => {
     fireEvent.click(screen.getByRole("button", { name: /submit/i }));
     // Feedback is immediately visible (before the timer fires).
     expect(screen.getByText(/correct!/i)).toBeInTheDocument();
-    // Should NOT reveal the name in an extra paragraph — the name is part
+    // Should NOT reveal the name in an extra paragraph - the name is part
     // of the feedback for wrong/close answers only. Exact-match only shows "Correct!".
     expect(screen.queryAllByText("Pikachu")).toHaveLength(0);
     // onGrade fires after the hold delay.
@@ -163,7 +163,7 @@ describe("TypedEntryNameCard", () => {
 // Localised input aria-label (#1607)
 // ---------------------------------------------------------------------------
 
-describe("TypedEntryNameCard — localised input aria-label", () => {
+describe("TypedEntryNameCard - localised input aria-label", () => {
   it("input aria-label is localised in Japanese", () => {
     renderJa(
       <TypedEntryNameCard
@@ -183,7 +183,7 @@ describe("TypedEntryNameCard — localised input aria-label", () => {
 // Locale-aware answer reveal (#1260 followup)
 // ---------------------------------------------------------------------------
 
-describe("TypedEntryNameCard — locale-aware answer reveal", () => {
+describe("TypedEntryNameCard - locale-aware answer reveal", () => {
   it("shows the locale-resolved name in the feedback reveal on a wrong answer", async () => {
     vi.useFakeTimers();
     vi.resetModules();

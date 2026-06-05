@@ -34,7 +34,7 @@ try {
 // skip the check rather than erroneously blocking the build.
 const majorMatch = nvmrcContent.match(/^v?(\d+)/);
 if (!majorMatch) {
-  // Non-numeric .nvmrc value — cannot compare majors, skip guard.
+  // Non-numeric .nvmrc value - cannot compare majors, skip guard.
   process.exit(0);
 }
 const requiredMajor = parseInt(majorMatch[1], 10);
@@ -54,11 +54,11 @@ and may produce incorrect output or fail deep inside the build.
 
 How to fix:
 
-  Option A — Homebrew node@${requiredMajor} (no nvm required):
+  Option A - Homebrew node@${requiredMajor} (no nvm required):
     export PATH="/opt/homebrew/opt/node@${requiredMajor}/bin:$PATH"
     npm run build
 
-  Option B — nvm:
+  Option B - nvm:
     nvm install ${requiredMajor}
     nvm use
 

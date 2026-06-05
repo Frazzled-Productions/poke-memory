@@ -48,7 +48,7 @@ describe("NumericInput draft-state pattern", () => {
     render(<NumericInput initialValue={10} min={1} onCommit={() => {}} />);
     const input = screen.getByRole("spinbutton", { name: "count" });
 
-    // Clear "10" then type "1" — the displayed value should be "1", not snapped to "10".
+    // Clear "10" then type "1" - the displayed value should be "1", not snapped to "10".
     await user.clear(input);
     await user.type(input, "1");
     expect(input).toHaveValue(1);

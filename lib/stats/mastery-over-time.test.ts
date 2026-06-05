@@ -114,13 +114,13 @@ function makeMasteredSpecies(
 // Tests: species-level mastery (both legs required, #1448)
 // ---------------------------------------------------------------------------
 
-describe("computeMasteryOverTime — species-level (both legs)", () => {
+describe("computeMasteryOverTime - species-level (both legs)", () => {
   it("returns empty array when no cards are present", () => {
     expect(computeMasteryOverTime([], TODAY)).toEqual([]);
   });
 
   it("returns empty array when only name cards are mastered (no reverse leg)", () => {
-    // The reverse leg is absent — species is NOT species-mastered.
+    // The reverse leg is absent - species is NOT species-mastered.
     const cards: ReviewableCard[] = [makeNameCard(1, "2026-05-01", true)];
     expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
   });
@@ -153,14 +153,14 @@ describe("computeMasteryOverTime — species-level (both legs)", () => {
   });
 
   it("uses the LATER of the two leg dates as the species masteredDate", () => {
-    // Name mastered on May 1, reverse mastered on May 5 — species mastered on May 5.
+    // Name mastered on May 1, reverse mastered on May 5 - species mastered on May 5.
     const cards = makeMasteredSpecies(1, "2026-05-01", "2026-05-05");
     const series = computeMasteryOverTime(cards, TODAY);
     expect(series).toEqual([{ date: "2026-05-05", count: 1 }]);
   });
 
   it("uses the later date regardless of which leg comes last", () => {
-    // Reverse mastered on May 3, name mastered on May 10 — species mastered on May 10.
+    // Reverse mastered on May 3, name mastered on May 10 - species mastered on May 10.
     const cards = makeMasteredSpecies(1, "2026-05-10", "2026-05-03");
     const series = computeMasteryOverTime(cards, TODAY);
     expect(series).toEqual([{ date: "2026-05-10", count: 1 }]);
@@ -223,11 +223,11 @@ describe("computeMasteryOverTime — species-level (both legs)", () => {
       { ...makeReverseCard(1, "2026-05-01", true), state: stateWith3Reps },
     ];
 
-    // Default threshold (3) — reps=3 meets the bar, species is mastered.
+    // Default threshold (3) - reps=3 meets the bar, species is mastered.
     const seriesDefault = computeMasteryOverTime(cards, TODAY);
     expect(seriesDefault).toHaveLength(1);
 
-    // High threshold (10) — reps=3 < 10, species is NOT mastered.
+    // High threshold (10) - reps=3 < 10, species is NOT mastered.
     const seriesHighThreshold = computeMasteryOverTime(cards, TODAY, 10);
     expect(seriesHighThreshold).toHaveLength(0);
   });
@@ -241,7 +241,7 @@ describe("computeMasteryOverTime — species-level (both legs)", () => {
       makeNameCard(1, null, false),
       makeNameCard(2, null, false),
       makeNameCard(3, "2026-04-01", true),
-      // Reverse cards — they must not inflate the species count.
+      // Reverse cards - they must not inflate the species count.
       makeReverseCard(1, null, false),
       makeReverseCard(2, null, false),
       makeReverseCard(3, "2026-04-01", true),

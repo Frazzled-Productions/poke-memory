@@ -6,7 +6,7 @@
  * from the Server Component root layout without making the whole layout
  * a client boundary.
  *
- * Renders nothing — the only side effect is the `navigator.storage.persist()`
+ * Renders nothing - the only side effect is the `navigator.storage.persist()`
  * call inside the hook.
  */
 

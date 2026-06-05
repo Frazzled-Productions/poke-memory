@@ -1,5 +1,5 @@
 /**
- * MeterBar — a horizontal progress/meter bar with canonical accessible markup.
+ * MeterBar - a horizontal progress/meter bar with canonical accessible markup.
  *
  * Emits role="meter" with aria-valuenow / aria-valuemin / aria-valuemax and an
  * aria-label from the `label` prop. This fixes the inconsistency across the
@@ -11,15 +11,15 @@
  *   - Fill: h-full, rounded-full, colour via `fillClass`, width via inline style
  *
  * The caller owns:
- *   - `fillClass` — fill colour (e.g. "bg-emerald-500 dark:bg-emerald-400")
- *   - `trackClass` — dark-mode track override (defaults to "dark:bg-zinc-700");
+ *   - `fillClass` - fill colour (e.g. "bg-emerald-500 dark:bg-emerald-400")
+ *   - `trackClass` - dark-mode track override (defaults to "dark:bg-zinc-700");
  *     pass "dark:bg-zinc-800" for surfaces that use the darker track tone
- *   - `transitionClass` — CSS transition applied to the fill div. Defaults to
+ *   - `transitionClass` - CSS transition applied to the fill div. Defaults to
  *     "transition-all". Pass "" to suppress animation, or e.g.
  *     "transition-all duration-300" to match an exact original timing. Each
  *     adopted site threads its own value so the animation behaviour is
  *     identical to what it was before extraction.
- *   - `className` — extra structural classes, e.g. "flex-1" or "w-20"
+ *   - `className` - extra structural classes, e.g. "flex-1" or "w-20"
  *
  * When `max === 0` the fill renders at 0% width (empty bar).
  */

@@ -17,7 +17,7 @@ import { ActivityHistoryChart } from "@/components/stats/ActivityHistoryChart";
 import type { ActivityPoint } from "@/lib/stats/activity-history";
 
 // ---------------------------------------------------------------------------
-// Recharts mock — lightweight stubs so the component can render in jsdom.
+// Recharts mock - lightweight stubs so the component can render in jsdom.
 // The Tooltip mock fires its content prop so ChartTooltip runs.
 // ---------------------------------------------------------------------------
 
@@ -83,7 +83,7 @@ describe("ActivityHistoryChart", () => {
   it("renders the ChartTooltip content (statValue lines) via the mocked Tooltip", () => {
     renderWithIntl(<ActivityHistoryChart series={SERIES} />);
     // The tooltip mock fires content with active=true; ChartTooltip renders
-    // "Reviews: 12" using the statValue class — verify the text is present.
+    // "Reviews: 12" using the statValue class - verify the text is present.
     expect(screen.getByText(/reviews: 12/i)).toBeInTheDocument();
   });
 

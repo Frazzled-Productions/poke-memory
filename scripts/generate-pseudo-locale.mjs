@@ -9,7 +9,7 @@
  *   "Practice" → "[Practice]"
  *
  * For ICU message-format patterns (strings containing "{…}"), the ENTIRE
- * pattern is wrapped — not the interpolated args — so that runtime
+ * pattern is wrapped - not the interpolated args - so that runtime
  * interpolation still works while translated strings are still
  * distinguishable from un-translated raw English:
  *   "{count, plural, one {# card} other {# cards}}"
@@ -21,7 +21,7 @@
  *
  * The harness test (components/review/DirectionBadge.i18n-leak.test.tsx)
  * imports this file via renderWithIntl's "xx-pseudo" locale slot and checks
- * that rendered text nodes match the sentinel pattern — proving the component
+ * that rendered text nodes match the sentinel pattern - proving the component
  * is routing its strings through the catalogue rather than hard-coding English.
  */
 
