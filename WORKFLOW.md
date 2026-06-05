@@ -468,7 +468,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Dry run** | `workflow_dispatch` with `dry_run: true` posts a `[DRY RUN] Would close ...` comment instead of closing. |
 | **Token** | Repo-scoped App token via `actions/create-github-app-token@v3` (mirrors `auto-status.yml`). No board move - this workflow only closes the issue. |
 | **Required check** | No - board / backlog hygiene, does not gate merge. |
-| **Concurrency** | `auto-close-umbrella-${{ github.event.issue.number }}`, `cancel-in-progress: false`. |
+| **Concurrency** | `auto-close-umbrella-${{ github.event.issue.number || github.event.inputs.issue_number }}` (the manual-dispatch branch produces a distinct key), `cancel-in-progress: false`. |
 
 ---
 
