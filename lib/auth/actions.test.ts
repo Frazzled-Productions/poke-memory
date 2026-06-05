@@ -168,7 +168,7 @@ describe("signUpWithUsername", () => {
     expect(result).toEqual({ ok: false, error: "username_taken" });
   });
 
-  it("maps signUpError.status===422 to username_taken", async () => {
+  it("maps unrecognised signUpError (status 422, unknown code) to signup_failed", async () => {
     mockSignUp.mockResolvedValue({
       data: { user: null, session: null },
       error: { message: "Unprocessable entity", code: "some_code", status: 422 },
@@ -176,7 +176,7 @@ describe("signUpWithUsername", () => {
 
     const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
 
-    expect(result).toEqual({ ok: false, error: "username_taken" });
+    expect(result).toEqual({ ok: false, error: "signup_failed" });
   });
 
   // --- Test 4: other signUp error -> signup_failed -------------------------
