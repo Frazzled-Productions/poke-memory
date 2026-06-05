@@ -143,7 +143,6 @@ export function SignInSheet({ open, onClose }: Props) {
       <dialog
         ref={dialogRef}
         open
-        role="dialog"
         aria-modal="true"
         aria-labelledby="sign-in-sheet-heading"
         className={[

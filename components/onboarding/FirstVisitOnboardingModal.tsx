@@ -178,7 +178,6 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
       <dialog
         ref={dialogRef}
         open
-        role="dialog"
         aria-modal="true"
         aria-labelledby="onboarding-modal-title"
         className="relative w-full max-w-md rounded-2xl bg-background p-0 shadow-xl focus:outline-none"

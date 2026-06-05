@@ -23,11 +23,10 @@ export function AuthButton() {
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
-          disabled={isPending}
           aria-haspopup="dialog"
           className={TRIGGER_CLASS}
         >
-          {isPending ? t("signingIn") : t("signIn")}
+          {t("signIn")}
         </button>
         <SignInSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
       </>
