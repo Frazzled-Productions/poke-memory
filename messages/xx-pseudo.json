@@ -33,7 +33,7 @@
     "signOut": "[Sign out]",
     "continueWithGitHub": "[Continue with GitHub]",
     "continueWithGoogle": "[Continue with Google]",
-    "providerHint": "[Use the same provider you signed up with to keep your progress.]",
+    "providerHint": "[Already have an account? Use the same provider you signed up with.]",
     "chooseProvider": "[Choose a sign-in provider]",
     "cardsReviewed": "[{count, plural, one {# card reviewed} other {# cards reviewed}}]",
     "streakDaysCount": "[{count, plural, one {# streak day} other {# streak days}}]",
@@ -984,8 +984,14 @@
       "openAudioSettings": "[Open audio settings]"
     },
     "guestStorage": {
-      "heading": "[Your progress is saved on this device]",
-      "body": "[Your progress is kept on this device. On iPhone and iPad, Safari may clear saved data after 7 days if you do not visit. Adding this page to your Home Screen prevents that. If you sign in, your progress is also saved online so you can use it on other devices.]"
+      "heading": "[Your progress is only on this device]",
+      "body": "[Clear your browser data or switch devices and your progress is gone. Create a free account to save it online. On iPhone and iPad, adding this page to your Home Screen also prevents Safari from clearing local data after 7 days.]"
+    },
+    "guestSignUpNudge": {
+      "heading": "[Your progress is at risk]",
+      "body": "[You have mastered {count, number} {count, plural, one {Pokémon} other {Pokémon}} on this device. If you clear your browser data or switch devices, that progress is gone. Create a free account to save it online.]",
+      "bodyLowMastery": "[Your practice history is only on this device. If you clear your browser data or switch devices, that progress is gone. Create a free account to save it online.]",
+      "cta": "[Create a free account]"
     },
     "getStarted": "[Get started]",
     "pwaInstallNudge": {

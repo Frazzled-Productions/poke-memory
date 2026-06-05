@@ -86,6 +86,7 @@ const VALID_SETTINGS: UserSettings = {
     slowSpriteLoadCount: 0,
     pastureLongPressHintDismissed: false,
     higherOrLowerNudgeDismissed: false,
+    guestSignUpNudgeDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

@@ -60,6 +60,10 @@ vi.mock("@/lib/settings/persistence", () => ({
     retentionTarget: 0.9,
     timezone: "UTC",
     streakProtection: { spendDates: [] },
+    onboarding: {
+      practiceSessionsCount: 0,
+      guestSignUpNudgeDismissed: false,
+    },
   })),
   saveSettings: vi.fn(),
   SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",

@@ -33,7 +33,7 @@
     "signOut": "登出",
     "continueWithGitHub": "使用 GitHub 继续",
     "continueWithGoogle": "使用 Google 继续",
-    "providerHint": "请使用注册时所用的登录方式，以保留您的进度。",
+    "providerHint": "已有账号？请使用注册时所用的登录方式。",
     "chooseProvider": "选择登录方式",
     "cardsReviewed": "{count, plural, other {已复习 # 张卡片}}",
     "streakDaysCount": "{count, plural, other {# 天连续}}",
@@ -984,8 +984,14 @@
       "openAudioSettings": "打开音频设置"
     },
     "guestStorage": {
-      "heading": "你的进度保存在本设备上",
-      "body": "你的进度保存在此设备上。在 iPhone 和 iPad 上，如果 7 天没有访问，Safari 可能会清除保存的数据。将此页面添加到主屏幕可以防止这种情况。如果你登录，进度还会在线保存，以便在其他设备上使用。"
+      "heading": "你的进度仅保存在本设备上",
+      "body": "清除浏览器数据或切换设备后，你的进度将会丢失。创建免费账号即可在线保存。在 iPhone 和 iPad 上，将此页面添加到主屏幕还可以防止 Safari 在 7 天后清除本地数据。"
+    },
+    "guestSignUpNudge": {
+      "heading": "你的进度面临风险",
+      "body": "你已在本设备上习得了 {count, number} 只 {count, plural, other {宝可梦}}。清除浏览器数据或切换设备后，这些进度将会丢失。创建免费账号即可在线保存。",
+      "bodyLowMastery": "你的练习记录仅保存在本设备上。清除浏览器数据或切换设备后，进度将会丢失。创建免费账号即可在线保存。",
+      "cta": "创建免费账号"
     },
     "getStarted": "开始",
     "pwaInstallNudge": {

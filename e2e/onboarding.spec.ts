@@ -761,3 +761,173 @@ test.describe("Higher-or-Lower signpost nudge (#1573)", () => {
     expect(stored?.onboarding?.higherOrLowerNudgeDismissed).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Guest sign-up value-prop nudge (#1668)
+//
+// Shown on Stats and Journey pages for guests who have real progress:
+//   masteredSpecies >= 10 OR practiceSessionsCount >= 3.
+//
+// Tests cover:
+//  - Nudge renders on Stats when practiceSessionsCount >= 3 (sessions gate).
+//  - Nudge renders on Journey when practiceSessionsCount >= 3.
+//  - Nudge absent when below both thresholds (fresh session).
+//  - Nudge absent when guestSignUpNudgeDismissed is true.
+//  - CTA opens the sign-in provider picker.
+//  - Nudge is dismissible and absent after dismissal.
+// ---------------------------------------------------------------------------
+
+test.describe("Guest sign-up nudge (#1668)", () => {
+  test("nudge renders on Stats page when sessions threshold is met (sessions >= 3)", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceSessionsCount: 5,
+            // guestSignUpNudgeDismissed absent (= false)
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/stats");
+
+    const nudge = page.locator(`[role="note"]`, { hasText: /your progress is at risk/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("nudge renders on Journey page when sessions threshold is met (sessions >= 3)", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceSessionsCount: 5,
+            // guestSignUpNudgeDismissed absent (= false)
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/journey");
+
+    const nudge = page.locator(`[role="note"]`, { hasText: /your progress is at risk/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("nudge absent on Stats when below both thresholds (fresh session)", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceSessionsCount: 0,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/stats");
+    // Wait for the page to hydrate past the skeleton before asserting absence.
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Stats" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /your progress is at risk/i }),
+    ).toHaveCount(0);
+  });
+
+  test("nudge absent on Stats when guestSignUpNudgeDismissed is true", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceSessionsCount: 10,
+            guestSignUpNudgeDismissed: true,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/stats");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Stats" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.locator(`[role="note"]`, { hasText: /your progress is at risk/i }),
+    ).toHaveCount(0);
+  });
+
+  test("CTA on Stats page opens the sign-in provider picker", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceSessionsCount: 5,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/stats");
+    const nudge = page.locator(`[role="note"]`, { hasText: /your progress is at risk/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
+
+    // Click the CTA button to open the provider picker.
+    await nudge.getByRole("button", { name: /create a free account/i }).click();
+
+    // Provider buttons should appear inside the nudge.
+    await expect(nudge.getByRole("button", { name: /continue with github/i })).toBeVisible();
+    await expect(nudge.getByRole("button", { name: /continue with google/i })).toBeVisible();
+  });
+
+  test("nudge on Stats page is dismissible and absent after dismissal", async ({
+    page,
+  }) => {
+    await page.addInitScript((key) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            practiceSessionsCount: 5,
+            guestSignUpNudgeDismissed: false,
+          },
+        }),
+      );
+    }, SETTINGS_KEY);
+
+    await page.goto("/stats");
+    const nudge = page.locator(`[role="note"]`, { hasText: /your progress is at risk/i });
+    await expect(nudge).toBeVisible({ timeout: 20_000 });
+
+    await nudge.getByRole("button", { name: /dismiss hint/i }).click();
+    await expect(nudge).toHaveCount(0);
+
+    // Verify flag persisted to localStorage.
+    const stored = await page.evaluate((key) => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    }, SETTINGS_KEY);
+    expect(stored?.onboarding?.guestSignUpNudgeDismissed).toBe(true);
+  });
+});
