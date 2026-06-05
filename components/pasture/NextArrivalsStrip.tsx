@@ -80,7 +80,7 @@ export function NextArrivalsStrip({ arrivals }: Props) {
       aria-label={t("ariaLabel")}
       className="mt-8 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4 dark:border-zinc-700 dark:bg-zinc-900/50"
     >
-      <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+      <h2 className="flex items-center gap-1.5 mb-3 text-sm font-semibold text-zinc-600 dark:text-zinc-400">
         {t("heading")}
         {arrivals.length > 0 && (
           <InfoButton

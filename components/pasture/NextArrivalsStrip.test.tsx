@@ -221,6 +221,15 @@ describe("NextArrivalsStrip — InfoButton in Japanese", () => {
       screen.getByRole("button", { name: "「reps」とは？" }),
     ).toBeInTheDocument();
   });
+
+  it("activating the InfoButton reveals Japanese panel content", async () => {
+    const user = userEvent.setup();
+    renderJa(<NextArrivalsStrip arrivals={[makeArrival(1, "Bulbasaur")]} />);
+    const btn = screen.getByRole("button", { name: "「reps」とは？" });
+    await user.click(btn);
+    // messages/ja.json pasture.nextArrivals.repsInfoPanel starts with "Reps（復習回数）"
+    expect(screen.getByText(/Reps（復習回数）/)).toBeInTheDocument();
+  });
 });
 
 describe("NextArrivalsStrip — InfoButton in Simplified Chinese", () => {
