@@ -453,6 +453,25 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
+### `auto-close-umbrella.yml` - Auto Close Umbrella
+
+| | |
+|---|---|
+| **Trigger** | `issues: [closed]`; `workflow_dispatch` (inputs `issue_number` required, `dry_run` boolean default `true`) |
+| **Job** | `close-umbrella` |
+| **What it does** | When a child issue closes, finds any OPEN umbrella that tracks it, checks whether ALL of that umbrella's tracked children are now closed, and if so closes the umbrella with a comment noting all tracked items are complete. Saves the maintainer from hand-closing digests / epics once their children ship. |
+| **How children are declared** | A task-list of `#N` refs in the umbrella body (`- [ ] #N` / `- [x] #N`). The checkbox tick is not trusted - each child's real state is read from the API. GitHub-native sub-issues are read as a best-effort secondary signal and unioned in; sub-issue API errors are non-fatal. Plain `#N` prose refs are ignored. |
+| **Opt-in gate** | Fires only for umbrellas carrying the `auto-close-when-complete` label - the umbrella, not the child, must carry it. Weekly digests (snapshots) should carry it by default; open-ended epics (e.g. #1445) deliberately omit it so they never auto-close prematurely. The maintainer creates the label once (no label-sync manifest exists in `.github/`). |
+| **Candidate lookup** | Lists open issues with the gate label and filters locally with jq on the fetched body - never `gh issue list --search '... in:body'`, which the GitHub search index strips (same caveat as `auto-retro-harvest.yml`). |
+| **Child-reopened** | No `reopened` trigger by design - reopening a child leaves the umbrella closed; a human reopens it if needed. Avoids open/close thrash. |
+| **Batch-close race** | A `qa -> main` promotion PR closing ~20 issues fires ~20 runs against the same umbrella; the "already closed" guard plus `cancel-in-progress: false` make this safe (first run closes, the rest find it closed). |
+| **Dry run** | `workflow_dispatch` with `dry_run: true` posts a `[DRY RUN] Would close ...` comment instead of closing. |
+| **Token** | Repo-scoped App token via `actions/create-github-app-token@v3` (mirrors `auto-status.yml`). No board move - this workflow only closes the issue. |
+| **Required check** | No - board / backlog hygiene, does not gate merge. |
+| **Concurrency** | `auto-close-umbrella-${{ github.event.issue.number }}`, `cancel-in-progress: false`. |
+
+---
+
 ### `qa-issue-label.yml` - QA Issue Label
 
 | | |
