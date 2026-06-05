@@ -195,16 +195,16 @@ describe("computePerGameStats", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("forceAllMastered overrides everything — all species are mastered", () => {
+  it("forceAllMastered overrides everything - all species are mastered", () => {
     const seed = [makeSeedPokemon(1, ["red-blue"]), makeSeedPokemon(2, ["red-blue"])];
-    // No cards at all — yet with forceAllMastered every species counts.
+    // No cards at all - yet with forceAllMastered every species counts.
     const result = computePerGameStats([], seed, 3, /* forceAllMastered = */ true);
     expect(result[0]).toMatchObject({ slug: "red-blue", total: 2, introduced: 0, mastered: 2 });
   });
 
   it("respects a custom masteryRepetitions threshold", () => {
     const seed = [makeSeedPokemon(1, ["red-blue"])];
-    // reps=5, scheduledDays=30 — passes default (3) but also a threshold of 5.
+    // reps=5, scheduledDays=30 - passes default (3) but also a threshold of 5.
     const state: Partial<ReviewState> = { ...MASTERED_STATE, reps: 5 };
     const cards: ReviewableCard[] = [
       makeNameCard(1, state),

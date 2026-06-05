@@ -18,7 +18,7 @@ const REVERSE_ID_OFFSET = 2_000_000;
 
 /**
  * The ReviewSession shape as stored in localStorage / passed through sync.
- * Deliberately minimal — only the fields this module touches.
+ * Deliberately minimal - only the fields this module touches.
  */
 export type ReviewSession = {
   cards: ReviewableCard[];
@@ -46,7 +46,7 @@ export function justBecameMastered(
 
 /**
  * Filters a card array to species-mastered name-cards only. Evolution, reverse,
- * and cry cards are excluded — the pasture shows one entry per species, keyed
+ * and cry cards are excluded - the pasture shows one entry per species, keyed
  * on the name card.
  *
  * Since #1234, a species is mastered when BOTH its name card AND its paired
@@ -99,7 +99,7 @@ export function filterMastered(
 
 /**
  * Returns a new session with the named card's `seenInPasture` flag set to
- * true. Pure function — the caller is responsible for persisting the result
+ * true. Pure function - the caller is responsible for persisting the result
  * and pushing to the cloud via existing helpers.
  */
 export function markSeenInPasture(

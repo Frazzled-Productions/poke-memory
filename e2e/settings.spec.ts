@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
 });
 
-test.describe("Settings — Audio TTS controls (#435)", () => {
+test.describe("Settings - Audio TTS controls (#435)", () => {
   test("'Hear sample' button is present inside the Audio section and clickable without error", async ({
     page,
   }) => {
@@ -22,7 +22,7 @@ test.describe("Settings — Audio TTS controls (#435)", () => {
     await page.getByRole("button", { name: /^audio$/i }).click();
 
     // TtsControls (and its "Hear sample" button) only mounts once the
-    // "Speak name on reveal" toggle is enabled — it defaults to off.
+    // "Speak name on reveal" toggle is enabled - it defaults to off.
     await page.getByRole("switch", { name: "Speak name on reveal" }).click();
 
     // The "Hear sample" button sits inside the Speech rate row of TtsControls.
@@ -36,7 +36,7 @@ test.describe("Settings — Audio TTS controls (#435)", () => {
   });
 });
 
-test.describe("Settings page — collapsible sections (#660)", () => {
+test.describe("Settings page - collapsible sections (#660)", () => {
   test("settings page opens with all category headings visible and collapsed", async ({
     page,
   }) => {
@@ -50,7 +50,7 @@ test.describe("Settings page — collapsible sections (#660)", () => {
     }
 
     // No section content should be visible on a fresh load (all collapsed).
-    // We check that the "Recall target" slider is not visible — it lives inside Practice.
+    // We check that the "Recall target" slider is not visible - it lives inside Practice.
     await expect(page.getByRole("slider", { name: /recall target/i })).not.toBeVisible();
   });
 
@@ -104,7 +104,7 @@ test.describe("Settings page — collapsible sections (#660)", () => {
   });
 });
 
-test.describe("Settings page — alternate forms toggle (#658)", () => {
+test.describe("Settings page - alternate forms toggle (#658)", () => {
   test("alternate forms toggle is present and off by default in Practice section", async ({
     page,
   }) => {
@@ -139,7 +139,7 @@ test.describe("Settings page — alternate forms toggle (#658)", () => {
   });
 });
 
-test.describe("Alternate forms — ScopeControl visibility (#658)", () => {
+test.describe("Alternate forms - ScopeControl visibility (#658)", () => {
   test("Alternate forms section is absent in ScopeControl when toggle is off (default)", async ({
     page,
   }) => {
@@ -157,7 +157,7 @@ test.describe("Alternate forms — ScopeControl visibility (#658)", () => {
   }) => {
     // Enable the toggle on the Settings page and persist via Save.
     // handleToggle only updates React state; saveSettings is only called from
-    // handleSave — so we must click Save before navigating away.
+    // handleSave - so we must click Save before navigating away.
     await page.goto("/settings");
     await page.getByRole("button", { name: /^practice$/i }).click();
     await page.getByRole("switch", { name: /include alternate forms in practice/i }).click();
@@ -176,7 +176,7 @@ test.describe("Alternate forms — ScopeControl visibility (#658)", () => {
   });
 });
 
-test.describe("Settings page — search/filter (#662)", () => {
+test.describe("Settings page - search/filter (#662)", () => {
   test("search input is visible at the top of the settings page", async ({ page }) => {
     await page.goto("/settings");
 
@@ -195,7 +195,7 @@ test.describe("Settings page — search/filter (#662)", () => {
     // Audio section must be visible and expanded (cry cards toggle is visible).
     await expect(page.getByRole("switch", { name: /enable cry cards/i })).toBeVisible();
 
-    // The Practice section button must be absent — it is filtered out.
+    // The Practice section button must be absent - it is filtered out.
     await expect(page.getByRole("button", { name: /^practice$/i })).not.toBeVisible();
   });
 
@@ -259,7 +259,7 @@ test.describe("Settings page — search/filter (#662)", () => {
   test("search input is keyboard-reachable via click and accepts input", async ({ page }) => {
     await page.goto("/settings");
     const input = page.getByRole("searchbox", { name: /search settings/i });
-    // Clicking gives focus — verifies the input is not disabled/inert.
+    // Clicking gives focus - verifies the input is not disabled/inert.
     await input.click();
     await expect(input).toBeFocused();
     // Typing filters the view.
@@ -288,7 +288,7 @@ test.describe("Settings page — search/filter (#662)", () => {
 
     const input = page.getByRole("searchbox", { name: /search settings/i });
 
-    // Type a query — the matching section should be visible and expanded.
+    // Type a query - the matching section should be visible and expanded.
     await input.fill("backup");
     await expect(page.getByRole("button", { name: /account & data/i })).toBeVisible();
 
@@ -311,7 +311,7 @@ test.describe("Settings page — search/filter (#662)", () => {
   }) => {
     // Navigate to a hash that targets Practice via a sub-section anchor.
     // With a query of 'backup' (matches only Account & Data), Practice would
-    // normally be filtered out — but the hash target must keep it present.
+    // normally be filtered out - but the hash target must keep it present.
     await page.goto("/settings#scheduler-heading");
 
     // The Practice button must be visible (hash target always included).
@@ -322,13 +322,13 @@ test.describe("Settings page — search/filter (#662)", () => {
 });
 
 // The "re-enable card type prompt (#835)" describe block was removed in #1234.
-// Since #1234, reverse cards are a required practice direction — the
+// Since #1234, reverse cards are a required practice direction - the
 // reverseCardsEnabled toggle and its re-enable dialog no longer exist on the
 // Settings page. The tests that exercised clicking that toggle, confirming the
 // dialog, and choosing "Reuse" / "Start fresh" / "Cancel" have been deleted
 // rather than left as dead assertions against a removed UI element.
 
-test.describe("Settings — CSV review history export (#918)", () => {
+test.describe("Settings - CSV review history export (#918)", () => {
   test("Download CSV link is not visible for guests (no session)", async ({
     page,
   }) => {
@@ -345,7 +345,7 @@ test.describe("Settings — CSV review history export (#918)", () => {
   test("GET /api/export rejects an unauthenticated request (401 or 503)", async ({
     page,
   }) => {
-    // Verify the endpoint is guarded — an unauthenticated request must never
+    // Verify the endpoint is guarded - an unauthenticated request must never
     // receive a CSV. In a fully-configured environment the route returns 401
     // (no session). In the CI e2e environment where Supabase env vars are
     // absent the client construction fails and the route returns 503 instead.
@@ -357,12 +357,12 @@ test.describe("Settings — CSV review history export (#918)", () => {
   });
 });
 
-test.describe("Settings — Danger zone (#697)", () => {
+test.describe("Settings - Danger zone (#697)", () => {
   test("danger zone shows Reset all progress; Delete account is hidden for guests", async ({
     page,
   }) => {
     // E2E runs guest-mode only. The "Delete account" control is gated on a
-    // signed-in session — there is no cloud identity for a guest to delete —
+    // signed-in session - there is no cloud identity for a guest to delete - 
     // so a guest should see "Reset all progress" but NOT "Delete account".
     await page.goto("/settings#danger-zone-heading");
 
@@ -384,14 +384,14 @@ test.describe("Settings — Danger zone (#697)", () => {
   });
 });
 
-test.describe("Settings page — Web Push opt-in (#1056)", () => {
+test.describe("Settings page - Web Push opt-in (#1056)", () => {
   test("daily reminder toggle is hidden in a regular browser tab (not standalone)", async ({
     page,
   }) => {
     // The PushOptIn component renders only when display-mode is standalone
     // AND push is supported AND the user is authenticated. A normal browser
     // session in CI satisfies none of those, so the toggle must be entirely
-    // absent — not just hidden via CSS.
+    // absent - not just hidden via CSS.
     await page.goto("/settings");
 
     // Expand Account & Data so the would-be parent section is open.
@@ -410,7 +410,7 @@ test.describe("Settings page — Web Push opt-in (#1056)", () => {
   }) => {
     // Even with display-mode emulated to standalone, the test browser in CI
     // does not provide a real PushManager + Notification surface that
-    // isPushSupported considers valid. The toggle must still not render —
+    // isPushSupported considers valid. The toggle must still not render - 
     // we don't want to show a control that can't actually subscribe.
     await page.emulateMedia({ media: "screen", colorScheme: "light" });
 
@@ -435,7 +435,7 @@ test.describe("Settings page — Web Push opt-in (#1056)", () => {
     //     by default so no stub is needed.
     //  3. isStandalone() reads matchMedia("(display-mode: standalone)") OR
     //     navigator.standalone. We force the iOS Safari hook to true via
-    //     addInitScript — same approach the auth.spec.ts mock-auth tests use
+    //     addInitScript - same approach the auth.spec.ts mock-auth tests use
     //     to flip readiness signals on the page before app code runs.
     //
     // Once the toggle renders we click it and assert the navigator-side
@@ -445,7 +445,7 @@ test.describe("Settings page — Web Push opt-in (#1056)", () => {
     // the test never sends a real notification. The mock-auth seam's
     // Supabase client resolves the delete + insert legs as no-op successes.
 
-    // Seed the addInitScript before navigation — the same ordering pattern
+    // Seed the addInitScript before navigation - the same ordering pattern
     // as the auth-spec helpers. This runs in the page context before any
     // app module evaluates, so isStandalone()'s detection sees our value.
     await page.addInitScript(() => {
@@ -519,7 +519,7 @@ test.describe("Settings page — Web Push opt-in (#1056)", () => {
     await page.goto("/settings#onboarding-heading");
 
     // The toggle must render with its expected accessible name. Both the
-    // role+name selector and the data-testid lookup must match — that is
+    // role+name selector and the data-testid lookup must match - that is
     // the positive assertion that absence-only suites lack.
     const toggle = page.getByTestId("push-optin-button");
     await expect(toggle).toBeVisible({ timeout: 15_000 });
@@ -537,8 +537,8 @@ test.describe("Settings page — Web Push opt-in (#1056)", () => {
   });
 });
 
-test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205 / #1234)", () => {
-  // Since #1234 reverse cards are always on — the reverseCardsEnabled toggle
+test.describe("Settings - reverse-card feedback delay gating (#1200 / #1205 / #1234)", () => {
+  // Since #1234 reverse cards are always on - the reverseCardsEnabled toggle
   // has been removed. The feedback delay fieldset is now unconditionally
   // visible whenever the Audio section is expanded.
   test("feedback delay control is always visible in the Audio section", async ({
@@ -554,7 +554,7 @@ test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205 / 
       page.getByRole("group", { name: /reverse card feedback delay/i }),
     ).toBeVisible();
 
-    // Verify the radio inputs are interactive — "core interaction succeeds" bar.
+    // Verify the radio inputs are interactive - "core interaction succeeds" bar.
     // The default value is "default", so click "off" to exercise a real change.
     // The native radio inputs are sr-only and the labels intercept pointer
     // events; click the label by its accessible text so the interaction lands
@@ -565,10 +565,10 @@ test.describe("Settings — reverse-card feedback delay gating (#1200 / #1205 / 
   });
 });
 
-test.describe("Settings — reverse-card feedback delay control (#1207)", () => {
+test.describe("Settings - reverse-card feedback delay control (#1207)", () => {
   // Since #1234 reverse cards are always on, so the feedback delay fieldset
   // is unconditionally visible once the Audio section is expanded.
-  // No beforeEach setup is needed here — the fieldset renders by default.
+  // No beforeEach setup is needed here - the fieldset renders by default.
 
   test("all three options render with correct labels", async ({ page }) => {
     await page.goto("/settings");
@@ -593,7 +593,7 @@ test.describe("Settings — reverse-card feedback delay control (#1207)", () => 
     const group = page.getByRole("group", { name: /reverse card feedback delay/i });
     await expect(group).toBeVisible();
 
-    // The factory default is "default" — "Default" radio must start checked.
+    // The factory default is "default" - "Default" radio must start checked.
     await expect(group.getByRole("radio", { name: "Default" })).toBeChecked();
     await expect(group.getByRole("radio", { name: "Off" })).not.toBeChecked();
     await expect(group.getByRole("radio", { name: "Fast" })).not.toBeChecked();
@@ -617,7 +617,7 @@ test.describe("Settings — reverse-card feedback delay control (#1207)", () => 
     const group = page.getByRole("group", { name: /reverse card feedback delay/i });
     await expect(group).toBeVisible();
 
-    // Select "Off" — the onChange handler calls saveSettings immediately, so
+    // Select "Off" - the onChange handler calls saveSettings immediately, so
     // no explicit Save button click is needed before reloading.
     await group.getByText("Off", { exact: true }).click();
     await expect(group.getByRole("radio", { name: "Off" })).toBeChecked();
@@ -626,7 +626,7 @@ test.describe("Settings — reverse-card feedback delay control (#1207)", () => 
     // the onChange handler, so "Off" remains selected. CollapsibleSection
     // also persists its open/closed state under
     // poke-memory:settings-section:audio-heading, so the Audio section
-    // reopens itself on reload — no click needed (clicking would toggle it
+    // reopens itself on reload - no click needed (clicking would toggle it
     // closed again).
     await page.reload();
 
@@ -639,7 +639,7 @@ test.describe("Settings — reverse-card feedback delay control (#1207)", () => 
   });
 });
 
-test.describe("Settings — Offline section (#1168)", () => {
+test.describe("Settings - Offline section (#1168)", () => {
   test("Offline section heading and Download button are present", async ({
     page,
   }) => {
@@ -660,7 +660,7 @@ test.describe("Settings — Offline section (#1168)", () => {
   });
 });
 
-test.describe("Settings — Labs section (#1258)", () => {
+test.describe("Settings - Labs section (#1258)", () => {
   // The Labs section only renders when the LABS_FLAGS registry has at least
   // one entry. This issue ships the infrastructure with an empty registry; the
   // section is intentionally absent until a subsequent issue registers the
@@ -669,7 +669,7 @@ test.describe("Settings — Labs section (#1258)", () => {
   // The positive-path render test (section heading visible, toggle interactive)
   // is covered by the unit tests in lib/labs/flags.test.ts. The E2E positive-
   // path test for the section itself will be added when the first flag is
-  // registered — see AGENTS.md "E2E tests" for the requirement.
+  // registered - see AGENTS.md "E2E tests" for the requirement.
 
   test("Labs section is absent on the settings page while the registry is empty", async ({
     page,
@@ -712,7 +712,7 @@ test.describe("Settings — Labs section (#1258)", () => {
     // deferred to when the first real flag is registered (the next Labs issue).
     test.skip(
       true,
-      "Positive render path deferred to first real flag registration — the section is intentionally hidden on initial infrastructure-only ship.",
+      "Positive render path deferred to first real flag registration - the section is intentionally hidden on initial infrastructure-only ship.",
     );
   });
 });
@@ -838,7 +838,7 @@ test.describe("Settings - Send feedback modal (#1622)", () => {
   });
 });
 
-test.describe("Settings — push notification hour picker (#1315)", () => {
+test.describe("Settings - push notification hour picker (#1315)", () => {
   test("hour picker renders in Account & Data > Regional section and can be set", async ({
     page,
   }) => {
@@ -851,7 +851,7 @@ test.describe("Settings — push notification hour picker (#1315)", () => {
     const select = page.getByLabel(/daily reminder time/i);
     await expect(select).toBeVisible();
 
-    // The default option must read "Default (08:00)" — no preference set.
+    // The default option must read "Default (08:00)" - no preference set.
     await expect(select).toHaveValue("");
 
     // Select a specific hour and verify the value updates.

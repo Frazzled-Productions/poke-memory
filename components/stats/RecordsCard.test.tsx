@@ -39,16 +39,16 @@ describe("RecordsCard", () => {
     renderWithIntl(
       <RecordsCard records={{ ...baseRecords, avgDaysToMastery: null }} />,
     );
-    // fmt() returns "—" for null values.
+    // fmt() returns " - " for null values.
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Locale coverage (mandatory per AGENTS.md — #1393)
+// Locale coverage (mandatory per AGENTS.md - #1393)
 // ---------------------------------------------------------------------------
 
-describe("RecordsCard — Japanese locale (#1393)", () => {
+describe("RecordsCard - Japanese locale (#1393)", () => {
   it("renders the Japanese heading in ja locale", () => {
     renderJa(<RecordsCard records={baseRecords} />);
     // ja stats.records.heading = "記録"

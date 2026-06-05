@@ -5,7 +5,7 @@ import type { ThemeIntensity } from "@/lib/settings/persistence";
  * CSS selectors in globals.css can layer tinted/full-bleed palette rules on
  * top of the baseline accent-only rules.
  *
- * `accents` is the default mode — no attribute is written so the baseline
+ * `accents` is the default mode - no attribute is written so the baseline
  * `:root` rules apply. `tinted` and `full` each set a distinct value that
  * ui-coder keys off via `:root[data-intensity="…"]` selectors.
  */

@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
 });
 
-test.describe("Mark Pokémon I already know — deferred scroll (#1483 / #1486)", () => {
+test.describe("Mark Pokémon I already know - deferred scroll (#1483 / #1486)", () => {
   // The quiz panel is collapsed by default and sits below many other settings
   // rows. openKnownQuiz() calls scrollIntoView({ block: "start" }) after a
   // 200ms timer to bring the heading + intro to the top of the viewport.
@@ -16,7 +16,7 @@ test.describe("Mark Pokémon I already know — deferred scroll (#1483 / #1486)"
   test("opening the quiz from a collapsed state scrolls the heading to near the top of the viewport", async ({
     page,
   }) => {
-    // Start at the settings page root — the Practice section is collapsed so
+    // Start at the settings page root - the Practice section is collapsed so
     // the quiz heading is well below the viewport.
     await page.goto("/settings");
 
@@ -45,7 +45,7 @@ test.describe("Mark Pokémon I already know — deferred scroll (#1483 / #1486)"
     const box = await headingEl.boundingBox();
     expect(box).not.toBeNull();
     // Top should be positive (on-screen) and not more than 200px from the top
-    // — this rules out the block:"center" regression where the heading was
+    // - this rules out the block:"center" regression where the heading was
     // centred and the user landed mid-list.
     expect(box!.y).toBeGreaterThanOrEqual(0);
     expect(box!.y).toBeLessThan(200);
@@ -60,7 +60,7 @@ test.describe("Mark Pokémon I already know quiz (#1084)", () => {
     // auto-expanded and we don't depend on the heading button order.
     await page.goto(SETTINGS_HEADING_HASH);
 
-    // The sub-section heading is rendered as plain text — assert by visible
+    // The sub-section heading is rendered as plain text - assert by visible
     // copy rather than role so we don't depend on heading-level styling.
     await expect(page.getByText(/mark pokémon i already know/i)).toBeVisible();
 
@@ -70,7 +70,7 @@ test.describe("Mark Pokémon I already know quiz (#1084)", () => {
     await openBtn.click();
 
     // Once open, the generation switcher should render. Gen I is the default
-    // — its tab carries a count of available species in the user's deck.
+    // - its tab carries a count of available species in the user's deck.
     await expect(
       page.getByRole("tab", { name: /Generation I \(\d+\)/i }),
     ).toBeVisible();
@@ -109,7 +109,7 @@ test.describe("Mark Pokémon I already know quiz (#1084)", () => {
     ).toHaveCount(0);
 
     // Status banner confirms. Filter by text because the settings page also
-    // has a sr-only role="status" live region for the search input — strict
+    // has a sr-only role="status" live region for the search input - strict
     // mode would error if we matched both.
     await expect(
       page.getByRole("status").filter({ hasText: /marked 1 pokémon as known/i }),
@@ -143,7 +143,7 @@ test.describe("Mark Pokémon I already know quiz (#1084)", () => {
       page.getByRole("heading", { name: /mark every pokémon in generation/i }),
     ).not.toBeVisible();
 
-    // Selection count remains zero — Apply is still disabled.
+    // Selection count remains zero - Apply is still disabled.
     await expect(
       page.getByRole("button", { name: /Apply \(0 selected\)/ }),
     ).toBeDisabled();

@@ -35,7 +35,7 @@ function validBackup(): Record<string, unknown> {
 // Happy paths
 // ---------------------------------------------------------------------------
 
-describe("isBackupFile — valid inputs", () => {
+describe("isBackupFile - valid inputs", () => {
   it("accepts a minimal valid backup object", () => {
     expect(isBackupFile(validBackup())).toBe(true);
   });
@@ -138,10 +138,10 @@ describe("isBackupFile — valid inputs", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Top-level rejection — wrong type for the root value
+// Top-level rejection - wrong type for the root value
 // ---------------------------------------------------------------------------
 
-describe("isBackupFile — rejects non-object roots", () => {
+describe("isBackupFile - rejects non-object roots", () => {
   it("rejects null", () => {
     expect(isBackupFile(null)).toBe(false);
   });
@@ -167,7 +167,7 @@ describe("isBackupFile — rejects non-object roots", () => {
 // Tampered / wrong version
 // ---------------------------------------------------------------------------
 
-describe("isBackupFile — version field", () => {
+describe("isBackupFile - version field", () => {
   it("rejects when version is missing", () => {
     const b = validBackup();
     delete b["version"];
@@ -195,7 +195,7 @@ describe("isBackupFile — version field", () => {
 // exportedAt field
 // ---------------------------------------------------------------------------
 
-describe("isBackupFile — exportedAt field", () => {
+describe("isBackupFile - exportedAt field", () => {
   it("rejects when exportedAt is missing", () => {
     const b = validBackup();
     delete b["exportedAt"];
@@ -215,7 +215,7 @@ describe("isBackupFile — exportedAt field", () => {
 // cards array
 // ---------------------------------------------------------------------------
 
-describe("isBackupFile — cards array", () => {
+describe("isBackupFile - cards array", () => {
   it("rejects when cards is missing", () => {
     const b = validBackup();
     delete b["cards"];
@@ -302,7 +302,7 @@ describe("isBackupFile — cards array", () => {
 // limits object
 // ---------------------------------------------------------------------------
 
-describe("isBackupFile — limits object", () => {
+describe("isBackupFile - limits object", () => {
   it("rejects when limits is missing", () => {
     const b = validBackup();
     delete b["limits"];
@@ -342,7 +342,7 @@ describe("isBackupFile — limits object", () => {
 // settings object
 // ---------------------------------------------------------------------------
 
-describe("isBackupFile — settings object", () => {
+describe("isBackupFile - settings object", () => {
   it("rejects when settings is missing", () => {
     const b = validBackup();
     delete b["settings"];
@@ -384,7 +384,7 @@ describe("isBackupFile — settings object", () => {
   });
 
   it("accepts settings without optional direction-related fields", () => {
-    // reverseCardsEnabled and nameCardsEnabled were removed in #1234 — they are
+    // reverseCardsEnabled and nameCardsEnabled were removed in #1234 - they are
     // no longer in UserSettings. Old backup files may still carry these fields;
     // isBackupFile tolerates extra unknown fields because isSettingsShaped only
     // checks the required numeric fields.
@@ -397,10 +397,10 @@ describe("isBackupFile — settings object", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Multiple cards — one invalid card invalidates the whole file
+// Multiple cards - one invalid card invalidates the whole file
 // ---------------------------------------------------------------------------
 
-describe("isBackupFile — partial card corruption", () => {
+describe("isBackupFile - partial card corruption", () => {
   it("rejects when the second card in the array is malformed", () => {
     const b = {
       ...validBackup(),

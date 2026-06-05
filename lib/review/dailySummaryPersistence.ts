@@ -36,8 +36,8 @@ export function loadDailySummary(timezone: string): DailySummaryRecord | null {
         return null;
       }
       const record = parsed as DailySummaryRecord;
-      // A date mismatch — whether the record is days old or was written seconds
-      // before a midnight rollover — means it is no longer "today's" summary, so
+      // A date mismatch - whether the record is days old or was written seconds
+      // before a midnight rollover - means it is no longer "today's" summary, so
       // discarding it here is the intended behaviour, not a lost-data bug.
       if (record.date !== todayInTimezone(timezone)) return null;
       return record;
@@ -47,6 +47,6 @@ export function loadDailySummary(timezone: string): DailySummaryRecord | null {
 }
 
 export function saveDailySummary(record: DailySummaryRecord): void {
-  // QuotaExceededError is swallowed — non-fatal, share button just won't survive a reload.
+  // QuotaExceededError is swallowed - non-fatal, share button just won't survive a reload.
   writeLocalStorage(STORAGE_KEY, record);
 }

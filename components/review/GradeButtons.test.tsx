@@ -62,7 +62,7 @@ describe("KeyboardShortcutsOverlay", () => {
     const user = userEvent.setup();
     renderWithIntl(<KeyboardShortcutsOverlay onClose={onClose} />);
 
-    // Click the inner dialog panel — stopPropagation prevents backdrop handler.
+    // Click the inner dialog panel - stopPropagation prevents backdrop handler.
     await user.click(screen.getByRole("dialog"));
 
     expect(onClose).not.toHaveBeenCalled();
@@ -154,7 +154,7 @@ describe("GradeButtons", () => {
 
   it("does NOT render the overlay independently when in controlled mode (parent owns it)", () => {
     // When showShortcuts / onOpenShortcuts / onCloseShortcuts are all provided,
-    // GradeButtons defers overlay rendering to the parent — no dialog in DOM.
+    // GradeButtons defers overlay rendering to the parent - no dialog in DOM.
     renderWithIntl(
       <GradeButtons
         onGrade={() => {}}
@@ -183,7 +183,7 @@ describe("GradeButtons", () => {
     await user.click(hintBtn);
 
     expect(onOpenShortcuts).toHaveBeenCalledOnce();
-    // Overlay still not in DOM — parent controls rendering.
+    // Overlay still not in DOM - parent controls rendering.
     expect(screen.queryByRole("dialog", { name: /keyboard shortcuts/i })).not.toBeInTheDocument();
   });
 

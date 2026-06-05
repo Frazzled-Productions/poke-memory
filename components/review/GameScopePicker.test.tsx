@@ -75,7 +75,7 @@ describe("GameScopePicker", () => {
 
   it("renders generation labels in ascending order, with Other at end", () => {
     render(<GameScopePicker selected={[]} onChange={() => {}} />);
-    // Query all section headers — both "Generation X" and "Other".
+    // Query all section headers - both "Generation X" and "Other".
     const headers = screen
       .getAllByText(/^Generation |^Other$/)
       .map((el) => el.textContent ?? "");
@@ -101,20 +101,20 @@ describe("GameScopePicker", () => {
     // Table-driven regression guard for genBulkLabel. Verifies that the comma
     // separator keeps game names with internal slashes (Black/White, X/Y, etc.)
     // unambiguous when joined. The assertions are based on the seed's known
-    // version-group set — update if the seed adds new version groups.
+    // version-group set - update if the seed adds new version groups.
     render(<GameScopePicker selected={[]} onChange={() => {}} />);
 
-    // Gen II: Gold/Silver + Crystal — simplest unambiguous example
+    // Gen II: Gold/Silver + Crystal - simplest unambiguous example
     expect(
       screen.queryAllByRole("button", { name: /^Select Gold\/Silver, Crystal$/ }).length,
     ).toBeGreaterThan(0);
 
-    // Gen V: Black/White + B2/W2 — the classic ambiguous case with the old " / " separator
+    // Gen V: Black/White + B2/W2 - the classic ambiguous case with the old " / " separator
     expect(
       screen.getByRole("button", { name: /^Select Black\/White, B2\/W2$/ }),
     ).toBeInTheDocument();
 
-    // Gen VI: X/Y + OR/AS — two slash-containing names
+    // Gen VI: X/Y + OR/AS - two slash-containing names
     expect(
       screen.getByRole("button", { name: /^Select X\/Y, OR\/AS$/ }),
     ).toBeInTheDocument();

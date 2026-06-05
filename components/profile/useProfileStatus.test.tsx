@@ -269,7 +269,7 @@ beforeEach(() => {
 // Empty state tests
 // ---------------------------------------------------------------------------
 
-describe("useProfileStatus — empty state (streak 0 / tokens 0 / mastery 0)", () => {
+describe("useProfileStatus - empty state (streak 0 / tokens 0 / mastery 0)", () => {
   it("streak and tokenBalance come from useStreakNavState (null pre-hydration)", () => {
     // useStreakNavState returns null until hydrated; cache is empty.
     const { result } = renderHook(() => useProfileStatus());
@@ -297,7 +297,7 @@ describe("useProfileStatus — empty state (streak 0 / tokens 0 / mastery 0)", (
 // Populated state tests
 // ---------------------------------------------------------------------------
 
-describe("useProfileStatus — populated state", () => {
+describe("useProfileStatus - populated state", () => {
   it("returns non-zero streak and tokenBalance from useStreakNavState", async () => {
     mockStreakNavState.mockReturnValue({ streak: 5, tokenBalance: 2, daysToNextMilestone: 2 });
 
@@ -340,10 +340,10 @@ describe("useProfileStatus — populated state", () => {
 // pretendAllMastered flag
 // ---------------------------------------------------------------------------
 
-describe("useProfileStatus — pretendAllMastered", () => {
+describe("useProfileStatus - pretendAllMastered", () => {
   it("returns masteryCount === totalSpecies when pretendAllMastered is ON", async () => {
     mockUseSuperuser.mockReturnValue({ flags: { pretendAllMastered: true } });
-    // Cache has 0 — must be overridden by the flag.
+    // Cache has 0 - must be overridden by the flag.
     const { result } = renderHook(() => useProfileStatus());
     await act(async () => {});
 
@@ -401,7 +401,7 @@ describe("useProfileStatus — pretendAllMastered", () => {
 // Locale-scoped cache (including non-en locale)
 // ---------------------------------------------------------------------------
 
-describe("useProfileStatus — locale-scoped mastery", () => {
+describe("useProfileStatus - locale-scoped mastery", () => {
   it("reads from en bucket when pokemonNameLocale is en", async () => {
     mockLoadSettings.mockReturnValue({ pokemonNameLocale: "en", masteryRepetitions: 3 });
     writeMasteredCountForLocale("en", 5);
@@ -446,7 +446,7 @@ describe("useProfileStatus — locale-scoped mastery", () => {
 
   it("activePokemonNameLocale takes precedence over pokemonNameLocale (#1562 bug fix)", async () => {
     // Simulate a user who has switched the active language to 'ja' via the
-    // language switcher — activePokemonNameLocale is 'ja', pokemonNameLocale is
+    // language switcher - activePokemonNameLocale is 'ja', pokemonNameLocale is
     // still 'en' (the back-compat alias is not updated on every switch).
     // Cast is needed because the mock type is intentionally narrow (it only
     // declares the fields used by other tests); the hook reads the full
@@ -471,7 +471,7 @@ describe("useProfileStatus — locale-scoped mastery", () => {
 // Reactivity
 // ---------------------------------------------------------------------------
 
-describe("useProfileStatus — reactivity", () => {
+describe("useProfileStatus - reactivity", () => {
   it("updates when a storage event fires for KEY_MASTERED_COUNT_BY_LOCALE", async () => {
     writeMasteredCountForLocale("en", 1);
     mockLoadSettings.mockReturnValue({ pokemonNameLocale: "en", masteryRepetitions: 3 });
@@ -528,7 +528,7 @@ describe("useProfileStatus — reactivity", () => {
 // the authoritative derivation.
 // ---------------------------------------------------------------------------
 
-describe("useProfileStatus — parity contract: masteryCount == computeStats.mastery.mastered", () => {
+describe("useProfileStatus - parity contract: masteryCount == computeStats.mastery.mastered", () => {
   /**
    * Fixture:
    *   Species 1: name + reverse both mastered (en locale) → species-mastered.

@@ -3,8 +3,8 @@
  *
  * The DB schema (migration 010) replaces the packed integer pokemon_id with a
  * string discriminator pair:
- *   card_type   text  — one of the five CardType slugs below
- *   subject_key text  — type-specific opaque key
+ *   card_type   text - one of the five CardType slugs below
+ *   subject_key text - type-specific opaque key
  *
  * For species cards (name / reverse / cry), subject_key is the Pokédex number
  * as a string: "1", "25", "1025".

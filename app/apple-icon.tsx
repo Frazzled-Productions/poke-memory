@@ -31,7 +31,7 @@ export default function AppleIcon() {
             justifyContent: "flex-start",
           }}
         >
-          {/* Highlight reflection — upper-left */}
+          {/* Highlight reflection - upper-left */}
           <div
             style={{
               width: 22,

@@ -22,7 +22,7 @@ let _loadPromise: Promise<Map<number, PokemonLocaleNames>> | null = null;
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch and cache the locale-names sidecar.  Safe to call concurrently —
+ * Fetch and cache the locale-names sidecar.  Safe to call concurrently - 
  * only one network request is ever in flight.
  */
 export async function loadLocaleNames(): Promise<Map<number, PokemonLocaleNames>> {
@@ -40,7 +40,7 @@ export async function loadLocaleNames(): Promise<Map<number, PokemonLocaleNames>
       _cache = map;
       return map;
     } catch {
-      // Non-fatal — callers fall back to the English name already on SeedPokemon.
+      // Non-fatal - callers fall back to the English name already on SeedPokemon.
       _cache = new Map();
       return _cache;
     }
@@ -68,7 +68,7 @@ export function getLocaleName(
  * Return the transliteration for a species and locale, or `undefined` if
  * not yet loaded or not available.
  *
- * `locale` must be `"ja"`, `"zh-Hans"`, or `"zh-Hant"` — English has no
+ * `locale` must be `"ja"`, `"zh-Hans"`, or `"zh-Hant"` - English has no
  * transliteration.
  */
 export function getTransliteration(
@@ -90,7 +90,7 @@ export function getLocaleNamesSnapshot(): ReadonlyMap<number, PokemonLocaleNames
 // Test helpers (reset module-level state between tests)
 // ---------------------------------------------------------------------------
 
-/** @internal — test use only.  Resets the in-memory cache. */
+/** @internal - test use only.  Resets the in-memory cache. */
 export function _resetLocaleNamesCache(): void {
   _cache = null;
   _loadPromise = null;

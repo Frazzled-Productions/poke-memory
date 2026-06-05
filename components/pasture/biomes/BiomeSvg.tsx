@@ -5,11 +5,11 @@ import styles from "./Biome.module.css";
  *
  * Every biome is a 1600×600 decorative SVG that fills its container, sits
  * behind sprites, and ignores pointer events. This component owns those
- * invariants — viewBox, preserveAspectRatio, aria-hidden, and the shared
- * CSS class — so each individual biome only needs to supply its unique
+ * invariants - viewBox, preserveAspectRatio, aria-hidden, and the shared
+ * CSS class - so each individual biome only needs to supply its unique
  * gradient defs and drawn elements as children.
  *
- * Pure static markup — no state, effects, or browser APIs — so no
+ * Pure static markup - no state, effects, or browser APIs - so no
  * "use client" directive is needed.
  *
  * The output is pixel-identical to writing the svg element inline in each

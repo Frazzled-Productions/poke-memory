@@ -20,7 +20,7 @@ export type { Grade };
 
 export type NameReviewCard = SeedPokemon & {
   cardType: "name";
-  /** DB subject key — equals String(pokemonId). */
+  /** DB subject key - equals String(pokemonId). */
   subjectKey: string;
   /**
    * Locale for which this card's FSRS state is tracked (#1259). Drives the
@@ -32,7 +32,7 @@ export type NameReviewCard = SeedPokemon & {
 };
 
 export type EvolutionReviewCard = EvolutionCard & {
-  /** DB subject key — equals Subject.forEdge(preEvoId, postEvoId). */
+  /** DB subject key - equals Subject.forEdge(preEvoId, postEvoId). */
   subjectKey: string;
   /** Locale for which this card's FSRS state is tracked (#1259). Optional; defaults to "en". */
   locale?: AppLocale;
@@ -43,7 +43,7 @@ export type EvolutionReviewCard = EvolutionCard & {
 // only the id and cardType differ. Counts against the "evolution" daily-limit
 // bucket so both directions of an edge share one budget.
 export type ReverseEvolutionReviewCard = ReverseEvolutionCard & {
-  /** DB subject key — equals Subject.forEdge(preEvoId, postEvoId). Same key as the forward direction. */
+  /** DB subject key - equals Subject.forEdge(preEvoId, postEvoId). Same key as the forward direction. */
   subjectKey: string;
   /** Locale for which this card's FSRS state is tracked (#1259). Optional; defaults to "en". */
   locale?: AppLocale;
@@ -57,7 +57,7 @@ export type ReverseEvolutionReviewCard = ReverseEvolutionCard & {
 export type ReverseReviewCard = Omit<SeedPokemon, "id"> & {
   cardType: "reverse";
   id: number;         // REVERSE_ID_OFFSET + pokemonId (legacy; kept for one release)
-  /** DB subject key — equals String(pokemonId). Same as the name card for this species. */
+  /** DB subject key - equals String(pokemonId). Same as the name card for this species. */
   subjectKey: string;
   pokemonId: number; // original species ID (same as SeedPokemon.id)
   /** Locale for which this card's FSRS state is tracked (#1259). Optional; defaults to "en". */
@@ -72,7 +72,7 @@ export type ReverseReviewCard = Omit<SeedPokemon, "id"> & {
 export type CryReviewCard = Omit<SeedPokemon, "id"> & {
   cardType: "cry";
   id: number;         // CRY_ID_OFFSET + pokemonId (legacy; kept for one release)
-  /** DB subject key — equals String(pokemonId). */
+  /** DB subject key - equals String(pokemonId). */
   subjectKey: string;
   pokemonId: number;
   /** Locale for which this card's FSRS state is tracked (#1259). Optional; defaults to "en". */
@@ -97,7 +97,7 @@ export type PerTypeLimits = {
 
 // Daily-limit bucket keys. Reverse-evolution cards have cardType
 // "reverse-evolution" but bucket as "evolution" so the two directions share
-// one daily new/review budget — see #343.
+// one daily new/review budget - see #343.
 export type CardTypeKey = "name" | "evolution" | "reverse" | "cry";
 
 /** Map a card's cardType to its daily-limit bucket. */
@@ -142,8 +142,8 @@ export type BuildSessionOpts = CardTypeOpts & {
  * without removing them from storage (non-destructive disable).
  *
  * Defaults for each type match the historical behaviour:
- *   name / evolution — enabled by default
- *   reverse / reverseEvolution / cry — disabled by default
+ *   name / evolution - enabled by default
+ *   reverse / reverseEvolution / cry - disabled by default
  */
 export function cardTypeIsEnabled(
   card: ReviewableCard,
@@ -190,7 +190,7 @@ export function buildSession(
         state: initialReviewState(now),
       }))
     : [];
-  // Reverse-evolution cards are 1:1 derivable from forward edges — same data,
+  // Reverse-evolution cards are 1:1 derivable from forward edges - same data,
   // different id, rendered with the prompt direction flipped. Derive from
   // `evoSeed` so tests can pass a custom edge set without a parallel seed.
   const reverseEvoCards: ReverseEvolutionReviewCard[] = opts.reverseEvolutionEnabled
@@ -214,7 +214,7 @@ export function buildSession(
         state: initialReviewState(now),
       }))
     : [];
-  // Cry cards are only generated for species with a non-null cry — there
+  // Cry cards are only generated for species with a non-null cry - there
   // is no point scheduling a card that can never have a prompt to play.
   const cryCards: CryReviewCard[] = opts.cryEnabled
     ? seed
@@ -234,10 +234,10 @@ export function buildSession(
 
 // Merge saved cards with the current seed, refreshing seed fields (e.g. newly
 // added flavorTexts) on existing cards while preserving their SM-2 state.
-// Missing seed entries for ENABLED types are appended at initialReviewState —
+// Missing seed entries for ENABLED types are appended at initialReviewState - 
 // due immediately.
 //
-// Saved cards of a disabled type are PRESERVED in the output — they are kept
+// Saved cards of a disabled type are PRESERVED in the output - they are kept
 // in storage so progress is not lost when a type is re-enabled. The session
 // queue builder filters them out of the active queue via the eligibleCardIds
 // gate; the cards themselves remain intact. New cards of disabled types are
@@ -279,7 +279,7 @@ export function hydrateSession(
   );
 
   // All saved cards are kept regardless of whether their type is currently
-  // enabled — disabling a type is non-destructive. Seed fields are refreshed
+  // enabled - disabling a type is non-destructive. Seed fields are refreshed
   // on every card so display data stays current.
   const allSaved = saved;
 
@@ -349,7 +349,7 @@ export function hydrateSession(
   //
   // Re-init strategy (not just patching FSRS math fields): we set fsrsState to
   // "new" and lastReview to null so the heal guard itself excludes the card on
-  // the NEXT load — giving the heal a stable fixed point. Without this, a card
+  // the NEXT load - giving the heal a stable fixed point. Without this, a card
   // with stability:0 would re-trigger on every cold load producing a spurious
   // saveSession write each time. Preserving the bogus history would also make the
   // next grade self-inconsistent (e.g. reps > 0 but FSRS re-initialising).
@@ -367,7 +367,7 @@ export function hydrateSession(
   // Signed-in note: re-init resets reps/lapses to 0 for the one poison card.
   // The next cloud push of that card may be rejected by the migration-015 monotonic-
   // reps regression trigger (silently, by design). This per-card cloud divergence
-  // is accepted — a crash is worse than a single card losing its history.
+  // is accepted - a crash is worse than a single card losing its history.
   let anyHealed = false;
   const todayStr = initialReviewState(now).dueDate; // "YYYY-MM-DD" in UTC
   const healedRefreshed = refreshed.map((card) => {
@@ -400,7 +400,7 @@ export function hydrateSession(
         firstSeen: card.state.firstSeen,
         // Set dueDate to today so the re-init card is immediately available.
         dueDate: todayStr,
-        // Preserve snooze and pasture flags — these are display/UX state, not FSRS.
+        // Preserve snooze and pasture flags - these are display/UX state, not FSRS.
         hiddenSince: card.state.hiddenSince,
         seenInPasture: card.state.seenInPasture,
       },
@@ -410,7 +410,7 @@ export function hydrateSession(
   // Dedup key: `(id, locale)` for ALL card types so that enrolling a new
   // language creates fresh cards rather than being silently blocked by an
   // existing "en" row with the same numeric id (#1562). This applies to
-  // evolution and reverse-evolution too — per-locale isolation is the locked
+  // evolution and reverse-evolution too - per-locale isolation is the locked
   // model (every card type gets its own independent FSRS row per language).
   const savedIdLocaleKeys = new Set(
     allSaved.map((c) => `${c.id}::${c.locale ?? "en"}`),
@@ -428,7 +428,7 @@ export function hydrateSession(
         }))
     : [];
 
-  // Evo cards: dedup by (id, locale) — per-locale isolation (#1562).
+  // Evo cards: dedup by (id, locale) - per-locale isolation (#1562).
   const evoAdditions: EvolutionReviewCard[] = evolutionEnabled
     ? evoSeed
         .filter((e) => !savedIdLocaleKeys.has(`${e.id}::${locale}`))
@@ -440,7 +440,7 @@ export function hydrateSession(
         }))
     : [];
 
-  // Reverse-evo cards: dedup by (id, locale) — per-locale isolation (#1562).
+  // Reverse-evo cards: dedup by (id, locale) - per-locale isolation (#1562).
   const reverseEvoAdditions: ReverseEvolutionReviewCard[] = reverseEvolutionEnabled
     ? evoSeed
         .map((fwd) => ({
@@ -496,7 +496,7 @@ export function hydrateSession(
 /**
  * Returns today's date as "YYYY-MM-DD" in the given IANA timezone.
  * Defaults to "UTC" for backward compatibility with call sites that don't
- * yet pass a timezone — pass the user's `timezone` setting to get local
+ * yet pass a timezone - pass the user's `timezone` setting to get local
  * midnight behaviour.
  */
 export function todayString(now: Date, tz = "UTC"): string {
@@ -525,7 +525,7 @@ export function stableShuffleForDay(
 /**
  * Species-keyed view of new-card candidates for the three species-aligned
  * directions (name, reverse, cry).  Evolution cards are edge-keyed and are
- * handled separately — they are not included here.
+ * handled separately - they are not included here.
  *
  * Each entry maps a speciesId to the card IDs for each direction that still
  * has a new candidate.  A direction is absent from the entry when it has no
@@ -546,7 +546,7 @@ export type SpeciesNewGroup = {
  * A card's speciesId is its `id` for name cards, and `pokemonId` for reverse
  * and cry cards.
  *
- * Pure — no I/O.
+ * Pure - no I/O.
  */
 export function groupNewCandidatesBySpecies(
   newCandidatesByType: Pick<Record<CardTypeKey, number[]>, "name" | "reverse" | "cry">,
@@ -594,7 +594,7 @@ export type PerTypeCounters = {
 /**
  * Computes all queues and today's counters from the full card set + limits.
  *
- * Counters and caps are tracked per cardType — name, evolution, and reverse
+ * Counters and caps are tracked per cardType - name, evolution, and reverse
  * cards each have their own daily new / review budget. The returned
  * `reviewQueue` and `newQueue` are merged across types (after each type's cap
  * is applied independently) so the consumer can keep its single-cursor
@@ -612,7 +612,7 @@ export type PerTypeCounters = {
  * - newIntroducedToday / reviewsDoneToday: blended totals for the TodayPill
  *   display (sum across types).
  *
- * Pure — no I/O.
+ * Pure - no I/O.
  */
 export function buildSessionQueues(
   cards: readonly ReviewableCard[],
@@ -622,7 +622,7 @@ export function buildSessionQueues(
   /** Per-user salt for `stableShuffleForDay`. Authenticated users pass their
    *  Supabase `user.id`; guests pass the stable per-device value from
    *  `getOrCreateClientSalt()`. Omitting it (or passing `""`) reproduces the
-   *  legacy behaviour — same shuffle for all users on the same day. */
+   *  legacy behaviour - same shuffle for all users on the same day. */
   userSalt: string | number = "",
   /**
    * Active Pokémon-name locale for the practice session (#1562). Only cards
@@ -654,7 +654,7 @@ export function buildSessionQueues(
   // Identify learning cards that are outside the active scope. Only meaningful
   // when a scope is active (eligibleCardIds is provided). A card is
   // "out-of-scope but still learning" when it is mid-step yet not in the
-  // eligible set — the queue must finish it to avoid corrupting FSRS state,
+  // eligible set - the queue must finish it to avoid corrupting FSRS state,
   // but the UI should explain why it is appearing despite the active filter.
   const outOfScopeLearningIds: number[] =
     eligibleCardIds !== undefined
@@ -672,7 +672,7 @@ export function buildSessionQueues(
   const newCandidatesByType: Record<CardTypeKey, number[]> = { name: [], evolution: [], reverse: [], cry: [] };
 
   // Counters reflect what already happened (timestamps in firstSeen /
-  // lastReview) and MUST NOT change when a filter is applied — otherwise
+  // lastReview) and MUST NOT change when a filter is applied - otherwise
   // daily caps would reset every time the user toggles the filter. The
   // `eligibleCardIds` gate only applies to candidate collection, not to
   // counter computation (#333).
@@ -683,7 +683,7 @@ export function buildSessionQueues(
   // Per-locale isolation (#1562): counters and candidates are scoped to
   // `activeLocale` so each enrolled language has its own independent daily
   // budget. The invariant is that counters run over all active-locale cards
-  // regardless of `eligibleCardIds` — scope/eligibility filtering never resets
+  // regardless of `eligibleCardIds` - scope/eligibility filtering never resets
   // daily caps.
   for (const card of cards) {
     if ((card.locale ?? "en") !== activeLocale) continue;
@@ -757,7 +757,7 @@ export function buildSessionQueues(
   // Pre-slice each direction to its budget so only candidates that could ever
   // be admitted this day enter the species groups.  A direction with
   // remainingNew = 0 contributes an empty slice, which means its cards never
-  // appear in any species group — cry or reverse candidates for those species
+  // appear in any species group - cry or reverse candidates for those species
   // then form "solo" entries and are admitted freely up to their own budget.
   //
   // After grouping, stable-shuffle species IDs and admit each species whose
@@ -847,14 +847,14 @@ export function getNextCardId(
  * tomorrow" teaser.
  *
  * New cards (lastReview === null) and learning-step cards are deliberately
- * excluded — only graduated review cards form a concrete commitment users can
+ * excluded - only graduated review cards form a concrete commitment users can
  * anticipate. Cards reviewed today and scheduled back for tomorrow are counted:
  * the user will genuinely need to review them tomorrow.
  *
  * If `eligibleCardIds` is provided, only cards in that set count (matches the
  * practice-scope gate inside buildSessionQueues).
  *
- * Note: the count is uncapped — it does not apply `maxReviewsPerDay`, so it
+ * Note: the count is uncapped - it does not apply `maxReviewsPerDay`, so it
  * may exceed the cap the user will actually encounter. This is intentional: the
  * teaser is a rough signal, not a commitment.
  */

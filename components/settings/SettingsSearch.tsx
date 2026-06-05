@@ -7,7 +7,7 @@ import { colStack } from "@/lib/utils/class-names";
 type Props = {
   value: string;
   onChange: (value: string) => void;
-  /** Number of matching sections — used for the aria-live status message. */
+  /** Number of matching sections - used for the aria-live status message. */
   matchCount: number;
 };
 
@@ -73,7 +73,7 @@ export function SettingsSearch({ value, onChange, matchCount }: Props) {
           </button>
         )}
       </div>
-      {/* aria-live region — announces result count when the query changes */}
+      {/* aria-live region - announces result count when the query changes */}
       <p
         id={statusId}
         role="status"

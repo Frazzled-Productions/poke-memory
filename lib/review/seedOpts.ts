@@ -6,7 +6,7 @@ import type { AppLocale } from "@/i18n/locales";
  * `buildSession` / `hydrateSession` expect. Centralises the mapping so the
  * fallback seeding paths (auth callback, manual sync brand-new-device,
  * pullAndMerge brand-new-device) cannot drift from each other and miss a
- * card-type toggle — the failure mode behind #391.
+ * card-type toggle - the failure mode behind #391.
  *
  * Name and reverse are always on since #1234. Only the opt-in enrichment
  * directions (evolution, reverse-evolution, cry) are read from settings.

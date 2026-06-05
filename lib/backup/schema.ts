@@ -14,11 +14,11 @@ export type BackupFile = {
 };
 
 // Intentionally less strict than isReviewCardShaped in persistence.ts:
-// - name and spriteUrl are omitted — hydrateSession refreshes them from seed on every load.
-// - Only dueDate is validated in state — other ReviewState fields get migration defaults.
+// - name and spriteUrl are omitted - hydrateSession refreshes them from seed on every load.
+// - Only dueDate is validated in state - other ReviewState fields get migration defaults.
 // - Evolution cards: either the new edge shape (postEvoId-keyed) or the
 //   legacy per-pre-evo shape are accepted; the import pipeline strips legacy
-//   evolution cards before hydration (#262 — there is no 1:N mapping from a
+//   evolution cards before hydration (#262 - there is no 1:N mapping from a
 //   legacy card to the new edge cards).
 //
 // Uses isBaseCardShaped from lib/review/card-shape.ts for the shared core;
@@ -26,7 +26,7 @@ export type BackupFile = {
 // the fields that isReviewCardShaped additionally validates.
 //
 // Returns `value is Record<string, unknown>` (not `value is ReviewableCard`)
-// because isBaseCardShaped only validates the minimal shared invariants — it
+// because isBaseCardShaped only validates the minimal shared invariants - it
 // does not check reverse-evolution preEvoId/postEvoId, name, spriteUrl, etc.
 // Claiming ReviewableCard here would be unsound.  The outer isBackupFile
 // predicate is what narrows the whole blob to BackupFile; this helper only
@@ -45,13 +45,13 @@ function isPerTypeLimitsShaped(value: unknown): boolean {
 
 function isLimitsShaped(value: unknown): boolean {
   if (!isNonNullObject(value)) return false;
-  // `reverse` is optional — existing exports don't have it; loadSession in lib/review/persistence.ts backfills.
+  // `reverse` is optional - existing exports don't have it; loadSession in lib/review/persistence.ts backfills.
   return isPerTypeLimitsShaped(value.name) && isPerTypeLimitsShaped(value.evolution);
 }
 
 function isSettingsShaped(value: unknown): boolean {
   if (!isNonNullObject(value)) return false;
-  // reverseCardsEnabled and maxNew/ReviewsReversePerDay are optional —
+  // reverseCardsEnabled and maxNew/ReviewsReversePerDay are optional - 
   // loadSettings backfills them on import so existing exports remain valid.
   return (
     typeof value.masteryRepetitions === "number" &&

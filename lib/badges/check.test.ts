@@ -29,7 +29,7 @@ describe("checkBadges", () => {
     expect(result.map((b) => b.id)).toEqual(["birds"]);
   });
 
-  it("requires every species — a single miss skips the badge", () => {
+  it("requires every species - a single miss skips the badge", () => {
     const result = checkBadges(new Set([144, 145]), CATALOG, new Set());
     expect(result).toEqual([]);
   });
@@ -43,8 +43,8 @@ describe("checkBadges", () => {
     expect(result.map((b) => b.id)).toEqual(["starters"]);
   });
 
-  it("returns empty when all satisfiable badges are already earned — full idempotency", () => {
-    // Every criterion is met, but every badge id is in alreadyEarned —
+  it("returns empty when all satisfiable badges are already earned - full idempotency", () => {
+    // Every criterion is met, but every badge id is in alreadyEarned - 
     // no badge should be awarded twice.
     const result = checkBadges(
       new Set([144, 145, 146, 1, 4, 7]),

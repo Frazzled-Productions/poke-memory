@@ -20,7 +20,7 @@ function zeroPad(id: number): string {
 // Cell component
 // ---------------------------------------------------------------------------
 
-// PokemonCell uses a plain <img> rather than next/image — deliberate exemption
+// PokemonCell uses a plain <img> rather than next/image - deliberate exemption
 // from the "default to next/image" rule (#932; see docs/sprites.md "The Pokédex
 // grid exemption"). We render ~1025 of these at a fixed 64×64 size, where
 // next/image's automatic sizing wrapper adds per-cell DOM overhead with no
@@ -31,7 +31,7 @@ function zeroPad(id: number): string {
 // This surface intentionally serves the raw PNG (`/sprites/pokemon/<id>.png`),
 // not the pre-generated WebP variants. The raw PNG is slightly larger but
 // avoids loading 1025 of these images through the global imageLoader path.
-// The size literal below is intentionally kept inline — this surface opts out
+// The size literal below is intentionally kept inline - this surface opts out
 // of next/image entirely, so it does not participate in the loader's WebP
 // variant routing that the shared size constants exist for.
 function PokemonCell({
@@ -103,7 +103,7 @@ function PokemonCell({
             />
           )}
 
-          {/* Sprite — using a plain <img> rather than next/image because we render
+          {/* Sprite - using a plain <img> rather than next/image because we render
               1025 of these at fixed 64×64 sizes, where next/image's automatic
               sizing wrapper adds DOM overhead per cell with no responsive benefit. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -129,7 +129,7 @@ function PokemonCell({
         </div>
       </Link>
 
-      {/* Name — visible for learning/mastered, sr-only for locked.
+      {/* Name - visible for learning/mastered, sr-only for locked.
           lang attribute applied when locale differs from the page language
           (WCAG 3.1.2) so screen readers use correct pronunciation rules. */}
       {isLocked ? (
@@ -239,7 +239,7 @@ export function LoadingSkeleton() {
 export type LocaleNameOverride = {
   /** The resolved locale name to display in place of the English `pokemon.name`. */
   name: string;
-  /** BCP 47 language tag — e.g. `"ja"`, `"zh-Hans"`. Set `lang` on the name element. */
+  /** BCP 47 language tag - e.g. `"ja"`, `"zh-Hans"`. Set `lang` on the name element. */
   lang: string;
 };
 
@@ -248,7 +248,7 @@ type PokedexGridProps = {
   activeGen?: number;
   /**
    * When true, renders all Pokémon in a single flat grid without generation
-   * headings. Used when a non-national sort is active — generation sections
+   * headings. Used when a non-national sort is active - generation sections
    * assume national-number order within each group, so they would be misleading
    * under alphabetical or closest-to-mastery sorts.
    */
@@ -279,7 +279,7 @@ export default function PokedexGrid({ pokemon, activeGen, flatList = false, loca
     );
   }
 
-  // Flat list — no generation headings. Used for non-national sort orders.
+  // Flat list - no generation headings. Used for non-national sort orders.
   if (flatList) {
     return (
       <ul

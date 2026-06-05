@@ -21,7 +21,7 @@ import { DEFAULT_STREAK_PROTECTION } from "@/lib/streak/tokens";
 import type { StreakProtection } from "@/lib/streak/tokens";
 
 // ---------------------------------------------------------------------------
-// Module mocks — must appear before the import of the module under test.
+// Module mocks - must appear before the import of the module under test.
 // ---------------------------------------------------------------------------
 
 const mockHasStoredSettings = vi.fn<() => boolean>();
@@ -79,7 +79,7 @@ afterEach(() => {
 // SSR no-op
 // ---------------------------------------------------------------------------
 
-describe("runStreakProtection — SSR no-op", () => {
+describe("runStreakProtection - SSR no-op", () => {
   it("returns null when window is undefined (server-side render)", () => {
     vi.stubGlobal("window", undefined);
     const result = runStreakProtection(TODAY);
@@ -97,7 +97,7 @@ describe("runStreakProtection — SSR no-op", () => {
 // No-settings no-op
 // ---------------------------------------------------------------------------
 
-describe("runStreakProtection — no stored settings", () => {
+describe("runStreakProtection - no stored settings", () => {
   it("returns null when hasStoredSettings is false", () => {
     mockHasStoredSettings.mockReturnValue(false);
     const result = runStreakProtection(TODAY);
@@ -115,7 +115,7 @@ describe("runStreakProtection — no stored settings", () => {
 // Basic result shape
 // ---------------------------------------------------------------------------
 
-describe("runStreakProtection — basic result", () => {
+describe("runStreakProtection - basic result", () => {
   it("returns a ProtectionStepResult object when conditions are met", () => {
     const result = runStreakProtection(TODAY);
     // Should be non-null and have the expected shape.
@@ -134,10 +134,10 @@ describe("runStreakProtection — basic result", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Earn-leg guard (lastEarnCheckDate) — same-day idempotency
+// Earn-leg guard (lastEarnCheckDate) - same-day idempotency
 // ---------------------------------------------------------------------------
 
-describe("runStreakProtection — earn-leg guard", () => {
+describe("runStreakProtection - earn-leg guard", () => {
   it("does not increment daysSinceLastEarn a second time on the same day", () => {
     // Simulate: today is a review day; first call increments the counter.
     mockLoadStreakData.mockReturnValue([TODAY]);
@@ -185,7 +185,7 @@ describe("runStreakProtection — earn-leg guard", () => {
 // Spend-leg guard (spendDates)
 // ---------------------------------------------------------------------------
 
-describe("runStreakProtection — spend-leg guard", () => {
+describe("runStreakProtection - spend-leg guard", () => {
   it("spends a token to bridge yesterday when streak was alive the day before", () => {
     // Streak alive on DAY_BEFORE, missed YESTERDAY, today opens app.
     mockLoadStreakData.mockReturnValue([DAY_BEFORE]);
@@ -200,7 +200,7 @@ describe("runStreakProtection — spend-leg guard", () => {
   });
 
   it("does not bridge a day that is already in spendDates", () => {
-    // Yesterday is already spent — the streak was already preserved.
+    // Yesterday is already spent - the streak was already preserved.
     mockLoadStreakData.mockReturnValue([DAY_BEFORE]);
     const protection = makeProtection({
       balance: 1,
@@ -216,7 +216,7 @@ describe("runStreakProtection — spend-leg guard", () => {
   });
 
   it("does not spend tokens when there is no anchor before the gap", () => {
-    // No streak dates, no prior spends — there is nothing to anchor the gap.
+    // No streak dates, no prior spends - there is nothing to anchor the gap.
     mockLoadStreakData.mockReturnValue([]);
     const protection = makeProtection({ balance: 3, spendDates: [] });
     mockLoadSettings.mockReturnValue(makeSettings(protection));
@@ -229,14 +229,14 @@ describe("runStreakProtection — spend-leg guard", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Safe-exit paths — SSR and no-settings guards are the two conditions where
+// Safe-exit paths - SSR and no-settings guards are the two conditions where
 // the function is documented to return null without throwing. Storage errors
 // in the normal path are NOT caught (no try/catch in the implementation);
 // callers that need robustness to storage errors must wrap in their own
 // try/catch. These tests document the actual safe boundary.
 // ---------------------------------------------------------------------------
 
-describe("runStreakProtection — SSR and no-settings safe-exit paths", () => {
+describe("runStreakProtection - SSR and no-settings safe-exit paths", () => {
   it("does not throw when window is undefined (SSR path is always safe)", () => {
     vi.stubGlobal("window", undefined);
     expect(() => runStreakProtection(TODAY)).not.toThrow();

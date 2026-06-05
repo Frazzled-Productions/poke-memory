@@ -1,7 +1,7 @@
 /**
  * Client-side canvas image generator for share cards.
  *
- * All rendering is spoiler-safe — no Pokémon names or sprites appear.
+ * All rendering is spoiler-safe - no Pokémon names or sprites appear.
  * The card shows: a wordmark and date in the top row; a centred disc
  * containing a hero number (streak, reviewed count, or milestone) with a
  * label below it; and an optional three-column stat row (reviewed / new /
@@ -181,8 +181,8 @@ function makeBackgroundGradient(
  * invisible against the disc and falls back to white.
  *
  * The brand default accent #C2162A scores ≈3.1:1 and just clears the floor,
- * rendering a coloured red ring. Dark mascot accents sit well below — e.g.
- * Mewtwo's deep-purple #4A2E7A at ≈1.8:1 — and fall back to white. Bright
+ * rendering a coloured red ring. Dark mascot accents sit well below - e.g.
+ * Mewtwo's deep-purple #4A2E7A at ≈1.8:1 - and fall back to white. Bright
  * accents (Umbreon gold #FFD700 at ≈13.5:1) clear the floor easily.
  */
 const RING_MIN_CONTRAST = 3;
@@ -278,7 +278,7 @@ function paintTopRow(
   ctx.textAlign = "left";
   ctx.fillText("poke·memory", dotCx + dotR + 11, dotCy);
 
-  // Date — top-right, 72% alpha.
+  // Date - top-right, 72% alpha.
   ctx.fillStyle = hexAlpha(fg, 0.72);
   ctx.font = `500 19px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
   ctx.textBaseline = "middle";
@@ -438,7 +438,7 @@ function paintCardInternal(opts: CardPaintOptions): void {
   const w = CARD_W;
   const h = CARD_H;
 
-  // Scale for HiDPI — all subsequent measurements are in logical CSS pixels.
+  // Scale for HiDPI - all subsequent measurements are in logical CSS pixels.
   ctx.scale(SCALE, SCALE);
 
   // Background gradient
@@ -447,7 +447,7 @@ function paintCardInternal(opts: CardPaintOptions): void {
   // Top row: Pokéball dot + wordmark + date
   paintTopRow(ctx, tokens, dateStr, w);
 
-  // Hero disc — centred in the space between the top row and the bottom section.
+  // Hero disc - centred in the space between the top row and the bottom section.
   // Top row bottom ≈ PAD + 23 (dot diameter) + a little breathing room.
   const topRowBottom = PAD + 23 + 16;
   // Bottom section height: 1.5 (divider) + 28 (gap) + 60 (count) + 22 (label) + PAD
@@ -558,7 +558,7 @@ export async function generateDailyShareImage(
  * Returns `null` if canvas is not available.
  *
  * The milestone card uses the same visual language as the daily card but omits
- * the stat row — milestone data has no reviewed/new/mastered counts.
+ * the stat row - milestone data has no reviewed/new/mastered counts.
  */
 export async function generateMilestoneShareImage(
   data: MilestoneShareData,

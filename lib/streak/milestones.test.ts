@@ -54,7 +54,7 @@ describe("findPendingMilestone", () => {
 
   it("picks the smallest un-seen milestone (not the largest)", () => {
     // Streak 35 has crossed 3, 7, 14, 30. With only 3 and 7 seen, the next
-    // celebration is 14 — not 30.
+    // celebration is 14 - not 30.
     expect(findPendingMilestone(35, [3, 7])).toBe(14);
   });
 

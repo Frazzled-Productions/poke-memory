@@ -1,5 +1,5 @@
 /**
- * Component tests for NavDrawer — the mobile hamburger / drawer disclosure.
+ * Component tests for NavDrawer - the mobile hamburger / drawer disclosure.
  *
  * Covers:
  * - Hamburger button aria-expanded starts as false
@@ -31,7 +31,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-// next/link — render as a plain anchor in jsdom
+// next/link - render as a plain anchor in jsdom
 vi.mock("next/link", () => ({
   default: ({
     href,

@@ -61,7 +61,7 @@ type DueRow = {
   card_type: string;
   subject_key: string;
   first_seen: string | null;
-  /** Migration 029 locale column — part of the PK (#1480). */
+  /** Migration 029 locale column - part of the PK (#1480). */
   locale: string;
 };
 
@@ -78,7 +78,7 @@ type SettingsMockRow = {
  * All-enabled settings JSONB that matches DEFAULT_SETTINGS. Used when a test
  * just needs "every card type on" without caring about the specific values.
  *
- * Note: nameCardsEnabled and reverseCardsEnabled are not present — name and
+ * Note: nameCardsEnabled and reverseCardsEnabled are not present - name and
  * reverse are always on since #1234 and are no longer stored in settings.
  *
  * `learningLocales` defaults to ["en"] (pre-#1484 / English-only users).
@@ -149,7 +149,7 @@ function buildAdminMock(opts: {
         })),
       };
     }
-    // card_reviews — chained lte().in().is() returning the due rows array.
+    // card_reviews - chained lte().in().is() returning the due rows array.
     return {
       select: vi.fn(() => {
         const builder = {
@@ -217,7 +217,7 @@ afterEach(() => {
 
 // ─── buildDailyMessage: single-language (regression-lock existing paths) ───────
 
-describe("buildDailyMessage — single-language (unchanged feel)", () => {
+describe("buildDailyMessage - single-language (unchanged feel)", () => {
   it("renders due-only copy for a single locale with no new estimate", async () => {
     const msg = await buildDailyMessage(makeLocaleDueMap({ en: 3 }));
     expect(msg.title).toBe("Time to practise");
@@ -278,7 +278,7 @@ describe("buildDailyMessage — single-language (unchanged feel)", () => {
 
 // ─── buildDailyMessage: multi-language breakdown (#1504) ──────────────────────
 
-describe("buildDailyMessage — multi-language breakdown (#1504)", () => {
+describe("buildDailyMessage - multi-language breakdown (#1504)", () => {
   it("two due locales: global total leads, breakdown ordered due-desc", async () => {
     // en=12, ja=8 → total 20, en first (higher due)
     const msg = await buildDailyMessage(makeLocaleDueMap({ en: 12, ja: 8 }));
@@ -377,7 +377,7 @@ describe("buildDailyMessage — multi-language breakdown (#1504)", () => {
 
 // ─── POST handler auth and config gates ──────────────────────────────────────
 
-describe("POST /api/push/send-daily — auth and config gates", () => {
+describe("POST /api/push/send-daily - auth and config gates", () => {
   it("returns 503 when CRON_SHARED_SECRET is unset", async () => {
     delete process.env.CRON_SHARED_SECRET;
     const res = await POST(makeRequest());
@@ -425,7 +425,7 @@ describe("POST /api/push/send-daily — auth and config gates", () => {
 
 // ─── POST handler happy path ──────────────────────────────────────────────────
 
-describe("POST /api/push/send-daily — happy path", () => {
+describe("POST /api/push/send-daily - happy path", () => {
   it("returns 200 and sends zero notifications when no subscriptions exist", async () => {
     const admin = buildAdminMock({ subscriptions: [] });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -567,7 +567,7 @@ describe("POST /api/push/send-daily — happy path", () => {
 
 // ─── Dead-endpoint cleanup ─────────────────────────────────────────────────────
 
-describe("POST /api/push/send-daily — dead-endpoint cleanup", () => {
+describe("POST /api/push/send-daily - dead-endpoint cleanup", () => {
   it("deletes a subscription that returns 410 Gone", async () => {
     const admin = buildAdminMock({
       subscriptions: [
@@ -646,7 +646,7 @@ describe("POST /api/push/send-daily — dead-endpoint cleanup", () => {
 
 // ─── #1153: per-user settings filtering ───────────────────────────────────────
 
-describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
+describe("POST /api/push/send-daily - card-type filtering (#1153)", () => {
   const SUB = {
     id: "sub-1",
     user_id: "user-a",
@@ -682,7 +682,7 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
     expect(parsed.body).toContain("5");
   });
 
-  it("reverse cards are always eligible — counts name and reverse due rows (#1234)", async () => {
+  it("reverse cards are always eligible - counts name and reverse due rows (#1234)", async () => {
     // Since #1234, reverse is always on. All 3 due rows (1 name + 2 reverse)
     // must be counted. The old reverseCardsEnabled: false toggle no longer exists.
     const admin = buildAdminMock({
@@ -715,11 +715,11 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
     const parsed = JSON.parse(
       mockSendNotification.mock.calls[0][1] as string,
     ) as { body: string };
-    // All 3 rows are eligible — name and reverse are both always on.
+    // All 3 rows are eligible - name and reverse are both always on.
     expect(parsed.body.startsWith("3 cards due")).toBe(true);
   });
 
-  it("alternateFormsEnabled: false — excludes name/reverse/cry rows with species id >= 10000", async () => {
+  it("alternateFormsEnabled: false - excludes name/reverse/cry rows with species id >= 10000", async () => {
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
@@ -738,9 +738,9 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name", subject_key: "25",    first_seen: null, locale: "en" }, // Pikachu — kept
-        { user_id: "user-a", card_type: "name", subject_key: "10004", first_seen: null, locale: "en" }, // alt-form — excluded
-        { user_id: "user-a", card_type: "name", subject_key: "10098", first_seen: null, locale: "en" }, // alt-form — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "25",    first_seen: null, locale: "en" }, // Pikachu - kept
+        { user_id: "user-a", card_type: "name", subject_key: "10004", first_seen: null, locale: "en" }, // alt-form - excluded
+        { user_id: "user-a", card_type: "name", subject_key: "10098", first_seen: null, locale: "en" }, // alt-form - excluded
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -755,7 +755,7 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
     expect(parsed.body).not.toContain("3");
   });
 
-  it("alternateFormsEnabled: false — excludes evolution-edge rows where either endpoint is >= 10000", async () => {
+  it("alternateFormsEnabled: false - excludes evolution-edge rows where either endpoint is >= 10000", async () => {
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
@@ -774,9 +774,9 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "133>>>134",     first_seen: null, locale: "en" }, // Eevee→Vaporeon — kept
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "10027>>>10028", first_seen: null, locale: "en" }, // alt-form — excluded
-        { user_id: "user-a", card_type: "evolution-edge", subject_key: "26>>>10023",    first_seen: null, locale: "en" }, // post-evo alt-form — excluded
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "133>>>134",     first_seen: null, locale: "en" }, // Eevee→Vaporeon - kept
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "10027>>>10028", first_seen: null, locale: "en" }, // alt-form - excluded
+        { user_id: "user-a", card_type: "evolution-edge", subject_key: "26>>>10023",    first_seen: null, locale: "en" }, // post-evo alt-form - excluded
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -791,7 +791,7 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
     expect(parsed.body).not.toContain("3");
   });
 
-  it("combined: alternateFormsEnabled off — reproduces the #1153 scenario with always-on reverse (#1234)", async () => {
+  it("combined: alternateFormsEnabled off - reproduces the #1153 scenario with always-on reverse (#1234)", async () => {
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
@@ -820,7 +820,7 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         { user_id: "user-a", card_type: "name", subject_key: "10116",  first_seen: null, locale: "en" },
         { user_id: "user-a", card_type: "name", subject_key: "10123",  first_seen: null, locale: "en" },
         { user_id: "user-a", card_type: "name", subject_key: "10176",  first_seen: null, locale: "en" },
-        // 5 reverse default (all eligible — reverse always on since #1234)
+        // 5 reverse default (all eligible - reverse always on since #1234)
         { user_id: "user-a", card_type: "reverse", subject_key: "25",  first_seen: null, locale: "en" },
         { user_id: "user-a", card_type: "reverse", subject_key: "26",  first_seen: null, locale: "en" },
         { user_id: "user-a", card_type: "reverse", subject_key: "27",  first_seen: null, locale: "en" },
@@ -828,12 +828,12 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
         { user_id: "user-a", card_type: "reverse", subject_key: "29",  first_seen: null, locale: "en" },
         // 1 reverse alt-form (excluded by alt-forms gate)
         { user_id: "user-a", card_type: "reverse", subject_key: "10027", first_seen: null, locale: "en" },
-        // 4 evolution-edge (default ids — all pass)
+        // 4 evolution-edge (default ids - all pass)
         { user_id: "user-a", card_type: "evolution-edge", subject_key: "1>>>2",   first_seen: null, locale: "en" },
         { user_id: "user-a", card_type: "evolution-edge", subject_key: "2>>>3",   first_seen: null, locale: "en" },
         { user_id: "user-a", card_type: "evolution-edge", subject_key: "4>>>5",   first_seen: null, locale: "en" },
         { user_id: "user-a", card_type: "evolution-edge", subject_key: "5>>>6",   first_seen: null, locale: "en" },
-        // 1 reverse-evolution-edge (default ids — passes)
+        // 1 reverse-evolution-edge (default ids - passes)
         { user_id: "user-a", card_type: "reverse-evolution-edge", subject_key: "4>>>5", first_seen: null, locale: "en" },
       ],
     });
@@ -853,7 +853,7 @@ describe("POST /api/push/send-daily — card-type filtering (#1153)", () => {
 
 // ─── #1153: new-card estimate ─────────────────────────────────────────────────
 
-describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
+describe("POST /api/push/send-daily - new-card estimate (#1153)", () => {
   const SUB = {
     id: "sub-1",
     user_id: "user-a",
@@ -1140,7 +1140,7 @@ describe("POST /api/push/send-daily — new-card estimate (#1153)", () => {
 
 // ─── #1159: practice-scope filtering ─────────────────────────────────────────
 
-describe("POST /api/push/send-daily — practice scope filtering (#1159)", () => {
+describe("POST /api/push/send-daily - practice scope filtering (#1159)", () => {
   const SUB = {
     id: "sub-1",
     user_id: "user-a",
@@ -1210,10 +1210,10 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name", subject_key: "1",   first_seen: null, locale: "en" }, // Gen 1 — kept
-        { user_id: "user-a", card_type: "name", subject_key: "4",   first_seen: null, locale: "en" }, // Gen 1 — kept
-        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null, locale: "en" }, // Gen 2 — excluded
-        { user_id: "user-a", card_type: "name", subject_key: "252", first_seen: null, locale: "en" }, // Gen 3 — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "1",   first_seen: null, locale: "en" }, // Gen 1 - kept
+        { user_id: "user-a", card_type: "name", subject_key: "4",   first_seen: null, locale: "en" }, // Gen 1 - kept
+        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null, locale: "en" }, // Gen 2 - excluded
+        { user_id: "user-a", card_type: "name", subject_key: "252", first_seen: null, locale: "en" }, // Gen 3 - excluded
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -1253,9 +1253,9 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" }, // Bulbasaur (Grass) — excluded
-        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "en" }, // Charmander (Fire) — kept
-        { user_id: "user-a", card_type: "name", subject_key: "6", first_seen: null, locale: "en" }, // Charizard (Fire/Flying) — kept
+        { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" }, // Bulbasaur (Grass) - excluded
+        { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "en" }, // Charmander (Fire) - kept
+        { user_id: "user-a", card_type: "name", subject_key: "6", first_seen: null, locale: "en" }, // Charizard (Fire/Flying) - kept
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -1337,8 +1337,8 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
         },
       }],
       due: [
-        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null, locale: "en" }, // Gen 2 — excluded
-        { user_id: "user-a", card_type: "name", subject_key: "155", first_seen: null, locale: "en" }, // Gen 2 — excluded
+        { user_id: "user-a", card_type: "name", subject_key: "152", first_seen: null, locale: "en" }, // Gen 2 - excluded
+        { user_id: "user-a", card_type: "name", subject_key: "155", first_seen: null, locale: "en" }, // Gen 2 - excluded
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -1358,7 +1358,7 @@ describe("POST /api/push/send-daily — practice scope filtering (#1159)", () =>
 
 // ─── #1315: per-user notification-hour gating ────────────────────────────────
 
-describe("POST /api/push/send-daily — per-user notification-hour gate (#1315)", () => {
+describe("POST /api/push/send-daily - per-user notification-hour gate (#1315)", () => {
   const SUB = {
     id: "sub-1",
     user_id: "user-a",
@@ -1470,7 +1470,7 @@ describe("POST /api/push/send-daily — per-user notification-hour gate (#1315)"
 
 // ─── #1504: learningLocales membership filter (supersedes #1480 pokemonNameLocale) ─
 
-describe("POST /api/push/send-daily — learningLocales filter (#1504, supersedes #1480)", () => {
+describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes #1480)", () => {
   const SUB = {
     id: "sub-1",
     user_id: "user-a",
@@ -1555,7 +1555,7 @@ describe("POST /api/push/send-daily — learningLocales filter (#1504, supersede
 
   it("multi-locale user: a locale NOT in learningLocales is excluded from the count", async () => {
     // User learns en only (learningLocales=["en"]). They have zh-Hans rows in
-    // card_reviews (perhaps from a past language trial) — those must NOT count.
+    // card_reviews (perhaps from a past language trial) - those must NOT count.
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
@@ -1624,7 +1624,7 @@ describe("POST /api/push/send-daily — learningLocales filter (#1504, supersede
     // User learns en + ja. Only ja has due cards. The DB returns only ja rows,
     // so the accumulated map has only ja. Compact single-due-locale form used.
     // New-card caps zeroed (all caps to 0) so the body is purely due-only for a
-    // clean assertion — we test the compact form specifically.
+    // clean assertion - we test the compact form specifically.
     const admin = buildAdminMock({
       subscriptions: [SUB],
       settings: [{
@@ -1680,7 +1680,7 @@ describe("POST /api/push/send-daily — learningLocales filter (#1504, supersede
           maxNewEvolutionPerDay: 5,
           maxNewReversePerDay: 10,
           maxNewCryPerDay: 10,
-          // learningLocales deliberately absent — tests the default fallback
+          // learningLocales deliberately absent - tests the default fallback
         },
       }],
       due: [
@@ -1729,7 +1729,7 @@ describe("POST /api/push/send-daily — learningLocales filter (#1504, supersede
         timezone: "UTC",
         settings: {
           ...ALL_ENABLED_SETTINGS,
-          learningLocales: ["zh-CN", "fr"], // both invalid — fallback to ["en"]
+          learningLocales: ["zh-CN", "fr"], // both invalid - fallback to ["en"]
         },
       }],
       due: [
@@ -1791,14 +1791,14 @@ describe("POST /api/push/send-daily — learningLocales filter (#1504, supersede
         { user_id: "user-b", timezone: "UTC", settings: { ...ALL_ENABLED_SETTINGS, learningLocales: ["en", "ja"] } },
       ],
       due: [
-        // user-a: 3 en (match) + 3 ja (skip — not in user-a's learning set)
+        // user-a: 3 en (match) + 3 ja (skip - not in user-a's learning set)
         { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" },
         { user_id: "user-a", card_type: "name", subject_key: "2", first_seen: null, locale: "en" },
         { user_id: "user-a", card_type: "name", subject_key: "3", first_seen: null, locale: "en" },
         { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "ja" },
         { user_id: "user-a", card_type: "name", subject_key: "2", first_seen: null, locale: "ja" },
         { user_id: "user-a", card_type: "name", subject_key: "3", first_seen: null, locale: "ja" },
-        // user-b: 3 en (match) + 3 ja (match — in user-b's learning set)
+        // user-b: 3 en (match) + 3 ja (match - in user-b's learning set)
         { user_id: "user-b", card_type: "name", subject_key: "1", first_seen: null, locale: "en" },
         { user_id: "user-b", card_type: "name", subject_key: "2", first_seen: null, locale: "en" },
         { user_id: "user-b", card_type: "name", subject_key: "3", first_seen: null, locale: "en" },

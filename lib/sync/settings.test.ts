@@ -193,7 +193,7 @@ describe("pullSettings", () => {
     // Here we only assert the field is not present on the raw returned object
     // so the persistence layer can apply its own migration path.
     expect(pulled).not.toBeNull();
-    // The cloud blob doesn't add the field — migration happens in parseStoredSettings.
+    // The cloud blob doesn't add the field - migration happens in parseStoredSettings.
     expect((pulled as Record<string, unknown>).reverseFeedbackDelay).toBeUndefined();
   });
 
@@ -236,7 +236,7 @@ describe("pullSettingsWithTimestamp", () => {
 
   it("returns updatedAt: null for a legacy row with no updated_at column value", async () => {
     // Legacy rows pre-date updated_at population; the column is null in the DB.
-    // The response key is present but null — and any undefined (omitted key) is
+    // The response key is present but null - and any undefined (omitted key) is
     // coerced to null so the null-comparison in pullAndMerge stays correct.
     const { client } = makeClientWithMaybeSingle({ settings: SAMPLE, updated_at: null });
     const result = await pullSettingsWithTimestamp(client, "user-1");
@@ -261,7 +261,7 @@ describe("pullSettingsWithTimestamp", () => {
 });
 
 describe("pushRegionalPrefs", () => {
-  it("calls update with timezone, date_format, and push_notification_hour — no updated_at — filtered by user_id", async () => {
+  it("calls update with timezone, date_format, and push_notification_hour - no updated_at - filtered by user_id", async () => {
     const { client, update, eq } = makeClientWithUpdate();
     const ok = await pushRegionalPrefs(client, "user-1", {
       timezone: "America/New_York",
@@ -273,10 +273,10 @@ describe("pushRegionalPrefs", () => {
     expect(row.timezone).toBe("America/New_York");
     expect(row.date_format).toBe("mdy");
     expect(row.push_notification_hour).toBe(20);
-    // Must NOT include updated_at — bumping it would cause other devices to
+    // Must NOT include updated_at - bumping it would cause other devices to
     // think the settings JSONB blob changed, triggering a spurious overwrite.
     expect(row).not.toHaveProperty("updated_at");
-    // UPDATE must not include user_id or settings — those belong to other columns/writes.
+    // UPDATE must not include user_id or settings - those belong to other columns/writes.
     expect(row).not.toHaveProperty("user_id");
     expect(row).not.toHaveProperty("settings");
     expect(eq).toHaveBeenCalledWith("user_id", "user-1");

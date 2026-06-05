@@ -1,7 +1,7 @@
 /**
  * Remove the ♀ (U+2640) and ♂ (U+2642) decorative gender symbols from a
  * Pokémon display name and collapse any resulting extra whitespace. Only those
- * two code points are stripped — apostrophes, accents (é), %, and parentheses
+ * two code points are stripped - apostrophes, accents (é), %, and parentheses
  * are intentionally preserved so that overrides for names like Farfetch’d
  * continue to work.
  */
@@ -13,7 +13,7 @@ export function stripDecorativeSymbols(name: string): string {
 // lower-cased Pokémon display names; values are respellings that the default
 // en-GB system voices (Apple’s Daniel on macOS/iOS, Google UK English on
 // Chrome/Android) pronounce noticeably better than the raw name. The list is
-// deliberately conservative — only entries whose default rendering is clearly
+// deliberately conservative - only entries whose default rendering is clearly
 // wrong are worth carrying.
 //
 // NOTE: ♀/♂ symbols are stripped by stripDecorativeSymbols() before this

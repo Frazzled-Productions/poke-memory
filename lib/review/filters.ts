@@ -3,7 +3,7 @@
  *
  * `PracticeScope` (see `lib/review/scope.ts`) decides which species are
  * eligible for the active session. Cards that drop out of scope must not
- * keep aging — otherwise removing the scope dumps a week's worth of
+ * keep aging - otherwise removing the scope dumps a week's worth of
  * "overdue" reviews on the user and FSRS treats the gap as forgetting.
  *
  * The mechanism is a per-card `hiddenSince` ISO date on `ReviewState`:
@@ -46,13 +46,13 @@ export const MAX_HIDDEN_SHIFT_DAYS = 365;
  *
  * Skipped:
  *   - New cards (`firstSeen === null`): no schedule to shift, no "since"
- *     to set — they'll get a `firstSeen` on first grade.
+ *     to set - they'll get a `firstSeen` on first grade.
  *   - Learning-step cards (`learningStep !== null`): the in-step
  *     countdown owns their timing; we don't snooze across the
  *     wall-clock countdown.
  *
  * The empty-scope code path is deliberately a no-op for everything except
- * clearing stale `hiddenSince` — that branch is the user's escape hatch
+ * clearing stale `hiddenSince` - that branch is the user's escape hatch
  * when they manually clear the scope. Running this function after every
  * scope change keeps the data tidy.
  *
@@ -75,12 +75,12 @@ export function reconcileHiddenState(
     if (card.state.firstSeen === null) continue;
     if (card.state.learningStep !== null) continue;
     // `cardMatchesScope` returns true for every card when the scope is
-    // empty — by evaluating it directly we ensure the empty-scope mode
+    // empty - by evaluating it directly we ensure the empty-scope mode
     // routes through the un-hide branch only.
     const inScope = cardMatchesScope(card, scope, context);
     const hiddenSince = card.state.hiddenSince;
     if (!inScope && hiddenSince === null) {
-      // Cannot reach this branch when `scopeEmpty` is true — guard kept
+      // Cannot reach this branch when `scopeEmpty` is true - guard kept
       // for clarity rather than correctness.
       if (scopeEmpty) continue;
       card.state.hiddenSince = today;

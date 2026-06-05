@@ -16,7 +16,7 @@
  *     },
  *   } as const;
  *
- * The registry is intentionally empty here — this issue ships infrastructure
+ * The registry is intentionally empty here - this issue ships infrastructure
  * only. Subsequent issues register the first flags.
  */
 

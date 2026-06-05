@@ -13,7 +13,7 @@ import type { GradeDistribution, GradeTrendPoint } from "@/lib/stats/grade-distr
 import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
-// Colour palette — consistent with GradeBreakdownBar and the Stats accent vocabulary
+// Colour palette - consistent with GradeBreakdownBar and the Stats accent vocabulary
 // ---------------------------------------------------------------------------
 
 const GRADE_COLOURS = {
@@ -86,7 +86,7 @@ type Props = {
 };
 
 // ---------------------------------------------------------------------------
-// Mini stacked bar (overall distribution) — pure CSS, mirrors GradeBreakdownBar
+// Mini stacked bar (overall distribution) - pure CSS, mirrors GradeBreakdownBar
 // ---------------------------------------------------------------------------
 
 function OverallBar({ distribution }: { distribution: GradeDistribution }) {

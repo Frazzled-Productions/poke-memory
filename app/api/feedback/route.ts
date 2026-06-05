@@ -9,16 +9,16 @@ import { createClient as createServerSupabaseClient } from "@/lib/supabase/serve
  * authenticated users. Writes via the service-role admin client so the
  * endpoint works regardless of RLS state on the `feedback` table.
  *
- * `user_id` is derived from the server-validated session — NEVER from the
- * request body — to prevent callers from spoofing another user's id.
+ * `user_id` is derived from the server-validated session - NEVER from the
+ * request body - to prevent callers from spoofing another user's id.
  *
  * Input shape:
  *   { category: 'bug' | 'feature' | 'other', message: string, page?: string, appVersion?: string }
  *
  * Responses:
- *   200 { ok: true }          — inserted successfully
- *   400 { ok: false, error }  — invalid input
- *   500 { ok: false }         — unexpected server error
+ *   200 { ok: true } - inserted successfully
+ *   400 { ok: false, error } - invalid input
+ *   500 { ok: false } - unexpected server error
  */
 
 const VALID_CATEGORIES = new Set(["bug", "feature", "other"]);
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     const { data } = await supabase.auth.getUser();
     userId = data.user?.id ?? null;
   } catch {
-    // Guest or session error — proceed with null user_id.
+    // Guest or session error - proceed with null user_id.
     userId = null;
   }
 

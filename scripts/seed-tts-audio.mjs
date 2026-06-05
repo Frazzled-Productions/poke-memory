@@ -3,7 +3,7 @@
 // lib/pokemon/generated.json and writes them to public/audio/names/<id>.mp3.
 //
 // Run with: npm run seed:tts
-// Node 20+ — uses global fetch, node:fs/promises, node:path, node:url.
+// Node 20+ - uses global fetch, node:fs/promises, node:path, node:url.
 //
 // Prerequisites:
 //   GOOGLE_CLOUD_TTS_API_KEY must be set in the environment (or .env.local).
@@ -29,7 +29,7 @@ const TTS_API_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
 const CONCURRENCY = 6;
 const MAX_RETRIES = 3;
 const BACKOFF_MS = [500, 1000, 2000];
-// 429 (rate limit) is transient and retryable — back off generously so a
+// 429 (rate limit) is transient and retryable - back off generously so a
 // one-off full run completes rather than silently skipping names.
 const RATE_LIMIT_MAX_RETRIES = 6;
 const RATE_LIMIT_BACKOFF_MS = [2000, 5000, 10000, 20000, 30000, 60000];
@@ -276,15 +276,15 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// A seed-output filename is always "<digits>.mp3" — derived from a validated
+// A seed-output filename is always "<digits>.mp3" - derived from a validated
 // integer species id. Anything else (path separators, "..", unexpected
 // characters) must never reach the filesystem.
 const SAFE_AUDIO_FILENAME = /^[0-9]+\.mp3$/;
 
 /**
  * Resolve `filename` inside `baseDir` and verify the result stays within
- * `baseDir`. `filename` must match SAFE_AUDIO_FILENAME — a bare basename with
- * no path separators — and the resolved path must sit directly under
+ * `baseDir`. `filename` must match SAFE_AUDIO_FILENAME - a bare basename with
+ * no path separators - and the resolved path must sit directly under
  * `baseDir`. Throws on any violation so an unsanitised value derived from the
  * input data can never become a write target outside the output directory.
  *
@@ -308,7 +308,7 @@ function resolveSafeOutputPath(baseDir, filename) {
  * Write `buffer` to `destPath` atomically: write to a unique sibling temp
  * file first, then rename it into place. rename() on the same filesystem is
  * atomic, so a concurrent reader sees either the old file or the fully-written
- * new one — never a partial write. `destPath` is expected to have already
+ * new one - never a partial write. `destPath` is expected to have already
  * passed through resolveSafeOutputPath.
  */
 async function writeFileAtomic(destPath, buffer) {
@@ -321,7 +321,7 @@ async function writeFileAtomic(destPath, buffer) {
       const { unlink } = await import("node:fs/promises");
       await unlink(tmpPath);
     } catch {
-      // ignore — temp file may not exist
+      // ignore - temp file may not exist
     }
     throw err;
   }
@@ -349,7 +349,7 @@ async function fileExists(filePath) {
 async function synthesize(text, apiKey) {
   // Cloud TTS v1 REST requires the key as a URL query parameter; there is no
   // Authorization-header path for API-key auth. The key will appear in Node.js
-  // --inspect heap dumps and in proxy logs that record request URIs — never
+  // --inspect heap dumps and in proxy logs that record request URIs - never
   // log `url` and never commit a key value.
   const url = `${TTS_API_URL}?key=${apiKey}`;
   const body = JSON.stringify({
@@ -414,7 +414,7 @@ async function synthesize(text, apiKey) {
     }
 
     if (!res.ok) {
-      // 4xx other than 429 — non-retryable
+      // 4xx other than 429 - non-retryable
       let errDetail = "";
       try {
         const errBody = await res.json();
@@ -457,7 +457,7 @@ async function main() {
     process.stderr.write(
       "[tts] ERROR: GOOGLE_CLOUD_TTS_API_KEY is not set.\n" +
         "  Set it in your environment or in .env.local and re-run npm run seed:tts\n" +
-        "  This key is only needed to regenerate audio files — it is never used at runtime.\n",
+        "  This key is only needed to regenerate audio files - it is never used at runtime.\n",
     );
     process.exit(1);
   }
@@ -520,7 +520,7 @@ async function main() {
         }
         // resolveSafeOutputPath re-validates the derived filename against a
         // strict allow-list and confirms the resolved path stays inside
-        // outputDir — a second, explicit barrier so no unsanitised input data
+        // outputDir - a second, explicit barrier so no unsanitised input data
         // can ever reach the file-write sink.
         let destPath;
         try {
@@ -550,7 +550,7 @@ async function main() {
           } else {
             failed++;
             process.stderr.write(
-              `[tts] FAIL: ${id} (${displayName}) — ${result.reason}\n`,
+              `[tts] FAIL: ${id} (${displayName}) - ${result.reason}\n`,
             );
           }
           done++;
@@ -572,7 +572,7 @@ async function main() {
     );
 
     // done advances by CONCURRENCY per batch, so a strict `% INTERVAL` test
-    // would rarely land exactly on a multiple — report once INTERVAL entries
+    // would rarely land exactly on a multiple - report once INTERVAL entries
     // have elapsed since the last line instead.
     if (done - lastProgress >= PROGRESS_INTERVAL || done === total) {
       lastProgress = done;
@@ -586,7 +586,7 @@ async function main() {
 
   if (failed > 0) {
     process.stderr.write(
-      `[tts] ${failed} file(s) failed — re-run to retry (already-written files will be skipped).\n`,
+      `[tts] ${failed} file(s) failed - re-run to retry (already-written files will be skipped).\n`,
     );
     process.exit(1);
   }

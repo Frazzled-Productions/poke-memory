@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /**
  * The `onConflict` column list for `streak_days` upserts.
  *
- * Matches the UNIQUE constraint on streak_days: (user_id, review_date) — migration 001.
+ * Matches the UNIQUE constraint on streak_days: (user_id, review_date) - migration 001.
  * Exported so the onConflict-PK parity integration test can import the live
  * client constant and compare it against the DB constraint.
  */

@@ -10,7 +10,7 @@ export type MergeUserSettingsArgs = {
 
 // Narrow function-shape type for the merge_user_settings RPC.
 // Keep the cast on the *call expression* (not a separate const) so the JS
-// member-access reference is preserved and `this` binds to `client` —
+// member-access reference is preserved and `this` binds to `client` - 
 // extracting to a local const would strip `this` and SupabaseClient.rpc reads
 // `this.rest` on every call.
 export type MergeUserSettingsRpc = (

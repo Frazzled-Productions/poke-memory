@@ -1,7 +1,7 @@
 /**
  * Component tests for ThemeWatermark.
  *
- * Lives under components/ so the jsdom vitest project picks it up — see
+ * Lives under components/ so the jsdom vitest project picks it up - see
  * AGENTS.md "Testing" for the node/jsdom partitioning rules.
  */
 
@@ -9,7 +9,7 @@ import { render } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { THEME_WATERMARK_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
-// Bypass next/image — render as a plain <img> so jsdom does not need an HTTP
+// Bypass next/image - render as a plain <img> so jsdom does not need an HTTP
 // server for sprite URLs.
 vi.mock("next/image", () => ({
   // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text

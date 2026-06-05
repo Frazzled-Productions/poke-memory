@@ -48,7 +48,7 @@ function makeSeed(id: number, types: string[]): SeedPokemon {
   };
 }
 
-// Canonical-ish fixtures by Pokédex id — types match the games.
+// Canonical-ish fixtures by Pokédex id - types match the games.
 const BULBASAUR = makeSeed(1, ["grass", "poison"]);     // Gen I
 const CHIKORITA = makeSeed(152, ["grass"]);             // Gen II
 
@@ -115,7 +115,7 @@ describe("reconcileHiddenState", () => {
   });
 
   it("caps the shift at MAX_HIDDEN_SHIFT_DAYS (365)", () => {
-    // hiddenSince two years ago — shift must clamp to 365.
+    // hiddenSince two years ago - shift must clamp to 365.
     const cards: ReviewableCard[] = [
       nameCardOf(BULBASAUR, {
         firstSeen: "2024-01-01",
@@ -162,7 +162,7 @@ describe("reconcileHiddenState", () => {
     expect(cards[0].state.dueDate).toBe("2026-05-15"); // no negative shift
   });
 
-  it("skips new cards (firstSeen === null) — no schedule to shift", () => {
+  it("skips new cards (firstSeen === null) - no schedule to shift", () => {
     // New card, out-of-scope: leave hiddenSince null. We don't snooze a
     // card the user has never seen.
     const cards: ReviewableCard[] = [nameCardOf(BULBASAUR)];
@@ -176,7 +176,7 @@ describe("reconcileHiddenState", () => {
   });
 
   it("skips learning-step cards entirely (in-step countdown owns timing)", () => {
-    // Out-of-scope + learningStep set — must NOT receive a hiddenSince stamp.
+    // Out-of-scope + learningStep set - must NOT receive a hiddenSince stamp.
     const cards: ReviewableCard[] = [
       nameCardOf(BULBASAUR, {
         firstSeen: "2026-05-01",
@@ -189,7 +189,7 @@ describe("reconcileHiddenState", () => {
     reconcileHiddenState(cards, SCOPE_GEN_II, TODAY);
     expect(cards[0].state.hiddenSince).toBeNull();
 
-    // In-scope + learningStep set + a stale hiddenSince — also skipped:
+    // In-scope + learningStep set + a stale hiddenSince - also skipped:
     // we never shift dueDate on an in-step card.
     const cards2: ReviewableCard[] = [
       nameCardOf(BULBASAUR, {
@@ -220,7 +220,7 @@ describe("reconcileHiddenState", () => {
     expect(cards[0].state.dueDate).toBe("2026-05-15");
   });
 
-  it("empty scope never sets hiddenSince — only the un-hide branch can fire", () => {
+  it("empty scope never sets hiddenSince - only the un-hide branch can fire", () => {
     // Graduated card with no prior hide stamp; empty scope keeps it null.
     const cards: ReviewableCard[] = [
       nameCardOf(BULBASAUR, {
@@ -255,7 +255,7 @@ describe("reconcileHiddenState", () => {
   it("dispatches via cardMatchesScope for reverse cards (species id resolution lives in scope.ts)", () => {
     // Bulbasaur is Gen I; SCOPE_GEN_II excludes it. The reverse card's
     // namespaced id (REVERSE_ID_OFFSET + 1) does NOT confuse the scope
-    // match — `cardMatchesScope` routes evolution cards by pokemonId; the
+    // match - `cardMatchesScope` routes evolution cards by pokemonId; the
     // name-card path uses `card.id`, and for reverse/cry that pre-existing
     // behavior is preserved (regression guard against accidental rewiring).
     const reverse = reverseCardOf(BULBASAUR, {
@@ -267,7 +267,7 @@ describe("reconcileHiddenState", () => {
     reconcileHiddenState([reverse], SCOPE_GEN_II, TODAY);
     // Pre-existing behavior of cardMatchesScope on reverse: pokemonId is
     // taken from card.id (which is namespaced). generationOf(namespaced id)
-    // returns 0 — so the card is out of scope under any gens filter that
+    // returns 0 - so the card is out of scope under any gens filter that
     // doesn't include 0, and ends up hidden.
     expect(reverse.state.hiddenSince).toBe(TODAY);
   });
@@ -307,7 +307,7 @@ describe("reconcileHiddenState", () => {
     expect(changed).toBe(true);
   });
 
-  it("returns changed: false when no card state was modified (no-op short-circuit — #1262)", () => {
+  it("returns changed: false when no card state was modified (no-op short-circuit - #1262)", () => {
     // Graduated card in scope, no hiddenSince: reconcile has nothing to do.
     const cards: ReviewableCard[] = [
       nameCardOf(BULBASAUR, {
@@ -322,7 +322,7 @@ describe("reconcileHiddenState", () => {
   });
 
   it("returns changed: false when all cards are new (firstSeen: null) regardless of scope", () => {
-    // New cards are skipped entirely — reconcile is a no-op.
+    // New cards are skipped entirely - reconcile is a no-op.
     const cards: ReviewableCard[] = [
       nameCardOf(BULBASAUR), // firstSeen: null
       nameCardOf(CHIKORITA), // firstSeen: null

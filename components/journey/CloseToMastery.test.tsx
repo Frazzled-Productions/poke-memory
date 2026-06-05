@@ -3,11 +3,11 @@
  *
  * Covers:
  *   1. Empty-state message when entries is empty.
- *   2. Populated list — heading, subtitle count, sprite, name, interval bar, days-remaining badge.
+ *   2. Populated list - heading, subtitle count, sprite, name, interval bar, days-remaining badge.
  *   3. Entry where reverse card is not yet started (reverseIntroduced = false).
  *   4. Entry where reverse card is ready (daysRemaining = 0).
- *   5. Truncation — shows at most 10 entries with a footer for the overflow.
- *   6. Exactly 10 entries — no footer.
+ *   5. Truncation - shows at most 10 entries with a footer for the overflow.
+ *   6. Exactly 10 entries - no footer.
  *
  * Lives in components/ so the jsdom vitest project picks it up.
  */
@@ -19,7 +19,7 @@ import { CloseToMastery } from "./CloseToMastery";
 import type { CloseToMasteryEntry } from "@/lib/journey/closeToMastery";
 
 // ---------------------------------------------------------------------------
-// Mock next/image — no HTTP server needed in jsdom.
+// Mock next/image - no HTTP server needed in jsdom.
 // ---------------------------------------------------------------------------
 
 vi.mock("next/image", () => ({
@@ -30,7 +30,7 @@ vi.mock("next/image", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock useLocalePokemonName — returns the englishName synchronously so tests
+// Mock useLocalePokemonName - returns the englishName synchronously so tests
 // are deterministic without the locale-sidecar async fetch.
 // ---------------------------------------------------------------------------
 
@@ -65,7 +65,7 @@ function makeEntry(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("CloseToMastery — empty state", () => {
+describe("CloseToMastery - empty state", () => {
   it("shows the section heading", () => {
     renderWithIntl(<CloseToMastery entries={[]} />);
     expect(
@@ -93,7 +93,7 @@ describe("CloseToMastery — empty state", () => {
   });
 });
 
-describe("CloseToMastery — populated list", () => {
+describe("CloseToMastery - populated list", () => {
   const entries = [
     makeEntry(1, "Bulbasaur", { reverseScheduledDays: 18, reverseReps: 5 }),
     makeEntry(4, "Charmander", { reverseScheduledDays: 7, reverseReps: 2 }),
@@ -108,7 +108,7 @@ describe("CloseToMastery — populated list", () => {
 
   it("shows the subtitle with the species count", () => {
     renderWithIntl(<CloseToMastery entries={entries} />);
-    // The count is now rendered inline via t.rich — query for it via the paragraph text.
+    // The count is now rendered inline via t.rich - query for it via the paragraph text.
     // "Name known, reverse card still to learn: 2 species to go." is the full text.
     expect(screen.getByText(/species to go/i)).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe("CloseToMastery — populated list", () => {
   });
 });
 
-describe("CloseToMastery — not-yet-started entry (reverseIntroduced = false)", () => {
+describe("CloseToMastery - not-yet-started entry (reverseIntroduced = false)", () => {
   const entry = makeEntry(7, "Squirtle", {
     reverseScheduledDays: 0,
     reverseReps: 0,
@@ -194,7 +194,7 @@ describe("CloseToMastery — not-yet-started entry (reverseIntroduced = false)",
   });
 });
 
-describe("CloseToMastery — ready-for-mastery entry (daysRemaining = 0)", () => {
+describe("CloseToMastery - ready-for-mastery entry (daysRemaining = 0)", () => {
   // scheduledDays >= MASTERY_INTERVAL_DAYS (21) means daysRemaining = 0.
   const entry = makeEntry(25, "Pikachu", {
     reverseScheduledDays: 21,
@@ -213,8 +213,8 @@ describe("CloseToMastery — ready-for-mastery entry (daysRemaining = 0)", () =>
   });
 });
 
-describe("CloseToMastery — truncation (more than 10 entries)", () => {
-  // Build 12 entries — only 10 should be displayed with a footer.
+describe("CloseToMastery - truncation (more than 10 entries)", () => {
+  // Build 12 entries - only 10 should be displayed with a footer.
   const manyEntries: CloseToMasteryEntry[] = Array.from(
     { length: 12 },
     (_, i) =>
@@ -240,7 +240,7 @@ describe("CloseToMastery — truncation (more than 10 entries)", () => {
   });
 });
 
-describe("CloseToMastery — exactly 10 entries (no footer)", () => {
+describe("CloseToMastery - exactly 10 entries (no footer)", () => {
   const tenEntries: CloseToMasteryEntry[] = Array.from(
     { length: 10 },
     (_, i) =>
@@ -260,10 +260,10 @@ describe("CloseToMastery — exactly 10 entries (no footer)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Locale coverage (mandatory per AGENTS.md — #1393)
+// Locale coverage (mandatory per AGENTS.md - #1393)
 // ---------------------------------------------------------------------------
 
-describe("CloseToMastery — locale coverage (i18n #1393)", () => {
+describe("CloseToMastery - locale coverage (i18n #1393)", () => {
   const entry = {
     speciesId: 1,
     englishName: "Bulbasaur",
@@ -311,7 +311,7 @@ describe("CloseToMastery — locale coverage (i18n #1393)", () => {
     // The count "2" appears in the subtitle span exactly once (not doubled).
     const countEls = screen.getAllByText("2");
     // Only one "2" in the subtitle (the em-wrapped count from t.rich).
-    // There may be an additional "2" from the interval progress label — filter to the subtitle paragraph.
+    // There may be an additional "2" from the interval progress label - filter to the subtitle paragraph.
     const subtitlePara = screen.getByText(/種族残り/).closest("p");
     expect(subtitlePara?.querySelectorAll("span")).toHaveLength(1);
   });

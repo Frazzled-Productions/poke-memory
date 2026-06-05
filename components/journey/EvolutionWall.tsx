@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * EvolutionWall — scrollable gallery of evolution family trees on the Journey tab.
+ * EvolutionWall - scrollable gallery of evolution family trees on the Journey tab.
  *
  * Shows every evolution family as a compact tree, with edges (arrows) lighting
  * up as the corresponding evolution/reverse-evolution cards are mastered.
@@ -424,7 +424,7 @@ export function EvolutionWall({
         </button>
       </div>
 
-      {/* Summary line — always visible, gives a progress snapshot at a glance */}
+      {/* Summary line - always visible, gives a progress snapshot at a glance */}
       <p className={`mb-3 mt-1 ${mutedText}`}>
         {tWidget("familiesCompleted")}{" "}
         <span className="font-semibold tabular-nums text-foreground">
@@ -438,7 +438,7 @@ export function EvolutionWall({
 
       {/*
         Panel is always in the DOM so aria-controls always references a real
-        element — use the `hidden` attribute rather than conditional render (#856).
+        element - use the `hidden` attribute rather than conditional render (#856).
       */}
       <div id={panelId} hidden={!isOpen}>
         {/* Filter tabs */}

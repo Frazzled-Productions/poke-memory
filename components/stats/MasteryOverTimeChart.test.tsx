@@ -6,7 +6,7 @@
  * refactor is instrumented by the coverage gate.
  *
  * Recharts is mocked to avoid the ResizeObserver dependency that jsdom cannot
- * satisfy — the mock renders lightweight stubs while still executing the
+ * satisfy - the mock renders lightweight stubs while still executing the
  * component's own JSX paths.
  */
 
@@ -17,7 +17,7 @@ import { MasteryOverTimeChart } from "@/components/stats/MasteryOverTimeChart";
 import type { MasteryPoint } from "@/lib/stats/mastery-over-time";
 
 // ---------------------------------------------------------------------------
-// Recharts mock — lightweight stubs so the component can render in jsdom.
+// Recharts mock - lightweight stubs so the component can render in jsdom.
 // ---------------------------------------------------------------------------
 
 vi.mock("recharts", () => ({
@@ -58,7 +58,7 @@ describe("MasteryOverTimeChart", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the chart when series has data (lines 188, 197 — XAxis/YAxis className)", () => {
+  it("renders the chart when series has data (lines 188, 197 - XAxis/YAxis className)", () => {
     renderWithIntl(
       <MasteryOverTimeChart series={[POINT, { date: "2026-05-10", count: 20 }]} totalCards={100} />,
     );
@@ -66,7 +66,7 @@ describe("MasteryOverTimeChart", () => {
     const xAxis = screen.getByTestId("x-axis");
     const yAxis = screen.getByTestId("y-axis");
     // The component passes chartTickText ("text-zinc-400 dark:text-zinc-500")
-    // to both axes — verify the prop reaches the DOM stub.
+    // to both axes - verify the prop reaches the DOM stub.
     expect(xAxis.className).toContain("text-zinc-400");
     expect(yAxis.className).toContain("text-zinc-400");
   });

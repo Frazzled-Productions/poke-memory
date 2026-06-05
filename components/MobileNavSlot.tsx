@@ -9,11 +9,11 @@ import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
 import { SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 
 /**
- * Mobile header slot — rendered below the `md` breakpoint only.
+ * Mobile header slot - rendered below the `md` breakpoint only.
  *
  * Reads `mobileNav` from the user's settings and shows either:
- * - `'hamburger'` — the existing NavDrawer trigger + slide-in panel.
- * - `'bottom'` — only the What's New indicator and the auth button
+ * - `'hamburger'` - the existing NavDrawer trigger + slide-in panel.
+ * - `'bottom'` - only the What's New indicator and the auth button
  *   (navigation is handled by the fixed bottom tab bar in this mode).
  *
  * Re-renders whenever the user saves a new `mobileNav` value on the Settings
@@ -46,7 +46,7 @@ export function MobileNavSlot() {
     );
   }
 
-  // bottom tab bar mode — show only auth + What's New in the header
+  // bottom tab bar mode - show only auth + What's New in the header
   return (
     <div className="flex items-center gap-2 md:hidden">
       <Suspense fallback={null}>

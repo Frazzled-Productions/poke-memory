@@ -1,5 +1,5 @@
 /**
- * Component tests for PastureBiomeStats — locale coverage (#1393).
+ * Component tests for PastureBiomeStats - locale coverage (#1393).
  *
  * Verifies that the sr-only ARIA labels are sourced from the catalogue and
  * render the correct values in English and Japanese.
@@ -24,7 +24,7 @@ const STATS_NO_LATEST: BiomeStats = {
   latestAddition: null,
 };
 
-describe("PastureBiomeStats — English (default)", () => {
+describe("PastureBiomeStats - English (default)", () => {
   it("renders the Biome statistics aria-label in en locale", () => {
     const { container } = renderWithIntl(<PastureBiomeStats stats={STATS} />);
     expect(container.querySelector('[aria-label="Biome statistics"]')).toBeInTheDocument();
@@ -51,7 +51,7 @@ describe("PastureBiomeStats — English (default)", () => {
   });
 });
 
-describe("PastureBiomeStats — Japanese locale coverage (mandatory #1393)", () => {
+describe("PastureBiomeStats - Japanese locale coverage (mandatory #1393)", () => {
   it("renders the Japanese biome statistics aria-label in ja locale", () => {
     const { container } = renderJa(<PastureBiomeStats stats={STATS} />);
     // ja pasture.biomeStats.ariaLabel = "バイオーム統計"

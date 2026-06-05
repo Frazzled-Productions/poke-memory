@@ -5,17 +5,17 @@
  * using this component.
  *
  * Renders a vertical linearGradient into `<defs>` and a 1600×600 background
- * rect that references it. Every biome has exactly this structure — only the
- * gradient id and stop colours differ — so extracting it here eliminates the
+ * rect that references it. Every biome has exactly this structure - only the
+ * gradient id and stop colours differ - so extracting it here eliminates the
  * 10-way duplication of that boilerplate.
  *
- * Pure static markup — no state, effects, or browser APIs.
+ * Pure static markup - no state, effects, or browser APIs.
  *
  * Props
  * ─────
- * gradientId   — the id used for both the <linearGradient> and the rect's
+ * gradientId - the id used for both the <linearGradient> and the rect's
  *                fill="url(#…)". Must be unique within the SVG document.
- * stops        — array of gradient stops (offset, stopColor, optional
+ * stops - array of gradient stops (offset, stopColor, optional
  *                stopOpacity). Rendered in order.
  */
 

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * LanguageBreakdown — per-enrolled-language mastery summary on the Journey page.
+ * LanguageBreakdown - per-enrolled-language mastery summary on the Journey page.
  *
  * Renders a "Languages" section showing, for each enrolled learning locale
  * (when more than one is enrolled), the language endonym, per-locale mastery
@@ -72,7 +72,7 @@ function LanguageRow({ locale, masteredCount, bestDay }: LanguageRowProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Inner component — rendered only when the gate passes
+// Inner component - rendered only when the gate passes
 // ---------------------------------------------------------------------------
 
 type LanguageBreakdownInnerProps = LanguageBreakdownProps & {
@@ -101,7 +101,7 @@ function LanguageBreakdownInner({
         locale,
       );
       // Best-day always reflects real review history regardless of
-      // forceAllMastered — pretend-mastery doesn't alter actual review counts.
+      // forceAllMastered - pretend-mastery doesn't alter actual review counts.
       const bestDay = bestReviewDayForLocale(gradeLog, locale);
       return { locale, mastered: stats.mastered, bestDay };
     });
@@ -144,7 +144,7 @@ function LanguageBreakdownInner({
 }
 
 // ---------------------------------------------------------------------------
-// Main component — applies the render gate
+// Main component - applies the render gate
 // ---------------------------------------------------------------------------
 
 export function LanguageBreakdown(props: LanguageBreakdownProps) {

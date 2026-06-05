@@ -1,7 +1,7 @@
 /**
  * Standalone structural-error state module for the card_reviews sync path (#1358).
  *
- * Extracted here so that cloud.ts can import directly — without creating a circular
+ * Extracted here so that cloud.ts can import directly - without creating a circular
  * dependency through persistence.ts. The import chain is:
  *
  *   persistence.ts  →  cloud.ts  (via toCloudRows)
@@ -60,7 +60,7 @@ export function resetStructuralProbe(): void {
 /**
  * Reads the structural-sync-error code from the persisted SyncStatus.
  * Returns null when no structural error is recorded, or when SyncStatus cannot
- * be parsed (treats absence as no error — safe default).
+ * be parsed (treats absence as no error - safe default).
  */
 export function getStructuralSyncError(): string | null {
   return readLocalStorage(
@@ -95,7 +95,7 @@ function patchSyncStatus(patch: Record<string, unknown>): void {
   writeLocalStorage(KEY_SYNC_STATUS, next);
 
   // Dispatch a synthetic StorageEvent so same-tab subscribers (useLocalStorageKey)
-  // receive the update — the browser only fires the native event in OTHER tabs.
+  // receive the update - the browser only fires the native event in OTHER tabs.
   // Re-reads after the write so newValue reflects the actually-stored form (the
   // defensive re-read convention used throughout the sync layer).
   try {
@@ -107,14 +107,14 @@ function patchSyncStatus(patch: Record<string, unknown>): void {
       }),
     );
   } catch {
-    // Non-standard environments without a StorageEvent constructor — ignore.
+    // Non-standard environments without a StorageEvent constructor - ignore.
   }
 }
 
 /**
  * Records a structural (non-transient) error on the card_reviews primary path.
  * Call this IMMEDIATELY when a push returns a structural SQLSTATE (42xxx,
- * 23505, 23503) — do not wait for FAILURE_THRESHOLD consecutive drains.
+ * 23505, 23503) - do not wait for FAILURE_THRESHOLD consecutive drains.
  *
  * Also flips `lastPushFailed` and stamps `lastPushAttemptAt` so the generic
  * failure banner does not show stale state during a structural incident.
@@ -136,13 +136,13 @@ export function markStructuralSyncError(code: string, at = new Date().toISOStrin
  * proving the schema mismatch has been resolved.
  *
  * Callers on the card_reviews success path should call this directly.
- * Auxiliary-leg success paths must NOT call this — use `markPushSucceeded`
+ * Auxiliary-leg success paths must NOT call this - use `markPushSucceeded`
  * from persistence.ts for those (which deliberately leaves structuralSyncError
  * intact, see FIX 2 / #1358 review).
  */
 export function clearStructuralSyncError(): void {
   if (typeof window === "undefined") return;
-  // Only write if something is actually set — avoids a spurious StorageEvent.
+  // Only write if something is actually set - avoids a spurious StorageEvent.
   const current = getStructuralSyncError();
   if (current === null) return;
   patchSyncStatus({ structuralSyncError: null });

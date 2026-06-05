@@ -1,7 +1,7 @@
 // i18n/request.ts
 // next-intl per-request configuration (#1260).
 //
-// We use next-intl WITHOUT i18n routing — the locale lives in a cookie
+// We use next-intl WITHOUT i18n routing - the locale lives in a cookie
 // (`poke-memory:locale`) rather than in the URL path. This avoids breaking
 // the existing URL structure and lets the locale change without a page
 // navigation.
@@ -30,7 +30,7 @@ export type { AppLocale };
 
 /**
  * Resolve the request locale from the cookie, falling back to `DEFAULT_LOCALE`.
- * Reads from the Next.js `cookies()` store — must be called outside
+ * Reads from the Next.js `cookies()` store - must be called outside
  * `'use cache'` functions. Returns a Promise because `cookies()` is async
  * in Next.js 16.
  */
@@ -43,7 +43,7 @@ export async function resolveLocale(): Promise<AppLocale> {
       return value as AppLocale;
     }
   } catch {
-    // Non-fatal — fall back to default.
+    // Non-fatal - fall back to default.
   }
   return DEFAULT_LOCALE;
 }

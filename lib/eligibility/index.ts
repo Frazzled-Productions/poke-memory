@@ -7,8 +7,8 @@
  * two-axis gate:
  *
  *   1. Card-type enabled flags (`evolutionCardsEnabled`, etc.)
- *      Name and reverse are always on (#1234) — no per-direction toggle.
- *   2. `alternateFormsEnabled` — excludes alt-form cards (species id >= 10000)
+ *      Name and reverse are always on (#1234) - no per-direction toggle.
+ *   2. `alternateFormsEnabled` - excludes alt-form cards (species id >= 10000)
  *      when false.
  *
  * This module is the single source of truth. Both callers wrap their input
@@ -29,11 +29,11 @@ import { Subject } from "@/lib/cards/subjectKey";
  * (client seed cards and server DB rows) map to this shape.
  *
  * `cardType` uses the persisted DB slug convention:
- *   - `"name"`                    — name-recognition card
- *   - `"reverse"`                 — reverse name card (image → name)
- *   - `"cry"`                     — cry-recognition card
- *   - `"evolution-edge"`          — forward evolution edge
- *   - `"reverse-evolution-edge"`  — reverse evolution edge
+ *   - `"name"` - name-recognition card
+ *   - `"reverse"` - reverse name card (image → name)
+ *   - `"cry"` - cry-recognition card
+ *   - `"evolution-edge"` - forward evolution edge
+ *   - `"reverse-evolution-edge"` - reverse evolution edge
  *
  * `subjectKey` is the opaque text key stored in `card_reviews.subject_key`
  * (see `docs/card-identity.md` for the encoding conventions):
@@ -54,7 +54,7 @@ export type EligibilityInput = {
  * `UserEligibility` shape in `app/api/push/send-daily/route.ts`.
  *
  * Name and reverse card directions are always on since #1234. They are not
- * represented here — their absence means "always pass".
+ * represented here - their absence means "always pass".
  */
 export type CardEligibilitySettings = {
   evolutionCardsEnabled: boolean;
@@ -85,7 +85,7 @@ export const ALT_FORM_ID_THRESHOLD = 10000;
  * Returns true when the card described by `input` is eligible under the
  * given `settings`.
  *
- * Gate 1 — card-type enabled flags:
+ * Gate 1 - card-type enabled flags:
  *   - `"name"`                   → always on (#1234)
  *   - `"reverse"`                → always on (#1234)
  *   - `"evolution-edge"`         → `evolutionCardsEnabled`
@@ -93,7 +93,7 @@ export const ALT_FORM_ID_THRESHOLD = 10000;
  *   - `"cry"`                    → `cryCardsEnabled`
  *   - unknown type               → pass through (forward-compatible)
  *
- * Gate 2 — alternate-forms toggle (applied only when gate 1 passes):
+ * Gate 2 - alternate-forms toggle (applied only when gate 1 passes):
  *   When `alternateFormsEnabled` is `false`:
  *   - `name` / `reverse` / `cry`: parse `subjectKey` as an integer species id.
  *     Species ids >= `ALT_FORM_ID_THRESHOLD` (10000) are alt-form variants
@@ -102,7 +102,7 @@ export const ALT_FORM_ID_THRESHOLD = 10000;
  *     `"<fromId>>><toId>"` (see `docs/card-identity.md`). Exclude the row
  *     when either endpoint id is >= `ALT_FORM_ID_THRESHOLD`.
  *
- * Pure — no I/O, no side effects.
+ * Pure - no I/O, no side effects.
  */
 export function isCardEligible(
   input: EligibilityInput,
@@ -111,11 +111,11 @@ export function isCardEligible(
   const { cardType, subjectKey } = input;
 
   // ── Gate 1: card-type enabled ───────────────────────────────────────────
-  // name and reverse are always on since #1234 — no guard needed.
+  // name and reverse are always on since #1234 - no guard needed.
   switch (cardType) {
     case "name":
     case "reverse":
-      // Always eligible — no per-direction toggle.
+      // Always eligible - no per-direction toggle.
       break;
     case "evolution-edge":
       if (!settings.evolutionCardsEnabled) return false;
@@ -127,7 +127,7 @@ export function isCardEligible(
       if (!settings.cryCardsEnabled) return false;
       break;
     default:
-      // Unknown card type — pass through so future card types are not
+      // Unknown card type - pass through so future card types are not
       // silently dropped while callers await an update.
       break;
   }
@@ -154,7 +154,7 @@ export function isCardEligible(
           return false;
         }
       } catch {
-        // Malformed subjectKey — treat as eligible (unknown cards pass through).
+        // Malformed subjectKey - treat as eligible (unknown cards pass through).
       }
     }
   }

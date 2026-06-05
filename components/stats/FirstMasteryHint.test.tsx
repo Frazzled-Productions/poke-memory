@@ -1,5 +1,5 @@
 /**
- * Tests for FirstMasteryHint — updated in #1408 to use renderWithIntl
+ * Tests for FirstMasteryHint - updated in #1408 to use renderWithIntl
  * (component now calls useTranslations) and to reflect the removal of
  * English-only spellOutSmall (replaced by ICU plural `#` format).
  */
@@ -37,7 +37,7 @@ describe("FirstMasteryHint", () => {
     expect(text).not.toContain("—");
     // The threshold explainer mentions the 21-day interval.
     expect(text).toContain("21");
-    // Note: spellOutSmall removed in #1408 — reps are now rendered as digits.
+    // Note: spellOutSmall removed in #1408 - reps are now rendered as digits.
     expect(text).toContain("3");
   });
 

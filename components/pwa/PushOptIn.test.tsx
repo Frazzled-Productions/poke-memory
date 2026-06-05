@@ -20,7 +20,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------------------------
-// Mocks — declared before the component import.
+// Mocks - declared before the component import.
 // ---------------------------------------------------------------------------
 
 import type {
@@ -85,7 +85,7 @@ beforeEach(() => {
 // Gating: renders nothing when any precondition fails.
 // ---------------------------------------------------------------------------
 
-describe("PushOptIn — gating", () => {
+describe("PushOptIn - gating", () => {
   it("renders nothing when isStandalone() is false", async () => {
     mockIsStandalone.mockReturnValue(false);
     const { container } = render(
@@ -112,7 +112,7 @@ describe("PushOptIn — gating", () => {
     render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
     expect(toggle).toBeTruthy();
-    // aria-checked reflects the subscribed state — false on a fresh device.
+    // aria-checked reflects the subscribed state - false on a fresh device.
     expect(toggle.getAttribute("aria-checked")).toBe("false");
   });
 
@@ -130,7 +130,7 @@ describe("PushOptIn — gating", () => {
 // Interaction: subscribe / unsubscribe paths.
 // ---------------------------------------------------------------------------
 
-describe("PushOptIn — interaction", () => {
+describe("PushOptIn - interaction", () => {
   it("calls subscribeToPush when toggled on from the unsubscribed state", async () => {
     render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
@@ -215,7 +215,7 @@ describe("PushOptIn — interaction", () => {
 // Superuser write-guard.
 // ---------------------------------------------------------------------------
 
-describe("PushOptIn — superuser guard", () => {
+describe("PushOptIn - superuser guard", () => {
   it("renders the disabled 'Sync paused' label when any flag is on", async () => {
     mockUseSuperuser.mockReturnValue({ anyFlagOn: true });
     render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
@@ -242,7 +242,7 @@ describe("PushOptIn — superuser guard", () => {
 // Localised aria-label (#1607).
 // ---------------------------------------------------------------------------
 
-describe("PushOptIn — localised aria-label", () => {
+describe("PushOptIn - localised aria-label", () => {
   it("toggle aria-label is localised in Japanese", async () => {
     renderJa(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
@@ -254,7 +254,7 @@ describe("PushOptIn — localised aria-label", () => {
 // Permission-denied explainer branch.
 // ---------------------------------------------------------------------------
 
-describe("PushOptIn — permission denied", () => {
+describe("PushOptIn - permission denied", () => {
   it("shows the iOS Settings explainer when Notification.permission is 'denied'", async () => {
     setNotificationPermission("denied");
     render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);

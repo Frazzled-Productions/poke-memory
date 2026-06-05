@@ -8,7 +8,7 @@
  * `lib/stats/derive.ts` re-exports every symbol defined here so all existing
  * callers importing from that module continue to work without change.
  *
- * Pure — no I/O, no side effects, no seed dependency.
+ * Pure - no I/O, no side effects, no seed dependency.
  */
 
 export type GenerationRange = {

@@ -32,11 +32,11 @@ describe("countOptimizableReviews", () => {
   });
 
   it("counts only entries belonging to fittable cards (ignores entries without subjectKey and single-review cards)", () => {
-    // Cards "1" and "2" each have a single review — they are not fittable and
+    // Cards "1" and "2" each have a single review - they are not fittable and
     // must not be counted. The entry without a subjectKey is also excluded.
     const entries: GradeLogEntry[] = [
       makeEntry(1000, 4, "1"),
-      makeEntry(2000, 4),         // no subjectKey — not counted
+      makeEntry(2000, 4),         // no subjectKey - not counted
       makeEntry(3000, 5, "2"),
     ];
     expect(countOptimizableReviews(entries)).toBe(0);
@@ -139,7 +139,7 @@ describe("gradeLogToOptimizerItems", () => {
 
   it("computes deltaT in whole days using Math.round", () => {
     const t0 = Date.UTC(2026, 0, 1, 12, 0, 0);
-    // 1.5 days later — rounds to 2
+    // 1.5 days later - rounds to 2
     const t1 = t0 + 1.5 * 86_400_000;
 
     const entries: GradeLogEntry[] = [
@@ -152,7 +152,7 @@ describe("gradeLogToOptimizerItems", () => {
   });
 
   it("groups same subjectKey in different locales as separate items (#1259)", () => {
-    // Two entries for the same subject key but different locales — they must
+    // Two entries for the same subject key but different locales - they must
     // not be merged into a single FSRS card history.
     const DAY = 86_400_000;
     const t = Date.UTC(2026, 0, 1, 12, 0, 0);
@@ -170,7 +170,7 @@ describe("gradeLogToOptimizerItems", () => {
 
   // --- #1304 regression tests ---
 
-  it("drops a card with only one review — the binding requires delta_t > 0 (#1304)", () => {
+  it("drops a card with only one review - the binding requires delta_t > 0 (#1304)", () => {
     // This is the exact scenario that caused a Rust WASI process-level panic
     // and an unrecoverable 500 at /api/srs/optimize.
     const t = Date.UTC(2026, 0, 1, 12, 0, 0);
@@ -210,7 +210,7 @@ describe("countOptimizableReviews (#1304)", () => {
     expect(countOptimizableReviews(entries)).toBe(0);
   });
 
-  it("excludes single-review cards — they are not fittable (#1304)", () => {
+  it("excludes single-review cards - they are not fittable (#1304)", () => {
     // A single-review card must not count toward the 200-review threshold,
     // because it would be dropped by gradeLogToOptimizerItems.
     const t = Date.UTC(2026, 0, 1, 12, 0, 0);
@@ -225,7 +225,7 @@ describe("countOptimizableReviews (#1304)", () => {
       makeEntry(t, 4, "card-a"),
       makeEntry(t + DAY, 5, "card-a"),
       makeEntry(t + 2 * DAY, 1, "card-a"),
-      makeEntry(t, 2, "single-review"),   // not fittable — excluded
+      makeEntry(t, 2, "single-review"),   // not fittable - excluded
     ];
     // card-a has 3 reviews and is fittable; single-review card is not
     expect(countOptimizableReviews(entries)).toBe(3);
@@ -257,7 +257,7 @@ describe("countOptimizableReviews (#1304)", () => {
 
     const items = gradeLogToOptimizerItems(entries);
     expect(items).toHaveLength(10);    // 13 single-review items dropped
-    // None of the items have a reviews array where every deltaT is 0 — that
+    // None of the items have a reviews array where every deltaT is 0 - that
     // would cause the Rust panic.
     for (const item of items) {
       expect(item.reviews.some((r) => r.deltaT > 0)).toBe(true);

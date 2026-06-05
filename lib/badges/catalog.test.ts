@@ -3,7 +3,7 @@ import { BADGE_CATALOG } from "./catalog";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 
 describe("BADGE_CATALOG", () => {
-  it("has unique badge ids — re-using an id would re-award an existing badge", () => {
+  it("has unique badge ids - re-using an id would re-award an existing badge", () => {
     const ids = BADGE_CATALOG.map((b) => b.id);
     expect(new Set(ids).size).toBe(ids.length);
   });

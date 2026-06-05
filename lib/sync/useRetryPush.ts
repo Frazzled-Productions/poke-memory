@@ -19,7 +19,7 @@ export type RetryState = "idle" | "retrying" | "success" | "error";
  * Push-only retry hook for recovering from a failed unload beacon.
  *
  * When lastPushFailed is true in SyncStatus, retryNow() re-pushes the
- * subset of cards that failed — without pulling from cloud first.
+ * subset of cards that failed - without pulling from cloud first.
  * Pull-before-push is the failure mode (#293) we are moving away from;
  * this hook is deliberately push-only.
  *
@@ -39,7 +39,7 @@ export function useRetryPush(
 ): { retryState: RetryState; retryNow: () => void } {
   const [retryState, setRetryState] = useState<RetryState>("idle");
 
-  // Synchronous in-progress flag — closes the race window where two rapid
+  // Synchronous in-progress flag - closes the race window where two rapid
   // calls both pass the retryState === "retrying" closure check before the
   // state batch re-renders.
   const isRetryingRef = useRef(false);
@@ -69,7 +69,7 @@ export function useRetryPush(
 
     const status = loadSyncStatus();
 
-    // Nothing to retry — the push-failed flag is clear.
+    // Nothing to retry - the push-failed flag is clear.
     if (!status.lastPushFailed) {
       return;
     }
@@ -99,7 +99,7 @@ export function useRetryPush(
       }, 3000);
     }
 
-    // Re-read the latest sync-status immediately before each write — a
+    // Re-read the latest sync-status immediately before each write - a
     // concurrent useVisibilityPull could have updated lastPullAt while this
     // call was queued; spreading a stale capturedStatus would clobber it and
     // poison the per-card conflict rule on the next pull.
@@ -113,7 +113,7 @@ export function useRetryPush(
       });
     }
 
-    // failedCardCount === 0: clear the failed flag without a network call —
+    // failedCardCount === 0: clear the failed flag without a network call - 
     // unless a non-empty persisted queue exists, in which case those cards
     // must be pushed even though the count signal says zero. The persisted
     // queue is the authoritative record; never abandon it on a zero-count
@@ -150,7 +150,7 @@ export function useRetryPush(
         if (cancelledRef.current) return;
 
         // Identify which cards failed so we can slim the persisted queue on
-        // partial success — re-pushing already-synced cards on the next retry
+        // partial success - re-pushing already-synced cards on the next retry
         // is idempotent but wasteful (#893 partial-success slimming).
         const failedCards = persistedQueue.filter((_, i) => {
           const r = results[i];
@@ -188,7 +188,7 @@ export function useRetryPush(
         // Positive count: push cards reviewed today (approximation of the
         // cards the unload beacon failed to deliver). If the today-filter
         // matches nothing (e.g. user returns the next day), fall back to all
-        // reviewed cards rather than silently declaring success — the
+        // reviewed cards rather than silently declaring success - the
         // failedCardCount > 0 signal means there is still real work to do.
         const todayOnly = allReviewed.filter(
           (card) => card.state.lastReview === today,
@@ -200,7 +200,7 @@ export function useRetryPush(
 
       if (cardsToRetry.length === 0) {
         // Nothing locally that could be pushed (e.g. wiped storage). Clear
-        // the failed flag — there's nothing to retry from this device.
+        // the failed flag - there's nothing to retry from this device.
         clearFailedFlag({ lastPushAt: now, lastPushAttemptAt: now });
         if (!cancelledRef.current) setRetryState("success");
         scheduleReset();

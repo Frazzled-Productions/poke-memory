@@ -1,5 +1,5 @@
 /**
- * Tests for lib/theme/intensity.ts — lives under components/ so the jsdom
+ * Tests for lib/theme/intensity.ts - lives under components/ so the jsdom
  * vitest project picks it up (lib/ runs in the node environment without a DOM;
  * see AGENTS.md "Testing" section for the partitioning rules).
  */

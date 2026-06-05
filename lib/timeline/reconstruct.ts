@@ -2,10 +2,10 @@
  * Collection timeline reconstruction.
  *
  * Two directions:
- *   Past  — replays grade_log entries through the FSRS scheduler to
+ *   Past - replays grade_log entries through the FSRS scheduler to
  *            reconstruct per-card state at any historical point in time,
  *            deriving firstSeen and mastery-crossing dates.
- *   Future — projects each card's current stability forward to find the day
+ *   Future - projects each card's current stability forward to find the day
  *            its FSRS retrievability is expected to drop below retentionTarget
  *            if never reviewed again (the "forgetting horizon").
  *
@@ -16,7 +16,7 @@
  *   cards. The divergence is acceptable here because: (a) weights stabilise
  *   quickly after a few sessions, (b) the visualisation is celebratory rather
  *   than an authoritative audit, and (c) the issue explicitly blesses this
- *   approach. The mastery-crossing timestamp is the key output — small errors
+ *   approach. The mastery-crossing timestamp is the key output - small errors
  *   in reconstructed stability do not change the week-level granularity the UI
  *   displays. Legacy grade_log entries that lack subjectKey are skipped; their
  *   absence makes the past replay slightly optimistic (fewer cards appear
@@ -73,7 +73,7 @@ export type CollectionTimeline = {
    */
   future: readonly CollectionSnapshot[];
   /**
-   * Epoch ms of the "now" anchor — the boundary between past and future.
+   * Epoch ms of the "now" anchor - the boundary between past and future.
    */
   nowMs: number;
   /**
@@ -113,8 +113,8 @@ function groupByCard(
 
 /**
  * Map from species subjectKey to the epoch-ms timestamps of:
- *   firstSeen — when this species was first graded (for any card type)
- *   masteredAt — when it first crossed the mastery threshold
+ *   firstSeen - when this species was first graded (for any card type)
+ *   masteredAt - when it first crossed the mastery threshold
  *               (null if never mastered in the log)
  */
 type SpeciesEvent = {
@@ -129,13 +129,13 @@ const VALID_GRADES = new Set([1, 2, 4, 5]);
  * the grade log through the FSRS scheduler.
  *
  * Only "name" card types are used to drive the `introduced` and `mastered`
- * counts that the timeline displays — evolution/reverse/cry cards contribute
+ * counts that the timeline displays - evolution/reverse/cry cards contribute
  * to the replay but do not create a separate species entry.
  *
  * @param log         Full grade log, any order (will be sorted internally).
  * @param masteryRepetitions   Mastery threshold (from user settings).
  * @param options     Optional FSRS weight/retention overrides (ignored in
- *                    replay — we use defaults, matching the approximation
+ *                    replay - we use defaults, matching the approximation
  *                    blessed in the SRS-expert verdict above).
  */
 function replayLog(
@@ -179,7 +179,7 @@ function replayLog(
     try {
       nextState = nextReview(state, entry.grade as Grade, now);
     } catch {
-      // Invalid grade or scheduler error — skip entry, preserve existing state.
+      // Invalid grade or scheduler error - skip entry, preserve existing state.
       continue;
     }
 
@@ -199,7 +199,7 @@ function replayLog(
       // Record when the name leg first crossed mastery.
       if (nowMastered && !nameMasteredAtMs.has(speciesKey)) {
         nameMasteredAtMs.set(speciesKey, entry.occurredAt);
-        // Check whether the reverse leg was already mastered — if so, this
+        // Check whether the reverse leg was already mastered - if so, this
         // grade completes species-level mastery.
         const revMs = reverseMasteredAtMs.get(speciesKey);
         if (revMs !== undefined) {
@@ -217,7 +217,7 @@ function replayLog(
       // Record when the reverse leg first crossed mastery.
       if (nowMastered && !reverseMasteredAtMs.has(speciesKey)) {
         reverseMasteredAtMs.set(speciesKey, entry.occurredAt);
-        // Check whether the name leg was already mastered — if so, this
+        // Check whether the name leg was already mastered - if so, this
         // grade completes species-level mastery.
         const nameMs = nameMasteredAtMs.get(speciesKey);
         if (nameMs !== undefined) {
@@ -346,7 +346,7 @@ function buildPastTimeline(
  *   t = (retentionTarget^(1/DECAY) - 1) / FACTOR * S
  *
  * This matches ts-fsrs's own `calculate_interval_modifier` formula.
- * Note: retentionTarget >= 1 returns Infinity (not 0) — the caller
+ * Note: retentionTarget >= 1 returns Infinity (not 0) - the caller
  * uses !isFinite to skip those entries.
  */
 function daysUntilForgetting(stability: number, retentionTarget: number): number {
@@ -372,7 +372,7 @@ type CardForgettingEvent = {
  * cards. Cards with no stability (never reviewed / in learning) are
  * excluded from the forgetting horizon.
  *
- * @param forceAllMastered  Superuser flag — when true, treat all species as
+ * @param forceAllMastered  Superuser flag - when true, treat all species as
  *                          currently mastered (stability set to a high value).
  */
 function buildFutureTimeline(
@@ -384,7 +384,7 @@ function buildFutureTimeline(
 ): CollectionSnapshot[] {
   const events: CardForgettingEvent[] = [];
   // A stability value that puts forgetting well beyond the maximum 365-day
-  // horizon — used when forceAllMastered is on to make all cards appear
+  // horizon - used when forceAllMastered is on to make all cards appear
   // retained for the full future window.
   const FAKE_MASTERY_STABILITY = 9_999; // days
 
@@ -482,7 +482,7 @@ export type BuildTimelineOptions = {
  * find the day FSRS retrievability is expected to drop below retentionTarget.
  *
  * Note: when `nowMs` is omitted the function falls back to `Date.now()`, so
- * it is not strictly pure — callers that require deterministic output should
+ * it is not strictly pure - callers that require deterministic output should
  * always provide an explicit `nowMs`.
  *
  * Returns a `CollectionTimeline` value object ready for the scrubber UI.
@@ -536,7 +536,7 @@ export function buildCollectionTimeline(
  * position < 0  → a past snapshot (maps onto past[]).
  * position > 0  → a future snapshot (maps onto future[]).
  *
- * This is a pure lookup function — the scrubber UI calls it on every drag event.
+ * This is a pure lookup function - the scrubber UI calls it on every drag event.
  */
 export function snapshotAtPosition(
   timeline: CollectionTimeline,

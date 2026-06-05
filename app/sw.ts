@@ -2,14 +2,14 @@
  * Poké Memory service worker (source).
  *
  * This file is the `swSrc` bundled by `@serwist/turbopack` via the route
- * handler at `app/sw/[path]/route.ts`. It is NOT a Next.js route itself — a
+ * handler at `app/sw/[path]/route.ts`. It is NOT a Next.js route itself - a
  * stray `.ts` file in `app/` is ignored by the App Router. esbuild bundles it
  * into `/sw/sw.js`, which the client registers.
  *
  * What it does:
  * - Precaches the app shell. `self.__SW_MANIFEST` is the injection point that
  *   `@serwist/turbopack` replaces at build time with the list of build-output
- *   files (JS and CSS — see the `globPatterns` in `app/sw/[path]/route.ts`).
+ *   files (JS and CSS - see the `globPatterns` in `app/sw/[path]/route.ts`).
  *   HTML documents are not precached; they are runtime-cached network-first so
  *   an offline visit still falls back to the last-known shell. With the static
  *   assets precached, an installed PWA opens offline.
@@ -26,7 +26,7 @@
  * persisted pending-grade queue from IndexedDB (the same `poke-memory/kv` store
  * used by `lib/idb/db.ts`) and replays it against `/api/sync`. If active window
  * clients are present, the handler posts `BACKGROUND_SYNC_REPLAY` to them
- * instead — `useOnlineReconnectSync` then handles the pull-before-push
+ * instead - `useOnlineReconnectSync` then handles the pull-before-push
  * sequence so the sync invariants from docs/sync.md are respected.
  */
 import {
@@ -48,12 +48,12 @@ import {
   versionedCacheName,
 } from "@/lib/pwa/cacheStrategy";
 
-// SW_CACHE_VERSION and versionedCacheName are imported from lib/pwa/cacheStrategy.ts —
+// SW_CACHE_VERSION and versionedCacheName are imported from lib/pwa/cacheStrategy.ts - 
 // the single source of truth for the cache-version suffix. Both this worker and
 // the offline precache orchestrator (lib/pwa/precache.ts) derive their cache
 // names from that one constant so their reads and writes target the same buckets.
 
-/** IndexedDB database/store names — must match lib/idb/db.ts exactly. */
+/** IndexedDB database/store names - must match lib/idb/db.ts exactly. */
 const IDB_DB_NAME = "poke-memory";
 const IDB_STORE_NAME = "kv";
 /**
@@ -63,7 +63,7 @@ const IDB_STORE_NAME = "kv";
 const PENDING_QUEUE_KEY = "poke-memory:pending-grade-queue:v1";
 
 /**
- * Sync tag — must stay byte-identical to BACKGROUND_SYNC_TAG in
+ * Sync tag - must stay byte-identical to BACKGROUND_SYNC_TAG in
  * lib/sync/backgroundSync.ts.
  */
 const BACKGROUND_SYNC_TAG = "poke-memory:grade-sync";
@@ -176,7 +176,7 @@ declare const self: ServiceWorkerScope;
  * Contract: `dpl` is stripped from the cache key for BOTH reads (`match`) and
  * writes (`put`). The precache writes dpl-free URLs; the runtime handler reads
  * with a dpl-stripped key. Both sides therefore normalise to the same key,
- * guaranteeing a cache hit.  The `w`, `q`, and `url` params are NOT stripped —
+ * guaranteeing a cache hit.  The `w`, `q`, and `url` params are NOT stripped - 
  * each variant (width / quality / source) is a distinct cache entry.
  *
  * This plugin is attached ONLY to the `/_next/image` sprites route. Raw sprite
@@ -198,13 +198,13 @@ const stripDplPlugin = {
  */
 const runtimeCaching: RuntimeCaching[] = [
   {
-    // Sprite art — immutable per URL, cache-first, large cap.
+    // Sprite art - immutable per URL, cache-first, large cap.
     //
     // `stripDplPlugin` normalises the cache key for `/_next/image` requests by
     // removing the `&dpl=<deployment-id>` query parameter that Vercel/Next.js
     // appends at runtime. Without this, the precache (which writes dpl-free
     // URLs) and the runtime handler (which reads dpl-decorated URLs) would
-    // target different cache entries — meaning every precached sprite would be
+    // target different cache entries - meaning every precached sprite would be
     // invisible. Raw `/sprites/pokemon/<id>.png` paths carry no `dpl` param, so
     // the plugin is a no-op for them.
     matcher: ({ url, request }) =>
@@ -223,7 +223,7 @@ const runtimeCaching: RuntimeCaching[] = [
     }),
   },
   {
-    // Pokémon cry audio — immutable per URL, cache-first, large cap.
+    // Pokémon cry audio - immutable per URL, cache-first, large cap.
     matcher: ({ url, request }) =>
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.cries,
@@ -239,7 +239,7 @@ const runtimeCaching: RuntimeCaching[] = [
     }),
   },
   {
-    // Next.js content-hashed build output — cache-first.
+    // Next.js content-hashed build output - cache-first.
     matcher: ({ url, request }) =>
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.static,
@@ -254,7 +254,7 @@ const runtimeCaching: RuntimeCaching[] = [
     }),
   },
   {
-    // Fonts — instant from cache, refreshed in the background.
+    // Fonts - instant from cache, refreshed in the background.
     matcher: ({ url, request }) =>
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.fonts,
@@ -269,7 +269,7 @@ const runtimeCaching: RuntimeCaching[] = [
     }),
   },
   {
-    // Same-origin navigations and data — network-first, cache fallback offline.
+    // Same-origin navigations and data - network-first, cache fallback offline.
     matcher: ({ url, request }) =>
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.pages,
@@ -304,7 +304,7 @@ const serwist = new Serwist({
 // Honour the client's silent activator (#1162): when a SW is waiting and the
 // active tab transitions to hidden, `ServiceWorkerProvider` posts a
 // SKIP_WAITING message. We activate the new worker only if at most one
-// window client is open — otherwise a still-foreground sibling tab would be
+// window client is open - otherwise a still-foreground sibling tab would be
 // swapped under the user. The client's visibility listener stays armed, so
 // the next quiet moment retries naturally.
 self.addEventListener("message", (event) => {
@@ -387,7 +387,7 @@ async function readPendingQueueFromIdb(): Promise<unknown[]> {
 
 /**
  * Clears the persisted pending-grade queue from IDB after a successful SW push.
- * Best-effort — errors are swallowed.
+ * Best-effort - errors are swallowed.
  */
 async function clearPendingQueueFromIdb(): Promise<void> {
   try {
@@ -405,7 +405,7 @@ async function clearPendingQueueFromIdb(): Promise<void> {
       }
     });
   } catch {
-    // Best-effort — swallow.
+    // Best-effort - swallow.
   }
 }
 
@@ -426,7 +426,7 @@ const CLIENT_ACK_TIMEOUT_MS = 3000;
  *   1. Checks for active window clients. If any are present, posts
  *      `BACKGROUND_SYNC_REPLAY` to each one via a `MessageChannel` and waits
  *      up to `CLIENT_ACK_TIMEOUT_MS` for at least one ACK. On ACK the client
- *      has committed to running the pull-before-push sequence — the SW resolves
+ *      has committed to running the pull-before-push sequence - the SW resolves
  *      without pushing. If no ACK arrives within the timeout (client frozen /
  *      backgrounded / not yet hydrated), the handler falls through to step 2.
  *
@@ -443,7 +443,7 @@ const CLIENT_ACK_TIMEOUT_MS = 3000;
  * null client/userId when a superuser flag is on). In this SW path there is no
  * session context to inspect, but the `/api/sync` route handler re-authenticates
  * via session cookie and returns 401 for unauthenticated calls. A QA session
- * therefore produces no cloud writes via this path either — the IDB queue is
+ * therefore produces no cloud writes via this path either - the IDB queue is
  * cleared by `enqueueGrade` (which calls `clearPendingQueue` when superuser is
  * active) before the tab is closed, so the queue is empty when the SW fires.
  */
@@ -491,10 +491,10 @@ self.addEventListener("sync", (event) => {
           // A live client has committed to running the pull-push sequence.
           return;
         }
-        // No ACK — fall through to direct push below.
+        // No ACK - fall through to direct push below.
       }
 
-      // Step 2: no active clients, or no client ACK'd in time — push directly
+      // Step 2: no active clients, or no client ACK'd in time - push directly
       // from the SW. The IDB queue was written as CloudRow[] by savePendingQueue
       // so no conversion is needed before POSTing to /api/sync (#1072 B1).
       const queue = await readPendingQueueFromIdb();
@@ -514,7 +514,7 @@ self.addEventListener("sync", (event) => {
           credentials: "include",
         });
       } catch {
-        // Network error (offline, DNS failure, etc.) — throw so the browser
+        // Network error (offline, DNS failure, etc.) - throw so the browser
         // retries the sync event when connectivity is restored.
         throw new Error("[sw-sync] network error posting to /api/sync");
       }
@@ -522,7 +522,7 @@ self.addEventListener("sync", (event) => {
       if (res.status === 401 || res.status === 403) {
         // Permanent auth failure: session cookie expired, user signed out, or
         // cookie purged by ITP. Resolving (not throwing) prevents the Background
-        // Sync spec from retrying indefinitely — retrying a 401 is pointless and
+        // Sync spec from retrying indefinitely - retrying a 401 is pointless and
         // wastes battery. The queue is cleared so stale grades are not replayed
         // against a future session (#1072 B2).
         await clearPendingQueueFromIdb();
@@ -535,7 +535,7 @@ self.addEventListener("sync", (event) => {
         throw new Error(`[sw-sync] /api/sync returned ${String(res.status)}`);
       }
 
-      // All cards pushed successfully — clear the IDB queue.
+      // All cards pushed successfully - clear the IDB queue.
       await clearPendingQueueFromIdb();
     })(),
   );
@@ -550,13 +550,13 @@ self.addEventListener("sync", (event) => {
  *   { title: string, body: string, url?: string }
  *
  * Defaults are conservative so a malformed payload from a future client
- * does not skip the visible notification — userVisibleOnly was set true at
+ * does not skip the visible notification - userVisibleOnly was set true at
  * subscribe time, so Chromium will surface a generic "site updated"
  * notification on our behalf if we fail to call showNotification.
  *
  * The icon and badge paths point at the existing manifest icons. `tag`
  * is fixed so a second daily notification on the same day replaces the
- * first rather than stacking — the user only needs to be told "you have
+ * first rather than stacking - the user only needs to be told "you have
  * reviews due" once per day.
  */
 self.addEventListener("push", (event) => {
@@ -581,7 +581,7 @@ self.addEventListener("push", (event) => {
         url = payload.url;
       }
     } catch {
-      // Malformed JSON — fall through with defaults so we still surface
+      // Malformed JSON - fall through with defaults so we still surface
       // a notification (Chromium will otherwise show the generic "site
       // updated" fallback because userVisibleOnly was set true).
     }
@@ -590,7 +590,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      // /icon2 and /apple-icon are dynamic Next.js icon routes — see
+      // /icon2 and /apple-icon are dynamic Next.js icon routes - see
       // app/icon2.tsx / app/apple-icon.tsx. The browser fetches and caches
       // them like any other image; the SW does not need to special-case them.
       icon: "/icon2",
@@ -634,7 +634,7 @@ self.addEventListener("notificationclick", (event) => {
         }
       }
 
-      // No exact match — prefer to navigate an existing tab so we don't
+      // No exact match - prefer to navigate an existing tab so we don't
       // stack windows. Fall back to opening a new one when navigate is
       // unavailable (Safari < 17) or no tab exists.
       const firstClient = allClients[0];

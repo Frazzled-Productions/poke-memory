@@ -11,7 +11,7 @@ import {
 } from "@/lib/theme/curated-pokemon";
 
 // Mirror the sRGB color-mix performed in app/globals.css. Keep the percentages
-// in sync with the CSS — this page exists to verify those exact blends.
+// in sync with the CSS - this page exists to verify those exact blends.
 function mix(a: string, b: string, pct: number): string {
   const ar = parseInt(a.slice(1, 3), 16);
   const ag = parseInt(a.slice(3, 5), 16);

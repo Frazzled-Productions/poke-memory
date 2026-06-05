@@ -12,7 +12,7 @@
  * would be a faster ceiling but adds noise). We advance the simulated clock
  * between calls to `nextReview` by the in-step duration (for in-step touches)
  * or by `scheduledDays` (for graduated touches). The minimum across cards is
- * the projected time-to-first-mastery — that's the card the user will
+ * the projected time-to-first-mastery - that's the card the user will
  * realistically master first.
  *
  * Returns `{ days: null }` when:
@@ -39,7 +39,7 @@ import type { NameReviewCard } from "@/lib/review/session";
 /** Cap the per-card simulation depth so a degenerate state cannot loop forever. */
 const MAX_SIMULATION_STEPS = 50;
 
-/** Always-Good grade — the realistic baseline assumption (see file header). */
+/** Always-Good grade - the realistic baseline assumption (see file header). */
 const GOOD = 4 as const;
 
 export type TimeToMasteryResult = {
@@ -56,7 +56,7 @@ export type TimeToMasteryResult = {
  * @param now                Reference timestamp; the projection counts from here.
  * @param masteryRepetitions Mastery threshold (matches the user's setting).
  *                           Defaults to MASTERY_REPETITIONS.
- * @param forceAllMastered   Superuser flag — when on, returns `{ days: null }`
+ * @param forceAllMastered   Superuser flag - when on, returns `{ days: null }`
  *                           because mastery is "complete" under the cheat.
  * @param options            FSRS overrides (retention target, per-user weights);
  *                           passed straight through to `nextReview` so the
@@ -91,7 +91,7 @@ export function projectTimeToFirstMastery(
 
   if (bestDays === null) return { days: null };
 
-  // Floor at 1 — "0 days" reads like a bug, and the user is almost certainly
+  // Floor at 1 - "0 days" reads like a bug, and the user is almost certainly
   // grading mid-day rather than at midnight UTC.
   const rounded = Math.max(1, Math.round(bestDays));
   return { days: rounded };
@@ -140,7 +140,7 @@ function simulateOne(
  * `lastReview === null` (a not-yet-introduced card is, by definition, not in
  * scope for a first-mastery projection). The brand-new branch of the step
  * ladder is therefore unreachable from this function, and we read from the
- * relearning steps unconditionally — the same ladder a lapsed-but-introduced
+ * relearning steps unconditionally - the same ladder a lapsed-but-introduced
  * card uses to climb back to graduation.
  */
 function computeAdvanceMs(state: ReviewState): number {

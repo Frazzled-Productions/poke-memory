@@ -152,6 +152,6 @@ describe("runStreakProtection SSR guard", () => {
   });
 });
 
-// The STORAGE_KEY import is referenced so the import statement is not pruned —
+// The STORAGE_KEY import is referenced so the import statement is not pruned - 
 // keeps the test file aligned with the public surface of `persistence.ts`.
 void STORAGE_KEY;

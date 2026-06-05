@@ -13,7 +13,7 @@ import { isSessionActive } from "@/lib/review/sessionActive";
  * app shell and runtime-caches sprites, so an installed PWA works offline for
  * a practice session.
  *
- * Update handling (silent-activate, #1162) — the classic PWA footgun is a
+ * Update handling (silent-activate, #1162) - the classic PWA footgun is a
  * stale cache. The service worker is built with `skipWaiting: false`, so a
  * freshly deployed worker installs but stays in the `waiting` state. The
  * previous version of this component rendered a "refresh to update" banner
@@ -34,7 +34,7 @@ import { isSessionActive } from "@/lib/review/sessionActive";
  *      `controllerchange` handler reloads it the next time the user brings
  *      it back, fresh from the new bundle.
  *
- * Periodic update check (#1164) — `registration.update()` is a cheap no-op
+ * Periodic update check (#1164) - `registration.update()` is a cheap no-op
  * when no new SW exists, so we call it on `visibilitychange → visible` after
  * the tab has been hidden for at least 5 minutes, and on a 4-hour interval
  * for tabs that never hide. This shrinks the discovery window for a fresh
@@ -49,7 +49,7 @@ export function ServiceWorkerProvider() {
   // Guards the single post-activation reload so an update can't loop reloads.
   const reloadedRef = useRef(false);
   // Set when the silent activator posts SKIP_WAITING. Only then does the
-  // resulting `controllerchange` warrant a reload — a `controllerchange` from
+  // resulting `controllerchange` warrant a reload - a `controllerchange` from
   // a first-ever install (via `clientsClaim`) must not reload the page.
   const updateAcceptedRef = useRef(false);
   // True when a SW is in the `waiting` state and the silent activator should
@@ -76,7 +76,7 @@ export function ServiceWorkerProvider() {
     const serwist = new Serwist("/sw/sw.js", { scope: "/", type: "module" });
     serwistRef.current = serwist;
 
-    // A new worker has installed and is waiting — arm the silent activator.
+    // A new worker has installed and is waiting - arm the silent activator.
     const onWaiting = () => {
       waitingRef.current = true;
     };
@@ -91,7 +91,7 @@ export function ServiceWorkerProvider() {
     });
 
     // A worker has taken control. Reload only when this is the result of the
-    // silent activator posting SKIP_WAITING — `clientsClaim` also fires this
+    // silent activator posting SKIP_WAITING - `clientsClaim` also fires this
     // event on a first-ever install, which must not reload the page.
     // `reloadedRef` additionally guards against a reload loop.
     const onControllerChange = () => {

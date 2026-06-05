@@ -34,7 +34,7 @@ import {
 import { mutedTextXs } from "@/lib/utils/class-names";
 
 export function StreakBadge() {
-  // Milestone signpost (days to next milestone) — surfaced here on Practice.
+  // Milestone signpost (days to next milestone) - surfaced here on Practice.
   // Uses the shared `nav.streakChip.*` copy.
   const tChip = useTranslations("nav.streakChip");
   // Group label for the mobile status-chip cluster.
@@ -43,7 +43,7 @@ export function StreakBadge() {
   // Streak / token / mastery chips, shown ONLY on mobile (md:hidden). On mobile
   // Practice the ProfileStatusBar band is hidden (no room on the tight one-
   // viewport layout), so the status chips surface inline here instead. On md+
-  // the band carries them, so this cluster is hidden — no duplication. Same
+  // the band carries them, so this cluster is hidden - no duplication. Same
   // shared StatusChips as the band, so the rendering can never diverge.
   const { tokenBalance, masteryCount, totalSpecies, masteryPercent } =
     useProfileStatus();
@@ -60,7 +60,7 @@ export function StreakBadge() {
   // STREAK_UPDATED_EVENT and SETTINGS_SAVED_EVENT can both fire multiple times
   // during a session (e.g. on a settings save), and the earn guard in
   // `applyProtectionStep` only prevents a *second earn on the same calendar
-  // day* — it does not prevent repeated `earned=true` returns when the result
+  // day* - it does not prevent repeated `earned=true` returns when the result
   // is read back from a stale-snapshot call path. A per-visit ref is the
   // simplest, safest guard.
   const hasShownTokenToastRef = useRef(false);
@@ -71,7 +71,7 @@ export function StreakBadge() {
   useEffect(() => {
     function refresh() {
       // Load settings before computing `today` so the protection pass and
-      // streak computation both honour the user's timezone — the streakDates
+      // streak computation both honour the user's timezone - the streakDates
       // set is populated in the user's local tz (see ReviewSession), so a
       // UTC `today` would cause off-by-one boundary errors at high offsets.
       const settings = loadSettings();
@@ -147,7 +147,7 @@ export function StreakBadge() {
     if (pendingMilestone === null) return;
     setPendingMilestone(null);
     if (flags.forceNextStreakMilestone) {
-      // QA fire: do not persist the milestone as seen — the user hasn't
+      // QA fire: do not persist the milestone as seen - the user hasn't
       // genuinely reached it. Just self-clear the flag so QA gets exactly
       // one forced fire per toggle.
       void setFlag("forceNextStreakMilestone", false);
@@ -212,7 +212,7 @@ export function StreakBadge() {
                   masteryPercent={masteryPercent}
                 />
               )}
-            {/* Learning-language switcher (Labs-gated inside the component) —
+            {/* Learning-language switcher (Labs-gated inside the component) - 
                 here too so it is reachable on mobile Practice where the bar
                 is hidden. */}
             <LanguageSwitcher />

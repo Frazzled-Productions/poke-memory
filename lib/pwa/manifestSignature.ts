@@ -3,8 +3,8 @@
  *
  * A stable, pure hash over the sorted set of URLs that `buildPrecacheUrls`
  * produces for a given set of species IDs, folded with `SW_CACHE_VERSION`.
- * Any change to the URL set — new species, new sprite width, new cache-version
- * string — produces a different signature, making it safe to compare a
+ * Any change to the URL set - new species, new sprite width, new cache-version
+ * string - produces a different signature, making it safe to compare a
  * persisted signature against the current one to detect delta.
  *
  * Why not a real crypto hash?

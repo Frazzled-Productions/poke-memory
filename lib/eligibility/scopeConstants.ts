@@ -1,5 +1,5 @@
 /**
- * Lightweight scope constants and helpers — no SEED_POKEMON dependency.
+ * Lightweight scope constants and helpers - no SEED_POKEMON dependency.
  *
  * Extracted from `lib/review/scope.ts` so server-side routes (e.g.
  * `app/api/push/send-daily/route.ts`) can import these without pulling the
@@ -9,7 +9,7 @@
  * client-side callers continue to import from their current path without
  * change.
  *
- * Pure — no I/O, no side effects, no seed dependency.
+ * Pure - no I/O, no side effects, no seed dependency.
  */
 
 import type { PracticeScope, FormCategoryFilter } from "@/lib/review/scope";

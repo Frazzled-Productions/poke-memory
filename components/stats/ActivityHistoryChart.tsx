@@ -15,7 +15,7 @@ import type { DateFormat } from "@/lib/utils/format-date";
 import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
-// Palette — consistent with other Stats components (zinc/emerald/rose)
+// Palette - consistent with other Stats components (zinc/emerald/rose)
 // ---------------------------------------------------------------------------
 
 /** Rose-500: reviews volume, matching the practice-accent colour. */
@@ -88,7 +88,7 @@ function ChartTooltip({
 // ---------------------------------------------------------------------------
 
 // The legend always shows both series, even on days with zero introductions.
-// This is intentional — the legend describes the chart's series, not the data.
+// This is intentional - the legend describes the chart's series, not the data.
 function ChartLegend() {
   return (
     <div
@@ -148,7 +148,7 @@ function sparseInterval(length: number): number {
  *
  * Derives from review history (`grade_log`), NOT from mastery state. This
  * chart is intentionally NOT affected by the `pretendAllMastered` superuser
- * flag — the caller passes in the raw log-derived series unchanged.
+ * flag - the caller passes in the raw log-derived series unchanged.
  *
  * Guest-mode empty state: when `isActivityHistoryEmpty(series)` is true,
  * a prompt to start a review session is shown instead of the chart.

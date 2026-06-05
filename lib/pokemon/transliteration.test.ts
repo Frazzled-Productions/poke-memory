@@ -15,7 +15,7 @@ import {
 } from "./transliteration";
 
 // ---------------------------------------------------------------------------
-// Real pinyin-pro and wanakana imports — these are devDependencies so they
+// Real pinyin-pro and wanakana imports - these are devDependencies so they
 // are only available in build/test contexts, never in the runtime bundle.
 // ---------------------------------------------------------------------------
 
@@ -145,7 +145,7 @@ describe("pinyinWithOverrides", () => {
   });
 
   it("falls back to generatePinyin when no override exists", () => {
-    // 喷火龙 = Charizard (zh-Hans) — not in override map
+    // 喷火龙 = Charizard (zh-Hans) - not in override map
     const result = pinyinWithOverrides("喷火龙", pinyinFn);
     expect(result).toBe("pēn huǒ lóng");
   });

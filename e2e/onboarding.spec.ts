@@ -7,7 +7,7 @@ const SETTINGS_KEY = "poke-memory:settings:v1";
 // The global storageState (e2e/global-setup.ts) pre-dismisses the onboarding
 // modal so it does not block every other spec. This file's whole purpose is
 // to verify the modal renders and dismisses correctly, so override the global
-// storageState with an empty one — the app must see a brand-new visitor.
+// storageState with an empty one - the app must see a brand-new visitor.
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe("First-visit onboarding modal (#1103)", () => {
@@ -19,7 +19,7 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     const modal = page.getByRole("dialog", { name: /welcome to pok[eé] memory/i });
     await expect(modal).toBeVisible();
 
-    // Grading guidance must be present inside the modal — assert all four grade
+    // Grading guidance must be present inside the modal - assert all four grade
     // labels render as bold terms in the grading list.
     await expect(modal.locator("strong").filter({ hasText: /^Again$/ })).toBeVisible();
     await expect(modal.locator("strong").filter({ hasText: /^Hard$/ })).toBeVisible();
@@ -32,7 +32,7 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     // After dismissal the Practice card surface must be interactable. The
     // first card may be a flip card (Reveal), a sprite-picker, or a
     // multiple-choice card depending on the deterministic per-day shuffle, so
-    // match every variant (#1370 — the bare Reveal-or-"all caught up" locator
+    // match every variant (#1370 - the bare Reveal-or-"all caught up" locator
     // timed out on days the shuffle led with a reverse card). 20 s budget
     // covers fresh-visitor hydration of the ~2 050-card set (#1234) plus the
     // #1260 next-intl Suspense round-trip.
@@ -100,7 +100,7 @@ test.describe("Feature nudges (#702)", () => {
     page,
   }) => {
     // Seed settings with the modal already dismissed.
-    // reverseCardsEnabled was removed in #1234 — reverse is now always on.
+    // reverseCardsEnabled was removed in #1234 - reverse is now always on.
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
@@ -166,7 +166,7 @@ test.describe("PWA install nudge (#701)", () => {
     // Inject a minimal mock of the deferred install prompt so the Android
     // variant renders in Chromium (which won't fire beforeinstallprompt in a
     // test environment). The mock returns "dismissed" so handleInstall does
-    // not call handleDismiss — the dismiss click below is the real trigger.
+    // not call handleDismiss - the dismiss click below is the real trigger.
     await page.addInitScript(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__pwaInstallPrompt = {
@@ -272,7 +272,7 @@ test.describe("Guest storage section in onboarding modal (#1057)", () => {
     await modal.getByRole("button", { name: /get started/i }).click();
     await expect(modal).toHaveCount(0);
 
-    // No standalone storage notice should appear — info was in the modal.
+    // No standalone storage notice should appear - info was in the modal.
     await expect(
       page.getByRole("note", { name: /your progress is saved on this device/i }),
     ).toHaveCount(0);
@@ -319,7 +319,7 @@ test.describe("Discovery nudges (#1443)", () => {
   test("markWhatIKnow nudge renders on settings page when flag is absent (existing-user reach)", async ({
     page,
   }) => {
-    // Seed with a realistic existing-user blob that predates #1443 — no
+    // Seed with a realistic existing-user blob that predates #1443 - no
     // markWhatIKnowNudgeDismissed key, so it resolves to false and shows.
     await page.addInitScript((key) => {
       localStorage.setItem(
@@ -468,7 +468,7 @@ test.describe("Discovery nudges (#1443)", () => {
     ).toHaveCount(0);
   });
 
-  // #1482 — session-count and scope-opened gate tests.
+  // #1482 - session-count and scope-opened gate tests.
 
   test("practiceScope nudge is absent when practiceScope is non-empty (scope already in use)", async ({
     page,
@@ -501,7 +501,7 @@ test.describe("Discovery nudges (#1443)", () => {
     page,
   }) => {
     // Seed: firstVisit done, plenty of sessions, practiceScope empty, but
-    // scopeEverOpened is true — the user has already interacted with scope.
+    // scopeEverOpened is true - the user has already interacted with scope.
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
@@ -550,7 +550,7 @@ test.describe("Discovery nudges (#1443)", () => {
   test("practiceScope nudge shown when sessions >= threshold, scope empty, and never opened", async ({
     page,
   }) => {
-    // Seed: all suppress conditions cleared — firstVisit done, scope empty,
+    // Seed: all suppress conditions cleared - firstVisit done, scope empty,
     // scopeEverOpened absent (false), practiceSessionsCount >= 3.
     // The nudge must show.
     await page.addInitScript((key) => {
@@ -612,7 +612,7 @@ test.describe("Offline download nudge (#1538)", () => {
     page,
   }) => {
     // Seed: firstVisit done, session count above threshold, but download
-    // timestamp present — the nudge must be suppressed once downloaded.
+    // timestamp present - the nudge must be suppressed once downloaded.
     await page.addInitScript((key) => {
       localStorage.setItem(
         key,
@@ -623,7 +623,7 @@ test.describe("Offline download nudge (#1538)", () => {
           },
         }),
       );
-      // Simulate a prior download — suppresses the nudge.
+      // Simulate a prior download - suppresses the nudge.
       localStorage.setItem("poke-memory:offline-downloaded-at", new Date().toISOString());
     }, SETTINGS_KEY);
 

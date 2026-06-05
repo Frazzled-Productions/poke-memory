@@ -9,17 +9,17 @@
  * "Closest to mastery" ranking
  * ----------------------------
  * Species are ordered by their mastery progress, highest first:
- *   1. Mastered species first (all tied at top — they have completed the
+ *   1. Mastered species first (all tied at top - they have completed the
  *      journey; within the mastered group, order by id ascending so the grid
  *      stays predictable).
  *   2. Learning species next, sorted by (reps desc, scheduledDays desc) so the
  *      species closest to the mastery gate floats up.
- *   3. Locked species last (never reviewed — nothing to rank), sorted by id.
+ *   3. Locked species last (never reviewed - nothing to rank), sorted by id.
  *
  * forceAllMastered (superuser pretendAllMastered)
  * -----------------------------------------------
  * When on, every species reads as mastered. The ranking degenerates to a flat
- * group of mastered species sorted by id — indistinguishable from national order
+ * group of mastered species sorted by id - indistinguishable from national order
  * within the mastered tier. Callers should pass `forceAllMastered` straight
  * through from useSuperuser().flags.pretendAllMastered.
  */
@@ -27,12 +27,12 @@
 import type { PokemonCellData } from "@/lib/pokemon/filter";
 
 // ---------------------------------------------------------------------------
-// Sort key type — carried by PokemonCellData for the "closest to mastery" path
+// Sort key type - carried by PokemonCellData for the "closest to mastery" path
 // ---------------------------------------------------------------------------
 
 /**
  * Optional review-state snapshot attached to PokemonCellData by the page layer.
- * Only `reps` and `scheduledDays` are needed for sort ranking — the full
+ * Only `reps` and `scheduledDays` are needed for sort ranking - the full
  * ReviewState is not bundled here to keep the type narrow.
  */
 export type MasteryProgress = {
@@ -92,9 +92,9 @@ export function compareAlphabetical(
  * Closest-to-mastery order.
  *
  * Tier ordering (lower tier = earlier in list):
- *   0 — mastered
- *   1 — learning (reviewed at least once, not yet mastered)
- *   2 — locked (never reviewed)
+ *   0 - mastered
+ *   1 - learning (reviewed at least once, not yet mastered)
+ *   2 - locked (never reviewed)
  *
  * Within tier 1 (learning), species are sorted by (reps desc, scheduledDays desc)
  * so the species nearest the mastery gate floats to the top.
@@ -108,7 +108,7 @@ export function compareClosestToMastery(
   forceAllMastered: boolean,
 ): number {
   if (forceAllMastered) {
-    // All mastered — deterministic order by national number.
+    // All mastered - deterministic order by national number.
     return a.id - b.id;
   }
 
@@ -128,7 +128,7 @@ export function compareClosestToMastery(
     if (daysA !== daysB) return daysB - daysA;
   }
 
-  // Same tier, same progress (or mastered/locked tiers) — national order.
+  // Same tier, same progress (or mastered/locked tiers) - national order.
   return a.id - b.id;
 }
 

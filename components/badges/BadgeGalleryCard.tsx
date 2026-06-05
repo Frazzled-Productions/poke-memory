@@ -10,7 +10,7 @@ type Props = {
  *
  * Earned badges show full-colour artwork (the star + name in amber).
  * Locked badges show a greyscale silhouette (the star in zinc) and the
- * badge's `lockedHint` text in place of the description — evocative but
+ * badge's `lockedHint` text in place of the description - evocative but
  * non-spoiler.
  *
  * Accessibility: the accessible name is "${name}, earned" or

@@ -53,14 +53,14 @@ describe('loadSettings migration', () => {
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      nameCardsEnabled: false, // stale field — should be ignored
+      nameCardsEnabled: false, // stale field - should be ignored
       evolutionCardsEnabled: true,
       maxNewReversePerDay: 10,
       maxReviewsReversePerDay: 100,
     };
     mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify(partial));
     const settings = loadSettings();
-    // nameCardsEnabled no longer exists on the type — no property to check.
+    // nameCardsEnabled no longer exists on the type - no property to check.
     // evolutionCardsEnabled must round-trip correctly.
     expect(settings.evolutionCardsEnabled).toBe(true);
   });
@@ -74,14 +74,14 @@ describe('loadSettings migration', () => {
       maxReviewsPerDay: 100,
       maxNewEvolutionPerDay: 5,
       maxReviewsEvolutionPerDay: 50,
-      reverseCardsEnabled: false, // stale field — should be ignored
+      reverseCardsEnabled: false, // stale field - should be ignored
       evolutionCardsEnabled: true,
       maxNewReversePerDay: 10,
       maxReviewsReversePerDay: 100,
     };
     mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify(partial));
     const settings = loadSettings();
-    // reverseCardsEnabled no longer exists on the type — no property to check.
+    // reverseCardsEnabled no longer exists on the type - no property to check.
     // evolutionCardsEnabled must round-trip correctly (not corrupted by the stale field).
     expect(settings.evolutionCardsEnabled).toBe(true);
   });
@@ -265,7 +265,7 @@ describe('loadSettings: earnedBadges (#420)', () => {
       JSON.stringify({
         earnedBadges: [
           { id: 'cascade-badge', earnedAt: '2026-05-13T09:00:00.000Z' },
-          { id: 'no-timestamp' }, // malformed — missing earnedAt
+          { id: 'no-timestamp' }, // malformed - missing earnedAt
           { id: 'eeveelutions', earnedAt: '2026-05-13T10:00:00.000Z' },
         ],
       }),
@@ -416,7 +416,7 @@ describe('loadSettings: practiceScope (#333)', () => {
     });
   });
 
-  it('accepts permissive type strings — UI restricts inputs, validator does not', () => {
+  it('accepts permissive type strings - UI restricts inputs, validator does not', () => {
     mockLocalStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -440,14 +440,14 @@ const LEGACY_SCOPE_KEY = 'poke-memory:practice-scope:v1';
 
 describe('loadSettings: legacy practice-scope migration', () => {
   it('copies a non-empty legacy scope into settings.practiceScope and clears the legacy key', () => {
-    // No settings yet — fresh device with a pre-#333 scope set.
+    // No settings yet - fresh device with a pre-#333 scope set.
     mockLocalStorage.setItem(
       LEGACY_SCOPE_KEY,
       JSON.stringify({ gens: [1], types: ['fire'], presets: [] }),
     );
     const settings = loadSettings();
     expect(settings.practiceScope).toEqual({ gens: [1], types: ['fire'], presets: [], formCategories: { mode: 'all' }, games: [] });
-    // Legacy key removed after migration — never fires again.
+    // Legacy key removed after migration - never fires again.
     expect(mockLocalStorage.getItem(LEGACY_SCOPE_KEY)).toBeNull();
     // Settings persisted, so the next load reads the migrated scope from
     // the canonical settings blob without needing the legacy key.
@@ -466,7 +466,7 @@ describe('loadSettings: legacy practice-scope migration', () => {
 
   it('stored settings.practiceScope wins over the legacy key; legacy key is still cleared', () => {
     // Existing settings carry an explicit non-default scope. The legacy
-    // key is treated as stale — clear it without overwriting.
+    // key is treated as stale - clear it without overwriting.
     saveSettings({
       ...DEFAULT_SETTINGS,
       practiceScope: { gens: [2], types: [], presets: [] },
@@ -553,7 +553,7 @@ describe('TTS settings (#429)', () => {
 
 describe('themeIntensity setting (#411)', () => {
   it('loadSettings returns themeIntensity: "accents" for a brand-new device (no localStorage)', () => {
-    // mockLocalStorage is cleared in beforeEach — nothing stored.
+    // mockLocalStorage is cleared in beforeEach - nothing stored.
     const settings = loadSettings();
     expect(settings.themeIntensity).toBe('accents');
   });
@@ -734,7 +734,7 @@ describe('themeIntensity setting (#411)', () => {
       }
     });
 
-    it('non-boolean scopeEverOpened coerces to false — === true guard (#1482)', () => {
+    it('non-boolean scopeEverOpened coerces to false - === true guard (#1482)', () => {
       for (const bad of [1, 'true', null, 0]) {
         mockLocalStorage.setItem(
           STORAGE_KEY,
@@ -1055,7 +1055,7 @@ describe("validateRemovedLocales (#1568)", () => {
     ]);
   });
 
-  it("always drops 'en' — English can never be in the removed set", () => {
+  it("always drops 'en' - English can never be in the removed set", () => {
     expect(validateRemovedLocales(["en", "ja"])).toEqual(["ja"]);
     expect(validateRemovedLocales(["en"])).toEqual([]);
   });
@@ -1131,9 +1131,9 @@ describe("removedLocales field (#1568)", () => {
 
 // ─── Offline nudge onboarding flags (#1538) ─────────────────────────────────
 
-describe("validateOnboarding — offline nudge flags", () => {
+describe("validateOnboarding - offline nudge flags", () => {
   it("defaults offlineDownloadNudgeDismissed to false when absent (reaches existing users)", () => {
-    // An existing user's blob will not have this key — it must resolve to false
+    // An existing user's blob will not have this key - it must resolve to false
     // so the nudge is eligible immediately, reaching existing users by construction.
     mockLocalStorage.setItem(
       STORAGE_KEY,

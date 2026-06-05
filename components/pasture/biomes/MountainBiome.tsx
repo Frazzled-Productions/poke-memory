@@ -2,13 +2,13 @@ import { BiomeSvg } from "./BiomeSvg";
 import { BiomeSky } from "./BiomeSky";
 
 /**
- * Mountain habitat backdrop — snow-capped peaks against a crisp sky,
+ * Mountain habitat backdrop - snow-capped peaks against a crisp sky,
  * rocky slopes descending to a foreground ridge with pines and boulders.
  * Anchor bands cluster sprites on the mid and lower slopes; the back
  * band sits just below the summit ridge.
  *
  * The foreground ridge is an irregular polygon with explicit vertex
- * co-ordinates rather than the shared wavy curve — extracting it into
+ * co-ordinates rather than the shared wavy curve - extracting it into
  * BiomeFloor would alter the shape, so it remains bespoke.
  */
 export function MountainBiome() {
@@ -59,7 +59,7 @@ export function MountainBiome() {
         <polygon points="1338,308 1360,280 1382,308 1370,322 1360,314 1350,322" fill="#ffffff" />
       </g>
 
-      {/* Foreground rocky ridge — irregular polygon, bespoke to this biome */}
+      {/* Foreground rocky ridge - irregular polygon, bespoke to this biome */}
       <path
         d="M-50,490 L0,470 L80,500 L180,460 L300,495 L420,470 L560,495 L700,465 L850,495 L1000,470 L1140,500 L1280,460 L1420,495 L1550,475 L1700,485 L1700,600 L-50,600 Z"
         fill="url(#mountain-foreground)"
@@ -78,7 +78,7 @@ export function MountainBiome() {
         <ellipse cx="1240" cy="488" rx="34" ry="5" />
       </g>
 
-      {/* Pine trees — distant on mid ridge */}
+      {/* Pine trees - distant on mid ridge */}
       <g>
         {[
           { x: 140, h: 36 }, { x: 220, h: 30 }, { x: 800, h: 38 }, { x: 1100, h: 32 },
@@ -97,7 +97,7 @@ export function MountainBiome() {
         ))}
       </g>
 
-      {/* Pine trees — foreground left + right (chunky) */}
+      {/* Pine trees - foreground left + right (chunky) */}
       <g>
         {[
           { x: 80,   h: 110 },

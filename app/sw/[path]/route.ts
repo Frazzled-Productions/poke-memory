@@ -7,8 +7,8 @@
  * bundles `app/sw.ts` with esbuild, injects the precache manifest, and exposes
  * the output as static files under this segment:
  *
- *   - `/sw/sw.js`     — the bundled service worker the client registers
- *   - `/sw/sw.js.map` — its source map
+ *   - `/sw/sw.js` - the bundled service worker the client registers
+ *   - `/sw/sw.js.map` - its source map
  *
  * The segment is `[path]` (a single dynamic segment), because esbuild emits
  * every asset at the top level with a deterministic name.
@@ -16,7 +16,7 @@
  * The handler also sets `Service-Worker-Allowed: /`, so the worker registered
  * from `/sw/sw.js` may claim the whole-site scope `/`.
  *
- * Precaching scope: the manifest covers ONLY the app shell — the Next.js
+ * Precaching scope: the manifest covers ONLY the app shell - the Next.js
  * static JS/CSS build output. The `public/sprites/**` directory (~1174 files,
  * ~170 MB) is deliberately excluded: precaching it would force a 170 MB
  * download on first install. Sprites are runtime-cached cache-first on first
@@ -47,7 +47,7 @@ export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
     //
     // The build-output glob is restricted to `*.{js,css}` on purpose. A
     // wider extension list (e.g. `json`) pulls `.next/static/` RSC payloads
-    // and route metadata into the precache — those change every deploy and
+    // and route metadata into the precache - those change every deploy and
     // stale instantly, bloating the install for no benefit. HTML documents
     // and other build assets are covered by the NetworkFirst runtime handler
     // instead. Root-level `public/` files (the web manifest, favicons) are

@@ -3,8 +3,8 @@ import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 // Smoke coverage for the FSRS scheduler swap (#263). Asserts structural
-// behaviour — queue movement and the relative shape of the per-button
-// interval preview — not exact day counts. Exact intervals depend on
+// behaviour - queue movement and the relative shape of the per-button
+// interval preview - not exact day counts. Exact intervals depend on
 // FSRS parameters and would make the test brittle.
 
 const SETTINGS_KEY = "poke-memory:settings:v1";
@@ -27,12 +27,12 @@ test.describe("FSRS smoke", () => {
 
     // Capture the currently-presented Pokémon name from the page heading
     // before grading. We rely on the practice card's accessible name
-    // pattern — the reveal-state heading reads as the Pokémon name.
+    // pattern - the reveal-state heading reads as the Pokémon name.
     await reveal.click();
     const gradeGroup = page.getByRole("group", { name: /grade your answer/i });
     await expect(gradeGroup).toBeVisible();
 
-    // Grab the visible name(s) on screen — the practice page renders the
+    // Grab the visible name(s) on screen - the practice page renders the
     // Pokémon name when revealed. Pick the first heading-like text near
     // the grade buttons.
     const namesBefore = await page
@@ -127,7 +127,7 @@ test.describe("FSRS smoke", () => {
     expect(goodLabel).toMatch(/\d+(d|mo|y)/);
     expect(easyLabel).toMatch(/\d+(d|mo|y)/);
 
-    // Easy interval should be at least as large as Good — FSRS's defining
+    // Easy interval should be at least as large as Good - FSRS's defining
     // property for higher-confidence grades.
     function dayCount(label: string): number {
       const dMatch = label.match(/(\d+)d/);

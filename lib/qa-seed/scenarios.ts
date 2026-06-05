@@ -7,7 +7,7 @@
  * new-card queue.
  *
  * IMPORTANT: scenario payloads are LOCAL-ONLY. They write to the same IDB
- * store that the app reads, so they are indistinguishable from real progress —
+ * store that the app reads, so they are indistinguishable from real progress - 
  * but the sync write-guard on SuperuserContext suppresses all cloud writes
  * while any superuser flag is on (including qaSeedMode). Seeded data can
  * therefore never reach Supabase.
@@ -17,9 +17,9 @@
  * the save step lives in applySeedScenario.
  *
  * FAITHFULNESS RULE: all FSRS states MUST be derived by replaying real grades
- * through nextReview (lib/srs/scheduler.ts) — never hand-set FSRS literals.
+ * through nextReview (lib/srs/scheduler.ts) - never hand-set FSRS literals.
  * Card identity (name, spriteUrl, id) MUST come from the real SEED_POKEMON /
- * SEED_EVOLUTION_CARDS data — never placeholders. This ensures seeded data
+ * SEED_EVOLUTION_CARDS data - never placeholders. This ensures seeded data
  * obeys the same invariants as real data (#1421).
  */
 
@@ -123,7 +123,7 @@ export type SeedPayload = {
    * Per-locale mastered-species count to warm the `KEY_MASTERED_COUNT_BY_LOCALE`
    * cache that `useProfileStatus` reads. Without this the ProfileStatusBar shows
    * 0 mastered on non-Practice pages until ReviewSession (Practice) warms the
-   * cache. Must equal `filterMastered(...).length` for the seeded cards — the
+   * cache. Must equal `filterMastered(...).length` for the seeded cards - the
    * parity test in scenarios.test.ts enforces that.
    */
   masteredCountByLocale?: Partial<Record<AppLocale, number>>;
@@ -210,7 +210,7 @@ function deriveMasteredState(opts: {
 
   // Post-replay: shift due-date and lastReview to wall-clock anchors so the
   // card appears in the correct queue bucket when the scenario is applied.
-  // firstSeen remains the historical T0 date — it is set during the first replay.
+  // firstSeen remains the historical T0 date - it is set during the first replay.
   const dueDate = relativeDate(opts.dueDaysFromNow ?? 7);
   const lastReview = relativeDate(opts.lastReviewDaysFromNow ?? -7);
 
@@ -301,7 +301,7 @@ function deriveGraduatedState(opts: {
   s = nextReview(s, 4, T0);  // graduate, reps=1
 
   for (let i = 0; i < extraGrades; i++) {
-    // Each review a few days after the previous — picks up consecutive reps.
+    // Each review a few days after the previous - picks up consecutive reps.
     s = nextReview(s, 4, T(2 + i * 5));
   }
 
@@ -355,7 +355,7 @@ const DEFAULT_LIMITS: DailyLimits = {
  * Consecutive review days seeded for the "populated" mastery scenarios. A run
  * of 34 days alone earns one protection token (EARN_INTERVAL_DAYS = 30), and
  * the months-old card history (firstSeen T0) makes a standing balance of 2
- * faithful — so the seeded streak and token balance are internally consistent
+ * faithful - so the seeded streak and token balance are internally consistent
  * with real data, not a state real usage could not reach (#1421 faithfulness).
  */
 const BELIEVABLE_STREAK_DAYS = 34;
@@ -387,7 +387,7 @@ function believableStreakProtection(): StreakProtection {
 
 /**
  * Builds a name card from real SEED_POKEMON data.
- * name and spriteUrl come from the actual seed — no placeholders.
+ * name and spriteUrl come from the actual seed - no placeholders.
  */
 function nameCard(id: number, state: SeededState, locale = "en"): SeededNameCard {
   const pokemon = SEED_BY_ID.get(id);
@@ -407,7 +407,7 @@ function nameCard(id: number, state: SeededState, locale = "en"): SeededNameCard
 
 /**
  * Builds a reverse card from real SEED_POKEMON data.
- * id = REVERSE_ID_OFFSET + pokemonId — matching hydrateSession.
+ * id = REVERSE_ID_OFFSET + pokemonId - matching hydrateSession.
  * name/spriteUrl come from the actual seed; hydrateSession also backfills
  * all SeedPokemon fields on load.
  *
@@ -463,7 +463,7 @@ function evolutionCard(preEvoId: number, postEvoId: number, state: SeededState):
  *
  * This stages the multi-language practice state (#1562): the language switcher
  * in the status bar shows English + 日本語, and switching to Japanese reveals a
- * SEPARATE, smaller mastered set with its own due/new queue — proving FSRS
+ * SEPARATE, smaller mastered set with its own due/new queue - proving FSRS
  * progress is tracked per `(id, locale)`. The en and ja cards for the same
  * species (e.g. 1, 4, 7, 25, 39) coexist without colliding because the session
  * now filters by the active locale (#1562 fixed the #1394 id-collision class).
@@ -472,7 +472,7 @@ function buildFsrsLocaleMastery(): SeedPayload {
   const cards: SeededCard[] = [];
 
   // 30 mastered Gen-I species (en locale).
-  // Since #1234, the Pasture requires both name AND reverse mastered — seed both.
+  // Since #1234, the Pasture requires both name AND reverse mastered - seed both.
   const masteredIds = [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
     13, 16, 19, 25, 35, 39, 52, 54, 58, 63,
@@ -553,7 +553,7 @@ function buildFsrsLocaleMastery(): SeedPayload {
 function buildOptimiserStress(): SeedPayload {
   const cards: SeededCard[] = [];
 
-  // 20 heavily-reviewed cards — each with many reps derived from real grades.
+  // 20 heavily-reviewed cards - each with many reps derived from real grades.
   const stressIds = [
     1, 4, 7, 25, 39, 52, 63, 66, 74, 79,
     84, 90, 95, 100, 109, 111, 122, 127, 130, 131,
@@ -586,12 +586,12 @@ function buildOptimiserStress(): SeedPayload {
  * flag, and lets QA verify the Pasture visual layout with real data.
  *
  * Mix: 40 mastered (en), 20 due-soon, 15 in-learning, rest locked (absent
- * from the session — hydrateSession adds them as new cards on next practice
+ * from the session - hydrateSession adds them as new cards on next practice
  * load).
  *
  * Sets `pokemonNameLocale: "en"` so the 40 en-locale mastered cards show
  * correctly. Switching to Japanese in Settings shows 0 mastered (the en cards
- * do not match the ja locale) — demonstrating that mastery is stored per
+ * do not match the ja locale) - demonstrating that mastery is stored per
  * locale (the per-locale FSRS rows introduced in #1259). We do NOT seed
  * ja-locale duplicates of the same species: the local review session keys
  * cards by numeric `id`, so an en+ja pair for one species collides and breaks
@@ -604,8 +604,8 @@ function buildOptimiserStress(): SeedPayload {
 function buildPastureProgression(): SeedPayload {
   const cards: SeededCard[] = [];
 
-  // 40 mastered Gen-I species (locale: en) — spreads across multiple biomes.
-  // Since #1234, the Pasture requires both name AND reverse mastered — seed both.
+  // 40 mastered Gen-I species (locale: en) - spreads across multiple biomes.
+  // Since #1234, the Pasture requires both name AND reverse mastered - seed both.
   const masteredIds = [
     1, 4, 7, 10, 13, 16, 19, 21, 23, 25,
     27, 29, 32, 35, 37, 39, 41, 43, 46, 48,
@@ -667,7 +667,7 @@ function buildPastureProgression(): SeedPayload {
     session: { cards, limits: DEFAULT_LIMITS },
     // Set en so the 40 en-locale mastered cards show by default. Switch to
     // Japanese in Settings > Pokémon name language to see 0 mastered (the en
-    // cards do not match the ja locale) — confirming per-locale FSRS storage
+    // cards do not match the ja locale) - confirming per-locale FSRS storage
     // (#1259).
     pokemonNameLocale: "en",
     streakDays: BELIEVABLE_STREAK_DAYS,
@@ -683,7 +683,7 @@ function buildPastureProgression(): SeedPayload {
  * Exercises two features that need specific in-between states:
  *
  * (a) "Next arrivals" strip on the Pasture (#1316): requires reviewed-but-unmastered
- *     name cards — i.e. name cards that have been seen at least once but have not
+ *     name cards - i.e. name cards that have been seen at least once but have not
  *     yet reached reps >= 3 AND scheduledDays >= 21. The strip ranks them by
  *     closest to mastery so QA can confirm real species appear rather than the
  *     "all reviewed Pokémon already in your Pasture" empty state.
@@ -739,12 +739,12 @@ function buildMasteryGaps(): SeedPayload {
     })));
   }
 
-  // Five with an unseen reverse card (no reverse seeded at all — it is "new"):
+  // Five with an unseen reverse card (no reverse seeded at all - it is "new"):
   const nearMissUnseenIds = [52, 54, 56, 58, 60];
   for (const id of nearMissUnseenIds) {
     // Name card: fully mastered.
     cards.push(nameCard(id, deriveMasteredState()));
-    // No reverse card seeded — hydrateSession treats it as new, and
+    // No reverse card seeded - hydrateSession treats it as new, and
     // deriveCloseToMastery reports reverseIntroduced: false for the row.
   }
 

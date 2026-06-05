@@ -166,14 +166,14 @@ beforeEach(() => {
   mockCompute.mockReturnValue(makeSnapshot(1));
 });
 
-describe("DashboardSnapshotProvider — initial state", () => {
+describe("DashboardSnapshotProvider - initial state", () => {
   it("returns null before any input is provided", () => {
     const { result } = renderHook(() => useDashboardSnapshot(), { wrapper });
     expect(result.current).toBeNull();
   });
 });
 
-describe("DashboardSnapshotProvider — computes on first input", () => {
+describe("DashboardSnapshotProvider - computes on first input", () => {
   it("returns a snapshot after input is provided", async () => {
     const { result, setInput } = renderWithProvide();
 
@@ -186,7 +186,7 @@ describe("DashboardSnapshotProvider — computes on first input", () => {
   });
 });
 
-describe("DashboardSnapshotProvider — memoisation", () => {
+describe("DashboardSnapshotProvider - memoisation", () => {
   it("does not recompute when the same input reference is set twice", async () => {
     const { result, setInput } = renderWithProvide();
 
@@ -195,7 +195,7 @@ describe("DashboardSnapshotProvider — memoisation", () => {
     await setInput(input);
     const snapshotAfterFirst = result.current.snapshot;
 
-    // Set the same reference again — useMemo should not re-run.
+    // Set the same reference again - useMemo should not re-run.
     await setInput(input);
 
     expect(mockCompute).toHaveBeenCalledTimes(1);
@@ -220,7 +220,7 @@ describe("DashboardSnapshotProvider — memoisation", () => {
   });
 });
 
-describe("DashboardSnapshotProvider — reset", () => {
+describe("DashboardSnapshotProvider - reset", () => {
   it("returns null after the input is cleared (set to null)", async () => {
     const { result, setInput } = renderWithProvide();
 
@@ -232,7 +232,7 @@ describe("DashboardSnapshotProvider — reset", () => {
   });
 });
 
-describe("DashboardSnapshotProvider — multiple consumers", () => {
+describe("DashboardSnapshotProvider - multiple consumers", () => {
   it("two useDashboardSnapshot calls in the same tree see the same object", async () => {
     type Combined = {
       snapshot1: ReturnType<typeof useDashboardSnapshot>;

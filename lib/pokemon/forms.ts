@@ -3,22 +3,22 @@
  *
  * Extracted from scripts/seed-pokemon.mjs so they are unit-testable in normal
  * TypeScript/Vitest land. The seed script imports the compiled output via the
- * module system — see scripts/seed-pokemon.mjs for usage.
+ * module system - see scripts/seed-pokemon.mjs for usage.
  *
  * "Worth learning" means the form is pedagogically distinct from the base form
  * and exists in at least one mainline game as a non-battle-only variant.
  *
  * v1 scope:
- *   INCLUDE  — regional variants (Alolan/Galarian/Hisuian/Paldean),
+ *   INCLUDE - regional variants (Alolan/Galarian/Hisuian/Paldean),
  *              out-of-battle formes (Deoxys, Rotom, Tauros, Calyrex fusions,
  *              Necrozma fusions, Ogerpon masks, Cap Pikachus, Partner
  *              Pikachu/Eevee, Meowstic-F, Indeedee-F, Zacian/Zamazenta
  *              crowned, size variants (Pumpkaboo/Gourgeist).
  *
- *   EXCLUDE  — is_battle_only (Megas, Gigantamax, Aegislash-Blade,
+ *   EXCLUDE - is_battle_only (Megas, Gigantamax, Aegislash-Blade,
  *              Darmanitan-Zen, Morpeko-Hangry, Terapagos-Terastal),
  *              totem forms, Koraidon/Miraidon ride forms, Minior meteor
- *              forms, cosmetic pattern variants (Vivillon/Unown/Alcremie —
+ *              forms, cosmetic pattern variants (Vivillon/Unown/Alcremie - 
  *              they share a pokemon_id and are handled separately), stub
  *              Megas (IDs 10278+, detected via base_experience === null &&
  *              moves.length === 0).
@@ -70,19 +70,19 @@ export function isWorthLearning(
   if (isStubEntry(pokemonData)) return false;
 
   // Battle-only forms (Megas, Gigantamax, Aegislash-Blade, Darmanitan-Zen,
-  // Morpeko-Hangry, Terapagos-Terastal, Primal — primal is also battle_only).
+  // Morpeko-Hangry, Terapagos-Terastal, Primal - primal is also battle_only).
   if (formData.is_battle_only) return false;
 
   const fn = formData.form_name ?? "";
 
-  // Empty form_name means this is the base/default form — handled elsewhere.
+  // Empty form_name means this is the base/default form - handled elsewhere.
   // "totem" forms are oversized boss versions; not pedagogically distinct.
   if (fn === "" || fn === "totem") return false;
 
-  // Minior meteor forms — just coloured rocks, no gameplay distinction.
+  // Minior meteor forms - just coloured rocks, no gameplay distinction.
   if (/-(meteor)$/.test(fn)) return false;
 
-  // Koraidon/Miraidon ride-mode forms — cosmetic, not separate Pokémon.
+  // Koraidon/Miraidon ride-mode forms - cosmetic, not separate Pokémon.
   // Matches at the start of the form_name (e.g. "sprinting-build") or after
   // a dash (e.g. "some-glide-form"). PokéAPI form_names for ride modes use
   // the verb as the leading word, so (^|-) catches both positions.

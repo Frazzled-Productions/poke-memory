@@ -298,7 +298,7 @@ test.describe("Practice page", () => {
       },
     });
     // Reverse-evolution cards are gated by a settings toggle (default off).
-    // Write to the correct key — poke-memory:settings:v1, not user-settings:v1
+    // Write to the correct key - poke-memory:settings:v1, not user-settings:v1
     // (the latter was always a dead key; the app never reads from it).
     await page.addInitScript(() => {
       const existing = JSON.parse(
@@ -359,13 +359,13 @@ test.describe("Practice page", () => {
         cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
       },
     });
-    // reverseCardsEnabled was removed in #1234 — reverse is always on.
+    // reverseCardsEnabled was removed in #1234 - reverse is always on.
     // poke-memory:user-settings:v1 was also a dead key (app reads settings:v1).
     // No settings override is needed here; the seeded reverse card will appear.
 
     await page.goto("/");
     await awaitSeedIdb(page);
-    // Reverse cards have no Reveal step — the prompt + sprite picker render on load.
+    // Reverse cards have no Reveal step - the prompt + sprite picker render on load.
     const speaker = page.getByRole("button", { name: "Hear Bulbasaur" });
     if (!(await speaker.isVisible().catch(() => false))) {
       test.skip();
@@ -517,7 +517,7 @@ test.describe("Stats page", () => {
       await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible({ timeout: 15_000 });
     }
 
-    // SyncNowButton was removed in #396 — assert it is absent in guest mode.
+    // SyncNowButton was removed in #396 - assert it is absent in guest mode.
     await expect(page.getByRole("button", { name: /Sync now/i })).toHaveCount(0);
   });
 
@@ -602,7 +602,7 @@ test.describe("Pokédex page", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Sprite loader — WebP static files (#1186)
+// Sprite loader - WebP static files (#1186)
 // ---------------------------------------------------------------------------
 
 test.describe("Sprite loader serves pre-generated WebP variants (#1186)", () => {
@@ -613,7 +613,7 @@ test.describe("Sprite loader serves pre-generated WebP variants (#1186)", () => 
     // The global custom loader must redirect the sprite src to the pre-generated
     // WebP path (/sprites/pokemon/webp/<id>/<width>.webp), bypassing /_next/image.
     //
-    // This is a cross-layer assertion (e2e/** is normally playwright-owned) — kept
+    // This is a cross-layer assertion (e2e/** is normally playwright-owned) - kept
     // to one small assertion as documented in the PR description.
     await page.goto("/");
 
@@ -685,7 +685,7 @@ test.describe("Settings page", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Expand the Practice section first — FSRS optimizer lives inside it.
+    // Expand the Practice section first - FSRS optimizer lives inside it.
     await page.getByRole("button", { name: "Practice", exact: true }).click();
 
     // Sub-section label is present inside the expanded panel.
@@ -708,7 +708,7 @@ test.describe("Settings page", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Expand the Practice section first — New cards per day and Save live inside it.
+    // Expand the Practice section first - New cards per day and Save live inside it.
     await page.getByRole("button", { name: "Practice", exact: true }).click();
 
     const input = page.getByLabel("New cards per day").first();
@@ -768,7 +768,7 @@ test.describe("Settings page", () => {
     await awaitSeedIdb(page);
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Expand the Appearance section — App Theme lives inside it.
+    // Expand the Appearance section - App Theme lives inside it.
     await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
     // App Theme heading and Charizard card should be visible.
@@ -808,7 +808,7 @@ test.describe("Sign-in picker (#360)", () => {
 
     const signIn = page.getByRole("button", { name: "Sign in" });
     if (!(await signIn.isVisible().catch(() => false))) {
-      // AuthButton renders nothing when Supabase env vars are absent — skip
+      // AuthButton renders nothing when Supabase env vars are absent - skip
       // rather than fail in environments without auth configured.
       test.skip();
       return;
@@ -830,10 +830,10 @@ test.describe("Sign-in picker (#360)", () => {
   });
 
   // Header flex-wrap puts the Sign-in trigger at the LEFT edge of the
-  // viewport on narrow mobile (e.g. 390px iPhone 14 — nav-ul wraps below
+  // viewport on narrow mobile (e.g. 390px iPhone 14 - nav-ul wraps below
   // the logo and the trigger sits beside it) and at the RIGHT edge on
   // wider mobile below the `sm:` breakpoint (e.g. 430px iPhone 14 Pro Max
-  // — the whole row fits and `justify-between` pushes the trigger right).
+  // - the whole row fits and `justify-between` pushes the trigger right).
   // Exercise both wrap modes so the panel doesn't regress to overflowing
   // on either edge (#406, #441).
   for (const vw of [375, 414]) {
@@ -948,7 +948,7 @@ test.describe("Streak milestone celebration (#419)", () => {
     });
     // Pre-dismiss the modal so it does not cover the milestone banner.
     // Called AFTER the streak-seed script so it merges into whatever state
-    // exists — it will not overwrite seenStreakMilestones that the app saves
+    // exists - it will not overwrite seenStreakMilestones that the app saves
     // into settings after the milestone fires.
     await addOnboardingPreDismiss(page);
 
@@ -960,7 +960,7 @@ test.describe("Streak milestone celebration (#419)", () => {
     await expect(banner).toBeVisible();
     await expect(page.getByText("3-day streak!")).toBeVisible();
 
-    // Auto-dismiss after 3.5 s — give it 5 s.
+    // Auto-dismiss after 3.5 s - give it 5 s.
     await expect(banner).toBeHidden({ timeout: 5000 });
 
     // Reload: seenStreakMilestones now contains 3, so no re-fire.
@@ -974,7 +974,7 @@ test.describe("Streak milestone celebration (#419)", () => {
 test.describe("Daily summary persistence (#685)", () => {
   // Pre-seed every known card ID as already-reviewed so hydrateSession adds no
   // new cards and the practice page lands on the "All caught up!" complete
-  // screen immediately. Seeding only a single card is not enough — hydrateSession
+  // screen immediately. Seeding only a single card is not enough - hydrateSession
   // would append the full SEED_POKEMON list as new cards and queue them.
   const completedSession = buildCompletedSession({
     pokemonIds: SEED_POKEMON_IDS,
@@ -986,7 +986,7 @@ test.describe("Daily summary persistence (#685)", () => {
 
     // Seed a valid today-dated daily summary in localStorage.
     // The date expression deliberately re-implements todayInTimezone("UTC")
-    // inline — addInitScript runs in the browser before any app module loads,
+    // inline - addInitScript runs in the browser before any app module loads,
     // so the production helper cannot be imported here.
     await page.addInitScript(() => {
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(new Date());
@@ -1018,12 +1018,12 @@ test.describe("Daily summary persistence (#685)", () => {
     // Wait for the complete screen to render.
     await expect(page.getByText("All caught up!")).toBeVisible({ timeout: 10_000 });
 
-    // No daily summary and no grade log — share button must not be shown.
+    // No daily summary and no grade log - share button must not be shown.
     await expect(page.getByRole("button", { name: "Share today" })).toHaveCount(0);
   });
 
   test("'Share today' button reconstructs from the grade log when no daily summary exists (#896)", async ({ page }) => {
-    // Grade-log entries are stamped with a UTC date — match that here.
+    // Grade-log entries are stamped with a UTC date - match that here.
     const todayUtc = new Intl.DateTimeFormat("en-CA", {
       timeZone: "UTC",
     }).format(new Date());
@@ -1050,10 +1050,10 @@ test.describe("Daily summary persistence (#685)", () => {
   });
 });
 
-test.describe("EndOfSessionScreen unification — share button on NEW_CARDS_LOCKED (#926)", () => {
+test.describe("EndOfSessionScreen unification - share button on NEW_CARDS_LOCKED (#926)", () => {
   // All known species pre-seeded as reviewed, PLUS one extra unseen name card
   // (id 99999) not in SEED_POKEMON_IDS. With maxNewPerDay: 0, hydrateSession
-  // adds the unseen card but it cannot enter the new queue — landing on NEW_CARDS_LOCKED.
+  // adds the unseen card but it cannot enter the new queue - landing on NEW_CARDS_LOCKED.
   const EXTRA_UNSEEN_ID = 99999;
   const completedSession = buildCompletedSession({
     pokemonIds: SEED_POKEMON_IDS,
@@ -1189,7 +1189,7 @@ test.describe("Evolution edge card prompt (#262)", () => {
     });
     // The session limits in the IDB payload are overridden by settings. The
     // seeded evolution card is a review-due card, so the review queue is served
-    // first — it appears before any new name/reverse cards regardless of which
+    // first - it appears before any new name/reverse cards regardless of which
     // types are enabled. nameCardsEnabled and reverseCardsEnabled were removed
     // in #1234 (name and reverse are now always on).
     await page.addInitScript(() => {
@@ -1324,7 +1324,7 @@ test.describe("Per-direction accuracy breakdown on session-end screen (#994)", (
     await seedSessionIdb(page, sessionWithOneDueCard);
     // buildCompletedSession seeds all reverse cards as future-due so hydrateSession
     // adds no new cards. The dead poke-memory:user-settings:v1 key was removed in
-    // #1234 — limits now come from poke-memory:settings:v1 defaults, and since
+    // #1234 - limits now come from poke-memory:settings:v1 defaults, and since
     // every species has a seeded reverse card there are no new cards to introduce.
 
     await page.goto("/");
@@ -1335,7 +1335,7 @@ test.describe("Per-direction accuracy breakdown on session-end screen (#994)", (
     await expect(reveal).toBeVisible({ timeout: 10_000 });
     await reveal.click();
 
-    // Grade the card as Good — passes accuracy.
+    // Grade the card as Good - passes accuracy.
     const gradeGroup = page.getByRole("group", { name: "Grade your answer" });
     await expect(gradeGroup).toBeVisible();
     await gradeGroup.getByRole("button", { name: "Good" }).click();
@@ -1405,7 +1405,7 @@ test.describe("Document title due-count badge (#1062)", () => {
     await page.goto("/");
     await awaitSeedIdb(page);
 
-    // Wait for the hook's async IDB read to settle — use waitForFunction so
+    // Wait for the hook's async IDB read to settle - use waitForFunction so
     // we don't assert before the effect has had a chance to run.
     await page.waitForFunction(
       () => document.readyState === "complete",
@@ -1427,7 +1427,7 @@ test.describe("Document title due-count badge (#1062)", () => {
     await seedSessionIdb(page, sessionWithOneDueCard);
     // buildCompletedSession seeds all reverse cards as future-due so hydrateSession
     // adds no new cards. The poke-memory:user-settings:v1 key was always a dead
-    // key — the app reads from poke-memory:settings:v1. Removed in this sweep
+    // key - the app reads from poke-memory:settings:v1. Removed in this sweep
     // (#1234): limits come from poke-memory:settings:v1 defaults, and since every
     // species has a seeded reverse card, hydrateSession adds nothing new.
 
@@ -1455,7 +1455,7 @@ test.describe("Document title due-count badge (#1062)", () => {
     // waitForFunction races with that. toHaveTitle keeps polling.
     await expect(page).toHaveTitle(/^\(\d+\) .*Poké Memory/, { timeout: 10_000 });
 
-    // Grade the card — this should clear the prefix.
+    // Grade the card - this should clear the prefix.
     const reveal = page.getByRole("button", { name: "Reveal" });
     await expect(reveal).toBeVisible({ timeout: 5_000 });
     await reveal.click();

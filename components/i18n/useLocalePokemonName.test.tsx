@@ -1,5 +1,5 @@
 /**
- * Tests for `useLocalePokemonName` — verifies that:
+ * Tests for `useLocalePokemonName` - verifies that:
  * - The hook reads the locale from `PokemonLocaleContext`, not directly from settings.
  * - It resolves the locale-appropriate name when the context locale is non-en.
  * - It falls back to English when the locale is "en" or when the sidecar misses.
@@ -53,7 +53,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("useLocalePokemonName — locale en (flag off or default)", () => {
+describe("useLocalePokemonName - locale en (flag off or default)", () => {
   it("returns the English name when locale is en, regardless of flag state", async () => {
     setContext("en", false);
     const { result } = renderHook(() => useLocalePokemonName(4, "Charmander"));
@@ -65,7 +65,7 @@ describe("useLocalePokemonName — locale en (flag off or default)", () => {
   });
 });
 
-describe("useLocalePokemonName — non-en locale", () => {
+describe("useLocalePokemonName - non-en locale", () => {
   it("returns the English name immediately on first render", () => {
     setContext("ja", true);
     const { result } = renderHook(() => useLocalePokemonName(4, "Charmander"));
@@ -100,7 +100,7 @@ describe("useLocalePokemonName — non-en locale", () => {
   it("returns English name with no transliteration when locale is en even with flag on", async () => {
     setContext("en", true);
     const { result } = renderHook(() => useLocalePokemonName(4, "Charmander"));
-    // en locale short-circuits — loadLocaleNames is never called.
+    // en locale short-circuits - loadLocaleNames is never called.
     expect(result.current.name).toBe("Charmander");
     expect(result.current.transliteration).toBeNull();
     expect(mockLoadLocaleNames).not.toHaveBeenCalled();

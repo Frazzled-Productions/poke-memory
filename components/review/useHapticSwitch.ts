@@ -38,7 +38,7 @@ import { supportsSwitchHaptic } from "@/lib/review/haptic";
  * When the `switch` attribute is not supported, `triggerIosHaptic` is `null`
  * and `triggerHaptic` will silently skip the iOS path.
  *
- * `supported` is memoised — `supportsSwitchHaptic()` (which allocates a DOM
+ * `supported` is memoised - `supportsSwitchHaptic()` (which allocates a DOM
  * element) runs only once per component mount.
  */
 export function useHapticSwitch() {

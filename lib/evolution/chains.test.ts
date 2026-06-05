@@ -220,7 +220,7 @@ describe("deriveEvolutionFamilies", () => {
     const cards: ReviewableCard[] = [masteredForward(BULBASAUR_TO_IVYSAUR)];
     const families = deriveEvolutionFamilies(cards, 3, false);
     const bulbasaurIdx = families.findIndex((f) => f.rootId === 1);
-    // Bulbasaur family is in progress — find an untouched family after it.
+    // Bulbasaur family is in progress - find an untouched family after it.
     // Any untouched family should sort after it.
     const untouchedFamilies = families.filter(
       (f) =>
@@ -245,7 +245,7 @@ describe("deriveEvolutionFamilies", () => {
     ];
     const families = deriveEvolutionFamilies(cards, 3, false);
     const bulbasaurIdx = families.findIndex((f) => f.rootId === 1);
-    // Bulbasaur is now completed — it must sort after all untouched families.
+    // Bulbasaur is now completed - it must sort after all untouched families.
     const untouchedFamilies = families.filter(
       (f) =>
         !f.completed &&

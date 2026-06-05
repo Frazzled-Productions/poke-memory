@@ -3,12 +3,12 @@
  *
  * These assertions are intentionally byte-exact checks against the string
  * values that are already persisted in real users' browsers. A key string
- * change would silently orphan their saved state — this test makes such a
+ * change would silently orphan their saved state - this test makes such a
  * change fail CI rather than ship unnoticed.
  *
  * If you legitimately need to rename a key (e.g. a v2 migration), add the
  * new key alongside the old one, run the migration, then remove the old key
- * — do not change the existing constant here.
+ * - do not change the existing constant here.
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -28,7 +28,7 @@ import {
   KEY_CLIENT_SALT,
 } from "./keys";
 
-describe("localStorage key registry — byte-exact strings", () => {
+describe("localStorage key registry - byte-exact strings", () => {
   it("KEY_REVIEW_SESSION", () =>
     expect(KEY_REVIEW_SESSION).toBe("poke-memory:review-session:v1"));
 

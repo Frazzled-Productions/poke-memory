@@ -1,5 +1,5 @@
 /**
- * swipeGesture — pure geometry helpers for swipe-to-grade gestures.
+ * swipeGesture - pure geometry helpers for swipe-to-grade gestures.
  *
  * Kept in `lib/` so these functions can be tested in the `node` vitest project
  * (no DOM required). The React hook that wires them to pointer events lives in

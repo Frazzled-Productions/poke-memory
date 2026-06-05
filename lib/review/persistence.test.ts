@@ -93,7 +93,7 @@ function makeReverseCard(): ReverseReviewCard {
 function makeReverseEvolutionCard(): ReverseEvolutionReviewCard {
   // Mirrors the shape produced by buildSession for reverse-evolution cards:
   // spread of EvolutionCard (preEvo*/postEvo* fields, triggerPhrase) + the
-  // reverse-edge id, subjectKey, and state. NO `name`/`spriteUrl` — those
+  // reverse-edge id, subjectKey, and state. NO `name`/`spriteUrl` - those
   // live on `preEvoName`/`postEvoName` etc. Regression test for the
   // persistence validator falling through to the non-evolution branch and
   // wiping every saved session that contained a rev-evo card (#343 follow-up).
@@ -208,7 +208,7 @@ describe("saveSession / loadSession (IDB-backed)", () => {
   });
 
   // Regression: rev-evo cards (introduced in #343) inherit the EvolutionCard
-  // shape — no top-level `name`/`spriteUrl`. The validator used to fall
+  // shape - no top-level `name`/`spriteUrl`. The validator used to fall
   // through to the "non-evolution" branch and reject them, so parseSession
   // returned null for any session that included one and every reload silently
   // wiped the user's progress to a fresh-seed state. Force-pull-from-cloud
@@ -269,23 +269,23 @@ describe("saveSession / loadSession (IDB-backed)", () => {
 // ─── New IDB-path tests (closes #1015) ────────────────────────────────────────
 //
 // The three scenarios below were not covered by the existing suite:
-//   A) loadSession when isIdbAvailable() is already false on entry — must
+//   A) loadSession when isIdbAvailable() is already false on entry - must
 //      skip IDB entirely and delegate straight to loadSessionLS.
-//   B) loadSession when idbGet itself throws — the catch branch on line 326 in
+//   B) loadSession when idbGet itself throws - the catch branch on line 326 in
 //      persistence.ts must fall back to loadSessionLS rather than propagating.
-//   C) loadSession when IDB has no entry for the key — must fall back to
+//   C) loadSession when IDB has no entry for the key - must fall back to
 //      loadSessionLS as a last resort (covers the localStorage-to-IDB migration
 //      window documented in the inline comment).
 //   D) saveSession when idbSet swallows an internal error (real idb-layer
-//      failure, not just a mocked isIdbAvailable result) — the post-write
+//      failure, not just a mocked isIdbAvailable result) - the post-write
 //      availability check must detect the flip and write to localStorage instead.
 //
 // Tests A–C use vi.spyOn on the already-imported idbModule bindings.
 // Test D uses vi.resetModules() + vi.doMock('idb', …) + dynamic imports so the
 // real idbSet / saveSession run against a module whose underlying idb.put always
-// rejects — matching the pattern used in lib/idb/db.test.ts error-flip tests.
+// rejects - matching the pattern used in lib/idb/db.test.ts error-flip tests.
 
-describe("loadSession — IDB unavailable on entry (isIdbAvailable returns false)", () => {
+describe("loadSession - IDB unavailable on entry (isIdbAvailable returns false)", () => {
   // Minimal localStorage stub with a valid saved session.
   const validSessionJson = JSON.stringify({
     cards: [],
@@ -318,12 +318,12 @@ describe("loadSession — IDB unavailable on entry (isIdbAvailable returns false
   it("delegates to loadSessionLS without touching IDB when isIdbAvailable returns false", async () => {
     // Force isIdbAvailable to report false on the entry guard inside loadSession.
     vi.spyOn(idbModule, "isIdbAvailable").mockReturnValue(false);
-    // idbGet must not be called — spy to detect any accidental call.
+    // idbGet must not be called - spy to detect any accidental call.
     const idbGetSpy = vi.spyOn(idbModule, "idbGet");
 
     const result = await loadSession();
 
-    // localStorage had a valid (empty-cards) session — loadSessionLS should
+    // localStorage had a valid (empty-cards) session - loadSessionLS should
     // have returned it.
     expect(result).not.toBeNull();
     expect(result!.cards).toHaveLength(0);
@@ -344,7 +344,7 @@ describe("loadSession — IDB unavailable on entry (isIdbAvailable returns false
   });
 });
 
-describe("loadSession — IDB read throws, falls back to localStorage", () => {
+describe("loadSession - IDB read throws, falls back to localStorage", () => {
   const validSessionJson = JSON.stringify({
     cards: [],
     limits: DEFAULT_LIMITS,
@@ -375,7 +375,7 @@ describe("loadSession — IDB read throws, falls back to localStorage", () => {
 
   it("falls back to localStorage when idbGet throws", async () => {
     // idbGet is available (isIdbAvailable returns true) but the read itself
-    // throws — persistence.ts's catch block on line ~326 must rescue this and
+    // throws - persistence.ts's catch block on line ~326 must rescue this and
     // delegate to loadSessionLS.
     vi.spyOn(idbModule, "idbGet").mockRejectedValue(new DOMException("UnknownError"));
 
@@ -400,7 +400,7 @@ describe("loadSession — IDB read throws, falls back to localStorage", () => {
   });
 });
 
-describe("loadSession — IDB returns null, falls back to localStorage", () => {
+describe("loadSession - IDB returns null, falls back to localStorage", () => {
   // Covers the window between migrateFromLocalStorage running and a fresh
   // install: IDB has no entry for the key, so loadSession checks localStorage
   // as a last resort (the comment at line ~321 in persistence.ts explains this).
@@ -447,13 +447,13 @@ describe("loadSession — IDB returns null, falls back to localStorage", () => {
       dispatchEvent: () => true,
     });
 
-    // IDB is empty, localStorage returns null — loadSession must return null.
+    // IDB is empty, localStorage returns null - loadSession must return null.
     const result = await loadSession();
     expect(result).toBeNull();
   });
 });
 
-describe("saveSession — real idbSet failure swallowed, localStorage fallback triggered", () => {
+describe("saveSession - real idbSet failure swallowed, localStorage fallback triggered", () => {
   // Uses vi.resetModules() + vi.doMock('idb', …) so both the db.ts module
   // (which holds the idbAvailable flag) and persistence.ts run against a
   // mocked idb whose db.put always rejects. This exercises the full path:
@@ -512,7 +512,7 @@ describe("saveSession — real idbSet failure swallowed, localStorage fallback t
 
     const result = await save({ cards: [makeReverseCard()], limits: DEFAULT_LIMITS });
 
-    // idbSet swallowed the error and flipped idbAvailable — saveSession must
+    // idbSet swallowed the error and flipped idbAvailable - saveSession must
     // have fallen back to saveSessionLS, written to localStorage, and returned
     // { ok: true }.
     expect(result.ok).toBe(true);

@@ -24,7 +24,7 @@ const PRE_SPRITE = "https://example.com/charmander.png";
 const POST_SPRITE = "https://example.com/charmeleon.png";
 
 // ---------------------------------------------------------------------------
-// direction="evolution" (forward — "What does X evolve into?")
+// direction="evolution" (forward - "What does X evolve into?")
 // ---------------------------------------------------------------------------
 
 describe('EvolutionCard direction="evolution"', () => {
@@ -203,7 +203,7 @@ describe('EvolutionCard direction="evolution"', () => {
 });
 
 // ---------------------------------------------------------------------------
-// direction="reverse-evolution" (reverse — "Which Pokémon evolves into X?")
+// direction="reverse-evolution" (reverse - "Which Pokémon evolves into X?")
 // Migrated from ReverseEvolutionCard.test.tsx (#1007).
 // ---------------------------------------------------------------------------
 
@@ -352,7 +352,7 @@ describe('EvolutionCard direction="reverse-evolution"', () => {
 // Locale-aware question prompt (#1260 followup)
 // ---------------------------------------------------------------------------
 
-describe("EvolutionCard — question-side name uses useLocalePokemonName", () => {
+describe("EvolutionCard - question-side name uses useLocalePokemonName", () => {
   it("forward direction: prompt renders the locale-resolved pre-evo name", async () => {
     vi.resetModules();
     vi.doMock("@/lib/i18n/useLocalePokemonName", () => ({

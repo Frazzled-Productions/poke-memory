@@ -152,12 +152,12 @@ describe("gradeTypedAnswer", () => {
     expect(grade).toBe(1);
   });
 
-  it("strips punctuation before comparing — mr. mime matches Mr. Mime", () => {
+  it("strips punctuation before comparing - mr. mime matches Mr. Mime", () => {
     const { grade } = gradeTypedAnswer("mr. mime", "Mr. Mime");
     expect(grade).toBe(4);
   });
 
-  it("strips punctuation before comparing — farfetchd matches Farfetch'd", () => {
+  it("strips punctuation before comparing - farfetchd matches Farfetch'd", () => {
     const { grade } = gradeTypedAnswer("farfetchd", "Farfetch'd");
     expect(grade).toBe(4);
   });

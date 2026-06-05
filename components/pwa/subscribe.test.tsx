@@ -2,7 +2,7 @@
  * Tests for lib/push/subscribe.
  *
  * Lives under components/pwa/ rather than lib/push/ because subscribeToPush
- * touches navigator.serviceWorker, window.matchMedia, and Notification —
+ * touches navigator.serviceWorker, window.matchMedia, and Notification - 
  * all of which require a window. Per AGENTS.md "Testing", any test that
  * uses DOM APIs must live in components/ or app/ so the jsdom vitest
  * project picks it up.
@@ -18,7 +18,7 @@ import {
 } from "@/lib/push/subscribe";
 
 // ---------------------------------------------------------------------------
-// urlBase64ToUint8Array — pure helper, deterministic
+// urlBase64ToUint8Array - pure helper, deterministic
 // ---------------------------------------------------------------------------
 describe("urlBase64ToUint8Array", () => {
   it("decodes a base64url string into the equivalent byte array", () => {
@@ -41,7 +41,7 @@ describe("urlBase64ToUint8Array", () => {
 });
 
 // ---------------------------------------------------------------------------
-// isPushSupported / isStandalone — feature detection
+// isPushSupported / isStandalone - feature detection
 // ---------------------------------------------------------------------------
 describe("isPushSupported", () => {
   it("returns true when the three core APIs exist", () => {
@@ -112,7 +112,7 @@ describe("isStandalone", () => {
 });
 
 // ---------------------------------------------------------------------------
-// subscribeToPush / unsubscribeFromPush — DB + browser integration
+// subscribeToPush / unsubscribeFromPush - DB + browser integration
 // ---------------------------------------------------------------------------
 
 type FakeSubscription = {
@@ -224,7 +224,7 @@ describe("subscribeToPush", () => {
 
   it("returns unsupported when PushManager is missing", async () => {
     // isPushSupported's serviceWorker check uses `in`, which sees prototype
-    // properties — and jsdom defines serviceWorker on Navigator.prototype, so
+    // properties - and jsdom defines serviceWorker on Navigator.prototype, so
     // `delete navigator.serviceWorker` doesn't remove it. PushManager is a
     // window-only feature with no prototype fallback, so removing it from
     // window IS the cleanest way to flip isPushSupported to false.

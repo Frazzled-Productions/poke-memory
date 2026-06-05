@@ -59,7 +59,7 @@ export default function PokedexPage() {
     }
   }
 
-  // Default forms only — one tile per species. Falls back to all entries when
+  // Default forms only - one tile per species. Falls back to all entries when
   // the seed hasn't been re-run yet (isDefaultForm will be undefined on older
   // generated.json) to avoid an empty grid.
   const defaultFormPokemon = SEED_POKEMON.filter(

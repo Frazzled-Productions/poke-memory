@@ -3,7 +3,7 @@ import { BiomeSky } from "./BiomeSky";
 import { BiomeFloor } from "./BiomeFloor";
 
 /**
- * Waters Edge habitat backdrop — calm lake with marsh reeds, lily pads,
+ * Waters Edge habitat backdrop - calm lake with marsh reeds, lily pads,
  * and a sandy/muddy shore in front. Anchor bands cluster sprites along
  * the shore and shallow-marsh band, with the deepest band on the far
  * bank.
@@ -110,7 +110,7 @@ export function WatersEdgeBiome() {
         fill="none" stroke="#ffffff" strokeWidth="2" opacity="0.7"
       />
 
-      {/* Foreground reed cluster — left */}
+      {/* Foreground reed cluster - left */}
       <g stroke="#3a6a22" strokeWidth="3" strokeLinecap="round" fill="none">
         {[
           [60, 555], [78, 555], [96, 555], [114, 555],
@@ -122,7 +122,7 @@ export function WatersEdgeBiome() {
         ))}
       </g>
 
-      {/* Foreground reed cluster — right */}
+      {/* Foreground reed cluster - right */}
       <g stroke="#3a6a22" strokeWidth="3" strokeLinecap="round" fill="none">
         {[
           [1480, 558], [1500, 555], [1520, 558], [1540, 555],

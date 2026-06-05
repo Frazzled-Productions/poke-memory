@@ -80,7 +80,7 @@ const ALT_FORM_ID = 10100; // Alolan Raichu
 function makeAltFormCard(state: ReviewState = initialReviewState(NOW)): NameReviewCard {
   return {
     ...makeNameCard(ALT_FORM_ID, state),
-    speciesId: 26, // Alolan Raichu's parent species (Raichu) — matches real seed shape
+    speciesId: 26, // Alolan Raichu's parent species (Raichu) - matches real seed shape
     isDefaultForm: false,
     formCategory: "regional",
     formSlug: "alola",
@@ -90,7 +90,7 @@ function makeAltFormCard(state: ReviewState = initialReviewState(NOW)): NameRevi
 }
 
 describe("eligibleCardsForKnownQuiz", () => {
-  it("returns only cards that have never been touched (no alternateFormsEnabled arg — defaults to true)", () => {
+  it("returns only cards that have never been touched (no alternateFormsEnabled arg - defaults to true)", () => {
     const fresh = makeNameCard(1);
     const reviewed = makeNameCard(2, {
       ...initialReviewState(NOW),
@@ -126,7 +126,7 @@ describe("eligibleCardsForKnownQuiz", () => {
     });
 
     it("defaults to including alternate forms when alternateFormsEnabled is omitted", () => {
-      // The default arg is true — callers that pre-date the parameter see no
+      // The default arg is true - callers that pre-date the parameter see no
       // behavioural change (backwards-compatible default).
       const altForm = makeAltFormCard();
       const result = eligibleCardsForKnownQuiz([altForm]);
@@ -174,7 +174,7 @@ describe("applyKnownGrades", () => {
 
   it("does NOT push the card to mastery in one shot (correctness invariant)", () => {
     // The quiz must produce real graduated state, not a synthesised mastered
-    // state — mastery requires reps >= masteryRepetitions and
+    // state - mastery requires reps >= masteryRepetitions and
     // scheduledDays >= 21, which one tap can't legitimately establish.
     const cards = [makeNameCard(1)];
     const { cards: next } = applyKnownGrades(cards, new Set([1]), NOW);
@@ -193,7 +193,7 @@ describe("applyKnownGrades", () => {
     });
     const { cards: next, gradedIds } = applyKnownGrades([reviewed], new Set([1]), NOW);
     expect(gradedIds).toEqual([]);
-    // State must be identical to input — no regression of in-progress cards.
+    // State must be identical to input - no regression of in-progress cards.
     expect(next[0].state).toEqual(reviewed.state);
   });
 

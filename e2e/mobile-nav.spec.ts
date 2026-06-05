@@ -12,13 +12,13 @@ test.beforeEach(async ({ page }) => {
  * - Default (new user, no persisted settings) → bottom tab bar.
  * - Hamburger (user toggles the setting on the Settings page) → hamburger drawer.
  *
- * Desktop is unaffected by the setting — the inline header nav row is always
+ * Desktop is unaffected by the setting - the inline header nav row is always
  * shown and no bottom tab bar leaks in.
  */
 
 // ─── Bottom tab bar (default mode) ───────────────────────────────────────────
 
-test.describe("Mobile nav — bottom tab bar (default)", () => {
+test.describe("Mobile nav - bottom tab bar (default)", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "mobile-safari",
@@ -59,7 +59,7 @@ test.describe("Mobile nav — bottom tab bar (default)", () => {
     }
   });
 
-  test("tab bar is fixed — does not scroll with the page", async ({ page }) => {
+  test("tab bar is fixed - does not scroll with the page", async ({ page }) => {
     await page.goto("/pokedex");
 
     const tabBar = page.getByRole("navigation", {
@@ -139,7 +139,7 @@ test.describe("Mobile nav — bottom tab bar (default)", () => {
     ).toHaveCount(0);
   });
 
-  test("header shows only brand and auth on mobile — no link row", async ({ page }) => {
+  test("header shows only brand and auth on mobile - no link row", async ({ page }) => {
     await page.goto("/");
 
     const header = page.getByRole("navigation", { name: "Main navigation" });
@@ -153,7 +153,7 @@ test.describe("Mobile nav — bottom tab bar (default)", () => {
 
 // ─── Hamburger mode ───────────────────────────────────────────────────────────
 
-test.describe("Mobile nav — hamburger mode (via Settings toggle)", () => {
+test.describe("Mobile nav - hamburger mode (via Settings toggle)", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "mobile-safari",
@@ -214,7 +214,7 @@ test.describe("Mobile nav — hamburger mode (via Settings toggle)", () => {
 
 // ─── Footer visibility & legal-page access (#734 / #735) ─────────────────────
 
-test.describe("Mobile nav — footer hidden and legal pages via Settings → About", () => {
+test.describe("Mobile nav - footer hidden and legal pages via Settings → About", () => {
   test("footer is not rendered in bottom-nav mode (default)", async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name !== "mobile-safari",
@@ -325,9 +325,9 @@ test.describe("Mobile nav — footer hidden and legal pages via Settings → Abo
   });
 });
 
-// ─── Desktop — unaffected by mobileNav setting ────────────────────────────────
+// ─── Desktop - unaffected by mobileNav setting ────────────────────────────────
 
-test.describe("Desktop nav — inline header row, no tab bar", () => {
+test.describe("Desktop nav - inline header row, no tab bar", () => {
   test("desktop shows the horizontal link row and no bottom tab bar", async (
     { page },
     testInfo,

@@ -14,7 +14,7 @@ import type { DateFormat } from "@/lib/utils/format-date";
 import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
-// Palette — consistent with other Stats components (zinc/emerald/rose)
+// Palette - consistent with other Stats components (zinc/emerald/rose)
 // ---------------------------------------------------------------------------
 
 /** Emerald fill matching the mastery colour used in MasteryBar and TypeBreakdown. */
@@ -55,7 +55,7 @@ function ChartTooltip({
 }
 
 // ---------------------------------------------------------------------------
-// X-axis tick formatter — show date labels sparsely, respecting user format
+// X-axis tick formatter - show date labels sparsely, respecting user format
 // ---------------------------------------------------------------------------
 
 function formatXTick(date: string, fmt: DateFormat): string {
@@ -77,7 +77,7 @@ type Props = {
    * `forceAllMastered`) renders a flat indicator.
    */
   series: readonly MasteryPoint[];
-  /** Total name-card count — used in the heading and empty-state copy. */
+  /** Total name-card count - used in the heading and empty-state copy. */
   totalCards: number;
   /**
    * User's preferred date format. Defaults to "dmy" (day-first, en-GB).
@@ -96,7 +96,7 @@ type Props = {
  * Cumulative area chart showing mastered species count over time.
  *
  * Data source: `lastReview` on mastered name-cards (same approximation used
- * by `computeRecords` — see `lib/stats/mastery-over-time.ts`).
+ * by `computeRecords` - see `lib/stats/mastery-over-time.ts`).
  *
  * Superuser `pretendAllMastered`: the caller passes in the result of
  * `computeMasteryOverTime(..., forceAllMastered)`, which produces a single
@@ -148,7 +148,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
             </div>
 
             {isSinglePoint ? (
-              /* Single-point: no trend to draw — just show the headline. */
+              /* Single-point: no trend to draw - just show the headline. */
               <p className={mutedTextXs}>
                 {forceAllMastered
                   ? t("superuserMode")

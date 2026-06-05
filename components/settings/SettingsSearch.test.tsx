@@ -99,7 +99,7 @@ describe("sectionMatchesQuery", () => {
   });
 
   it("matches case-insensitively when caller passes a lower-cased query", () => {
-    // sectionMatchesQuery expects a pre-normalised (lower-cased) query —
+    // sectionMatchesQuery expects a pre-normalised (lower-cased) query - 
     // the settings page normalises via .trim().toLowerCase() before calling it.
     expect(sectionMatchesQuery(entry, "audio")).toBe(true);
   });
@@ -219,7 +219,7 @@ describe("Settings page filter logic", () => {
     expect(getVisibleSectionIds("xyzzynosuchthing").size).toBe(0);
   });
 
-  it("is case-insensitive — 'BACKUP' matches Account & Data", () => {
+  it("is case-insensitive - 'BACKUP' matches Account & Data", () => {
     expect(getVisibleSectionIds("BACKUP").has("account-data-heading")).toBe(true);
   });
 
@@ -236,13 +236,13 @@ describe("Settings page filter logic", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SettingsSearch — Japanese locale (#1392)
+// SettingsSearch - Japanese locale (#1392)
 //
 // Verifies that the aria strings (clear button, aria-live announcements)
 // are localised in the Japanese catalogue and not hardcoded English.
 // ---------------------------------------------------------------------------
 
-describe("SettingsSearch — Japanese locale aria strings", () => {
+describe("SettingsSearch - Japanese locale aria strings", () => {
   it("renders the clear button with a Japanese aria-label", () => {
     renderJa(<SettingsSearch value="test" onChange={vi.fn()} matchCount={1} />);
     // The Japanese catalog key clearAriaLabel must produce a non-English label.

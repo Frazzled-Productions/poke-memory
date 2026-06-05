@@ -8,7 +8,7 @@
  *
  * When a grade push fails while offline, the caller registers the
  * `poke-memory:grade-sync` tag. The browser will fire a `sync` event in the
- * service worker once connectivity is restored — even if every app tab is
+ * service worker once connectivity is restored - even if every app tab is
  * closed. The SW handler (`app/sw.ts`) then reads the persisted pending queue
  * from IndexedDB and replays it against `/api/sync`.
  *
@@ -53,7 +53,7 @@ export function isBackgroundSyncSupported(): boolean {
  * is closed at that point.
  *
  * No-op when Background Sync is not supported or the service worker is not
- * registered. Never throws — any error is swallowed and logged.
+ * registered. Never throws - any error is swallowed and logged.
  */
 export async function registerBackgroundSync(): Promise<void> {
   if (!isBackgroundSyncSupported()) return;
@@ -66,7 +66,7 @@ export async function registerBackgroundSync(): Promise<void> {
     await syncManager.register(BACKGROUND_SYNC_TAG);
   } catch (err) {
     // The browser may reject the registration (e.g. user denied notifications
-    // permission, or the SW is not yet installed). Silently degrade — the
+    // permission, or the SW is not yet installed). Silently degrade - the
     // on-reconnect-while-open path remains the fallback.
     console.warn("[background-sync] failed to register sync tag:", err);
   }

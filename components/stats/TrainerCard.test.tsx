@@ -211,7 +211,7 @@ describe("TrainerCard", () => {
 // Locale coverage (mandatory per AGENTS.md)
 // ---------------------------------------------------------------------------
 
-describe("TrainerCard — locale coverage (i18n #1393)", () => {
+describe("TrainerCard - locale coverage (i18n #1393)", () => {
   const perGen = Array.from({ length: 9 }, (_, i) =>
     gen(i + 1, 0, 100),
   );

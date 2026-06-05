@@ -63,7 +63,7 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
     try {
       const audio = new Audio(card.cryUrl ?? `/cries/${card.id}.ogg`);
       audio.play().catch(() => {
-        // Ignore — mobile Safari may block without user gesture in some cases.
+        // Ignore - mobile Safari may block without user gesture in some cases.
       });
     } catch {
       // Ignore audio errors entirely.
@@ -80,7 +80,7 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
   }, []);
 
   const handleClick = useCallback(() => {
-    // The click that follows a long-press should not also play the cry — the
+    // The click that follows a long-press should not also play the cry - the
     // user's intent was the popover, not a tap. Consume the flag and bail.
     if (longPressFiredRef.current) {
       longPressFiredRef.current = false;

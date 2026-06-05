@@ -46,7 +46,7 @@ export function useLearningQueueTimer(
 
     timeoutRef.current = setTimeout(() => {
       timeoutRef.current = null;
-      // Fire the callback — ReviewSession passes `() => setLearningQueue(q => [...q])`
+      // Fire the callback - ReviewSession passes `() => setLearningQueue(q => [...q])`
       // which forces a re-render so the now-due card is picked up. Bumping the array
       // reference re-runs this effect, which is harmless: the newly-due entry is
       // filtered out of `futureDue`, and any remaining future entries chain onto

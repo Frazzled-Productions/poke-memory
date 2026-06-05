@@ -29,7 +29,7 @@ async function enableTypedEntry(page: import("@playwright/test").Page) {
             existing = parsed as Record<string, unknown>;
           }
         } catch {
-          /* malformed — keep defaults */
+          /* malformed - keep defaults */
         }
       }
       localStorage.setItem(
@@ -69,7 +69,7 @@ async function enableTypedEntryWithMcBannerPending(page: import("@playwright/tes
             existing = parsed as Record<string, unknown>;
           }
         } catch {
-          /* malformed — keep defaults */
+          /* malformed - keep defaults */
         }
       }
       localStorage.setItem(
@@ -179,7 +179,7 @@ test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
 });
 
-test.describe("Verified typed entry — Settings toggle (#1251)", () => {
+test.describe("Verified typed entry - Settings toggle (#1251)", () => {
   test("the toggle is present in the Practice - Name cards section", async ({ page }) => {
     await page.goto("/settings");
 
@@ -215,7 +215,7 @@ test.describe("Verified typed entry — Settings toggle (#1251)", () => {
   });
 });
 
-test.describe("Verified typed entry — Practice flow (#1251)", () => {
+test.describe("Verified typed entry - Practice flow (#1251)", () => {
   test("with the setting on, a name card shows the text input instead of the Reveal button", async ({
     page,
   }) => {
@@ -255,7 +255,7 @@ test.describe("Verified typed entry — Practice flow (#1251)", () => {
     const input = page.getByRole("textbox", { name: /type the pokémon name/i });
     await expect(input).toBeVisible({ timeout: 10000 });
 
-    // Click I don't know — this should fire Again (1) and show feedback.
+    // Click I don't know - this should fire Again (1) and show feedback.
     await page.getByRole("button", { name: /i don.t know/i }).click();
 
     // After submitting, the input form disappears and feedback appears.
@@ -318,7 +318,7 @@ async function enableTypedEntryFirstTime(page: import("@playwright/test").Page) 
   });
 }
 
-test.describe("Typed entry onboarding (#1271) — Settings touch 1 (inline help)", () => {
+test.describe("Typed entry onboarding (#1271) - Settings touch 1 (inline help)", () => {
   test("inline MC-ramp help text is always visible under the toggle", async ({ page }) => {
     await page.goto("/settings");
     await page.getByRole("button", { name: /^practice$/i }).click();
@@ -329,7 +329,7 @@ test.describe("Typed entry onboarding (#1271) — Settings touch 1 (inline help)
   });
 });
 
-test.describe("Typed entry onboarding (#1271) — Settings touch 2 (first-enable banner)", () => {
+test.describe("Typed entry onboarding (#1271) - Settings touch 2 (first-enable banner)", () => {
   test("first-enable banner appears when the toggle is turned on for the first time", async ({
     page,
   }) => {
@@ -359,7 +359,7 @@ test.describe("Typed entry onboarding (#1271) — Settings touch 2 (first-enable
   });
 });
 
-test.describe("Typed entry onboarding (#1271) — Touch 3 (MC card banner)", () => {
+test.describe("Typed entry onboarding (#1271) - Touch 3 (MC card banner)", () => {
   test("one-time banner appears above the first MC card when mcCardOnboardingShown is false", async ({
     page,
   }) => {
@@ -384,7 +384,7 @@ test.describe("Typed entry onboarding (#1271) — Touch 3 (MC card banner)", () 
 
   test("MC card banner is absent when mcCardOnboardingShown is true", async ({ page }) => {
     await enableTypedEntry(page);
-    // Override mcCardOnboardingShown to true — banner should not appear.
+    // Override mcCardOnboardingShown to true - banner should not appear.
     await page.addInitScript(() => {
       try {
         const KEY = "poke-memory:settings:v1";
@@ -417,7 +417,7 @@ test.describe("Typed entry onboarding (#1271) — Touch 3 (MC card banner)", () 
   });
 });
 
-test.describe("MC learning step — Practice flow (#1237)", () => {
+test.describe("MC learning step - Practice flow (#1237)", () => {
   test("a new name card in learning phase shows 4 MC buttons, not the typed-entry input", async ({
     page,
   }) => {

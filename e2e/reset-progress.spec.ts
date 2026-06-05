@@ -66,7 +66,7 @@ test.describe("Reset-progress dialog (#766)", () => {
     // The dialog must no longer be visible.
     await expect(dialog).toBeHidden();
 
-    // The page must still be /settings — no navigation happened.
+    // The page must still be /settings - no navigation happened.
     await expect(page).toHaveURL(/\/settings/);
   });
 

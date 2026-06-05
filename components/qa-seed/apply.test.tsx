@@ -1,6 +1,6 @@
 /**
  * Unit tests for lib/qa-seed/apply.ts (#1608). jsdom (needs localStorage,
- * StorageEvent, and fake-indexeddb) — lives under components/ per the
+ * StorageEvent, and fake-indexeddb) - lives under components/ per the
  * AGENTS.md test-placement rule.
  *
  * The existing components/settings/QaSeedApply.test.tsx covers the
@@ -8,13 +8,13 @@
  * called, StorageEvent dispatched). This file covers the non-trivial internal
  * logic:
  *
- *   1. lastNDates() — date arithmetic, DST-safety, boundary cases.
- *   2. Multi-key settings merge — all payload keys flow into a single
+ *   1. lastNDates() - date arithmetic, DST-safety, boundary cases.
+ *   2. Multi-key settings merge - all payload keys flow into a single
  *      loadSettings/saveSettings call; pre-existing keys are preserved.
- *   3. masteredCountByLocale warming — writeMasteredCountForLocale is called
+ *   3. masteredCountByLocale warming - writeMasteredCountForLocale is called
  *      once per locale in the payload, with the correct value.
- *   4. Slug persistence — KEY_QA_SEED_ACTIVE is written / omitted correctly.
- *   5. clearSeedScenario — IDB deletes, streak + settings reset, mastered
+ *   4. Slug persistence - KEY_QA_SEED_ACTIVE is written / omitted correctly.
+ *   5. clearSeedScenario - IDB deletes, streak + settings reset, mastered
  *      cache zeroed, StorageEvents dispatched.
  */
 
@@ -133,7 +133,7 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// lastNDates() — date arithmetic
+// lastNDates() - date arithmetic
 //
 // lastNDates is not exported; we exercise it indirectly via applySeedScenario
 // → saveStreakData (which receives the computed array). We can also test it
@@ -176,7 +176,7 @@ describe("lastNDates arithmetic (via saveStreakData call)", () => {
       const curr = new Date(dates[i]).getTime();
       // Allow for a DST boundary: 23 or 25 hours in ms. The implementation
       // uses Date.now() - i * 86_400_000, which is millisecond arithmetic and
-      // therefore DST-safe — the difference in ISO date strings will always be
+      // therefore DST-safe - the difference in ISO date strings will always be
       // one calendar day regardless of clock changes.
       const diffMs = curr - prev;
       expect(diffMs).toBeGreaterThanOrEqual(23 * 60 * 60 * 1000);
@@ -371,7 +371,7 @@ describe("masteredCountByLocale warming", () => {
       masteredCountByLocale: { en: 20, ja: 0 },
     });
     const mock = vi.mocked(writeMasteredCountForLocale);
-    // en = 20 (valid), ja = 0 (valid number — 0 IS a number).
+    // en = 20 (valid), ja = 0 (valid number - 0 IS a number).
     expect(mock).toHaveBeenCalledWith("en", 20);
     expect(mock).toHaveBeenCalledWith("ja", 0);
     expect(mock).toHaveBeenCalledTimes(2);
@@ -445,7 +445,7 @@ describe("IDB write path", () => {
   // StorageEvent dispatch requires the real jsdom localStorage (not the stub)
   // because jsdom's StorageEvent constructor validates that storageArea is a
   // proper Storage instance and throws otherwise (writeLocalStorage catches it).
-  describe("StorageEvent dispatch — real localStorage", () => {
+  describe("StorageEvent dispatch - real localStorage", () => {
     beforeEach(() => {
       Object.defineProperty(window, "localStorage", {
         value: realJsdomLocalStorage,
@@ -537,9 +537,9 @@ describe("clearSeedScenario", () => {
     expect(cached["zh-Hant"]).toBe(0);
   });
 
-  // StorageEvent dispatch requires the real jsdom localStorage — see note in
+  // StorageEvent dispatch requires the real jsdom localStorage - see note in
   // the "IDB write path" describe above for the full rationale.
-  describe("StorageEvent dispatch — real localStorage", () => {
+  describe("StorageEvent dispatch - real localStorage", () => {
     beforeEach(() => {
       Object.defineProperty(window, "localStorage", {
         value: realJsdomLocalStorage,

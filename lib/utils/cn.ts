@@ -1,7 +1,7 @@
 /**
  * Lightweight class-name composition helper.
  *
- * Accepts any mix of strings, booleans, null, and undefined — falsy values are
+ * Accepts any mix of strings, booleans, null, and undefined - falsy values are
  * silently dropped. Equivalent to the popular `clsx` library for the subset of
  * features this project needs, with no external dependency.
  *

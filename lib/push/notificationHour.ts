@@ -9,7 +9,7 @@
  * route will fire once per hour and `shouldSendToUser` will gate each call
  * correctly using the user's local preferred hour converted to UTC.
  *
- * IMPORTANT — interim behaviour (this PR):
+ * IMPORTANT - interim behaviour (this PR):
  * The cron is STILL daily (0 8 * * *). Users with no preference (NULL →
  * effective UTC hour 8) continue to receive their notification exactly as
  * before. Users who set a non-8-UTC-equivalent preferred hour will be
@@ -30,7 +30,7 @@ export const PUSH_DEFAULT_HOUR_UTC = 8;
  * equivalent UTC hour at a given reference timestamp.
  *
  * Uses `Intl.DateTimeFormat` evaluated against `now` so DST transitions are
- * handled correctly — the UTC offset is derived from the actual civil wall
+ * handled correctly - the UTC offset is derived from the actual civil wall
  * clock at `now`, not from a fixed offset. Two DST-adjacent timestamps an
  * hour apart on the same `referenceHour` in the same `timezone` may return
  * different UTC hours: that is correct behaviour.
@@ -60,7 +60,7 @@ export function localHourToUtcHour(
   let currentLocalHour: number;
   try {
     // Extract the current hour in the user's timezone using Intl.
-    // hour12: false gives 0-23 — but Intl can return "24" for midnight in
+    // hour12: false gives 0-23 - but Intl can return "24" for midnight in
     // some implementations, so we normalise with % 24.
     const fmt = new Intl.DateTimeFormat("en-US", {
       timeZone: timezone,
@@ -71,7 +71,7 @@ export function localHourToUtcHour(
     const hourStr = parts.find((p) => p.type === "hour")?.value ?? "0";
     currentLocalHour = parseInt(hourStr, 10) % 24;
   } catch {
-    // Invalid timezone — fall back to treating referenceHour as UTC.
+    // Invalid timezone - fall back to treating referenceHour as UTC.
     return referenceHour % 24;
   }
 

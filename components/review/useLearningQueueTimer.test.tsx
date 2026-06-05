@@ -6,7 +6,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("useLearningQueueTimer — empty queue", () => {
+describe("useLearningQueueTimer - empty queue", () => {
   it("does not call onDue when learningQueue is empty", () => {
     vi.useFakeTimers();
     const onDue = vi.fn();
@@ -16,7 +16,7 @@ describe("useLearningQueueTimer — empty queue", () => {
   });
 });
 
-describe("useLearningQueueTimer — all entries already due", () => {
+describe("useLearningQueueTimer - all entries already due", () => {
   it("does not schedule a timeout when all entries are in the past", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-01T12:00:00Z"));
@@ -30,7 +30,7 @@ describe("useLearningQueueTimer — all entries already due", () => {
   });
 });
 
-describe("useLearningQueueTimer — future entry", () => {
+describe("useLearningQueueTimer - future entry", () => {
   it("calls onDue after the delay when a future entry exists", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-01T12:00:00Z"));
@@ -69,7 +69,7 @@ describe("useLearningQueueTimer — future entry", () => {
     await act(async () => { vi.advanceTimersByTime(600); });
     expect(onDue).toHaveBeenCalledOnce();
 
-    // Only fired once — the second entry has not yet elapsed.
+    // Only fired once - the second entry has not yet elapsed.
     onDue.mockClear();
     await act(async () => { vi.advanceTimersByTime(1500); });
     // The effect re-runs with a fresh queue on each render cycle; since

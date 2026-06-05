@@ -92,10 +92,10 @@ Object.defineProperty(navigator, "storage", {
 });
 
 // ---------------------------------------------------------------------------
-// IntensityPicker — locale coverage
+// IntensityPicker - locale coverage
 // ---------------------------------------------------------------------------
 
-describe("IntensityPicker — locale coverage", () => {
+describe("IntensityPicker - locale coverage", () => {
   it("en: renders heading and all three option labels", () => {
     renderWithIntl(<IntensityPicker value="accents" onChange={vi.fn()} />);
     expect(screen.getByRole("heading", { name: /theme intensity/i })).toBeInTheDocument();
@@ -121,10 +121,10 @@ describe("IntensityPicker — locale coverage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// TtsControls — locale coverage
+// TtsControls - locale coverage
 // ---------------------------------------------------------------------------
 
-describe("TtsControls — locale coverage", () => {
+describe("TtsControls - locale coverage", () => {
   beforeEach(() => {
     vi.resetModules();
   });
@@ -172,7 +172,7 @@ describe("TtsControls — locale coverage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// TtsWipNote — locale coverage (state in + out) — closes #1536
+// TtsWipNote - locale coverage (state in + out) - closes #1536
 // ---------------------------------------------------------------------------
 // The note is an inline paragraph in settings/page.tsx, not a standalone
 // component, so we test it through the i18n key rendered in isolation
@@ -189,7 +189,7 @@ function TtsWipNoteWrapper({ on }: { on: boolean }) {
   return <p className={mutedTextXs}>{t("ttsWipNote")}</p>;
 }
 
-describe("TtsWipNote — locale coverage (state in + out)", () => {
+describe("TtsWipNote - locale coverage (state in + out)", () => {
   it("en: shown when speakNameOnReveal is on (state in)", () => {
     renderWithIntl(<TtsWipNoteWrapper on={true} />);
     expect(screen.getByText(/AI-generated audio we are still improving/i)).toBeInTheDocument();
@@ -217,10 +217,10 @@ describe("TtsWipNote — locale coverage (state in + out)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// OfflineSection — locale coverage (idle state and downloading state)
+// OfflineSection - locale coverage (idle state and downloading state)
 // ---------------------------------------------------------------------------
 
-describe("OfflineSection — locale coverage", () => {
+describe("OfflineSection - locale coverage", () => {
   beforeEach(() => {
     _resetForTesting();
     Object.defineProperty(window, "localStorage", {
@@ -250,17 +250,17 @@ describe("OfflineSection — locale coverage", () => {
     expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
   });
 
-  it("ja: idle state — download button label in Japanese", () => {
+  it("ja: idle state - download button label in Japanese", () => {
     renderJa(<OfflineSection />);
     expect(screen.getByRole("button", { name: /ダウンロード/ })).toBeInTheDocument();
   });
 
-  it("zh-Hans: idle state — download button label in Simplified Chinese", () => {
+  it("zh-Hans: idle state - download button label in Simplified Chinese", () => {
     renderZhHans(<OfflineSection />);
     expect(screen.getByRole("button", { name: /下载/ })).toBeInTheDocument();
   });
 
-  it("zh-Hant: idle state — download button label in Traditional Chinese", () => {
+  it("zh-Hant: idle state - download button label in Traditional Chinese", () => {
     renderZhHant(<OfflineSection />);
     expect(screen.getByRole("button", { name: /下載/ })).toBeInTheDocument();
   });
@@ -288,7 +288,7 @@ describe("OfflineSection — locale coverage", () => {
     await screen.findByRole("button", { name: /download|update/i });
   });
 
-  it("ja: downloading state — stop button label in Japanese", async () => {
+  it("ja: downloading state - stop button label in Japanese", async () => {
     let resolvePrecache!: (value: precacheModule.PrecacheSummary) => void;
     vi.spyOn(precacheModule, "precacheAll").mockImplementation(({ onProgress }) => {
       onProgress?.({ done: 1, total: 100, bytesSoFar: 25_000 });
@@ -308,7 +308,7 @@ describe("OfflineSection — locale coverage", () => {
     await screen.findByRole("button", { name: /ダウンロード|更新/ });
   });
 
-  it("zh-Hans: done state — update button label in Simplified Chinese", () => {
+  it("zh-Hans: done state - update button label in Simplified Chinese", () => {
     window.localStorage.setItem(
       precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
       new Date().toISOString(),
@@ -317,7 +317,7 @@ describe("OfflineSection — locale coverage", () => {
     expect(screen.getByRole("button", { name: /更新/ })).toBeInTheDocument();
   });
 
-  it("zh-Hant: done state — update button label in Traditional Chinese", () => {
+  it("zh-Hant: done state - update button label in Traditional Chinese", () => {
     window.localStorage.setItem(
       precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
       new Date().toISOString(),

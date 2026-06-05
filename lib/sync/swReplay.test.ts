@@ -3,16 +3,16 @@
  *
  * These tests cover the three blockers identified in the PR review:
  *
- *   B1 — data-format mismatch: savePendingQueue must write CloudRow[] (snake_case)
+ *   B1 - data-format mismatch: savePendingQueue must write CloudRow[] (snake_case)
  *        to IDB, not ReviewableCard[] (camelCase), so the SW can POST directly to
  *        /api/sync without conversion.
  *
- *   B2 — 401/403 triggers infinite retries: the SW resolves (does not throw) on
+ *   B2 - 401/403 triggers infinite retries: the SW resolves (does not throw) on
  *        permanent auth failures. Tested indirectly via the 401/403 branch in the
  *        direct-push logic; the observable contract is the clearPendingQueueFromIdb
  *        call and no re-throw.
  *
- *   B3 — client-delegation has no ACK: useOnlineReconnectSync sends an ACK on the
+ *   B3 - client-delegation has no ACK: useOnlineReconnectSync sends an ACK on the
  *        transferred MessageChannel port before starting the pull-push sequence.
  *
  * The SW itself (app/sw.ts) runs in a ServiceWorkerGlobalScope and is excluded
@@ -92,10 +92,10 @@ function makeCard(
 }
 
 // ---------------------------------------------------------------------------
-// BLOCKER 1 — data-format: toCloudRows projects to snake_case CloudRow[]
+// BLOCKER 1 - data-format: toCloudRows projects to snake_case CloudRow[]
 // ---------------------------------------------------------------------------
 
-describe("toCloudRows (BLOCKER 1 — data-format projection for IDB/SW path)", () => {
+describe("toCloudRows (BLOCKER 1 - data-format projection for IDB/SW path)", () => {
   it("returns snake_case fields matching the /api/sync CloudRow contract", () => {
     const card = makeCard(1);
     const [row] = toCloudRows([card]);
@@ -137,12 +137,12 @@ describe("toCloudRows (BLOCKER 1 — data-format projection for IDB/SW path)", (
     expect(cryRow.card_type).toBe("cry");
   });
 
-  it("drops in-step cards (firstSeen set, lastReview null — not sync-safe)", () => {
+  it("drops in-step cards (firstSeen set, lastReview null - not sync-safe)", () => {
     const inStepCard = makeCard(6, { firstSeen: "2026-05-01", lastReview: null });
     expect(toCloudRows([inStepCard])).toHaveLength(0);
   });
 
-  it("includes cards with firstSeen null (never seen — reps=0 new cards)", () => {
+  it("includes cards with firstSeen null (never seen - reps=0 new cards)", () => {
     const newCard = makeCard(7, { firstSeen: null, lastReview: null });
     expect(toCloudRows([newCard])).toHaveLength(1);
   });
@@ -176,17 +176,17 @@ describe("toCloudRows (BLOCKER 1 — data-format projection for IDB/SW path)", (
 });
 
 // ---------------------------------------------------------------------------
-// BLOCKER 2 — 401/403 resolve path
+// BLOCKER 2 - 401/403 resolve path
 //
 // The SW direct-push path is not unit-testable (ServiceWorkerGlobalScope).
 // These tests verify the contract from the *caller's side*: the IDB queue
 // should be cleared on a permanent auth failure so the SW does not retry.
 // The actual resolve-not-throw behaviour is validated here as a specification
-// test — if the implementation throws on 401 instead of resolving, grades
+// test - if the implementation throws on 401 instead of resolving, grades
 // accumulate in IDB forever and Background Sync retries for days.
 // ---------------------------------------------------------------------------
 
-describe("SW direct-push 401/403 behaviour (BLOCKER 2 — specification)", () => {
+describe("SW direct-push 401/403 behaviour (BLOCKER 2 - specification)", () => {
   /**
    * Simulates the SW direct-push decision logic in isolation so we can assert
    * the correct branch without a real ServiceWorkerGlobalScope.
@@ -211,29 +211,29 @@ describe("SW direct-push 401/403 behaviour (BLOCKER 2 — specification)", () =>
     return "resolved";
   }
 
-  it("resolves (no retry) on 401 — expired session", async () => {
+  it("resolves (no retry) on 401 - expired session", async () => {
     expect(await simulateSwPush(401)).toBe("resolved");
   });
 
-  it("resolves (no retry) on 403 — forbidden / signed out", async () => {
+  it("resolves (no retry) on 403 - forbidden / signed out", async () => {
     expect(await simulateSwPush(403)).toBe("resolved");
   });
 
-  it("retries on 500 — transient server error", async () => {
+  it("retries on 500 - transient server error", async () => {
     expect(await simulateSwPush(500)).toBe("retried");
   });
 
-  it("retries on 502 — bad gateway / transient", async () => {
+  it("retries on 502 - bad gateway / transient", async () => {
     expect(await simulateSwPush(502)).toBe("retried");
   });
 
-  it("resolves on 200 — success", async () => {
+  it("resolves on 200 - success", async () => {
     expect(await simulateSwPush(200)).toBe("resolved");
   });
 });
 
 // ---------------------------------------------------------------------------
-// BLOCKER 3 — ACK on MessageChannel port
+// BLOCKER 3 - ACK on MessageChannel port
 //
 // useOnlineReconnectSync must reply on event.ports[0] before starting the
 // pull-push sequence. If it does not, the SW falls through to direct push
@@ -313,11 +313,11 @@ describe("SW BACKGROUND_SYNC_REPLAY ACK (BLOCKER 3)", () => {
 // savePendingQueue IDB write format
 //
 // Verifies that the IDB mirror receives CloudRow[] JSON, not ReviewableCard[]
-// JSON — the key invariant for Blocker 1. We mock idbSet and JSON.stringify
+// JSON - the key invariant for Blocker 1. We mock idbSet and JSON.stringify
 // capture to inspect what gets written.
 // ---------------------------------------------------------------------------
 
-describe("savePendingQueue IDB format (BLOCKER 1 — storage contract)", () => {
+describe("savePendingQueue IDB format (BLOCKER 1 - storage contract)", () => {
   beforeEach(() => {
     vi.stubGlobal("window", {
       localStorage: {

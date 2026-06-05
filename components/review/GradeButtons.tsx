@@ -32,7 +32,7 @@ export function KeyboardShortcutsOverlay({ onClose }: { onClose: () => void }) {
 
   // Keyboard shortcut rows shown in the help overlay. Key `3` is listed alongside
   // `4` as an alias for Good, matching the common 1/2/3/4 muscle memory from other
-  // SRS apps — the keydown handler in ReviewSession accepts both.
+  // SRS apps - the keydown handler in ReviewSession accepts both.
   const SHORTCUT_ROWS: { keys: string; action: string }[] = [
     { keys: "Space / Enter", action: t("keyboardShortcuts.revealCard") },
     { keys: "1", action: t("keyboardShortcuts.gradeAgain") },
@@ -186,7 +186,7 @@ export function GradeButtons({
   // Local open/close state, used when the parent does not provide controlled props.
   const [showShortcutsLocal, setShowShortcutsLocal] = useState(false);
 
-  // iOS haptic switch — hidden off-screen element toggled to trigger a system
+  // iOS haptic switch - hidden off-screen element toggled to trigger a system
   // haptic on iOS 17.4+ (Mobile Safari supports `<input switch>`). Fully inert
   // to keyboard and assistive tech via aria-hidden + tabIndex={-1}.
   const hapticSwitchId = useId();
@@ -213,13 +213,13 @@ export function GradeButtons({
 
   return (
     <>
-      {/* Grade buttons group — role="group" scopes the accessible name to the
+      {/* Grade buttons group - role="group" scopes the accessible name to the
           four grade buttons only. The `?` hint button is a sibling outside this
           group so screen readers do not announce it as part of the grading action. */}
       <div className="relative">
         <div
           // grid-cols-4 on mobile guarantees all four buttons share one row at
-          // any viewport >= 320 px — the flex-wrap layout previously bumped
+          // any viewport >= 320 px - the flex-wrap layout previously bumped
           // Easy to a second line at 402 px (iPhone 17 Pro) because the
           // per-button `min-w-[80px]` plus gaps overshot the available width
           // by ~10 px. The flex fallback at sm+ keeps the tablet/desktop
@@ -265,7 +265,7 @@ export function GradeButtons({
           ))}
         </div>
 
-        {/* Keyboard shortcut hint — a sibling of the grade group, not inside it,
+        {/* Keyboard shortcut hint - a sibling of the grade group, not inside it,
             so it is not announced as part of "Grade your answer". Positioned
             absolutely relative to the outer wrapper. Hidden on small viewports. */}
         <button
@@ -284,14 +284,14 @@ export function GradeButtons({
           before the card is revealed). */}
       {!isControlled && overlayOpen && <KeyboardShortcutsOverlay onClose={handleClose} />}
 
-      {/* Hidden iOS haptic switch — toggling this element via a label click
+      {/* Hidden iOS haptic switch - toggling this element via a label click
           triggers a system haptic on iOS 17.4+ (Mobile Safari supports the
           `switch` attribute on checkboxes). Fully inert to AT and keyboard:
           aria-hidden, tabIndex={-1}, positioned off-screen. Rendered
           unconditionally so the label ref is always valid; the trigger function
           is only called when `supportsSwitchHaptic()` is true. */}
       {/* `switch` is an iOS-only non-standard attribute not yet in React's type
-          definitions — cast through unknown to avoid the no-explicit-any rule. */}
+          definitions - cast through unknown to avoid the no-explicit-any rule. */}
       <input
         id={hapticSwitchId}
         type="checkbox"

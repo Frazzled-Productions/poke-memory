@@ -36,12 +36,12 @@ export function useCardClass(id: number): CardClassOrPending {
       // both have cleared the FSRS gate before the tile shows "mastered" (#1448).
       const nameClass = classifyCard(nameCard, masteryRepetitions);
       if (nameClass !== "mastered") {
-        // Either locked or learning — no need to check the reverse leg.
+        // Either locked or learning - no need to check the reverse leg.
         setCardClass(nameClass);
         return;
       }
 
-      // Name card is individually mastered — check the reverse leg.
+      // Name card is individually mastered - check the reverse leg.
       const reverseId = REVERSE_ID_OFFSET + id;
       const reverseCard = session.cards.find(
         (c) => c.id === reverseId && c.cardType === "reverse",
@@ -49,7 +49,7 @@ export function useCardClass(id: number): CardClassOrPending {
       if (reverseCard !== undefined && isMastered(reverseCard.state, masteryRepetitions)) {
         setCardClass("mastered");
       } else {
-        // Name card mastered but reverse is not — species not yet fully mastered.
+        // Name card mastered but reverse is not - species not yet fully mastered.
         setCardClass("learning");
       }
     }

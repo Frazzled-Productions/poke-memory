@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { renderWithIntl, renderJa, screen } from "@/components/test-utils/renderWithIntl";
 import { DirectionBadge, type CardDirection } from "@/components/review/DirectionBadge";
 
-describe("DirectionBadge — English labels", () => {
+describe("DirectionBadge - English labels", () => {
   const cases: Array<[CardDirection, string]> = [
     ["name", "Name this Pokémon"],
     ["evolution", "Evolution"],
@@ -23,7 +23,7 @@ describe("DirectionBadge — English labels", () => {
   }
 });
 
-describe("DirectionBadge — Japanese labels", () => {
+describe("DirectionBadge - Japanese labels", () => {
   it("renders the name direction in Japanese", () => {
     renderJa(<DirectionBadge direction="name" />);
     expect(screen.getByText("この Pokémon の名前は？")).toBeInTheDocument();

@@ -20,7 +20,7 @@ import type { CollectionTimeline as CollectionTimelineData } from "@/lib/timelin
 
 const NOW_MS = Date.UTC(2026, 4, 30); // 2026-05-30
 
-/** A timeline with no past or future data — triggers the empty state. */
+/** A timeline with no past or future data - triggers the empty state. */
 const emptyTimeline: CollectionTimelineData = {
   past: [],
   future: [],
@@ -28,7 +28,7 @@ const emptyTimeline: CollectionTimelineData = {
   totalSpecies: 100,
 };
 
-/** A minimal timeline with one past snapshot — shows the populated scrubber UI. */
+/** A minimal timeline with one past snapshot - shows the populated scrubber UI. */
 const populatedTimeline: CollectionTimelineData = {
   past: [
     { atMs: NOW_MS - 7 * 86400_000, introduced: 10, mastered: 3 },
@@ -40,10 +40,10 @@ const populatedTimeline: CollectionTimelineData = {
 };
 
 // ---------------------------------------------------------------------------
-// English baseline — empty state
+// English baseline - empty state
 // ---------------------------------------------------------------------------
 
-describe("CollectionTimeline — empty state (English)", () => {
+describe("CollectionTimeline - empty state (English)", () => {
   it("renders the section heading", () => {
     renderWithIntl(<CollectionTimeline timeline={emptyTimeline} />);
     expect(
@@ -63,10 +63,10 @@ describe("CollectionTimeline — empty state (English)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// English baseline — populated state
+// English baseline - populated state
 // ---------------------------------------------------------------------------
 
-describe("CollectionTimeline — populated state (English)", () => {
+describe("CollectionTimeline - populated state (English)", () => {
   it("renders the section heading", () => {
     renderWithIntl(<CollectionTimeline timeline={populatedTimeline} />);
     expect(
@@ -99,10 +99,10 @@ describe("CollectionTimeline — populated state (English)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Japanese locale — mandatory non-English coverage (#1393)
+// Japanese locale - mandatory non-English coverage (#1393)
 // ---------------------------------------------------------------------------
 
-describe("CollectionTimeline — Japanese locale (#1393)", () => {
+describe("CollectionTimeline - Japanese locale (#1393)", () => {
   it("renders the Japanese heading in the empty state", () => {
     renderJa(<CollectionTimeline timeline={emptyTimeline} />);
     // ja journey.collectionTimelineWidget.heading = "コレクションタイムライン"

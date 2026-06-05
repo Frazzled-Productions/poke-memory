@@ -2,7 +2,7 @@
  * jsdom tests for lib/qa-seed/apply.ts.
  *
  * Lives under components/ (not lib/) because the test calls functions that
- * dispatch browser events and use IDB — both require the jsdom environment.
+ * dispatch browser events and use IDB - both require the jsdom environment.
  * See AGENTS.md "Testing" section on test-file placement.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -12,7 +12,7 @@ import { applySeedScenario, clearSeedScenario } from "@/lib/qa-seed/apply";
 // localStorage stub
 // ---------------------------------------------------------------------------
 
-// jsdom on this Node version does not ship localStorage — install an in-memory
+// jsdom on this Node version does not ship localStorage - install an in-memory
 // stub, matching the pattern in CollapsibleSection.test.tsx.
 function makeLocalStorage(): Storage {
   const store = new Map<string, string>();
@@ -112,7 +112,7 @@ describe("applySeedScenario", () => {
   });
 
   it("writes the active-seed slug to localStorage when slug is provided", async () => {
-    // Install a localStorage stub for this test only — jsdom does not ship one.
+    // Install a localStorage stub for this test only - jsdom does not ship one.
     Object.defineProperty(window, "localStorage", {
       value: makeLocalStorage(),
       configurable: true,
@@ -125,7 +125,7 @@ describe("applySeedScenario", () => {
   });
 
   it("does not write the active-seed slug when no slug is provided", async () => {
-    // Install a localStorage stub for this test only — jsdom does not ship one.
+    // Install a localStorage stub for this test only - jsdom does not ship one.
     Object.defineProperty(window, "localStorage", {
       value: makeLocalStorage(),
       configurable: true,
@@ -165,7 +165,7 @@ describe("clearSeedScenario", () => {
   });
 
   it("removes the active-seed slug from localStorage", async () => {
-    // Install a localStorage stub for this test only — jsdom does not ship one.
+    // Install a localStorage stub for this test only - jsdom does not ship one.
     Object.defineProperty(window, "localStorage", {
       value: makeLocalStorage(),
       configurable: true,

@@ -21,7 +21,7 @@
  *
  * - `versionGroups` / games axis uses the `versionGroups` field from the lookup.
  *
- * Pure — no I/O, no side effects.
+ * Pure - no I/O, no side effects.
  */
 
 import type { PracticeScope, FormCategoryFilter } from "@/lib/review/scope";
@@ -98,7 +98,7 @@ export function scopeMatchesEntry(
     return true;
   }
 
-  // "incomplete-chains" preset skipped server-side — requires runtime state.
+  // "incomplete-chains" preset skipped server-side - requires runtime state.
 
   if (gamesActive) {
     const gamesSet = new Set(scope.games!);
@@ -116,7 +116,7 @@ export function scopeMatchesEntry(
  * Given a card's `cardType` and `subjectKey`, return the pokemon id(s) that
  * anchor the scope check. For name/reverse/cry cards this is the single
  * numeric id in `subjectKey`. For evolution-edge / reverse-evolution-edge
- * cards, the scope is anchored on the **pre-evo id** — the "from" id in the
+ * cards, the scope is anchored on the **pre-evo id** - the "from" id in the
  * `"<fromId>>><toId>"` format. This mirrors `cardMatchesScope` in
  * `lib/review/scope.ts`, which uses `card.preEvoId` for evolution cards.
  *
@@ -137,7 +137,7 @@ export function resolveAnchorId(cardType: string, subjectKey: string): number | 
     cardType === "reverse-evolution-edge"
   ) {
     // Route through Subject.parseEdge (the canonical codec for "<fromId>>><toId>" keys).
-    // The scope anchor is the pre-evo — the "from" id — matching cardMatchesScope in
+    // The scope anchor is the pre-evo - the "from" id - matching cardMatchesScope in
     // lib/review/scope.ts which uses card.preEvoId for evolution cards.
     try {
       return Subject.parseEdge(subjectKey).fromId;
@@ -146,6 +146,6 @@ export function resolveAnchorId(cardType: string, subjectKey: string): number | 
     }
   }
 
-  // Unknown card type — cannot resolve.
+  // Unknown card type - cannot resolve.
   return null;
 }

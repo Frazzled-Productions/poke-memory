@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 declare global {
   interface Window {
     __seedIdbReady?: Promise<void>;
-    // Write-epoch counter — mirrors the declaration in lib/review/persistence.ts.
+    // Write-epoch counter - mirrors the declaration in lib/review/persistence.ts.
     // Bumped here (in the browser context injected by addInitScript) so the
     // catch-up check in BottomTabBar/NavLinks/NavDrawer can detect that a seed
     // write happened before their SESSION_CHANGED_EVENT listeners attached.
@@ -57,7 +57,7 @@ export async function seedIdb(
           // Bump the write-epoch counter before dispatching the CustomEvent.
           // Components capture this counter at useEffect mount time and check
           // in a requestAnimationFrame whether it advanced before their listener
-          // attached — catching the race where tx.oncomplete fires before React
+          // attached - catching the race where tx.oncomplete fires before React
           // hydrates and registers the SESSION_CHANGED_EVENT listener.
           //
           // Mirrors the bump in lib/review/persistence.ts::dispatchStorageEvent.
@@ -72,7 +72,7 @@ export async function seedIdb(
           }
           // Dispatch the same CustomEvent that saveSession emits. Nav
           // components (BottomTabBar, NavDrawer, NavLinks) no longer subscribe
-          // to this event directly — they track the KEY_HAS_MASTERED localStorage
+          // to this event directly - they track the KEY_HAS_MASTERED localStorage
           // flag instead. The event is still dispatched here for any other
           // subscriber that may be listening, and as belt-and-suspenders in case
           // WebKit does not reliably propagate synthetic StorageEvents to
@@ -108,13 +108,13 @@ export async function seedIdb(
  *
  * Must be called after `seedIdb` has been registered via `page.addInitScript`.
  * If called before `seedIdb` (or on an unseeded page), it logs a warning and
- * resolves immediately — giving a false green on any race it was meant to catch.
+ * resolves immediately - giving a false green on any race it was meant to catch.
  */
 export async function awaitSeedIdb(page: Page): Promise<void> {
   await page.evaluate(() => {
     if (!window.__seedIdbReady) {
       console.warn(
-        "awaitSeedIdb: __seedIdbReady is not set — seedIdb must be called before page.goto",
+        "awaitSeedIdb: __seedIdbReady is not set - seedIdb must be called before page.goto",
       );
       return Promise.resolve();
     }

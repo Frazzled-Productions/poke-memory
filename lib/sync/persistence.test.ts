@@ -130,7 +130,7 @@ describe("loadSyncStatus", () => {
   });
 
   it("defaults failedCardCount to null when stored value is negative", () => {
-    // Negative count is not a valid state — guard rejects it
+    // Negative count is not a valid state - guard rejects it
     storage.setItem(STORAGE_KEY, JSON.stringify({ failedCardCount: -1 }));
     expect(loadSyncStatus().failedCardCount).toBeNull();
   });
@@ -239,20 +239,20 @@ describe("markPushSucceeded", () => {
     expect(loadSyncStatus().lastPushFailed).toBe(false);
   });
 
-  it("does NOT clear structuralSyncError — only a card_reviews push clears it (#1358 FIX 2)", () => {
+  it("does NOT clear structuralSyncError - only a card_reviews push clears it (#1358 FIX 2)", () => {
     // markPushSucceeded is called from auxiliary legs (settings, streak, etc.) as
     // well as the card_reviews path. An auxiliary-leg success during a live 42P10
     // incident must not clear the structural banner. Only pushSingleCard /
     // pushSession (via clearStructuralSyncError in cloud.ts) clears it.
     saveSyncStatus({ ...ZERO, structuralSyncError: "42P10", lastPushFailed: true });
     markPushSucceeded("2026-05-10T12:00:00.000Z");
-    // structuralSyncError must remain — markPushSucceeded does not clear it.
+    // structuralSyncError must remain - markPushSucceeded does not clear it.
     expect(loadSyncStatus().structuralSyncError).toBe("42P10");
     // lastPushFailed is cleared (generic failure cleared by any success).
     expect(loadSyncStatus().lastPushFailed).toBe(false);
   });
 
-  it("preserves failedCardCount (intentional — callers gate on lastPushFailed)", () => {
+  it("preserves failedCardCount (intentional - callers gate on lastPushFailed)", () => {
     saveSyncStatus({ ...ZERO, lastPushFailed: true, failedCardCount: 7 });
     markPushSucceeded("2026-05-10T12:00:00.000Z");
     // failedCardCount deliberately left untouched on success
@@ -295,7 +295,7 @@ describe("markPushFailed", () => {
   it("preserves lastPushAt from before the failure", () => {
     saveSyncStatus({ ...ZERO, lastPushAt: "2026-05-09T08:00:00.000Z" });
     markPushFailed(2, "2026-05-10T12:00:00.000Z");
-    // lastPushAt should remain — it's the last *successful* sync
+    // lastPushAt should remain - it's the last *successful* sync
     expect(loadSyncStatus().lastPushAt).toBe("2026-05-09T08:00:00.000Z");
   });
 
@@ -331,7 +331,7 @@ describe("markStructuralSyncError", () => {
     expect(loadSyncStatus().lastPushAttemptAt).toBe("2026-05-30T12:00:00.000Z");
   });
 
-  it("preserves lastPushAt — the last successful sync should remain visible", () => {
+  it("preserves lastPushAt - the last successful sync should remain visible", () => {
     saveSyncStatus({ ...ZERO, lastPushAt: "2026-05-29T08:00:00.000Z" });
     markStructuralSyncError("42P10", "2026-05-30T12:00:00.000Z");
     expect(loadSyncStatus().lastPushAt).toBe("2026-05-29T08:00:00.000Z");

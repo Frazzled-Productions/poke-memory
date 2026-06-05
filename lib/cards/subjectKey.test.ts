@@ -115,7 +115,7 @@ describe("Subject.forEdge + parseEdge (round-trip)", () => {
     expect(Subject.parseEdge(key)).toEqual({ fromId: 1000, toId: 1025 });
   });
 
-  it("keys with different (from, to) pairs are distinct — no collision", () => {
+  it("keys with different (from, to) pairs are distinct - no collision", () => {
     expect(Subject.forEdge(1, 25)).not.toBe(Subject.forEdge(1, 26));
     expect(Subject.forEdge(1, 25)).not.toBe(Subject.forEdge(2, 5));
     expect(Subject.forEdge(1, 25)).not.toBe(Subject.forEdge(125, 1));

@@ -59,14 +59,14 @@ function useIsLandscape(): boolean {
  *
  * When the device viewport is in portrait orientation the content is rotated
  * 90° clockwise so the biome renders in landscape. When the device is already
- * in landscape the rotation is omitted — applying it would compound the OS
+ * in landscape the rotation is omitted - applying it would compound the OS
  * reflow and double-rotate the content, leaving it portrait-oriented inside
  * a landscape frame.
  *
  * Orientation changes are detected live via a `matchMedia` listener so the
  * layout updates without a page reload when the user rotates their device.
  *
- * Params are Promises in Next.js 16 — always await them.
+ * Params are Promises in Next.js 16 - always await them.
  */
 export default function BiomeLandscapePage({
   params,
@@ -116,7 +116,7 @@ export default function BiomeLandscapePage({
         if (session) {
           // Hydrate so each card carries the full SEED_POKEMON fields (habitat,
           // isDefaultForm, etc.) that biomeStats and the biome filter depend on.
-          // All *Enabled flags are false — only refresh existing cards from seed
+          // All *Enabled flags are false - only refresh existing cards from seed
           // (backfill habitat, isDefaultForm, etc.) without adding ~1 000 new unseen cards.
           const { cards: hydrated, anyHealed } = hydrateSession(session.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
             reverseEnabled: false,
@@ -150,10 +150,10 @@ export default function BiomeLandscapePage({
     void load();
   }, [storageVersion, settingsVersion, flags.pretendAllMastered]);
 
-  // Not a recognised habitat — render a 404.
+  // Not a recognised habitat - render a 404.
   if (!zone) return notFound();
 
-  // Still loading from localStorage — render nothing to avoid flash.
+  // Still loading from localStorage - render nothing to avoid flash.
   if (masteredCards === null) return null;
 
   // Filter to just this biome's cards.
@@ -183,7 +183,7 @@ export default function BiomeLandscapePage({
      */
     <div className="fixed inset-0 overflow-hidden bg-background">
       {/*
-       * Inner wrapper — two layout branches:
+       * Inner wrapper - two layout branches:
        *
        * Portrait device  → rotate 90° CW so the biome renders in landscape.
        *   After rotation the element's width maps to viewport height and
@@ -215,7 +215,7 @@ export default function BiomeLandscapePage({
               }
         }
       >
-        {/* Back button + biome heading — top-left in the rotated (landscape) frame */}
+        {/* Back button + biome heading - top-left in the rotated (landscape) frame */}
         <div className="sticky top-0 z-20 bg-background/90 px-4 py-2 backdrop-blur-sm">
           <div className="flex items-center gap-2">
             <button
@@ -257,7 +257,7 @@ export default function BiomeLandscapePage({
             </h1>
           </div>
 
-          {/* Richer stats panel — shown below the heading row */}
+          {/* Richer stats panel - shown below the heading row */}
           <dl
             className={`mt-1 flex flex-wrap gap-x-4 gap-y-0.5 ${mutedTextXs}`}
             aria-label={t("biome.statsAriaLabel")}
@@ -304,7 +304,7 @@ export default function BiomeLandscapePage({
               zone={zone}
               placements={placements}
               onMarkSeen={() => {
-                /* read-only in landscape view — sparkle clears on the main Pasture page */
+                /* read-only in landscape view - sparkle clears on the main Pasture page */
               }}
             />
           )}

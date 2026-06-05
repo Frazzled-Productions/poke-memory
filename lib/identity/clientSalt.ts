@@ -8,7 +8,7 @@ import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
  * On first call the salt is generated with `crypto.randomUUID()` and
  * persisted to localStorage under `KEY_CLIENT_SALT` so subsequent page
  * loads return the same value.  If localStorage is unavailable (e.g. in a
- * Node test environment) a fallback empty string is returned — the shuffle
+ * Node test environment) a fallback empty string is returned - the shuffle
  * still works, just without per-device differentiation.
  *
  * Authenticated users should use their Supabase `user.id` instead of this

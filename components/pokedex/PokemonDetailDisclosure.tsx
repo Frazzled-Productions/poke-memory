@@ -120,7 +120,7 @@ function buildStages(chain: EvolutionNode[]): EvolutionNode[][] {
 }
 
 // ---------------------------------------------------------------------------
-// FormBlock — collapsible block for a single alternate form
+// FormBlock - collapsible block for a single alternate form
 // ---------------------------------------------------------------------------
 
 function FormBlock({ form }: { form: SeedPokemon }) {
@@ -221,7 +221,7 @@ export function PokemonDetailDisclosure({
   const isMasteredCard = cardClass === "mastered";
   const isLearning = cardClass === "learning";
   // Always called (hooks must not be conditional). Only rendered when
-  // pretendAllMastered is off — the flag fakes mastery state without altering
+  // pretendAllMastered is off - the flag fakes mastery state without altering
   // the SRS schedule, so showing schedule info alongside faked-mastery UI
   // would be misleading.
   const nextReview = useNextReviewDate(id);
@@ -233,7 +233,7 @@ export function PokemonDetailDisclosure({
   // Kick off flavour-text fetch the first time any disclosure opens. The cache
   // is shared across all instances so concurrent disclosures only fetch once.
   // `flavorLoaded` is stored in state so the component re-renders once the async
-  // load resolves — without this, game labels never appear on a cold first visit
+  // load resolves - without this, game labels never appear on a cold first visit
   // because `getPokemonFacts` reads the module-level cache synchronously at render
   // time and the mastery re-render races the network fetch (#1559).
   const [flavorLoaded, setFlavorLoaded] = useState(isFlavorTextsReady);
@@ -265,7 +265,7 @@ export function PokemonDetailDisclosure({
   // Collect evo-chain sprite URLs (excluding the current Pokémon, which is
   // already the main visible image) and warm them in the background so nodes
   // render without pop-in when the chain section scrolls into view.
-  // Only preload when the Evolution Chain section will actually render — if
+  // Only preload when the Evolution Chain section will actually render - if
   // the card is not mastered or there are no multi-stage siblings, the section
   // is hidden and pre-fetching those sprites would waste bytes.
   const evoNodeUrls =

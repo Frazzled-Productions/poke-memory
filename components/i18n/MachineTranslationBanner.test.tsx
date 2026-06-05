@@ -6,7 +6,7 @@
  *   - Dismissed: not dismissed (banner present) vs. dismissed (banner absent).
  *
  * Uses renderWithIntl / renderJa from the shared test helper so real message
- * catalogues are exercised — no inline translation fixtures.
+ * catalogues are exercised - no inline translation fixtures.
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
@@ -49,7 +49,7 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// useAppLocale mock — reads document.cookie; set the cookie in tests instead.
+// useAppLocale mock - reads document.cookie; set the cookie in tests instead.
 // ---------------------------------------------------------------------------
 // We mock the module so tests can control the active locale without touching
 // real cookie parsing, keeping tests fast and isolated.
@@ -129,7 +129,7 @@ describe("MachineTranslationBanner", () => {
     });
 
     it("renders the banner when the ja key is missing but a different locale is dismissed", () => {
-      // Dismiss zh-Hans but not ja — banner should still show for ja.
+      // Dismiss zh-Hans but not ja - banner should still show for ja.
       store[mtBannerDismissedKey("zh-Hans")] = "1";
 
       renderJa(<MachineTranslationBanner />);
@@ -197,7 +197,7 @@ describe("MachineTranslationBanner", () => {
     it("guest path: saveSettings is still called (local-only, no cloud write without auth)", () => {
       // Guest mode: AutoSyncOnChange treats userId as null (anyFlagOn or no user),
       // so saveSettings persists locally and the cloud push never fires.
-      // From the component's perspective, saveSettings is always called on dismiss —
+      // From the component's perspective, saveSettings is always called on dismiss - 
       // the write-guard lives in AutoSyncOnChange, not here.
       renderJa(<MachineTranslationBanner />);
       fireEvent.click(screen.getByRole("button"));

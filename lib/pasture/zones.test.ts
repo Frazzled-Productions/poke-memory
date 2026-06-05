@@ -37,7 +37,7 @@ function totalSlots(habitat: KnownHabitat): number {
 // Structural integrity
 // ---------------------------------------------------------------------------
 
-describe("HABITAT_ZONES — structural integrity", () => {
+describe("HABITAT_ZONES - structural integrity", () => {
   it("defines exactly 10 zones", () => {
     expect(HABITAT_ZONES).toHaveLength(10);
   });
@@ -95,7 +95,7 @@ describe("HABITAT_ZONES — structural integrity", () => {
 // Anchor slot coordinate invariants
 // ---------------------------------------------------------------------------
 
-describe("HABITAT_ZONES — anchor slot coordinate invariants", () => {
+describe("HABITAT_ZONES - anchor slot coordinate invariants", () => {
   it("all anchor x values are in [0.03, 0.97]", () => {
     for (const zone of HABITAT_ZONES) {
       for (const sr of zone.subRegions) {
@@ -145,7 +145,7 @@ describe("HABITAT_ZONES — anchor slot coordinate invariants", () => {
 // Slot capacity vs. habitat species count
 // ---------------------------------------------------------------------------
 
-describe("HABITAT_ZONES — slot capacity vs. species counts", () => {
+describe("HABITAT_ZONES - slot capacity vs. species counts", () => {
   it("grassland has at least 80 slots (species count: 80)", () => {
     expect(totalSlots("grassland")).toBeGreaterThanOrEqual(80);
   });
@@ -159,7 +159,7 @@ describe("HABITAT_ZONES — slot capacity vs. species counts", () => {
   });
 
   it("mountain has at least 44 slots (species count: 45, slot total: 44)", () => {
-    // The zone defines 8+10+12+14 = 44 slots — enough to cover the 45 species
+    // The zone defines 8+10+12+14 = 44 slots - enough to cover the 45 species
     // with just one overflow wrap at most.
     expect(totalSlots("mountain")).toBeGreaterThanOrEqual(44);
   });
@@ -195,7 +195,7 @@ describe("HABITAT_ZONES — slot capacity vs. species counts", () => {
 // Per-zone spot checks
 // ---------------------------------------------------------------------------
 
-describe("HABITAT_ZONES — per-zone spot checks", () => {
+describe("HABITAT_ZONES - per-zone spot checks", () => {
   it("grassland has 5 sub-regions", () => {
     expect(zoneFor("grassland").subRegions).toHaveLength(5);
   });
@@ -226,7 +226,7 @@ describe("HABITAT_ZONES — per-zone spot checks", () => {
 // Sub-region ordering and depth conventions
 // ---------------------------------------------------------------------------
 
-describe("HABITAT_ZONES — sub-region ordering and depth", () => {
+describe("HABITAT_ZONES - sub-region ordering and depth", () => {
   // Ground-based biomes stack sub-regions top-to-bottom (increasing y).
   // The first sub-region should have a lower median y than the last, reflecting
   // the "distant hills / far bank → foreground" layering described in the
@@ -295,7 +295,7 @@ describe("HABITAT_ZONES — sub-region ordering and depth", () => {
 // Exact slot counts (per the comments in zones.ts)
 // ---------------------------------------------------------------------------
 
-describe("HABITAT_ZONES — exact slot counts from source comments", () => {
+describe("HABITAT_ZONES - exact slot counts from source comments", () => {
   it("grassland has exactly 90 slots (14+16+18+20+22)", () => {
     expect(totalSlots("grassland")).toBe(90);
   });

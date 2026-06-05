@@ -33,7 +33,7 @@ afterEach(() => {
 // State: earned variant
 // ---------------------------------------------------------------------------
 
-describe("ProtectionToast — earned", () => {
+describe("ProtectionToast - earned", () => {
   it("renders the earn heading and message", () => {
     const onDismiss = vi.fn();
     renderWithIntl(
@@ -89,7 +89,7 @@ describe("ProtectionToast — earned", () => {
 // State: spent variant
 // ---------------------------------------------------------------------------
 
-describe("ProtectionToast — spent", () => {
+describe("ProtectionToast - spent", () => {
   it("renders the spend heading and streak count", () => {
     renderWithIntl(
       <ProtectionToast kind="spent" streakCount={7} onDismiss={vi.fn()} />,
@@ -105,7 +105,7 @@ describe("ProtectionToast — spent", () => {
 // State: earned-and-spent variant (longest body text, critical for locale wrapping)
 // ---------------------------------------------------------------------------
 
-describe("ProtectionToast — earned-and-spent", () => {
+describe("ProtectionToast - earned-and-spent", () => {
   it("renders the combined heading and message with streak count", () => {
     renderWithIntl(
       <ProtectionToast
@@ -129,7 +129,7 @@ describe("ProtectionToast — earned-and-spent", () => {
 // Locale: earned variant
 // ---------------------------------------------------------------------------
 
-describe("ProtectionToast — locale: earned", () => {
+describe("ProtectionToast - locale: earned", () => {
   it("en: renders earn heading and message in English", () => {
     renderWithIntl(
       <ProtectionToast kind="earned" streakCount={5} onDismiss={vi.fn()} />,
@@ -171,7 +171,7 @@ describe("ProtectionToast — locale: earned", () => {
 // Locale: spent variant
 // ---------------------------------------------------------------------------
 
-describe("ProtectionToast — locale: spent", () => {
+describe("ProtectionToast - locale: spent", () => {
   it("en: renders spend heading and message in English", () => {
     renderWithIntl(
       <ProtectionToast kind="spent" streakCount={3} onDismiss={vi.fn()} />,
@@ -209,7 +209,7 @@ describe("ProtectionToast — locale: spent", () => {
 // Locale: earned-and-spent variant
 // ---------------------------------------------------------------------------
 
-describe("ProtectionToast — locale: earned-and-spent", () => {
+describe("ProtectionToast - locale: earned-and-spent", () => {
   it("en: renders combined message in English with streak count", () => {
     renderWithIntl(
       <ProtectionToast

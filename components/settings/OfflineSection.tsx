@@ -14,7 +14,7 @@ import {
 import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
 
 /**
- * Species IDs eligible for offline caching — all default-form entries in the
+ * Species IDs eligible for offline caching - all default-form entries in the
  * seed. Computed once at module load since `SEED_POKEMON` is a static import;
  * this avoids re-running the filter+map on every render.
  */
@@ -51,12 +51,12 @@ export function OfflineSection() {
    * Derive the update-available state from the persisted manifest vs. the
    * current one (#1539). Only meaningful in the "done" phase.
    *
-   * - `null`             — not applicable (not in done state)
-   * - `{ isStale: false }` — downloaded signature matches current; up to date
-   * - `{ isStale: true, newCount: number | null }` — signatures differ;
+   * - `null` - not applicable (not in done state)
+   * - `{ isStale: false }` - downloaded signature matches current; up to date
+   * - `{ isStale: true, newCount: number | null }` - signatures differ;
    *   `newCount` is the number of new species IDs when countable (may be null
    *   when the count is unchanged but the signature still differs, e.g. a
-   *   sprite-width or cache-version bump — avoids a misleading "0 new").
+   *   sprite-width or cache-version bump - avoids a misleading "0 new").
    */
   const manifestStatus = useMemo<
     null | { isStale: false } | { isStale: true; newCount: number | null }
@@ -64,7 +64,7 @@ export function OfflineSection() {
     if (downloadState.phase !== "done") return null;
     const persisted = downloadState.manifest;
     if (persisted.signature === CURRENT_MANIFEST.signature) return { isStale: false };
-    // Signatures differ — compute how many new species IDs there are.
+    // Signatures differ - compute how many new species IDs there are.
     const countDiff = CURRENT_MANIFEST.count - persisted.count;
     const newCount = countDiff > 0 ? countDiff : null;
     return { isStale: true, newCount };
@@ -78,7 +78,7 @@ export function OfflineSection() {
   }, []);
 
   // Read storage estimate on mount. Skip when the initial phase is already
-  // "done" — the phase-change effect below fires in that case and makes the
+  // "done" - the phase-change effect below fires in that case and makes the
   // same call, so the mount call would be a duplicate.
   useEffect(() => {
     if (downloadState.phase === "done") return;

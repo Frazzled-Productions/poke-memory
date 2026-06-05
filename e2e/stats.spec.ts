@@ -23,7 +23,7 @@ async function seedSuperuser(
   }, opts);
 }
 
-test.describe("Stats page — review charts", () => {
+test.describe("Stats page - review charts", () => {
   test("the three analytical chart sections render", async ({ page }) => {
     await page.goto("/stats");
     // The recall-vs-target indicator, per-direction breakdown and difficulty
@@ -44,7 +44,7 @@ test.describe("Stats page — review charts", () => {
   });
 });
 
-test.describe("Stats page — Pokédex completion projection", () => {
+test.describe("Stats page - Pokédex completion projection", () => {
   test("the completion projection section is visible for a guest with no history", async ({
     page,
   }) => {
@@ -68,7 +68,7 @@ test.describe("Stats page — Pokédex completion projection", () => {
   });
 });
 
-test.describe("Stats page — daily activity chart", () => {
+test.describe("Stats page - daily activity chart", () => {
   test("daily activity section renders with empty state for a guest", async ({
     page,
   }) => {
@@ -77,7 +77,7 @@ test.describe("Stats page — daily activity chart", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Daily activity" }),
     ).toBeVisible({ timeout: 15_000 });
-    // A fresh guest session has no grade log — the empty-state message should
+    // A fresh guest session has no grade log - the empty-state message should
     // be visible instead of the chart.
     await expect(
       page.getByText("No activity recorded yet"),
@@ -85,7 +85,7 @@ test.describe("Stats page — daily activity chart", () => {
   });
 });
 
-test.describe("Stats page — accuracy window tabs", () => {
+test.describe("Stats page - accuracy window tabs", () => {
   test("switching accuracy windows updates the selected tab", async ({
     page,
   }) => {
@@ -99,17 +99,17 @@ test.describe("Stats page — accuracy window tabs", () => {
     const tablist = page.getByRole("tablist", { name: "Accuracy window" });
     await expect(tablist).toBeVisible();
 
-    // Default window is 7d — the "7d" tab should be selected.
+    // Default window is 7d - the "7d" tab should be selected.
     const tab7d = page.getByRole("tab", { name: "7d" });
     await expect(tab7d).toHaveAttribute("aria-selected", "true");
 
-    // A fresh guest session has no accuracy data — the empty-state message
+    // A fresh guest session has no accuracy data - the empty-state message
     // is shown instead of the sparkline SVG.
     await expect(
       page.getByText("No reviews yet in the last 7 days"),
     ).toBeVisible();
 
-    // Switch to 30d — the "30d" tab should become selected and the 7d tab
+    // Switch to 30d - the "30d" tab should become selected and the 7d tab
     // deselected. The empty-state message updates to reflect the new window.
     const tab30d = page.getByRole("tab", { name: "30d" });
     await tab30d.click();
@@ -119,7 +119,7 @@ test.describe("Stats page — accuracy window tabs", () => {
       page.getByText("No reviews yet in the last 30 days"),
     ).toBeVisible();
 
-    // Switch to 1yr — same pattern.
+    // Switch to 1yr - same pattern.
     const tab1yr = page.getByRole("tab", { name: "1yr" });
     await tab1yr.click();
     await expect(tab1yr).toHaveAttribute("aria-selected", "true");
@@ -130,7 +130,7 @@ test.describe("Stats page — accuracy window tabs", () => {
   });
 });
 
-test.describe("Stats page — mastery over time chart", () => {
+test.describe("Stats page - mastery over time chart", () => {
   test("the mastery over time section is visible on a fresh guest session", async ({
     page,
   }) => {
@@ -148,7 +148,7 @@ test.describe("Stats page — mastery over time chart", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Mastery over time" }),
     ).toBeVisible({ timeout: 15_000 });
-    // A fresh guest has no mastered cards — the empty state copy should appear.
+    // A fresh guest has no mastered cards - the empty state copy should appear.
     await expect(
       page.getByText(/No mastered species yet/i),
     ).toBeVisible();
@@ -160,7 +160,7 @@ test.describe("Stats page — mastery over time chart", () => {
     await expect(
       page.getByRole("heading", { level: 2, name: "Mastery over time" }),
     ).toBeVisible({ timeout: 15_000 });
-    // Under the flag the headline count is the full species count — non-zero.
+    // Under the flag the headline count is the full species count - non-zero.
     // We can't assert the exact number without knowing the seed size, so just
     // confirm the empty-state copy is NOT shown.
     await expect(
@@ -169,7 +169,7 @@ test.describe("Stats page — mastery over time chart", () => {
   });
 });
 
-test.describe("Stats page — section headings", () => {
+test.describe("Stats page - section headings", () => {
   test("analytical section headings are present", async ({ page }) => {
     await page.goto("/stats");
     // Wait for hydration.
@@ -202,7 +202,7 @@ test.describe("Stats page — section headings", () => {
   });
 });
 
-test.describe("Stats page — due forecast bar popup", () => {
+test.describe("Stats page - due forecast bar popup", () => {
   test("tapping a forecast bar reveals a popup with date and card count (mobile)", async ({
     page,
     isMobile,
@@ -298,7 +298,7 @@ test.describe("Stats page — due forecast bar popup", () => {
   });
 });
 
-test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
+test.describe("Stats page - time-to-first-mastery hint (#1083)", () => {
   test("renders the hint when the user has introduced cards but none mastered", async ({
     page,
   }) => {
@@ -381,7 +381,7 @@ test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
         seenInPasture: false,
       };
       const cards = [
-        // Bulbasaur name card — mastered.
+        // Bulbasaur name card - mastered.
         {
           id: 1,
           speciesId: 1,
@@ -392,7 +392,7 @@ test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
           types: ["grass", "poison"],
           state: masteredState,
         },
-        // Bulbasaur reverse card — also mastered (required since #1234).
+        // Bulbasaur reverse card - also mastered (required since #1234).
         {
           id: reverseOffset + 1,
           cardType: "reverse",
@@ -402,7 +402,7 @@ test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
           spriteUrl: "/sprites/pokemon/1.png",
           state: masteredState,
         },
-        // Charmander name card — not yet mastered.
+        // Charmander name card - not yet mastered.
         {
           id: 4,
           speciesId: 4,
@@ -455,7 +455,7 @@ test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
   }) => {
     // Seed an introduced-but-unmastered name card so the introduced > 0 /
     // mastered === 0 gate would otherwise render the hint. The
-    // pretendAllMastered flag should suppress the hint anyway — that is the
+    // pretendAllMastered flag should suppress the hint anyway - that is the
     // behaviour this test guards.
     await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
     await page.addInitScript(() => {
@@ -502,20 +502,20 @@ test.describe("Stats page — time-to-first-mastery hint (#1083)", () => {
       page.getByRole("heading", { level: 2, name: "Scheduling", exact: true }),
     ).toBeVisible({ timeout: 15_000 });
     // With pretendAllMastered on, computeStats overlays mastered = totalCards,
-    // and projectTimeToFirstMastery short-circuits to null — both guards
+    // and projectTimeToFirstMastery short-circuits to null - both guards
     // independently hide the hint. The introduced > 0 gate is exercised by
     // the seed above, so this test now actually covers the superuser path.
     await expect(page.getByTestId("first-mastery-hint")).toHaveCount(0);
   });
 });
 
-test.describe("Stats page — streak protection card (#1227)", () => {
+test.describe("Stats page - streak protection card (#1227)", () => {
   test("renders with zero tokens for a fresh guest", async ({ page }) => {
     await page.goto("/stats");
     await expect(
       page.getByRole("heading", { level: 2, name: "Streak protection" }),
     ).toBeVisible({ timeout: 15_000 });
-    // 0 + " tokens" — verified via the explicit aria-label on the count.
+    // 0 + " tokens" - verified via the explicit aria-label on the count.
     // Scope the query to the card to stay robust against any other surface
     // carrying a "protection tokens" label.
     await expect(
@@ -603,7 +603,7 @@ test.describe("Stats page — streak protection card (#1227)", () => {
   });
 });
 
-test.describe("Stats page — per-game mastery breakdown (#1313)", () => {
+test.describe("Stats page - per-game mastery breakdown (#1313)", () => {
   test("the Progress section and By game heading are visible", async ({
     page,
   }) => {
@@ -636,12 +636,12 @@ test.describe("Stats page — per-game mastery breakdown (#1313)", () => {
     await expect(genButton).toBeVisible();
     await expect(genButton).toHaveAttribute("aria-expanded", "false");
 
-    // Click to expand — game rows should appear.
+    // Click to expand - game rows should appear.
     await genButton.click();
     await expect(genButton).toHaveAttribute("aria-expanded", "true");
 
     // At least Pokémon Red/Blue should be listed.
-    // Use exact: true to avoid a strict-mode violation — the GameRow also
+    // Use exact: true to avoid a strict-mode violation - the GameRow also
     // renders a sr-only span containing the full string "Pokémon Red/Blue:
     // 0 of 151 mastered (0%)", so a substring match resolves to two elements.
     await expect(page.getByText("Pokémon Red/Blue", { exact: true })).toBeVisible();
@@ -665,7 +665,7 @@ test.describe("Stats page — per-game mastery breakdown (#1313)", () => {
   });
 });
 
-test.describe("Stats page — heatmap hover tooltip", () => {
+test.describe("Stats page - heatmap hover tooltip", () => {
   test("hovering a heatmap cell shows a tooltip with the date and review count", async ({
     page,
     browserName,

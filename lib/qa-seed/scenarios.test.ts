@@ -201,7 +201,7 @@ describe("scenario payload builders", () => {
 
   // Card identity is `(id, locale)` (migration 029). Since #1562 the review
   // session filters by the active locale, so an en+ja pair for one species is
-  // legal — but two cards sharing the SAME `(id, locale)` would still collide in
+  // legal - but two cards sharing the SAME `(id, locale)` would still collide in
   // buildSessionQueues. Assert uniqueness on the composite key, matching the DB
   // primary key (the old id-only invariant predated multi-locale seeds).
   it("every scenario emits session cards with unique (id, locale) keys", () => {
@@ -227,7 +227,7 @@ describe("scenario payload builders", () => {
       // Cast to ReviewableCard[] as expected by the derivation helpers.
       // The seed shape is structurally compatible: cardType / id / state are present.
       // SeededNameCard has no `displayName`, so `englishName` on any
-      // deriveCloseToMastery result will be undefined — assertions below only
+      // deriveCloseToMastery result will be undefined - assertions below only
       // check reverseScheduledDays, so this is an intentional stub gap.
       return (payload.session?.cards ?? []) as unknown as ReviewableCard[];
     }
@@ -318,7 +318,7 @@ describe("scenario payload builders", () => {
     for (const scenario of SCENARIOS) {
       const a = JSON.stringify(scenario.build().session?.cards ?? []);
       const b = JSON.stringify(scenario.build().session?.cards ?? []);
-      // Dates are recomputed each call — only check structural equivalence
+      // Dates are recomputed each call - only check structural equivalence
       // by comparing lengths rather than exact string equality, since
       // relative dates may differ by a millisecond in slow test runs.
       // The real determinism guarantee is that the card set and reps are fixed.
@@ -328,7 +328,7 @@ describe("scenario payload builders", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC1: States derived via real scheduler — not hand-set FSRS literals
+// AC1: States derived via real scheduler - not hand-set FSRS literals
 // ---------------------------------------------------------------------------
 
 describe("FSRS state bounds (scheduler-derived, not hand-fabricated)", () => {
@@ -393,7 +393,7 @@ describe("FSRS state bounds (scheduler-derived, not hand-fabricated)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC2: Card identity from real hydrate path — not placeholders
+// AC2: Card identity from real hydrate path - not placeholders
 // ---------------------------------------------------------------------------
 
 describe("card identity: names and ids from real seed data", () => {
@@ -461,7 +461,7 @@ describe("card identity: names and ids from real seed data", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC3: Forcing-function tests — name/reverse pairing
+// AC3: Forcing-function tests - name/reverse pairing
 // ---------------------------------------------------------------------------
 
 describe("name/reverse pairing rules (#1234)", () => {
@@ -532,7 +532,7 @@ describe("name/reverse pairing rules (#1234)", () => {
 
       // Set of (pokemonId, locale) keys for name cards. Keyed on the composite
       // identity so the en and ja name cards for one species are distinct
-      // (#1562) — a Map keyed on id alone would collapse the pair.
+      // (#1562) - a Map keyed on id alone would collapse the pair.
       const nameKeys = new Set(
         cards
           .filter((c) => c.cardType === "name")
@@ -553,14 +553,14 @@ describe("name/reverse pairing rules (#1234)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC3: Forcing-function tests — locale model
+// AC3: Forcing-function tests - locale model
 // ---------------------------------------------------------------------------
 
 describe("locale model: mastery is tracked per locale", () => {
   /**
    * The locale-mastery invariant: mastered cards are stored per locale.
    * `pasture-progression` and `mastery-gaps` seed only en-locale mastered cards,
-   * so switching to ja shows zero mastered — proving per-locale storage.
+   * so switching to ja shows zero mastered - proving per-locale storage.
    * `fsrs-locale-mastery` (since #1562) additionally seeds a smaller, independent
    * ja mastered set, so BOTH locales show a non-zero count and the two differ.
    */
@@ -605,7 +605,7 @@ describe("locale model: mastery is tracked per locale", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC4: Practice-load smoke — hydrateSession + buildSessionQueues, no throw
+// AC4: Practice-load smoke - hydrateSession + buildSessionQueues, no throw
 // ---------------------------------------------------------------------------
 
 describe("Practice-load smoke: hydrateSession + buildSessionQueues do not throw per scenario", () => {
@@ -614,7 +614,7 @@ describe("Practice-load smoke: hydrateSession + buildSessionQueues do not throw 
   for (const scenario of SCENARIOS) {
     it(`${scenario.slug}: hydrate → buildSessionQueues does not throw`, () => {
       const payload = scenario.build();
-      if (!payload.session) return; // No session — nothing to hydrate.
+      if (!payload.session) return; // No session - nothing to hydrate.
 
       // Cast the seeded cards to ReviewableCard[]. hydrateSession will backfill
       // real SeedPokemon fields (displayName, types, etc.) on any card it recognises
@@ -721,7 +721,7 @@ describe("scenario streak + protection-token seeding", () => {
 
   // The declared mastered count (used to warm the ProfileStatusBar cache on
   // apply) MUST equal what filterMastered actually computes for the seeded
-  // cards — otherwise the bar would show a count that disagrees with the
+  // cards - otherwise the bar would show a count that disagrees with the
   // Pasture/Stats. Parity forcing function (mirrors the #1489 contract test).
   for (const slug of populatedSlugs) {
     it(`${slug}: declared masteredCountByLocale.en matches filterMastered`, () => {

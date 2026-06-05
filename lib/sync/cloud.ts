@@ -16,8 +16,8 @@ import { Subject, appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKe
 import { markStructuralSyncError, clearStructuralSyncError } from "@/lib/sync/structuralError";
 import type { AppLocale } from "@/i18n/locales";
 
-// cloud.ts imports markStructuralSyncError from structuralError.ts — a leaf
-// module that has no imports from cloud.ts or persistence.ts — so there is no
+// cloud.ts imports markStructuralSyncError from structuralError.ts - a leaf
+// module that has no imports from cloud.ts or persistence.ts - so there is no
 // circular dependency. persistence.ts re-exports those helpers from the same
 // leaf for callers that already import from persistence.ts.
 
@@ -29,8 +29,8 @@ export type SeedOpts = BuildSessionOpts;
  *
  * Must exactly match the table's PRIMARY KEY: (user_id, card_type, subject_key, locale).
  * Migration 029 widened the PK from 3 columns to 4 (adding locale). Exporting
- * this constant — and importing it at every upsert call site (cloud.ts + route.ts)
- * — means the integration test in lib/sync/integration/onconflict-pk-parity.test.ts
+ * this constant - and importing it at every upsert call site (cloud.ts + route.ts)
+ * - means the integration test in lib/sync/integration/onconflict-pk-parity.test.ts
  * mechanically catches any future PK change that is not matched by a client update.
  * That is the safeguard that would have caught the #1344 silent-outage shape at CI time.
  */
@@ -42,21 +42,21 @@ export const CARD_REVIEWS_CONFLICT_COLS =
  * failure on the card_reviews write path (#1358).
  *
  * Structural codes:
- *   42xxx — schema/SQL errors (42P10 ON CONFLICT mismatch, 42P01 relation
+ *   42xxx - schema/SQL errors (42P10 ON CONFLICT mismatch, 42P01 relation
  *            not found, 42703 column not found, 42501 insufficient privilege
  *            at the PG layer). These always mean a deploy/schema mismatch and
  *            are NEVER transient.
- *   23505 — unique_violation. Upsert should never produce this unless the
+ *   23505 - unique_violation. Upsert should never produce this unless the
  *            conflict target is wrong.
- *   23503 — foreign_key_violation.
+ *   23503 - foreign_key_violation.
  *
  * Excluded from this predicate:
- *   23514 — check_violation. This is the regression trigger (migration 002 /
+ *   23514 - check_violation. This is the regression trigger (migration 002 /
  *            015 / 016 / 017), a DELIBERATE DB guard. Treat as best-effort/skip
- *            (the trigger rejects bad state — that's the intended behaviour).
- *   PGRST* — PostgREST HTTP-layer codes, transient during schema-cache reload.
- *   Network TypeErrors — land in the catch block, not error.code. Best-effort.
- *   Generic 5xx — transient; retrying is appropriate.
+ *            (the trigger rejects bad state - that's the intended behaviour).
+ *   PGRST* - PostgREST HTTP-layer codes, transient during schema-cache reload.
+ *   Network TypeErrors - land in the catch block, not error.code. Best-effort.
+ *   Generic 5xx - transient; retrying is appropriate.
  *
  * IMPORTANT: Only call this from the card_reviews primary path. Auxiliary legs
  * (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs) must warn-and-
@@ -66,7 +66,7 @@ export function isStructuralError(error: PostgrestError | null): boolean {
   if (!error) return false;
   const code = error.code;
   if (typeof code !== "string") return false;
-  // Exclude 23514 (check_violation — deliberate regression trigger).
+  // Exclude 23514 (check_violation - deliberate regression trigger).
   if (code === "23514") return false;
   // Exclude PGRST-prefixed PostgREST HTTP-layer codes (transient schema-cache).
   if (code.startsWith("PGRST")) return false;
@@ -82,7 +82,7 @@ export function isStructuralError(error: PostgrestError | null): boolean {
 
 /**
  * Returns true when a card's SM-2 state is safe to write to the cloud.
- * A card is unsafe when firstSeen is set but lastReview is null — this means
+ * A card is unsafe when firstSeen is set but lastReview is null - this means
  * the card entered learning steps but has not yet graduated. Writing this state
  * would produce a row with first_seen != null and last_review = null, violating
  * the invariant that every seen card has a review date.
@@ -95,16 +95,16 @@ export function isSyncSafe(card: ReviewableCard): boolean {
  * Cloud row shape after migration 029 (locale column added).
  *
  * Primary identity: (card_type, subject_key, locale).
- *   card_type   — DB discriminator (e.g. "name", "evolution-edge"). Note: the
+ *   card_type - DB discriminator (e.g. "name", "evolution-edge"). Note: the
  *                 app internally uses "evolution" / "reverse-evolution"; these
  *                 are mapped by appTypeToDbType / dbTypeToAppType.
- *   subject_key — type-specific opaque key: species ID string for species cards,
+ *   subject_key - type-specific opaque key: species ID string for species cards,
  *                 "fromId>>>toId" for edge cards.
- *   locale      — Pokémon-name locale for this FSRS row (#1259).
+ *   locale - Pokémon-name locale for this FSRS row (#1259).
  *
  * The legacy `pokemon_id` integer column was dropped by migration 012. Push
  * paths upsert via `(user_id, card_type, subject_key, locale)` and never write
- * `pokemon_id` — it does not exist on the table.
+ * `pokemon_id` - it does not exist on the table.
  */
 export type CloudRow = {
   /** DB card_type discriminator. Use appTypeToDbType / dbTypeToAppType to convert to/from app types. */
@@ -115,7 +115,7 @@ export type CloudRow = {
    * Pokémon-name locale for this FSRS row (#1259). Each locale gets independent
    * FSRS state. Defaults to "en" for rows written before migration 029.
    * Optional so pre-migration cloud rows (which lack this column) are still
-   * type-safe — all pull paths default to "en" via `row.locale ?? "en"`.
+   * type-safe - all pull paths default to "en" via `row.locale ?? "en"`.
    */
   locale?: string;
   stability: number;
@@ -183,7 +183,7 @@ function toCloudRow(card: ReviewableCard): CloudRow {
 /**
  * Projects an array of ReviewableCards to CloudRow[] (snake_case, with
  * appTypeToDbType applied). Skips cards that violate the isSyncSafe invariant
- * (firstSeen set but lastReview null — in-step cards).
+ * (firstSeen set but lastReview null - in-step cards).
  *
  * Exported so callers that need the cloud-row shape without constructing a
  * Blob (e.g. the IDB mirror written by savePendingQueue for the service worker)
@@ -198,7 +198,7 @@ export function toCloudRows(cards: ReviewableCard[]): CloudRow[] {
  * Returns true if all batches succeeded, false if any batch failed.
  * learningStep and stepStartedAt are in-memory only and are not persisted.
  * Cards that violate the firstSeen/lastReview invariant are silently skipped
- * rather than written — in-step cards (firstSeen set, lastReview null) should
+ * rather than written - in-step cards (firstSeen set, lastReview null) should
  * not be persisted to the cloud until they graduate.
  * Note: returns true when every card is filtered out (no batches attempted =
  * no failures). The caller should not interpret true as "something was written".
@@ -230,7 +230,7 @@ export async function pushSession(
       if (error) {
         allOk = false;
         if (isStructuralError(error)) {
-          // Structural errors are never transient — fail loud immediately rather
+          // Structural errors are never transient - fail loud immediately rather
           // than swallowing as best-effort (#1358). console.error reaches error
           // monitoring; markStructuralSyncError persists the code directly so
           // no caller-must-pop indirection is needed.
@@ -238,7 +238,7 @@ export async function pushSession(
             `[sync] structural error on card_reviews upsert (SQLSTATE ${error.code}): ${error.message}`
           );
           markStructuralSyncError(error.code);
-          // Break early — retrying a structural error is pointless until a
+          // Break early - retrying a structural error is pointless until a
           // deploy fixes the mismatch.
           break;
         }
@@ -248,7 +248,7 @@ export async function pushSession(
     }
   }
   if (allOk) {
-    // All batches succeeded — clear any outstanding structural error.
+    // All batches succeeded - clear any outstanding structural error.
     // Only the card_reviews success path clears structuralSyncError; auxiliary
     // legs must not (#1358 FIX 2).
     clearStructuralSyncError();
@@ -257,7 +257,7 @@ export async function pushSession(
 }
 
 /**
- * Upserts a single card into card_reviews. Best-effort — returns false on any
+ * Upserts a single card into card_reviews. Best-effort - returns false on any
  * error without throwing. Returns false without a network call when the card
  * violates the firstSeen/lastReview invariant (in-step, not yet graduated).
  */
@@ -296,14 +296,14 @@ export async function pushSingleCard(
       { onConflict: CARD_REVIEWS_CONFLICT_COLS },
     );
     if (!error) {
-      // Successful card_reviews push — clear any outstanding structural error.
+      // Successful card_reviews push - clear any outstanding structural error.
       // This is the ONLY path that clears structuralSyncError; auxiliary-leg
       // success (pushSettings, pushStreak, etc.) must not clear it (#1358 FIX 2).
       clearStructuralSyncError();
       return true;
     }
     if (isStructuralError(error)) {
-      // Structural errors are never transient — fail loud immediately (#1358).
+      // Structural errors are never transient - fail loud immediately (#1358).
       // console.error reaches error monitoring; markStructuralSyncError persists
       // the code directly so no caller-must-pop indirection is needed.
       console.error(
@@ -343,7 +343,7 @@ export async function pullSession(
         .eq("user_id", userId)
         .range(offset, offset + PAGE - 1);
       if (error || !data) return null;
-      // Skip rows with null subject_key — these are unmigrated edge rows that
+      // Skip rows with null subject_key - these are unmigrated edge rows that
       // will be re-pushed on the next sync after the app-side backfill runs.
       const rows = (data as CloudRow[]).filter((r) => r.subject_key !== null);
       allRows.push(...rows);
@@ -372,7 +372,7 @@ export function maxCloudUpdatedAt(rows: CloudRow[]): string {
 
 /**
  * Serialises cards to a Blob suitable for navigator.sendBeacon('/api/sync', blob).
- * Content-Type is set to application/json via the Blob constructor — sendBeacon
+ * Content-Type is set to application/json via the Blob constructor - sendBeacon
  * does not accept a headers option, so this is the only way to set it.
  */
 export function buildBeaconPayload(cards: ReviewableCard[]): Blob {
@@ -387,19 +387,19 @@ export function buildBeaconPayload(cards: ReviewableCard[]): Blob {
  */
 function applyCloudRow(card: ReviewableCard, row: CloudRow): ReviewableCard {
   // Legacy cloud rows (pre-migration 007) won't have hidden_since on the
-  // wire — treat undefined as null so the normalised local state always
+  // wire - treat undefined as null so the normalised local state always
   // has the field set to a concrete value.
   const hiddenSince = row.hidden_since ?? null;
   // Legacy cloud rows (pre-migration 008) won't have seen_in_pasture on the
-  // wire — treat undefined as false.
+  // wire - treat undefined as false.
   const seenInPasture = row.seen_in_pasture ?? false;
-  // Legacy cloud rows (pre-migration 029) won't have locale on the wire —
+  // Legacy cloud rows (pre-migration 029) won't have locale on the wire - 
   // treat undefined as "en" so normalised local state always has the field set.
   const locale = (row.locale ?? "en") as ReviewableCard["locale"];
 
   if (row.first_seen !== null && row.last_review === null) {
     console.warn(
-      `[sync] normalizing card ${row.card_type}:${row.subject_key}:${row.locale ?? "en"}: cloud row has firstSeen=${row.first_seen} but lastReview=null — clearing firstSeen`
+      `[sync] normalizing card ${row.card_type}:${row.subject_key}:${row.locale ?? "en"}: cloud row has firstSeen=${row.first_seen} but lastReview=null - clearing firstSeen`
     );
     return {
       ...card,
@@ -601,23 +601,23 @@ export function mergeCloudIntoLocalSilent(
     const pullDate = lastPullAt.slice(0, 10);
     const localLastReview = card.state.lastReview;
 
-    // Local has a review on the same calendar day as the pull or later — keep local.
+    // Local has a review on the same calendar day as the pull or later - keep local.
     if (localLastReview !== null && localLastReview >= pullDate) {
       return card;
     }
 
-    // Cloud row updated after the last pull — take cloud.
+    // Cloud row updated after the last pull - take cloud.
     // When updated_at is absent (legacy row), conservatively treat as newer.
     if (!row.updated_at || row.updated_at > lastPullAt) {
       return applyCloudRow(card, row);
     }
 
-    // Cloud row unchanged since last pull — keep local.
+    // Cloud row unchanged since last pull - keep local.
     return card;
   });
 
   // Pass 2: INSERT cloud rows that have no matching local card. This handles
-  // the case where a user has enrolled multiple languages on another device —
+  // the case where a user has enrolled multiple languages on another device - 
   // the other-locale rows exist in the cloud but were never seeded locally
   // (local session was built for a single locale). Without this pass, a fresh
   // device pull only imports the currently-active locale's progress.
@@ -680,7 +680,7 @@ export function mergeCloudIntoLocal(
  * counterpart in the cloud is discarded.
  *
  * Use this instead of `mergeCloudIntoLocal` when the intent is "cloud is the
- * source of truth" — e.g. superuser exit cleanup (wiping QA drift) or the
+ * source of truth" - e.g. superuser exit cleanup (wiping QA drift) or the
  * "Keep cloud" branch of the conflict picker on a new device.
  */
 export function applyCloudAuthoritative(

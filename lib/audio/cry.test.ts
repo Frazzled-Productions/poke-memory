@@ -106,7 +106,7 @@ describe("playCry", () => {
     await flushMicrotasks();
     currentAudio().fire("ended");
 
-    // Firing again does nothing — listener was removed.
+    // Firing again does nothing - listener was removed.
     currentAudio().fire("ended");
     expect(onEnded).toHaveBeenCalledOnce();
     expect(currentAudio().listenerCount("ended")).toBe(0);

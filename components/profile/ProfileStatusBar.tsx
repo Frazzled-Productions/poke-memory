@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ProfileStatusBar — a slim, read-only status band rendered in `app/layout.tsx`
+ * ProfileStatusBar - a slim, read-only status band rendered in `app/layout.tsx`
  * directly below `<Nav>`, showing streak, protection-token balance, and mastery
  * at a glance on every route.
  *
@@ -12,7 +12,7 @@
  *     is tight (#1086/#1087). Visible on all other mobile routes.
  *
  * De-dup: the token pip has been removed from `StreakBadge` (Practice) and the
- * streak line has been removed from `StreakProtectionCard` (Stats) — the bar
+ * streak line has been removed from `StreakProtectionCard` (Stats) - the bar
  * carries those signals on all non-Practice surfaces (and on Practice desktop).
  * The milestone countdown on Practice and the full protection card on Stats are
  * kept intact.
@@ -38,7 +38,7 @@ import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Height of the bar in CSS — kept as a named constant so the skeleton and
+/** Height of the bar in CSS - kept as a named constant so the skeleton and
  *  the populated bar share the same fixed height, preventing layout shift. */
 const BAR_HEIGHT_CLASS = "h-9";
 
@@ -92,7 +92,7 @@ export function ProfileStatusBar() {
       >
         {/*
           Single-language users (languagesEnabled === false): original order,
-          byte-for-byte unchanged — streak · mastery · token. No divider.
+          byte-for-byte unchanged - streak · mastery · token. No divider.
           Multi-language users (languagesEnabled === true): streak · token |
           mastery · pill. The hairline divider separates global signals from
           per-language signals.
@@ -110,7 +110,7 @@ export function ProfileStatusBar() {
               totalSpecies={totalSpecies}
               masteryPercent={masteryPercent}
             />
-            {/* Learning-language switcher — renders only when the languages Labs
+            {/* Learning-language switcher - renders only when the languages Labs
                 flag is on (gated inside the component). Interactive pill, distinct
                 from the passive status chips. */}
             <LanguageSwitcher />

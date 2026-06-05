@@ -194,7 +194,7 @@ describe("nextArrivals", () => {
   });
 
   it("honours masteryRepetitions threshold (higher threshold includes near-mastered cards)", () => {
-    // Card has reps=3, scheduledDays=21 — mastered at default threshold (3) but
+    // Card has reps=3, scheduledDays=21 - mastered at default threshold (3) but
     // not at threshold 5. Under threshold 5, the card should appear.
     const cards = [makeNameCard(1, masteredState)];
     // Default threshold: mastered → excluded

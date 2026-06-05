@@ -2,7 +2,7 @@
  * Unit tests for lib/timeline/reconstruct.ts
  *
  * Tests live in lib/ so they run in the `node` vitest project (no DOM).
- * All functions under test are pure — no I/O, no Date.now() leakage.
+ * All functions under test are pure - no I/O, no Date.now() leakage.
  */
 
 import { describe, it, expect } from "vitest";
@@ -56,10 +56,10 @@ function baseOpts(
 }
 
 // ---------------------------------------------------------------------------
-// buildCollectionTimeline — past direction
+// buildCollectionTimeline - past direction
 // ---------------------------------------------------------------------------
 
-describe("buildCollectionTimeline — past direction", () => {
+describe("buildCollectionTimeline - past direction", () => {
   it("returns empty past array when log is empty", () => {
     const tl = buildCollectionTimeline(baseOpts());
     expect(tl.past).toHaveLength(0);
@@ -223,7 +223,7 @@ describe("buildCollectionTimeline — past direction", () => {
   });
 
   it("log with date gaps: checkpoints bridge the gap correctly", () => {
-    // Two species introduced 35 and 7 days ago — both are within the daily
+    // Two species introduced 35 and 7 days ago - both are within the daily
     // resolution window (90 days), so the checkpoints between them must show
     // introduced=1 for entries between the two events.
     const earlyMs = NOW_MS - 35 * DAY_MS; // 5 weeks ago
@@ -240,7 +240,7 @@ describe("buildCollectionTimeline — past direction", () => {
       (s) => s.atMs > earlyMs && s.atMs < lateMs,
     );
     expect(midSnap).toBeDefined();
-    // Only species "1" was introduced before the gap — species "2" comes later.
+    // Only species "1" was introduced before the gap - species "2" comes later.
     expect(midSnap!.introduced).toBe(1);
 
     // The final snapshot must show both species.
@@ -306,7 +306,7 @@ describe("buildCollectionTimeline — past direction", () => {
     ];
     const tl = buildCollectionTimeline(baseOpts({ log }));
 
-    // Total entries must be bounded — 120 daily entries would be excessive.
+    // Total entries must be bounded - 120 daily entries would be excessive.
     // Expect roughly: ~4-5 weekly entries (weeks 1-4 of older history) +
     // ~90 daily entries = well under 150 total.
     expect(tl.past.length).toBeLessThan(150);
@@ -365,10 +365,10 @@ describe("buildCollectionTimeline — past direction", () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildCollectionTimeline — future direction
+// buildCollectionTimeline - future direction
 // ---------------------------------------------------------------------------
 
-describe("buildCollectionTimeline — future direction", () => {
+describe("buildCollectionTimeline - future direction", () => {
   it("returns empty future array when no cards have been reviewed", () => {
     const cards = new Map([["1", makeState({ lastReview: null, stability: 0 })]]);
     const tl = buildCollectionTimeline(baseOpts({ currentNameCards: cards }));
@@ -461,7 +461,7 @@ describe("buildCollectionTimeline — future direction", () => {
 // forceAllMastered (superuser flag)
 // ---------------------------------------------------------------------------
 
-describe("buildCollectionTimeline — forceAllMastered", () => {
+describe("buildCollectionTimeline - forceAllMastered", () => {
   it("past shows all species as mastered when flag is on", () => {
     const cards = new Map([
       ["1", makeState()],
@@ -564,7 +564,7 @@ describe("snapshotAtPosition", () => {
     expect(snap.introduced).toBe(3);
   });
 
-  it("position is clamped — out-of-range values don't throw", () => {
+  it("position is clamped - out-of-range values don't throw", () => {
     const tl = makeFakeTl();
     expect(() => snapshotAtPosition(tl, -999)).not.toThrow();
     expect(() => snapshotAtPosition(tl, 999)).not.toThrow();

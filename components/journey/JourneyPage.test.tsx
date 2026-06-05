@@ -4,11 +4,11 @@
  * Covers:
  *   1. Page renders the loading skeleton then the main content.
  *   2. Celebratory components (TrainerCard, BadgeGallery, RecordsCard) are present.
- *   3. pretendAllMastered superuser path — every badge shown, stats derived with forceAllMastered.
- *   4. Cloud hydration branch — pullSession called when signed-in, setCards updated.
+ *   3. pretendAllMastered superuser path - every badge shown, stats derived with forceAllMastered.
+ *   4. Cloud hydration branch - pullSession called when signed-in, setCards updated.
  *   5. Cloud hydration suppressed when anyFlagOn.
- *   6. Retroactive badge award path — newly earned badges saved to settings.
- *   7. Guest path — pullSession never called.
+ *   6. Retroactive badge award path - newly earned badges saved to settings.
+ *   7. Guest path - pullSession never called.
  *   8. Streak rendered when currentStreak > 0.
  */
 
@@ -16,7 +16,7 @@ import { renderWithIntl as render, screen, waitFor } from "@/components/test-uti
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mocks — must appear before the component import
+// Mocks - must appear before the component import
 // ---------------------------------------------------------------------------
 
 vi.mock("next/image", () => ({
@@ -358,7 +358,7 @@ vi.mock("@/components/stats/RecordsCard", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Auth context mock — overrideable per describe
+// Auth context mock - overrideable per describe
 // ---------------------------------------------------------------------------
 
 const { mockAuthValue } = vi.hoisted(() => ({
@@ -393,7 +393,7 @@ beforeEach(() => {
   mockSuperuserValue.anyFlagOn = false;
 });
 
-describe("JourneyPage — basic render", () => {
+describe("JourneyPage - basic render", () => {
   it("renders the heading and key celebratory components once data is loaded", async () => {
     render(<JourneyPage />);
 
@@ -465,7 +465,7 @@ describe("JourneyPage — basic render", () => {
   });
 });
 
-describe("JourneyPage — streak > 0", () => {
+describe("JourneyPage - streak > 0", () => {
   it("renders a stat card with streak count when streak is positive", async () => {
     const { computeStreak } = await import("@/lib/streak");
     vi.mocked(computeStreak).mockReturnValue(5);
@@ -494,7 +494,7 @@ describe("JourneyPage — streak > 0", () => {
   });
 });
 
-describe("JourneyPage — pretendAllMastered superuser path", () => {
+describe("JourneyPage - pretendAllMastered superuser path", () => {
   it("passes forceAllMastered=true to BadgeGallery when flag is on", async () => {
     mockSuperuserValue.flags = { pretendAllMastered: true };
     mockSuperuserValue.anyFlagOn = true;
@@ -523,7 +523,7 @@ describe("JourneyPage — pretendAllMastered superuser path", () => {
   });
 });
 
-describe("JourneyPage — cloud hydration (signed in)", () => {
+describe("JourneyPage - cloud hydration (signed in)", () => {
   it("calls pullSession when signed in and updates cards from cloud", async () => {
     const cloudRows = [makeCloudRow(1), makeCloudRow(2), makeCloudRow(3)];
     mockPullSession.mockResolvedValue(cloudRows);
@@ -568,7 +568,7 @@ describe("JourneyPage — cloud hydration (signed in)", () => {
   });
 });
 
-describe("JourneyPage — guest user", () => {
+describe("JourneyPage - guest user", () => {
   it("does not call pullSession when user is null", async () => {
     mockAuthValue.user = null;
     mockAuthValue.supabase = null;
@@ -604,7 +604,7 @@ describe("JourneyPage — guest user", () => {
   });
 });
 
-describe("JourneyPage — retroactive badge award", () => {
+describe("JourneyPage - retroactive badge award", () => {
   it("saves newly earned badges to settings when anyFlagOn is false", async () => {
     const { checkBadges } = await import("@/lib/badges/check");
     const settingsMod = await import("@/lib/settings/persistence");
@@ -665,10 +665,10 @@ describe("JourneyPage — retroactive badge award", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Layout-shift fix (#961) — per-section skeleton placeholders
+// Layout-shift fix (#961) - per-section skeleton placeholders
 // ---------------------------------------------------------------------------
 
-describe("JourneyPage — timeline and evolution wall layout placeholders (#961)", () => {
+describe("JourneyPage - timeline and evolution wall layout placeholders (#961)", () => {
   it("shows timeline and evolution wall skeleton headings while cloud pull is in flight", async () => {
     // Hold the cloud pull open so we can inspect the intermediate render state
     // where stats/currentStreak are ready but timeline/evolutionFamilies are null.
@@ -705,7 +705,7 @@ describe("JourneyPage — timeline and evolution wall layout placeholders (#961)
   });
 
   it("replaces the timeline skeleton with the real widget once data lands", async () => {
-    // Resolve pull immediately — no cards from cloud, so local path is used.
+    // Resolve pull immediately - no cards from cloud, so local path is used.
     mockPullSession.mockResolvedValue(null);
     mockAuthValue.user = mockSuiteUser;
     mockAuthValue.supabase = { auth: {} };
@@ -713,7 +713,7 @@ describe("JourneyPage — timeline and evolution wall layout placeholders (#961)
     render(<JourneyPage />);
 
     // After the load effect completes, both headings must be present AND the
-    // aria-busy skeleton sections must be gone — verifying the swap happened,
+    // aria-busy skeleton sections must be gone - verifying the swap happened,
     // not just that a heading (which also exists in the skeleton) is present.
     await waitFor(() => {
       expect(
@@ -750,7 +750,7 @@ describe("JourneyPage — timeline and evolution wall layout placeholders (#961)
   });
 });
 
-describe("JourneyPage — daysInARow label (no doubled number)", () => {
+describe("JourneyPage - daysInARow label (no doubled number)", () => {
   it("does not double the streak number in the StatCard aria-label", async () => {
     const { computeStreak } = await import("@/lib/streak");
     vi.mocked(computeStreak).mockReturnValue(5);
@@ -790,7 +790,7 @@ describe("JourneyPage — daysInARow label (no doubled number)", () => {
   });
 });
 
-describe("JourneyPage — byGenerationColumn column header", () => {
+describe("JourneyPage - byGenerationColumn column header", () => {
   it("renders the generation column header in English", async () => {
     render(<JourneyPage />);
 
@@ -814,7 +814,7 @@ describe("JourneyPage — byGenerationColumn column header", () => {
 // Mastery explainer hint (#1441)
 // ---------------------------------------------------------------------------
 
-describe("JourneyPage — mastery explainer hint (AC #1441)", () => {
+describe("JourneyPage - mastery explainer hint (AC #1441)", () => {
   it("renders the hint on a fresh guest session (empty, all-locked state)", async () => {
     // Default mock: all cards reps=0 (locked). The hint must appear regardless of mastery count.
     render(<JourneyPage />);
@@ -891,7 +891,7 @@ describe("JourneyPage — mastery explainer hint (AC #1441)", () => {
   it("existing-user reach: settings blob WITHOUT journeyMasteryExplainerDismissed still shows hint", async () => {
     // Simulates a pre-#1441 settings blob that has no journeyMasteryExplainerDismissed key.
     // The === true coercion in validateOnboarding (real module) means the absent key resolves
-    // to false — hint shows. Reset the mock to the factory default (no dismissal) before render
+    // to false - hint shows. Reset the mock to the factory default (no dismissal) before render
     // so previous test mock overrides do not bleed in.
     const settingsMod = await import("@/lib/settings/persistence");
     vi.mocked(settingsMod.loadSettings).mockReset().mockImplementation(() => ({
@@ -918,7 +918,7 @@ describe("JourneyPage — mastery explainer hint (AC #1441)", () => {
         daysSinceLastEarn: 0,
         lastEarnCheckDate: null,
       },
-      // No onboarding field — simulates an older settings blob that pre-dates #1441.
+      // No onboarding field - simulates an older settings blob that pre-dates #1441.
       // OnboardingHint reads onboarding?.[id] ?? false → false → hint shows.
     } as unknown as ReturnType<typeof settingsMod.loadSettings>));
     render(<JourneyPage />);
@@ -935,7 +935,7 @@ describe("JourneyPage — mastery explainer hint (AC #1441)", () => {
   });
 });
 
-describe("JourneyPage — mastery explainer hint locale rendering (#1441)", () => {
+describe("JourneyPage - mastery explainer hint locale rendering (#1441)", () => {
   beforeEach(async () => {
     // Reset loadSettings to the factory default so previous test overrides don't bleed in.
     const settingsMod = await import("@/lib/settings/persistence");

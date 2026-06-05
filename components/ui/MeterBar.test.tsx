@@ -166,7 +166,7 @@ describe("MeterBar", () => {
   });
 
   // -------------------------------------------------------------------------
-  // transitionClass — animation fidelity
+  // transitionClass - animation fidelity
   // -------------------------------------------------------------------------
 
   it("applies the default transition-all class to the fill div when transitionClass is omitted", () => {

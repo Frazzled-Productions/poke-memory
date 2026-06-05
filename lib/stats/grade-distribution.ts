@@ -16,12 +16,12 @@ export type GradeDistribution = {
 
 /**
  * Compute the distribution of grade buttons pressed from the grade log.
- * Pure — no I/O.
+ * Pure - no I/O.
  *
  * This derives from review *history* (`grade_log`), not mastery state, so it
  * is intentionally NOT affected by the `pretendAllMastered` superuser flag.
  *
- * Guest mode: an empty `log` returns all-zero counts — the UI renders an
+ * Guest mode: an empty `log` returns all-zero counts - the UI renders an
  * empty state when `total === 0`.
  */
 export function computeGradeDistribution(log: GradeLog): GradeDistribution {
@@ -87,7 +87,7 @@ function isoWeekStart(isoDate: string): string {
  * before the user's first recorded activity. Trailing zero weeks are kept so
  * the x-axis extends to the most recent complete week.
  *
- * Pure — no I/O. Returns up to `weeks` entries in ascending `weekStart` order.
+ * Pure - no I/O. Returns up to `weeks` entries in ascending `weekStart` order.
  */
 export function computeGradeTrend(
   log: GradeLog,

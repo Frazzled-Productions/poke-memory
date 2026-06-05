@@ -17,7 +17,7 @@ const FEEDBACK_HOLD_MS = 1500;
 type Props = {
   spriteUrl: string;
   canonicalName: string;
-  /** Pokémon id — passed through to the Image alt text and future TTS. */
+  /** Pokémon id - passed through to the Image alt text and future TTS. */
   id?: number | null;
   onGrade: (grade: Grade) => void;
   /** While true the submit button is disabled (grade in flight). */
@@ -30,22 +30,22 @@ type Props = {
  * Renders the sprite (prompt) + a text input + Submit + "I don't know".
  * The user types the name; the grade is computed automatically:
  *   - Exact match (case-insensitive, punctuation-stripped) → Good (4)
- *   - Off by 1–2 chars → Hard (2) — feedback shown before advancing
- *   - Off by > 2 or empty → Again (1) — correct answer revealed
- *   - "I don't know" click → Again (1) — correct answer revealed
+ *   - Off by 1–2 chars → Hard (2) - feedback shown before advancing
+ *   - Off by > 2 or empty → Again (1) - correct answer revealed
+ *   - "I don't know" click → Again (1) - correct answer revealed
  *
  * This is a UI component owned by ui-coder by convention, but lives in
  * components/review/ alongside the existing card components. The grading
  * logic itself is a pure lib function (lib/srs/typedEntryGrade.ts).
  *
- * The component calls `onGrade` once and then becomes "submitted" — further
+ * The component calls `onGrade` once and then becomes "submitted" - further
  * input is ignored while the grade is in flight. The parent (ReviewSession)
  * is responsible for advancing to the next card.
  *
  * The revealed answer text uses the locale-resolved name from
  * `useLocalePokemonName` so it updates when `pokemonNameLocale` changes
  * (#1260 followup). The grading comparison still uses `canonicalName` (the
- * English name) — locale-aware typed-entry validation is tracked separately
+ * English name) - locale-aware typed-entry validation is tracked separately
  * in #1259 (typed-entry strictness / accept native script).
  */
 export function TypedEntryNameCard({

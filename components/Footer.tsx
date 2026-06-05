@@ -29,7 +29,7 @@ export function Footer() {
     return () => window.removeEventListener(SETTINGS_SAVED_EVENT, onSaved);
   }, []);
 
-  // In bottom-nav (app-like) mode the footer is hidden — it would sit
+  // In bottom-nav (app-like) mode the footer is hidden - it would sit
   // underneath the fixed tab bar and is unreachable. Privacy / Terms / the
   // fan-project disclaimer remain accessible via Settings → About.
   if (mobileNav === "bottom") return null;

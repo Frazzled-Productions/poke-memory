@@ -9,7 +9,7 @@
  * covered by all tests below.
  *
  * File lives under components/ (not lib/) because it calls renderHook, which
- * requires jsdom — the vitest jsdom project covers components/**\/*.test.tsx.
+ * requires jsdom - the vitest jsdom project covers components/**\/*.test.tsx.
  */
 
 import { renderHook, act } from "@testing-library/react";
@@ -58,7 +58,7 @@ function fireVisible() {
 // ─── localStorage stub ────────────────────────────────────────────────────────
 //
 // jsdom on this Node version does not ship localStorage out of the box, so
-// session-active tests need an in-memory stub — matching the pattern used in
+// session-active tests need an in-memory stub - matching the pattern used in
 // components/sync/loadPendingQueue.test.tsx and components/identity/clientSalt.test.tsx.
 
 function makeLocalStorage(): Storage {
@@ -114,7 +114,7 @@ describe("useVisibilityPull", () => {
     removeLocalStorage();
   });
 
-  // 1. No-op when client is null — lines 28-30 still execute (covered).
+  // 1. No-op when client is null - lines 28-30 still execute (covered).
   it("does not pull when client is null", async () => {
     renderHook(() =>
       useVisibilityPull(null, FAKE_USER, NON_BLOCKED_PATH),
@@ -128,7 +128,7 @@ describe("useVisibilityPull", () => {
     expect(pullAndMerge).not.toHaveBeenCalled();
   });
 
-  // 2. No-op when userId is null — lines 28-30 still execute (covered).
+  // 2. No-op when userId is null - lines 28-30 still execute (covered).
   it("does not pull when userId is null", async () => {
     renderHook(() =>
       useVisibilityPull(FAKE_CLIENT, null, NON_BLOCKED_PATH),
@@ -204,7 +204,7 @@ describe("useVisibilityPull", () => {
     expect(pullAndMerge).not.toHaveBeenCalled();
   });
 
-  // 7. Uses the latest refs — a re-render with updated props is reflected in
+  // 7. Uses the latest refs - a re-render with updated props is reflected in
   //    the handler even though the listener was registered only once.
   it("reflects updated client/userId/pathname after re-render (useLatestRef behaviour)", async () => {
     vi.mocked(pullAndMerge).mockResolvedValue("ok");
@@ -274,7 +274,7 @@ describe("useVisibilityPull", () => {
     expect(pullAndMerge).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER, false);
   });
 
-  // 10. Listener is removed on unmount — no calls after cleanup.
+  // 10. Listener is removed on unmount - no calls after cleanup.
   it("removes the visibilitychange listener on unmount", async () => {
     vi.mocked(pullAndMerge).mockResolvedValue("ok");
 

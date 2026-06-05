@@ -36,7 +36,7 @@ export function numericPrefix(filename: string): number {
  * applied them (verified against `list_migrations`: drop_legacy_per_pre_evo
  * before grade_log_card_id), so the apply sequence stays correct.
  *
- * New duplicate prefixes are still a collision — see the guard below.
+ * New duplicate prefixes are still a collision - see the guard below.
  */
 const KNOWN_PREFIX_DUPLICATES = new Set<number>([9]);
 
@@ -57,7 +57,7 @@ export function sortAndValidateMigrationFiles(filenames: string[]): string[] {
     return a < b ? -1 : a > b ? 1 : 0;
   });
 
-  // Guard: a new duplicate prefix is a real collision — apply order would be
+  // Guard: a new duplicate prefix is a real collision - apply order would be
   // ambiguous and a future migration in between would silently reorder.
   const seen = new Map<number, string>();
   for (const f of files) {

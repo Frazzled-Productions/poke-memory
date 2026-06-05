@@ -4,7 +4,7 @@
  * Shared signal so background side-effects can avoid yanking state from under
  * an in-progress review:
  *
- * - `useVisibilityPull` skips `pullAndMerge` while a session is mounted — a
+ * - `useVisibilityPull` skips `pullAndMerge` while a session is mounted - a
  *   pull mid-session can move card progress and force a reload via
  *   `SYNC_PULL_APPLIED_EVENT` (#1163).
  * - `ServiceWorkerProvider` skips the silent SKIP_WAITING activator while a
@@ -13,8 +13,8 @@
  *
  * The producer is `ReviewSession`: it increments the count on mount and
  * decrements it on unmount. localStorage is used (not in-memory state) so
- * consumers outside the React tree — service-worker visibility handler,
- * top-level sync hooks — can read it without prop drilling.
+ * consumers outside the React tree - service-worker visibility handler,
+ * top-level sync hooks - can read it without prop drilling.
  *
  * **Reference-count design (#1178).** The original implementation stored a
  * boolean, which broke when two `/practice` tabs were open: closing Tab A
@@ -27,7 +27,7 @@
  * `"1"` when active and removed the key when inactive. `parseInt("1", 10)`
  * is 1, which is correctly treated as "one session active". Any value that
  * `parseInt` cannot parse (e.g. `"true"`, `"false"`, `""`) returns `NaN`,
- * which is treated as 0 — safe, erring on the side of allowing background
+ * which is treated as 0 - safe, erring on the side of allowing background
  * work rather than permanently blocking it.
  *
  * SSR-safe: every helper guards against `window` being undefined, so
@@ -80,7 +80,7 @@ export function markSessionActive(): void {
 /**
  * Decrement the active-session count. Call on `ReviewSession` unmount.
  *
- * Clamped at 0 — the count never goes negative. Safe to call when the flag
+ * Clamped at 0 - the count never goes negative. Safe to call when the flag
  * was never set.
  */
 export function markSessionInactive(): void {
@@ -91,7 +91,7 @@ export function markSessionInactive(): void {
 /**
  * Returns `true` when at least one review session is currently mounted.
  *
- * SSR returns `false` — there is no review session on the server.
+ * SSR returns `false` - there is no review session on the server.
  */
 export function isSessionActive(): boolean {
   if (typeof window === "undefined") return false;
@@ -107,7 +107,7 @@ export function isSessionActive(): boolean {
  * and with `false` after `setRevealed(false)` in `handleGrade` / `handleUndo`,
  * and in the component unmount cleanup.
  *
- * Read by `LanguageSwitcher` to block mid-card locale switches — switching
+ * Read by `LanguageSwitcher` to block mid-card locale switches - switching
  * language is only safe between cards, never while grade buttons are shown.
  *
  * SSR-safe: guards against `window` being undefined.
@@ -121,7 +121,7 @@ export function markCardRevealed(revealed: boolean): void {
       window.localStorage.removeItem(KEY_CARD_REVEALED);
     }
   } catch {
-    // Quota or non-standard environment — silently skip.
+    // Quota or non-standard environment - silently skip.
   }
 }
 

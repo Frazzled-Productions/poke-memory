@@ -36,7 +36,7 @@ function basePokemon(overrides: Partial<SeedPokemon> = {}): SeedPokemon {
 
 describe('getPokemonFacts', () => {
   // ---------------------------------------------------------------------------
-  // Legacy string[] shape (pre-#1559 payloads) — falls back to "Pokédex entry"
+  // Legacy string[] shape (pre-#1559 payloads) - falls back to "Pokédex entry"
   // ---------------------------------------------------------------------------
 
   it('returns facts for a fully-populated pokemon (legacy string[] flavourTexts)', () => {
@@ -62,7 +62,7 @@ describe('getPokemonFacts', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // New FlavorTextEntry[] shape (post-#1559) — label is formatted game names
+  // New FlavorTextEntry[] shape (post-#1559) - label is formatted game names
   // ---------------------------------------------------------------------------
 
   it('uses game-name label when flavorTexts is FlavorTextEntry[] with known versions', () => {
@@ -120,7 +120,7 @@ describe('getPokemonFacts', () => {
     const entries: FlavorTextEntry[] = [
       { text: 'Some text.', versions: ['scarlet', 'violet'] },
     ];
-    // Tested with English fallback — the label comes from VERSION_NAMES which
+    // Tested with English fallback - the label comes from VERSION_NAMES which
     // is locale-invariant. The locale-coverage test for the component is in
     // PokemonDetailDisclosure.test.tsx.
     const facts = getPokemonFacts(basePokemon({ flavorTexts: entries }));
@@ -128,16 +128,16 @@ describe('getPokemonFacts', () => {
     expect(entry?.label).toBe('Scarlet · Violet');
   });
 
-  it('height fact contains " m — " (comparison present)', () => {
+  it('height fact contains " m - " (comparison present)', () => {
     const facts = getPokemonFacts(basePokemon());
     const height = facts.find((f) => f.label === 'Height');
-    expect(height?.value).toContain(' m — ');
+    expect(height?.value).toContain(' m - ');
   });
 
-  it('weight fact contains " kg — " (comparison present)', () => {
+  it('weight fact contains " kg - " (comparison present)', () => {
     const facts = getPokemonFacts(basePokemon());
     const weight = facts.find((f) => f.label === 'Weight');
-    expect(weight?.value).toContain(' kg — ');
+    expect(weight?.value).toContain(' kg - ');
   });
 
   it('base happiness fact is tier label, not raw number', () => {

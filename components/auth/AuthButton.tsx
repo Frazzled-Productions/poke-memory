@@ -71,7 +71,7 @@ function SignInPicker({ isPending, onChoose }: { isPending: boolean; onChoose: (
           // top computed from the trigger's bbox. Header wrap puts the trigger
           // on the left edge on narrow viewports and the right edge on wider
           // mobile viewports (e.g. 430px), so anchoring to either side of the
-          // trigger overflows in one of the two cases — pin to the viewport
+          // trigger overflows in one of the two cases - pin to the viewport
           // instead. Desktop (sm:): restore absolute positioning under the
           // trigger via `right-0`.
           style={

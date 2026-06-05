@@ -69,7 +69,7 @@ afterEach(() => {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("PracticeSidebar — loading state", () => {
+describe("PracticeSidebar - loading state", () => {
   it("renders a loading skeleton before the grade log resolves", () => {
     // Never-resolving promise keeps the component in the loading state.
     mockLoadGradeLog.mockReturnValue(new Promise(() => {}));
@@ -85,7 +85,7 @@ describe("PracticeSidebar — loading state", () => {
   });
 });
 
-describe("PracticeSidebar — zero grades (empty state)", () => {
+describe("PracticeSidebar - zero grades (empty state)", () => {
   beforeEach(() => {
     mockLoadGradeLog.mockResolvedValue([]);
   });
@@ -124,7 +124,7 @@ describe("PracticeSidebar — zero grades (empty state)", () => {
   });
 });
 
-describe("PracticeSidebar — non-zero grades", () => {
+describe("PracticeSidebar - non-zero grades", () => {
   const GRADES = [
     entry(4, 1000),
     entry(5, 2000),
@@ -167,7 +167,7 @@ describe("PracticeSidebar — non-zero grades", () => {
       expect(screen.getByText("Accuracy")).toBeInTheDocument();
     });
 
-    // Good × 2, Easy × 1, Hard × 1, Again × 1 — all present.
+    // Good × 2, Easy × 1, Hard × 1, Again × 1 - all present.
     expect(screen.getByText("Again")).toBeInTheDocument();
     expect(screen.getByText("Hard")).toBeInTheDocument();
     expect(screen.getByText("Good")).toBeInTheDocument();
@@ -205,7 +205,7 @@ describe("PracticeSidebar — non-zero grades", () => {
   });
 });
 
-describe("PracticeSidebar — GRADE_LOG_APPENDED_EVENT live update", () => {
+describe("PracticeSidebar - GRADE_LOG_APPENDED_EVENT live update", () => {
   it("re-reads the grade log when a grade-appended event fires", async () => {
     // Initially empty log.
     mockLoadGradeLog.mockResolvedValueOnce([]);
@@ -232,7 +232,7 @@ describe("PracticeSidebar — GRADE_LOG_APPENDED_EVENT live update", () => {
   });
 });
 
-describe("PracticeSidebar — StorageEvent reset path", () => {
+describe("PracticeSidebar - StorageEvent reset path", () => {
   it("re-reads the grade log when the grade-log storage key fires a StorageEvent", async () => {
     // Initially has one grade.
     mockLoadGradeLog.mockResolvedValueOnce([entry(5, 1000)]);

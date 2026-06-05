@@ -2,7 +2,7 @@
  * Tests for POST /api/sync
  *
  * Verifies auth rejection, malformed/oversized request handling, partial-payload
- * behaviour, and the upsert path. The route does not call revalidateTag — it is
+ * behaviour, and the upsert path. The route does not call revalidateTag - it is
  * a write-only beacon endpoint with no cache-invalidation side effects, and these
  * tests confirm that absence.
  */
@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Module mocks — hoisted so vi.mock runs before imports.
+// Module mocks - hoisted so vi.mock runs before imports.
 // ---------------------------------------------------------------------------
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -141,7 +141,7 @@ describe("POST /api/sync", () => {
   });
 
   it("returns 400 when cards field is missing from payload", async () => {
-    // The route validates the payload before touching Supabase — no mock needed.
+    // The route validates the payload before touching Supabase - no mock needed.
     const res = await POST(makeRequest({ notCards: [] }));
     const body = await res.json();
 
@@ -250,7 +250,7 @@ describe("POST /api/sync", () => {
   it("splits a payload larger than 200 cards into multiple upsert batches", async () => {
     const { upsertMock } = makeSupabaseMock();
 
-    // 201 cards — should trigger two batches: 200 + 1.
+    // 201 cards - should trigger two batches: 200 + 1.
     const cards = Array.from({ length: 201 }, (_, i) =>
       makeCard({ subject_key: String(i + 1) })
     );
@@ -311,7 +311,7 @@ describe("POST /api/sync", () => {
 
     expect(res.status).toBe(200);
     expect(body.ok).toBe(true);
-    // Confirm the route retried — upsert was called more than once.
+    // Confirm the route retried - upsert was called more than once.
     expect(upsertMock.mock.calls.length).toBeGreaterThan(1);
   });
 
@@ -319,7 +319,7 @@ describe("POST /api/sync", () => {
   // No cache-invalidation side effects
   // -------------------------------------------------------------------------
 
-  it("does not invoke revalidateTag — the sync route is write-only with no cache side effects", async () => {
+  it("does not invoke revalidateTag - the sync route is write-only with no cache side effects", async () => {
     // Regression guard: if someone adds a revalidateTag call to the sync
     // route, this assertion fails and forces an explicit decision.
     makeSupabaseMock();

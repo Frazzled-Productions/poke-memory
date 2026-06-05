@@ -8,11 +8,11 @@
  * modes (key absent, unparseable JSON, non-array JSON).
  *
  * File lives under components/ (not lib/) because the jsdom project covers
- * components/**\/*.test.tsx — loadPendingQueue reads localStorage, which
+ * components/**\/*.test.tsx - loadPendingQueue reads localStorage, which
  * requires a DOM environment.
  *
  * jsdom on this Node version does not ship localStorage out of the box, so
- * the test provides its own in-memory stub — matching the pattern used in
+ * the test provides its own in-memory stub - matching the pattern used in
  * components/settings/deleteAccount-local.test.tsx.
  */
 
@@ -55,7 +55,7 @@ function setUnparseable(): void {
 }
 
 /**
- * A minimal well-formed entry — contains all four required fields with the
+ * A minimal well-formed entry - contains all four required fields with the
  * correct types. Additional ReviewableCard fields are intentionally omitted;
  * `loadPendingQueue` only validates the minimum set.
  */
@@ -85,7 +85,7 @@ function removeLocalStorage() {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe("loadPendingQueue — top-level failure modes", () => {
+describe("loadPendingQueue - top-level failure modes", () => {
   beforeEach(installLocalStorage);
   afterEach(removeLocalStorage);
 
@@ -119,7 +119,7 @@ describe("loadPendingQueue — top-level failure modes", () => {
   });
 });
 
-describe("loadPendingQueue — per-entry validation (malformed entries are dropped)", () => {
+describe("loadPendingQueue - per-entry validation (malformed entries are dropped)", () => {
   beforeEach(installLocalStorage);
   afterEach(removeLocalStorage);
 
@@ -243,15 +243,15 @@ describe("loadPendingQueue — per-entry validation (malformed entries are dropp
     expect(loadPendingQueue()).toHaveLength(0);
   });
 
-  // ─── Mixed arrays — valid entries survive partial corruption ───────────────
+  // ─── Mixed arrays - valid entries survive partial corruption ───────────────
 
   it("keeps valid entries when a mix of valid and invalid entries are stored", () => {
     setRaw([
       null,
       wellFormed({ id: 1, subjectKey: "1" }),
-      wellFormed({ id: 2, subjectKey: "2", cardType: 99 }),  // cardType is number — dropped
+      wellFormed({ id: 2, subjectKey: "2", cardType: 99 }),  // cardType is number - dropped
       wellFormed({ id: 3, subjectKey: "3" }),
-      { id: 4, cardType: "name", subjectKey: "4" },          // missing state — dropped
+      { id: 4, cardType: "name", subjectKey: "4" },          // missing state - dropped
     ]);
 
     const result = loadPendingQueue();

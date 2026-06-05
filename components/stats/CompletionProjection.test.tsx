@@ -3,7 +3,7 @@ import { screen } from "@testing-library/react";
 import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { CompletionProjection } from "./CompletionProjection";
 
-describe("CompletionProjection — insufficient-history empty state", () => {
+describe("CompletionProjection - insufficient-history empty state", () => {
   it("shows the updated heading (not the old 'Not enough data yet' copy)", () => {
     renderWithIntl(<CompletionProjection projection={{ kind: "insufficient-history" }} />);
     expect(screen.getByText("Projection not available yet")).toBeInTheDocument();
@@ -18,7 +18,7 @@ describe("CompletionProjection — insufficient-history empty state", () => {
   });
 });
 
-describe("CompletionProjection — complete state", () => {
+describe("CompletionProjection - complete state", () => {
   it("shows the congratulations message", () => {
     renderWithIntl(<CompletionProjection projection={{ kind: "complete" }} />);
     expect(screen.getByText("Complete!")).toBeInTheDocument();
@@ -26,7 +26,7 @@ describe("CompletionProjection — complete state", () => {
   });
 });
 
-describe("CompletionProjection — projected state", () => {
+describe("CompletionProjection - projected state", () => {
   it("shows the projected date, remaining count, and weekly rate", () => {
     renderWithIntl(
       <CompletionProjection

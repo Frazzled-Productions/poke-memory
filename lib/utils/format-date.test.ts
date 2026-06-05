@@ -18,7 +18,7 @@ describe("isoDate", () => {
     expect(isoDate(new Date("2026-05-14T00:00:00Z"))).toBe("2026-05-14");
   });
 
-  it("uses UTC, not local time — midnight UTC stays on the same day", () => {
+  it("uses UTC, not local time - midnight UTC stays on the same day", () => {
     // A Date at exactly midnight UTC is 2026-01-01 in UTC.
     expect(isoDate(new Date("2026-01-01T00:00:00Z"))).toBe("2026-01-01");
   });
@@ -139,7 +139,7 @@ describe("formatDate", () => {
   });
 
   it("does not throw on an ISO date from a different month", () => {
-    // January — en-GB: "Thu, 1 Jan" (or similar)
+    // January - en-GB: "Thu, 1 Jan" (or similar)
     const jan = formatDate("2026-01-01", "dmy", "UTC");
     expect(jan).toMatch(/Jan/);
   });

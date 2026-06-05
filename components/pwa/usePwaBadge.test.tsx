@@ -8,7 +8,7 @@
  *   - Is a no-op when the Web Badging API is unavailable.
  *   - Re-syncs when the session storage key changes (card graded).
  *   - Re-syncs when SETTINGS_SAVED_EVENT fires (e.g. timezone changed).
- *   - Re-syncs when SESSION_CHANGED_EVENT fires (IDB write on WebKit — #1134).
+ *   - Re-syncs when SESSION_CHANGED_EVENT fires (IDB write on WebKit - #1134).
  *   - Clears badge on unmount.
  *   - On a fresh install, badge is capped by the daily new-card cap, not the full backlog.
  *   - Delegates queue computation to computeQueueCount (#1137).
@@ -235,7 +235,7 @@ describe("usePwaBadge", () => {
       expect(mockSetAppBadge).toHaveBeenCalledWith(1);
     });
 
-    // Settings change (e.g. timezone) — should re-sync.
+    // Settings change (e.g. timezone) - should re-sync.
     stubQueueCount(3);
 
     act(() => {
@@ -247,7 +247,7 @@ describe("usePwaBadge", () => {
     });
   });
 
-  it("re-syncs when SESSION_CHANGED_EVENT fires (WebKit IDB write — #1134)", async () => {
+  it("re-syncs when SESSION_CHANGED_EVENT fires (WebKit IDB write - #1134)", async () => {
     // Simulates WebKit: loadSession returns null initially, then returns cards
     // after an IDB write. The hook must re-run `sync` when the CustomEvent fires.
     mockLoadSession.mockResolvedValue(null);
@@ -293,8 +293,8 @@ describe("usePwaBadge", () => {
   });
 
   it("badge is capped at the daily new-card limit on a fresh install", async () => {
-    // Verifies the hook passes the session to computeQueueCount — which applies
-    // the cap — rather than summing the raw backlog directly.
+    // Verifies the hook passes the session to computeQueueCount - which applies
+    // the cap - rather than summing the raw backlog directly.
     const BACKLOG_SIZE = 3600;
     const DAILY_CAP = 10;
 

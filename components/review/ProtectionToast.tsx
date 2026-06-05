@@ -13,7 +13,7 @@ export type ProtectionToastKind = "earned" | "spent" | "earned-and-spent";
 
 type Props = {
   kind: ProtectionToastKind;
-  /** Current streak length — used in the spend/earned-and-spent message. */
+  /** Current streak length - used in the spend/earned-and-spent message. */
   streakCount: number;
   onDismiss: () => void;
 };

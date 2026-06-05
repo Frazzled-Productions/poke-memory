@@ -16,7 +16,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Module mocks — must precede the import of the module under test.
+// Module mocks - must precede the import of the module under test.
 // ---------------------------------------------------------------------------
 
 const mockLoadSession = vi.fn();
@@ -101,7 +101,7 @@ beforeEach(() => {
 
 describe("useCardClass", () => {
   it('returns "pending" synchronously before the async load completes', () => {
-    // loadSession never resolves during this test — use a Promise that
+    // loadSession never resolves during this test - use a Promise that
     // stays pending so we can inspect the synchronous initial value.
     mockLoadSession.mockReturnValue(new Promise(() => {}));
 
@@ -135,7 +135,7 @@ describe("useCardClass", () => {
     await waitFor(() => {
       expect(result.current).toBe("locked");
     });
-    // classifyCard should not be called — card not found.
+    // classifyCard should not be called - card not found.
     expect(mockClassifyCard).not.toHaveBeenCalled();
   });
 
@@ -185,12 +185,12 @@ describe("useCardClass", () => {
   });
 
   it('returns "learning" when name card is mastered but reverse leg is absent (#1448)', async () => {
-    // Only name card — no reverse card in session. Name-only mastery does not count.
+    // Only name card - no reverse card in session. Name-only mastery does not count.
     const nameCard = makeNameCard(25, { lastReview: "2026-04-01", reps: 3, scheduledDays: 30 });
     mockLoadSession.mockResolvedValue({ cards: [nameCard], limits: {} });
     mockLoadSettings.mockReturnValue(makeSettings(3));
     mockClassifyCard.mockReturnValue("mastered");
-    // isMastered never called when reverse is absent; irrelevant — default is undefined.
+    // isMastered never called when reverse is absent; irrelevant - default is undefined.
 
     const { result } = renderHook(() => useCardClass(25));
 

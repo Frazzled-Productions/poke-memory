@@ -133,13 +133,13 @@ describe("computeBestReviewDay", () => {
     expect(computeBestReviewDay(log)).toBe(3);
   });
 
-  it("single-day log — all reviews on one day — returns that day's count", () => {
+  it("single-day log - all reviews on one day - returns that day's count", () => {
     const log: GradeLog = [entry("2026-05-12"), entry("2026-05-12")];
     expect(computeBestReviewDay(log)).toBe(2);
   });
 });
 
-describe("computeRecords — species-level mastery (both legs, #1448)", () => {
+describe("computeRecords - species-level mastery (both legs, #1448)", () => {
   it("empty inputs produce zeros and nulls", () => {
     const r = computeRecords([], [], [], MASTERY_REPETITIONS);
     expect(r).toEqual({
@@ -150,7 +150,7 @@ describe("computeRecords — species-level mastery (both legs, #1448)", () => {
     });
   });
 
-  it("name-only mastered cards produce null (reverse leg absent — not species-mastered)", () => {
+  it("name-only mastered cards produce null (reverse leg absent - not species-mastered)", () => {
     // Per #1448: name-card mastery alone does not count as species mastery.
     const cards: ReviewableCard[] = [
       nameCard(1, {
@@ -274,7 +274,7 @@ describe("computeRecords — species-level mastery (both legs, #1448)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// bestReviewDayForLocale — per-locale grade-log filtering (#1620)
+// bestReviewDayForLocale - per-locale grade-log filtering (#1620)
 // ---------------------------------------------------------------------------
 
 describe("bestReviewDayForLocale", () => {
@@ -303,7 +303,7 @@ describe("bestReviewDayForLocale", () => {
 
   it("treats legacy entries without a locale field as 'en'", () => {
     const log: GradeLog = [
-      // No locale field — legacy entry, treated as "en".
+      // No locale field - legacy entry, treated as "en".
       { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 1 },
       { date: "2026-05-12", grade: 4, cardType: "name", occurredAt: 2 },
     ];

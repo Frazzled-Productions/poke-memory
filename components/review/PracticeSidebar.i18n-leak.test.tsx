@@ -50,7 +50,7 @@ function collectLeaks(container: HTMLElement): string[] {
   return leaks;
 }
 
-describe("PracticeSidebar — i18n leak (empty state)", () => {
+describe("PracticeSidebar - i18n leak (empty state)", () => {
   beforeEach(() => {
     mockLoadGradeLog.mockResolvedValue([]);
   });
@@ -64,7 +64,7 @@ describe("PracticeSidebar — i18n leak (empty state)", () => {
   });
 });
 
-describe("PracticeSidebar — i18n leak (populated state)", () => {
+describe("PracticeSidebar - i18n leak (populated state)", () => {
   beforeEach(() => {
     mockLoadGradeLog.mockResolvedValue([
       makeEntry(4),

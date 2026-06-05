@@ -67,7 +67,7 @@ function makeArrival(id: number, name: string, reps = 2): NextArrival {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("NextArrivalsStrip — empty state", () => {
+describe("NextArrivalsStrip - empty state", () => {
   it("renders the 'Next arrivals' heading", () => {
     render(<NextArrivalsStrip arrivals={[]} />);
     expect(
@@ -90,7 +90,7 @@ describe("NextArrivalsStrip — empty state", () => {
   });
 });
 
-describe("NextArrivalsStrip — with arrivals", () => {
+describe("NextArrivalsStrip - with arrivals", () => {
   it("renders the arrivals list", () => {
     const arrivals = [makeArrival(1, "Bulbasaur"), makeArrival(4, "Charmander")];
     render(<NextArrivalsStrip arrivals={arrivals} />);
@@ -154,10 +154,10 @@ describe("NextArrivalsStrip — with arrivals", () => {
 });
 
 // ---------------------------------------------------------------------------
-// NextArrivalsStrip — InfoButton (#1633)
+// NextArrivalsStrip - InfoButton (#1633)
 // ---------------------------------------------------------------------------
 
-describe("NextArrivalsStrip — InfoButton (populated state)", () => {
+describe("NextArrivalsStrip - InfoButton (populated state)", () => {
   const arrivals = [makeArrival(1, "Bulbasaur"), makeArrival(4, "Charmander")];
 
   it("renders the InfoButton by its aria-label in English", () => {
@@ -200,7 +200,7 @@ describe("NextArrivalsStrip — InfoButton (populated state)", () => {
   });
 });
 
-describe("NextArrivalsStrip — InfoButton absent in empty state", () => {
+describe("NextArrivalsStrip - InfoButton absent in empty state", () => {
   it("does NOT render an InfoButton when arrivals is empty", () => {
     render(<NextArrivalsStrip arrivals={[]} />);
     expect(
@@ -210,10 +210,10 @@ describe("NextArrivalsStrip — InfoButton absent in empty state", () => {
 });
 
 // ---------------------------------------------------------------------------
-// NextArrivalsStrip — InfoButton locale coverage (#1633)
+// NextArrivalsStrip - InfoButton locale coverage (#1633)
 // ---------------------------------------------------------------------------
 
-describe("NextArrivalsStrip — InfoButton in Japanese", () => {
+describe("NextArrivalsStrip - InfoButton in Japanese", () => {
   it("renders InfoButton with Japanese aria-label", () => {
     renderJa(<NextArrivalsStrip arrivals={[makeArrival(1, "Bulbasaur")]} />);
     // messages/ja.json pasture.nextArrivals.repsInfoAriaLabel = "「reps」とは？"
@@ -232,7 +232,7 @@ describe("NextArrivalsStrip — InfoButton in Japanese", () => {
   });
 });
 
-describe("NextArrivalsStrip — InfoButton in Simplified Chinese", () => {
+describe("NextArrivalsStrip - InfoButton in Simplified Chinese", () => {
   it("renders InfoButton with Simplified Chinese aria-label", () => {
     renderZhHans(<NextArrivalsStrip arrivals={[makeArrival(1, "Bulbasaur")]} />);
     // messages/zh-Hans.json pasture.nextArrivals.repsInfoAriaLabel = "「reps」是什么意思？"
@@ -242,7 +242,7 @@ describe("NextArrivalsStrip — InfoButton in Simplified Chinese", () => {
   });
 });
 
-describe("NextArrivalsStrip — InfoButton in Traditional Chinese", () => {
+describe("NextArrivalsStrip - InfoButton in Traditional Chinese", () => {
   it("renders InfoButton with Traditional Chinese aria-label", () => {
     renderZhHant(<NextArrivalsStrip arrivals={[makeArrival(1, "Bulbasaur")]} />);
     // messages/zh-Hant.json pasture.nextArrivals.repsInfoAriaLabel = "「reps」是什麼意思？"

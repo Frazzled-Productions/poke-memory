@@ -10,7 +10,7 @@ import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
  * so the fixed bottom tab bar never overlaps content.
  * When `mobileNav === 'hamburger'`: no extra padding (there is no fixed bar).
  *
- * `md:pb-0` is always applied — desktop layout is unaffected by this setting.
+ * `md:pb-0` is always applied - desktop layout is unaffected by this setting.
  */
 export function MobileNavPaddingWrapper({ children }: { children: React.ReactNode }) {
   // Initialise to null so the first client render matches the server render

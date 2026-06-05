@@ -14,9 +14,9 @@ export const STREAK_MILESTONES: readonly number[] = [
  * Celebration tier for a streak milestone. Controls confetti density,
  * banner styling, and copy.
  *
- * - `light`    — 3, 7, 14: early hook milestones, gentle celebration.
- * - `standard` — 30, 60, 100, 150, 200, 250: consistent-user milestones.
- * - `major`    — 365 and every post-365 milestone (465, 565, …): rare,
+ * - `light` - 3, 7, 14: early hook milestones, gentle celebration.
+ * - `standard` - 30, 60, 100, 150, 200, 250: consistent-user milestones.
+ * - `major` - 365 and every post-365 milestone (465, 565, …): rare,
  *               maximum celebration.
  */
 export type MilestoneTier = "light" | "standard" | "major";
@@ -44,7 +44,7 @@ export function tierForMilestone(milestone: number): MilestoneTier {
  *
  * Picks the smallest un-seen milestone (not the largest) so a user who
  * misses a celebration day still gets a celebration the next time they
- * open the app — but only one celebration per session, with the larger
+ * open the app - but only one celebration per session, with the larger
  * milestone deferred to the next reload.
  *
  * For streaks beyond 365, milestones are generated every 100 days (465,
@@ -62,7 +62,7 @@ export function findPendingMilestone(
     if (!seenSet.has(m)) return m;
   }
 
-  // All static milestones reached and seen — check the post-365 tail.
+  // All static milestones reached and seen - check the post-365 tail.
   const lastStatic = STREAK_MILESTONES[STREAK_MILESTONES.length - 1]; // 365
   if (streak <= lastStatic) return null;
 

@@ -60,7 +60,7 @@ import { WhatsNewIndicator } from "@/components/whats-new/WhatsNewIndicator";
 
 describe("WhatsNewIndicator", () => {
   it("renders nothing when last-seen version matches the current build", () => {
-    // compareSemver returns 0 when versions match — no unseen changes.
+    // compareSemver returns 0 when versions match - no unseen changes.
     mockReadLastSeenVersion.mockReturnValue("0.0.1");
     const { container } = renderWithIntl(<WhatsNewIndicator />);
     // After the mount effect resolves hasUnseen stays false → null render.
@@ -68,7 +68,7 @@ describe("WhatsNewIndicator", () => {
   });
 
   it("renders a link with the localised aria-label when there are unseen changes (en)", async () => {
-    // The current build is newer than the stored version — compareSemver returns 1.
+    // The current build is newer than the stored version - compareSemver returns 1.
     mockReadLastSeenVersion.mockReturnValue("0.0.0");
     mockCompareSemver.mockReturnValue(1);
     renderWithIntl(<WhatsNewIndicator />);
@@ -86,7 +86,7 @@ describe("WhatsNewIndicator", () => {
     expect(link).toBeInTheDocument();
   });
 
-  it("renders nothing when last-seen is null (first visit) — seeds the version silently", () => {
+  it("renders nothing when last-seen is null (first visit) - seeds the version silently", () => {
     // No stored version = first visit. The component seeds APP_VERSION and
     // keeps hasUnseen=false so the pill is not shown to brand-new users.
     mockReadLastSeenVersion.mockReturnValue(null);

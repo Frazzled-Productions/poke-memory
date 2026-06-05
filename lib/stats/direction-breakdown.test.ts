@@ -159,7 +159,7 @@ describe("computeSessionDirectionAccuracy", () => {
 });
 
 describe("enabledDirectionsFromSettings", () => {
-  // Name and reverse are always on since #1234 — no per-direction toggle.
+  // Name and reverse are always on since #1234 - no per-direction toggle.
   it("always includes name and reverse regardless of enrichment flags", () => {
     const enabled = enabledDirectionsFromSettings({
       evolutionCardsEnabled: false,

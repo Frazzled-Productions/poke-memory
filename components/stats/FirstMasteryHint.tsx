@@ -9,7 +9,7 @@
  * weakest. This component renders a small, hedged line near the scheduling
  * controls projecting roughly when the first mastery will land.
  *
- * Render contract — the hint should only render when:
+ * Render contract - the hint should only render when:
  *   - the user has at least one introduced card,
  *   - the user has zero mastered cards,
  *   - the superuser `pretendAllMastered` flag is off,

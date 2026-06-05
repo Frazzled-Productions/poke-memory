@@ -6,7 +6,7 @@
  * MachineTranslationBanner visibility inside the modal.
  *
  * All renders use renderWithIntl / renderJa so the real message catalogues are
- * exercised — bare render is intentionally avoided here.
+ * exercised - bare render is intentionally avoided here.
  */
 
 import {
@@ -58,7 +58,7 @@ describe("FirstVisitOnboardingModal", () => {
       configurable: true,
       writable: true,
     });
-    // window.dispatchEvent is called by saveSettings — ensure it exists in jsdom.
+    // window.dispatchEvent is called by saveSettings - ensure it exists in jsdom.
     if (!window.dispatchEvent) {
       Object.defineProperty(window, "dispatchEvent", {
         value: vi.fn(),
@@ -264,7 +264,7 @@ describe("FirstVisitOnboardingModal", () => {
     it("en: renders plain-English intro (no 'spaced repetition' jargon)", async () => {
       renderWithIntl(<FirstVisitOnboardingModal />);
       await screen.findByRole("dialog");
-      // New en intro contains "longer the gap before it comes back" — distinctive phrase.
+      // New en intro contains "longer the gap before it comes back" - distinctive phrase.
       expect(screen.getByText(/longer the gap before it comes back/i)).toBeInTheDocument();
     });
 
@@ -392,7 +392,7 @@ describe("FirstVisitOnboardingModal", () => {
       vi.mocked(useAppLocale).mockReturnValue("en");
       renderWithIntl(<FirstVisitOnboardingModal />, { locale: "en" });
       await screen.findByRole("dialog");
-      // Banner self-hides for en locale — no role="note" element.
+      // Banner self-hides for en locale - no role="note" element.
       expect(screen.queryByRole("note")).not.toBeInTheDocument();
     });
 
@@ -401,7 +401,7 @@ describe("FirstVisitOnboardingModal", () => {
       renderJa(<FirstVisitOnboardingModal />);
       await screen.findByRole("dialog");
       // After the banner's useEffect fires (dismissed === false), the note renders.
-      // The dialog is the container — confirm the note is inside the DOM.
+      // The dialog is the container - confirm the note is inside the DOM.
       expect(await screen.findByRole("note")).toBeInTheDocument();
     });
 
@@ -418,7 +418,7 @@ describe("FirstVisitOnboardingModal", () => {
         await new Promise((r) => setTimeout(r, 0));
       });
 
-      // Banner must be absent — dismissed flag is set.
+      // Banner must be absent - dismissed flag is set.
       expect(screen.queryByRole("note")).not.toBeInTheDocument();
     });
   });

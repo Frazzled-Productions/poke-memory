@@ -16,7 +16,7 @@ function writeOpenState(sectionId: string, open: boolean): void {
   try {
     window.localStorage.setItem(`${STORAGE_PREFIX}${sectionId}`, open ? "1" : "0");
   } catch {
-    // Silently ignore — localStorage might be unavailable in private browsing.
+    // Silently ignore - localStorage might be unavailable in private browsing.
   }
 }
 
@@ -27,7 +27,7 @@ type Props = {
   heading: string;
   /** Optional class names applied to the outer section element. */
   className?: string;
-  /** Section content — rendered when expanded. */
+  /** Section content - rendered when expanded. */
   children: React.ReactNode;
   /**
    * When true, force-expand this section AND persist the open state to
@@ -60,7 +60,7 @@ export function CollapsibleSection({
 
   // Honour forceOpen (e.g. hash deep-link). Persists to localStorage so the
   // section stays open on the next visit. Only runs when forceOpen flips to
-  // true — does not collapse when it flips back to false.
+  // true - does not collapse when it flips back to false.
   useEffect(() => {
     if (!forceOpen) return;
     setOpen(true);

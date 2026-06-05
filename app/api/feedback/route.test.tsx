@@ -66,7 +66,7 @@ beforeEach(() => {
 
 // ─── Valid categories ─────────────────────────────────────────────────────────
 
-describe("POST /api/feedback — valid categories", () => {
+describe("POST /api/feedback - valid categories", () => {
   const CATEGORIES = ["bug", "feature", "other"] as const;
 
   for (const cat of CATEGORIES) {
@@ -96,7 +96,7 @@ describe("POST /api/feedback — valid categories", () => {
 
 // ─── Input validation ─────────────────────────────────────────────────────────
 
-describe("POST /api/feedback — input validation", () => {
+describe("POST /api/feedback - input validation", () => {
   it("returns 400 for an invalid category string", async () => {
     const adminMock = buildAdminMock();
     const serverMock = buildServerMock(null);
@@ -174,7 +174,7 @@ describe("POST /api/feedback — input validation", () => {
 
 // ─── Message truncation ───────────────────────────────────────────────────────
 
-describe("POST /api/feedback — message truncation", () => {
+describe("POST /api/feedback - message truncation", () => {
   it("truncates a message longer than 2000 chars to exactly 2000 before inserting", async () => {
     const adminMock = buildAdminMock();
     const serverMock = buildServerMock(null);
@@ -211,7 +211,7 @@ describe("POST /api/feedback — message truncation", () => {
 
 // ─── User id resolution ───────────────────────────────────────────────────────
 
-describe("POST /api/feedback — user_id resolution", () => {
+describe("POST /api/feedback - user_id resolution", () => {
   it("inserts user_id: null for a guest (no session)", async () => {
     const adminMock = buildAdminMock();
     const serverMock = buildServerMock(null);
@@ -283,7 +283,7 @@ describe("POST /api/feedback — user_id resolution", () => {
 
 // ─── Optional fields ──────────────────────────────────────────────────────────
 
-describe("POST /api/feedback — optional fields", () => {
+describe("POST /api/feedback - optional fields", () => {
   it("passes page and appVersion through to the insert when provided", async () => {
     const adminMock = buildAdminMock();
     const serverMock = buildServerMock(null);
@@ -330,7 +330,7 @@ describe("POST /api/feedback — optional fields", () => {
 
 // ─── Error handling ───────────────────────────────────────────────────────────
 
-describe("POST /api/feedback — error handling", () => {
+describe("POST /api/feedback - error handling", () => {
   it("returns 500 { ok: false } when the insert returns an error", async () => {
     const adminMock = buildAdminMock({ insertError: { message: "DB error" } });
     const serverMock = buildServerMock(null);

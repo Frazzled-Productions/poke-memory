@@ -251,7 +251,7 @@ describe("classifyCard", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeStats — mastery boundary
+// computeStats - mastery boundary
 // ---------------------------------------------------------------------------
 
 describe("computeStats mastery boundary", () => {
@@ -280,7 +280,7 @@ describe("computeStats mastery boundary", () => {
     expect(enResult.totalCards).toBe(1); // only 1 name card with locale "en"
   });
 
-  it("locale scoping: en is the default — cards without locale field count as en (#1259)", () => {
+  it("locale scoping: en is the default - cards without locale field count as en (#1259)", () => {
     // Cards without a locale field (pre-#1259 state) should count under the "en" scope.
     const enNameNoLocale = card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS });
     const enReverseNoLocale = masteredReverse(1);
@@ -290,7 +290,7 @@ describe("computeStats mastery boundary", () => {
     expect(enResult.mastered).toBe(1);
 
     const jaResult = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, false, "ja");
-    expect(jaResult.mastered).toBe(0); // same cards, but scoped to "ja" — no matches
+    expect(jaResult.mastered).toBe(0); // same cards, but scoped to "ja" - no matches
     expect(jaResult.totalCards).toBe(0);
   });
 
@@ -372,7 +372,7 @@ describe("computeStats.dueForecast", () => {
       card(1, { lastReview: TODAY, dueDate: "2026-05-11" }),
       card(2, { lastReview: TODAY, dueDate: "2026-05-11" }),
       card(3, { lastReview: TODAY, dueDate: "2026-05-14" }),
-      // outside window — ignored
+      // outside window - ignored
       card(4, { lastReview: TODAY, dueDate: "2026-05-24" }),
     ];
     const result = computeStats(cards, TODAY);
@@ -398,7 +398,7 @@ describe("computeStats.dueForecast", () => {
         types: ["fire", "flying"],
       },
       masteredReverse(2),
-      // unknown type — silently ignored
+      // unknown type - silently ignored
       { ...card(3), types: ["mystery"] },
     ];
     const result = computeStats(cards, TODAY);
@@ -434,7 +434,7 @@ describe("computeStats.dueForecast", () => {
     // when `today` is also UTC today. If the caller mistakenly passed a
     // behind-UTC local date (e.g. "2026-05-09" when UTC is "2026-05-10"), the
     // card's dueDate (2026-05-10) > localToday (2026-05-09) and the card would
-    // appear in forecastCounts[1] instead — matching the bug report.
+    // appear in forecastCounts[1] instead - matching the bug report.
     const UTC_TODAY = "2026-05-10";
     const LOCAL_TODAY_BEHIND_UTC = "2026-05-09"; // e.g. user in UTC−8 late at night
     const cardsDue = [
@@ -442,22 +442,22 @@ describe("computeStats.dueForecast", () => {
       card(2, { lastReview: "2026-05-08", dueDate: UTC_TODAY }),
     ];
 
-    // Correct: called with UTC today — both cards counted in day 0.
+    // Correct: called with UTC today - both cards counted in day 0.
     const utcResult = computeStats(cardsDue, UTC_TODAY);
     expect(utcResult.dueForecast[0].count).toBe(2);
     expect(utcResult.dueForecast[1].count).toBe(0);
 
-    // Wrong (bug): called with behind-UTC local date — cards "miss" today bar
+    // Wrong (bug): called with behind-UTC local date - cards "miss" today bar
     // and fall into day 1 instead, producing an empty today bar despite the
     // Practice screen showing them as reviews due.
     const localResult = computeStats(cardsDue, LOCAL_TODAY_BEHIND_UTC);
-    expect(localResult.dueForecast[0].count).toBe(0); // today bar empty — the bug
+    expect(localResult.dueForecast[0].count).toBe(0); // today bar empty - the bug
     expect(localResult.dueForecast[1].count).toBe(2); // shows up tomorrow instead
   });
 });
 
 // ---------------------------------------------------------------------------
-// computeStats — superuser pretendAllMastered
+// computeStats - superuser pretendAllMastered
 // ---------------------------------------------------------------------------
 
 describe("computeStats with forceAllMastered", () => {
@@ -488,7 +488,7 @@ describe("computeStats with forceAllMastered", () => {
     expect(gen2.total).toBe(1);
     expect(gen2.introduced).toBe(1);
     expect(gen2.mastered).toBe(1);
-    // Generations with zero cards stay zero — the overlay only inflates
+    // Generations with zero cards stay zero - the overlay only inflates
     // mastered up to each generation's own total.
     const gen9 = result.perGeneration.find((g) => g.gen === 9)!;
     expect(gen9.total).toBe(0);
@@ -510,7 +510,7 @@ describe("computeStats with forceAllMastered", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeStats — alternate-form generation bucketing
+// computeStats - alternate-form generation bucketing
 // ---------------------------------------------------------------------------
 
 describe("computeStats form-card generation bucketing", () => {
@@ -563,7 +563,7 @@ describe("computeStats form-card generation bucketing", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeStats — struggling-card gate (#736)
+// computeStats - struggling-card gate (#736)
 // ---------------------------------------------------------------------------
 
 describe("computeStats struggling gate", () => {
@@ -692,10 +692,10 @@ describe("computeStats struggling gate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeStats([]) — empty card array (issue #1527)
+// computeStats([]) - empty card array (issue #1527)
 // ---------------------------------------------------------------------------
 
-describe("computeStats([]) — empty card array", () => {
+describe("computeStats([]) - empty card array", () => {
   it("does not throw for an empty card array", () => {
     expect(() => computeStats([], TODAY)).not.toThrow();
   });

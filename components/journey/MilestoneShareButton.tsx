@@ -20,10 +20,10 @@ type Props = {
  * crosses a round-number mastery threshold or completes a generation.
  *
  * Priority order:
- *   1. Web Share API file share (PNG image card) — when navigator.canShare({ files }) is truthy.
- *   2. Web Share API text share — when navigator.share is available but file-share is not.
- *   3. PNG download — when the image rendered but the Share API is unavailable.
- *   4. Clipboard text copy — last resort.
+ *   1. Web Share API file share (PNG image card) - when navigator.canShare({ files }) is truthy.
+ *   2. Web Share API text share - when navigator.share is available but file-share is not.
+ *   3. PNG download - when the image rendered but the Share API is unavailable.
+ *   4. Clipboard text copy - last resort.
  */
 export function MilestoneShareButton({ milestone }: Props) {
   const t = useTranslations("journey.milestoneShare");
@@ -39,7 +39,7 @@ export function MilestoneShareButton({ milestone }: Props) {
     };
   }, []);
 
-  // Nothing to show — either no milestone reached, or suppressed by
+  // Nothing to show - either no milestone reached, or suppressed by
   // the superuser guard.
   if (milestone === null) return null;
 
@@ -72,7 +72,7 @@ export function MilestoneShareButton({ milestone }: Props) {
 
     // --- Path 1: Web Share API with PNG file ---
     // Tracks whether the file-share capability was present. When true, we
-    // attempted a share sheet — any error (including user dismissal) must
+    // attempted a share sheet - any error (including user dismissal) must
     // not open a second sheet via Path 2.
     let triedFileShare = false;
     if (file !== null && nav !== null) {
@@ -90,7 +90,7 @@ export function MilestoneShareButton({ milestone }: Props) {
           await navExt.share({ files: [file] });
           return;
         } catch (err) {
-          // User dismissed the sheet — stop here; do not open another sheet.
+          // User dismissed the sheet - stop here; do not open another sheet.
           if (err instanceof Error && err.name === "AbortError") return;
           // Any other error (e.g. OS-level failure): fall through to
           // download/clipboard, but do NOT open a second share sheet.
@@ -100,7 +100,7 @@ export function MilestoneShareButton({ milestone }: Props) {
 
     // --- Path 2: Web Share API text only ---
     // Only reached when the file-share capability was absent (canShare returned
-    // false or canShare/share were not available) — i.e. a genuine capability
+    // false or canShare/share were not available) - i.e. a genuine capability
     // miss. If Path 1 was attempted (triedFileShare) we skip here to avoid
     // opening a second share sheet.
     if (!triedFileShare && nav !== null) {
@@ -112,7 +112,7 @@ export function MilestoneShareButton({ milestone }: Props) {
           await navExt.share({ text: shareText });
           return;
         } catch {
-          // Share sheet dismissed or unavailable — fall through.
+          // Share sheet dismissed or unavailable - fall through.
         }
       }
     }

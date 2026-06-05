@@ -7,7 +7,7 @@ import { LOCALE_COOKIE, SUPPORTED_LOCALES, type AppLocale } from "@/i18n/locales
 
 /**
  * Write the user's chosen locale to the `poke-memory:locale` cookie.
- * Not HTTP-only — the client-side `useAppLocale` hook reads it via
+ * Not HTTP-only - the client-side `useAppLocale` hook reads it via
  * `document.cookie`. Expires in 1 year. The `secure` flag is derived from
  * the actual request protocol (via `x-forwarded-proto`) rather than from
  * `NODE_ENV`: production (Vercel HTTPS) sets it; the e2e CI runs against

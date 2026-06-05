@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * CollectionTimeline — the hero scrubber on the Journey tab.
+ * CollectionTimeline - the hero scrubber on the Journey tab.
  *
  * Allows the user to drag through time in both directions:
  *   Left (past): replay how the collection was built, day by day.
- *   Right (future): the forgetting horizon — cards that will fade if
+ *   Right (future): the forgetting horizon - cards that will fade if
  *                   never reviewed again.
  *
  * The control is an accessible HTML range input with a bespoke visual
@@ -26,7 +26,7 @@ import { MeterBar } from "@/components/ui/MeterBar";
 // ---------------------------------------------------------------------------
 
 // formatDate is imported from lib/utils/format-date (routes through the shared
-// helper instead of raw toLocaleDateString — #1456 lint rule).
+// helper instead of raw toLocaleDateString - #1456 lint rule).
 // Local wrapper converts milliseconds to ISO string for the lib helper.
 function formatDateMs(ms: number): string {
   return formatDate(isoDate(new Date(ms)), "dmy-year", "UTC");
@@ -89,7 +89,7 @@ function CountPill({
 // markup with the canonical a11y contract.
 
 // ---------------------------------------------------------------------------
-// EmptyState — shown when no grade log data exists yet
+// EmptyState - shown when no grade log data exists yet
 // ---------------------------------------------------------------------------
 
 function EmptyState() {
@@ -247,7 +247,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
           )}
         </div>
 
-        {/* Progress bars — wrapped in aria-hidden; screen-reader content is
+        {/* Progress bars - wrapped in aria-hidden; screen-reader content is
             provided by the aria-live region lower in the tree. */}
         {!isFuture && (
           <div className={`mb-5 ${colStack}`} aria-hidden="true">
@@ -294,7 +294,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
 
         {/* Scrubber */}
         <div className="relative">
-          {/* Visual track — a coloured gradient bar behind the thumb */}
+          {/* Visual track - a coloured gradient bar behind the thumb */}
           <div
             className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full"
             style={{ background: trackGradient }}
@@ -305,7 +305,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
             className="pointer-events-none absolute left-1/2 top-1/2 h-3 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-400"
             aria-hidden="true"
           />
-          {/* The actual range input — transparent except the thumb */}
+          {/* The actual range input - transparent except the thumb */}
           <input
             id={sliderId}
             type="range"

@@ -19,7 +19,7 @@ import type { MergeUserSettingsRpc } from "@/lib/supabase/rpc-types";
 /**
  * Push a JSONB patch to the user's settings row via merge_user_settings.
  * Accepts `Partial<UserSettings>` so callers can send only the keys they
- * intend to change — the RPC's `||` overlay only touches keys present in
+ * intend to change - the RPC's `||` overlay only touches keys present in
  * the patch, leaving the rest of cloud's blob alone (#583). Callers may
  * still pass a full `UserSettings` object; it's a no-op widening.
  *
@@ -63,7 +63,7 @@ export type RegionalPrefs = {
    * Stored as a scalar column on user_settings (migration 030) for the same
    * reason as timezone/dateFormat: a dedicated write path prevents
    * last-write-wins collisions with the JSONB settings blob.
-   * NULL means "no preference" — the route falls back to PUSH_DEFAULT_HOUR_UTC.
+   * NULL means "no preference" - the route falls back to PUSH_DEFAULT_HOUR_UTC.
    */
   pushNotificationHour: number | null;
 };
@@ -80,7 +80,7 @@ export async function pushRegionalPrefs(
   prefs: RegionalPrefs,
 ): Promise<boolean> {
   try {
-    // UPDATE rather than upsert — avoids creating a sparse row (settings=NULL)
+    // UPDATE rather than upsert - avoids creating a sparse row (settings=NULL)
     // for a user whose pushSettings hasn't run yet. A no-op update (row doesn't
     // exist) is safe: the row will be created by pushSettings and the next
     // explicit timezone/date_format/hour change will update the scalar columns.
@@ -140,7 +140,7 @@ function validatePushNotificationHour(value: number | null | undefined): number 
 }
 
 // ---------------------------------------------------------------------------
-// JSONB settings blob (original push/pull — unchanged)
+// JSONB settings blob (original push/pull - unchanged)
 // ---------------------------------------------------------------------------
 
 // Returns the cloud settings object, or null if the user has no row yet, the
@@ -158,7 +158,7 @@ export async function pullSettings(
 
 export type PulledSettings = {
   settings: UserSettings;
-  /** Server-side updated_at — the cross-device anchor for "is cloud newer than what this device last saw". Null if the row has no timestamp (legacy). */
+  /** Server-side updated_at - the cross-device anchor for "is cloud newer than what this device last saw". Null if the row has no timestamp (legacy). */
   updatedAt: string | null;
 };
 
@@ -168,11 +168,11 @@ export type PulledSettings = {
  * last copy this device applied. Without it, a device that has any local
  * settings can never receive remote updates (issue #572).
  *
- * Returns `null` when the row has no real settings — same semantics as
+ * Returns `null` when the row has no real settings - same semantics as
  * `pullSettings`. Callers that *also* need the row's `last_reset_at` should
  * use `pullUserSettingsRow` directly, because that flag is meaningful even
  * when the JSONB blob is empty (reset_all_progress creates a row with only
- * `last_reset_at` populated — see migration 022).
+ * `last_reset_at` populated - see migration 022).
  */
 export async function pullSettingsWithTimestamp(
   client: SupabaseClient,
@@ -196,7 +196,7 @@ export type UserSettingsRow = {
  * Single-query helper that returns every column of the `user_settings` row the
  * sync layer cares about. Callers that only want the JSONB blob should use
  * `pullSettings` / `pullSettingsWithTimestamp`; the background pull uses this
- * directly so it can read `last_reset_at` (the tombstone marker — issue #576)
+ * directly so it can read `last_reset_at` (the tombstone marker - issue #576)
  * even when the JSONB column is empty.
  *
  * Returns `null` only when the row doesn't exist or the fetch failed.
@@ -239,7 +239,7 @@ export async function pullUserSettingsRow(
 // Cross-device union-merge for learningLocales + removedLocales (#1568)
 // ---------------------------------------------------------------------------
 //
-// These are pure functions — no I/O, no side effects. They mirror the
+// These are pure functions - no I/O, no side effects. They mirror the
 // `mergeStreak` pattern in `lib/sync/streak.ts`.
 //
 // Design contract (maintainer decision, see issue #1568):

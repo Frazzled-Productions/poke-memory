@@ -44,13 +44,13 @@ describe("computeStreak", () => {
   });
 
   it("handles out-of-order input correctly", () => {
-    // Dates provided in reverse order — Set normalises this.
+    // Dates provided in reverse order - Set normalises this.
     const dates = ["2026-05-09", "2026-05-07", "2026-05-08"];
     expect(computeStreak(dates, "2026-05-09")).toBe(3);
   });
 
   it("handles a month boundary within a consecutive streak", () => {
-    // Streak crosses from April into May — offsetDate must carry the month correctly.
+    // Streak crosses from April into May - offsetDate must carry the month correctly.
     const dates = ["2026-04-29", "2026-04-30", "2026-05-01", "2026-05-02"];
     expect(computeStreak(dates, "2026-05-02")).toBe(4);
   });
@@ -74,7 +74,7 @@ describe("computeStreak", () => {
   });
 
   it("counts a long consecutive streak via the grace window", () => {
-    // 30-day streak ending yesterday — today not yet reviewed.
+    // 30-day streak ending yesterday - today not yet reviewed.
     const dates: string[] = [];
     for (let i = 30; i >= 1; i--) {
       const d = new Date("2026-05-09T00:00:00Z");

@@ -105,7 +105,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockLoadSettings.mockReturnValue({ miniGameBestScore: 0 });
   mockPickPair.mockReturnValue(FIXED_PAIR);
-  // shufflePair is a passthrough in tests — just return the pair unchanged.
+  // shufflePair is a passthrough in tests - just return the pair unchanged.
   mockShufflePair.mockImplementation((pair: typeof FIXED_PAIR) => pair);
 });
 
@@ -127,7 +127,7 @@ describe("HigherOrLowerGame", () => {
     const user = userEvent.setup();
     renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
-    // Ivysaur has the higher attack — clicking it is the correct choice.
+    // Ivysaur has the higher attack - clicking it is the correct choice.
     await user.click(screen.getByRole("button", { name: "Ivysaur" }));
 
     expect(screen.getByText(/correct/i)).toBeInTheDocument();
@@ -142,7 +142,7 @@ describe("HigherOrLowerGame", () => {
     const user = userEvent.setup();
     renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
-    // Bulbasaur has the lower attack — clicking it is wrong.
+    // Bulbasaur has the lower attack - clicking it is wrong.
     await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
 
     expect(screen.getByText(/game over/i)).toBeInTheDocument();
@@ -158,14 +158,14 @@ describe("HigherOrLowerGame", () => {
     expect(screen.getByText(/which has higher/i)).toBeInTheDocument();
   });
 
-  it("persists new best immediately on the correct guess that sets it — not deferred to Play again", async () => {
+  it("persists new best immediately on the correct guess that sets it - not deferred to Play again", async () => {
     const user = userEvent.setup();
     renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
     // Correct pick: streak becomes 1, which beats bestScore of 0.
     await user.click(screen.getByRole("button", { name: "Ivysaur" }));
 
-    // saveSettings must have fired already — before the user clicks anything else.
+    // saveSettings must have fired already - before the user clicks anything else.
     expect(mockSaveSettings).toHaveBeenCalledWith(
       expect.objectContaining({ miniGameBestScore: 1 }),
     );
@@ -221,7 +221,7 @@ describe("HigherOrLowerGame", () => {
     const user = userEvent.setup();
     renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
-    // Immediately pick wrong — streak of 0 never beats bestScore of 5.
+    // Immediately pick wrong - streak of 0 never beats bestScore of 5.
     await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
 
     expect(mockSaveSettings).not.toHaveBeenCalled();
@@ -262,7 +262,7 @@ describe("HigherOrLowerGame", () => {
     expect(section?.getAttribute("aria-label")).toBe("高い or 低いミニゲーム");
   });
 
-  describe("idempotent initialisation (#887 — re-show does not clobber game state)", () => {
+  describe("idempotent initialisation (#887 - re-show does not clobber game state)", () => {
     // The `if (pair) return;` guard in the pair-seeding useEffect makes
     // initialisation idempotent. The effect has `[pair]` as its dep array, so
     // it fires twice on mount: once when pair is null (seeds the pair) and once
@@ -278,7 +278,7 @@ describe("HigherOrLowerGame", () => {
     it("calls pickPair and shufflePair exactly once on mount even though the [pair] effect fires twice", async () => {
       renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
-      // Wait for the pair to render — confirms both effect runs have completed.
+      // Wait for the pair to render - confirms both effect runs have completed.
       expect(await screen.findByRole("button", { name: "Bulbasaur" })).toBeInTheDocument();
 
       // Guard holds: each sampler called once despite the effect firing twice
@@ -320,13 +320,13 @@ describe("HigherOrLowerGame", () => {
       // the second effect run from re-reading it). Removing the guard yields 2.
       expect(mockLoadSettings).toHaveBeenCalledTimes(1);
 
-      // Make a correct pick — streak=1 beats bestScore=0 so it is updated in-state.
+      // Make a correct pick - streak=1 beats bestScore=0 so it is updated in-state.
       await user.click(screen.getByRole("button", { name: "Ivysaur" }));
       expect(
         screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "Best: 1"),
       ).toBeInTheDocument();
 
-      // In-session best (1) must still be shown — loadSettings was not re-read
+      // In-session best (1) must still be shown - loadSettings was not re-read
       // on the second effect run (which would have returned 0 and overwritten it).
       expect(mockPickPair).toHaveBeenCalledTimes(1);
       expect(mockShufflePair).toHaveBeenCalledTimes(1);
@@ -371,7 +371,7 @@ describe("HigherOrLowerGame", () => {
       await user.click(screen.getByRole("button", { name: "Ivysaur" }));
       expect(screen.getByRole("button", { name: /next pair/i })).toBeInTheDocument();
 
-      // Click "Next pair" — decode is now pending.
+      // Click "Next pair" - decode is now pending.
       await user.click(screen.getByRole("button", { name: /next pair/i }));
 
       // The "Next pair" button should be disabled while decode is in-flight.
@@ -406,11 +406,11 @@ describe("HigherOrLowerGame", () => {
         expect(screen.queryByText(/correct/i)).toBeNull();
       });
 
-      // Now pick wrong — streak was 1, so the banner should read "streak of 1!".
+      // Now pick wrong - streak was 1, so the banner should read "streak of 1!".
       await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
       expect(screen.getByText(/game over! streak of 1/i)).toBeInTheDocument();
 
-      // Click "Play again" — decode is now pending; streak must NOT flip to 0 yet.
+      // Click "Play again" - decode is now pending; streak must NOT flip to 0 yet.
       await user.click(screen.getByRole("button", { name: /play again/i }));
 
       // The game-over banner must still show the correct (non-zero) streak value.
@@ -473,7 +473,7 @@ describe("HigherOrLowerGame", () => {
       const user = userEvent.setup();
       renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
-      // No scroll before the user picks — still in picking phase.
+      // No scroll before the user picks - still in picking phase.
       expect(scrollIntoViewCalls).toHaveLength(0);
 
       // Correct pick: Ivysaur has the higher attack.
@@ -482,7 +482,7 @@ describe("HigherOrLowerGame", () => {
       // Result block is shown; scrollIntoView must have fired once.
       expect(screen.getByRole("button", { name: /next pair/i })).toBeInTheDocument();
       expect(scrollIntoViewCalls).toHaveLength(1);
-      // block: "nearest" means no scrolling when already in view — correct for
+      // block: "nearest" means no scrolling when already in view - correct for
       // desktop where everything fits; necessary scroll on tall mobile viewports.
       expect(scrollIntoViewCalls[0]).toMatchObject({
         block: "nearest",
@@ -526,7 +526,7 @@ describe("HigherOrLowerGame", () => {
 
     it("does NOT call scrollIntoView before a guess is made (picking phase)", () => {
       renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
-      // Still in picking phase — no scroll should have fired.
+      // Still in picking phase - no scroll should have fired.
       expect(scrollIntoViewCalls).toHaveLength(0);
       // Both tile buttons are present and the result block is absent.
       expect(screen.getByRole("button", { name: "Bulbasaur" })).toBeInTheDocument();

@@ -32,7 +32,7 @@ const _createTranslator = _createTranslatorRaw as unknown as (
  *
  * CURRENT CRON SCHEDULE: once per day at 08:00 UTC (0 8 * * *).
  * This route now supports per-user notification hours (#1315) but the cron
- * has NOT yet been changed to hourly — that is a deliberate split to avoid
+ * has NOT yet been changed to hourly - that is a deliberate split to avoid
  * a deploy-ordering hazard (the phase-2 migration must only be applied
  * AFTER this PR is promoted to production). See the follow-up issue filed
  * alongside #1315 for the phase-2 cron change.
@@ -67,7 +67,7 @@ const _createTranslator = _createTranslatorRaw as unknown as (
  *      (`cron_shared_secret`); they must match exactly.
  *   2. Inside the route, we use the SUPABASE_SERVICE_ROLE_KEY to read
  *      across every user's `push_subscriptions` row. Row-level security is
- *      bypassed by design — the cron has no `auth.uid()` to authorise as,
+ *      bypassed by design - the cron has no `auth.uid()` to authorise as,
  *      and the route's only privileged operation is reading subscriptions
  *      + computing due counts + sending pushes.
  */
@@ -152,7 +152,7 @@ function isAuthorized(headerValue: string | null, secret: string): boolean {
  *   - Exactly one due locale among multiple enrolled: the compact
  *     "N cards due in <Language>" form (avoids a one-item breakdown list).
  *   - Zero due across all locales: falls through to the new-only copy
- *     (same as before — no per-language new-card breakdown in v1).
+ *     (same as before - no per-language new-card breakdown in v1).
  *
  * New-card count: GLOBAL for v1 (per-locale new-card capping is a larger
  * modelling question; see #1504 PR body for the rationale).
@@ -231,7 +231,7 @@ type SubscriptionRow = {
  * `timezone` is a scalar column (migration 019).
  * `push_notification_hour` is a scalar column (migration 030, #1315) storing
  * the user's preferred LOCAL hour (0-23) for the daily reminder. NULL means
- * "no preference" — falls back to PUSH_DEFAULT_HOUR_UTC (8).
+ * "no preference" - falls back to PUSH_DEFAULT_HOUR_UTC (8).
  */
 type SettingsRow = {
   user_id: string;
@@ -241,7 +241,7 @@ type SettingsRow = {
 };
 
 // ---------------------------------------------------------------------------
-// Scope lookup map — built once at module load from the compact lookup table.
+// Scope lookup map - built once at module load from the compact lookup table.
 // Keyed by pokemon id (same as card subject_key for name/reverse/cry cards;
 // for evolution cards we resolve the pre-evo anchor id via resolveAnchorId).
 // ---------------------------------------------------------------------------
@@ -260,7 +260,7 @@ const SCOPE_LOOKUP_MAP = new Map(SCOPE_LOOKUP.map((e) => [e.id, e]));
  * set from the multi-language model). The route counts due cards across ALL
  * learning locales and builds a per-language breakdown. `activePokemonNameLocale`
  * is device-local (a DEVICE_LOCAL_KEYS entry, not reliably in cloud JSONB)
- * and is NOT read here — ordering is by due-count desc, not active-first.
+ * and is NOT read here - ordering is by due-count desc, not active-first.
  */
 type UserEligibility = {
   evolutionCardsEnabled: boolean;
@@ -273,7 +273,7 @@ type UserEligibility = {
   maxNewCryPerDay: number;
   /**
    * Practice scope axes persisted to `user_settings.settings` JSONB (#1159).
-   * Empty scope (all axes empty) means no restriction — all species are eligible.
+   * Empty scope (all axes empty) means no restriction - all species are eligible.
    * Defaults to EMPTY_SCOPE so users without a stored scope value see all cards.
    */
   practiceScope: PracticeScope;
@@ -317,7 +317,7 @@ const DEFAULT_ELIGIBILITY: UserEligibility = {
  * constant is involved).
  *
  * Returns `EMPTY_SCOPE` on absent / malformed input so users with no stored
- * scope see all cards — same defensive default as the app itself.
+ * scope see all cards - same defensive default as the app itself.
  */
 function parsePracticeScope(raw: unknown): PracticeScope {
   if (typeof raw !== "object" || raw === null) return EMPTY_SCOPE;
@@ -387,7 +387,7 @@ function parseLearningLocales(raw: unknown): AppLocale[] {
       }
     }
   }
-  // English is unremovable — ensure it's always present.
+  // English is unremovable - ensure it's always present.
   if (!seen.has("en")) out.unshift("en");
   return out;
 }
@@ -436,7 +436,7 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
  * Three gates, in order:
  *
  *   1. Card-type enabled flags + alt-forms toggle (delegated to
- *      `isCardEligible` from `lib/eligibility` — shared with the on-device
+ *      `isCardEligible` from `lib/eligibility` - shared with the on-device
  *      PWA badge filter via `lib/review/scope.ts` `computeEligibleCardIds`).
  *
  *   2. Practice scope (gens / types / games / presets / formCategories) via
@@ -477,7 +477,7 @@ function rowIsEligible(
 
   const anchorId = resolveAnchorId(cardType, subjectKey);
   if (anchorId === null) {
-    // Unknown card type — pass through (forward-compatible, same as gate 1).
+    // Unknown card type - pass through (forward-compatible, same as gate 1).
     return true;
   }
 
@@ -499,7 +499,7 @@ function rowIsEligible(
  *
  * `startedTodayCount[direction]` is the count of `card_reviews` rows for
  * this user where `first_seen = today` and the row passes the eligibility
- * gate — i.e. cards the user has already started during today's session.
+ * gate - i.e. cards the user has already started during today's session.
  * Subtracting these prevents double-counting cards that are new-and-due
  * (first introduced today, due today).
  *
@@ -515,7 +515,7 @@ function rowIsEligible(
  * `"evolution-edge"` and `"reverse-evolution-edge"` rows started today,
  * matching how `buildSessionQueues` accumulates `perType.evolution.newIntroducedToday`.
  *
- * New-card estimate is GLOBAL for v1 (#1504 — per-locale new-card capping
+ * New-card estimate is GLOBAL for v1 (#1504 - per-locale new-card capping
  * is a separate modelling question).
  */
 function computeNewEstimate(
@@ -561,7 +561,7 @@ type DueRow = {
   card_type: string;
   subject_key: string;
   first_seen: string | null;
-  /** Migration 029 locale column — part of the PK (#1480). */
+  /** Migration 029 locale column - part of the PK (#1480). */
   locale: string;
 };
 
@@ -629,10 +629,10 @@ export async function POST(request: Request) {
   // Step 2: resolve timezones, notification-hour preference, and per-user
   // eligibility settings. We widen the SELECT to include:
   //   - `settings` JSONB: card-type enabled flags, alt-forms toggle, and
-  //     `learningLocales` (#1504 — the user's full learning-locale set).
-  //   - `timezone`: scalar column (migration 019) — used for "today" bucketing
+  //     `learningLocales` (#1504 - the user's full learning-locale set).
+  //   - `timezone`: scalar column (migration 019) - used for "today" bucketing
   //     and for converting the local preferred hour to UTC (#1315).
-  //   - `push_notification_hour`: scalar column (migration 030, #1315) — the
+  //   - `push_notification_hour`: scalar column (migration 030, #1315) - the
   //     user's preferred local hour for the daily reminder (0-23 or NULL).
   // Users without a stored settings record fall back to DEFAULT_ELIGIBILITY.
   const uniqueUserIds = Array.from(new Set(subscriptions.map((s) => s.user_id)));
@@ -673,7 +673,7 @@ export async function POST(request: Request) {
   if (filteredSubscriptions.length === 0) {
     // No subscriptions match the current UTC hour. This is expected while the
     // cron is still daily (only NULL/default-8 users arrive here at 08:00 UTC
-    // and they all pass) — in phase-2 it means no user scheduled this hour.
+    // and they all pass) - in phase-2 it means no user scheduled this hour.
     return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
   }
 
@@ -708,7 +708,7 @@ export async function POST(request: Request) {
   //   scalar, so we can build the per-language breakdown for the notification body.
   //
   // NOTE: lib/profile/dueCountCache.ts (the localStorage badge cache) is
-  // intentionally NOT used here — it is client-side only and unreachable
+  // intentionally NOT used here - it is client-side only and unreachable
   // from this Node cron route. The route computes due counts from the same
   // card_reviews aggregation it has always used; #1480 already threads the
   // `locale` column through DueRow. The per-locale breakdown is produced by
@@ -781,7 +781,7 @@ export async function POST(request: Request) {
 
   // Step 5: send. Dead subscriptions (410 Gone) and not-found (404) are
   // deleted so the next cron run doesn't try them again. All other errors
-  // are logged and skipped — a single bad endpoint must not abort the
+  // are logged and skipped - a single bad endpoint must not abort the
   // whole batch.
   const toDelete: string[] = [];
   let sent = 0;
@@ -813,13 +813,13 @@ export async function POST(request: Request) {
         toDelete.push(sub.id);
         continue;
       }
-      // Transient or non-fatal error — keep going so a single bad device
+      // Transient or non-fatal error - keep going so a single bad device
       // does not block the rest of the batch.
       console.warn("[push] sendNotification failed", { id: sub.id, status });
     }
   }
 
-  // Step 6: cleanup. Best-effort — if the delete fails we'll retry on the
+  // Step 6: cleanup. Best-effort - if the delete fails we'll retry on the
   // next cron cycle when the same endpoints fail again.
   let deleted = 0;
   if (toDelete.length > 0) {

@@ -45,7 +45,7 @@ const { mockLoadSession, mockPullSession, mockSuiteUser } = vi.hoisted(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Minimal card factory — just enough fields to pass computeStats
+// Minimal card factory - just enough fields to pass computeStats
 // ---------------------------------------------------------------------------
 
 function makeCard(id: number, reps = 0): NameReviewCard {
@@ -367,7 +367,7 @@ vi.mock("@/lib/stats/accuracy", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Auth context mock — swapped per-describe
+// Auth context mock - swapped per-describe
 // ---------------------------------------------------------------------------
 
 const { mockAuthValue } = vi.hoisted(() => ({
@@ -390,7 +390,7 @@ vi.mock("@/components/stats/SyncStatusLine", () => ({
   SyncStatusLine: () => <div data-testid="sync-status-line" />,
 }));
 
-// TrainerCard has moved to the Journey page (#852) — Stats no longer renders it.
+// TrainerCard has moved to the Journey page (#852) - Stats no longer renders it.
 // Keep the mock defined so imports resolve cleanly if any transitional reference remains.
 vi.mock("@/components/stats/TrainerCard", () => ({
   TrainerCard: ({ totalMastered }: { totalMastered: number }) => (
@@ -482,7 +482,7 @@ beforeEach(() => {
   };
 });
 
-describe("StatsPage — signed-in user hydrates from cloud", () => {
+describe("StatsPage - signed-in user hydrates from cloud", () => {
   it("calls pullSession when signed in and renders the analytics once hydrated", async () => {
     // Arrange: local is empty, cloud has 3 mastered cards.
     mockLoadSession.mockResolvedValue(null);
@@ -532,7 +532,7 @@ describe("StatsPage — signed-in user hydrates from cloud", () => {
   });
 });
 
-describe("StatsPage — guest user reads only from local", () => {
+describe("StatsPage - guest user reads only from local", () => {
   it("does not call pullSession when user is null", async () => {
     // Arrange: local has 2 cards, one mastered.
     const localCard = makeCard(1, 5); // reps=5 → mastered
@@ -562,7 +562,7 @@ describe("StatsPage — guest user reads only from local", () => {
   });
 });
 
-describe("StatsPage — Force pull from cloud button", () => {
+describe("StatsPage - Force pull from cloud button", () => {
   it("is not visible when the user is a guest", async () => {
     mockLoadSession.mockResolvedValue(null);
     mockAuthValue.user = null;
@@ -648,7 +648,7 @@ describe("StatsPage — Force pull from cloud button", () => {
   });
 });
 
-describe("StatsPage — CompletionProjection widget", () => {
+describe("StatsPage - CompletionProjection widget", () => {
   it("renders the completion-projection stub in the page", async () => {
     mockLoadSession.mockResolvedValue(null);
     mockAuthValue.user = null;
@@ -662,7 +662,7 @@ describe("StatsPage — CompletionProjection widget", () => {
   });
 });
 
-describe("StatsPage — FirstMasteryHint (#1083)", () => {
+describe("StatsPage - FirstMasteryHint (#1083)", () => {
   it("renders the hint when the snapshot has firstMasteryDays set", async () => {
     // The page renders the hint when snapshot.firstMasteryDays is non-null.
     // Set it on the mock snapshot and verify the hint text appears.
@@ -693,7 +693,7 @@ describe("StatsPage — FirstMasteryHint (#1083)", () => {
         totalCards: 3,
         introduced: 3,
         learning: 0,
-        mastered: 3,  // all mastered — hint suppressed
+        mastered: 3,  // all mastered - hint suppressed
         locked: 0,
         perGeneration: [],
         perType: [],
@@ -718,7 +718,7 @@ describe("StatsPage — FirstMasteryHint (#1083)", () => {
       firstMasteryDays: null,
       mastery: {
         totalCards: 3,
-        introduced: 0,  // all locked — hint suppressed
+        introduced: 0,  // all locked - hint suppressed
         learning: 0,
         mastered: 0,
         locked: 3,

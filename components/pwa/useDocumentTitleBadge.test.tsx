@@ -8,7 +8,7 @@
  *   - Preserves the base route title (does not replace it).
  *   - Re-syncs when the session storage key changes (card graded).
  *   - Re-syncs when SETTINGS_SAVED_EVENT fires (e.g. timezone changed).
- *   - Re-syncs when SESSION_CHANGED_EVENT fires (IDB write on WebKit — #1134).
+ *   - Re-syncs when SESSION_CHANGED_EVENT fires (IDB write on WebKit - #1134).
  *   - Clears prefix on unmount.
  *   - Delegates queue computation to computeQueueCount (#1137).
  */
@@ -17,7 +17,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Module mocks — must match the pattern in usePwaBadge.test.tsx
+// Module mocks - must match the pattern in usePwaBadge.test.tsx
 // ---------------------------------------------------------------------------
 
 const mockLoadSession = vi.fn().mockResolvedValue(null);
@@ -243,7 +243,7 @@ describe("useDocumentTitleBadge", () => {
     });
   });
 
-  it("re-syncs when SESSION_CHANGED_EVENT fires (WebKit IDB write — #1134)", async () => {
+  it("re-syncs when SESSION_CHANGED_EVENT fires (WebKit IDB write - #1134)", async () => {
     // Simulates WebKit: loadSession returns null initially, then returns cards
     // after an IDB write. The hook must re-run `sync` when the CustomEvent fires.
     mockLoadSession.mockResolvedValue(null);

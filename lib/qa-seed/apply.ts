@@ -47,7 +47,7 @@ function lastNDates(n: number): string[] {
  *                  When provided, written to localStorage under KEY_QA_SEED_ACTIVE
  *                  so the QaSeedSection can restore the active indicator on remount.
  *
- * This is intentionally NOT async-safe to call from multiple tabs at once —
+ * This is intentionally NOT async-safe to call from multiple tabs at once - 
  * it is a developer-only QA tool invoked by an explicit button click.
  */
 export async function applySeedScenario(payload: SeedPayload, slug?: string): Promise<void> {
@@ -82,13 +82,13 @@ export async function applySeedScenario(payload: SeedPayload, slug?: string): Pr
     }
   }
 
-  // Streak storage (KEY_STREAK) — saveStreakData dispatches STREAK_UPDATED_EVENT
+  // Streak storage (KEY_STREAK) - saveStreakData dispatches STREAK_UPDATED_EVENT
   // so a mounted StreakBadge / ProfileStatusBar re-reads the seeded streak live.
   if (payload.streakDays !== undefined && payload.streakDays > 0) {
     saveStreakData(lastNDates(payload.streakDays));
   }
 
-  // Settings legs (pokemonNameLocale + learningLocales + streakProtection) —
+  // Settings legs (pokemonNameLocale + learningLocales + streakProtection) - 
   // merged into a single load/save so we touch localStorage once. saveSettings
   // dispatches SETTINGS_SAVED_EVENT, which the status surfaces also listen to.
   const settingsPatch: Partial<UserSettings> = {};
@@ -134,17 +134,17 @@ export async function applySeedScenario(payload: SeedPayload, slug?: string): Pr
     try {
       window.localStorage.setItem(KEY_QA_SEED_ACTIVE, slug);
     } catch {
-      // Private browsing / storage quota — non-fatal for a QA tool.
+      // Private browsing / storage quota - non-fatal for a QA tool.
     }
   }
 }
 
 /**
- * Clears seeded QA state — removes the review session and grade log from IDB,
+ * Clears seeded QA state - removes the review session and grade log from IDB,
  * resets the seeded streak + protection-token state, and dispatches synthetic
  * events so same-tab subscribers notice the cleared state.
  *
- * The locale preference (pokemonNameLocale) is NOT cleared — the user may want
+ * The locale preference (pokemonNameLocale) is NOT cleared - the user may want
  * to keep it. The streak and streakProtection ARE reset, because a scenario
  * seeds them (so leaving them behind would show a phantom streak/token balance
  * on the now-empty status bar). This mirrors the apply step.

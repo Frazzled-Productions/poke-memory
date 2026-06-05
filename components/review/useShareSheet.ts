@@ -67,8 +67,8 @@ export function useShareSheet(
     };
   // loadStreakData() and loadSettings() are synchronous localStorage reads.
   // They are intentionally called inside the memo but excluded from deps: they
-  // are snapshot at the moment the grade sequence last changes — the same point
-  // at which streak state is updated — rather than on every render. Streak or
+  // are snapshot at the moment the grade sequence last changes - the same point
+  // at which streak state is updated - rather than on every render. Streak or
   // protection-settings changes between grade events (e.g. from an async sync
   // pull) will be picked up on the next grade, which is the earliest the share
   // sheet could meaningfully reflect them.

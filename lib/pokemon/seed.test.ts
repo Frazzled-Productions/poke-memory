@@ -30,7 +30,7 @@ describe("reverseEdgeIdFor", () => {
     expect(reverseEdgeIdFor(forwardId)).toBe(REVERSE_EDGE_ID_BASE + 42); // 2_500_042
   });
 
-  it("preserves the offset delta — forward and reverse IDs differ by exactly REVERSE_EDGE_ID_BASE - EDGE_ID_BASE", () => {
+  it("preserves the offset delta - forward and reverse IDs differ by exactly REVERSE_EDGE_ID_BASE - EDGE_ID_BASE", () => {
     const forwardId = EDGE_ID_BASE + 100;
     const delta = REVERSE_EDGE_ID_BASE - EDGE_ID_BASE;
     expect(reverseEdgeIdFor(forwardId)).toBe(forwardId + delta);
@@ -80,7 +80,7 @@ describe("isReverseEdgeId", () => {
     expect(isReverseEdgeId(CRY_ID_OFFSET + 1)).toBe(false);
   });
 
-  it("round-trips with reverseEdgeIdFor — every mapped ID passes isReverseEdgeId", () => {
+  it("round-trips with reverseEdgeIdFor - every mapped ID passes isReverseEdgeId", () => {
     const sampleForwardIds = [
       EDGE_ID_BASE + 1,
       EDGE_ID_BASE + 50,
@@ -225,7 +225,7 @@ describe("SEED_EVOLUTION_CARDS", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SEED_EVOLUTION_CARDS builder — error paths (tested via synthetic fixtures)
+// SEED_EVOLUTION_CARDS builder - error paths (tested via synthetic fixtures)
 //
 // Because the IIFE runs at module load time against the real generated JSON,
 // we cannot inject bad data into it. Instead we extract the builder logic
@@ -262,7 +262,7 @@ function buildEvolutionCards(pokemonList: SeedPokemon[]): EvolutionCard[] {
       const postEvo = pokemonById.get(node.speciesId);
       if (!postEvo) {
         throw new Error(
-          `Edge ${pokemon.name} → ${node.name} (speciesId ${node.speciesId}) has no matching pokemon in seed data — seed may be incomplete.`,
+          `Edge ${pokemon.name} → ${node.name} (speciesId ${node.speciesId}) has no matching pokemon in seed data - seed may be incomplete.`,
         );
       }
       cards.push({
@@ -340,7 +340,7 @@ function makeEdge(
   };
 }
 
-describe("buildEvolutionCards (synthetic fixtures — error paths)", () => {
+describe("buildEvolutionCards (synthetic fixtures - error paths)", () => {
   const VALID_EDGE_ID = EDGE_ID_BASE + 1; // 1_500_001
 
   it("happy path: returns one card for a simple A → B chain", () => {
@@ -398,7 +398,7 @@ describe("buildEvolutionCards (synthetic fixtures — error paths)", () => {
     const preEvo = makePokemon(1, {
       evolutionChain: [
         { speciesId: 1, name: "pokemon1", evolvesFromId: null },
-        makeEdge(2, 1, EDGE_ID_BASE), // exactly the base — not a valid forward id
+        makeEdge(2, 1, EDGE_ID_BASE), // exactly the base - not a valid forward id
       ],
     });
     const postEvo = makePokemon(2);
@@ -411,7 +411,7 @@ describe("buildEvolutionCards (synthetic fixtures — error paths)", () => {
     const preEvo = makePokemon(1, {
       evolutionChain: [
         { speciesId: 1, name: "pokemon1", evolvesFromId: null },
-        makeEdge(2, 1, REVERSE_ID_OFFSET), // exactly the upper boundary — not valid
+        makeEdge(2, 1, REVERSE_ID_OFFSET), // exactly the upper boundary - not valid
       ],
     });
     const postEvo = makePokemon(2);
@@ -421,7 +421,7 @@ describe("buildEvolutionCards (synthetic fixtures — error paths)", () => {
   });
 
   it("throws when edgeId falls in the legacy EVOLUTION_ID_OFFSET range (below EDGE_ID_BASE)", () => {
-    const legacyId = EVOLUTION_ID_OFFSET + 1; // 1_000_001 — legacy sub-range
+    const legacyId = EVOLUTION_ID_OFFSET + 1; // 1_000_001 - legacy sub-range
     const preEvo = makePokemon(1, {
       evolutionChain: [
         { speciesId: 1, name: "pokemon1", evolvesFromId: null },

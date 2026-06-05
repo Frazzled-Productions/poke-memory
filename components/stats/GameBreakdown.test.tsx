@@ -87,7 +87,7 @@ describe("GameBreakdown", () => {
   it("multiple games in the same generation appear under one accordion", () => {
     const YELLOW: GameStats = { slug: "yellow", total: 151, introduced: 0, mastered: 0 };
     renderWithIntl(<GameBreakdown perGame={[RED_BLUE, YELLOW]} />);
-    // Both are Gen I — only one accordion button.
+    // Both are Gen I - only one accordion button.
     expect(screen.getAllByRole("button")).toHaveLength(1);
     expect(screen.getByText(/2 games/)).toBeInTheDocument();
     // Expand and confirm both games appear.

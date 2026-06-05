@@ -37,7 +37,7 @@ export function ThemeWatermark() {
     }
 
     // Same-tab settings saves carry the new value directly on the event
-    // detail — read from there rather than the DOM attribute to avoid a
+    // detail - read from there rather than the DOM attribute to avoid a
     // race with the FavouriteThemeProvider listener that sets it.
     function syncFromEvent(e: Event) {
       const detail = (e as CustomEvent<UserSettings>).detail;
@@ -93,9 +93,9 @@ function PokeBallSVG() {
       height={180}
       aria-hidden="true"
     >
-      {/* Top half — red */}
+      {/* Top half - red */}
       <path d="M 5 50 A 45 45 0 0 1 95 50 Z" fill="currentColor" />
-      {/* Bottom half — white */}
+      {/* Bottom half - white */}
       <path d="M 5 50 A 45 45 0 0 0 95 50 Z" fill="currentColor" opacity="0.4" />
       {/* Outer ring */}
       <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="5" />

@@ -19,13 +19,13 @@ describe("snapToGeneratedWidth", () => {
   });
 
   it("rounds up to the next larger generated width for in-between values", () => {
-    // Between 32 and 40 — should round up to 40.
+    // Between 32 and 40 - should round up to 40.
     expect(snapToGeneratedWidth(35)).toBe(40);
 
-    // Between 40 and 48 — should round up to 48.
+    // Between 40 and 48 - should round up to 48.
     expect(snapToGeneratedWidth(44)).toBe(48);
 
-    // Between 64 and 120 — should round up to 120.
+    // Between 64 and 120 - should round up to 120.
     expect(snapToGeneratedWidth(80)).toBe(120);
   });
 
@@ -37,7 +37,7 @@ describe("snapToGeneratedWidth", () => {
     const largest = GENERATED_SPRITE_WIDTHS[GENERATED_SPRITE_WIDTHS.length - 1]!;
     expect(snapToGeneratedWidth(largest + 1)).toBe(largest);
     expect(snapToGeneratedWidth(9999)).toBe(largest);
-    // Source resolution cap — 475 px exceeds 320 (the largest).
+    // Source resolution cap - 475 px exceeds 320 (the largest).
     expect(snapToGeneratedWidth(475)).toBe(largest);
   });
 });
@@ -80,7 +80,7 @@ describe("imageLoader", () => {
   });
 
   it("snaps the requested width to the nearest generated width when not exact", () => {
-    // 35 is between 32 and 40 — should snap up to 40
+    // 35 is between 32 and 40 - should snap up to 40
     const result = imageLoader({ src: "/sprites/pokemon/1.png", width: 35, quality: 75 });
     expect(result).toBe("/sprites/pokemon/webp/1/40.webp");
   });
@@ -91,7 +91,7 @@ describe("imageLoader", () => {
   });
 
   it("does not double-redirect a path already in the WebP tree", () => {
-    // src already contains /webp/ — the guard should pass it through unchanged
+    // src already contains /webp/ - the guard should pass it through unchanged
     const src = "/sprites/pokemon/webp/25/64.webp";
     expect(imageLoader({ src, width: 64, quality: 75 })).toBe(src);
   });

@@ -4,10 +4,10 @@
 // without re-fetching from PokéAPI.  Run after any manual edit to generated.json.
 //
 // Produces four files:
-//   generated-core.json         — all fields except flavorTexts and evolutionChain
-//   generated-chains.json       — deduplicated evolution chains + pokemon→hash map
-//   generated-flavor.json       — id + flavorTexts (lib/ + public/)
-//   generated-locale-names.json — per-species locale names + transliterations (#1259)
+//   generated-core.json - all fields except flavorTexts and evolutionChain
+//   generated-chains.json - deduplicated evolution chains + pokemon→hash map
+//   generated-flavor.json - id + flavorTexts (lib/ + public/)
+//   generated-locale-names.json - per-species locale names + transliterations (#1259)
 //
 // Usage: node scripts/split-seed.mjs
 
@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 
 // Build-time transliteration: pinyin-pro (zh-Hans / zh-Hant) and wanakana
-// (ja rōmaji fallback).  Both are devDependencies — never imported at runtime.
+// (ja rōmaji fallback).  Both are devDependencies - never imported at runtime.
 import { pinyin as pinyinPro } from "pinyin-pro";
 import { toRomaji } from "wanakana";
 
@@ -40,11 +40,11 @@ const records = JSON.parse(await readFile(resolve(libDir, "generated.json"), "ut
 
 await mkdir(publicDir, { recursive: true });
 
-// generated-core.json — strip flavorTexts + evolutionChain
+// generated-core.json - strip flavorTexts + evolutionChain
 const coreRecords = records.map(({ flavorTexts: _ft, evolutionChain: _ec, ...rest }) => rest);
 await writeFile(resolve(libDir, "generated-core.json"), JSON.stringify(coreRecords), "utf-8");
 
-// generated-chains.json — deduped chains + pokemon→hash map
+// generated-chains.json - deduped chains + pokemon→hash map
 const chainsByHash = {};
 const pokemonChain = {};
 for (const p of records) {
@@ -60,7 +60,7 @@ await writeFile(
   "utf-8",
 );
 
-// generated-flavor.json — id + flavorTexts (lib/ + public/)
+// generated-flavor.json - id + flavorTexts (lib/ + public/)
 const flavorRecords = records
   .filter((p) => p.flavorTexts && p.flavorTexts.length > 0)
   .map((p) => ({ id: p.id, flavorTexts: p.flavorTexts }));
@@ -88,7 +88,7 @@ try {
     existingLocaleNames[entry.speciesId] = entry;
   }
 } catch {
-  // No existing sidecar — build placeholder entries.
+  // No existing sidecar - build placeholder entries.
 }
 
 const localeNamesRecords = records
@@ -99,7 +99,7 @@ const localeNamesRecords = records
       return existingLocaleNames[p.speciesId];
     }
     // Fallback: English-only entry (no locale data available without re-seed).
-    const jaKana = "";   // Not available in generated.json — re-seed to populate.
+    const jaKana = "";   // Not available in generated.json - re-seed to populate.
     const zhHans = "";
     const zhHant = "";
     const jaRoma = "";

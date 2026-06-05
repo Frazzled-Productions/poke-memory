@@ -1,10 +1,10 @@
 /**
- * "Mark Pokémon I already know" quiz — pure state transition (#1084).
+ * "Mark Pokémon I already know" quiz - pure state transition (#1084).
  *
  * The quiz lives on the Settings page. The user taps sprites for species they
  * already know, then commits the selection. Each selected card is run through
- * `nextReview(state, Easy, now)` — the brand-new + Easy graduation path (A2 in
- * `lib/srs/scheduler.ts`) — producing a real graduated FSRS state with
+ * `nextReview(state, Easy, now)` - the brand-new + Easy graduation path (A2 in
+ * `lib/srs/scheduler.ts`) - producing a real graduated FSRS state with
  * `reps = 1`, `firstSeen = today`, `lastReview = today`, and a long initial
  * interval.
  *
@@ -17,7 +17,7 @@
  * Eligibility: only `new` cards (`lastReview === null`). Cards the user has
  * already graded are skipped so a quiz pass cannot regress in-flight state.
  *
- * The helper is pure — no localStorage, no sync, no time source other than
+ * The helper is pure - no localStorage, no sync, no time source other than
  * the injected `now`. Callers are responsible for persistence and grade-log
  * emission (see `components/onboarding/KnownPokemonQuiz.tsx`).
  */
@@ -29,7 +29,7 @@ import { isCardEligible } from "@/lib/eligibility/index";
 export type ApplyKnownGradesOptions = NextReviewOptions;
 
 /**
- * True when the card has never been graded — the only state a quiz pass is
+ * True when the card has never been graded - the only state a quiz pass is
  * allowed to touch. Cards in a learning step (firstSeen set but lastReview
  * null) are also skipped: the user already started learning them and a quiz
  * pass would clobber their in-progress state.
@@ -46,7 +46,7 @@ export function isEligibleForKnownQuiz(card: ReviewableCard): boolean {
  * When `alternateFormsEnabled` is `false` (the default user setting), alternate-form cards
  * (species id >= 10000, e.g. Alolan Vulpix, Galarian Ponyta) are excluded from
  * the result. This mirrors the same gate applied by `buildSessionQueues` via
- * `isCardEligible` (#1481) — cards hidden from the practice queue must also be
+ * `isCardEligible` (#1481) - cards hidden from the practice queue must also be
  * hidden from the known-quiz grid so the user cannot create orphaned FSRS
  * states for cards that will never surface.
  *
@@ -56,7 +56,7 @@ export function isEligibleForKnownQuiz(card: ReviewableCard): boolean {
  */
 export function eligibleCardsForKnownQuiz(
   cards: readonly ReviewableCard[],
-  // Default true for backwards-compat only — always pass settings.alternateFormsEnabled explicitly.
+  // Default true for backwards-compat only - always pass settings.alternateFormsEnabled explicitly.
   alternateFormsEnabled: boolean = true,
 ): ReviewableCard[] {
   return cards.filter(
@@ -80,7 +80,7 @@ export function eligibleCardsForKnownQuiz(
  *
  * - Skips cards that are not eligible (no regression of an in-progress card).
  * - Cards not in `selectedIds` are returned unchanged.
- * - The graded state comes from `nextReview(state, 5, now, options)` — the
+ * - The graded state comes from `nextReview(state, 5, now, options)` - the
  *   same chokepoint the live review flow uses, so retention target and FSRS
  *   weights are honoured.
  */

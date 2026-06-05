@@ -34,7 +34,7 @@ export type DirectionBreakdownRow = {
 
 /**
  * Derive review counts and accuracy split by card direction from the
- * grade log. Pure — no I/O.
+ * grade log. Pure - no I/O.
  *
  * This derives from review *history* (`grade_log`), not mastery state, so it
  * is intentionally NOT affected by the `pretendAllMastered` superuser flag.
@@ -45,7 +45,7 @@ export type DirectionBreakdownRow = {
  * still included so callers can decide whether to show or hide them.
  *
  * If `enabledDirections` is omitted, `disabled` defaults to `false` for every
- * row — backwards-compatible with callers that do not read Settings.
+ * row - backwards-compatible with callers that do not read Settings.
  */
 export function computeDirectionBreakdown(
   log: GradeLog,
@@ -121,7 +121,7 @@ export type SessionDirectionTally = Map<CardDirection, { total: number; passes: 
  * display order. Accuracy is `passes / total` (Good + Easy as a share of all
  * grades). Returns an empty array when no grades have been recorded.
  *
- * Pure — no I/O.
+ * Pure - no I/O.
  */
 export function computeSessionDirectionAccuracy(
   tally: SessionDirectionTally,

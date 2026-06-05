@@ -32,7 +32,7 @@ describe("numericPrefix", () => {
 });
 
 // ---------------------------------------------------------------------------
-// sortAndValidateMigrationFiles — collision detection
+// sortAndValidateMigrationFiles - collision detection
 // ---------------------------------------------------------------------------
 
 describe("sortAndValidateMigrationFiles", () => {
@@ -41,7 +41,7 @@ describe("sortAndValidateMigrationFiles", () => {
       sortAndValidateMigrationFiles([
         "001_initial.sql",
         "020_first.sql",
-        "020_second.sql", // duplicate 020_ prefix — not allow-listed
+        "020_second.sql", // duplicate 020_ prefix - not allow-listed
         "021_later.sql",
       ]),
     ).toThrowError(/Duplicate migration prefix 20/);

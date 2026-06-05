@@ -191,7 +191,7 @@ async function main() {
     const speciesId = rec.speciesId;
     const allForSpecies = speciesIdToVersionGroups.get(speciesId);
     if (!allForSpecies || allForSpecies.size === 0) {
-      // Species not in any pokedex (very unusual — likely a brand-new species
+      // Species not in any pokedex (very unusual - likely a brand-new species
       // whose dex membership hasn't been published yet).  Preserve any prior
       // versionGroups field rather than wiping it.
       if (!Array.isArray(rec.versionGroups)) rec.versionGroups = [];

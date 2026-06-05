@@ -152,7 +152,7 @@ describe("NavLinksFallback", () => {
   });
 });
 
-describe("NavLinks — Japanese locale", () => {
+describe("NavLinks - Japanese locale", () => {
   it("renders the Practice link label in Japanese (練習)", async () => {
     renderJa(<NavLinks />);
 

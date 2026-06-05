@@ -26,7 +26,7 @@ export function useVisibilityPull(
   pathname: string,
   /**
    * When true, the locale push-back inside `pullAndMerge` is suppressed.
-   * Pulls (reads) remain enabled regardless — same contract as every other
+   * Pulls (reads) remain enabled regardless - same contract as every other
    * write-guarded hook. Pass `anyFlagOn` from `useSuperuser()`.
    */
   superuserPaused = false,
@@ -73,5 +73,5 @@ export function useVisibilityPull(
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []); // empty deps — handler always reads from refs
+  }, []); // empty deps - handler always reads from refs
 }

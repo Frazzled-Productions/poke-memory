@@ -118,7 +118,7 @@ function expandWall() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("EvolutionWall — basic render", () => {
+describe("EvolutionWall - basic render", () => {
   it("renders the Evolution wall section heading", () => {
     renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     expect(
@@ -196,7 +196,7 @@ describe("EvolutionWall — basic render", () => {
   });
 });
 
-describe("EvolutionWall — species nodes", () => {
+describe("EvolutionWall - species nodes", () => {
   it("renders species names for a linear chain (after expanding)", () => {
     renderWithIntl(<EvolutionWall families={[makeLinearFamily({})]} />);
     expandWall();
@@ -213,7 +213,7 @@ describe("EvolutionWall — species nodes", () => {
   });
 });
 
-describe("EvolutionWall — completed family styling", () => {
+describe("EvolutionWall - completed family styling", () => {
   it("shows a Done badge on completed families (after expanding)", () => {
     renderWithIntl(
       <EvolutionWall families={[makeLinearFamily({ edgeMastered: true, completed: true })]} />,
@@ -229,7 +229,7 @@ describe("EvolutionWall — completed family styling", () => {
   });
 });
 
-describe("EvolutionWall — filter behaviour", () => {
+describe("EvolutionWall - filter behaviour", () => {
   const inProgressFamily: EvolutionFamily = {
     rootId: 1,
     nodes: [makeNode(1, "Bulbasaur"), makeNode(2, "Ivysaur")],
@@ -331,7 +331,7 @@ describe("EvolutionWall — filter behaviour", () => {
   });
 });
 
-describe("EvolutionWall — edge accessibility labels", () => {
+describe("EvolutionWall - edge accessibility labels", () => {
   it("labels a fully-mastered edge with 'both directions mastered' (after expanding)", () => {
     const family: EvolutionFamily = {
       rootId: 1,
@@ -383,7 +383,7 @@ describe("EvolutionWall — edge accessibility labels", () => {
   });
 });
 
-describe("EvolutionWall — empty families list", () => {
+describe("EvolutionWall - empty families list", () => {
   it("renders the section heading even with no families", () => {
     renderWithIntl(<EvolutionWall families={[]} />);
     expect(
@@ -393,17 +393,17 @@ describe("EvolutionWall — empty families list", () => {
 
   it("shows 0 / 0 for the metric", () => {
     renderWithIntl(<EvolutionWall families={[]} />);
-    // Both completedFamilies (0) and totalFamilies (0) — two zeros in the metric area.
+    // Both completedFamilies (0) and totalFamilies (0) - two zeros in the metric area.
     const zeros = screen.getAllByText("0");
     expect(zeros.length).toBeGreaterThanOrEqual(2);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Locale coverage (mandatory per AGENTS.md — #1393)
+// Locale coverage (mandatory per AGENTS.md - #1393)
 // ---------------------------------------------------------------------------
 
-describe("EvolutionWall — locale coverage (i18n #1393)", () => {
+describe("EvolutionWall - locale coverage (i18n #1393)", () => {
   it("renders the Japanese heading in ja locale", () => {
     renderJa(<EvolutionWall families={[makeLinearFamily({})]} />);
     // ja journey.evolutionWallWidget.heading = "進化ウォール"

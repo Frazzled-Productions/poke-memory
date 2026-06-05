@@ -29,9 +29,9 @@ type Props = {
  * Stats-page accent vocabulary.
  */
 function bucketColour(lower: number): string {
-  if (lower <= 3) return "#10b981"; // emerald-500 — easy
-  if (lower <= 6) return "#f59e0b"; // amber-500 — moderate
-  return "#f43f5e"; // rose-500 — hard
+  if (lower <= 3) return "#10b981"; // emerald-500 - easy
+  if (lower <= 6) return "#f59e0b"; // amber-500 - moderate
+  return "#f43f5e"; // rose-500 - hard
 }
 
 type ChartDatum = {

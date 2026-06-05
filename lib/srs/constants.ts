@@ -5,14 +5,14 @@
  * Relearning steps are applied when a graduated card lapses (grade = Again).
  *
  * Step timing (ms) is used only by the in-memory learning queue in the UI
- * component — the scheduler itself does not compute wall-clock due times.
+ * component - the scheduler itself does not compute wall-clock due times.
  */
 
 /**
  * Default learning steps for new cards. The scheduler and UI use
  * `learningStepsFor(difficulty)` so harder cards (FSRS difficulty 8+)
  * get more steps, while easy cards (≤4) graduate after a single 1m
- * step. This constant is the medium-band default — preserved so legacy
+ * step. This constant is the medium-band default - preserved so legacy
  * callers and tests that don't have a difficulty value keep working.
  */
 export const LEARNING_STEPS_MS: readonly number[] = [60_000, 600_000];

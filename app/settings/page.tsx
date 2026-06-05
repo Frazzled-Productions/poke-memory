@@ -103,7 +103,7 @@ const FALLBACK_TIMEZONES: string[] = [
   "Pacific/Apia",
 ];
 
-// Evaluated once at module load — list is stable, no point computing it
+// Evaluated once at module load - list is stable, no point computing it
 // on every render of the Settings page.
 const TIMEZONE_OPTIONS: string[] =
   typeof Intl !== "undefined" && "supportedValuesOf" in Intl
@@ -120,7 +120,7 @@ function SkeletonBlock({ className }: { className: string }) {
 
 /**
  * Developer-only row for clearing the earned-badges list (#420). A QA tool
- * — no confirmation dialog because the only way to render it is from inside
+ * - no confirmation dialog because the only way to render it is from inside
  * superuser mode. While any superuser flag is on, cloud sync is paused, so
  * the click only mutates localStorage; cloud state is untouched until the
  * user explicitly exits superuser mode.
@@ -362,7 +362,7 @@ const EVOLUTION_NUMERIC_FIELDS: FieldConfig[] = [
   },
 ];
 
-// Numeric fields only — used for clamping on save. Boolean fields are handled
+// Numeric fields only - used for clamping on save. Boolean fields are handled
 // separately in handleSave via spread.
 const ALL_NUMERIC_FIELDS: FieldConfig[] = [
   ...GROUPS.flatMap((g) => g.fields),
@@ -387,14 +387,14 @@ const REVERSE_NUMERIC_FIELDS: FieldConfig[] = [
   },
 ];
 
-/** Human-readable names for the card-type settings keys — used in the re-enable dialog. */
+/** Human-readable names for the card-type settings keys - used in the re-enable dialog. */
 const CARD_TYPE_DISPLAY_NAMES: Partial<Record<keyof UserSettings, string>> = {
   evolutionCardsEnabled: "evolution cards",
   reverseEvolutionCardsEnabled: "reverse-evolution cards",
   cryCardsEnabled: "cry cards",
 };
 
-/** All top-level section ids used on this page — drives hash deep-link detection. */
+/** All top-level section ids used on this page - drives hash deep-link detection. */
 const TOP_LEVEL_SECTION_IDS = [
   "appearance-heading",
   "practice-heading",
@@ -458,7 +458,7 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "danger-zone-heading": "advanced-heading",
 };
 
-// LOCALE_ENDONYMS is imported from @/i18n/locales — the single source of truth
+// LOCALE_ENDONYMS is imported from @/i18n/locales - the single source of truth
 // for locale endonyms used across the settings locale picker and the machine-
 // translation banner (#1349).
 
@@ -513,7 +513,7 @@ export default function SettingsPage() {
 
   const [optimizableReviewCount, setOptimizableReviewCount] = useState<number>(0);
 
-  // "Mark Pokémon I already know" quiz — collapsed by default so the long
+  // "Mark Pokémon I already know" quiz - collapsed by default so the long
   // sprite grid does not eat the Practice section.
   const [knownQuizOpen, setKnownQuizOpen] = useState<boolean>(false);
 
@@ -539,7 +539,7 @@ export default function SettingsPage() {
     // category heading (much higher up), so without this the user lands above
     // the fold and never sees the quiz they asked to open (#1443 QA).
     // Use block:"start" so the quiz heading + intro lands at/near the top of
-    // the viewport rather than centred — centring pushed the heading above
+    // the viewport rather than centred - centring pushed the heading above
     // the fold and landed the user mid-list (#1486). This is a "use client"
     // component, so window is always defined here.
     window.setTimeout(() => {
@@ -577,7 +577,7 @@ export default function SettingsPage() {
 
     // Auto-detect regional prefs on first load when not yet set.
     // These live in LOCAL settings (which syncs to the scalar columns on
-    // user_settings via pushRegionalPrefs — NOT through merge_user_settings,
+    // user_settings via pushRegionalPrefs - NOT through merge_user_settings,
     // which would put them inside the JSONB blob and expose them to the LWW
     // race documented in the #517 audit).
     let needsSave = false;
@@ -601,7 +601,7 @@ export default function SettingsPage() {
     setFavouriteId(loadFavourite()?.id ?? null);
     // Read per-locale mastered counts for the enrolment checklist (item 5).
     setEnrolmentMasteredCounts(readMasteredCountCache());
-    // Count optimizable reviews from local grade log (async now — IDB backed)
+    // Count optimizable reviews from local grade log (async now - IDB backed)
     void loadGradeLog().then((log) => setOptimizableReviewCount(countOptimizableReviews(log)));
 
     // Resolve hash deep-link → find the top-level category to force-expand.
@@ -656,11 +656,11 @@ export default function SettingsPage() {
 
     // Card-type toggles: re-enable prompts and non-destructive disable.
     //
-    // Disabling is now non-destructive — saved progress is preserved in
+    // Disabling is now non-destructive - saved progress is preserved in
     // storage. When re-enabling, we show a prompt so the user can choose
     // between resuming saved progress (the default) or starting fresh.
     //
-    // Name and reverse are always on since #1234 — they are not in this list.
+    // Name and reverse are always on since #1234 - they are not in this list.
     const cardTypeKeys = [
       "evolutionCardsEnabled",
       "reverseEvolutionCardsEnabled",
@@ -703,8 +703,8 @@ export default function SettingsPage() {
 
   /**
    * Called when the user picks a choice in the re-enable dialog.
-   * "reuse" — enable the type; saved progress is preserved as-is.
-   * "fresh" — enable the type and reset all cards of that type to initialReviewState.
+   * "reuse" - enable the type; saved progress is preserved as-is.
+   * "fresh" - enable the type and reset all cards of that type to initialReviewState.
    */
   async function handleReenableChoice(choice: ReenableChoice) {
     if (settings === null || reenableKey === null) return;
@@ -745,7 +745,7 @@ export default function SettingsPage() {
       const result = await resetAllProgressEverywhere(supabase);
       if (!result.ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
     } else {
-      // Guest: no cloud to wipe — the orchestrator's local clear is invoked
+      // Guest: no cloud to wipe - the orchestrator's local clear is invoked
       // directly here. The two paths must not converge into one orchestrator
       // call: passing a null client would force the orchestrator to skip the
       // cloud step (silently OK for guests, but a future signed-out-but-stale
@@ -761,8 +761,8 @@ export default function SettingsPage() {
 
   /**
    * Full account erasure: wipe the cloud identity (and all cascaded data) via
-   * the delete_account RPC, clear ALL local poke-memory keys — including the
-   * settings keys a normal reset spares — then sign out.
+   * the delete_account RPC, clear ALL local poke-memory keys - including the
+   * settings keys a normal reset spares - then sign out.
    *
    * This is gated on a signed-in session; the button is only rendered for
    * `user`. The superuser write-guard (anyFlagOn) disables the button at the
@@ -777,7 +777,7 @@ export default function SettingsPage() {
         "Could not delete your account. Check your connection and try again.",
       );
     }
-    // Note: do NOT call saveFavourite(null) here — deleteAccountEverywhere
+    // Note: do NOT call saveFavourite(null) here - deleteAccountEverywhere
     // has already wiped every poke-memory:* localStorage key. saveFavourite
     // would re-create the settings key (leaving stale settings the deletion
     // was meant to erase) and dispatch SETTINGS_SAVED_EVENT, triggering a
@@ -906,7 +906,7 @@ export default function SettingsPage() {
                 forceOpen={targetCategoryId === "appearance-heading"}
                 transientOpen={isFiltering}
               >
-                {/* App Theme (mascot picker) — only shown when unlocked entries exist */}
+                {/* App Theme (mascot picker) - only shown when unlocked entries exist */}
                 <div>
                   <FavouritePicker
                     settings={settings}
@@ -932,7 +932,7 @@ export default function SettingsPage() {
                   }}
                 />
 
-                {/* Mobile navigation style (#661) — bottom tab bar vs hamburger */}
+                {/* Mobile navigation style (#661) - bottom tab bar vs hamburger */}
                 <div id="mobile-nav-heading" className={colStackLg}>
                   <p className={sectionLabel}>
                     {t("settings.appearance.mobileNav.heading")}
@@ -1076,7 +1076,7 @@ export default function SettingsPage() {
 
                     Lets the user fast-track Pokémon they already know without
                     grinding through the new-card queue. Each selection runs
-                    the brand-new card through the simulated-Easy FSRS path —
+                    the brand-new card through the simulated-Easy FSRS path - 
                     real graduated state, not synthesised mastery. */}
                 <div id="known-quiz-heading" className={colStackLg}>
                   <p className={sectionLabel}>
@@ -1116,7 +1116,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Name cards — always on since #1234 */}
+                {/* Name cards - always on since #1234 */}
                 <div id="name-cards-heading" className={colStackLg}>
                   <p className={sectionLabel}>
                     {t("settings.practice.nameCards.heading")}
@@ -1353,7 +1353,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Reverse cards — always on since #1234 */}
+                {/* Reverse cards - always on since #1234 */}
                 <div id="reverse-heading" className={colStackLg}>
                   <p className={sectionLabel}>
                     {t("settings.practice.reverseCards.heading")}
@@ -1560,7 +1560,7 @@ export default function SettingsPage() {
                 </div>
                 )}
 
-                {/* Reverse-card feedback delay (#1200) — always shown since reverse is always on (#1234) */}
+                {/* Reverse-card feedback delay (#1200) - always shown since reverse is always on (#1234) */}
                 <div className={cardPanelPadded}>
                   <p className="text-sm font-medium text-foreground">
                     {t("settings.audio.reverseFeedbackDelay.label")}
@@ -1632,13 +1632,13 @@ export default function SettingsPage() {
                 forceOpen={targetCategoryId === "account-data-heading"}
                 transientOpen={isFiltering}
               >
-                {/* Sign-in methods — only shown for signed-in users */}
+                {/* Sign-in methods - only shown for signed-in users */}
                 {user && supabase && (
                   <LinkIdentitiesSection user={user} supabase={supabase} />
                 )}
 
                 {/* Daily review reminder (Web Push, #1056). The component
-                    handles its own visibility — it renders nothing outside
+                    handles its own visibility - it renders nothing outside
                     an installed PWA or when push is unsupported, so the
                     parent does not need to gate further. */}
                 {user && supabase && (
@@ -1714,7 +1714,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
 
-                  {/* Review history CSV export — authenticated users only (#918) */}
+                  {/* Review history CSV export - authenticated users only (#918) */}
                   {user && (
                     <>
                       <hr className="border-zinc-200 dark:border-zinc-800" />
@@ -2052,12 +2052,12 @@ export default function SettingsPage() {
                           </button>
                         </div>
 
-                        {/* Locale pickers — only shown when languages flag is on.
+                        {/* Locale pickers - only shown when languages flag is on.
                             Two independent selectors: one for the app UI, one
                             for Pokémon names (#1260). */}
                         {key === "languages" && (settings.labsFlags[key] ?? false) && (
                           <div className={`mt-4 border-t border-zinc-100 pt-4 dark:border-zinc-800 ${colStackLg}`}>
-                            {/* App language — writes the locale cookie */}
+                            {/* App language - writes the locale cookie */}
                             <div>
                               <label
                                 htmlFor="labs-app-locale-select"
@@ -2090,7 +2090,7 @@ export default function SettingsPage() {
                               </select>
                             </div>
 
-                            {/* Pokémon name practice languages — enrolment set
+                            {/* Pokémon name practice languages - enrolment set
                                 (#1484 Phase 3). English is always included;
                                 toggling a language adds/removes it from
                                 learningLocales. Removing the active language
@@ -2324,7 +2324,7 @@ export default function SettingsPage() {
                 forceOpen={targetCategoryId === "advanced-heading"}
                 transientOpen={isFiltering}
               >
-                {/* Developer section — superuser gated */}
+                {/* Developer section - superuser gated */}
                 {unlocked && (
                   <div
                     id="developer-heading"
@@ -2540,7 +2540,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    {/* QA seed panel — only shown when qaSeedMode is on */}
+                    {/* QA seed panel - only shown when qaSeedMode is on */}
                     {flags.qaSeedMode && <QaSeedSection />}
                   </div>
                 )}
@@ -2573,11 +2573,11 @@ export default function SettingsPage() {
                   </div>
 
                   {/*
-                    Delete account — full erasure, distinct from reset-progress.
+                    Delete account - full erasure, distinct from reset-progress.
                     Only meaningful for a signed-in user (there is a cloud
                     identity to delete), so the row is gated on `user`. Visually
                     separated from the reset control by a divider. While a
-                    superuser flag is on, all cloud writes are paused — so the
+                    superuser flag is on, all cloud writes are paused - so the
                     button shows the same disabled "Sync paused (superuser)"
                     treatment as FsrsOptimizerSection.
                   */}

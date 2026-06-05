@@ -33,7 +33,7 @@ function detectInstallState(): InstallState {
     return { platform: "already-installed", canPrompt: false };
   }
 
-  // Chrome / Android — deferred prompt captured by the inline head script
+  // Chrome / Android - deferred prompt captured by the inline head script
   if (window.__pwaInstallPrompt) {
     const deferred = window.__pwaInstallPrompt;
     return {
@@ -51,7 +51,7 @@ function detectInstallState(): InstallState {
     };
   }
 
-  // iOS Safari — no beforeinstallprompt, show manual instructions instead.
+  // iOS Safari - no beforeinstallprompt, show manual instructions instead.
   // iPadOS 13+ reports a desktop `Macintosh` user-agent, so an iPad is only
   // distinguishable from a real Mac by its touch support.
   const ua = navigator.userAgent;
@@ -68,7 +68,7 @@ function detectInstallState(): InstallState {
 
 export function useInstallPrompt(): InstallState {
   const [state, setState] = useState<InstallState>(() => {
-    // Safe for SSR — detectInstallState guards typeof window
+    // Safe for SSR - detectInstallState guards typeof window
     return detectInstallState();
   });
 

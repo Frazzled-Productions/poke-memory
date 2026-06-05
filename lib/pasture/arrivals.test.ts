@@ -139,13 +139,13 @@ describe("justBecameMastered", () => {
   });
 
   it("honours a higher masteryRepetitions threshold", () => {
-    // masteredState has reps: 3 — mastered under the default but not under a
+    // masteredState has reps: 3 - mastered under the default but not under a
     // custom threshold of 5, so the transition no longer counts as a crossing.
     expect(justBecameMastered(learningState, masteredState, 5)).toBe(false);
   });
 
   it("honours a lower masteryRepetitions threshold", () => {
-    // learningState has reps: 2, scheduledDays: 10 — not mastered under any
+    // learningState has reps: 2, scheduledDays: 10 - not mastered under any
     // threshold because scheduledDays < 21. Use a state that crosses only once
     // the rep threshold drops to 2.
     const lowRepMastered = makeState({
@@ -175,7 +175,7 @@ describe("filterMastered", () => {
       makeCard(1, "name", masteredState),
       makeCard(2_000_001, "reverse", masteredState), // paired reverse for species 1
       makeCard(2, "name", learningState),
-      makeCard(2_000_002, "reverse", masteredState), // mastered reverse but name not — excluded
+      makeCard(2_000_002, "reverse", masteredState), // mastered reverse but name not - excluded
       makeCard(3, "name", newState),
     ];
     const result = filterMastered(cards);
@@ -188,7 +188,7 @@ describe("filterMastered", () => {
     // qualifies, but confirm the evolution card is never in the output.
     const cards = [
       makeCard(1, "name", masteredState),
-      makeCard(2000001, "reverse", masteredState), // paired reverse — needed for species mastery
+      makeCard(2000001, "reverse", masteredState), // paired reverse - needed for species mastery
       makeCard(1500001, "evolution", masteredState),
     ];
     const result = filterMastered(cards);
@@ -254,7 +254,7 @@ describe("filterMastered", () => {
 
   it("honours a higher masteryRepetitions threshold", () => {
     // reps: 3 satisfies the default threshold but not a custom threshold of 5.
-    // Supply the paired reverse card too — both need to fail the higher threshold.
+    // Supply the paired reverse card too - both need to fail the higher threshold.
     const cards = [
       makeCard(1, "name", masteredState),
       makeCard(2000001, "reverse", masteredState),
@@ -304,14 +304,14 @@ describe("filterMastered", () => {
   });
 
   it("locale scoping: cards without locale field default to en (#1259)", () => {
-    // Pre-#1259 cards have no locale — they default to "en".
+    // Pre-#1259 cards have no locale - they default to "en".
     const cards = [
       makeCard(1, "name", masteredState),       // no locale → en
       makeCard(2_000_001, "reverse", masteredState), // no locale → en
     ];
-    // Scoped to "en" — should find species 1
+    // Scoped to "en" - should find species 1
     expect(filterMastered(cards, false, 3, "en")).toHaveLength(1);
-    // Scoped to "ja" — should find nothing
+    // Scoped to "ja" - should find nothing
     expect(filterMastered(cards, false, 3, "ja")).toHaveLength(0);
   });
 

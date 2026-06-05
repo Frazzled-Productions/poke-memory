@@ -42,7 +42,7 @@ type TileProps = {
  * A single sprite tile in the 2×2 grid.
  *
  * Extracted as its own component so `useLocalePokemonName` can be called
- * unconditionally — hooks may not be called inside array maps (#1260 followup).
+ * unconditionally - hooks may not be called inside array maps (#1260 followup).
  */
 function SpritePickerTile({ tile, answered, selectedId, onTap, tileClassName }: TileProps) {
   // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
@@ -81,7 +81,7 @@ function SpritePickerTile({ tile, answered, selectedId, onTap, tileClassName }: 
 
 /**
  * Fisher-Yates shuffle. Returns a new array; does not mutate the input.
- * Uses Math.random() so the order differs every time the function is called —
+ * Uses Math.random() so the order differs every time the function is called - 
  * the caller is responsible for calling it once per card presentation.
  */
 export function fisherYatesShuffle<T>(items: readonly T[]): T[] {
@@ -114,7 +114,7 @@ type Props = {
   /**
    * When true, speaks the target Pokémon's name at the answer-feedback moment.
    * When both `playCryOnAnswer` and `speakNameOnAnswer` are true, the cry plays
-   * first and the name is spoken via the `onEnded` callback — consistent with
+   * first and the name is spoken via the `onEnded` callback - consistent with
    * the cry → TTS chaining in handleReveal on flip cards.
    */
   speakNameOnAnswer?: boolean;
@@ -151,7 +151,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
     setAnswered(true);
     setSelectedId(tile.id);
 
-    // Play the target cry and/or speak the name at the answer-feedback moment —
+    // Play the target cry and/or speak the name at the answer-feedback moment - 
     // the reverse-card equivalent of the reveal moment on flip cards (#707, #731).
     // When both are enabled, chain TTS to fire after the cry ends, consistent
     // with the cry → TTS ordering in handleReveal on flip cards.
@@ -241,7 +241,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
         ))}
       </div>
 
-      {/* Feedback label — announced to screen readers after answering */}
+      {/* Feedback label - announced to screen readers after answering */}
       <div aria-live="polite" aria-atomic="true" className="min-h-[1.5rem]">
         {answered && selectedId !== null && (
           <p className="text-sm font-medium text-center text-zinc-600 dark:text-zinc-300">

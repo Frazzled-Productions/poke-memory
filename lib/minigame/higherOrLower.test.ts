@@ -12,7 +12,7 @@ import type { ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import type { PracticeScope } from "@/lib/review/scope";
 
-// Minimal SeedPokemon factory — only the fields touched by this module.
+// Minimal SeedPokemon factory - only the fields touched by this module.
 function makePokemon(
   id: number,
   stats: Partial<Record<StatKey, number>> = {},
@@ -119,14 +119,14 @@ describe("scoreGuess", () => {
     expect(result).toEqual({ correct: false, tie: false });
   });
 
-  it("tie is always correct regardless of guess direction — left", () => {
+  it("tie is always correct regardless of guess direction - left", () => {
     expect(scoreGuess(high, equal, "attack", "left")).toEqual({
       correct: true,
       tie: true,
     });
   });
 
-  it("tie is always correct regardless of guess direction — right", () => {
+  it("tie is always correct regardless of guess direction - right", () => {
     expect(scoreGuess(high, equal, "attack", "right")).toEqual({
       correct: true,
       tie: true,
@@ -278,9 +278,9 @@ describe("getSeenPokemon", () => {
   });
 });
 
-// ── getSeenPokemon — scope filtering ─────────────────────────────────────────
+// ── getSeenPokemon - scope filtering ─────────────────────────────────────────
 
-describe("getSeenPokemon — alternate-forms gate", () => {
+describe("getSeenPokemon - alternate-forms gate", () => {
   // p10 is an alternate-form entry (e.g. Alolan Raichu).
   // p1 and p2 are default-form entries.
   const p1 = makePokemon(1);
@@ -311,7 +311,7 @@ describe("getSeenPokemon — alternate-forms gate", () => {
   });
 });
 
-describe("getSeenPokemon — gens/types scope", () => {
+describe("getSeenPokemon - gens/types scope", () => {
   // Gen 1 Pokémon have IDs 1-151. Gen 2 IDs 152-251 etc.
   // For the scope filter, speciesId drives generationOf(). We use IDs 1 and 152.
   const p1 = makePokemon(1, {}, { types: ["fire"] as SeedPokemon["types"] });

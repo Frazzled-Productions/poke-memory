@@ -36,7 +36,7 @@ function isRawGithubUserContentUrl(value: string): boolean {
 
 // Validate a raw shape against the StoredFavourite schema. Returns the
 // validated object (with the canonical name from CURATED_POKEMON) or null if
-// validation fails. Pure — takes a value, returns a value. Used for both
+// validation fails. Pure - takes a value, returns a value. Used for both
 // the cloud-pulled shape (loadSettings().favouriteTheme) and the legacy
 // localStorage shape during one-time migration.
 function validateRawFavourite(value: unknown): StoredFavourite | null {
@@ -66,7 +66,7 @@ function validateRawFavourite(value: unknown): StoredFavourite | null {
   const rawSpriteUrl = typeof obj.spriteUrl === "string" ? obj.spriteUrl : null;
   // Migrate legacy remote sprite URLs stored before sprites were self-hosted.
   // raw.githubusercontent.com is no longer in next.config.ts remotePatterns.
-  // Parse and match the host exactly — a substring check would also match a
+  // Parse and match the host exactly - a substring check would also match a
   // look-alike host like `raw.githubusercontent.com.evil.example`.
   const needsRemoteMigration =
     rawSpriteUrl !== null && isRawGithubUserContentUrl(rawSpriteUrl);
@@ -108,7 +108,7 @@ export function loadFavourite(): StoredFavourite | null {
           favourite = legacyParsed;
           saveSettings({ ...settings, favouriteTheme: favourite });
         }
-        // Clear the legacy key regardless of whether it parsed — we've either
+        // Clear the legacy key regardless of whether it parsed - we've either
         // migrated it or it was corrupt and we don't want to re-attempt.
         try {
           localStorage.removeItem(LEGACY_STORAGE_KEY);
@@ -126,7 +126,7 @@ export function loadFavourite(): StoredFavourite | null {
 
 // Pure. Returns true if there is no favourite, or its underlying name card
 // meets the mastery bar. Used by the superuser exit-cleanup and by the
-// FavouriteThemeProvider as a load-time invariant — a cheat-selected theme
+// FavouriteThemeProvider as a load-time invariant - a cheat-selected theme
 // must not survive a flag-off transition or a subsequent page load.
 export function isFavouriteEarned(
   favourite: StoredFavourite | null,
@@ -152,6 +152,6 @@ export function saveFavourite(
         : { id: entry.id, name: entry.name, colors: entry.colors, spriteUrl };
     saveSettings({ ...settings, favouriteTheme: next });
   } catch {
-    // private browsing or storage full — silently ignore
+    // private browsing or storage full - silently ignore
   }
 }

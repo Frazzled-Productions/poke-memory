@@ -9,7 +9,7 @@
  *
  * Superuser behaviour: when pretendAllMastered is active, every species is
  * already mastered so there are no upcoming arrivals. The strip renders an
- * all-caught-up message in that state — this is correct and deliberate.
+ * all-caught-up message in that state - this is correct and deliberate.
  */
 
 import Image from "next/image";

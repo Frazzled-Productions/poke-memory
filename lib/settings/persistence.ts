@@ -29,7 +29,7 @@ export const STORAGE_KEY = KEY_SETTINGS;
 
 // Mirror of the structure stored under `favouriteTheme`. Validation of the
 // values (HEX_COLOR / known Pokémon id) happens in lib/theme/persistence.ts
-// — here we treat the field as an opaque container.
+// - here we treat the field as an opaque container.
 export type StoredFavouriteTheme = {
   id: number;
   name: string;
@@ -110,7 +110,7 @@ export type OnboardingFlags = {
   /**
    * Count of completed practice sessions (#1482). Incremented once per
    * browser session (sessionStorage-guarded) on the first grade. Used to
-   * gate the scope nudge: shown only after N sessions. Default `0` —
+   * gate the scope nudge: shown only after N sessions. Default `0` - 
    * absent in pre-#1482 blobs resolves to `0` (below threshold) via
    * integer coercion.
    */
@@ -198,8 +198,8 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
 /**
  * Mobile navigation style (#661). Controls which mobile nav surface is shown
  * below the `md` breakpoint.
- * - `'bottom'` — fixed bottom tab bar (new default for new users).
- * - `'hamburger'` — slide-in drawer triggered by a hamburger button in the header
+ * - `'bottom'` - fixed bottom tab bar (new default for new users).
+ * - `'hamburger'` - slide-in drawer triggered by a hamburger button in the header
  *   (the classic style; kept as the default for existing users who already have
  *   a settings record without this field).
  */
@@ -227,7 +227,7 @@ export type UserSettings = {
    * When true, form cards are eligible and the per-category filter in
    * `practiceScope.formCategories` applies as normal.
    *
-   * Defaults to false — the base Pokédex is already a large deck and forms
+   * Defaults to false - the base Pokédex is already a large deck and forms
    * are opt-in. Missing/non-boolean values in persisted JSON default to
    * false (existing users lose forms from practice until they re-enable).
    */
@@ -264,7 +264,7 @@ export type UserSettings = {
    * Streak milestones (in days) the user has already seen celebrated (#419).
    * Persists in the JSONB settings blob so a milestone fires exactly once
    * across reloads on a device. Cross-device deduplication is eventually
-   * consistent — settings sync is LWW so a second device will only learn
+   * consistent - settings sync is LWW so a second device will only learn
    * about a celebration after the next manual sync cycle.
    */
   seenStreakMilestones: number[];
@@ -273,7 +273,7 @@ export type UserSettings = {
    * id matches a `BadgeDefinition.id` from `lib/badges/catalog.ts`;
    * `earnedAt` is an ISO timestamp. The list is the source of truth for
    * which badges to render on the Trainer card. Unearned badges have no
-   * entry — there is no progress hint anywhere in the UI.
+   * entry - there is no progress hint anywhere in the UI.
    */
   earnedBadges: readonly { id: string; earnedAt: string }[];
   /**
@@ -287,7 +287,7 @@ export type UserSettings = {
   fsrsWeightsOptimizedAt?: string;
   /**
    * Number of distinct browser sessions in which the app has been visited.
-   * Used to gate the PWA install nudge (#701) — shown only after 3 visits.
+   * Used to gate the PWA install nudge (#701) - shown only after 3 visits.
    * Incremented once per session (guarded by sessionStorage). Missing in
    * pre-#701 records; parses to 0 so existing users are not forced through the
    * threshold immediately (they will still see the nudge after 3 more visits).
@@ -320,21 +320,21 @@ export type UserSettings = {
    * When true (default), `handleGrade` waits for any in-progress cry and/or
    * TTS to finish before swapping to the next card (#1191). When false, the
    * visible swap fires immediately and audio continues playing under the next
-   * card — cry/TTS are global and are not cut off, only overlapped. Turning
+   * card - cry/TTS are global and are not cut off, only overlapped. Turning
    * this off removes the ~1-3 s audio-wait lag from the grading critical path.
    */
   waitForAudioOnGrade: boolean;
   /**
    * Controls how long the sprite-picker lingers on the correct/incorrect
    * feedback colouring before auto-advancing (#1200).
-   * - `"off"`     — 0 ms / 0 ms (no pause; advances immediately).
-   * - `"fast"`    — 250 ms correct / 500 ms incorrect.
-   * - `"default"` — 600 ms correct / 1200 ms incorrect (original hardcoded values).
+   * - `"off"` - 0 ms / 0 ms (no pause; advances immediately).
+   * - `"fast"` - 250 ms correct / 500 ms incorrect.
+   * - `"default"` - 600 ms correct / 1200 ms incorrect (original hardcoded values).
    * Defaults to `"default"` so existing users keep the behaviour they know.
    */
   reverseFeedbackDelay: "off" | "fast" | "default";
   /**
-   * User's IANA timezone (#508). Null means "not yet detected" — the
+   * User's IANA timezone (#508). Null means "not yet detected" - the
    * Settings page auto-detects via Intl on first load and writes it back.
    * Stored as a scalar column in user_settings (NOT inside the JSONB blob)
    * so it doesn't get clobbered by the LWW JSONB sync. See lib/sync/settings.ts.
@@ -347,7 +347,7 @@ export type UserSettings = {
   dateFormat: DateFormat | null;
   /**
    * User's preferred local hour (0-23) for the daily push notification
-   * (#1315). Null means "no preference" — the send-daily route falls back to
+   * (#1315). Null means "no preference" - the send-daily route falls back to
    * PUSH_DEFAULT_HOUR_UTC (8 = 08:00 UTC). Stored as a scalar column on
    * user_settings (migration 030), NOT inside the JSONB blob, for the same
    * reason as timezone/dateFormat: a dedicated write path via pushRegionalPrefs
@@ -380,14 +380,14 @@ export type UserSettings = {
   verifiedTypedEntryMode: boolean;
   /**
    * One-time onboarding toast for typed entry (#1271). Set to true after the
-   * first-enable toast is shown so it never fires again. Default false — absent
+   * first-enable toast is shown so it never fires again. Default false - absent
    * in pre-#1271 records; bool parser back-fills to false.
    */
   typedEntryOnboardingShown: boolean;
   /**
    * One-time banner above the first MC card (#1271). Set to true after the
    * first MC card in typed-entry mode is graded so the banner never reappears.
-   * Default false — absent in pre-#1271 records; bool parser back-fills to false.
+   * Default false - absent in pre-#1271 records; bool parser back-fills to false.
    */
   mcCardOnboardingShown: boolean;
   /**
@@ -454,7 +454,7 @@ export type UserSettings = {
    *
    * Sync semantics: client-side union in `pullAndMerge` (see `mergeRemovedLocales`
    * in `lib/sync/settings.ts`). A locale in both `learningLocales` and
-   * `removedLocales` is an invalid state — `saveSettings` and the enrol/remove
+   * `removedLocales` is an invalid state - `saveSettings` and the enrol/remove
    * handlers keep them disjoint.
    *
    * v1 limitation: re-enrolling a locale that another OFFLINE device still
@@ -543,7 +543,7 @@ function clampRetention(v: number): number {
  * sub-field must not poison the whole settings payload.
  *
  *   - gens: integers in [1, 9], deduped, preserving first-occurrence order.
- *   - types: any string accepted — the UI restricts the input set; this
+ *   - types: any string accepted - the UI restricts the input set; this
  *     validator just guards JSON shape so a manually-edited localStorage
  *     blob with a stray type name doesn't drop the whole payload.
  *   - presets: only the known preset literals (`"starters"`, `"legendaries"`,
@@ -581,10 +581,10 @@ function validatePracticeScope(value: unknown): PracticeScope | null {
     seenPresets.add(p);
     presets.push(p);
   }
-  // formCategories is additive — absent in pre-#450 persisted scopes; default
+  // formCategories is additive - absent in pre-#450 persisted scopes; default
   // to {mode:'all'} so existing users see no behaviour change.
   const formCategories = parseFormCategoryFilter(v.formCategories);
-  // games is additive — absent in pre-#1089 persisted scopes; default to [].
+  // games is additive - absent in pre-#1089 persisted scopes; default to [].
   // Unknown string entries are kept (the matcher just won't match them) rather
   // than rejecting the whole payload, mirroring the type-axis approach.
   const games: string[] = [];
@@ -604,7 +604,7 @@ function validatePracticeScope(value: unknown): PracticeScope | null {
 //
 // Each helper reads a single key from the raw parsed object and returns the
 // stored value when its runtime type matches, or the corresponding default
-// otherwise.  They are intentionally narrow — no side-effects, no clamping.
+// otherwise.  They are intentionally narrow - no side-effects, no clamping.
 // Custom validators (retentionTarget clamp, practiceScope, etc.) are left
 // inline so they remain visually distinct.
 
@@ -694,7 +694,7 @@ function parseStoredSettings(raw: string | null): UserSettings {
     // Defensive default: missing/non-boolean → false. Existing users lose form
     // cards from practice until they opt in via the Settings toggle (#658).
     alternateFormsEnabled: bool(obj, "alternateFormsEnabled"),
-    // Shallow validation only — lib/theme/persistence.ts does the deep
+    // Shallow validation only - lib/theme/persistence.ts does the deep
     // validation (HEX_COLOR, known Pokémon id) on read.
     favouriteTheme:
       typeof obj.favouriteTheme === "object" && obj.favouriteTheme !== null
@@ -760,7 +760,7 @@ function parseStoredSettings(raw: string | null): UserSettings {
     // Existing-user migration (#661): a record that pre-dates this field will
     // have no `mobileNav` key. To preserve their experience, default to
     // 'hamburger' (what they had before). A brand-new user (raw === null) never
-    // reaches this branch — they get DEFAULT_SETTINGS which is 'bottom'.
+    // reaches this branch - they get DEFAULT_SETTINGS which is 'bottom'.
     mobileNav:
       obj.mobileNav === "bottom" || obj.mobileNav === "hamburger"
         ? obj.mobileNav
@@ -788,7 +788,7 @@ function parseStoredSettings(raw: string | null): UserSettings {
     learningLocales,
     activePokemonNameLocale,
     // Default []: absent in pre-#1387 records. Non-array or entries that are
-    // not strings are silently dropped — same defensive posture as seenStreakMilestones.
+    // not strings are silently dropped - same defensive posture as seenStreakMilestones.
     dismissedMtBannerLocales: validateDismissedMtBannerLocales(obj.dismissedMtBannerLocales),
     // Default []: absent in pre-#1568 records. Deduped; "en" always dropped.
     removedLocales: validateRemovedLocales(obj.removedLocales),
@@ -951,7 +951,7 @@ function validateEarnedBadges(
 
 // Returns DEFAULT_SETTINGS on fresh load, server, or corruption. Never throws.
 // Legacy stored objects without the evolution-* keys are silently upgraded
-// with the defaults — name-card limits keep their saved values.
+// with the defaults - name-card limits keep their saved values.
 //
 // Also performs a one-shot migration of the legacy practice-scope localStorage
 // key (`poke-memory:practice-scope:v1`, the original storage used before
@@ -959,7 +959,7 @@ function validateEarnedBadges(
 // once per device: as soon as the legacy key is cleared, the read short-circuits
 // and there is nothing left to copy in. When both the legacy key and a stored
 // `practiceScope` field exist, the stored field wins (it is newer by definition
-// — once `saveSettings` runs it always carries `practiceScope`).
+// - once `saveSettings` runs it always carries `practiceScope`).
 export function loadSettings(): UserSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   const settings = readLocalStorage(
@@ -969,7 +969,7 @@ export function loadSettings(): UserSettings {
   );
 
   // Legacy scope migration. Only fires when the current settings.practiceScope
-  // is the empty default — a non-empty stored field always wins. The legacy
+  // is the empty default - a non-empty stored field always wins. The legacy
   // key is cleared after the read regardless, so the migration is strictly
   // one-shot (no perpetual re-fire).
   const legacy = readLegacyScope();
@@ -998,8 +998,8 @@ export const SETTINGS_SAVED_EVENT = "poke-memory:settings-saved";
 export function saveSettings(settings: UserSettings): void {
   if (typeof window === "undefined") return;
   // Mirror the deprecated `pokemonNameLocale` scalar from the active learning
-  // locale (#1484), so any reader that only knows the old field — including the
-  // cloud settings JSONB before the union-merge RPC ships — stays correct.
+  // locale (#1484), so any reader that only knows the old field - including the
+  // cloud settings JSONB before the union-merge RPC ships - stays correct.
   const toWrite: UserSettings = {
     ...settings,
     pokemonNameLocale: settings.activePokemonNameLocale,
@@ -1014,7 +1014,7 @@ export function saveSettings(settings: UserSettings): void {
 }
 
 // True if a settings blob has been explicitly written. loadSettings cannot
-// distinguish "never written" from "written with defaults" — sync logic needs
+// distinguish "never written" from "written with defaults" - sync logic needs
 // this to know whether a pulled cloud value should overlay local defaults.
 export function hasStoredSettings(): boolean {
   if (typeof window === "undefined") return false;

@@ -10,12 +10,12 @@
 // code from landing untested.
 //
 // Inputs:
-//   coverage/coverage-final.json   — produced by the `json` coverage reporter.
-//   A unified diff on stdin        — typically `git diff <base>...<head>`.
+//   coverage/coverage-final.json - produced by the `json` coverage reporter.
+//   A unified diff on stdin - typically `git diff <base>...<head>`.
 //
 // Env (optional):
-//   DIFF_COVERAGE_MIN   — patch-coverage bar as a percentage (default 90).
-//   DIFF_COVERAGE_OUT   — path to write a Markdown summary fragment.
+//   DIFF_COVERAGE_MIN - patch-coverage bar as a percentage (default 90).
+//   DIFF_COVERAGE_OUT - path to write a Markdown summary fragment.
 //
 // Exit codes:
 //   0  patch coverage at or above the bar, or no measurable changed lines.
@@ -38,7 +38,7 @@ const OUT_FILE = process.env.DIFF_COVERAGE_OUT;
 const INCLUDE_PREFIXES = ["app/", "components/", "lib/"];
 
 // Files that match an include prefix but are excluded from coverage in
-// vitest.config.ts — test files and the generated seed payload. Changed lines
+// vitest.config.ts - test files and the generated seed payload. Changed lines
 // in these never count toward patch coverage.
 function isMeasurableFile(repoPath) {
   if (!INCLUDE_PREFIXES.some((p) => repoPath.startsWith(p))) return false;
@@ -59,7 +59,7 @@ function parseDiff(diffText) {
 
   for (const raw of diffText.split("\n")) {
     if (raw.startsWith("+++ ")) {
-      // "+++ b/path/to/file" — strip the "b/" prefix. "/dev/null" means the
+      // "+++ b/path/to/file" - strip the "b/" prefix. "/dev/null" means the
       // file was deleted; leave currentFile null so its hunks are skipped.
       const target = raw.slice(4).trim();
       currentFile = target === "/dev/null" ? null : target.replace(/^b\//, "");
@@ -79,9 +79,9 @@ function parseDiff(diffText) {
       added.get(currentFile).add(newLine);
       newLine += 1;
     } else if (raw.startsWith("-") && !raw.startsWith("---")) {
-      // Deleted line — no new-side line number to advance.
+      // Deleted line - no new-side line number to advance.
     } else if (raw.startsWith("\\")) {
-      // "\ No newline at end of file" — metadata, not a content line.
+      // "\ No newline at end of file" - metadata, not a content line.
     } else {
       // Context line (leading space) or an empty line inside a hunk.
       newLine += 1;

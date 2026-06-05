@@ -113,7 +113,7 @@ function reverseCard(pokemonId: number, stateOverrides: Partial<ReviewState> = {
 // Tests: basic derivation
 // ---------------------------------------------------------------------------
 
-describe("deriveCloseToMastery — no results", () => {
+describe("deriveCloseToMastery - no results", () => {
   it("returns empty array when there are no cards", () => {
     expect(deriveCloseToMastery([])).toHaveLength(0);
   });
@@ -142,7 +142,7 @@ describe("deriveCloseToMastery — no results", () => {
   });
 });
 
-describe("deriveCloseToMastery — results present", () => {
+describe("deriveCloseToMastery - results present", () => {
   it("includes a species whose name card is mastered but has no reverse card", () => {
     const cards = [nameCard(1, masteredState())];
     const result = deriveCloseToMastery(cards);
@@ -196,7 +196,7 @@ describe("deriveCloseToMastery — results present", () => {
 // Tests: sorting
 // ---------------------------------------------------------------------------
 
-describe("deriveCloseToMastery — sort order", () => {
+describe("deriveCloseToMastery - sort order", () => {
   it("sorts by reverseScheduledDays descending (closest to gate first)", () => {
     const cards = [
       nameCard(1, masteredState()),
@@ -256,7 +256,7 @@ describe("deriveCloseToMastery — sort order", () => {
 // Tests: custom masteryRepetitions
 // ---------------------------------------------------------------------------
 
-describe("deriveCloseToMastery — custom masteryRepetitions", () => {
+describe("deriveCloseToMastery - custom masteryRepetitions", () => {
   it("respects a higher masteryRepetitions threshold", () => {
     // With masteryRepetitions = 5, reps=4 is not mastered for name card.
     const cards = [

@@ -2,11 +2,11 @@
 // Smoke tests for per-locale practice sessions (#1562, part of the #1484 epic).
 //
 // Scenarios:
-//   1. Baseline (en only, languages flag off) — Practice renders a card and a
+//   1. Baseline (en only, languages flag off) - Practice renders a card and a
 //      grade interaction succeeds. Regression guard for the default majority.
 //   2. Language pill is visible when the languages flag and learningLocales are set.
 //   3. Switch to Japanese → non-empty ja session with a Japanese name rendered.
-//   4. Mid-card lock — while a card is revealed the pill opens but blocks switching
+//   4. Mid-card lock - while a card is revealed the pill opens but blocks switching
 //      and shows the lock message; grading the card re-enables switching.
 //
 // Guest-mode only. State is driven via localStorage / QA seed, never by
@@ -175,7 +175,7 @@ async function seedJaAsActive(page: Page): Promise<void> {
 test.describe("Per-locale practice session (#1562)", () => {
   test.beforeEach(async ({ page }) => {
     // Each Playwright test runs in a fresh, isolated browser context, so
-    // localStorage already starts empty — no explicit clear is needed (and a
+    // localStorage already starts empty - no explicit clear is needed (and a
     // clear via addInitScript would be HARMFUL here: it re-fires on every
     // navigation, so it would wipe the settings the QA seed writes via the app
     // on the post-seed reload, hiding the language pill). Just pre-dismiss the
@@ -188,7 +188,7 @@ test.describe("Per-locale practice session (#1562)", () => {
   test("baseline (flag off): practice page renders a card in the default English session", async ({
     page,
   }) => {
-    // Default state — no labsFlags, no learningLocales override. A fresh
+    // Default state - no labsFlags, no learningLocales override. A fresh
     // guest session sees only English cards with the standard daily budget.
     await page.goto("/");
 
@@ -218,7 +218,7 @@ test.describe("Per-locale practice session (#1562)", () => {
       await goodButton.click();
 
       // After grading, either the next card renders or the session is complete.
-      // Either is a passing state — we are proving the grade cycle does not error.
+      // Either is a passing state - we are proving the grade cycle does not error.
       const nextReady = practiceReadyLocator(page);
       await expect(nextReady).toBeVisible({ timeout: 10_000 });
     }
@@ -246,14 +246,14 @@ test.describe("Per-locale practice session (#1562)", () => {
     //   • 30 mastered + 10 due-soon + 5 in-learning name cards (locale: en).
     //   • 5 mastered + 5 due-soon name cards (locale: ja) for species 43, 52, 63, 66, 74.
     //   • learningLocales: ["en", "ja"], activePokemonNameLocale: "en".
-    //   • labsFlags: { languages: true } — pill visible immediately.
+    //   • labsFlags: { languages: true } - pill visible immediately.
     await seedSuperuserQaSeed(page);
     await applyFsrsLocaleMasterySeed(page);
 
     // Navigate to Practice now that the seed is live.
     await page.goto("/");
 
-    // The language pill must be visible — the seed enables the flag and sets
+    // The language pill must be visible - the seed enables the flag and sets
     // learningLocales. Full accessible name: "Pokémon name language: English. Tap to change."
     const pill = page.getByRole("button", { name: /Pokémon name language.*English/i });
     await expect(pill).toBeVisible({ timeout: 15_000 });
@@ -292,7 +292,7 @@ test.describe("Per-locale practice session (#1562)", () => {
     // The ja session must be non-empty. practiceReadyLocator matches every
     // legitimate first-card surface (Reveal / SpritePicker / MultipleChoice /
     // end-state), so the assertion is robust to the daily shuffle leading with
-    // any card type — not just a flip card with a Reveal button.
+    // any card type - not just a flip card with a Reveal button.
     await expect(practiceReadyLocator(page)).toBeVisible({ timeout: 20_000 });
 
     // The pill still shows Japanese (locale persists across navigation).
@@ -302,7 +302,7 @@ test.describe("Per-locale practice session (#1562)", () => {
 
     // A Japanese name must be on screen. For a flip card, reveal it first; for a
     // multiple-choice or sprite-picker card the ja name(s) are already shown.
-    // Japanese names resolve via useLocalePokemonName for locale "ja" — hiragana,
+    // Japanese names resolve via useLocalePokemonName for locale "ja" - hiragana,
     // katakana, or kanji (U+3040–U+9FFF). Poll main's text either way.
     const reveal = page.getByRole("button", { name: /^reveal$/i });
     if (await reveal.isVisible().catch(() => false)) {
@@ -348,7 +348,7 @@ test.describe("Per-locale practice session (#1562)", () => {
     await expect(jaCheckbox).toBeVisible();
     await jaCheckbox.click();
 
-    // The inline confirm block must appear. Scope to its text — `role="alert"`
+    // The inline confirm block must appear. Scope to its text - `role="alert"`
     // alone also matches Next.js's invisible `__next-route-announcer__`.
     const confirmBlock = page
       .getByRole("alert")
@@ -378,7 +378,7 @@ test.describe("Per-locale practice session (#1562)", () => {
     //   • ja: cards with review history → "Caught up" when due = 0.
     // To assert the "No cards yet" branch we additionally need a locale enrolled
     // but with no history. After the seed, we enrol zh-Hans (which has no cards).
-    // The seed sets learningLocales: ["en", "ja"] — we extend it to include
+    // The seed sets learningLocales: ["en", "ja"] - we extend it to include
     // zh-Hans via an addInitScript AFTER the seed setup.
     await seedSuperuserQaSeed(page);
     await applyFsrsLocaleMasterySeed(page);
@@ -417,7 +417,7 @@ test.describe("Per-locale practice session (#1562)", () => {
     // 简体中文 has no history → shows "No cards yet"
     // (aria-label = "简体中文: no cards yet").
     //
-    // We check both badges are in the radiogroup — tolerant of whether the due
+    // We check both badges are in the radiogroup - tolerant of whether the due
     // count happens to be > 0 on the day the seed is applied.
     const zhHansOption = dialog.getByRole("radio", { name: /简体中文/i });
     await expect(zhHansOption).toBeVisible({ timeout: 5_000 });
@@ -445,14 +445,14 @@ test.describe("Per-locale practice session (#1562)", () => {
 
     // Wait for the pill and a Reveal card. The mid-card lock only applies when
     // a card is in the revealed state. If the session leads with a SpritePicker
-    // or MultipleChoice card, skip — the lock is exercised on flip-type cards.
+    // or MultipleChoice card, skip - the lock is exercised on flip-type cards.
     const pill = page.getByRole("button", { name: /Pokémon name language.*English/i });
     await expect(pill).toBeVisible({ timeout: 15_000 });
 
     const reveal = page.getByRole("button", { name: /^reveal$/i });
     const hasReveal = await reveal.isVisible({ timeout: 5_000 }).catch(() => false);
     if (!hasReveal) {
-      test.skip(true, "First card is not a flip-type card — mid-card lock cannot be exercised");
+      test.skip(true, "First card is not a flip-type card - mid-card lock cannot be exercised");
       return;
     }
 
@@ -475,14 +475,14 @@ test.describe("Per-locale practice session (#1562)", () => {
 
     // The Japanese radio is disabled while a card is revealed (the lock), so it
     // cannot switch the locale. Playwright treats aria-disabled as
-    // non-actionable — which IS the user-facing block — so assert the disabled
+    // non-actionable - which IS the user-facing block - so assert the disabled
     // state rather than attempting a click.
     const jaOption = dialog.getByRole("radio", { name: /日本語/ });
     await expect(jaOption).toBeVisible();
     await expect(jaOption).toHaveAttribute("aria-disabled", "true");
 
     // The dialog is still open (the lock message is showing) and the pill still
-    // reads English — no switch happened.
+    // reads English - no switch happened.
     await expect(dialog).toBeVisible();
     await expect(
       page.getByRole("button", { name: /Pokémon name language.*English/i }),
@@ -492,7 +492,7 @@ test.describe("Per-locale practice session (#1562)", () => {
     await page.keyboard.press("Escape");
     await expect(dialog).not.toBeVisible({ timeout: 3_000 });
 
-    // Grade the card — this clears KEY_CARD_REVEALED.
+    // Grade the card - this clears KEY_CARD_REVEALED.
     await gradeButtons.getByRole("button", { name: /good/i }).click();
 
     // Now the pill can be opened and switching should succeed.
@@ -507,13 +507,13 @@ test.describe("Per-locale practice session (#1562)", () => {
     // The lock message must NOT be present after grading.
     await expect(dialog2.getByRole("status")).toHaveCount(0);
 
-    // Switch to Japanese — this should succeed (dialog closes).
+    // Switch to Japanese - this should succeed (dialog closes).
     const jaOption2 = dialog2.getByRole("radio", { name: /日本語/ });
     await expect(jaOption2).toBeVisible();
     await jaOption2.click();
     await expect(dialog2).not.toBeVisible({ timeout: 5_000 });
 
-    // The pill must now show 日本語 — the switch went through.
+    // The pill must now show 日本語 - the switch went through.
     await expect(
       page.getByRole("button", { name: /Pokémon name language.*日本語/ }),
     ).toBeVisible({ timeout: 5_000 });

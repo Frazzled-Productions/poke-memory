@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Helper — expand the filter disclosure before interacting with filter controls.
+// Helper - expand the filter disclosure before interacting with filter controls.
 // The disclosure is collapsed by default (#865).
 // ---------------------------------------------------------------------------
 
@@ -21,7 +21,7 @@ async function expandFilters(page: Page): Promise<void> {
   }
 }
 // ---------------------------------------------------------------------------
-// Helper — enable the languages Labs flag and set pokemonNameLocale before load.
+// Helper - enable the languages Labs flag and set pokemonNameLocale before load.
 // ---------------------------------------------------------------------------
 
 async function setLocale(
@@ -129,7 +129,7 @@ test.describe("Pokédex filter disclosure (#865)", () => {
   });
 });
 
-test.describe("Pokédex detail — Hear name button", () => {
+test.describe("Pokédex detail - Hear name button", () => {
   test("Hear name button appears on a non-locked Pokédex entry", async ({ page }) => {
     // Seed Bulbasaur (id=1) as reviewed (lastReview set) so it is "learning" not "locked".
     await seedSessionIdb(page, {
@@ -171,7 +171,7 @@ test.describe("Pokédex detail — Hear name button", () => {
 
   test("Hear name button is clickable without throwing a page error (#435)", async ({ page }) => {
     // Clicking the button triggers speakName(name, id). The MP3 at
-    // /audio/names/1.mp3 may 404 on a preview deployment — speakName must
+    // /audio/names/1.mp3 may 404 on a preview deployment - speakName must
     // degrade gracefully to Web Speech and must not throw an uncaught exception.
     const pageErrors: Error[] = [];
     page.on("pageerror", (err) => pageErrors.push(err));
@@ -221,14 +221,14 @@ test.describe("Pokédex detail — Hear name button", () => {
   });
 });
 
-test.describe("Pokédex type filter — intersection", () => {
+test.describe("Pokédex type filter - intersection", () => {
   test("single-type selection returns non-empty grid", async ({ page }) => {
     await page.goto("/pokedex");
     await expect(
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible();
 
-    // Filter controls are collapsed by default — expand before interacting (#865).
+    // Filter controls are collapsed by default - expand before interacting (#865).
     await expandFilters(page);
 
     const fireButton = page
@@ -245,7 +245,7 @@ test.describe("Pokédex type filter — intersection", () => {
   test("Fire + Flying returns fewer results than Fire alone", async ({ page }) => {
     await page.goto("/pokedex");
 
-    // Filter controls are collapsed by default — expand before interacting (#865).
+    // Filter controls are collapsed by default - expand before interacting (#865).
     await expandFilters(page);
 
     const typeGroup = page.getByRole("group", { name: "Filter by type" });
@@ -253,7 +253,7 @@ test.describe("Pokédex type filter — intersection", () => {
     const pokemonListItems = page.getByRole("list", { name: /Pokémon/ }).getByRole("listitem");
 
     await typeGroup.getByRole("button", { name: "Fire" }).click();
-    // Wait for the URL to reflect the new filter before counting — the filter
+    // Wait for the URL to reflect the new filter before counting - the filter
     // is URL-driven (router.replace), so URL settlement = grid re-rendered.
     await page.waitForURL(/type=fire/);
     const fireCount = await pokemonListItems.count();
@@ -273,11 +273,11 @@ test.describe("Pokédex type filter — intersection", () => {
     // simultaneously. The filter logic itself is unit-tested in filter.test.ts.
     await page.goto("/pokedex");
 
-    // Filter controls are collapsed by default — expand before interacting (#865).
+    // Filter controls are collapsed by default - expand before interacting (#865).
     await expandFilters(page);
 
     const typeGroup = page.getByRole("group", { name: "Filter by type" });
-    // Wait for each URL update before the next click — handleTypeToggle reads
+    // Wait for each URL update before the next click - handleTypeToggle reads
     // filter state from the current URL, so clicking before the URL settles
     // causes the next type to overwrite rather than append.
     await typeGroup.getByRole("button", { name: "Fire" }).click();
@@ -287,14 +287,14 @@ test.describe("Pokédex type filter — intersection", () => {
     await typeGroup.getByRole("button", { name: "Water" }).click();
     await page.waitForURL(/type=.*water/);
 
-    // No Pokémon has all three types — empty state must appear
+    // No Pokémon has all three types - empty state must appear
     await expect(
       page.getByText("No Pokémon match your filters."),
     ).toBeVisible();
   });
 });
 
-test.describe("Pokédex detail — cry button (#476)", () => {
+test.describe("Pokédex detail - cry button (#476)", () => {
   test("Play cry button appears on a non-locked Pokédex entry that has a cryUrl", async ({
     page,
   }) => {
@@ -347,7 +347,7 @@ test.describe("Pokédex detail — cry button (#476)", () => {
   test("Play cry button is absent on a locked Pokédex entry", async ({
     page,
   }) => {
-    // Fresh IDB — no cards seeded, so all species are locked.
+    // Fresh IDB - no cards seeded, so all species are locked.
     await seedSessionIdb(page, { cards: [], limits: { name: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 }, reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 }, cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 } } });
 
     await page.goto("/pokedex/1");
@@ -363,11 +363,11 @@ test.describe("Pokédex detail — cry button (#476)", () => {
   });
 });
 
-test.describe("Pokédex detail — Forms section hidden when locked (#495)", () => {
+test.describe("Pokédex detail - Forms section hidden when locked (#495)", () => {
   test("Forms section is absent when species is locked (empty IDB)", async ({
     page,
   }) => {
-    // Seed an empty session — all species are locked, so isLocked=true for
+    // Seed an empty session - all species are locked, so isLocked=true for
     // Raichu (id=26). PokemonDetailDisclosure only renders the Forms section
     // when !isLocked && forms.length > 0, so it must be absent here.
     await seedSessionIdb(page, {
@@ -383,13 +383,13 @@ test.describe("Pokédex detail — Forms section hidden when locked (#495)", () 
     await page.goto("/pokedex/26");
     await awaitSeedIdb(page);
 
-    // Locked species shows "???" — verify the page loaded correctly.
+    // Locked species shows "???" - verify the page loaded correctly.
     await expect(
       page.getByRole("heading", { level: 1, name: "???" }),
     ).toBeVisible();
 
     // The Forms h2 heading must not be visible regardless of whether the seed
-    // contains Alolan Raichu — locking gates the whole section.
+    // contains Alolan Raichu - locking gates the whole section.
     await expect(
       page.getByRole("heading", { name: "Forms", level: 2 }),
     ).not.toBeVisible();
@@ -441,7 +441,7 @@ test.describe("Pokédex mastery-status filter (#542)", () => {
     const pokemonLists = page.getByRole("list", { name: /Pokémon/ });
     await expect(pokemonLists.first()).toBeVisible();
 
-    // Filter controls are collapsed by default — expand before interacting (#865).
+    // Filter controls are collapsed by default - expand before interacting (#865).
     await expandFilters(page);
 
     // Count all Grass-type tiles.
@@ -451,7 +451,7 @@ test.describe("Pokédex mastery-status filter (#542)", () => {
     const grassCount = await pokemonLists.getByRole("listitem").count();
     expect(grassCount).toBeGreaterThan(0);
 
-    // Now narrow by "Not yet mastered" — Bulbasaur is mastered so it should drop out.
+    // Now narrow by "Not yet mastered" - Bulbasaur is mastered so it should drop out.
     const masteryGroup = page.getByRole("group", { name: "Filter by mastery" });
     await masteryGroup.getByRole("button", { name: "Not yet mastered" }).click();
     await page.waitForURL(/mastery=not-yet-mastered/);
@@ -481,7 +481,7 @@ test.describe("Pokédex mastery-status filter (#542)", () => {
   });
 });
 
-test.describe("Pokédex — alternate-form surfaces (#450)", () => {
+test.describe("Pokédex - alternate-form surfaces (#450)", () => {
   test("searching 'alolan' shows at least 1 result when seed has forms, or shows 0 gracefully", async ({
     page,
   }) => {
@@ -490,7 +490,7 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible();
 
-    // Filter controls are collapsed by default — expand before interacting (#865).
+    // Filter controls are collapsed by default - expand before interacting (#865).
     await expandFilters(page);
 
     // Type "alolan" into the search box.
@@ -518,7 +518,7 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
       const count = await tiles.count();
       expect(count).toBeGreaterThanOrEqual(1);
     }
-    // If hasEmpty is true, that is the expected pre-#445 behaviour — no assertion needed.
+    // If hasEmpty is true, that is the expected pre-#445 behaviour - no assertion needed.
   });
 
   test("toggling 'Has alternate forms' chip changes the tile count or shows the empty state", async ({
@@ -531,7 +531,7 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
 
     // The Pokédex page is client-rendered: it shows a skeleton while it loads
     // the session from IndexedDB, then replaces it with the grid. Wait for the
-    // first list to appear before counting — without this wait, count() races
+    // first list to appear before counting - without this wait, count() races
     // the IDB load and returns 0 (skeleton has no list items).
     const allLists = page.getByRole("list", { name: /Pokémon/ });
     await expect(allLists.first()).toBeVisible();
@@ -539,7 +539,7 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
     const countBefore = await tilesBefore.count();
     expect(countBefore).toBeGreaterThan(0);
 
-    // Filter controls are collapsed by default — expand before interacting (#865).
+    // Filter controls are collapsed by default - expand before interacting (#865).
     await expandFilters(page);
 
     // Click the "Has alternate forms" chip.
@@ -556,7 +556,7 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
     const hasEmpty = await emptyState.isVisible().catch(() => false);
 
     if (hasEmpty) {
-      // Pre-#445 seed: expected — verify the "Clear filters" link is present.
+      // Pre-#445 seed: expected - verify the "Clear filters" link is present.
       await expect(page.getByRole("link", { name: "Clear filters" })).toBeVisible();
     } else {
       // Post-#445 seed: the filtered count must be strictly less than before.
@@ -572,7 +572,7 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
     await page.goto("/pokedex/26");
 
     // The page always renders the Pokémon name (locked or not).
-    // Verify the page loaded — either "Raichu" or the locked "???" heading.
+    // Verify the page loaded - either "Raichu" or the locked "???" heading.
     const heading = page.getByRole("heading", { level: 1 });
     await expect(heading).toBeVisible();
 
@@ -587,7 +587,7 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
       // Pre-#445 seed: Forms section is absent because Raichu has no alternate
       // form entries in generated.json yet. This is the expected state until the
       // seed is re-run.
-      test.skip(true, "Seed does not yet contain Alolan Raichu — skipping Forms section assertions.");
+      test.skip(true, "Seed does not yet contain Alolan Raichu - skipping Forms section assertions.");
       return;
     }
 
@@ -602,7 +602,7 @@ test.describe("Pokédex — alternate-form surfaces (#450)", () => {
   });
 });
 
-test.describe("Pokédex detail — bottom nav anchoring (#1086)", () => {
+test.describe("Pokédex detail - bottom nav anchoring (#1086)", () => {
   // These tests run on mobile projects where the bottom tab bar is visible.
   // On desktop the tab bar is hidden so the position check is moot.
   test.beforeEach(async ({}, testInfo) => {
@@ -655,7 +655,7 @@ test.describe("Pokédex detail — bottom nav anchoring (#1086)", () => {
   });
 });
 
-test.describe("Pokédex detail — next review date (#992)", () => {
+test.describe("Pokédex detail - next review date (#992)", () => {
   test("shows 'Due today' for a Pokémon whose review is overdue", async ({ page }) => {
     // Seed Bulbasaur (id=1) with a dueDate in the past so it is overdue.
     await seedSessionIdb(page, {
@@ -742,7 +742,7 @@ test.describe("Pokédex detail — next review date (#992)", () => {
   });
 
   test("review date is absent for a locked (never-started) Pokémon", async ({ page }) => {
-    // Empty session — Bulbasaur is locked.
+    // Empty session - Bulbasaur is locked.
     await seedSessionIdb(page, {
       cards: [],
       limits: {
@@ -756,7 +756,7 @@ test.describe("Pokédex detail — next review date (#992)", () => {
     await page.goto("/pokedex/1");
     await awaitSeedIdb(page);
 
-    // Locked Pokémon shows "???" — no review-date line.
+    // Locked Pokémon shows "???" - no review-date line.
     await expect(
       page.getByRole("heading", { level: 1, name: "???" }),
     ).toBeVisible();
@@ -915,7 +915,7 @@ test.describe("Pokédex sort options (#1314)", () => {
   });
 });
 
-test.describe("Pokédex detail — locale-aware Pokémon name (#1327)", () => {
+test.describe("Pokédex detail - locale-aware Pokémon name (#1327)", () => {
   // PokemonDetailDisclosure now uses useLocalePokemonName, so switching the
   // pokemonNameLocale setting to 'ja' must cause the Japanese name to appear.
   // This verifies the migration of direct .displayName reads to the hook.
@@ -1010,7 +1010,7 @@ test.describe("Pokédex detail — locale-aware Pokémon name (#1327)", () => {
 // Pokédex grid locale names (#1327 follow-up: grid names localised)
 // ---------------------------------------------------------------------------
 
-test.describe("Pokédex grid — locale names (#1327)", () => {
+test.describe("Pokédex grid - locale names (#1327)", () => {
   test("grid renders a Japanese name when pokemonNameLocale=ja (happy path)", async ({
     page,
   }) => {
@@ -1115,7 +1115,7 @@ test.describe("Pokédex grid — locale names (#1327)", () => {
 // Pokédex sort stickiness (#1314)
 // ---------------------------------------------------------------------------
 
-test.describe("Pokédex sort — sticky across navigation (#1314)", () => {
+test.describe("Pokédex sort - sticky across navigation (#1314)", () => {
   test("sort defaults to National Number", async ({ page }) => {
     await page.goto("/pokedex");
     await expandFilters(page);
@@ -1150,10 +1150,10 @@ test.describe("Pokédex sort — sticky across navigation (#1314)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Pokédex detail — locked-state signposts (#1440)
+// Pokédex detail - locked-state signposts (#1440)
 // ---------------------------------------------------------------------------
 
-test.describe("Pokédex detail — locked-state signposts (#1440)", () => {
+test.describe("Pokédex detail - locked-state signposts (#1440)", () => {
   test("locked species: Base Stats section shows unlock hint instead of stat bars", async ({
     page,
   }) => {
@@ -1210,7 +1210,7 @@ test.describe("Pokédex detail — locked-state signposts (#1440)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Pokédex detail — game-label facts (#1559)
+// Pokédex detail - game-label facts (#1559)
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -1281,7 +1281,7 @@ test.describe("Pokédex sort - Closest to mastery InfoButton (#1574)", () => {
   });
 });
 
-test.describe("Pokédex detail — game-label facts (#1559)", () => {
+test.describe("Pokédex detail - game-label facts (#1559)", () => {
   test("facts section shows source game names instead of 'Pokédex entry' for a mastered Pokémon", async ({
     page,
   }) => {

@@ -3,7 +3,7 @@ import { render, screen, act, fireEvent } from "@testing-library/react";
 import { ShareTodayButton } from "./ShareTodayButton";
 import type { DailySummaryParts } from "@/lib/review/share";
 
-// Mock the image generator — canvas is not available in jsdom and the
+// Mock the image generator - canvas is not available in jsdom and the
 // rendering logic is covered separately in components/share/generateShareImage.test.tsx.
 vi.mock("@/lib/share/generateShareImage", () => ({
   generateDailyShareImage: vi.fn().mockResolvedValue(null),
@@ -30,7 +30,7 @@ const TEXT = "poke-memory · 2026-05-12\n7-day streak 🔥\n24 reviewed · 6 new
 // Rendering
 // ---------------------------------------------------------------------------
 
-describe("ShareTodayButton — rendering", () => {
+describe("ShareTodayButton - rendering", () => {
   it("renders a 'Share today' button", () => {
     render(<ShareTodayButton parts={PARTS} text={TEXT} />);
     expect(
@@ -48,11 +48,11 @@ describe("ShareTodayButton — rendering", () => {
 // Clipboard fallback
 //
 // jsdom does not implement navigator.share, navigator.canShare, or
-// navigator.clipboard by default — the component falls through to the
+// navigator.clipboard by default - the component falls through to the
 // clipboard path. We use fake timers + fireEvent.click to maintain control.
 // ---------------------------------------------------------------------------
 
-describe("ShareTodayButton — clipboard fallback", () => {
+describe("ShareTodayButton - clipboard fallback", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -66,7 +66,7 @@ describe("ShareTodayButton — clipboard fallback", () => {
         configurable: true,
       });
     } catch {
-      // ignore — may not be configurable on some jsdom versions
+      // ignore - may not be configurable on some jsdom versions
     }
   });
 
@@ -111,7 +111,7 @@ describe("ShareTodayButton — clipboard fallback", () => {
 // Web Share API file path
 // ---------------------------------------------------------------------------
 
-describe("ShareTodayButton — Web Share API file path", () => {
+describe("ShareTodayButton - Web Share API file path", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     // Remove navigator properties set via Object.defineProperty.
@@ -123,7 +123,7 @@ describe("ShareTodayButton — Web Share API file path", () => {
           writable: true,
         });
       } catch {
-        // ignore — may not be configurable on all jsdom versions
+        // ignore - may not be configurable on all jsdom versions
       }
     }
   });
@@ -211,7 +211,7 @@ describe("ShareTodayButton — Web Share API file path", () => {
 
     // share was called exactly once (Path 1 only) and no second sheet was opened.
     expect(shareFn).toHaveBeenCalledOnce();
-    // No status shown — treated as a user cancellation, not an error.
+    // No status shown - treated as a user cancellation, not an error.
     expect(screen.queryByRole("status")).toBeNull();
   });
 });

@@ -3,7 +3,7 @@ import { BiomeSky } from "./BiomeSky";
 import { BiomeFloor } from "./BiomeFloor";
 
 /**
- * Sanctuary (rare-habitat) backdrop — a starlit twilight sky with aurora
+ * Sanctuary (rare-habitat) backdrop - a starlit twilight sky with aurora
  * ribbons, a moon, ancient stone arches, and a glowing crystal shrine.
  * Reserved for legendary / mythical Pokémon.
  */
@@ -83,7 +83,7 @@ export function SanctuaryBiome() {
         <circle cx="1280" cy="260" r="3" opacity="0.85" />
       </g>
 
-      {/* Stone arch ruins — left */}
+      {/* Stone arch ruins - left */}
       <g>
         <g fill="#5a4870" stroke="#2e1f4a" strokeWidth="2.5">
           <rect x="380" y="350" width="22" height="160" />
@@ -94,7 +94,7 @@ export function SanctuaryBiome() {
         <ellipse cx="450" cy="312" rx="40" ry="6" fill="#3ad29f" opacity="0.55" />
       </g>
 
-      {/* Stone arch ruins — right */}
+      {/* Stone arch ruins - right */}
       <g>
         <g fill="#5a4870" stroke="#2e1f4a" strokeWidth="2.5">
           <rect x="1080" y="360" width="22" height="150" />
