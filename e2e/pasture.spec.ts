@@ -1010,4 +1010,29 @@ test.describe("Pasture page — Next arrivals strip (#1316)", () => {
       page.getByText(/All reviewed Pokémon are already in your Pasture/i),
     ).toBeVisible();
   });
+
+  test("reps InfoButton is visible and reveals its panel on click", async ({
+    page,
+  }) => {
+    await seedSessionIdb(
+      page,
+      buildSession([
+        masteredCard(10, "Caterpie", "forest"),
+        masteredReverseCard(10),
+        reviewedCard(1, "Bulbasaur", "grassland"),
+      ]),
+    );
+
+    await page.goto("/pasture");
+    await awaitSeedIdb(page);
+
+    const infoBtn = page.getByRole("button", { name: "What does reps mean?" });
+    await expect(infoBtn).toBeVisible();
+
+    await infoBtn.click();
+
+    await expect(
+      page.getByText(/how many times you have reviewed this card/i),
+    ).toBeVisible();
+  });
 });

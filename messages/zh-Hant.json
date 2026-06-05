@@ -643,7 +643,9 @@
       "ariaLabel": "即將到來",
       "heading": "即將到來",
       "upcomingAriaLabel": "即將加入牧場的寶可夢",
-      "allCaughtUp": "所有已複習的寶可夢都已在您的牧場中。"
+      "allCaughtUp": "所有已複習的寶可夢都已在您的牧場中。",
+      "repsInfoAriaLabel": "「reps」是什麼意思？",
+      "repsInfoPanel": "Reps（複習次數）：您迄今為止複習該卡片的次數。數字越高，代表您越接近掌握。"
     },
     "longPressHint": "長按任意寶可夢，查看其名稱、掌握日期和複習間隔。"
   },

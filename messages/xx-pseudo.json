@@ -643,7 +643,9 @@
       "ariaLabel": "[Next arrivals]",
       "heading": "[Next arrivals]",
       "upcomingAriaLabel": "[Upcoming Pasture species]",
-      "allCaughtUp": "[All reviewed Pokémon are already in your Pasture.]"
+      "allCaughtUp": "[All reviewed Pokémon are already in your Pasture.]",
+      "repsInfoAriaLabel": "[What does reps mean?]",
+      "repsInfoPanel": "[Reps: how many times you have reviewed this card so far. A higher number means you are closer to mastering it.]"
     },
     "longPressHint": "[Press and hold any Pokémon to see its name, mastery date, and review interval.]"
   },

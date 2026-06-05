@@ -1,6 +1,7 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
-import { renderWithIntl as render } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl as render, renderJa, renderZhHans, renderZhHant } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -132,8 +133,10 @@ describe("NextArrivalsStrip — with arrivals", () => {
   it("renders the reps count as a badge for each arrival", () => {
     const arrivals = [makeArrival(1, "Bulbasaur", 2)];
     render(<NextArrivalsStrip arrivals={arrivals} />);
-    // The reps badge is aria-hidden; find it by text content
-    expect(screen.getByText("2")).toBeInTheDocument();
+    // The reps badge is aria-hidden; scope to the list so the count
+    // does not inadvertently match text inside the InfoButton panel.
+    const list = screen.getByRole("list", { name: "Upcoming Pasture species" });
+    expect(within(list).getByText("2")).toBeInTheDocument();
   });
 
   it("does not show the all-caught-up message when arrivals exist", () => {
@@ -147,5 +150,104 @@ describe("NextArrivalsStrip — with arrivals", () => {
   it("the section has an accessible label of 'Next arrivals'", () => {
     render(<NextArrivalsStrip arrivals={[makeArrival(1, "Bulbasaur")]} />);
     expect(screen.getByRole("region", { name: "Next arrivals" })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NextArrivalsStrip — InfoButton (#1633)
+// ---------------------------------------------------------------------------
+
+describe("NextArrivalsStrip — InfoButton (populated state)", () => {
+  const arrivals = [makeArrival(1, "Bulbasaur"), makeArrival(4, "Charmander")];
+
+  it("renders the InfoButton by its aria-label in English", () => {
+    render(<NextArrivalsStrip arrivals={arrivals} />);
+    expect(
+      screen.getByRole("button", { name: "What does reps mean?" }),
+    ).toBeInTheDocument();
+  });
+
+  it("InfoButton starts with aria-expanded=false and panel hidden", () => {
+    render(<NextArrivalsStrip arrivals={arrivals} />);
+    const btn = screen.getByRole("button", { name: "What does reps mean?" });
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByText(/how many times you have reviewed/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("activating the InfoButton reveals the explanation content", async () => {
+    const user = userEvent.setup();
+    render(<NextArrivalsStrip arrivals={arrivals} />);
+    const btn = screen.getByRole("button", { name: "What does reps mean?" });
+    await user.click(btn);
+    expect(
+      screen.getByText(/how many times you have reviewed this card/i),
+    ).toBeInTheDocument();
+    expect(btn).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("clicking InfoButton a second time closes the panel", async () => {
+    const user = userEvent.setup();
+    render(<NextArrivalsStrip arrivals={arrivals} />);
+    const btn = screen.getByRole("button", { name: "What does reps mean?" });
+    await user.click(btn);
+    await user.click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByText(/how many times you have reviewed/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("NextArrivalsStrip — InfoButton absent in empty state", () => {
+  it("does NOT render an InfoButton when arrivals is empty", () => {
+    render(<NextArrivalsStrip arrivals={[]} />);
+    expect(
+      screen.queryByRole("button", { name: "What does reps mean?" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NextArrivalsStrip — InfoButton locale coverage (#1633)
+// ---------------------------------------------------------------------------
+
+describe("NextArrivalsStrip — InfoButton in Japanese", () => {
+  it("renders InfoButton with Japanese aria-label", () => {
+    renderJa(<NextArrivalsStrip arrivals={[makeArrival(1, "Bulbasaur")]} />);
+    // messages/ja.json pasture.nextArrivals.repsInfoAriaLabel = "「reps」とは？"
+    expect(
+      screen.getByRole("button", { name: "「reps」とは？" }),
+    ).toBeInTheDocument();
+  });
+
+  it("activating the InfoButton reveals Japanese panel content", async () => {
+    const user = userEvent.setup();
+    renderJa(<NextArrivalsStrip arrivals={[makeArrival(1, "Bulbasaur")]} />);
+    const btn = screen.getByRole("button", { name: "「reps」とは？" });
+    await user.click(btn);
+    // messages/ja.json pasture.nextArrivals.repsInfoPanel starts with "Reps（復習回数）"
+    expect(screen.getByText(/Reps（復習回数）/)).toBeInTheDocument();
+  });
+});
+
+describe("NextArrivalsStrip — InfoButton in Simplified Chinese", () => {
+  it("renders InfoButton with Simplified Chinese aria-label", () => {
+    renderZhHans(<NextArrivalsStrip arrivals={[makeArrival(1, "Bulbasaur")]} />);
+    // messages/zh-Hans.json pasture.nextArrivals.repsInfoAriaLabel = "「reps」是什么意思？"
+    expect(
+      screen.getByRole("button", { name: "「reps」是什么意思？" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("NextArrivalsStrip — InfoButton in Traditional Chinese", () => {
+  it("renders InfoButton with Traditional Chinese aria-label", () => {
+    renderZhHant(<NextArrivalsStrip arrivals={[makeArrival(1, "Bulbasaur")]} />);
+    // messages/zh-Hant.json pasture.nextArrivals.repsInfoAriaLabel = "「reps」是什麼意思？"
+    expect(
+      screen.getByRole("button", { name: "「reps」是什麼意思？" }),
+    ).toBeInTheDocument();
   });
 });
