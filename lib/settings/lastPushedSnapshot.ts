@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS, type UserSettings } from "./persistence";
+import { deepEqual } from "./deepEqual";
 import { KEY_SETTINGS_LAST_PUSHED } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { writeLocalStorage } from "@/lib/storage/writeLocalStorage";
@@ -86,14 +87,20 @@ export function diffSettings(
       // Default-prune on first push: skip keys that are unchanged from the
       // DEFAULT_SETTINGS baseline. A device that has never customised a field
       // must not clobber a richer value that another device has already pushed.
-      if (JSON.stringify(next[key]) === JSON.stringify(DEFAULT_SETTINGS[key])) continue;
+      // deepEqual is used here instead of JSON.stringify comparison because
+      // stringify is key-order-sensitive: a validator that reconstructs a
+      // sub-object via Object.entries spread (e.g. validateStreakProtection,
+      // validateOnboarding) can produce the same value in a different key order,
+      // causing stringify to report a false "differs from default" and
+      // re-opening the clobber (#1682).
+      if (deepEqual(next[key], DEFAULT_SETTINGS[key])) continue;
       patch[key as string] = next[key];
     }
     return patch as Partial<UserSettings>;
   }
   for (const key of Object.keys(next) as Array<keyof UserSettings>) {
     if (DEVICE_LOCAL_KEYS.has(key)) continue;
-    if (JSON.stringify(prev[key]) !== JSON.stringify(next[key])) {
+    if (!deepEqual(prev[key], next[key])) {
       patch[key as string] = next[key];
     }
   }

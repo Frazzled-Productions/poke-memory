@@ -419,7 +419,15 @@ export async function pullAndMerge(
           // On a fresh device there is no prior snapshot, so seed it from the
           // current local settings (rather than skipping the update, which would
           // let AutoSyncOnChange fire a redundant push on first sign-in).
-          if (cloudLearningNeedsUpdate || cloudRemovedNeedsUpdate) {
+          //
+          // NOTE: we update the snapshot whenever learningLocales or
+          // removedLocales change locally (not only when cloud needs an update).
+          // Without this, a local-only locale change that saveSettings() writes
+          // but the snapshot does not record causes AutoSyncOnChange to see a
+          // diff and fire a spurious duplicate push on the next settings save.
+          // activePokemonNameLocale is device-local (DEVICE_LOCAL_KEYS) and
+          // therefore never in the pushed diff; it does not gate snapshot updates.
+          if (learningLocalChanged || removedLocalChanged) {
             const snapshotBase = loadLastPushedSettings() ?? currentLocal;
             saveLastPushedSettings({
               ...snapshotBase,

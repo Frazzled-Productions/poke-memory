@@ -126,6 +126,48 @@ describe("diffSettings", () => {
     // streakProtection default matches DEFAULT_STREAK_PROTECTION; must be absent.
     expect(patch).not.toHaveProperty("streakProtection");
   });
+
+  // ─── Fix 2 / Fix 3: order-insensitive default-prune (#1684) ─────────────────
+  //
+  // These tests are executable documentation for the switch from JSON.stringify
+  // to deepEqual. JSON.stringify is key-order-sensitive: a validator that
+  // rebuilds a sub-object via Object.entries spread can produce the same value
+  // with a different key order, causing stringify to report a false
+  // "differs from default" and re-opening the cloud clobber. deepEqual is
+  // key-order-insensitive and must still prune these cases.
+
+  it("default-prune (order-insensitive): still prunes streakProtection with reversed key order", () => {
+    // Use streakProtection as the canary: DEFAULT_STREAK_PROTECTION has 6 keys;
+    // reversing the entry order produces a structurally-identical object with
+    // a different JSON.stringify representation.
+    const reversedStreakProtection = Object.fromEntries(
+      Object.entries(DEFAULT_SETTINGS.streakProtection).reverse(),
+    ) as typeof DEFAULT_SETTINGS.streakProtection;
+
+    const next: UserSettings = {
+      ...DEFAULT_SETTINGS,
+      streakProtection: reversedStreakProtection,
+    };
+
+    const patch = diffSettings(null, next);
+
+    // The reversed-key default must be recognised as default-valued and pruned.
+    expect(patch).not.toHaveProperty("streakProtection");
+  });
+
+  it("default-prune (order-insensitive): still prunes onboarding with reversed key order", () => {
+    const reversedOnboarding = Object.fromEntries(
+      Object.entries(DEFAULT_SETTINGS.onboarding).reverse(),
+    ) as typeof DEFAULT_SETTINGS.onboarding;
+
+    const next: UserSettings = {
+      ...DEFAULT_SETTINGS,
+      onboarding: reversedOnboarding,
+    };
+
+    const patch = diffSettings(null, next);
+    expect(patch).not.toHaveProperty("onboarding");
+  });
 });
 
 describe("preserveDeviceLocalKeys", () => {
