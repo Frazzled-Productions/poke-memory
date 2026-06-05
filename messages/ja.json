@@ -639,6 +639,8 @@
     "closeDetailsAriaLabel": "詳細を閉じる",
     "pokemonDetailsAriaLabel": "{name} の詳細",
     "newArrivalSuffix": "（新着）",
+    "firstSeen": "初見",
+    "interval": "間隔",
     "nextArrivals": {
       "ariaLabel": "次の到着",
       "heading": "次の到着",

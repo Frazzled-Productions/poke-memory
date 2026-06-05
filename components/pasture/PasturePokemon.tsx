@@ -202,19 +202,15 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
           className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 w-44 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
         >
           <p className="text-center text-sm font-semibold text-foreground">
-            {pokemonLocale !== "en" ? (
-              <span lang={pokemonLocale}>{localeName}</span>
-            ) : (
-              localeName
-            )}
+            <span lang={pokemonLocale}>{localeName}</span>
           </p>
           <dl className={`mt-1.5 space-y-0.5 ${mutedTextXs}`}>
             <div className="flex justify-between">
-              <dt>First seen</dt>
+              <dt>{t("firstSeen")}</dt>
               <dd>{firstSeenLabel}</dd>
             </div>
             <div className="flex justify-between">
-              <dt>Interval</dt>
+              <dt>{t("interval")}</dt>
               <dd>{card.state.scheduledDays}d</dd>
             </div>
           </dl>

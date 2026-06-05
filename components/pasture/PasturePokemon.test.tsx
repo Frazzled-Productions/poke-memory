@@ -1,5 +1,5 @@
 import { renderWithIntl as render, screen, fireEvent, act } from "@/components/test-utils/renderWithIntl";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -269,10 +269,17 @@ describe("PasturePokemon — locale suffix in aria-label with seenInPasture: fal
 // ---------------------------------------------------------------------------
 
 describe("PasturePokemon — popover locale names", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   async function openPopover(btn: HTMLElement) {
     await act(async () => {
       fireEvent.pointerDown(btn);
-      await new Promise((r) => setTimeout(r, 520));
+      await vi.advanceTimersByTimeAsync(520);
     });
   }
 
@@ -331,7 +338,7 @@ describe("PasturePokemon — popover locale names", () => {
     await openPopover(btn);
     const dialog = screen.queryByRole("dialog");
     expect(dialog).not.toBeNull();
-    expect(screen.getByText(LOCALE_NAMES["ja"])).toBeInTheDocument();
+    expect(dialog?.textContent).toContain(LOCALE_NAMES["ja"]);
   });
 
   it("wraps visible name in <span lang> for non-English locale (ja)", async () => {
@@ -348,14 +355,15 @@ describe("PasturePokemon — popover locale names", () => {
     expect(langSpan?.textContent).toBe(LOCALE_NAMES["ja"]);
   });
 
-  it("does not wrap visible name in <span lang> for English locale", async () => {
+  it("wraps visible name in <span lang='en'> for English locale", async () => {
     const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
     render(<PasturePokemon card={card} onMarkSeen={vi.fn()} />);
     const btn = screen.getByRole("button", { name: "Bulbasaur" });
     await openPopover(btn);
     const dialog = screen.queryByRole("dialog");
     expect(dialog).not.toBeNull();
-    const langSpan = dialog?.querySelector("span[lang]");
-    expect(langSpan).toBeNull();
+    const langSpan = dialog?.querySelector("span[lang='en']");
+    expect(langSpan).not.toBeNull();
+    expect(langSpan?.textContent).toBe("Bulbasaur");
   });
 });

@@ -639,6 +639,8 @@
     "closeDetailsAriaLabel": "關閉詳情",
     "pokemonDetailsAriaLabel": "{name}的詳情",
     "newArrivalSuffix": "（新到來）",
+    "firstSeen": "初見",
+    "interval": "間隔",
     "nextArrivals": {
       "ariaLabel": "即將到來",
       "heading": "即將到來",
