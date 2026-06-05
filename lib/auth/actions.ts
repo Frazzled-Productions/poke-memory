@@ -81,16 +81,18 @@ export async function signUpWithUsername(
   if (signUpError) {
     // Use GoTrue's canonical signal for an already-registered email rather than
     // the human-readable message string, which can change across GoTrue versions.
-    // `user?.identities?.length === 0` is the documented indicator; the code/status
-    // checks are a fallback for edge cases.
+    // `code === "email_exists"` is the primary signal; `identities.length === 0`
+    // is the documented secondary indicator. Status 422 is GoTrue's general
+    // "Unprocessable Entity" and is intentionally excluded — it can cover
+    // non-duplicate rejections (e.g. a future password-strength rule) and would
+    // mislead the user into changing their username instead of their password.
     // Cast signUpData.user via unknown so TS does not narrow 'identities' to
     // never in the error branch (the Supabase SDK types differ between the
     // error and success overloads of AuthResponse).
     const maybeUser = signUpData.user as { identities?: unknown[] } | null;
     const alreadyRegistered =
-      maybeUser?.identities?.length === 0 ||
-      (signUpError as { code?: string; status?: number }).code === "email_exists" ||
-      (signUpError as { code?: string; status?: number }).status === 422;
+      (signUpError as { code?: string }).code === "email_exists" ||
+      maybeUser?.identities?.length === 0;
     if (alreadyRegistered) {
       return { ok: false, error: "username_taken" };
     }
@@ -117,15 +119,21 @@ export async function signUpWithUsername(
   // the PRIMARY KEY constraint returns a conflict error.
   // Cast to any because Database is a stub (unknown) until types are generated
   // from the live schema. Safe: the migration defines the exact shape.
+  // TODO: remove cast once `supabase gen types` is run after migration 035 is
+  // applied (tracked in the post-merge checklist for #1671).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: insertError } = await (supabase as any)
     .from("usernames")
     .insert({ username: normalised, user_id: userId });
 
   if (insertError) {
-    // The username was claimed between sign-up and insert (race condition), or
-    // RLS rejected the insert. Either way, present as "username taken".
-    return { ok: false, error: "username_taken" };
+    // Postgres code 23505 = unique_violation: the username was claimed in a
+    // race (PK conflict) or the user already has a username (UNIQUE user_id
+    // constraint). Any other failure — transient DB error, future CHECK
+    // constraint — is surfaced as signup_failed so the user doesn't
+    // unnecessarily change their chosen username.
+    const isConflict = (insertError as { code?: string }).code === "23505";
+    return { ok: false, error: isConflict ? "username_taken" : "signup_failed" };
   }
 
   return { ok: true };

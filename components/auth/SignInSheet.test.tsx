@@ -327,6 +327,23 @@ describe("SignInSheet - username/password door (sign-up mode)", () => {
       expect(screen.getByText(/already taken/i)).toBeTruthy();
     });
   });
+
+  it("shows generic error when server returns signup_failed", async () => {
+    mockSignUpWithUsername.mockResolvedValueOnce({ ok: false, error: "signup_failed" });
+
+    renderSheet();
+
+    await userEvent.type(screen.getByLabelText(/username/i), "trainer99");
+    await userEvent.type(screen.getByLabelText(/password/i), "correct-horse-battery");
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

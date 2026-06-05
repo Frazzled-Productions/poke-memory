@@ -199,6 +199,8 @@ export function SignInSheet({ open, onClose }: Props) {
         // re-render with the authenticated state via onAuthStateChange.
         handleClose();
       }
+    } catch {
+      setFormError(t("signInSheet.username.errorSignupFailed"));
     } finally {
       setIsSubmitting(false);
     }

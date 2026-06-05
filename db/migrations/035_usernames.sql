@@ -26,6 +26,9 @@ CREATE TABLE public.usernames (
   -- Normalisation constraints so lookups are deterministic.
   CONSTRAINT username_lowercase    CHECK (username = lower(username)),
   CONSTRAINT username_length       CHECK (char_length(username) BETWEEN 3 AND 30),
+  -- NOTE: the pattern here must stay in sync with USERNAME_PATTERN in
+  -- lib/auth/username.ts — a divergence will accept usernames at the DB
+  -- layer that the app rejects (or vice versa).
   CONSTRAINT username_chars        CHECK (username ~ '^[a-z0-9_-]+$'),
 
   -- One username per account: prevents a user from registering multiple
