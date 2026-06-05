@@ -4,6 +4,8 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import type { NameReviewCard } from "@/lib/review/session";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 import { ArrivalSparkle } from "./ArrivalSparkle";
 import styles from "./Pasture.module.css";
 import { PASTURE_SPRITE_SIZE } from "@/lib/sprites/sizes";
@@ -30,6 +32,8 @@ const HOP_DURATION_MS = 600;
  */
 export function PasturePokemon({ card, onMarkSeen }: Props) {
   const t = useTranslations("pasture");
+  const { name: localeName } = useLocalePokemonName(card.speciesId, card.name);
+  const { locale: pokemonLocale } = usePokemonLocaleContext();
   // Stable per-sprite animation delay so sprites bob asynchronously.
   // No hydration mismatch because PasturePage returns null until `loaded=true`
   // (set in a useEffect), so this component never renders on the server.
@@ -171,13 +175,13 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
-        aria-label={`${card.name}${!card.state.seenInPasture ? t("newArrivalSuffix") : ""}`}
+        aria-label={`${localeName}${!card.state.seenInPasture ? t("newArrivalSuffix") : ""}`}
         className="relative flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
         style={{ touchAction: "manipulation" }}
       >
         <Image
           src={card.spriteUrl}
-          alt={card.name}
+          alt={localeName}
           width={PASTURE_SPRITE_SIZE}
           height={PASTURE_SPRITE_SIZE}
           className={[
@@ -194,19 +198,19 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
         <div
           role="dialog"
           aria-modal="false"
-          aria-label={t("pokemonDetailsAriaLabel", { name: card.name })}
+          aria-label={t("pokemonDetailsAriaLabel", { name: localeName })}
           className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 w-44 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
         >
           <p className="text-center text-sm font-semibold text-foreground">
-            {card.name}
+            <span lang={pokemonLocale}>{localeName}</span>
           </p>
           <dl className={`mt-1.5 space-y-0.5 ${mutedTextXs}`}>
             <div className="flex justify-between">
-              <dt>First seen</dt>
+              <dt>{t("firstSeen")}</dt>
               <dd>{firstSeenLabel}</dd>
             </div>
             <div className="flex justify-between">
-              <dt>Interval</dt>
+              <dt>{t("interval")}</dt>
               <dd>{card.state.scheduledDays}d</dd>
             </div>
           </dl>
