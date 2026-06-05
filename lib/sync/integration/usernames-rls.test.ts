@@ -35,6 +35,13 @@ let dbName: string;
 
 const USER_A = randomUUID();
 const USER_B = randomUUID();
+// Distinct user IDs for tests that persist admin-inserted rows without rolling
+// back. Each test that calls adminInsertUsername outside a transaction needs its
+// own user_id so the UNIQUE(user_id) constraint never rejects a setup insert
+// because a prior test already holds a row for the same user.
+const USER_B_ANON_SELECT = randomUUID();
+const USER_B_UPDATE = randomUUID();
+const USER_B_DELETE = randomUUID();
 
 let rlsPool: pg.Pool;
 
@@ -67,6 +74,9 @@ beforeAll(async () => {
 
   await insertAuthUser(adminPool, USER_A);
   await insertAuthUser(adminPool, USER_B);
+  await insertAuthUser(adminPool, USER_B_ANON_SELECT);
+  await insertAuthUser(adminPool, USER_B_UPDATE);
+  await insertAuthUser(adminPool, USER_B_DELETE);
 
   // Create an unprivileged role for RLS testing (cluster-level).
   await adminPool.query(`
@@ -164,7 +174,7 @@ describe("usernames RLS policies (integration)", () => {
   });
 
   it("unauthenticated (anon) session can SELECT all rows", async () => {
-    await adminInsertUsername(adminPool, "trainerb2", USER_B);
+    await adminInsertUsername(adminPool, "trainerb2", USER_B_ANON_SELECT);
 
     const rows = await asAnon(async (c) => {
       const res = await c.query(
@@ -225,7 +235,7 @@ describe("usernames RLS policies (integration)", () => {
   // ---------------------------------------------------------------------------
 
   it("user A UPDATE on user B's row is silently ignored (no UPDATE policy)", async () => {
-    await adminInsertUsername(adminPool, "update-target", USER_B);
+    await adminInsertUsername(adminPool, "update-target", USER_B_UPDATE);
 
     // The update should not throw, but must not change any rows.
     await asUser(USER_A, async (c) => {
@@ -240,7 +250,7 @@ describe("usernames RLS policies (integration)", () => {
       `SELECT user_id FROM public.usernames WHERE username = 'update-target'`,
     );
     expect(rows).toHaveLength(1);
-    expect(rows[0].user_id).toBe(USER_B);
+    expect(rows[0].user_id).toBe(USER_B_UPDATE);
   });
 
   // ---------------------------------------------------------------------------
@@ -248,7 +258,7 @@ describe("usernames RLS policies (integration)", () => {
   // ---------------------------------------------------------------------------
 
   it("user A DELETE on user B's row is silently ignored (no DELETE policy)", async () => {
-    await adminInsertUsername(adminPool, "delete-target", USER_B);
+    await adminInsertUsername(adminPool, "delete-target", USER_B_DELETE);
 
     await asUser(USER_A, async (c) => {
       await c.query(
