@@ -43,6 +43,13 @@ export type ThemeIntensity = "accents" | "tinted" | "full";
 /**
  * Per-surface dismissal flags for the first-run onboarding hints (#433).
  * `false` = hint still shows; `true` = user dismissed it.
+ *
+ * IMPORTANT: the boolean dismissal flags listed here are mirrored in the
+ * `user_settings_reject_regression` trigger (migration 038). When adding a
+ * new boolean dismissal flag, add it to the ARRAY[] list in that trigger
+ * function as well, so the DB enforces the one-shot invariant at the data layer.
+ * Numeric counters (practiceSessionsCount, slowSpriteLoadCount) are also
+ * mirrored in a separate section of that trigger (monotonic counter guard).
  */
 export type OnboardingFlags = {
   /**

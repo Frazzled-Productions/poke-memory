@@ -164,9 +164,18 @@ describe("settings clobber protection (#1682) - integration", () => {
     }
   });
 
-  it("counterfactual: pushing the FULL default-valued blob WITHOUT pruning WOULD clobber cloud values", async () => {
-    // This test documents why the prune matters. It uses a separate user to
-    // avoid interfering with the passing test above.
+  it("Phase B: pushing the FULL default-valued blob WITHOUT pruning is now blocked by the regression trigger", async () => {
+    // With Phase B deployed (migration 037: deep-merge + migration 038: trigger),
+    // the counterfactual scenario from Phase A's test is now blocked at the DB level:
+    //   - migration 037 switches merge_user_settings to deep-merge, so the object keys
+    //     inside streakProtection are merged rather than overwritten.
+    //   - migration 038 adds the regression trigger, which rejects any UPDATE that
+    //     drops a spendDate entry (even via the deep-merge path, since the spendDates
+    //     ARRAY is replaced LWW and the trigger checks the resulting state).
+    //
+    // The assertion changes from "the clobber happens" to "the push is rejected",
+    // confirming that Phase B makes the Phase A client-side guard redundant at the DB
+    // layer (defence-in-depth).
     const counterUserId = randomUUID();
     await insertAuthUser(pool, counterUserId);
     const client = await pool.connect();
@@ -194,24 +203,28 @@ describe("settings clobber protection (#1682) - integration", () => {
         .streakProtection as typeof populatedStreak;
       expect(seedStreak.balance).toBe(1);
 
-      // Simulate the un-fixed behaviour: push the FULL default-bearing blob
-      // (no prune) via the RPC. The `||` overlay clobbers streakProtection.
+      // Attempt to push the FULL default-bearing blob (no prune) via the RPC.
+      // The default-bearing blob has streakProtection.spendDates = [], which is
+      // empty. The deep-merge (migration 037) LWW-replaces the spendDates array
+      // with [], and the trigger (migration 038) rejects the loss of "2026-05-10".
       const unprunedFullBlob = { ...DEFAULT_SETTINGS };
-      await client.query(
-        `SELECT merge_user_settings($1::uuid, $2::jsonb)`,
-        [counterUserId, JSON.stringify(unprunedFullBlob)],
-      );
+      await expect(
+        client.query(
+          `SELECT merge_user_settings($1::uuid, $2::jsonb)`,
+          [counterUserId, JSON.stringify(unprunedFullBlob)],
+        ),
+      ).rejects.toThrow();
 
-      // The un-pruned push DOES clobber the cloud value (balance returns to 0).
+      // The cloud values are still intact - the rejected write did not commit.
       const { rows: afterRows } = await client.query(
         `SELECT settings FROM user_settings WHERE user_id = $1`,
         [counterUserId],
       );
       const afterStreak = (afterRows[0].settings as Record<string, unknown>)
         .streakProtection as typeof populatedStreak;
-      // Without the prune, balance is now 0 - the clobber happened.
-      expect(afterStreak.balance).toBe(0);
-      expect(afterStreak.spendDates).toEqual([]);
+      // Phase B: the trigger blocked the clobber; balance and spendDates are unchanged.
+      expect(afterStreak.balance).toBe(1);
+      expect(afterStreak.spendDates).toEqual(["2026-05-10"]);
     } finally {
       client.release();
     }
