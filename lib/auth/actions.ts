@@ -83,7 +83,7 @@ export async function signUpWithUsername(
     // the human-readable message string, which can change across GoTrue versions.
     // `code === "email_exists"` is the primary signal; `identities.length === 0`
     // is the documented secondary indicator. Status 422 is GoTrue's general
-    // "Unprocessable Entity" and is intentionally excluded — it can cover
+    // "Unprocessable Entity" and is intentionally excluded: it can cover
     // non-duplicate rejections (e.g. a future password-strength rule) and would
     // mislead the user into changing their username instead of their password.
     // Cast signUpData.user via unknown so TS does not narrow 'identities' to
@@ -129,8 +129,8 @@ export async function signUpWithUsername(
   if (insertError) {
     // Postgres code 23505 = unique_violation: the username was claimed in a
     // race (PK conflict) or the user already has a username (UNIQUE user_id
-    // constraint). Any other failure — transient DB error, future CHECK
-    // constraint — is surfaced as signup_failed so the user doesn't
+    // constraint). Any other failure (transient DB error, future CHECK
+    // constraint) is surfaced as signup_failed so the user doesn't
     // unnecessarily change their chosen username.
     const isConflict = (insertError as { code?: string }).code === "23505";
     return { ok: false, error: isConflict ? "username_taken" : "signup_failed" };
