@@ -10,11 +10,20 @@
 --                                     (i.e. a token was spent); a bare balance drop is rejected.
 --   3. earnedBadges                 — no badge id may be removed (id-level check, not length).
 --   4. onboarding dismissal flags   — a flag that is true cannot be set to non-true.
+--                                     Exception: if NEW.settings.onboardingResetAt is a
+--                                     non-null string that is strictly lexicographically >
+--                                     OLD.settings.onboardingResetAt (or OLD is absent), the
+--                                     user intentionally clicked "Show onboarding again" and
+--                                     the revert is allowed. The client sets this tombstone in
+--                                     lib/settings/persistence.ts when resetting onboarding.
 --   5. Top-level one-shot flags     — typedEntryOnboardingShown, mcCardOnboardingShown:
 --                                     same true->non-true check. verifiedTypedEntryMode is
 --                                     excluded — it is a toggleable preference, not one-shot.
+--                                     These flags are NOT reset by "Show onboarding again" and
+--                                     are never bypassed by the onboardingResetAt tombstone.
 --   6. onboarding monotonic counters — practiceSessionsCount, slowSpriteLoadCount:
 --                                     new value must be >= old value.
+--                                     Exception: same onboardingResetAt tombstone as predicate 4.
 --   7. learningLocales              — no locale may be removed unless it is present in
 --                                     removedLocales (tombstone-safe); defaults to ["en"].
 --
@@ -29,26 +38,27 @@
 CREATE OR REPLACE FUNCTION public.user_settings_reject_regression()
 RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
 DECLARE
-  old_sp        jsonb;
-  new_sp        jsonb;
-  old_spend     jsonb;
-  new_spend     jsonb;
-  old_bal       numeric;
-  new_bal       numeric;
-  old_badges    jsonb;
-  new_badges    jsonb;
-  old_onb       jsonb;
-  new_onb       jsonb;
-  old_ll        jsonb;
-  new_ll        jsonb;
-  new_removed   jsonb;
-  badge_id      text;
-  flag          text;
-  date_val      text;
-  locale_val    text;
-  i             int;
-  old_count     numeric;
-  new_count     numeric;
+  old_sp                     jsonb;
+  new_sp                     jsonb;
+  old_spend                  jsonb;
+  new_spend                  jsonb;
+  old_bal                    numeric;
+  new_bal                    numeric;
+  old_badges                 jsonb;
+  new_badges                 jsonb;
+  old_onb                    jsonb;
+  new_onb                    jsonb;
+  old_ll                     jsonb;
+  new_ll                     jsonb;
+  new_removed                jsonb;
+  badge_id                   text;
+  flag                       text;
+  date_val                   text;
+  locale_val                 text;
+  i                          int;
+  old_count                  numeric;
+  new_count                  numeric;
+  onboarding_intentional_reset bool := false;
 BEGIN
   -- ── 1 + 2: streakProtection ────────────────────────────────────────────────
   old_sp := CASE WHEN jsonb_typeof(OLD.settings -> 'streakProtection') = 'object'
@@ -116,6 +126,8 @@ BEGIN
 
   -- ── 4: onboarding dismissal flags ─────────────────────────────────────────
   -- Each listed flag is a one-shot dismissal: once true it must stay true.
+  -- Exception: if the client includes a strictly-newer onboardingResetAt timestamp
+  -- the reset is user-intentional ("Show onboarding again" button) and is allowed.
   -- NOTE: keep this list in sync with OnboardingFlags in lib/settings/persistence.ts.
   old_onb := CASE WHEN jsonb_typeof(OLD.settings -> 'onboarding') = 'object'
                   THEN OLD.settings -> 'onboarding'
@@ -124,37 +136,50 @@ BEGIN
                   THEN NEW.settings -> 'onboarding'
                   ELSE '{}'::jsonb END;
 
-  FOR flag IN SELECT unnest(ARRAY[
-    'firstVisitOnboardingDismissed',
-    'welcomeDismissed',
-    'practiceHintDismissed',
-    'statsHintDismissed',
-    'settingsHintDismissed',
-    'installNudgeDismissed',
-    'audioHintDismissed',
-    'cardTypesHintDismissed',
-    'guestStorageNoticeDismissed',
-    'journeyMasteryExplainerDismissed',
-    'markWhatIKnowNudgeDismissed',
-    'practiceScopeNudgeDismissed',
-    'scopeEverOpened',
-    'offlineDownloadNudgeDismissed',
-    'pastureLongPressHintDismissed',
-    'higherOrLowerNudgeDismissed',
-    'guestSignUpNudgeDismissed'
-  ]) LOOP
-    IF (old_onb ->> flag)::boolean = true
-       AND (new_onb ->> flag)::boolean IS DISTINCT FROM true
-    THEN
-      RAISE EXCEPTION
-        'user_settings regression: onboarding.% was true, cannot be set to non-true', flag
-        USING ERRCODE = '23514';
-    END IF;
-  END LOOP;
+  -- Check for the user-intentional onboarding reset tombstone.
+  -- A strictly-newer onboardingResetAt means the user clicked "Show onboarding again";
+  -- predicates 4 and 6 are skipped for that write.
+  IF (NEW.settings ->> 'onboardingResetAt') IS NOT NULL
+     AND (NEW.settings ->> 'onboardingResetAt') > COALESCE(OLD.settings ->> 'onboardingResetAt', '')
+  THEN
+    onboarding_intentional_reset := true;
+  END IF;
+
+  IF NOT onboarding_intentional_reset THEN
+    FOR flag IN SELECT unnest(ARRAY[
+      'firstVisitOnboardingDismissed',
+      'welcomeDismissed',
+      'practiceHintDismissed',
+      'statsHintDismissed',
+      'settingsHintDismissed',
+      'installNudgeDismissed',
+      'audioHintDismissed',
+      'cardTypesHintDismissed',
+      'guestStorageNoticeDismissed',
+      'journeyMasteryExplainerDismissed',
+      'markWhatIKnowNudgeDismissed',
+      'practiceScopeNudgeDismissed',
+      'scopeEverOpened',
+      'offlineDownloadNudgeDismissed',
+      'pastureLongPressHintDismissed',
+      'higherOrLowerNudgeDismissed',
+      'guestSignUpNudgeDismissed'
+    ]) LOOP
+      IF (old_onb ->> flag)::boolean = true
+         AND (new_onb ->> flag)::boolean IS DISTINCT FROM true
+      THEN
+        RAISE EXCEPTION
+          'user_settings regression: onboarding.% was true, cannot be set to non-true', flag
+          USING ERRCODE = '23514';
+      END IF;
+    END LOOP;
+  END IF;
 
   -- ── 5: top-level one-shot flags ───────────────────────────────────────────
   -- typedEntryOnboardingShown and mcCardOnboardingShown: true -> non-true is rejected.
   -- verifiedTypedEntryMode is excluded — it is a toggleable preference.
+  -- These top-level flags are NOT reset by "Show onboarding again" and are never
+  -- bypassed by the onboardingResetAt tombstone.
   FOR flag IN SELECT unnest(ARRAY[
     'typedEntryOnboardingShown',
     'mcCardOnboardingShown'
@@ -169,22 +194,26 @@ BEGIN
   END LOOP;
 
   -- ── 6: onboarding monotonic counters ──────────────────────────────────────
-  FOR flag IN SELECT unnest(ARRAY[
-    'practiceSessionsCount',
-    'slowSpriteLoadCount'
-  ]) LOOP
-    old_count := CASE WHEN (old_onb ->> flag) IS NOT NULL
-                      THEN (old_onb ->> flag)::numeric
-                      ELSE 0 END;
-    new_count := CASE WHEN (new_onb ->> flag) IS NOT NULL
-                      THEN (new_onb ->> flag)::numeric
-                      ELSE 0 END;
-    IF new_count < old_count THEN
-      RAISE EXCEPTION
-        'user_settings regression: onboarding.% decreased (% -> %)', flag, old_count, new_count
-        USING ERRCODE = '23514';
-    END IF;
-  END LOOP;
+  -- Same onboardingResetAt tombstone exception as predicate 4: the user-intentional
+  -- reset is allowed to zero out the counters so nudge thresholds reset correctly.
+  IF NOT onboarding_intentional_reset THEN
+    FOR flag IN SELECT unnest(ARRAY[
+      'practiceSessionsCount',
+      'slowSpriteLoadCount'
+    ]) LOOP
+      old_count := CASE WHEN (old_onb ->> flag) IS NOT NULL
+                        THEN (old_onb ->> flag)::numeric
+                        ELSE 0 END;
+      new_count := CASE WHEN (new_onb ->> flag) IS NOT NULL
+                        THEN (new_onb ->> flag)::numeric
+                        ELSE 0 END;
+      IF new_count < old_count THEN
+        RAISE EXCEPTION
+          'user_settings regression: onboarding.% decreased (% -> %)', flag, old_count, new_count
+          USING ERRCODE = '23514';
+      END IF;
+    END LOOP;
+  END IF;
 
   -- ── 7: learningLocales ────────────────────────────────────────────────────
   -- A locale in OLD must be present in NEW.learningLocales OR in NEW.removedLocales

@@ -488,6 +488,15 @@ export type UserSettings = {
    * timestamps). Rare and recoverable by re-enrolling.
    */
   removedLocales: AppLocale[];
+  /**
+   * ISO timestamp of the last user-triggered onboarding reset ("Show onboarding
+   * again" button in Settings). Used as a tombstone by the DB regression trigger
+   * (migration 038, predicate 4/6): a strictly-newer value signals that the flag
+   * resets and counter decreases are user-intentional, not a stale-client clobber.
+   * Absent in pre-reset records and in the DEFAULT_SETTINGS shape; back-fills to
+   * undefined on read (trigger treats absent OLD as '' for the comparison).
+   */
+  onboardingResetAt?: string;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -818,6 +827,9 @@ function parseStoredSettings(raw: string | null): UserSettings {
     dismissedMtBannerLocales: validateDismissedMtBannerLocales(obj.dismissedMtBannerLocales),
     // Default []: absent in pre-#1568 records. Deduped; "en" always dropped.
     removedLocales: validateRemovedLocales(obj.removedLocales),
+    // Absent in records that predate the first onboarding reset; back-fills to
+    // undefined so the trigger treats it as '' (no bypass).
+    onboardingResetAt: typeof obj.onboardingResetAt === 'string' ? obj.onboardingResetAt : undefined,
   };
 }
 

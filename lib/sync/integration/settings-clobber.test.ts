@@ -215,6 +215,11 @@ describe("settings clobber protection (#1682) - integration", () => {
         ),
       ).rejects.toThrow();
 
+      // Safe to query the same client after the trigger raised: there is no
+      // explicit BEGIN here, so Postgres ran `merge_user_settings` in an
+      // implicit single-statement transaction. The trigger's RAISE aborted that
+      // transaction, returning the connection to IDLE — not to an
+      // "aborted-transaction" state that would need a ROLLBACK first.
       // The cloud values are still intact - the rejected write did not commit.
       const { rows: afterRows } = await client.query(
         `SELECT settings FROM user_settings WHERE user_id = $1`,

@@ -381,6 +381,62 @@ describe("user_settings_reject_regression_trigger (integration)", () => {
       }
     });
 
+    it("rejects UPDATE that sets typedEntryOnboardingShown from true to false", async () => {
+      await seedSettings({
+        streakProtection: ZERO_STREAK,
+        earnedBadges: [],
+        onboarding: { practiceSessionsCount: 0, slowSpriteLoadCount: 0 },
+        typedEntryOnboardingShown: true,
+        learningLocales: ["en"],
+        removedLocales: [],
+      });
+      const client = await pool.connect();
+      try {
+        await withUser(client, testUserId, async (c) => {
+          await expect(
+            directUpdate(c, testUserId, {
+              streakProtection: ZERO_STREAK,
+              earnedBadges: [],
+              onboarding: { practiceSessionsCount: 0, slowSpriteLoadCount: 0 },
+              typedEntryOnboardingShown: false, // reverted to false
+              learningLocales: ["en"],
+              removedLocales: [],
+            }),
+          ).rejects.toThrow();
+        });
+      } finally {
+        client.release();
+      }
+    });
+
+    it("rejects UPDATE that sets mcCardOnboardingShown from true to false", async () => {
+      await seedSettings({
+        streakProtection: ZERO_STREAK,
+        earnedBadges: [],
+        onboarding: { practiceSessionsCount: 0, slowSpriteLoadCount: 0 },
+        mcCardOnboardingShown: true,
+        learningLocales: ["en"],
+        removedLocales: [],
+      });
+      const client = await pool.connect();
+      try {
+        await withUser(client, testUserId, async (c) => {
+          await expect(
+            directUpdate(c, testUserId, {
+              streakProtection: ZERO_STREAK,
+              earnedBadges: [],
+              onboarding: { practiceSessionsCount: 0, slowSpriteLoadCount: 0 },
+              mcCardOnboardingShown: false, // reverted to false
+              learningLocales: ["en"],
+              removedLocales: [],
+            }),
+          ).rejects.toThrow();
+        });
+      } finally {
+        client.release();
+      }
+    });
+
     it("rejects UPDATE that nulls streakProtection (absent streakProtection with existing spend dates)", async () => {
       await seedSettings({
         streakProtection: {
@@ -779,6 +835,123 @@ describe("user_settings_reject_regression_trigger (integration)", () => {
               [testUserId],
             ),
           ).resolves.toBeDefined();
+        });
+      } finally {
+        client.release();
+      }
+    });
+
+    it("allows onboarding flag reset when onboardingResetAt is strictly newer", async () => {
+      // Simulates the "Show onboarding again" button: client sends a newer
+      // onboardingResetAt alongside the zeroed-out onboarding object.
+      await seedSettings({
+        streakProtection: ZERO_STREAK,
+        earnedBadges: [],
+        onboarding: {
+          firstVisitOnboardingDismissed: true,
+          statsHintDismissed: true,
+          practiceSessionsCount: 5,
+          slowSpriteLoadCount: 2,
+        },
+        onboardingResetAt: "2026-06-01T10:00:00.000Z",
+        learningLocales: ["en"],
+        removedLocales: [],
+      });
+      const client = await pool.connect();
+      try {
+        await withUser(client, testUserId, async (c) => {
+          await expect(
+            directUpdate(c, testUserId, {
+              streakProtection: ZERO_STREAK,
+              earnedBadges: [],
+              onboarding: {
+                firstVisitOnboardingDismissed: false, // reverted
+                statsHintDismissed: false,            // reverted
+                practiceSessionsCount: 0,             // zeroed
+                slowSpriteLoadCount: 0,               // zeroed
+              },
+              // Strictly newer than the seeded "2026-06-01T10:00:00.000Z"
+              onboardingResetAt: "2026-06-05T12:00:00.000Z",
+              learningLocales: ["en"],
+              removedLocales: [],
+            }),
+          ).resolves.toBeDefined();
+        });
+      } finally {
+        client.release();
+      }
+    });
+
+    it("rejects onboarding flag reset when onboardingResetAt is absent (no tombstone)", async () => {
+      // Without the tombstone, a true->false flip is still blocked even if the
+      // caller is sending the same values as the reset button — there's no signal
+      // that this is user-intentional.
+      await seedSettings({
+        streakProtection: ZERO_STREAK,
+        earnedBadges: [],
+        onboarding: {
+          firstVisitOnboardingDismissed: true,
+          practiceSessionsCount: 0,
+          slowSpriteLoadCount: 0,
+        },
+        learningLocales: ["en"],
+        removedLocales: [],
+      });
+      const client = await pool.connect();
+      try {
+        await withUser(client, testUserId, async (c) => {
+          await expect(
+            directUpdate(c, testUserId, {
+              streakProtection: ZERO_STREAK,
+              earnedBadges: [],
+              onboarding: {
+                firstVisitOnboardingDismissed: false, // reverted, no tombstone
+                practiceSessionsCount: 0,
+                slowSpriteLoadCount: 0,
+              },
+              // onboardingResetAt absent
+              learningLocales: ["en"],
+              removedLocales: [],
+            }),
+          ).rejects.toThrow();
+        });
+      } finally {
+        client.release();
+      }
+    });
+
+    it("rejects onboarding flag reset when onboardingResetAt is the same as existing (not strictly newer)", async () => {
+      // A stale client replaying an old reset (same timestamp) must not bypass
+      // the guard — the tombstone check requires a strictly-newer value.
+      await seedSettings({
+        streakProtection: ZERO_STREAK,
+        earnedBadges: [],
+        onboarding: {
+          firstVisitOnboardingDismissed: true,
+          practiceSessionsCount: 0,
+          slowSpriteLoadCount: 0,
+        },
+        onboardingResetAt: "2026-06-05T12:00:00.000Z",
+        learningLocales: ["en"],
+        removedLocales: [],
+      });
+      const client = await pool.connect();
+      try {
+        await withUser(client, testUserId, async (c) => {
+          await expect(
+            directUpdate(c, testUserId, {
+              streakProtection: ZERO_STREAK,
+              earnedBadges: [],
+              onboarding: {
+                firstVisitOnboardingDismissed: false, // reverted
+                practiceSessionsCount: 0,
+                slowSpriteLoadCount: 0,
+              },
+              onboardingResetAt: "2026-06-05T12:00:00.000Z", // same, not newer
+              learningLocales: ["en"],
+              removedLocales: [],
+            }),
+          ).rejects.toThrow();
         });
       } finally {
         client.release();
