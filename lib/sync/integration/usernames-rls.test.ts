@@ -306,4 +306,24 @@ describe("usernames RLS policies (integration)", () => {
       ),
     ).rejects.toThrow();
   });
+
+  // ---------------------------------------------------------------------------
+  // UNIQUE(user_id) - one username per account
+  // ---------------------------------------------------------------------------
+
+  it("a second INSERT for the same user_id is rejected by the one_username_per_user constraint", async () => {
+    // First insert succeeds.
+    await adminPool.query(
+      `INSERT INTO public.usernames (username, user_id) VALUES ('uniquetest1', $1)`,
+      [USER_A],
+    );
+
+    // A second INSERT with the same user_id (different username) must be rejected.
+    await expect(
+      adminPool.query(
+        `INSERT INTO public.usernames (username, user_id) VALUES ('uniquetest2', $1)`,
+        [USER_A],
+      ),
+    ).rejects.toThrow();
+  });
 });

@@ -24,9 +24,13 @@ CREATE TABLE public.usernames (
   user_id   uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
 
   -- Normalisation constraints so lookups are deterministic.
-  CONSTRAINT username_lowercase CHECK (username = lower(username)),
-  CONSTRAINT username_length    CHECK (char_length(username) BETWEEN 3 AND 30),
-  CONSTRAINT username_chars     CHECK (username ~ '^[a-z0-9_-]+$')
+  CONSTRAINT username_lowercase    CHECK (username = lower(username)),
+  CONSTRAINT username_length       CHECK (char_length(username) BETWEEN 3 AND 30),
+  CONSTRAINT username_chars        CHECK (username ~ '^[a-z0-9_-]+$'),
+
+  -- One username per account: prevents a user from registering multiple
+  -- usernames (e.g. by racing concurrent sign-up calls).
+  CONSTRAINT one_username_per_user UNIQUE (user_id)
 );
 
 ALTER TABLE public.usernames ENABLE ROW LEVEL SECURITY;

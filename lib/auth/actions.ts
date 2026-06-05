@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { AuthProvider } from "./types";
-import { normaliseUsername, validateUsername, syntheticEmail } from "./username";
+import { normaliseUsername, validateUsername, syntheticEmail, MIN_PASSWORD_LENGTH } from "./username";
 
 export async function signIn(provider: AuthProvider) {
   if (provider !== "github" && provider !== "google") redirect("/");
@@ -57,7 +57,7 @@ export async function signUpWithUsername(
     return { ok: false, error: usernameError };
   }
 
-  if (password.length < 8) {
+  if (password.length < MIN_PASSWORD_LENGTH) {
     return { ok: false, error: "password_too_short" };
   }
 
@@ -79,8 +79,19 @@ export async function signUpWithUsername(
   });
 
   if (signUpError) {
-    // Surface a user-friendly key rather than the raw Supabase message.
-    if (signUpError.message.toLowerCase().includes("already registered")) {
+    // Use GoTrue's canonical signal for an already-registered email rather than
+    // the human-readable message string, which can change across GoTrue versions.
+    // `user?.identities?.length === 0` is the documented indicator; the code/status
+    // checks are a fallback for edge cases.
+    // Cast signUpData.user via unknown so TS does not narrow 'identities' to
+    // never in the error branch (the Supabase SDK types differ between the
+    // error and success overloads of AuthResponse).
+    const maybeUser = signUpData.user as { identities?: unknown[] } | null;
+    const alreadyRegistered =
+      maybeUser?.identities?.length === 0 ||
+      (signUpError as { code?: string; status?: number }).code === "email_exists" ||
+      (signUpError as { code?: string; status?: number }).status === 422;
+    if (alreadyRegistered) {
       return { ok: false, error: "username_taken" };
     }
     return { ok: false, error: "signup_failed" };
@@ -88,6 +99,17 @@ export async function signUpWithUsername(
 
   const userId = signUpData.user?.id;
   if (!userId) {
+    return { ok: false, error: "signup_failed" };
+  }
+
+  // If the Supabase dashboard has "Confirm email" enabled, the synthetic address
+  // cannot receive a confirmation mail, so the session will be null even when
+  // the auth.users row was created. Without a session there is no auth.uid(),
+  // which means the INSERT into public.usernames will be rejected by RLS, leaving
+  // an orphan auth.users row and surfacing a misleading "username_taken" error.
+  // Return signup_failed here and let the user (or the admin) investigate the
+  // dashboard misconfiguration rather than creating a confusing half-created account.
+  if (!signUpData.session) {
     return { ok: false, error: "signup_failed" };
   }
 
