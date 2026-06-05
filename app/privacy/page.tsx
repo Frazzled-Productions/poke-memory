@@ -211,6 +211,13 @@ export default async function PrivacyPage() {
             any personally identifying information. It goes to Vercel&rsquo;s
             infrastructure, not ours.
           </p>
+          <p className="mt-2">
+            On app open, a custom event is also sent to Vercel Analytics
+            recording two bucketed, non-identifying properties: whether you are
+            a new visitor, a returning guest, or signed in; and a coarse bucket
+            for how many Pokémon you have mastered (0, 1&ndash;10, 11&ndash;50,
+            or 50+). No raw counts, user IDs, or card content are included.
+          </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
             Authentication cookie (signed-in users only)

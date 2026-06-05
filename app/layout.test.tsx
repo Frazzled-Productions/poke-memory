@@ -44,6 +44,9 @@ vi.mock("@/components/theme/ThemeWatermark", () => ({ ThemeWatermark: () => null
 vi.mock("@/lib/superuser/SuperuserContext", () => ({ SuperuserProvider: () => null }));
 vi.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
 vi.mock("@vercel/speed-insights/next", () => ({ SpeedInsights: () => null }));
+vi.mock("@/components/analytics/FunnelTracker", () => ({
+  FunnelTracker: () => null,
+}));
 vi.mock("@/components/IdbMigration", () => ({ IdbMigration: () => null }));
 vi.mock("@/components/onboarding/PwaInstallNudge", () => ({ PwaInstallNudge: () => null }));
 vi.mock("@/components/pwa/ServiceWorkerProvider", () => ({ ServiceWorkerProvider: () => null }));
