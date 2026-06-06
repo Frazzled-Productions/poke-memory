@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { POKEMON_TYPES, TYPE_COLORS } from "@/lib/pokemon/types";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
+import type { SeedPokemon } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
 import { colStack, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 import {
@@ -59,7 +60,7 @@ function toggleCategory(arr: FormCategory[], v: FormCategory): FormCategory[] {
 }
 
 /** Derive the set of non-default form categories present in the seed at runtime. */
-function presentFormCategories(seed: typeof SEED_POKEMON): FormCategory[] {
+function presentFormCategories(seed: readonly SeedPokemon[]): FormCategory[] {
   const seen = new Set<FormCategory>();
   for (const p of seed) {
     const cat = (p as { formCategory?: FormCategory }).formCategory;
@@ -137,6 +138,8 @@ export function ScopeControl({
   incompleteChainSpeciesIds,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const { seed } = useSeed();
+  const seedPokemon = seed?.seedPokemon ?? [];
   // Note: the loop variable inside POKEMON_TYPES.map is named `type` (not `t`)
   // to avoid shadowing the `tTypes` translation function. See LANDMINE note in
   // issue #1389 specialist notes.
@@ -152,13 +155,13 @@ export function ScopeControl({
   // When the forms gate is off, alternate-form entries are excluded from the
   // count so the "X of N" display is consistent with what the session builds.
   const matchCount = countMatchingSpecies(
-    SEED_POKEMON,
+    seedPokemon,
     scope,
     alternateFormsEnabled,
     scopeContext,
   );
-  const totalCount = countMatchingSpecies(SEED_POKEMON, EMPTY_SCOPE, alternateFormsEnabled);
-  const availableFormCategories = useMemo(() => presentFormCategories(SEED_POKEMON), []);
+  const totalCount = countMatchingSpecies(seedPokemon, EMPTY_SCOPE, alternateFormsEnabled);
+  const availableFormCategories = useMemo(() => presentFormCategories(seedPokemon), [seedPokemon]);
 
   const formFilter: FormCategoryFilter = scope.formCategories ?? { mode: "all" };
 

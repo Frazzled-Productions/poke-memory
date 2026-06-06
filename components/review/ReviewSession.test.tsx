@@ -164,6 +164,39 @@ vi.mock("@/lib/pokemon/seed", () => ({
   CRY_ID_OFFSET: 3_000_000,
 }));
 
+// ReviewSession reads the seed from useSeed() (SeedContext) rather than from
+// the static @/lib/pokemon/seed import. Mock useSeed() to return the same
+// fixture data that mockSeedPokemon() returns, so tests can control seed
+// content via the existing mockSeedPokemon.mockReturnValue(...) pattern.
+//
+// Important: the `seed` object returned by useSeed() must be STABLE (same
+// reference) across renders within a single test. The session-load effect
+// has `seedData` in its dependency array; a new object on every render would
+// re-fire the effect continuously. Production SeedContext stores seed in
+// React state (stable after first resolve). We replicate this with a
+// module-scoped cache that is invalidated only when the test changes the
+// mockSeedPokemon fixture between test cases.
+const { mockUseSeed } = vi.hoisted(() => {
+  let _lastPokemon: unknown = undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only cache
+  let _stableSeed: any = null;
+  return {
+    mockUseSeed: vi.fn(() => {
+      const pokemon = mockSeedPokemon();
+      if (pokemon !== _lastPokemon) {
+        _lastPokemon = pokemon;
+        _stableSeed = { seedPokemon: pokemon, seedEvolutionCards: [], seedReverseEvolutionCards: [] };
+      }
+      return { seed: _stableSeed, error: null, retry: vi.fn() };
+    }),
+  };
+});
+
+vi.mock("@/lib/pokemon/SeedContext", () => ({
+  useSeed: mockUseSeed,
+  SeedProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 // loadSession / saveSession are vi.fn() so individual tests can override them
 // with mockResolvedValueOnce; defaults simulate an empty session.
 vi.mock("@/lib/review/persistence", () => ({

@@ -17,7 +17,10 @@
  */
 
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
-import { REVERSE_ID_OFFSET, type SeedPokemon } from "@/lib/pokemon/seed";
+// Import the numeric constant from seed-builder (no JSON dependency) so
+// per-game.ts does NOT force the seed JSON into any shared chunk (#1677).
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-builder";
+import type { SeedPokemon } from "@/lib/pokemon/seed";
 import {
   isMastered,
   MASTERY_REPETITIONS,

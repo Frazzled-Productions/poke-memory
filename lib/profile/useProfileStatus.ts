@@ -28,8 +28,8 @@
 import { useEffect, useState } from "react";
 import { useStreakNavState } from "@/lib/streak/useStreakNavState";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { readMasteredCountCache } from "@/lib/profile/masteredCountCache";
 import { KEY_MASTERED_COUNT_BY_LOCALE } from "@/lib/storage/keys";
 
@@ -82,6 +82,7 @@ export type ProfileStatus = {
 export function useProfileStatus(): ProfileStatus {
   const streakState = useStreakNavState();
   const { flags } = useSuperuser();
+  const { seed } = useSeed();
 
   const [masteryState, setMasteryState] = useState<{
     masteryCount: number | null;
@@ -94,7 +95,8 @@ export function useProfileStatus(): ProfileStatus {
   });
 
   useEffect(() => {
-    const total = SEED_POKEMON.length;
+    // Use the async-loaded seed length; 0 while the seed is still loading.
+    const total = seed?.seedPokemon.length ?? 0;
 
     function refreshMastery() {
       if (flags.pretendAllMastered) {
@@ -147,7 +149,9 @@ export function useProfileStatus(): ProfileStatus {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener(SETTINGS_SAVED_EVENT, handleSettingsSaved);
     };
-  }, [flags.pretendAllMastered]);
+    // seed added: when the async seed resolves, total updates and the effect
+    // re-runs so totalSpecies reflects the real count.
+  }, [flags.pretendAllMastered, seed]);
 
   return {
     streak: streakState.streak,

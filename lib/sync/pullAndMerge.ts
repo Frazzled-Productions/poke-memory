@@ -29,7 +29,7 @@ import {
 import { mtBannerDismissedKey } from "@/lib/storage/keys";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { loadSeed } from "@/lib/pokemon/seed-async";
 
 /**
  * Fires when `pullAndMerge` completes a cold-load merge that transitioned at
@@ -297,6 +297,11 @@ export async function pullAndMerge(
     const wasColdLoad =
       localSession === null || isPristineSession(localSession.cards);
 
+    // Load seed data asynchronously: the JSON is no longer bundled into the
+    // boot chunk, so we await it here rather than using the static imports.
+    // loadSeed() is idempotent - the result is cached after the first call.
+    const seedData = await loadSeed();
+
     let merged: ReturnType<typeof buildSession>;
     let saveResult;
     let preMergeCards: ReviewableCard[];
@@ -309,8 +314,8 @@ export async function pullAndMerge(
         preMergeCards,
         cloudRows,
         syncStatus.lastPullAt,
-        SEED_POKEMON,
-        SEED_EVOLUTION_CARDS,
+        seedData.seedPokemon,
+        seedData.seedEvolutionCards,
       );
       saveResult = await saveSession({ cards: merged, limits: localSession.limits });
     } else {
@@ -321,8 +326,8 @@ export async function pullAndMerge(
       // merge (#391).
       const settings = loadSettings();
       preMergeCards = buildSession(
-        SEED_POKEMON,
-        SEED_EVOLUTION_CARDS,
+        seedData.seedPokemon,
+        seedData.seedEvolutionCards,
         undefined,
         seedOptsFromSettings(settings),
       );
@@ -330,8 +335,8 @@ export async function pullAndMerge(
         preMergeCards,
         cloudRows,
         syncStatus.lastPullAt,
-        SEED_POKEMON,
-        SEED_EVOLUTION_CARDS,
+        seedData.seedPokemon,
+        seedData.seedEvolutionCards,
       );
       saveResult = await saveSession({ cards: merged, limits: DEFAULT_LIMITS });
     }

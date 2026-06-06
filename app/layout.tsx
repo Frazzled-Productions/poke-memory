@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { splashStartupImages } from "@/lib/pwa/splashDevices";
 import { LocaleProvider } from "@/components/i18n/LocaleProvider";
 import { PokemonLocaleProvider } from "@/lib/i18n/PokemonLocaleContext";
+import { SeedProvider } from "@/lib/pokemon/SeedContext";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -146,6 +147,16 @@ export default function RootLayout({
             */}
             <PokemonLocaleProvider>
             {/*
+              SeedProvider kicks off the async fetch of generated-core.json and
+              generated-chains.json from public/pokemon-data/ on mount. This
+              removes both files from the synchronous boot chunk, cutting the
+              first-load JS parse from ~6.7s to sub-second on iOS (#1677).
+              Placed inside PokemonLocaleProvider (which needs next-intl locale
+              resolution) and outside AuthProvider (so auth state is irrelevant
+              to the seed fetch). ReviewSession reads from useSeed().
+            */}
+            <SeedProvider>
+            {/*
               #app-root wraps all persistent page chrome. FirstVisitOnboardingModal
               renders via createPortal directly onto <body> and toggles `inert` +
               `aria-hidden` on this element while open, preventing the screen-reader
@@ -218,6 +229,7 @@ export default function RootLayout({
             <DocumentTitleBadge />
             <Analytics />
             <SpeedInsights />
+            </SeedProvider>
             </PokemonLocaleProvider>
           </LocaleProvider>
         </Suspense>

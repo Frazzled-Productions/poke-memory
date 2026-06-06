@@ -4,7 +4,9 @@ import { loadSession } from "@/lib/review/persistence";
 import { loadSettings } from "@/lib/settings/persistence";
 import { classifyCard, isMastered } from "@/lib/stats/derive";
 import type { CardClass } from "@/lib/stats/derive";
-import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
+// Import numeric constant from seed-builder (no JSON dependency) so this
+// module does not force the seed JSON into the boot chunk.
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-builder";
 
 /** "pending" = hydration not yet complete; CardClass = resolved. */
 export type CardClassOrPending = CardClass | "pending";

@@ -9,8 +9,11 @@
  *   reps >= masteryRepetitions && scheduledDays >= 21
  */
 
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS, REVERSE_EDGE_ID_BASE, EDGE_ID_BASE } from "@/lib/pokemon/seed";
+// Import pure numeric constants from seed-builder (no JSON dependency) so
+// chains.ts does NOT force the seed JSON into the boot chunk (#1677).
+import { REVERSE_EDGE_ID_BASE, EDGE_ID_BASE } from "@/lib/pokemon/seed-builder";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
+import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
 import type { ReviewableCard, EvolutionReviewCard, ReverseEvolutionReviewCard } from "@/lib/review/session";
 import { isMastered } from "@/lib/stats/derive";
 
@@ -92,13 +95,19 @@ export function deriveEvolutionFamilies(
   masteryRepetitions = 3,
   forceAllMastered = false,
 ): EvolutionFamily[] {
+  // Seed data is loaded asynchronously at runtime; fall back to empty arrays
+  // before it arrives so the function never throws on early calls (#1677).
+  const seed = getSeedIfLoaded();
+  const seedPokemon = seed?.seedPokemon ?? [];
+  const seedEvolutionCards = seed?.seedEvolutionCards ?? [];
+
   // Build lookup maps for evolution card mastery by edge id.
   const forwardMasteredSet = new Set<number>();
   const reverseMasteredSet = new Set<number>();
 
   if (forceAllMastered) {
-    // All edges mastered - populate from SEED_EVOLUTION_CARDS edge ids.
-    for (const card of SEED_EVOLUTION_CARDS) {
+    // All edges mastered - populate from seedEvolutionCards edge ids.
+    for (const card of seedEvolutionCards) {
       forwardMasteredSet.add(card.id);
       reverseMasteredSet.add(REVERSE_EDGE_ID_BASE + (card.id - EDGE_ID_BASE));
     }
@@ -121,7 +130,7 @@ export function deriveEvolutionFamilies(
 
   // Build a spriteUrl lookup by speciesId.
   const pokemonById = new Map<number, SeedPokemon>(
-    SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => [p.id, p]),
+    seedPokemon.filter((p) => p.isDefaultForm).map((p) => [p.id, p]),
   );
 
   // Deduplicate chains: each chain appears in every member's evolutionChain array.
@@ -129,7 +138,7 @@ export function deriveEvolutionFamilies(
   const seenChainKeys = new Set<string>();
   const families: EvolutionFamily[] = [];
 
-  for (const pokemon of SEED_POKEMON) {
+  for (const pokemon of seedPokemon) {
     if (!pokemon.isDefaultForm) continue;
     if (pokemon.evolutionChain.length <= 1) continue; // Solo - no edges to display.
 
