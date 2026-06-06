@@ -196,10 +196,18 @@ export function SignInSheet({ open, onClose }: Props) {
                   ? t("signInSheet.username.errorSignupFailed")
                   : t("signInSheet.username.errorSigninFailed"),
         );
+        setIsSubmitting(false);
       } else {
-        // Success - the session is now set. Close the sheet; the page will
-        // re-render with the authenticated state via onAuthStateChange.
-        handleClose();
+        // Success. signUpWithUsername / signInWithUsername are SERVER ACTIONS:
+        // they set the Supabase session in cookies server-side. The browser
+        // client's `onAuthStateChange` does NOT fire for an out-of-band cookie
+        // write, and AuthContext only reads the session via getUser() on mount,
+        // so closing the sheet alone leaves the UI in the signed-out state until
+        // a manual reload. A full navigation re-reads the new session cookie and
+        // runs the sign-in side effects (SignInPull etc.), mirroring what the
+        // OAuth callback redirect already does (#1671 real-auth regression).
+        window.location.assign("/");
+        return;
       }
     } catch {
       setFormError(
@@ -207,7 +215,6 @@ export function SignInSheet({ open, onClose }: Props) {
           ? t("signInSheet.username.errorSignupFailed")
           : t("signInSheet.username.errorSigninFailed"),
       );
-    } finally {
       setIsSubmitting(false);
     }
   }
