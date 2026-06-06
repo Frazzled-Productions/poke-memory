@@ -118,12 +118,17 @@ jobs:
           # 2. References in each linked PR's body. A squash-merged batch PR
           #    collapses to one commit on qa whose message may not carry every
           #    `Closes #N` the original PR body did, so read the PR bodies too.
-          #    Map each range commit to its PR via the search API, de-dupe PR
-          #    numbers, then pull each PR body.
+          #    Map each range commit to its PR(s) via the per-commit
+          #    `commits/{sha}/pulls` REST endpoint, de-dupe PR numbers, then pull
+          #    each PR body. This endpoint resolves the associated PR directly
+          #    and is NOT backed by the commit-search index, so it does not lag
+          #    behind a fresh qa push the way `gh pr list --search "$SHA"` does
+          #    (the search index trails a push by seconds-to-minutes, dropping
+          #    the most recent squash commits on a dispatch right after a push).
           PR_NUMS=""
           for SHA in $(git rev-list origin/main..origin/qa); do
-            FOUND=$(gh pr list --repo "$REPO" --state merged --search "$SHA" \
-              --json number --jq '.[].number' 2>/dev/null || true)
+            FOUND=$(gh api "repos/$REPO/commits/$SHA/pulls" \
+              --jq '.[].number' 2>/dev/null || true)
             PR_NUMS="$PR_NUMS $FOUND"
           done
           PR_NUMS=$(printf '%s\n' $PR_NUMS | grep -oE '[0-9]+' | sort -un || true)
@@ -234,6 +239,16 @@ jobs:
             echo "Updating existing open promotion PR #$EXISTING."
             gh pr edit "$EXISTING" --repo "$REPO" \
               --title "$TITLE" --body-file "$BODY_FILE"
+            # `gh pr edit` does not re-draft a PR the maintainer previously
+            # marked ready, so the "draft until preview QA" invariant would be
+            # silently violated on re-dispatch. Restore draft state explicitly.
+            # `gh pr ready --undo` is a no-op if the PR is already a draft, so
+            # this is safe to run unconditionally on the update path.
+            IS_DRAFT=$(gh pr view "$EXISTING" --repo "$REPO" --json isDraft --jq '.isDraft')
+            if [ "$IS_DRAFT" != "true" ]; then
+              echo "Re-drafting promotion PR #$EXISTING (was marked ready)."
+              gh pr ready "$EXISTING" --repo "$REPO" --undo
+            fi
             URL=$(gh pr view "$EXISTING" --repo "$REPO" --json url --jq '.url')
           else
             echo "Opening a new draft promotion PR."
