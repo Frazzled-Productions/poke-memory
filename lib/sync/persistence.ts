@@ -50,6 +50,19 @@ export type SyncStatus = {
    * fixes require a deploy, not a user action).
    */
   structuralSyncError: string | null;
+  /**
+   * The Supabase user.id of the user whose data currently occupies local
+   * storage on this device. null = guest/never-signed-in. Written once on
+   * first sign-in (guest claim path) and updated on each account switch.
+   *
+   * Used by guardAccountSwitch (#1712) to detect when a different user signs
+   * in and trigger the archive/restore cycle before pullAndMerge runs.
+   *
+   * Intentionally survives clearLocalProgress (sync-status:v1 is under
+   * poke-memory:sync-status:v1, which IS wiped - but after the guard has
+   * already archived and the caller writes a fresh status with the new owner).
+   */
+  ownerUserId: string | null;
 };
 
 const ZERO: SyncStatus = {
@@ -61,6 +74,7 @@ const ZERO: SyncStatus = {
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
   structuralSyncError: null,
+  ownerUserId: null,
 };
 
 export function loadSyncStatus(): SyncStatus {
@@ -80,6 +94,7 @@ function parseSyncStatus(raw: string): SyncStatus {
     lastSettingsPullAt: typeof obj.lastSettingsPullAt === "string" ? obj.lastSettingsPullAt : null,
     lastSeenResetAt: typeof obj.lastSeenResetAt === "string" ? obj.lastSeenResetAt : null,
     structuralSyncError: typeof obj.structuralSyncError === "string" ? obj.structuralSyncError : null,
+    ownerUserId: typeof obj.ownerUserId === "string" ? obj.ownerUserId : null,
   };
 }
 

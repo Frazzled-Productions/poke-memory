@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
+import { guardAccountSwitch } from "@/lib/sync/guardAccountSwitch";
 
 /**
  * One-shot pull of cloud state when a user signs in (or when a tab loads
@@ -40,6 +41,13 @@ export function useSignInPull(
     }
     if (lastPulledRef.current === userId) return;
     lastPulledRef.current = userId;
-    void pullAndMerge(client, userId, superuserPaused);
+    // guardAccountSwitch MUST complete before pullAndMerge starts:
+    // it reads + resets SyncStatus cursors that pullAndMerge uses to
+    // resolve LWW conflicts.  The guard is a no-op for same-user and
+    // guest-claim paths.
+    void (async () => {
+      await guardAccountSwitch(userId);
+      void pullAndMerge(client, userId, superuserPaused);
+    })();
   }, [client, userId, superuserPaused]);
 }

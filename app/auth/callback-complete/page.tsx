@@ -131,12 +131,15 @@ export default function CallbackCompletePage() {
       if (hasLocal && !cloudHasData) {
         const ok = await pushSession(supabase, user.id, localSession!.cards);
         const prev = loadSyncStatus();
+        // Stamp ownerUserId to mark this device's data as belonging to this user
+        // (guest-claim path: owner was null, now becomes user.id). (#1712)
         saveSyncStatus({
           ...prev,
           lastPushAt: ok ? new Date().toISOString() : prev.lastPushAt,
           lastPushFailed: !ok,
           lastPushAttemptAt: new Date().toISOString(),
           failedCardCount: ok ? 0 : null,
+          ownerUserId: user.id,
         });
         if (!ok && !cancelled) {
           setStatus({ kind: "push-warning", message: "Sync upload failed. Your progress is safe locally." });
@@ -259,12 +262,15 @@ export default function CallbackCompletePage() {
     await saveSession({ cards: rebuilt, limits });
     // Advance every cursor so the next background pullAndMerge starts from a
     // non-null anchor (#293 / #577 lesson applied across all tables).
+    // Stamp ownerUserId so guardAccountSwitch recognises this device as belonging
+    // to this user going forward (guest-claim and keep-cloud paths). (#1712)
     const prev = loadSyncStatus();
     saveSyncStatus({
       ...prev,
       lastPullAt: maxCloudUpdatedAt(data.cloudRows),
       lastSettingsPullAt: data.cloudSettingsUpdatedAt ?? prev.lastSettingsPullAt,
       lastSeenResetAt: data.cloudLastResetAt ?? prev.lastSeenResetAt,
+      ownerUserId: user?.id ?? prev.ownerUserId,
     });
     // Wake an open Stats mount (streakDates / gradeLog read on the
     // session-key effect).
@@ -310,12 +316,15 @@ export default function CallbackCompletePage() {
       void auxPushes;
 
       const prev = loadSyncStatus();
+      // Stamp ownerUserId so guardAccountSwitch recognises this device's data
+      // as belonging to this user going forward (keep-local conflict path). (#1712)
       saveSyncStatus({
         ...prev,
         lastPushAt: cardsOk ? new Date().toISOString() : prev.lastPushAt,
         lastPushFailed: !cardsOk,
         lastPushAttemptAt: new Date().toISOString(),
         failedCardCount: cardsOk ? 0 : null,
+        ownerUserId: user?.id ?? prev.ownerUserId,
       });
       if (!cardsOk) {
         setStatus({ kind: "push-warning", message: "Sync failed. Your progress is safe locally." });

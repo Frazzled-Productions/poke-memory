@@ -23,6 +23,7 @@ vi.mock("@/lib/sync/persistence", () => ({
     lastSettingsPullAt: null,
     lastSeenResetAt: null,
     structuralSyncError: null,
+    ownerUserId: null,
   })),
   savePendingQueue: vi.fn(),
   clearPendingQueue: vi.fn(),
@@ -401,6 +402,7 @@ describe("usePerGradeSync - structural error: drain marks structural immediately
       lastSettingsPullAt: null,
       lastSeenResetAt: null,
       structuralSyncError: null,
+      ownerUserId: null,
     });
     vi.mocked(hasStructuralProbeBeenAttempted).mockReturnValue(false);
   });
@@ -418,8 +420,8 @@ describe("usePerGradeSync - structural error: drain marks structural immediately
     // After the push, structuralSyncError is now set (simulating markStructuralSyncError
     // having been called by cloud.ts during the push).
     vi.mocked(loadSyncStatus)
-      .mockReturnValueOnce({ lastPushAt: null, lastPushFailed: false, lastPushAttemptAt: null, failedCardCount: null, lastPullAt: null, lastSettingsPullAt: null, lastSeenResetAt: null, structuralSyncError: null })  // first call: pre-push check
-      .mockReturnValue({ lastPushAt: null, lastPushFailed: true, lastPushAttemptAt: null, failedCardCount: null, lastPullAt: null, lastSettingsPullAt: null, lastSeenResetAt: null, structuralSyncError: "42P10" }); // post-push check
+      .mockReturnValueOnce({ lastPushAt: null, lastPushFailed: false, lastPushAttemptAt: null, failedCardCount: null, lastPullAt: null, lastSettingsPullAt: null, lastSeenResetAt: null, structuralSyncError: null, ownerUserId: null })  // first call: pre-push check
+      .mockReturnValue({ lastPushAt: null, lastPushFailed: true, lastPushAttemptAt: null, failedCardCount: null, lastPullAt: null, lastSettingsPullAt: null, lastSeenResetAt: null, structuralSyncError: "42P10", ownerUserId: null }); // post-push check
 
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
@@ -449,6 +451,7 @@ describe("usePerGradeSync - structural error: drain marks structural immediately
       lastSettingsPullAt: null,
       lastSeenResetAt: null,
       structuralSyncError: "42P10",
+      ownerUserId: null,
     });
     vi.mocked(hasStructuralProbeBeenAttempted).mockReturnValue(false);
     vi.mocked(pushSingleCard).mockResolvedValue(true); // probe succeeds!
@@ -481,6 +484,7 @@ describe("usePerGradeSync - structural error: drain marks structural immediately
       lastSettingsPullAt: null,
       lastSeenResetAt: null,
       structuralSyncError: "42P10",
+      ownerUserId: null,
     });
     // Probe already attempted this session.
     vi.mocked(hasStructuralProbeBeenAttempted).mockReturnValue(true);
