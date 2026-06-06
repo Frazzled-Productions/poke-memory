@@ -33,7 +33,7 @@ export default async function TermsPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Terms of Use</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 16 May 2026
+          Last updated: 6 June 2026
         </p>
       </header>
 
@@ -123,6 +123,14 @@ export default async function TermsPage() {
             (PITR) in place for this project</strong>: a destructive operation
             or database failure could result in permanent data loss. We will not
             be liable for any such loss.
+          </p>
+          <p className="mb-3">
+            If you have a username and password account, there is{" "}
+            <strong>no password-reset mechanism</strong>: no email address is
+            associated with your account, so we have no way to send you a reset
+            link. Keep a record of your password in a safe place. If you forget
+            it, you will need to create a new account, and your previous progress
+            cannot be recovered.
           </p>
           <p>
             The Service may be suspended, terminated, or have features removed

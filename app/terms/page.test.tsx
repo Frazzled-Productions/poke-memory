@@ -59,6 +59,14 @@ describe("Terms of Use page", () => {
       expect(numberMatches.length).toBeGreaterThan(0);
     });
 
+    it("warns that username and password accounts cannot recover a lost password (#1672)", async () => {
+      await renderPage();
+      expect(screen.getByText(/no password-reset mechanism/i)).toBeTruthy();
+      expect(
+        screen.getByText(/your previous progress\s*cannot be recovered/i),
+      ).toBeTruthy();
+    });
+
     it("does NOT show the English-only notice in the English locale", async () => {
       vi.mocked(resolveLocale).mockResolvedValueOnce("en");
       await renderPage();

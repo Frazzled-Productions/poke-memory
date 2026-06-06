@@ -159,9 +159,20 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 4 June 2026 (#1623)", async () => {
+    it("shows the last updated date as 6 June 2026 (#1672)", async () => {
       await renderPage();
-      expect(screen.getByText(/4 june 2026/i)).toBeTruthy();
+      expect(screen.getByText(/6 june 2026/i)).toBeTruthy();
+    });
+
+    it("documents the username and password sign-in option (#1672)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/Signed-in mode \(GitHub, Google, or username and password\)/i),
+      ).toBeTruthy();
+      // The synthetic-internal-email explanation for username accounts.
+      expect(
+        screen.getByText(/synthetic internal email address that is not a real address/i),
+      ).toBeTruthy();
     });
 
     it("does NOT show the English-only notice in the English locale", async () => {

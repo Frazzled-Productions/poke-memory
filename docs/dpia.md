@@ -37,7 +37,7 @@ Poké Memory operates two distinct paths:
 
 - **Guest path.** All card-review state is held in browser `localStorage`. No data is transmitted to any server the controller operates. Pokémon sprites are served as static files from the same Vercel infrastructure as the app - no third-party image CDN. The guest path involves no server-side personal-data processing.
 
-- **Authenticated path.** When a user signs in via GitHub or Google OAuth, per-card review state is synchronised to a Supabase Postgres database so the user can continue across devices. This is the path where UK GDPR applies in full.
+- **Authenticated path.** When a user signs in via GitHub or Google OAuth, or creates a username and password account directly, per-card review state is synchronised to a Supabase Postgres database so the user can continue across devices. This is the path where UK GDPR applies in full.
 
 The processing activities on the authenticated path are:
 
@@ -49,7 +49,7 @@ The processing activities on the authenticated path are:
 
 ### Scope
 
-- **Authenticated users:** any user who signs in via GitHub or Google. Sign-in requires a GitHub or Google account; both providers impose a minimum age of 13 (or 16 in some EU jurisdictions).
+- **Authenticated users:** any user who signs in via GitHub or Google OAuth, or who creates a username and password account directly. The OAuth providers impose a minimum age of 13 (or 16 in some EU jurisdictions). The username/password door has no inherited age gate; age assurance for those accounts relies on the Children's Code uniform-standards approach applied to all users (see Step 6, R4, and `docs/childrens-code-assessment.md`).
 - **Guest users:** any user who does not sign in, including children of any age. This is the default and primary path.
 - **Analytics:** all users on both paths.
 
@@ -76,11 +76,11 @@ All of the following apply to **authenticated users only** unless stated otherwi
 | Daily activity dates | Calendar dates on which at least one review was completed | `streak_days` |
 | Grade events | Card type, subject identifier, grade chosen, entry date, precise timestamp | `grade_log` |
 | User settings | Daily review limits, practice scope, theme, timezone | `user_settings` |
-| Auth account record (held by Supabase Auth, not our own tables) | Email and display name returned by the OAuth provider; used only for authentication | Supabase Auth schema |
+| Auth account record (held by Supabase Auth, not our own tables) | For OAuth accounts: the email address and display name returned by the provider, used only for authentication. For username/password accounts: the chosen username (also stored in `public.usernames`) plus a synthetic internal email that is not a real address and is never shown to the user or used to send mail. A username may be personal data if the user chooses a name that identifies them. | Supabase Auth schema; `public.usernames` |
 | Aggregate analytics (all users) | Page path, referrer, country, device type, Core Web Vitals - no per-user identifier, no cookie | Vercel infrastructure |
 | Feedback submissions | Category label, free-text message (up to 2,000 chars), page pathname, app version. user_id nullable (null for guest submissions). May contain personal data typed by the user. | `feedback` |
 
-No special-category data (Article 9) is collected. No name or email address is written into our own tables - our five tables are keyed only by the opaque UUID issued by Supabase Auth (the `feedback` table's user_id is nullable for guests).
+No special-category data (Article 9) is collected. For OAuth accounts, no name or email from the provider is written into our own tables. For username/password accounts, the chosen username is written to `public.usernames` (keyed by the user UUID) and may be personal data if the user selects a name that identifies them; the synthetic internal email used by Supabase Auth for those accounts is not a real address and is never shown to the user. Our review tables remain keyed only by the opaque UUID issued by Supabase Auth (the `feedback` table's user_id is nullable for guests).
 
 As of #1369, the app UI renders in the user's chosen locale (`en` / `ja` / `zh-Hans` / `zh-Hant`), selected via the `poke-memory:locale` cookie. **This applies to all users - guest and authenticated** - since the locale cookie is set on explicit locale selection regardless of sign-in state. The chosen locale is a display preference only - it is **not personal data**: it carries no tracking payload, does not identify the individual, and is set only on an explicit user selection. It is recorded in the PECR storage inventory (`docs/cookies-pecr.md`) as a strictly-necessary functional-preference cookie, on the same footing as theme and timezone.
 
@@ -125,7 +125,7 @@ Each data category is assessed against the purposes stated in Step 2:
 - **Streak dates** (`streak_days`): The streak feature requires a record of which dates had at least one review. No alternative representation can produce this without storing the dates. Necessary.
 - **Grade-event log** (`grade_log`): Per-user FSRS-weight optimisation requires a time-ordered log of grade events; the optimiser reads raw grade sequences, not just aggregates. Necessary.
 - **Settings** (`user_settings`): The cross-device service requires that the user's preferences (daily limits, practice scope, timezone, theme) are available on all devices. Necessary.
-- **Auth account record** (Supabase Auth): Supabase Auth requires a profile record to identify the user on subsequent sign-ins. We do not control this - it is a function of the Supabase Auth service the user explicitly invoked. Necessary for authentication.
+- **Auth account record** (Supabase Auth): Supabase Auth requires a profile record to identify the user on subsequent sign-ins. For OAuth accounts this is handled entirely by the provider exchange. For username/password accounts, the chosen username is the user-visible identifier (stored in `public.usernames`) and the synthetic internal email is a technical artefact required by Supabase Auth's data model, carrying no personal data. Necessary for authentication.
 - **Aggregate analytics** (Vercel): Anonymous, cookieless usage data enables the controller to understand whether the service is reaching users and identify performance regressions. No individual is identified. Proportionate.
 - **Feedback submissions** (`feedback`): Category, message, and pathname are consumed for issue investigation and service improvement. App version is included to contextualise reports against a specific release. user_id is included where present (authenticated users) to enable follow-up with the submitter if needed; it is nullable so guests can submit without being identified. The 2,000-character message limit prevents excessive data collection. Necessary.
 
@@ -164,7 +164,7 @@ Risks are rated on a two-axis grid: **Likelihood** (Very Low / Low / Medium / Hi
 | R1 | Unauthorised access to a user's review data via Supabase (e.g. RLS misconfiguration or compromised credentials) | Low | Medium | Low–Medium |
 | R2 | Cross-border transfer of personal data outside the UK/EEA without adequate safeguards | Low | Medium | Low–Medium |
 | R3 | Excessive data collection beyond what the SRS service requires | Low | Low | Low |
-| R4 | A child under 13 signs in and has personal data stored in Supabase | Low | Low | Low |
+| R4 | A child under 13 creates an account and has personal data stored in Supabase | Low | Medium | Low–Medium |
 | R5 | Data retained beyond its useful life after account deletion | Low | Low | Low |
 | R6 | Anonymous analytics data re-identified and linked to an individual | Very Low | Low | Very Low |
 | R7 | User types personal or sensitive data into the free-text feedback field | Low | Low | Low |
@@ -219,17 +219,22 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 
 ---
 
-### R4 - Child under 13 signs in and has personal data stored
+### R4 - Child under 13 creates an account and has personal data stored
+
+**Review trigger:** Own-account creation (username/password, #1671) was introduced in June 2026, firing the review trigger recorded at Step 7. This assessment is updated accordingly: the inherited 13+ age gate that OAuth provided does not apply to the username/password door, so severity rises from Low to Medium while likelihood remains Low.
 
 **Existing controls:**
 
-- Sign-in requires a GitHub or Google account. Both providers' terms of service require account holders to be at least 13 years old (or 16 in some EU jurisdictions). The app therefore has no mechanism by which an under-13 could sign in without first violating their OAuth provider's age requirements.
-- The privacy notice (§11) explicitly directs under-13s to guest mode and asks them not to sign in.
-- Guest mode - which stores nothing server-side - is the default experience and requires no account.
+- The OAuth doors (GitHub, Google) still carry the providers' 13+ minimum age. The username/password door does not collect or verify age.
+- The privacy notice (§11) explicitly directs under-13s to guest mode and asks them not to create an account or sign in.
+- Guest mode, which stores nothing server-side, is the default experience and requires no account. Children of any age can use the app's full feature set without creating an account.
+- The Children's Code uniform-standards approach is applied to all users regardless of age: minimal data, no profiling, no advertising, high-privacy defaults. The standard of care applied to any under-13 who does create an account is therefore the same as for all users, which satisfies the Code's requirement to treat the worst-case user as a child. The Children's Code assessment (`docs/childrens-code-assessment.md`) records this as the deliberate mitigation.
+- `public.usernames` stores only the user-chosen username alongside the UUID. No age, name, location, or contact details are solicited at account creation.
+- The absence of PITR (#298) means a parental erasure request results in immediate, permanent deletion.
 
-**Residual risk:** Very Low. There is no realistic path by which an under-13 creates authenticated personal-data records without first obtaining a 13+ account from a third party. This residual risk cannot be eliminated by the controller unilaterally, because own-account creation (which would remove the inherited age gate) is not in scope for this service.
+**Residual risk:** Low–Medium. The inherited OAuth age gate is gone for the username/password door. Likelihood stays Low (guest mode is the default path, the privacy notice advises against signing in, and no age-relevant feature drives sign-up). Severity is Medium because authenticated accounts do store personal data (username, FSRS parameters) under the controller's responsibility, though that data is highly minimal and the uniform Children's Code standard applies.
 
-**Acceptable:** Yes.
+**Acceptable:** Yes, on the basis that data minimisation and the uniform-standards approach adequately protect any child who does create an account, and that the privacy notice direction to guest mode is clear. A further review is required if magic-link (#1670) or email + password (#1673) sign-in is added, since those introduce real email collection.
 
 ---
 
@@ -308,7 +313,7 @@ None of these conditions apply to Poké Memory:
 |---|---|
 | Approved by | Frazzled Productions Ltd (company no. 17258540) - privacy@pokememory.com |
 | Date | June 2026 |
-| Reference | Issues #721, #1623 |
+| Reference | Issues #721, #1623, #1672 |
 | Outcome | All residual risks assessed as Low or Very Low. No unacceptable risks identified. No ICO pre-consultation required. |
 
 ### Review triggers
@@ -318,7 +323,7 @@ This DPIA should be reviewed and updated if any of the following occur:
 - A new category of personal data is collected (e.g. age data, payment data, precise location).
 - Social, community, or user-to-user features are added.
 - Advertising, marketing, affiliate, or behavioural-profiling integrations are added.
-- Own-account creation (removing the inherited 13+ OAuth age gate) is added to the service.
+- Own-account creation was added in #1671 (username/password, June 2026): this trigger fired and R4 was updated accordingly. A further review is required if magic-link (#1670) or email + password (#1673) sign-in is added, since those introduce real email collection.
 - A new sub-processor is engaged.
 - A significant security incident occurs affecting the confidentiality, integrity, or availability of user data.
 - The Children's Code assessment (`docs/childrens-code-assessment.md`) is updated to reflect a changed risk profile.
