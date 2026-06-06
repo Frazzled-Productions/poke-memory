@@ -8,7 +8,7 @@
 
 The ICO's *Age Appropriate Design Code* ("Children's Code") **applies** to Poké Memory. A Pokémon-themed learning app is likely to be accessed by children in the UK, and "likely to be accessed" - not "directed at" - is the statutory trigger.
 
-The good news: Poké Memory's existing architecture already satisfies the substance of most of the 15 standards. It collects minimal data, runs no advertising or marketing profiling, sets no tracking cookies, defaults to a guest mode that stores nothing server-side, and gates all server-side data collection behind a third-party account (GitHub or Google) that itself enforces a 13+ minimum age.
+The good news: Poké Memory's existing architecture already satisfies the substance of most of the 15 standards. It collects minimal data, runs no advertising or marketing profiling, sets no tracking cookies, and defaults to a guest mode that stores nothing server-side. Server-side data collection requires account creation, which can be done via GitHub OAuth, Google OAuth, or (as of #1671) a direct username/password account. The OAuth doors carry an inherited 13+ age gate; the username/password door does not, and relies instead on the uniform-standards approach (the same high-privacy, minimal-data design applied to all users regardless of age) described under Standard 3.
 
 The gaps are about **transparency and documentation**, not data practices: the privacy notice is not written in age-appropriate language, there is no child-facing summary, and a handful of standards have never been explicitly recorded as design decisions. None of the gaps are data-flow changes. They are addressed below - trivial ones are noted as in-scope for the issue #699 PR, larger ones are filed as follow-ups.
 
@@ -26,10 +26,11 @@ The Children's Code applies to "information society services likely to be access
 
 ### Interaction with the under-13 sign-in position
 
-The privacy notice currently says the app is "not directed at children under 13" and asks under-13s to use guest mode rather than signing in. That remains a sensible position for the **authenticated** path, because:
+The privacy notice currently says the app is "not directed at children under 13" and asks under-13s to use guest mode rather than creating an account or signing in. That remains a sensible position for the **authenticated** path, because:
 
-- Sign-in requires a GitHub or Google account. Both providers' terms set a **minimum age of 13** (16 in some jurisdictions). A child under 13 should not hold either account.
-- This means server-side personal-data processing is gated behind a third-party account that is itself age-restricted. The app never operates an under-13 account on its own infrastructure.
+- The OAuth doors require a GitHub or Google account. Both providers' terms set a **minimum age of 13** (16 in some jurisdictions). A child under 13 should not hold either account.
+- The username/password door (#1671) has no inherited age gate, so it does not provide age assurance on its own. Its mitigation is the uniform-standards approach (Standard 3): the same high-privacy, minimal-data design applies to every account regardless of the holder's age.
+- Either way, the data processed is highly minimal and guest mode (which stores nothing server-side) remains the default, account-free experience.
 
 But this does **not** remove the app from the Children's Code's scope, because:
 
@@ -52,7 +53,7 @@ The Code's 15 standards are assessed below. Each is marked **Met**, **Met (recor
 
 ### 3. Age-appropriate application
 
-**Met, with one transparency gap.** The app applies the same high-privacy, low-data design to all users regardless of age - it does not attempt to estimate age and vary the experience. For a service of this risk profile the ICO accepts applying the standards to **all** users as a valid alternative to age assurance, and that is what Poké Memory does. The only age-related distinction is the sign-in age gate inherited from GitHub/Google. The gap is purely that the privacy notice is not written in language a child can understand (see Standard 4).
+**Met, with one transparency gap.** The app applies the same high-privacy, low-data design to all users regardless of age - it does not attempt to estimate age and vary the experience. For a service of this risk profile the ICO accepts applying the standards uniformly to **all** users as a valid alternative to age assurance, and that is what Poké Memory does. As of #1671 a username/password door exists alongside the GitHub and Google OAuth options. The OAuth doors carry an inherited 13+ age gate; the username/password door does not. The uniform-standards approach is the deliberate mitigation for that: because the same high-privacy, minimal-data standard applies to every account regardless of the holder's age, the worst-case scenario (an under-13 creating a username/password account) is fully covered by those standards, which is the ICO's accepted approach where age assurance is not used. The remaining gap is purely that the privacy notice is not written in language a child can understand (see Standard 4).
 
 ### 4. Transparency
 
@@ -72,7 +73,7 @@ The Code's 15 standards are assessed below. Each is marked **Met**, **Met (recor
 
 ### 8. Data minimisation
 
-**Met.** This is a clear strength. The app collects only what the spaced-repetition service needs: per-card FSRS parameters, daily review dates, a grade-event log, and user settings - all keyed to an opaque Supabase user UUID. Our own tables hold no name, no email, no profile data. No precise location, no advertising identifiers, no payment data. Guest users have nothing collected server-side at all. See privacy notice §3.
+**Met.** This is a clear strength. The app collects only what the spaced-repetition service needs: per-card FSRS parameters, daily review dates, a grade-event log, and user settings - all keyed to an opaque Supabase user UUID. Our review tables hold no name, no email, no profile data, no precise location, no advertising identifiers, and no payment data. For username/password accounts (#1671) the chosen username is stored in `public.usernames` alongside the UUID; it may be personal data if the user picks a name that identifies them, and no other profile data is collected at account creation. Guest users have nothing collected server-side at all. See privacy notice §3.
 
 ### 9. Data sharing
 
@@ -132,11 +133,11 @@ The US *Children's Online Privacy Protection Act* (COPPA) is narrower than the C
 High-level position for Poké Memory:
 
 - **Guest path:** COPPA's core obligations attach to the *collection* of personal information from a child. The guest path collects no personal information server-side - review state never leaves the device. There is no collection for COPPA to regulate.
-- **Authenticated path:** Sign-in requires a GitHub or Google account, and both providers require account holders to be **13 or older**. The app therefore has no reasonable basis to expect - and gains no actual knowledge of - under-13 sign-ins. Personal information is collected only after an age-gated third-party authentication. The privacy notice §11 additionally states the app is not directed at under-13s and asks them not to sign in.
+- **Authenticated path:** The OAuth doors require a GitHub or Google account, and both providers require account holders to be **13 or older**, so the app gains no actual knowledge of under-13 sign-ins via those doors. The username/password door (#1671) has no age gate, but it collects no contact information: only a chosen username (which is not, by itself, the contact information COPPA centres on) and FSRS review data. The app has no mechanism by which it gains actual knowledge that an account holder is under 13. The privacy notice §11 additionally states the app is not directed at under-13s and asks them not to create an account or sign in.
 - **"Directed to children":** The FTC's multi-factor test (subject matter, visuals, child-oriented activities, etc.) could plausibly weigh toward "directed to children" given the Pokémon theme - the same honest read applies as for the Children's Code's "likely to be accessed" test. But because the only path that collects personal information is gated behind an age-restricted 13+ account, the practical COPPA exposure is low: there is no mechanism by which the app knowingly collects personal information from an under-13.
 - **Vercel Analytics:** Analytics runs for all visitors regardless of path or age, so it would collect country-level aggregate metrics from any US-based under-13 who uses the app. It is cookieless and gathers no per-user identifier, no precise location, and no contact details - the data is aggregated and not tied to an individual. COPPA's "personal information" definition turns on data collected from a child that could identify or contact them; aggregate, cookieless country counts do not meet that bar, so Analytics does not bring the app within COPPA's collection trigger. It is noted here for completeness rather than as a gap.
 
-**Conclusion:** COPPA exposure is low and is adequately mitigated by the existing design - guest mode collects nothing, and authenticated collection sits behind a 13+ age gate. No COPPA-specific changes are recommended at this time. This position should be revisited if the app ever adds its own (non-OAuth) account creation, since that would remove the inherited age gate.
+**Conclusion:** Own-account creation via username/password was added in #1671. COPPA exposure remains low: the guest path collects no personal information server-side; username/password accounts collect only the chosen username and FSRS review data, which are not the contact information COPPA centres on; and there is no mechanism by which the app gains actual knowledge that an account holder is under 13. The privacy notice §11 states the app is not directed at under-13s and asks them not to sign in. No COPPA-specific changes are recommended at this time. This position should be revisited if magic-link or email + password sign-in is added (#1670, #1673), since those introduce email collection.
 
 ## Outcome and follow-ups
 
@@ -198,7 +199,7 @@ This review was conducted by a non-native expert and materially improves registe
 
 This assessment should be revisited if any of the following change:
 
-- The app adds its own account creation (removing the inherited 13+ age gate).
+- Own-account creation (username/password) was added in #1671 (June 2026): this trigger fired, and Standards 3 and 8, the COPPA section, and the under-13 sign-in position were updated for the uniform-standards approach. A further review is required when magic-link (#1670) or email + password (#1673) ships, since those introduce real email collection.
 - The app UI is translated into a new locale, or machine-translated copy is replaced by human-reviewed copy.
 - Social, community, or user-to-user features are added.
 - Advertising, marketing, affiliate, or behavioural-profiling integrations are added.

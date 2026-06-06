@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 4 June 2026
+          Last updated: 6 June 2026
         </p>
       </header>
 
@@ -91,13 +91,14 @@ export default async function PrivacyPage() {
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
-            Signed-in mode (GitHub or Google OAuth)
+            Signed-in mode (GitHub, Google, or username and password)
           </h3>
           <p>
-            When you sign in with GitHub or Google, your per-card review
-            history is synchronised to a Supabase Postgres database so you can
-            continue across devices. This is where personal data processing
-            begins and this notice applies in full.
+            When you sign in, via GitHub, Google, or a username and password you
+            create directly, your per-card review history is synchronised to a
+            Supabase Postgres database so you can continue across devices. This
+            is where personal data processing begins and this notice applies in
+            full.
           </p>
         </section>
 
@@ -137,13 +138,17 @@ export default async function PrivacyPage() {
             address, or any profile information beyond that identifier.
           </p>
           <p className="mt-2">
-            Separately, Supabase Auth maintains your account record. When you
-            sign in via GitHub or Google, the OAuth provider returns a profile
-            to Supabase Auth that typically includes the email address and
-            display name associated with the account you signed in with;
-            Supabase Auth stores this on the account record so it can identify
-            you on your next sign-in. We use it only for authentication; it is
-            never written into our review-history tables and is never used for
+            Separately, Supabase Auth maintains your account record. If you sign
+            in via GitHub or Google, the OAuth provider returns a profile to
+            Supabase Auth that typically includes the email address and display
+            name associated with the account you signed in with; Supabase Auth
+            stores this on the account record so it can identify you on your next
+            sign-in. If you create a username and password account, Supabase Auth
+            stores your chosen username (which may be personal data if it
+            identifies you) and a synthetic internal email address that is not a
+            real address and is never shown to you or used to send you mail. In
+            both cases this data is used only for authentication; it is never
+            written into our review-history tables and is never used for
             marketing or tracking.
           </p>
 
@@ -287,7 +292,8 @@ export default async function PrivacyPage() {
             </li>
             <li>
               <strong>Supabase Auth session cookie (signed-in path only).</strong>{" "}
-              When you sign in with GitHub or Google, Supabase Auth sets an
+              When you sign in, via GitHub, Google, or username and password,
+              Supabase Auth sets an
               HTTP-only session cookie containing a signed JWT. This cookie is strictly
               necessary to keep you authenticated across requests. It is not
               set in guest mode and is not used for advertising or tracking.
@@ -538,14 +544,15 @@ export default async function PrivacyPage() {
             7. International transfers
           </h2>
           <p>
-            The third-party services listed in §6 (Vercel, Supabase, and, if
-            you choose to sign in, GitHub or Google) may process data outside
-            the UK / EEA. Vercel and Supabase (our sub-processors) operate
-            under the EU Standard Contractual Clauses (SCCs), providing
-            equivalent safeguards via the UK International Data Transfer
-            Agreement (IDTA) addendum. GitHub and Google act as independent
-            controllers under their own applicable transfer mechanisms,
-            including their own published SCCs with end-users.
+            The third-party services listed in §6 (Vercel; Supabase if you
+            sign in by any method, including username and password; and, if
+            you sign in via GitHub or Google, those providers) may process
+            data outside the UK / EEA. Vercel and Supabase (our
+            sub-processors) operate under the EU Standard Contractual Clauses
+            (SCCs), providing equivalent safeguards via the UK International
+            Data Transfer Agreement (IDTA) addendum. GitHub and Google act as
+            independent controllers under their own applicable transfer
+            mechanisms, including their own published SCCs with end-users.
           </p>
         </section>
 
@@ -642,10 +649,13 @@ export default async function PrivacyPage() {
               className={inlineLink}
             >
               privacy@pokememory.com
-            </a>{" "}
-            from the email address associated with the GitHub or Google
-            account you signed in with, so we can verify the request. We will
-            respond within one month.
+            </a>
+            . If you signed in with GitHub or Google, please write from the email
+            address associated with that account so we can verify the request. If
+            you have a username and password account with no email address,
+            please include your username in your message and we will ask you to
+            confirm your identity by other means. We will respond within one
+            month.
           </p>
         </section>
 
@@ -685,11 +695,11 @@ export default async function PrivacyPage() {
           <p>
             Poké Memory is not directed at children under the age of 13. We do
             not knowingly collect personal data from under-13s. If you are
-            under 13, please do not sign in; use guest mode instead, which
-            stores nothing outside your own device. For a plain-language
-            version of this notice suited to younger readers, see the summary
-            above. If you believe a child under 13 has signed in, please
-            contact us at{" "}
+            under 13, please use guest mode only and do not create an account or
+            sign in; guest mode stores your progress on your own device and
+            nothing is sent to us. For a plain-language version of this notice
+            suited to younger readers, see the summary above. If you believe a
+            child under 13 has created an account, please contact us at{" "}
             <a
               href="mailto:privacy@pokememory.com"
               className={inlineLink}
