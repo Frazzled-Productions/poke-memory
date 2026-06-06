@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("PWA cold-start splash", () => {
-  test("inline script creates splash before JS runs, then React removes it", async ({
+test.describe("PWA cold-start theme application", () => {
+  test("inline script applies theme background before JS runs", async ({
     page,
   }) => {
     await page.goto("/");
@@ -14,7 +14,8 @@ test.describe("PWA cold-start splash", () => {
     );
     expect(bg).not.toBe("");
 
-    // React removed the splash div after hydrating
+    // The Pokéball overlay (#pwa-splash) was removed in #1727. Verify no
+    // residual splash element is present after hydration.
     await expect(page.locator("#pwa-splash")).not.toBeAttached();
   });
 });
