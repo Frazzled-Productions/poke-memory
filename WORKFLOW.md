@@ -67,6 +67,13 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 
 **`ux-advisor` before writing onboarding/discoverability code.** On the same design-time pattern as `workflow-expert` before GitHub Actions, invoke `ux-advisor` on the brief **before** dispatching the implementer for any change that adds a user-facing feature, changes how something is displayed, or changes how something is accessed/discovered. The planner's testability + first-contact UX pre-flight (#1276) names this hook; any discoverability gap `ux-advisor` cannot resolve from the existing code becomes a `[USER-DECISION]` open question or a dedicated acceptance criterion. At review time, `code-reviewer` raises a new surface with no declared discovery path as a Concern (the "Discoverability" check in its step-3 list) - auto-review.yml is unchanged, the check lives in the agent definition.
 
+**Orchestration entrypoints - `/batch-issues` and `/ship`.** Two local slash-commands run the playbook end-to-end so the gate, the in-session `code-reviewer` pass, the issue-first cross-check, and branch-off-`qa` are not re-derived by hand each time:
+
+- **`/batch-issues`** (`.claude/commands/batch-issues.md`) - drains the open backlog in conflict-minimizing batches, parallel where safe, draining into `qa` and opening a draft `qa -> main` promotion PR. Use for a backlog pass.
+- **`/ship`** (`.claude/commands/ship.md`, #1718) - the single-change projection of `/batch-issues`: one issue (or one freshly-created issue) → branch off `qa` → implement → `npm run pre-pr` gate → PR into `qa` with `Closes #N` → `code-reviewer` → auto-merge. It **defers** to `/batch-issues` for the gate, review, and branching rules rather than restating them, so the two paths never diverge. Use for one linear change where the batch machinery is overkill.
+
+Both run the same `npm run pre-pr` gate (AGENTS.md "Pre-PR build gate") and the same `code-reviewer` pass; the only difference is batch fan-out vs single change.
+
 ---
 
 ## Issue lifecycle
@@ -696,6 +703,20 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Idempotency** | The marker comment is upserted (patched in place) rather than appended, so a missed cron tick does not produce a stack of duplicate comments. |
 | **Required secrets** | None (uses `GITHUB_TOKEN`). |
 | **Concurrency** | Default; no concurrency group. The work is cheap (a few API calls) and runs once per day. |
+
+---
+
+### `cut-release.yml` - Cut Release
+
+| | |
+|---|---|
+| **Trigger** | `workflow_dispatch` only. Any maintainer dispatches it to open the correct `qa -> main` promotion PR for a **hand-rolled** release (the path `/batch-issues` automates at end of drain; #1715). |
+| **What it does** | (1) Computes the `origin/main..origin/qa` range and parses `closes/fixes/resolves #N` from both the range's commit messages and each linked merged PR's body (the same keyword set GitHub honours, mirroring `qa-issue-label.yml`), aggregating a `## Closes` section so the promotion closes every referenced issue on merge. (2) Runs the aggregate diff-coverage gate over the whole `qa`-vs-`main` diff (`git diff origin/main...origin/qa \| node scripts/diff-coverage.mjs`, WORKFLOW.md "Batch-drain pre-flight") and surfaces the result in the PR body. (3) Opens, or edits in place if already open, the `qa -> main` PR as a **draft** with the body + summary. |
+| **Why** | A hand-rolled promotion opened by hand skips the aggregated `Closes #N` and the aggregate diff-coverage check. The v0.10.35 release missed every `Closes #N` (11 issues left open, reconciled manually + the #1714 label safety net) and skipped the aggregate check. This makes the correct promotion PR a single dispatch, whether or not the batch came through `/batch-issues` (it reads the live range, not session state). |
+| **Idempotency** | Looks up an existing open PR (`--base main --head qa`) and edits it; never opens a duplicate on re-dispatch. |
+| **Coverage breach** | Below-bar aggregate diff coverage fails the job *after* the PR is opened/updated (so the maintainer still gets the PR), unless the `coverage_fail_on_breach` dispatch input is set false (annotate-only). |
+| **Token** | Mints a `poke-memory-bot` App installation token (same as `auto-release.yml`) so the PR behaves like a bot-opened promotion and `auto-review.yml`'s `head.ref == 'qa'` skip applies. **Does not merge** - the maintainer's preview QA is the gate. |
+| **Concurrency** | Shares `group: auto-release` (`cancel-in-progress: false`) so a dispatch cannot race a release run touching the same qa/main state. |
 
 ---
 

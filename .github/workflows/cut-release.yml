@@ -1,0 +1,254 @@
+name: Cut Release
+
+# Opens (or updates) the `qa -> main` promotion PR correctly for a HAND-ROLLED
+# release - the path `/batch-issues` automates at the end of a batch drain, but
+# which a one-off promotion opened by hand skips (#1715). The v0.10.35 release
+# was promoted by hand, missed every `Closes #N` (11 issues left open, then
+# reconciled manually + the #1714 label safety net added) and skipped the
+# aggregate diff-coverage check. This workflow makes the correct promotion PR a
+# single dispatch.
+#
+# What one dispatch does:
+#   1. Computes the `origin/main..origin/qa` commit range and parses
+#      `closes/fixes/resolves #N` from the commit messages AND each linked PR's
+#      body, aggregating a `## Closes` section (the same keyword set GitHub
+#      honours and qa-issue-label.yml mirrors).
+#   2. Runs the aggregate diff-coverage gate over the whole qa-vs-main diff
+#      (`git diff origin/main...origin/qa | node scripts/diff-coverage.mjs`,
+#      WORKFLOW.md "Batch-drain pre-flight"). The result is surfaced in the PR
+#      body; below-bar fails the job so the maintainer sees it before merge.
+#   3. Opens - or, if one is already open, EDITS in place - the `qa -> main`
+#      PR as a DRAFT, with the body + a generated summary. The maintainer marks
+#      it ready after the preview QA, then merges (which triggers
+#      auto-release.yml).
+#
+# Idempotent: re-dispatching never opens a duplicate. It looks up an existing
+# open PR with base `main` + head `qa` first and edits that one.
+#
+# Works whether or not the batch came through `/batch-issues`: it reads the live
+# `origin/main..origin/qa` range, not any `/batch-issues` session state.
+#
+# Token: mints a poke-memory-bot App installation token (same as
+# auto-release.yml) so the opened PR and its CI behave like the bot-opened batch
+# promotion PR (and so auto-review.yml's `head.ref == 'qa'` skip still applies).
+#
+# This does NOT merge anything. The maintainer's QA of the qa preview is the gate
+# between batch work and production (mirrors the /batch-issues "never merge the
+# qa -> main PR yourself" guardrail).
+
+on:
+  workflow_dispatch:
+    inputs:
+      coverage_fail_on_breach:
+        description: "Fail the job if aggregate diff coverage is below the bar (else annotate only)"
+        type: boolean
+        default: true
+
+concurrency:
+  # Share the auto-release group so a cut-release dispatch cannot race a release
+  # run touching the same qa/main state.
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  cut-release:
+    name: Open/update the qa->main promotion PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          # Full history + both branches so the range and the aggregate diff
+          # resolve. Checkout `qa` - the promotion's head branch.
+          ref: qa
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Ensure both branches are fetched
+        run: git fetch origin main qa --quiet
+
+      - name: Guard - qa must be ahead of main
+        run: |
+          set -euo pipefail
+          # `--count` of qa-only commits. Zero means nothing to promote.
+          AHEAD=$(git rev-list --count origin/main..origin/qa)
+          echo "qa is $AHEAD commit(s) ahead of main."
+          if [ "$AHEAD" -eq 0 ]; then
+            echo "::error::qa has no commits ahead of main - nothing to promote. No PR opened."
+            exit 1
+          fi
+
+      - name: Aggregate the Closes references over the qa..main range
+        id: closes
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Same keyword set GitHub honours / qa-issue-label.yml mirrors:
+          # close, closes, closed, fix, fixes, fixed, resolve, resolves,
+          # resolved, with an optional colon. The leading `\b` stops a match
+          # inside a longer word.
+          REF='\b(close[sd]?|fix(es|ed)?|resolve[sd]?):? +#[0-9]+'
+
+          # 1. References in commit messages on the qa..main range (headline +
+          #    body of every commit qa has that main does not).
+          COMMIT_MSGS=$(git log origin/main..origin/qa --format='%B')
+          COMMIT_REFS=$(printf '%s\n' "$COMMIT_MSGS" | grep -oiE "$REF" || true)
+
+          # 2. References in each linked PR's body. A squash-merged batch PR
+          #    collapses to one commit on qa whose message may not carry every
+          #    `Closes #N` the original PR body did, so read the PR bodies too.
+          #    Map each range commit to its PR via the search API, de-dupe PR
+          #    numbers, then pull each PR body.
+          PR_NUMS=""
+          for SHA in $(git rev-list origin/main..origin/qa); do
+            FOUND=$(gh pr list --repo "$REPO" --state merged --search "$SHA" \
+              --json number --jq '.[].number' 2>/dev/null || true)
+            PR_NUMS="$PR_NUMS $FOUND"
+          done
+          PR_NUMS=$(printf '%s\n' $PR_NUMS | grep -oE '[0-9]+' | sort -un || true)
+
+          PR_BODY_REFS=""
+          for PR in $PR_NUMS; do
+            BODY=$(gh pr view "$PR" --repo "$REPO" --json body --jq '.body // ""' 2>/dev/null || true)
+            HIT=$(printf '%s\n' "$BODY" | grep -oiE "$REF" || true)
+            PR_BODY_REFS="$PR_BODY_REFS"$'\n'"$HIT"
+          done
+
+          # Extract bare issue numbers from both sources and de-duplicate.
+          ISSUES=$(printf '%s\n%s\n' "$COMMIT_REFS" "$PR_BODY_REFS" \
+            | grep -oE '[0-9]+' | sort -un || true)
+
+          # Build the `## Closes` section: one `Closes #N` line per issue, so
+          # GitHub closes every one of them when the promotion PR merges into
+          # main (the default branch).
+          {
+            echo "## Closes"
+            echo ""
+            if [ -z "$ISSUES" ]; then
+              echo "_No closing references found in the qa..main range._"
+            else
+              for N in $ISSUES; do echo "Closes #$N"; done
+            fi
+          } > /tmp/closes.md
+
+          COUNT=$(printf '%s\n' "$ISSUES" | grep -cE '[0-9]+' || true)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Aggregated $COUNT closing reference(s)."
+          cat /tmp/closes.md
+
+      - name: Aggregate diff-coverage gate (qa vs main)
+        id: diffcov
+        env:
+          # The diff-coverage script reads coverage/coverage-final.json. Produce
+          # it once; the script does not run the suite itself.
+          DIFF_COVERAGE_OUT: /tmp/diff-coverage.md
+        run: |
+          set -euo pipefail
+          npm run test:coverage
+          if [ ! -f coverage/coverage-final.json ]; then
+            echo "::error::coverage/coverage-final.json missing - coverage run failed before producing it."
+            exit 1
+          fi
+          # Aggregate over the whole qa-vs-main diff (WORKFLOW.md
+          # "Batch-drain pre-flight"). `set +e` so a below-bar exit is captured
+          # rather than aborting before we can record it.
+          set +e
+          git diff origin/main...origin/qa | node scripts/diff-coverage.mjs
+          DIFFCOV_STATUS=$?
+          set -e
+          echo "status=$DIFFCOV_STATUS" >> "$GITHUB_OUTPUT"
+          if [ "$DIFFCOV_STATUS" -ne 0 ]; then
+            echo "::warning::Aggregate diff coverage is below the bar (see the PR body for the breakdown)."
+          fi
+
+      - name: Open or update the qa->main promotion PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          DIFFCOV_STATUS: ${{ steps.diffcov.outputs.status }}
+          CLOSES_COUNT: ${{ steps.closes.outputs.count }}
+          FAIL_ON_BREACH: ${{ inputs.coverage_fail_on_breach }}
+        run: |
+          set -euo pipefail
+
+          # Assemble the PR body: a generated summary, the aggregated Closes
+          # section, and the aggregate diff-coverage result.
+          BODY_FILE=$(mktemp)
+          {
+            echo "## Summary"
+            echo ""
+            echo "Promotion of \`qa\` into \`main\` (hand-rolled release, opened by \`cut-release.yml\`, #1715)."
+            echo "$CLOSES_COUNT issue(s) referenced in the \`qa..main\` range; full list below."
+            echo ""
+            cat /tmp/closes.md
+            echo ""
+            echo "## Aggregate diff coverage"
+            echo ""
+            if [ "${DIFFCOV_STATUS:-0}" = "0" ]; then
+              echo "Aggregate diff coverage over the whole \`qa\`-vs-\`main\` diff is **at or above the bar**."
+            else
+              echo "**Aggregate diff coverage is BELOW the bar.** A set of PRs that each clear the per-PR 90% patch bar can still leave the aggregate below it (WORKFLOW.md \"Batch-drain pre-flight\"). Add catch-up tests on \`qa\` before promoting."
+            fi
+            if [ -f /tmp/diff-coverage.md ]; then
+              echo ""
+              echo "<details><summary>Diff-coverage breakdown</summary>"
+              echo ""
+              cat /tmp/diff-coverage.md
+              echo ""
+              echo "</details>"
+            fi
+            echo ""
+            echo "---"
+            echo "_Draft until the maintainer QAs the \`qa\` preview, then marks ready + merges. Merging triggers \`auto-release.yml\`._"
+          } > "$BODY_FILE"
+
+          TITLE="Promote qa to main"
+
+          # Idempotency: find an already-open PR with base main + head qa and
+          # edit it in place rather than opening a duplicate.
+          EXISTING=$(gh pr list --repo "$REPO" --state open \
+            --base main --head qa --json number --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            echo "Updating existing open promotion PR #$EXISTING."
+            gh pr edit "$EXISTING" --repo "$REPO" \
+              --title "$TITLE" --body-file "$BODY_FILE"
+            URL=$(gh pr view "$EXISTING" --repo "$REPO" --json url --jq '.url')
+          else
+            echo "Opening a new draft promotion PR."
+            URL=$(gh pr create --repo "$REPO" \
+              --base main --head qa --draft \
+              --title "$TITLE" --body-file "$BODY_FILE")
+          fi
+          echo "Promotion PR: $URL"
+          echo "### Promotion PR: $URL" >> "$GITHUB_STEP_SUMMARY"
+          rm -f "$BODY_FILE"
+
+          # Surface a below-bar coverage result as a job failure last (after the
+          # PR is open/updated so the maintainer still gets the PR), unless the
+          # dispatcher opted out via the input.
+          if [ "${DIFFCOV_STATUS:-0}" != "0" ] && [ "${FAIL_ON_BREACH}" = "true" ]; then
+            echo "::error::Aggregate diff coverage is below the bar. The promotion PR is open/updated; add catch-up tests on qa before merging."
+            exit 1
+          fi
