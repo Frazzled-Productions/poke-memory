@@ -1257,10 +1257,16 @@ test.describe("PWA / offline support", () => {
   }) => {
     // The Serwist Turbopack route at /sw/[path] bundles and serves the worker.
     const res = await request.get("/sw/sw.js");
+    // Assert explicit 200 so a future 500 (e.g. a file-trace gap) fails the
+    // build rather than silently passing because res.ok() is not checked.
+    expect(res.status()).toBe(200);
     expect(res.ok()).toBeTruthy();
     expect(res.headers()["content-type"]).toContain("javascript");
     // The route grants whole-site scope so the worker can control "/".
     expect(res.headers()["service-worker-allowed"]).toBe("/");
+    // Explicit no-cache header prevents a future edge-cache change from
+    // silently freezing PWA updates for all installed users (#1749).
+    expect(res.headers()["cache-control"]).toContain("no-cache");
     const body = await res.text();
     expect(body.length).toBeGreaterThan(0);
   });

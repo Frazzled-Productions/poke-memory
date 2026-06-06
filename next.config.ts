@@ -37,8 +37,39 @@ const nextConfig: NextConfig = {
   // (process.cwd() + filename), which @vercel/nft may not statically trace —
   // include it explicitly so the file ships with the deployment in any
   // output mode.
+  //
+  // /sw/[path] is the Serwist service-worker route. Under cacheComponents:true,
+  // Next 16 ignores the route's `dynamic = "force-static"` / `revalidate = false`
+  // segment exports and ships the route as a request-time serverless function.
+  // That function pulls in next/dist/server/config.js transitively, but
+  // @vercel/nft's file-tracer does not include it in the bundle, so every
+  // request 500s with "Cannot find module .../next/dist/server/config.js".
+  // Explicitly tracing the next/dist/server and next/dist/shared trees forces
+  // the module into the function bundle and restores SW serving immediately.
+  // The proper fix (serving the SW as a static public/ asset) is tracked in a
+  // separate follow-up issue.
   outputFileTracingIncludes: {
     "/whats-new": ["./CHANGELOG.md"],
+    "/sw/[path]": [
+      "./node_modules/next/dist/server/**/*.js",
+      "./node_modules/next/dist/shared/**/*.js",
+    ],
+  },
+  // Explicit no-cache header for the service-worker script. The SW spec
+  // requires no-cache so the browser always revalidates before deciding
+  // whether to install a new version; without it, a future edge-cache change
+  // could silently freeze updates for all installed PWAs.
+  async headers() {
+    return [
+      {
+        source: "/sw/sw.js",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+      {
+        source: "/sw/sw.js.map",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+    ];
   },
   images: {
     // Custom loader routes sprite paths to pre-generated static WebP files,
