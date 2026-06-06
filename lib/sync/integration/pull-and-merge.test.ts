@@ -56,6 +56,7 @@ import {
   dropTestDatabase,
   applyPreMigrationFixture,
   insertAuthUser,
+  pgDateToISO,
 } from "./setup";
 import { applyMigrations } from "./applyMigrations";
 import pg from "pg";
@@ -268,9 +269,7 @@ describe("upsert conflict resolution (integration)", () => {
     expect(Number(row!.difficulty)).toBeCloseTo(4.8);
     // DB stores date columns; the pg client parses them as JS Date objects.
     expect(row!.last_review).toBeInstanceOf(Date);
-    expect(
-      (row!.last_review as Date).toISOString().slice(0, 10),
-    ).toBe("2026-05-20");
+    expect(pgDateToISO(row!.last_review as Date)).toBe("2026-05-20");
   });
 
   it("ON CONFLICT correctly updates updated_at to the EXCLUDED value", async () => {
@@ -401,12 +400,8 @@ describe("updated_at as merge-rule anchor (integration)", () => {
     expect(row).not.toBeNull();
     // Confirm the data the pull would overlay onto the pristine local card.
     expect(Number(row!.reps)).toBe(4);
-    expect(
-      (row!.last_review as Date).toISOString().slice(0, 10),
-    ).toBe("2026-05-15");
-    expect(
-      (row!.first_seen as Date).toISOString().slice(0, 10),
-    ).toBe("2026-05-10");
+    expect(pgDateToISO(row!.last_review as Date)).toBe("2026-05-15");
+    expect(pgDateToISO(row!.first_seen as Date)).toBe("2026-05-10");
   });
 });
 
