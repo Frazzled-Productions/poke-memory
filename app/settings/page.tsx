@@ -28,7 +28,7 @@ import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
 import { loadFavourite, saveFavourite } from "@/lib/theme/persistence";
 import { useFavourite } from "@/components/theme/FavouriteThemeProvider";
 import { isMastered } from "@/lib/stats/derive";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
 import type { ReviewState } from "@/lib/srs/scheduler";
@@ -186,6 +186,7 @@ function FavouritePicker({
 }) {
   const t = useTranslations();
   const { flags } = useSuperuser();
+  const { seed } = useSeed();
   // Loaded once at mount. Nothing on this page writes to the session so a
   // snapshot is safe and avoids re-reading on every render.
   const [cardStateById, setCardStateById] = useState<Map<number, ReviewState>>(new Map());
@@ -240,7 +241,7 @@ function FavouritePicker({
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {unlockedEntries.map((entry) => {
-          const seed = SEED_POKEMON.find((p) => p.id === entry.id);
+          const pokemon = seed?.seedPokemon.find((p) => p.id === entry.id);
           const selected = favouriteId === entry.id;
 
           return (
@@ -253,9 +254,9 @@ function FavouritePicker({
                 style={{ backgroundColor: entry.colors.primary }}
                 aria-hidden="true"
               />
-              {seed?.spriteUrl ? (
+              {pokemon?.spriteUrl ? (
                 <Image
-                  src={seed.spriteUrl}
+                  src={pokemon.spriteUrl}
                   alt={entry.name}
                   width={POKEDEX_GRID_SPRITE_SIZE}
                   height={POKEDEX_GRID_SPRITE_SIZE}
@@ -283,7 +284,7 @@ function FavouritePicker({
               ) : (
                 <button
                   type="button"
-                  onClick={() => onSelect(entry, seed?.spriteUrl ?? null)}
+                  onClick={() => onSelect(entry, pokemon?.spriteUrl ?? null)}
                   className="w-full min-h-[36px] rounded-lg bg-foreground px-3 py-1 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
                 >
                   {t("settings.appearance.theme.setAsTheme")}
@@ -479,6 +480,7 @@ export default function SettingsPage() {
   const { user, supabase } = useAuth();
   const { updateFavourite } = useFavourite();
   const { unlocked, flags, setFlag, anyFlagOn } = useSuperuser();
+  const { seed } = useSeed();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [activeLocale, setActiveLocale] = useState<AppLocale>(DEFAULT_LOCALE);
   const [draftValues, setDraftValues] = useState<Partial<Record<keyof UserSettings, string>>>({});
@@ -2141,7 +2143,7 @@ export default function SettingsPage() {
                                   // locale shows the full masterable total
                                   // (mirrors ProfileStatusBar / useProfileStatus).
                                   const masteredCount = flags.pretendAllMastered
-                                    ? SEED_POKEMON.length
+                                    ? (seed?.seedPokemon.length ?? 0)
                                     : (enrolmentMasteredCounts[loc] ?? 0);
                                   const isPendingConfirm =
                                     pendingUnenrolLocale === loc;

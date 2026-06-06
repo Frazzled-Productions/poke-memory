@@ -37,11 +37,16 @@ vi.mock("next/link", () => ({
 import type { NameReviewCard } from "@/lib/review/session";
 import type { CloudRow } from "@/lib/sync/cloud";
 
-const { mockLoadSession, mockPullSession, mockSuiteUser } = vi.hoisted(() => {
+const { mockLoadSession, mockPullSession, mockSuiteUser, STABLE_SEED } = vi.hoisted(() => {
   const mockLoadSession = vi.fn();
   const mockPullSession = vi.fn();
   const mockSuiteUser = { id: "user-123", user_metadata: {} };
-  return { mockLoadSession, mockPullSession, mockSuiteUser };
+  const STABLE_SEED = {
+    seedPokemon: [] as unknown[],
+    seedEvolutionCards: [] as unknown[],
+    seedReverseEvolutionCards: [] as unknown[],
+  };
+  return { mockLoadSession, mockPullSession, mockSuiteUser, STABLE_SEED };
 });
 
 // ---------------------------------------------------------------------------
@@ -118,6 +123,10 @@ function makeCloudRow(id: number): CloudRow {
   };
 }
 
+// Populate STABLE_SEED after makeCard/makeCloudRow are defined (vi.hoisted runs before imports,
+// so we can't reference makeCard inside the hoisted block itself).
+STABLE_SEED.seedPokemon = [makeCard(1), makeCard(2), makeCard(3)];
+
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
@@ -183,6 +192,10 @@ vi.mock("@/lib/pokemon/seed", () => ({
   REVERSE_ID_OFFSET: 2_000_000,
   REVERSE_EDGE_ID_BASE: 2_500_000,
   CRY_ID_OFFSET: 3_000_000,
+}));
+
+vi.mock("@/lib/pokemon/SeedContext", () => ({
+  useSeed: () => ({ seed: STABLE_SEED, error: null, retry: vi.fn() }),
 }));
 
 vi.mock("@/lib/settings/persistence", () => ({

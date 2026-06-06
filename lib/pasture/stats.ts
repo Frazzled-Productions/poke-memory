@@ -6,21 +6,27 @@
  * and (if ever needed) server-side helpers.
  */
 
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
 import type { NameReviewCard } from "@/lib/review/session";
 
-/** Total species count per habitat, derived once from the seed data. */
-const BIOME_TOTALS: Readonly<Record<string, number>> = (() => {
+/** Total species count per habitat, derived lazily once the seed has loaded. */
+let _biomeTotalsCache: Readonly<Record<string, number>> | null = null;
+
+function getBiomeTotals(): Readonly<Record<string, number>> {
+  if (_biomeTotalsCache !== null) return _biomeTotalsCache;
+  const seed = getSeedIfLoaded();
+  if (!seed) return {};
   const counts: Record<string, number> = {};
-  for (const p of SEED_POKEMON) {
+  for (const p of seed.seedPokemon) {
     // Only default forms count toward the species total - regional variants and
     // alternate formes are not independent species in the Pokédex sense.
     if (!p.isDefaultForm) continue;
     const habitat = p.habitat ?? "unknown";
     counts[habitat] = (counts[habitat] ?? 0) + 1;
   }
+  _biomeTotalsCache = counts;
   return counts;
-})();
+}
 
 export type BiomeStats = {
   /** Number of mastered (or force-mastered) species in this biome. */
@@ -56,7 +62,7 @@ export function biomeStats(
   allMasteredCards: NameReviewCard[],
   forceAllMastered = false,
 ): BiomeStats {
-  const totalCount = BIOME_TOTALS[habitatKey] ?? 0;
+  const totalCount = getBiomeTotals()[habitatKey] ?? 0;
 
   if (forceAllMastered) {
     // In QA mode every species counts as mastered.

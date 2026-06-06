@@ -11,6 +11,7 @@
     "prebuild": "node scripts/check-node-version.mjs",
     "build": "next build",
     "start": "next start",
+    "check:bundle": "node scripts/check-bundle-size.mjs",
     "lint": "eslint && npm run lint:em-dash && npm run lint:i18n && npm run lint:pseudo-locale && npm run lint:changelog && npm run lint:agents-size",
     "lint:em-dash": "node scripts/check-no-em-dash.mjs",
     "lint:i18n": "node scripts/lint-i18n.mjs",

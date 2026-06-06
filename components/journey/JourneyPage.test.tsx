@@ -49,7 +49,7 @@ vi.mock("next/link", () => ({
 import type { NameReviewCard } from "@/lib/review/session";
 import type { CloudRow } from "@/lib/sync/cloud";
 
-const { mockLoadSession, mockPullSession, mockSuiteUser, mockSuperuserValue } =
+const { mockLoadSession, mockPullSession, mockSuiteUser, mockSuperuserValue, STABLE_SEED } =
   vi.hoisted(() => {
     const mockLoadSession = vi.fn();
     const mockPullSession = vi.fn();
@@ -58,11 +58,15 @@ const { mockLoadSession, mockPullSession, mockSuiteUser, mockSuperuserValue } =
       flags: { pretendAllMastered: false },
       anyFlagOn: false,
     };
+    // Stable reference so the seed dep in useEffect doesn't trigger a re-run loop.
+    // Populated with real cards after makeCard is defined (below, module-scope).
+    const STABLE_SEED = { seedPokemon: [] as unknown[], seedEvolutionCards: [] as unknown[], seedReverseEvolutionCards: [] as unknown[] };
     return {
       mockLoadSession,
       mockPullSession,
       mockSuiteUser,
       mockSuperuserValue,
+      STABLE_SEED,
     };
   });
 
@@ -126,6 +130,11 @@ function makeCard(id: number, reps = 0): NameReviewCard {
   };
 }
 
+// Populate the stable seed with the same 3 cards as the SEED_POKEMON mock.
+// This runs after makeCard is defined (module scope, top-to-bottom), so by the
+// time any vi.mock factory uses STABLE_SEED the array is already filled.
+STABLE_SEED.seedPokemon = [makeCard(1), makeCard(2), makeCard(3)];
+
 function makeCloudRow(id: number): CloudRow {
   return {
     card_type: "name",
@@ -165,6 +174,14 @@ vi.mock("@/lib/pokemon/seed", () => ({
   REVERSE_ID_OFFSET: 2_000_000,
   REVERSE_EDGE_ID_BASE: 2_500_000,
   CRY_ID_OFFSET: 3_000_000,
+}));
+
+vi.mock("@/lib/pokemon/SeedContext", () => ({
+  useSeed: () => ({
+    seed: STABLE_SEED,
+    error: null,
+    retry: vi.fn(),
+  }),
 }));
 
 vi.mock("@/lib/settings/persistence", () => ({

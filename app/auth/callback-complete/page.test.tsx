@@ -51,6 +51,14 @@ vi.mock("@/lib/pokemon/seed", () => ({
   SEED_EVOLUTION_CARDS: [],
 }));
 
+vi.mock("@/lib/pokemon/SeedContext", () => ({
+  useSeed: () => ({
+    seed: { seedPokemon: [], seedEvolutionCards: [], seedReverseEvolutionCards: [] },
+    error: null,
+    retry: vi.fn(),
+  }),
+}));
+
 vi.mock("@/lib/settings/persistence", () => ({
   hasStoredSettings: vi.fn(() => false),
   loadSettings: vi.fn(() => ({})),

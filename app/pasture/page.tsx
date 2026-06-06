@@ -24,7 +24,7 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { hydrateSession } from "@/lib/review/session";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { generationOf } from "@/lib/stats/derive";
@@ -133,6 +133,7 @@ export default function PasturePage() {
   const t = useTranslations("pasture");
   const { user, supabase } = useAuth();
   const { flags } = useSuperuser();
+  const { seed } = useSeed();
   const [session, setSession] = useState<SavedSession | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [filters, setFilters] = useState<PastureFilters>(PASTURE_FILTERS_DEFAULT);
@@ -154,10 +155,12 @@ export default function PasturePage() {
   }, []);
 
   useEffect(() => {
+    if (seed === null) return; // wait for seed to load
+    const currentSeed = seed; // capture non-null reference for async closure
     async function load() {
       const s = await loadSession();
       if (s) {
-        // Hydrate so each card carries the full SEED_POKEMON fields (habitat,
+        // Hydrate so each card carries the full seed fields (habitat,
         // isDefaultForm, etc.) that biomeStats and buildZoneData depend on.
         // Without hydration, QA-seeded cards and any other minimal cards lack
         // those fields, causing all species to fall into the "unknown"/Wildlands
@@ -165,9 +168,9 @@ export default function PasturePage() {
         const { pokemonNameLocale } = loadSettings();
         // All *Enabled flags are false - we only want the refresh step of
         // hydrateSession (backfill habitat, isDefaultForm, types, etc. onto
-        // each saved card from SEED_POKEMON). Adding new cards here would bloat
+        // each saved card from the seed). Adding new cards here would bloat
         // session.cards with ~1 000 unseen species, hurting filterMastered perf.
-        const { cards: hydrated, anyHealed } = hydrateSession(s.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
+        const { cards: hydrated, anyHealed } = hydrateSession(s.cards, currentSeed.seedPokemon, currentSeed.seedEvolutionCards, undefined, {
           reverseEnabled: false,
           nameEnabled: false,
           evolutionEnabled: false,
@@ -191,7 +194,7 @@ export default function PasturePage() {
       setLoaded(true);
     }
     void load();
-  }, [storageVersion]);
+  }, [storageVersion, seed]);
 
   // The user's configured mastery threshold. loadSettings is synchronous and
   // reads localStorage, so it is safe to call directly in render; it falls
@@ -206,7 +209,7 @@ export default function PasturePage() {
   const masteredCount = !loaded
     ? null
     : flags.pretendAllMastered
-      ? SEED_POKEMON.length
+      ? (seed?.seedPokemon.length ?? 0)
       : session
         ? filterMastered(session.cards, false, masteryRepetitions, pokemonNameLocale).length
         : 0;
@@ -274,13 +277,13 @@ export default function PasturePage() {
     return null;
   }
 
-  // Superuser pretendAllMastered: source every species from SEED_POKEMON
+  // Superuser pretendAllMastered: source every species from the seed
   // directly so the pasture is fully populated even on a fresh or sparse
   // localStorage session. seenInPasture is forced true so the synthesized
   // cards don't sparkle as "new arrivals" in QA mode. Persisted state is left
   // untouched - markSeenInPasture is a no-op for ids not in session.cards.
   const masteredCards: NameReviewCard[] = flags.pretendAllMastered
-    ? SEED_POKEMON.map((p) => ({
+    ? (seed?.seedPokemon ?? []).map((p) => ({
         ...p,
         cardType: "name" as const,
         subjectKey: String(p.id),

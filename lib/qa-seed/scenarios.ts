@@ -28,11 +28,9 @@ import { initialReviewState, nextReview } from "@/lib/srs/scheduler";
 import type { StreakProtection } from "@/lib/streak/tokens";
 import type { AppLocale } from "@/i18n/locales";
 import type { LabsFlags } from "@/lib/labs/flags";
-import {
-  SEED_POKEMON,
-  SEED_EVOLUTION_CARDS,
-  REVERSE_ID_OFFSET,
-} from "@/lib/pokemon/seed";
+import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-constants";
+import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -172,13 +170,43 @@ function relativeDate(days: number): string {
 
 // ─── Real-data lookups ────────────────────────────────────────────────────────
 
+// The seed data is fetched at runtime (Stage 3, #1677) rather than bundled, so
+// these lookups are built lazily from the loaded snapshot on first use. Callers
+// (scenario `build()` functions) must ensure the seed has loaded first - the
+// QaSeedSection awaits `loadSeed()` before applying a scenario.
+let _seedById: Map<number, SeedPokemon> | null = null;
+let _evoByEndpoints: Map<string, EvolutionCard> | null = null;
+
+function requireSeed() {
+  const seed = getSeedIfLoaded();
+  if (seed === null) {
+    throw new Error(
+      "QA seed scenarios require the Pokémon seed to be loaded first (call loadSeed()).",
+    );
+  }
+  return seed;
+}
+
 /** Map of pokemonId → SeedPokemon for O(1) lookups. */
-const SEED_BY_ID = new Map(SEED_POKEMON.map((p) => [p.id, p]));
+function seedById(): Map<number, SeedPokemon> {
+  if (_seedById === null) {
+    _seedById = new Map(requireSeed().seedPokemon.map((p) => [p.id, p]));
+  }
+  return _seedById;
+}
 
 /** Map of (preEvoId, postEvoId) → EvolutionCard to look up edges by endpoint IDs. */
-const EVO_BY_ENDPOINTS = new Map(
-  SEED_EVOLUTION_CARDS.map((e) => [`${e.preEvoId}:${e.postEvoId}`, e]),
-);
+function evoByEndpoints(): Map<string, EvolutionCard> {
+  if (_evoByEndpoints === null) {
+    _evoByEndpoints = new Map(
+      requireSeed().seedEvolutionCards.map((e) => [
+        `${e.preEvoId}:${e.postEvoId}`,
+        e,
+      ]),
+    );
+  }
+  return _evoByEndpoints;
+}
 
 // ─── Grade-replay helpers ─────────────────────────────────────────────────────
 
@@ -390,7 +418,7 @@ function believableStreakProtection(): StreakProtection {
  * name and spriteUrl come from the actual seed - no placeholders.
  */
 function nameCard(id: number, state: SeededState, locale = "en"): SeededNameCard {
-  const pokemon = SEED_BY_ID.get(id);
+  const pokemon = seedById().get(id);
   if (!pokemon) {
     throw new Error(`QA seed: no SeedPokemon found for id=${id}`);
   }
@@ -415,7 +443,7 @@ function nameCard(id: number, state: SeededState, locale = "en"): SeededNameCard
  * card to be mastered before a species appears.
  */
 function reverseCard(id: number, state: SeededState, locale = "en"): SeededReverseCard {
-  const pokemon = SEED_BY_ID.get(id);
+  const pokemon = seedById().get(id);
   if (!pokemon) {
     throw new Error(`QA seed: no SeedPokemon found for id=${id}`);
   }
@@ -436,7 +464,7 @@ function reverseCard(id: number, state: SeededState, locale = "en"): SeededRever
  * Looks up the edge by (preEvoId, postEvoId) so the edgeId matches the real seed.
  */
 function evolutionCard(preEvoId: number, postEvoId: number, state: SeededState): SeededEvolutionCard {
-  const edge = EVO_BY_ENDPOINTS.get(`${preEvoId}:${postEvoId}`);
+  const edge = evoByEndpoints().get(`${preEvoId}:${postEvoId}`);
   if (!edge) {
     throw new Error(`QA seed: no evolution edge found for ${preEvoId}→${postEvoId}`);
   }

@@ -37,8 +37,9 @@ vi.mock("next/dynamic", () => ({
 // Hoisted fixtures
 // ---------------------------------------------------------------------------
 
-const { mockLoadSession } = vi.hoisted(() => ({
+const { mockLoadSession, STABLE_SEED } = vi.hoisted(() => ({
   mockLoadSession: vi.fn(),
+  STABLE_SEED: { seedPokemon: [] as unknown[], seedEvolutionCards: [] as unknown[], seedReverseEvolutionCards: [] as unknown[] },
 }));
 
 vi.mock("@/lib/review/persistence", () => ({
@@ -119,6 +120,14 @@ vi.mock("@/lib/pokemon/seed", () => ({
   REVERSE_ID_OFFSET: 2_000_000,
   REVERSE_EDGE_ID_BASE: 2_500_000,
   CRY_ID_OFFSET: 3_000_000,
+}));
+
+vi.mock("@/lib/pokemon/SeedContext", () => ({
+  useSeed: () => ({
+    seed: STABLE_SEED,
+    error: null,
+    retry: vi.fn(),
+  }),
 }));
 
 vi.mock("@/lib/review/session", () => ({

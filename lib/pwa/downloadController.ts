@@ -30,7 +30,7 @@ import { computeManifestSignature, parseOfflineManifest, type OfflineManifest } 
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
 import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -84,7 +84,7 @@ function seedFromStorage(): void {
   if (at !== null) {
     // Read the persisted manifest (may be absent for downloads predating #1539).
     const rawManifest = readLocalStorage(KEY_OFFLINE_MANIFEST, (raw) => raw, null);
-    const manifest = parseOfflineManifest(rawManifest) ?? CURRENT_MANIFEST;
+    const manifest = parseOfflineManifest(rawManifest) ?? getCurrentManifest();
     currentState = {
       phase: "done",
       summary: { totalRequested: 0, downloaded: 0, skipped: 0, failed: 0 },
@@ -95,16 +95,43 @@ function seedFromStorage(): void {
 }
 
 /**
- * The manifest for the current asset set - computed once at module load.
- * Used as a fallback when a download timestamp exists but no persisted manifest
- * (e.g. a download predating #1539), and written to storage after each new
- * download. Exported so `OfflineSection` can compare without recomputing.
+ * The manifest for the current asset set - computed lazily once the seed has
+ * loaded. Memoised so repeated calls are O(1). Used as a fallback when a
+ * download timestamp exists but no persisted manifest (e.g. a download
+ * predating #1539), and written to storage after each new download. Exported
+ * so `OfflineSection` can compare without recomputing.
+ *
+ * Falls back to { signature: "", count: 0 } when the seed is not yet loaded;
+ * OfflineSection only accesses this after the seed is available (it renders
+ * inside <SeedProvider>).
  */
-const _currentOfflineIds = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
-export const CURRENT_MANIFEST: OfflineManifest = {
-  signature: computeManifestSignature(buildPrecacheUrls(_currentOfflineIds)),
-  count: _currentOfflineIds.length,
-};
+let _currentManifestCache: OfflineManifest | null = null;
+
+export function getCurrentManifest(): OfflineManifest {
+  if (_currentManifestCache !== null) return _currentManifestCache;
+  const seed = getSeedIfLoaded();
+  if (!seed) return { signature: "", count: 0 };
+  const ids = seed.seedPokemon.filter((p) => p.isDefaultForm).map((p) => p.id);
+  _currentManifestCache = {
+    signature: computeManifestSignature(buildPrecacheUrls(ids)),
+    count: ids.length,
+  };
+  return _currentManifestCache;
+}
+
+/**
+ * @deprecated Use `getCurrentManifest()`. This re-export exists only to avoid
+ * breaking tests that import `CURRENT_MANIFEST` directly; it returns the
+ * lazily-computed manifest.
+ *
+ * @internal - will be removed once the test is updated.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const CURRENT_MANIFEST: OfflineManifest = new Proxy({} as OfflineManifest, {
+  get(_target, prop) {
+    return getCurrentManifest()[prop as keyof OfflineManifest];
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -199,13 +226,14 @@ export async function startDownload(ids: number[]): Promise<void> {
     writeLocalStorageRaw(OFFLINE_DOWNLOADED_AT_KEY, downloadedAt);
 
     // Persist the manifest signature alongside the timestamp (#1539).
+    const manifest = getCurrentManifest();
     try {
-      writeLocalStorageRaw(KEY_OFFLINE_MANIFEST, JSON.stringify(CURRENT_MANIFEST));
+      writeLocalStorageRaw(KEY_OFFLINE_MANIFEST, JSON.stringify(manifest));
     } catch {
       // Best-effort; non-fatal if localStorage is full.
     }
 
-    setState({ phase: "done", summary, downloadedAt, manifest: CURRENT_MANIFEST });
+    setState({ phase: "done", summary, downloadedAt, manifest });
     abortController = null;
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
@@ -243,4 +271,5 @@ export function _resetForTesting(): void {
   listeners.clear();
   currentState = { phase: "idle" };
   storageSeedDone = false;
+  _currentManifestCache = null;
 }

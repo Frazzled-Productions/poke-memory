@@ -9,7 +9,7 @@ import { getTypeName } from "@/lib/i18n/typeNames";
 import { useNextReviewDate } from "@/lib/review/useNextReviewDate";
 import { colStack, mutedTextXs, sectionLabelSmSubtle } from "@/lib/utils/class-names";
 import type { SeedPokemon, EvolutionNode } from "@/lib/pokemon/seed";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
 import { getPokemonFacts, isFlavorTextsReady, loadFlavorTexts } from "@/lib/pokemon/facts";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
 import type { CardClassOrPending } from "@/lib/review/useCardClass";
@@ -46,14 +46,21 @@ function statBarColor(value: number): string {
   return "bg-red-500";
 }
 
-const SPRITE_BY_ID: Record<number, string> = Object.fromEntries(
-  SEED_POKEMON.map((p) => [p.id, p.spriteUrl])
-);
+// Lazily-built sprite lookup - memoised once the seed has loaded.
+let _spriteCacheByIdCache: Record<number, string> | null = null;
+
+function getSpriteById(): Record<number, string> {
+  if (_spriteCacheByIdCache !== null) return _spriteCacheByIdCache;
+  const seed = getSeedIfLoaded();
+  if (!seed) return {};
+  _spriteCacheByIdCache = Object.fromEntries(seed.seedPokemon.map((p) => [p.id, p.spriteUrl]));
+  return _spriteCacheByIdCache;
+}
 
 function EvolutionChainNode({ node }: { node: EvolutionNode }) {
   const t = useTranslations("pokedex");
   const { flags } = useSuperuser();
-  const nodeSprite = SPRITE_BY_ID[node.speciesId];
+  const nodeSprite = getSpriteById()[node.speciesId];
   const rawNodeClass: CardClassOrPending = useCardClass(node.speciesId);
   const nodeClass: CardClassOrPending =
     flags.pretendAllMastered && rawNodeClass !== "pending" ? "mastered" : rawNodeClass;
@@ -272,7 +279,7 @@ export function PokemonDetailDisclosure({
     isMasteredCard && showEvolution
       ? evolutionChain
           .filter((node) => node.speciesId !== id)
-          .map((node) => SPRITE_BY_ID[node.speciesId])
+          .map((node) => getSpriteById()[node.speciesId])
           .filter((url): url is string => Boolean(url))
       : [];
 
