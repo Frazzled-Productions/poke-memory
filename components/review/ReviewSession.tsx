@@ -1081,12 +1081,14 @@ export function ReviewSession() {
 
   // Higher-or-Lower signpost nudge (#1573): one-shot hint teasing the
   // post-session mini-game. Gate (in priority order):
-  //   1. seenPokemon.length < 1  -> suppress (no Pokémon seen yet; nothing to tease).
+  //   1. seenPokemon.length < 2  -> suppress. The game itself only renders at
+  //      seenPokemon.length >= 2 (the end-of-session screen), so teasing it
+  //      before then promises a game the user cannot yet reach (#1696).
   //   2. firstVisitDone false    -> suppress (first-visit modal still showing).
   //   3. Otherwise: show.
   // The OnboardingHint component handles the higherOrLowerNudgeDismissed flag.
   const higherOrLowerNudge = (
-    seenPokemon.length < 1 ||
+    seenPokemon.length < 2 ||
     !firstVisitDone
   ) ? null : (
     <div className="mb-3">

@@ -638,40 +638,41 @@ test.describe("Offline download nudge (#1538)", () => {
 //
 // The nudge fires on the practice page when:
 //   - firstVisitOnboardingDismissed is true
-//   - seenPokemon.length >= 1 (at least one card has firstSeen set in session)
+//   - seenPokemon.length >= 2 (at least two cards have firstSeen set in session)
 //   - higherOrLowerNudgeDismissed is absent/false
 //
 // Tests cover the show-path, the dismiss interaction, and the primary
 // suppression path (nudge pre-dismissed).
 
-// Minimal session containing a Bulbasaur name card that has been seen (firstSeen
-// set), satisfying the seenPokemon.length >= 1 gate in ReviewSession.
-const SEEN_BULBASAUR_SESSION = {
-  cards: [
-    {
-      id: 1,
-      cardType: "name",
-      speciesId: 1,
-      name: "Bulbasaur",
-      spriteUrl: "/sprites/pokemon/1.png",
-      state: {
-        stability: 1,
-        difficulty: 5,
-        elapsedDays: 1,
-        scheduledDays: 1,
-        reps: 1,
-        lapses: 0,
-        fsrsState: "learning",
-        dueDate: "2026-06-04",
-        lastReview: "2026-06-03",
-        firstSeen: "2026-06-03",
-        learningStep: null,
-        stepStartedAt: null,
-        hiddenSince: null,
-        seenInPasture: false,
-      },
-    },
-  ],
+// Minimal session containing two seen name cards (Bulbasaur + Ivysaur, each with
+// firstSeen set), satisfying the seenPokemon.length >= 2 gate in ReviewSession.
+// The mini-game only renders at >= 2, so the teaser is gated the same way (#1696).
+const seenNameCard = (id: number, name: string) => ({
+  id,
+  cardType: "name",
+  speciesId: id,
+  name,
+  spriteUrl: `/sprites/pokemon/${id}.png`,
+  state: {
+    stability: 1,
+    difficulty: 5,
+    elapsedDays: 1,
+    scheduledDays: 1,
+    reps: 1,
+    lapses: 0,
+    fsrsState: "learning",
+    dueDate: "2026-06-04",
+    lastReview: "2026-06-03",
+    firstSeen: "2026-06-03",
+    learningStep: null,
+    stepStartedAt: null,
+    hiddenSince: null,
+    seenInPasture: false,
+  },
+});
+
+const SEEN_TWO_SESSION = {
+  cards: [seenNameCard(1, "Bulbasaur"), seenNameCard(2, "Ivysaur")],
   limits: {
     name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
     evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
@@ -681,7 +682,7 @@ const SEEN_BULBASAUR_SESSION = {
 };
 
 test.describe("Higher-or-Lower signpost nudge (#1573)", () => {
-  test("nudge renders on practice page when seenPokemon >= 1 and flag is absent", async ({
+  test("nudge renders on practice page when seenPokemon >= 2 and flag is absent", async ({
     page,
   }) => {
     // Seed settings: firstVisit done, higherOrLowerNudgeDismissed absent (resolves to false).
@@ -696,8 +697,8 @@ test.describe("Higher-or-Lower signpost nudge (#1573)", () => {
         }),
       );
     }, SETTINGS_KEY);
-    // Seed a session with one seen Pokémon to satisfy the seenPokemon gate.
-    await seedSessionIdb(page, SEEN_BULBASAUR_SESSION);
+    // Seed a session with two seen Pokémon to satisfy the seenPokemon >= 2 gate.
+    await seedSessionIdb(page, SEEN_TWO_SESSION);
 
     await page.goto("/");
     await awaitSeedIdb(page);
@@ -741,7 +742,7 @@ test.describe("Higher-or-Lower signpost nudge (#1573)", () => {
         }),
       );
     }, SETTINGS_KEY);
-    await seedSessionIdb(page, SEEN_BULBASAUR_SESSION);
+    await seedSessionIdb(page, SEEN_TWO_SESSION);
 
     await page.goto("/");
     await awaitSeedIdb(page);
