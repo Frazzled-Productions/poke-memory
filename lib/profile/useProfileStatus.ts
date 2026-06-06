@@ -14,7 +14,7 @@
  *   - The `KEY_MASTERED_COUNT_BY_LOCALE` localStorage cache (written by
  *     `ReviewSession`) for `masteryCount` - avoids a full ~1025-card parse on
  *     non-Stats routes (#1234 perf concern).
- *   - `SEED_POKEMON.length` for `totalSpecies` (locale-independent seed count).
+ *   - `seed.seedPokemon.length` from `useSeed()` for `totalSpecies` (locale-independent seed count).
  *
  * Mastery is locale-scoped per #1259: the count is keyed by the user's current
  * `pokemonNameLocale` setting.
@@ -28,8 +28,8 @@
 import { useEffect, useState } from "react";
 import { useStreakNavState } from "@/lib/streak/useStreakNavState";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { readMasteredCountCache } from "@/lib/profile/masteredCountCache";
 import { KEY_MASTERED_COUNT_BY_LOCALE } from "@/lib/storage/keys";
 
@@ -54,7 +54,7 @@ export type ProfileStatus = {
   masteryCount: number | null;
   /**
    * Total species in the seed (locale-independent). Always the same value
-   * once loaded (`SEED_POKEMON.length`).
+   * once loaded (`seed.seedPokemon.length`).
    * `null` = not yet loaded.
    */
   totalSpecies: number | null;
@@ -82,6 +82,7 @@ export type ProfileStatus = {
 export function useProfileStatus(): ProfileStatus {
   const streakState = useStreakNavState();
   const { flags } = useSuperuser();
+  const { seed } = useSeed();
 
   const [masteryState, setMasteryState] = useState<{
     masteryCount: number | null;
@@ -94,9 +95,9 @@ export function useProfileStatus(): ProfileStatus {
   });
 
   useEffect(() => {
-    const total = SEED_POKEMON.length;
-
     function refreshMastery() {
+      if (!seed) return;
+      const total = seed.seedPokemon.length;
       if (flags.pretendAllMastered) {
         setMasteryState({
           masteryCount: total,
@@ -147,7 +148,9 @@ export function useProfileStatus(): ProfileStatus {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener(SETTINGS_SAVED_EVENT, handleSettingsSaved);
     };
-  }, [flags.pretendAllMastered]);
+    // seed added: when the async seed resolves, total updates and the effect
+    // re-runs so totalSpecies reflects the real count.
+  }, [flags.pretendAllMastered, seed]);
 
   return {
     streak: streakState.streak,

@@ -116,3 +116,16 @@ export function _resetSeedAsyncCache(): void {
   _cache = null;
   _loadPromise = null;
 }
+
+/**
+ * @internal - test / non-React priming only.
+ * Directly sets the module-level cache so `getSeedIfLoaded()` returns the
+ * supplied data and `loadSeed()` short-circuits immediately.
+ *
+ * Mirrors `_resetSeedAsyncCache` in style: mutates the same `_cache` and
+ * `_loadPromise` variables so both synchronous and async readers see the data.
+ */
+export function _primeSeed(data: SeedData): void {
+  _cache = data;
+  _loadPromise = Promise.resolve(data);
+}

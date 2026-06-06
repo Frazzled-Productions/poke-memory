@@ -12,7 +12,9 @@
  */
 
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
-import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
+// Import the numeric constant from seed-builder (no JSON dependency) so
+// mastery-species-events.ts does NOT force the seed JSON into any shared chunk (#1677).
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-builder";
 import { isMastered, MASTERY_REPETITIONS } from "@/lib/stats/derive";
 import type { AppLocale } from "@/i18n/locales";
 

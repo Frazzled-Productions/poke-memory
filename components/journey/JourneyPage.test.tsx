@@ -970,30 +970,34 @@ describe("JourneyPage - mastery explainer hint locale rendering (#1441)", () => 
     } as unknown as ReturnType<typeof settingsMod.loadSettings>));
   });
 
+  // The hint renders only after JourneyPage's async pipeline settles (cards load,
+  // then masterySnapshot + currentStreak resolve; until then a LoadingSkeleton
+  // shows). Use findByText with an explicit timeout so the assertion waits for
+  // that load rather than the default 1000ms, which CI's heavier run exceeds.
   it("renders hint title in Japanese", async () => {
     render(<JourneyPage />, { locale: "ja" });
 
-    await waitFor(() => {
-      // ja: journey.masteryExplainer.title = "リングの意味"
-      expect(screen.getByText("リングの意味")).toBeInTheDocument();
-    });
+    // ja: journey.masteryExplainer.title = "リングの意味"
+    expect(
+      await screen.findByText("リングの意味", undefined, { timeout: 5000 }),
+    ).toBeInTheDocument();
   });
 
   it("renders hint title in Simplified Chinese", async () => {
     render(<JourneyPage />, { locale: "zh-Hans" });
 
-    await waitFor(() => {
-      // zh-Hans: journey.masteryExplainer.title = "圆环含义"
-      expect(screen.getByText("圆环含义")).toBeInTheDocument();
-    });
+    // zh-Hans: journey.masteryExplainer.title = "圆环含义"
+    expect(
+      await screen.findByText("圆环含义", undefined, { timeout: 5000 }),
+    ).toBeInTheDocument();
   });
 
   it("renders hint title in Traditional Chinese", async () => {
     render(<JourneyPage />, { locale: "zh-Hant" });
 
-    await waitFor(() => {
-      // zh-Hant: journey.masteryExplainer.title = "圓環含義"
-      expect(screen.getByText("圓環含義")).toBeInTheDocument();
-    });
+    // zh-Hant: journey.masteryExplainer.title = "圓環含義"
+    expect(
+      await screen.findByText("圓環含義", undefined, { timeout: 5000 }),
+    ).toBeInTheDocument();
   });
 });

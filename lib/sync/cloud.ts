@@ -11,7 +11,9 @@ import type {
 import { buildSession } from "@/lib/review/session";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
-import { reverseEdgeIdFor, REVERSE_ID_OFFSET, CRY_ID_OFFSET } from "@/lib/pokemon/seed";
+// Import numeric constants from seed-builder (no JSON dependency) so cloud.ts
+// does not force the seed JSON into the boot chunk.
+import { reverseEdgeIdFor, REVERSE_ID_OFFSET, CRY_ID_OFFSET } from "@/lib/pokemon/seed-builder";
 import { Subject, appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKey";
 import { markStructuralSyncError, clearStructuralSyncError } from "@/lib/sync/structuralError";
 import type { AppLocale } from "@/i18n/locales";

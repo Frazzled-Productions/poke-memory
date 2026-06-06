@@ -1,6 +1,7 @@
 import type { ReviewableCard } from "@/lib/review/session";
 import { generationOf } from "@/lib/stats/derive";
-import { SEED_POKEMON, type SeedPokemon } from "@/lib/pokemon/seed";
+import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
+import type { SeedPokemon } from "@/lib/pokemon/seed";
 import type { FormCategory } from "@/lib/pokemon/forms";
 import { KEY_LEGACY_PRACTICE_SCOPE } from "@/lib/storage/keys";
 import { versionGroupLabel } from "@/lib/pokemon/versionGroupLabels";
@@ -90,14 +91,18 @@ export type PracticeScope = {
  */
 const LEGACY_SCOPE_KEY = KEY_LEGACY_PRACTICE_SCOPE;
 
-/** Cards in the SEED set tagged `isLegendary` (excludes mythicals by design). */
-function legendaryIds(): ReadonlySet<number> {
-  return new Set(SEED_POKEMON.filter((p) => p.isLegendary).map((p) => p.id));
-}
-
 let _legendaryIds: ReadonlySet<number> | null = null;
+/**
+ * Cards in the SEED set tagged `isLegendary` (excludes mythicals by design).
+ *
+ * Only memoises when the seed is already loaded; returns an empty Set if the
+ * seed is not yet available (so a later call after load recomputes correctly).
+ */
 function getLegendaryIds(): ReadonlySet<number> {
-  if (_legendaryIds === null) _legendaryIds = legendaryIds();
+  if (_legendaryIds !== null) return _legendaryIds;
+  const seed = getSeedIfLoaded();
+  if (!seed) return new Set();  // not loaded yet: do not cache
+  _legendaryIds = new Set(seed.seedPokemon.filter((p) => p.isLegendary).map((p) => p.id));
   return _legendaryIds;
 }
 
@@ -206,10 +211,18 @@ function speciesMatchesScope(
  * receive safe defaults: `isDefaultForm=true`, `formCategory='default'`.
  */
 
-/** Lazy lookup map from pokemon id to SeedPokemon - built once on first use. */
+/**
+ * Lazy lookup map from pokemon id to SeedPokemon - built once on first use.
+ *
+ * Only memoises when the seed is already loaded; returns an empty Map if the
+ * seed is not yet available (so a later call after load recomputes correctly).
+ */
 let _seedById: Map<number, SeedPokemon> | null = null;
 function getSeedById(): Map<number, SeedPokemon> {
-  if (_seedById === null) _seedById = new Map(SEED_POKEMON.map((p) => [p.id, p]));
+  if (_seedById !== null) return _seedById;
+  const seed = getSeedIfLoaded();
+  if (!seed) return new Map();  // not loaded yet: do not cache
+  _seedById = new Map(seed.seedPokemon.map((p) => [p.id, p]));
   return _seedById;
 }
 

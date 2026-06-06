@@ -1,8 +1,10 @@
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
-import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
+// Import the numeric constant from seed-builder (no JSON dependency) so
+// derive.ts does NOT force the seed JSON into the boot chunk.
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-builder";
 import { POKEMON_TYPES } from "@/lib/pokemon/types";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
 import { addDaysToIsoDate as sharedAddDaysToIsoDate } from "@/lib/utils/dates";
 // Import and re-export seed-free generation helpers so all existing callers
 // importing from this module continue to work unchanged.
@@ -68,20 +70,24 @@ export function classifyCard(card: ReviewableCard, masteryRepetitions = MASTERY_
 }
 
 /**
- * Lazy-initialised Map from pokemon ID → species ID, built from SEED_POKEMON.
+ * Lazy-initialised Map from pokemon ID → species ID, built from the async seed.
  * Falls back to the pokemon's own `id` for entries where `speciesId` is not
  * yet populated (pre-seed-expansion state of generated.json, where all IDs
  * are in 1..1025 and speciesId === id). This keeps generation lookups correct
  * for the current seed while also correctly routing form IDs (10001+) to
  * their species' generation once the seed re-runs.
+ *
+ * Only memoises when the seed is already loaded; returns an empty Map if the
+ * seed is not yet available (so a later call after load recomputes correctly).
  */
 let _idToSpeciesIdMap: Map<number, number> | null = null;
 function getIdToSpeciesIdMap(): Map<number, number> {
-  if (_idToSpeciesIdMap === null) {
-    _idToSpeciesIdMap = new Map(
-      SEED_POKEMON.map((p) => [p.id, p.speciesId ?? p.id]),
-    );
-  }
+  if (_idToSpeciesIdMap !== null) return _idToSpeciesIdMap;
+  const seed = getSeedIfLoaded();
+  if (!seed) return new Map();  // not loaded yet: do not cache
+  _idToSpeciesIdMap = new Map(
+    seed.seedPokemon.map((p) => [p.id, p.speciesId ?? p.id]),
+  );
   return _idToSpeciesIdMap;
 }
 
