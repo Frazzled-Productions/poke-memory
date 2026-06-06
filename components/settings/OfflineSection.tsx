@@ -2,23 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import {
   getState,
   subscribe,
   startDownload,
   stopDownload,
-  CURRENT_MANIFEST,
+  getCurrentManifest,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
 import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
-
-/**
- * Species IDs eligible for offline caching - all default-form entries in the
- * seed. Computed once at module load since `SEED_POKEMON` is a static import;
- * this avoids re-running the filter+map on every render.
- */
-const ALL_OFFLINE_IDS: number[] = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id);
 
 /** Format bytes as MB, e.g. 47.3 MB */
 function formatMb(bytes: number): string {
@@ -39,6 +32,7 @@ function formatMb(bytes: number): string {
 export function OfflineSection() {
   const t = useTranslations("settings.offline");
   const format = useFormatter();
+  const { seed } = useSeed();
   // Initialise from the singleton synchronously. The subscribe() effect (below)
   // fires after mount and immediately calls setDownloadState with the current
   // singleton state, which may already be "downloading" if a download survived
@@ -63,9 +57,10 @@ export function OfflineSection() {
   >(() => {
     if (downloadState.phase !== "done") return null;
     const persisted = downloadState.manifest;
-    if (persisted.signature === CURRENT_MANIFEST.signature) return { isStale: false };
+    const currentManifest = getCurrentManifest();
+    if (persisted.signature === currentManifest.signature) return { isStale: false };
     // Signatures differ - compute how many new species IDs there are.
-    const countDiff = CURRENT_MANIFEST.count - persisted.count;
+    const countDiff = currentManifest.count - persisted.count;
     const newCount = countDiff > 0 ? countDiff : null;
     return { isStale: true, newCount };
   }, [downloadState]);
@@ -122,7 +117,9 @@ export function OfflineSection() {
   }, [downloadState.phase]);
 
   function handleDownload() {
-    void startDownload(ALL_OFFLINE_IDS);
+    // Derive species IDs from the context-provided seed rather than a static import.
+    const ids = seed ? seed.seedPokemon.filter((p) => p.isDefaultForm).map((p) => p.id) : [];
+    void startDownload(ids);
   }
 
   return (

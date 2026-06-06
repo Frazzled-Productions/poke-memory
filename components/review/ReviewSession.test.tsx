@@ -164,6 +164,39 @@ vi.mock("@/lib/pokemon/seed", () => ({
   CRY_ID_OFFSET: 3_000_000,
 }));
 
+// ReviewSession reads the seed from useSeed() (SeedContext) rather than from
+// the static @/lib/pokemon/seed import. Mock useSeed() to return the same
+// fixture data that mockSeedPokemon() returns, so tests can control seed
+// content via the existing mockSeedPokemon.mockReturnValue(...) pattern.
+//
+// Important: the `seed` object returned by useSeed() must be STABLE (same
+// reference) across renders within a single test. The session-load effect
+// has `seedData` in its dependency array; a new object on every render would
+// re-fire the effect continuously. Production SeedContext stores seed in
+// React state (stable after first resolve). We replicate this with a
+// module-scoped cache that is invalidated only when the test changes the
+// mockSeedPokemon fixture between test cases.
+const { mockUseSeed } = vi.hoisted(() => {
+  let _lastPokemon: unknown = undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only cache
+  let _stableSeed: any = null;
+  return {
+    mockUseSeed: vi.fn(() => {
+      const pokemon = mockSeedPokemon();
+      if (pokemon !== _lastPokemon) {
+        _lastPokemon = pokemon;
+        _stableSeed = { seedPokemon: pokemon, seedEvolutionCards: [], seedReverseEvolutionCards: [] };
+      }
+      return { seed: _stableSeed, error: null, retry: vi.fn() };
+    }),
+  };
+});
+
+vi.mock("@/lib/pokemon/SeedContext", () => ({
+  useSeed: mockUseSeed,
+  SeedProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 // loadSession / saveSession are vi.fn() so individual tests can override them
 // with mockResolvedValueOnce; defaults simulate an empty session.
 vi.mock("@/lib/review/persistence", () => ({
@@ -4454,9 +4487,9 @@ describe("ReviewSession higher-or-lower nudge seenPokemon gate (#1573)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("nudge is visible when seenPokemon.length >= 1 and firstVisitDone is true", async () => {
-    // Seed a saved session where the Bulbasaur name card has firstSeen set - this
-    // makes getSeenPokemon return [Bulbasaur], satisfying the seenPokemon.length >= 1 gate.
+  it("nudge is absent when only one Pokémon has been seen (#1696 - game needs >= 2)", async () => {
+    // One seen species (Bulbasaur firstSeen set). The mini-game only renders at
+    // seenPokemon.length >= 2, so the teaser must stay hidden at length 1.
     vi.mocked(loadSession).mockResolvedValueOnce({
       cards: [
         {
@@ -4469,6 +4502,40 @@ describe("ReviewSession higher-or-lower nudge seenPokemon gate (#1573)", () => {
             fsrsState: "learning" as const,
           },
         },
+        GRADUATED_REVERSE_CARD,
+      ],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue(higherOrLowerNudgeSettings);
+
+    renderWithIntl(<ReviewSession />);
+
+    await screen.findByRole("button", { name: /reveal/i });
+
+    expect(
+      screen.queryByText(/finish your session for a bonus mini-game/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("nudge is visible when seenPokemon.length >= 2 and firstVisitDone is true (#1696)", async () => {
+    // Expand the mocked seed to two species and seed two graduated name cards
+    // (Bulbasaur + Ivysaur), both with firstSeen, so getSeenPokemon returns two
+    // distinct species and the >= 2 gate is satisfied.
+    const ivysaur = FIXTURE_CARDS_4[1];
+    mockSeedPokemon.mockReturnValue([FIXTURE_CARD, ivysaur]);
+    const graduatedState = {
+      ...FIXTURE_CARD.state,
+      firstSeen: "2026-01-01",
+      lastReview: "2026-01-05",
+      reps: 3,
+      scheduledDays: 21,
+      fsrsState: "review" as const,
+      dueDate: "2099-01-01",
+    };
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [
+        { ...FIXTURE_CARD, state: { ...graduatedState } },
+        { ...ivysaur, state: { ...graduatedState } },
         GRADUATED_REVERSE_CARD,
       ],
       limits: DEFAULT_LIMITS,

@@ -183,7 +183,8 @@ describe("biomeStats", () => {
       makeCard(12, "Butterfree", "forest", masteredState("2026-02-10")),
     ];
     const stats = biomeStats("forest", cards);
-    expect(stats.latestAddition).toBe("Metapod");
+    // Carries both speciesId (for locale resolution, #1662) and the English name.
+    expect(stats.latestAddition).toEqual({ speciesId: 11, name: "Metapod" });
   });
 
   it("capturedPercent is at most 100 and at least 0", () => {
@@ -302,7 +303,7 @@ describe("biomeStats - forceAllMastered", () => {
       makeCard(10, "Caterpie", "forest", masteredState("2026-04-01")),
     ];
     const stats = biomeStats("forest", cards, true);
-    expect(stats.latestAddition).toBe("Caterpie");
+    expect(stats.latestAddition).toEqual({ speciesId: 10, name: "Caterpie" });
   });
 
   it("returns null latestAddition when forceAllMastered but no cards are provided for the biome", () => {

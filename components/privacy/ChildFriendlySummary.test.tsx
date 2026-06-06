@@ -216,6 +216,14 @@ describe("ChildFriendlySummary", () => {
     expect(items).toHaveLength(6);
   });
 
+  it("renders the sign-in item (item2) with username-and-password and under-13 guidance (#1672)", async () => {
+    render(await ChildFriendlySummary());
+    const items = screen.getAllByRole("listitem");
+    const item2 = items[1];
+    expect(item2.textContent).toMatch(/username and password/i);
+    expect(item2.textContent).toMatch(/under 13/i);
+  });
+
   it("renders the feedback item (item6) with text about 12-month retention (#1623)", async () => {
     render(await ChildFriendlySummary());
     // The feedback item mentions 12 months retention.

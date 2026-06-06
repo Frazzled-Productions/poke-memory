@@ -17,6 +17,18 @@ import {
 import { ScopeControl } from "@/components/review/ScopeControl";
 import { EMPTY_SCOPE } from "@/lib/review/scope";
 
+// ScopeControl calls useSeed() to compute the matchCount summary ("X of N
+// Pokémon match"). Mock SeedContext with the real seed (primed by
+// vitest.setup.ts via _primeSeed) so the locale tests receive actual counts.
+vi.mock("@/lib/pokemon/SeedContext", async () => {
+  const { getSeedIfLoaded } = await import("@/lib/pokemon/seed-async");
+  const seed = getSeedIfLoaded();
+  return {
+    useSeed: () => ({ seed, error: null, retry: vi.fn() }),
+    SeedProvider: ({ children }: { children: React.ReactNode }) => children,
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Helper - render ScopeControl and open the scope panel
 // ---------------------------------------------------------------------------
@@ -185,5 +197,43 @@ describe("ScopeControl - scope section legends in Traditional Chinese locale (#1
     await renderAndOpen("zh-Hant");
     // messages/zh-Hant.json practice.scope.games = "遊戲"
     expect(screen.getByText("遊戲")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// practice.scope.matchCount - locale coverage (#1705)
+// Verifies the "X of N Pokémon match" summary line localises correctly.
+// With EMPTY_SCOPE and the real seed, match === total (all species pass).
+// ---------------------------------------------------------------------------
+
+describe("ScopeControl - matchCount summary in English locale", () => {
+  it("renders the matchCount line with English template", async () => {
+    await renderAndOpen("en");
+    // en: "{match} of {total} Pokémon match"
+    expect(screen.getByText(/\d[\d,]*\s+of\s+\d[\d,]*\s+Pokémon match/)).toBeInTheDocument();
+  });
+});
+
+describe("ScopeControl - matchCount summary in Japanese locale", () => {
+  it("renders the matchCount line with Japanese template", async () => {
+    await renderAndOpen("ja");
+    // ja: "{total} 匹中 {match} 匹が一致"
+    expect(screen.getByText(/\d[\d,]*\s*匹中\s*\d[\d,]*\s*匹が一致/)).toBeInTheDocument();
+  });
+});
+
+describe("ScopeControl - matchCount summary in Simplified Chinese locale", () => {
+  it("renders the matchCount line with zh-Hans template", async () => {
+    await renderAndOpen("zh-Hans");
+    // zh-Hans: "{total} 只中有 {match} 只匹配"
+    expect(screen.getByText(/\d[\d,]*\s*只中有\s*\d[\d,]*\s*只匹配/)).toBeInTheDocument();
+  });
+});
+
+describe("ScopeControl - matchCount summary in Traditional Chinese locale", () => {
+  it("renders the matchCount line with zh-Hant template", async () => {
+    await renderAndOpen("zh-Hant");
+    // zh-Hant: "{total} 隻中有 {match} 隻符合"
+    expect(screen.getByText(/\d[\d,]*\s*隻中有\s*\d[\d,]*\s*隻符合/)).toBeInTheDocument();
   });
 });

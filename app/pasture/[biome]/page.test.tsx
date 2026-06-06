@@ -6,7 +6,7 @@
  */
 
 import { act } from "@testing-library/react";
-import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -30,8 +30,11 @@ vi.mock("next/image", () => ({
 // Hoisted fixtures.
 // ---------------------------------------------------------------------------
 
-const { mockLoadSession } = vi.hoisted(() => ({
+const { mockLoadSession, STABLE_SEED } = vi.hoisted(() => ({
   mockLoadSession: vi.fn(),
+  // Stable object reference so the seed dep in useEffect doesn't trigger
+  // a re-render loop when the mock is called on every render.
+  STABLE_SEED: { seedPokemon: [] as unknown[], seedEvolutionCards: [] as unknown[], seedReverseEvolutionCards: [] as unknown[] },
 }));
 
 vi.mock("@/lib/review/persistence", () => ({
@@ -108,6 +111,25 @@ vi.mock("@/lib/pasture/stats", () => ({
   })),
 }));
 
+// Locale-name resolution for the per-biome "Latest addition" (#1662).
+let mockPokemonLocale = "en";
+const mockLocaleNames: Record<string, string> = {};
+
+vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
+  useLocalePokemonName: (_speciesId: number | undefined, englishName: string) => ({
+    name: mockLocaleNames[mockPokemonLocale] ?? englishName,
+    transliteration: null,
+  }),
+}));
+
+vi.mock("@/lib/i18n/PokemonLocaleContext", () => ({
+  usePokemonLocaleContext: () => ({
+    locale: mockPokemonLocale,
+    languagesEnabled: false,
+    learningLocales: ["en"],
+  }),
+}));
+
 vi.mock("@/lib/pokemon/seed", () => ({
   SEED_POKEMON: [],
   SEED_EVOLUTION_CARDS: [],
@@ -116,6 +138,14 @@ vi.mock("@/lib/pokemon/seed", () => ({
   REVERSE_ID_OFFSET: 2_000_000,
   REVERSE_EDGE_ID_BASE: 2_500_000,
   CRY_ID_OFFSET: 3_000_000,
+}));
+
+vi.mock("@/lib/pokemon/SeedContext", () => ({
+  useSeed: () => ({
+    seed: STABLE_SEED,
+    error: null,
+    retry: vi.fn(),
+  }),
 }));
 
 vi.mock("@/lib/srs/scheduler", () => ({
@@ -148,6 +178,7 @@ vi.mock("@/components/pasture/PastureZone", () => ({
 
 import BiomeLandscapePage from "@/app/pasture/[biome]/page";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
+import { biomeStats } from "@/lib/pasture/stats";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -198,5 +229,32 @@ describe("BiomeLandscapePage", () => {
 
     // While loading the component renders null - the container has no children.
     expect(container.firstChild).toBeNull();
+  });
+
+  it("renders the locale-resolved Latest addition name with a lang attribute (#1662)", async () => {
+    mockPokemonLocale = "ja";
+    mockLocaleNames["ja"] = "ピカチュウ";
+    vi.mocked(biomeStats).mockReturnValueOnce({
+      masteredCount: 1,
+      totalCount: 10,
+      capturedPercent: 10,
+      latestAddition: { speciesId: 25, name: "Pikachu" },
+    });
+    mockLoadSession.mockResolvedValue(null);
+    const params = Promise.resolve({ biome: "grassland" });
+
+    await act(async () => {
+      renderWithIntl(<BiomeLandscapePage params={params} />);
+      await params;
+    });
+    // Flush the async load() effect so masteredCards is set and the stats
+    // strip (with BiomeLatestAddition) renders.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const nameEl = screen.getByText("ピカチュウ");
+    expect(nameEl.tagName).toBe("SPAN");
+    expect(nameEl).toHaveAttribute("lang", "ja");
   });
 });

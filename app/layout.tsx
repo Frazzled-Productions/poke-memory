@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
+import { splashStartupImages } from "@/lib/pwa/splashDevices";
 import { LocaleProvider } from "@/components/i18n/LocaleProvider";
 import { PokemonLocaleProvider } from "@/lib/i18n/PokemonLocaleContext";
+import { SeedProvider } from "@/lib/pokemon/SeedContext";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -48,74 +50,9 @@ export const metadata: Metadata = {
   appleWebApp: {
     title: "Poké Memory",
     statusBarStyle: "black-translucent",
-    startupImage: [
-      // iPhone 16 Pro Max  (440 × 956 logical, 3×)
-      {
-        url: "/splash/iphone16promax-portrait.png",
-        media:
-          "(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
-      },
-      {
-        url: "/splash/iphone16promax-landscape.png",
-        media:
-          "(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
-      },
-      // iPhone 16 Pro  (402 × 874 logical, 3×; 15 Pro / 14 Pro use 393 × 852 - see iphone16 entry)
-      {
-        url: "/splash/iphone16pro-portrait.png",
-        media:
-          "(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
-      },
-      {
-        url: "/splash/iphone16pro-landscape.png",
-        media:
-          "(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
-      },
-      // iPhone 16 Plus / 15 Plus / 14 Plus  (430 × 932 logical, 3×)
-      {
-        url: "/splash/iphone16plus-portrait.png",
-        media:
-          "(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
-      },
-      {
-        url: "/splash/iphone16plus-landscape.png",
-        media:
-          "(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
-      },
-      // iPhone 16 / 15 / 14  (393 × 852 logical, 3×)
-      {
-        url: "/splash/iphone16-portrait.png",
-        media:
-          "(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
-      },
-      {
-        url: "/splash/iphone16-landscape.png",
-        media:
-          "(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
-      },
-      // iPhone 13 mini / 12 mini  (375 × 812 logical, 3×)
-      {
-        url: "/splash/iphone13mini-portrait.png",
-        media:
-          "(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
-      },
-      {
-        url: "/splash/iphone13mini-landscape.png",
-        media:
-          "(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)",
-      },
-      // iPhone SE (3rd gen) / SE (2nd gen) / iPhone 8  (375 × 667 logical, 2×)
-      {
-        url: "/splash/iphoneSE-portrait.png",
-        media:
-          "(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)",
-      },
-      {
-        url: "/splash/iphoneSE-landscape.png",
-        media:
-          "(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)",
-      },
-    ],
+    // Derived from lib/pwa/splashDevices.ts (single source of truth, #1676), so
+    // a new device's PNGs and media queries can never drift apart.
+    startupImage: splashStartupImages(),
   },
   openGraph: {
     title: "Poké Memory",
@@ -210,6 +147,16 @@ export default function RootLayout({
             */}
             <PokemonLocaleProvider>
             {/*
+              SeedProvider kicks off the async fetch of generated-core.json and
+              generated-chains.json from public/pokemon-data/ on mount. This
+              removes both files from the synchronous boot chunk, cutting the
+              first-load JS parse from ~6.7s to sub-second on iOS (#1677).
+              Placed inside PokemonLocaleProvider (which needs next-intl locale
+              resolution) and outside AuthProvider (so auth state is irrelevant
+              to the seed fetch). ReviewSession reads from useSeed().
+            */}
+            <SeedProvider>
+            {/*
               #app-root wraps all persistent page chrome. FirstVisitOnboardingModal
               renders via createPortal directly onto <body> and toggles `inert` +
               `aria-hidden` on this element while open, preventing the screen-reader
@@ -282,6 +229,7 @@ export default function RootLayout({
             <DocumentTitleBadge />
             <Analytics />
             <SpeedInsights />
+            </SeedProvider>
             </PokemonLocaleProvider>
           </LocaleProvider>
         </Suspense>

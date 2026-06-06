@@ -31,45 +31,19 @@ import {
 import { filterMastered } from "@/lib/pasture/arrivals";
 
 // ---------------------------------------------------------------------------
-// Module mocks (hoisted)
+// Hoisted shared fixtures and mock functions (available inside vi.mock factories)
 // ---------------------------------------------------------------------------
 
-// Mock useStreakNavState so we control streak / token independently.
-const mockStreakNavState = vi.fn(() => ({
-  streak: null as number | null,
-  tokenBalance: null as number | null,
-  daysToNextMilestone: null as number | null,
-}));
-
-vi.mock("@/lib/streak/useStreakNavState", () => ({
-  useStreakNavState: () => mockStreakNavState(),
-}));
-
-// Mock useSuperuser to control pretendAllMastered.
-const mockUseSuperuser = vi.fn(() => ({
-  flags: { pretendAllMastered: false },
-}));
-
-vi.mock("@/lib/superuser/SuperuserContext", () => ({
-  useSuperuser: () => mockUseSuperuser(),
-}));
-
-// Mock loadSettings to control pokemonNameLocale.
-const mockLoadSettings = vi.fn(() => ({
-  pokemonNameLocale: "en" as string,
-  masteryRepetitions: 3,
-}));
-
-vi.mock("@/lib/settings/persistence", () => ({
-  loadSettings: () => mockLoadSettings(),
-  SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
-}));
-
-// Mock SEED_POKEMON with a small deterministic list so totalSpecies is
-// stable in tests. The real seed has ~1025 entries; we use 10 here.
-vi.mock("@/lib/pokemon/seed", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/lib/pokemon/seed")>();
-  const minimalSeed = Array.from({ length: 10 }, (_, i) => ({
+const {
+  mockStreakNavState,
+  mockUseSuperuser,
+  mockLoadSettings,
+  mockUseSeed,
+  minimalSeedPokemon,
+} = vi.hoisted(() => {
+  // A small deterministic seed so totalSpecies is stable in tests.
+  // The real seed has ~1025 entries; we use 10 here.
+  const minimalSeedPokemon = Array.from({ length: 10 }, (_, i) => ({
     id: i + 1,
     speciesId: i + 1,
     displayName: `Pokemon${i + 1}`,
@@ -81,8 +55,8 @@ vi.mock("@/lib/pokemon/seed", async (importOriginal) => {
       specialAttack: 50, specialDefense: 50, speed: 50,
     },
     flavorText: "",
-    flavorTexts: undefined,
-    evolutionChain: [],
+    flavorTexts: undefined as undefined,
+    evolutionChain: [] as never[],
     height: 10,
     weight: 100,
     baseExperience: 64,
@@ -91,18 +65,72 @@ vi.mock("@/lib/pokemon/seed", async (importOriginal) => {
     captureRate: 45,
     baseHappiness: 50,
     growthRate: "medium",
-    habitat: null,
+    habitat: null as null,
     genderRate: 0,
     isLegendary: false,
     isMythical: false,
-    cryUrl: null,
+    cryUrl: null as null,
     isDefaultForm: true,
-    formCategory: "default",
-    formSlug: null,
-    versionGroups: [],
+    formCategory: "default" as const,
+    formSlug: null as null,
+    versionGroups: [] as string[],
   }));
-  return { ...original, SEED_POKEMON: minimalSeed };
+
+  return {
+    minimalSeedPokemon,
+    mockStreakNavState: vi.fn(() => ({
+      streak: null as number | null,
+      tokenBalance: null as number | null,
+      daysToNextMilestone: null as number | null,
+    })),
+    mockUseSuperuser: vi.fn(() => ({
+      flags: { pretendAllMastered: false },
+    })),
+    mockLoadSettings: vi.fn(() => ({
+      pokemonNameLocale: "en" as string,
+      masteryRepetitions: 3,
+    })),
+    mockUseSeed: vi.fn(() => ({
+      seed: {
+        seedPokemon: minimalSeedPokemon,
+        seedEvolutionCards: [] as never[],
+        seedReverseEvolutionCards: [] as never[],
+      },
+      error: null as null,
+      retry: vi.fn(),
+    })),
+  };
 });
+
+// ---------------------------------------------------------------------------
+// Module mocks
+// ---------------------------------------------------------------------------
+
+vi.mock("@/lib/streak/useStreakNavState", () => ({
+  useStreakNavState: () => mockStreakNavState(),
+}));
+
+vi.mock("@/lib/superuser/SuperuserContext", () => ({
+  useSuperuser: () => mockUseSuperuser(),
+}));
+
+vi.mock("@/lib/settings/persistence", () => ({
+  loadSettings: () => mockLoadSettings(),
+  SETTINGS_SAVED_EVENT: "poke-memory:settings-saved",
+}));
+
+// Mock @/lib/pokemon/seed - still needed for REVERSE_ID_OFFSET (value import)
+// and the parity-contract tests that call filterMastered / computeStats.
+vi.mock("@/lib/pokemon/seed", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/pokemon/seed")>();
+  return { ...original, SEED_POKEMON: minimalSeedPokemon };
+});
+
+// Mock useSeed() to return the same minimal seed so the hook under test reads
+// the correct totalSpecies (10) without needing a real SeedProvider or fetch.
+vi.mock("@/lib/pokemon/SeedContext", () => ({
+  useSeed: () => mockUseSeed(),
+}));
 
 // ---------------------------------------------------------------------------
 // Import hook under test AFTER mocks are hoisted.
@@ -262,6 +290,15 @@ beforeEach(() => {
   mockLoadSettings.mockReturnValue({
     pokemonNameLocale: "en",
     masteryRepetitions: 3,
+  });
+  mockUseSeed.mockReturnValue({
+    seed: {
+      seedPokemon: minimalSeedPokemon,
+      seedEvolutionCards: [] as never[],
+      seedReverseEvolutionCards: [] as never[],
+    },
+    error: null,
+    retry: vi.fn(),
   });
 });
 

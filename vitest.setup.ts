@@ -1,6 +1,18 @@
 // Polyfill IndexedDB for the jsdom environment. jsdom does not ship IDB support,
 // so component tests that exercise persistence indirectly need this shim.
 import "fake-indexeddb/auto";
+
+// Prime the async seed cache so `getSeedIfLoaded()` (and scope.ts helpers
+// that read it) return real data in jsdom-project tests without triggering a
+// fetch. Importing seed.ts here is fine - test setups are not the client
+// bundle, so the JSON cost is acceptable in tests.
+import { SEED_POKEMON, SEED_EVOLUTION_CARDS, SEED_REVERSE_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { _primeSeed } from "@/lib/pokemon/seed-async";
+_primeSeed({
+  seedPokemon: SEED_POKEMON,
+  seedEvolutionCards: SEED_EVOLUTION_CARDS,
+  seedReverseEvolutionCards: SEED_REVERSE_EVOLUTION_CARDS,
+});
 import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";

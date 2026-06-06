@@ -14,6 +14,7 @@
     "whatsNew": "新功能",
     "privacy": "隐私",
     "terms": "条款",
+    "moreFromFrazzled": "Frazzled Productions 的更多应用",
     "openMenu": "打开导航菜单",
     "closeMenu": "关闭导航菜单",
     "navigationMenu": "导航菜单",
@@ -335,7 +336,10 @@
       "whatsNewDescription": "查看最近版本的更新内容。",
       "viewChangelog": "查看更新日志",
       "privacy": "隐私",
-      "terms": "条款"
+      "terms": "条款",
+      "moreFromFrazzled": "Frazzled Productions 的更多应用",
+      "moreFromFrazzledDescription": "看看我们的其他应用。",
+      "moreFromFrazzledCta": "访问 frazzledproductions.com"
     },
     "feedback": {
       "rowLabel": "发送反馈",
@@ -441,6 +445,9 @@
     "undoLastGradeAriaLabel": "撤销上次评分",
     "loadingCard": "加载卡片中...",
     "loadingAriaLabel": "加载复习会话中",
+    "seedLoadError": "无法加载游戏数据",
+    "seedLoadErrorBody": "请检查网络连接后重试。",
+    "seedLoadRetry": "重试",
     "noCardTypesEnabled": "未启用任何卡片类型",
     "noCardTypesEnabledBody": "请在<link>设置</link>中至少启用一种卡片类型以开始复习。",
     "noScopeMatch": "没有符合您范围的宝可梦",
@@ -535,7 +542,7 @@
     },
     "higherOrLowerNudge": {
       "title": "完成本轮练习，解锁额外小游戏",
-      "body": "今天练习至少两只宝可梦后，会话摘要下方将解锁「高低」属性挑战。看看能否打破你的最佳连击纪录？"
+      "body": "完成今日所有卡片后，只要你已复习了至少两只宝可梦，会话摘要下方就会出现「高低」属性挑战。看看能否打破你的最佳连击纪录？"
     }
   },
   "review": {
@@ -1119,7 +1126,7 @@
     "childFriendlySummary": {
       "heading": "用简单的话说：Poké Memory 如何处理你的数据？",
       "item1": "<s>仅游玩（无需登录）。</s> 不登录直接游玩时，你的宝可梦进度只保存在你自己的设备上，不会发送给我们或存储到网络上。",
-      "item2": "<s>关于登录。</s> 如果你用 GitHub 或 Google 账号登录，我们会将你的卡片进度保存到安全的数据库，方便你在不同设备上继续使用。注册 GitHub 或 Google 账号需要年满 13 岁。",
+      "item2": "<s>关于登录。</s> 如果你用 GitHub、Google 或用户名和密码登录，我们会将你的卡片进度保存到安全的数据库，方便你在不同设备上继续使用。如果你未满 13 岁，请不要登录，直接使用应用即可。",
       "item3": "<s>我们保存的内容。</s> 我们只保存你练习过的宝可梦卡片、你对它们的熟悉程度，以及上次练习的时间，不保存其他任何信息。我们不知道你的姓名、地址或任何个人信息。",
       "item4": "<s>其他人能看到吗？</s> 没有人能看到你的进度。只有你自己能看到自己的卡片。我们绝不会与他人共享你的进度，也不会用它来向你展示广告。",
       "item5": "<s>你可以自己掌控。</s> 你可以随时在设置页面<export>导出进度</export>或<reset>重置所有进度</reset>，无需征得我们的同意，现在就可以自己操作。",

@@ -6,7 +6,8 @@ import {
   versionGroupGeneration,
   compareVersionGroupSlugs,
 } from "@/lib/pokemon/versionGroupLabels";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
+import type { SeedPokemon } from "@/lib/pokemon/seed";
 import { sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
@@ -37,16 +38,14 @@ const PILL_BASE =
 
 /**
  * Version-group slugs present in the seed, grouped by generation number and
- * sorted for display. Computed once at module load - the seed is a build-time
- * constant so the result is stable for the module lifetime (mirrors the
- * `_seedById` / `_legendaryIds` pattern in `scope.ts`).
+ * sorted for display.
  *
  * Generation 0 ("Other") is placed after all numbered generations so mainline
  * games appear first in the picker.
  */
-const _groupedVersionGroups: [number, string[]][] = (() => {
+function buildGroupedVersionGroups(seedPokemon: readonly SeedPokemon[]): [number, string[]][] {
   const seen = new Set<string>();
-  for (const p of SEED_POKEMON) {
+  for (const p of seedPokemon) {
     for (const vg of (p as { versionGroups?: string[] }).versionGroups ?? []) seen.add(vg);
   }
   const map = new Map<number, string[]>();
@@ -60,7 +59,7 @@ const _groupedVersionGroups: [number, string[]][] = (() => {
     if (b[0] === 0) return -1;
     return a[0] - b[0];
   });
-})();
+}
 
 /**
  * Build a short label for the "Select all" / "Clear all" bulk-action button
@@ -110,6 +109,12 @@ function genBulkLabel(slugs: string[]): string {
  * in ScopeControl (#1110).
  */
 export function GameScopePicker({ selected, onChange }: Props) {
+  const { seed } = useSeed();
+  const seedPokemon = seed?.seedPokemon ?? [];
+  const _groupedVersionGroups = useMemo(
+    () => buildGroupedVersionGroups(seedPokemon),
+    [seedPokemon],
+  );
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   function toggleGame(slug: string): void {

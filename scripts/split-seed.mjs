@@ -40,11 +40,13 @@ const records = JSON.parse(await readFile(resolve(libDir, "generated.json"), "ut
 
 await mkdir(publicDir, { recursive: true });
 
-// generated-core.json - strip flavorTexts + evolutionChain
+// generated-core.json - strip flavorTexts + evolutionChain (lib/ + public/pokemon-data/)
 const coreRecords = records.map(({ flavorTexts: _ft, evolutionChain: _ec, ...rest }) => rest);
-await writeFile(resolve(libDir, "generated-core.json"), JSON.stringify(coreRecords), "utf-8");
+const coreJson = JSON.stringify(coreRecords);
+await writeFile(resolve(libDir, "generated-core.json"), coreJson, "utf-8");
+await writeFile(resolve(publicDir, "generated-core.json"), coreJson, "utf-8");
 
-// generated-chains.json - deduped chains + pokemon→hash map
+// generated-chains.json - deduped chains + pokemon→hash map (lib/ + public/pokemon-data/)
 const chainsByHash = {};
 const pokemonChain = {};
 for (const p of records) {
@@ -54,11 +56,9 @@ for (const p of records) {
   if (!chainsByHash[hash]) chainsByHash[hash] = ec;
   pokemonChain[String(p.id)] = hash;
 }
-await writeFile(
-  resolve(libDir, "generated-chains.json"),
-  JSON.stringify({ chains: chainsByHash, pokemonChain }),
-  "utf-8",
-);
+const chainsJson = JSON.stringify({ chains: chainsByHash, pokemonChain });
+await writeFile(resolve(libDir, "generated-chains.json"), chainsJson, "utf-8");
+await writeFile(resolve(publicDir, "generated-chains.json"), chainsJson, "utf-8");
 
 // generated-flavor.json - id + flavorTexts (lib/ + public/)
 const flavorRecords = records
@@ -124,14 +124,14 @@ const localeNamesJson = JSON.stringify(localeNamesRecords);
 await writeFile(resolve(libDir, "generated-locale-names.json"), localeNamesJson, "utf-8");
 await writeFile(resolve(publicDir, "generated-locale-names.json"), localeNamesJson, "utf-8");
 
-const coreSize = JSON.stringify(coreRecords).length;
-const chainsSize = JSON.stringify({ chains: chainsByHash, pokemonChain }).length;
+const coreSize = coreJson.length;
+const chainsSize = chainsJson.length;
 const flavorSize = flavorJson.length;
 const localeNamesSize = localeNamesJson.length;
 process.stdout.write(
   `Split seed files written:\n` +
-  `  generated-core.json:         ${(coreSize / 1024).toFixed(0)} KB\n` +
-  `  generated-chains.json:       ${(chainsSize / 1024).toFixed(0)} KB\n` +
+  `  generated-core.json:         ${(coreSize / 1024).toFixed(0)} KB (lib/ + public/pokemon-data/)\n` +
+  `  generated-chains.json:       ${(chainsSize / 1024).toFixed(0)} KB (lib/ + public/pokemon-data/)\n` +
   `  generated-flavor.json:       ${(flavorSize / 1024).toFixed(0)} KB (lib/ + public/pokemon-data/)\n` +
   `  generated-locale-names.json: ${(localeNamesSize / 1024).toFixed(0)} KB (lib/ + public/pokemon-data/)\n`,
 );

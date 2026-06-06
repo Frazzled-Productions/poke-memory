@@ -14,6 +14,9 @@ import { createRequire } from 'module';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+// Single source of truth for the device table, shared with app/layout.tsx's
+// startupImage metadata (#1676). Node 24 strips the TS types on import.
+import { SPLASH_DEVICES } from '../lib/pwa/splashDevices.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -35,27 +38,11 @@ const BG_COLOUR = '#DC0A2D'; // manifest theme_color
 const ICON_SIZE = 180;        // rendered icon diameter (matches apple-icon.tsx)
 
 // ─── Device table ─────────────────────────────────────────────────────────────
-// Each entry covers one physical device form-factor.
-// portrait  = { w, h } in CSS px; landscape swaps them.
-// scale     = device pixel ratio (used in the media query only).
-//
-// Sources: Apple Human Interface Guidelines + Safari Web Content Guide (2024).
-// https://developer.apple.com/design/human-interface-guidelines/layout#iOS-iPadOS-safe-areas
+// Imported from lib/pwa/splashDevices.ts (single source of truth). To add a
+// device, edit that file: the Next.js startupImage metadata derives from the
+// same table, so the two cannot drift.
 
-const DEVICES = [
-  // iPhone 16 Pro Max
-  { label: 'iphone16promax', w: 440, h: 956, scale: 3 },
-  // iPhone 16 Pro  (402 × 874 logical, 3×; 15 Pro / 14 Pro use 393 × 852 - see iphone16 entry)
-  { label: 'iphone16pro',    w: 402, h: 874, scale: 3 },
-  // iPhone 16 Plus / 15 Plus / 14 Plus
-  { label: 'iphone16plus',   w: 430, h: 932, scale: 3 },
-  // iPhone 16 / 15 / 14
-  { label: 'iphone16',       w: 393, h: 852, scale: 3 },
-  // iPhone 13 mini / 12 mini
-  { label: 'iphone13mini',   w: 375, h: 812, scale: 3 },
-  // iPhone SE (3rd gen) / SE (2nd gen) / iPhone 8
-  { label: 'iphoneSE',       w: 375, h: 667, scale: 2 },
-];
+const DEVICES = SPLASH_DEVICES;
 
 // ─── Icon rendering ───────────────────────────────────────────────────────────
 // Re-implement the app icon from apple-icon.tsx using sharp compositing

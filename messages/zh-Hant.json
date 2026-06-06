@@ -14,6 +14,7 @@
     "whatsNew": "新功能",
     "privacy": "隱私",
     "terms": "條款",
+    "moreFromFrazzled": "Frazzled Productions 的更多應用程式",
     "openMenu": "開啟導覽選單",
     "closeMenu": "關閉導覽選單",
     "navigationMenu": "導覽選單",
@@ -335,7 +336,10 @@
       "whatsNewDescription": "查看最近版本的更新內容。",
       "viewChangelog": "查看更新記錄",
       "privacy": "隱私",
-      "terms": "條款"
+      "terms": "條款",
+      "moreFromFrazzled": "Frazzled Productions 的更多應用程式",
+      "moreFromFrazzledDescription": "看看我們的其他應用程式。",
+      "moreFromFrazzledCta": "前往 frazzledproductions.com"
     },
     "feedback": {
       "rowLabel": "傳送意見回饋",
@@ -441,6 +445,9 @@
     "undoLastGradeAriaLabel": "撤銷上次評分",
     "loadingCard": "載入卡片中...",
     "loadingAriaLabel": "載入複習工作階段中",
+    "seedLoadError": "無法載入遊戲資料",
+    "seedLoadErrorBody": "請檢查連線後再試一次。",
+    "seedLoadRetry": "再試一次",
     "noCardTypesEnabled": "未啟用任何卡片類型",
     "noCardTypesEnabledBody": "請在<link>設定</link>中至少啟用一種卡片類型以開始複習。",
     "noScopeMatch": "沒有符合您範圍的寶可夢",
@@ -535,7 +542,7 @@
     },
     "higherOrLowerNudge": {
       "title": "完成本輪練習，解鎖額外小遊戲",
-      "body": "今天練習至少兩隻寶可夢後，會話摘要下方將解鎖「高低」屬性挑戰。看看能否打破你的最佳連擊紀錄？"
+      "body": "完成今日所有卡片後，只要你已複習了至少兩隻寶可夢，會話摘要下方就會出現「高低」屬性挑戰。看看能否打破你的最佳連擊紀錄？"
     }
   },
   "review": {
@@ -1119,7 +1126,7 @@
     "childFriendlySummary": {
       "heading": "用簡單的話說：Poké Memory 如何處理你的資料？",
       "item1": "<s>僅遊玩（無需登入）。</s> 不登入直接遊玩時，你的寶可夢進度只保存在你自己的裝置上，不會傳送給我們或儲存到網路上。",
-      "item2": "<s>關於登入。</s> 如果你用 GitHub 或 Google 帳號登入，我們會將你的卡片進度儲存到安全的資料庫，方便你在不同裝置上繼續使用。申請 GitHub 或 Google 帳號需要年滿 13 歲。",
+      "item2": "<s>關於登入。</s> 如果你用 GitHub、Google 或使用者名稱和密碼登入，我們會將你的卡片進度儲存到安全的資料庫，方便你在不同裝置上繼續使用。如果你未滿 13 歲，請不要登入，直接使用應用程式即可。",
       "item3": "<s>我們儲存的內容。</s> 我們只儲存你練習過的寶可夢卡片、你對它們的熟悉程度，以及上次練習的時間，不儲存其他任何資訊。我們不知道你的姓名、地址或任何個人資訊。",
       "item4": "<s>其他人能看到嗎？</s> 沒有人能看到你的進度。只有你自己能看到自己的卡片。我們絕不會與他人分享你的進度，也不會用它來向你展示廣告。",
       "item5": "<s>你可以自己掌控。</s> 你可以隨時在設定頁面<export>匯出進度</export>或<reset>重置所有進度</reset>，無需徵得我們的同意，現在就可以自己操作。",

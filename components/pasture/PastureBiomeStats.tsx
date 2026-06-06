@@ -9,6 +9,8 @@
 
 import { useTranslations } from "next-intl";
 import type { BiomeStats } from "@/lib/pasture/stats";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 
 type Props = {
   stats: BiomeStats;
@@ -26,6 +28,16 @@ type Props = {
 export function PastureBiomeStats({ stats, className = "" }: Props) {
   const t = useTranslations("pasture");
   const { masteredCount, totalCount, capturedPercent, latestAddition } = stats;
+
+  // Resolve the "Latest addition" name through the canonical locale path (#1662),
+  // so it renders in the active pokemonNameLocale like every other Pokémon name.
+  // The hook tolerates an undefined speciesId (returns the fallback), so it is
+  // safe to call unconditionally even when latestAddition is null.
+  const { name: latestLocaleName } = useLocalePokemonName(
+    latestAddition?.speciesId,
+    latestAddition?.name ?? "",
+  );
+  const { locale: pokemonLocale } = usePokemonLocaleContext();
 
   return (
     <dl
@@ -52,7 +64,9 @@ export function PastureBiomeStats({ stats, className = "" }: Props) {
           <div aria-hidden="true" className="opacity-40">·</div>
           <div className="flex items-center gap-1">
             <dt className="sr-only">{t("biomeStats.latestAddition")}</dt>
-            <dd className="truncate max-w-[12ch]">{latestAddition}</dd>
+            <dd className="truncate max-w-[12ch]">
+              <span lang={pokemonLocale}>{latestLocaleName}</span>
+            </dd>
           </div>
         </>
       )}

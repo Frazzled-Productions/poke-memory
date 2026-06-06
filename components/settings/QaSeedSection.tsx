@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils/cn";
 import { SCENARIOS, SCENARIO_BY_SLUG } from "@/lib/qa-seed/scenarios";
 import { applySeedScenario, clearSeedScenario } from "@/lib/qa-seed/apply";
 import { KEY_QA_SEED_ACTIVE } from "@/lib/storage/keys";
+import { loadSeed } from "@/lib/pokemon/seed-async";
 
 type ApplyStatus =
   | { kind: "idle" }
@@ -58,6 +59,10 @@ export function QaSeedSection() {
 
     setStatus({ kind: "applying" });
     try {
+      // The seed JSON is fetched at runtime (Stage 3, #1677) rather than
+      // bundled; scenario builders read it via getSeedIfLoaded(), so ensure it
+      // has loaded before building the payload.
+      await loadSeed();
       const payload = selectedScenario.build();
       await applySeedScenario(payload, selectedScenario.slug);
       setActiveSeedSlug(selectedScenario.slug);

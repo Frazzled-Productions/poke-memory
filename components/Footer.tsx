@@ -59,6 +59,15 @@ export function Footer() {
           {t("terms")}
         </Link>
         <span aria-hidden="true">·</span>
+        <a
+          href="https://frazzledproductions.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+        >
+          {t("moreFromFrazzled")}
+        </a>
+        <span aria-hidden="true">·</span>
         <span className="font-mono">v{APP_VERSION}</span>
       </div>
       <p className="mx-auto max-w-5xl px-4 pb-2 text-center text-xs text-zinc-400 dark:text-zinc-500">

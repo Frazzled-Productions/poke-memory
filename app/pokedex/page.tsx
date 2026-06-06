@@ -6,7 +6,7 @@ import { mutedText } from "@/lib/utils/class-names";
 import { buildSession, hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import { classifyCard } from "@/lib/stats/derive";
 import type { CardClass } from "@/lib/stats/derive";
 import type { MasteryProgress } from "@/lib/pokedex/sort";
@@ -19,17 +19,20 @@ import PokedexFiltered from "@/components/pokedex/PokedexFiltered";
 export default function PokedexPage() {
   const t = useTranslations("pokedex");
   const format = useFormatter();
+  const { seed } = useSeed();
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
 
   useEffect(() => {
+    if (seed === null) return;
+    const currentSeed = seed; // capture non-null reference for async closure
     async function load() {
       const { masteryRepetitions: mr } = loadSettings();
       setMasteryRepetitions(mr);
       const saved = await loadSession();
       if (saved !== null) {
-        const { cards: hydrated, anyHealed } = hydrateSession(saved.cards, SEED_POKEMON, []);
+        const { cards: hydrated, anyHealed } = hydrateSession(saved.cards, currentSeed.seedPokemon, []);
         // Persist healed cards so the fixed point is durable across all entry
         // points, not only Practice (#1506).
         if (anyHealed) {
@@ -37,11 +40,11 @@ export default function PokedexPage() {
         }
         setCards(hydrated);
       } else {
-        setCards(buildSession(SEED_POKEMON, []));
+        setCards(buildSession(currentSeed.seedPokemon, []));
       }
     }
     void load();
-  }, [storageVersion]);
+  }, [storageVersion, seed]);
 
   const cardClassById = new Map<number, CardClass>();
   const masteryProgressById = new Map<number, MasteryProgress>();
@@ -62,7 +65,7 @@ export default function PokedexPage() {
   // Default forms only - one tile per species. Falls back to all entries when
   // the seed hasn't been re-run yet (isDefaultForm will be undefined on older
   // generated.json) to avoid an empty grid.
-  const defaultFormPokemon = SEED_POKEMON.filter(
+  const defaultFormPokemon = (seed?.seedPokemon ?? []).filter(
     (p) => p.isDefaultForm === undefined || p.isDefaultForm,
   );
 

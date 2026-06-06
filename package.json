@@ -11,6 +11,7 @@
     "prebuild": "node scripts/check-node-version.mjs",
     "build": "next build",
     "start": "next start",
+    "check:bundle": "node scripts/check-bundle-size.mjs",
     "lint": "eslint && npm run lint:em-dash && npm run lint:i18n && npm run lint:pseudo-locale && npm run lint:changelog && npm run lint:agents-size",
     "lint:em-dash": "node scripts/check-no-em-dash.mjs",
     "lint:i18n": "node scripts/lint-i18n.mjs",
@@ -34,7 +35,8 @@
     "test:integration": "VITEST_INTEGRATION=1 vitest run --project integration",
     "test:e2e": "playwright test --project=chromium --project=mobile-safari --project=desktop-webkit --project=mobile-chrome",
     "test:visual": "playwright test --project=visual-chromium --project=visual-webkit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "qa:seed-cloud": "node scripts/run-qa-seed-cloud.mjs"
   },
   "dependencies": {
     "@open-spaced-repetition/binding": "^0.3.1",

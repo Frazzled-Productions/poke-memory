@@ -3,6 +3,19 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GameScopePicker } from "./GameScopePicker";
 
+// GameScopePicker calls useSeed() to read seedPokemon for version-group
+// discovery. Mock SeedContext with the real seed (primed by vitest.setup.ts
+// via _primeSeed) so the component renders its game pills in unit tests
+// without requiring a SeedProvider or a live fetch.
+vi.mock("@/lib/pokemon/SeedContext", async () => {
+  const { getSeedIfLoaded } = await import("@/lib/pokemon/seed-async");
+  const seed = getSeedIfLoaded();
+  return {
+    useSeed: () => ({ seed, error: null, retry: vi.fn() }),
+    SeedProvider: ({ children }: { children: React.ReactNode }) => children,
+  };
+});
+
 describe("GameScopePicker", () => {
   it("renders generation headers when games are present in the seed", () => {
     render(<GameScopePicker selected={[]} onChange={() => {}} />);

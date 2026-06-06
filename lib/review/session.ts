@@ -1,12 +1,13 @@
 import type { ReviewState, Grade } from "@/lib/srs/scheduler";
 import { initialReviewState, isFsrsInvalidState } from "@/lib/srs/scheduler";
 import type { SeedPokemon, EvolutionCard, ReverseEvolutionCard } from "@/lib/pokemon/seed";
+// Import numeric constants and pure functions from seed-builder (no JSON
+// dependency) so session.ts does not force the seed JSON into the boot chunk.
 import {
-  SEED_EVOLUTION_CARDS,
   REVERSE_ID_OFFSET,
   CRY_ID_OFFSET,
   reverseEdgeIdFor,
-} from "@/lib/pokemon/seed";
+} from "@/lib/pokemon/seed-builder";
 import { fnv1a, fnv1aUint32 } from "@/lib/utils/fnv1a";
 import { Subject, appTypeToDbType } from "@/lib/cards/subjectKey";
 import { todayInTimezone } from "@/lib/utils/format-date";
@@ -168,7 +169,7 @@ export function cardTypeIsEnabled(
 
 export function buildSession(
   seed: readonly SeedPokemon[],
-  evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
+  evoSeed: readonly EvolutionCard[] = [],
   now: Date = new Date(),
   opts: BuildSessionOpts = {},
 ): ReviewableCard[] {
@@ -256,7 +257,7 @@ export type HydrateSessionResult = {
 export function hydrateSession(
   saved: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
-  evoSeed: readonly EvolutionCard[] = SEED_EVOLUTION_CARDS,
+  evoSeed: readonly EvolutionCard[] = [],
   now: Date = new Date(),
   opts: BuildSessionOpts = {},
 ): HydrateSessionResult {

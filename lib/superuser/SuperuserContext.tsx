@@ -31,7 +31,7 @@ import {
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { saveStreakData } from "@/lib/streak/persistence";
 import { saveGradeLog } from "@/lib/gradelog/persistence";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { loadSeed } from "@/lib/pokemon/seed-async";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { KEY_QA_SEED_ACTIVE } from "@/lib/storage/keys";
 
@@ -161,7 +161,8 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
           const local = await loadSession();
           const settings = loadSettings();
           const opts = seedOptsFromSettings(settings);
-          const rebuilt = applyCloudAuthoritative(SEED_POKEMON, SEED_EVOLUTION_CARDS, rows, opts);
+          const seedData = await loadSeed();
+          const rebuilt = applyCloudAuthoritative(seedData.seedPokemon, seedData.seedEvolutionCards, rows, opts);
           const limits = local?.limits ?? DEFAULT_LIMITS;
           // Streak and grade-log: cloud truth replaces local outright. The
           // repudiation contract is "whatever QA changed in local is wiped";

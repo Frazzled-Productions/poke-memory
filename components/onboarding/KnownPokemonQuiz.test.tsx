@@ -9,6 +9,16 @@ import { KnownPokemonQuiz } from "@/components/onboarding/KnownPokemonQuiz";
 import type { UserSettings } from "@/lib/settings/persistence";
 
 // ────────────────────────────────────────────────────────────────────────────
+// Hoisted fixtures
+// ────────────────────────────────────────────────────────────────────────────
+
+// Stable seed reference so the useSeed hook returns the same object on every
+// render and the seed dep in useEffect does not trigger a re-run loop.
+const { STABLE_SEED } = vi.hoisted(() => ({
+  STABLE_SEED: { seedPokemon: [] as unknown[], seedEvolutionCards: [] as unknown[], seedReverseEvolutionCards: [] as unknown[] },
+}));
+
+// ────────────────────────────────────────────────────────────────────────────
 // Stubs
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -79,6 +89,17 @@ vi.mock("@/lib/sync/usePerGradeSync", () => ({
   usePerGradeSync: () => ({
     enqueueGrade: enqueueGradeSpy,
     flushPending: () => [],
+  }),
+}));
+
+// Provide a real-looking seed so the quiz can build a fallback session when
+// no persisted session exists. Tests that seed `currentSession` won't hit this
+// path, but tests that leave it null will.
+vi.mock("@/lib/pokemon/SeedContext", () => ({
+  useSeed: () => ({
+    seed: STABLE_SEED,
+    error: null,
+    retry: vi.fn(),
   }),
 }));
 

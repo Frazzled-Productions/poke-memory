@@ -17,7 +17,7 @@ import {
   bumpSessionStorageKey,
 } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import {
   hasStoredSettings,
   loadSettings,
@@ -86,6 +86,7 @@ function summariseCloudCards(rows: CloudRow[]) {
 export default function CallbackCompletePage() {
   const router = useRouter();
   const { user, loading, supabase } = useAuth();
+  const { seed } = useSeed();
   const tAuth = useTranslations("auth");
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [pending, setPending] = useState(false);
@@ -93,6 +94,7 @@ export default function CallbackCompletePage() {
 
   useEffect(() => {
     if (loading) return;
+    if (seed === null) return;
     if (!user) { router.replace("/"); return; }
     if (!supabase) { router.replace("/"); return; }
     let cancelled = false;
@@ -200,7 +202,7 @@ export default function CallbackCompletePage() {
     }
     void resolve();
     return () => { cancelled = true; };
-  }, [loading, user, supabase, router, retryCount]);
+  }, [loading, user, supabase, router, retryCount, seed]);
 
   async function applyCloud(data: {
     cloudRows: CloudRow[];
@@ -243,8 +245,8 @@ export default function CallbackCompletePage() {
     const opts = seedOptsFromSettings(settings);
     const limits = localExisting?.limits ?? DEFAULT_LIMITS;
     const rebuilt = applyCloudAuthoritative(
-      SEED_POKEMON,
-      SEED_EVOLUTION_CARDS,
+      seed?.seedPokemon ?? [],
+      seed?.seedEvolutionCards ?? [],
       data.cloudRows,
       opts,
     );

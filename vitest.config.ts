@@ -80,7 +80,15 @@ export default defineConfig({
           // jsdom project below instead.
           // Exclude the integration sub-directory — those tests require a live
           // Postgres instance and run only when VITEST_INTEGRATION=1 is set.
-          include: ["lib/**/*.test.ts", "lib/**/*.test.tsx"],
+          include: [
+            "lib/**/*.test.ts",
+            "lib/**/*.test.tsx",
+            // CI tooling under scripts/lib/ (e.g. the shared changelog-fragment
+            // parser, #1664) is pure and DOM-free, so it runs in the node project.
+            "scripts/**/*.test.mjs",
+            // QA cloud-seed dataset tests (#1707). TypeScript, DOM-free.
+            "scripts/**/*.test.ts",
+          ],
           exclude: ["lib/sync/integration/**"],
           environment: "node",
           setupFiles: ["./vitest.setup.node.ts"],

@@ -217,3 +217,22 @@ export async function insertAuthUser(
     [userId],
   );
 }
+
+/**
+ * Formats a JS Date that node-postgres parsed from a Postgres `date` column into
+ * a 'YYYY-MM-DD' string, timezone-robustly (#1685).
+ *
+ * The pg driver materialises a bare `date` at LOCAL midnight. Using
+ * `.toISOString()` converts that to UTC and, in any timezone behind UTC (e.g.
+ * Europe/London under BST), renders the day BEFORE - an off-by-one that
+ * false-failed the integration suite locally while passing in UTC CI. Reading
+ * the LOCAL components instead returns the stored calendar date in every
+ * timezone. Only use this on `date` columns; `timestamptz` columns are absolute
+ * instants and round-trip correctly through `.toISOString()`.
+ */
+export function pgDateToISO(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}

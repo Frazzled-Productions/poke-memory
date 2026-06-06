@@ -84,6 +84,7 @@ vi.mock("@/i18n/locales", () => ({
 // ---------------------------------------------------------------------------
 
 import RootLayout, { metadata } from "@/app/layout";
+import { SPLASH_DEVICES } from "@/lib/pwa/splashDevices";
 import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 
 /**
@@ -118,12 +119,12 @@ describe("Root layout - metadata export", () => {
     expect(metadata.appleWebApp).toBeDefined();
   });
 
-  it("includes exactly 12 startup images (portrait + landscape for 6 device sizes)", () => {
+  it("includes a portrait + landscape startup image for every device in the table (#1676)", () => {
     const appleWebApp = metadata.appleWebApp as {
       startupImage: Array<{ url: string; media: string }>;
     };
     expect(Array.isArray(appleWebApp.startupImage)).toBe(true);
-    expect(appleWebApp.startupImage).toHaveLength(12);
+    expect(appleWebApp.startupImage).toHaveLength(SPLASH_DEVICES.length * 2);
   });
 
   it("every startup image entry has a url and a media string", () => {
@@ -148,8 +149,8 @@ describe("Root layout - metadata export", () => {
     const landscapes = appleWebApp.startupImage.filter((e) =>
       e.media.includes("orientation: landscape"),
     );
-    expect(portraits).toHaveLength(6);
-    expect(landscapes).toHaveLength(6);
+    expect(portraits).toHaveLength(SPLASH_DEVICES.length);
+    expect(landscapes).toHaveLength(SPLASH_DEVICES.length);
   });
 
   it("device dimensions in media queries match the url slug names", () => {

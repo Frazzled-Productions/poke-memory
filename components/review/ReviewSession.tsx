@@ -17,7 +17,9 @@ import { GradeButtons, KeyboardShortcutsOverlay } from "@/components/review/Grad
 import { useSwipeGrade } from "@/components/review/useSwipeGrade";
 import { SwipeHint } from "@/components/review/SwipeHint";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
+import type { SeedPokemon, EvolutionCard as SeedEvolutionCard } from "@/lib/pokemon/seed";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-constants";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import { reconcileHiddenState } from "@/lib/review/filters";
 import { pickDistractors } from "@/lib/pokemon/distractors";
 import { buildMcOptions } from "@/lib/srs/multipleChoiceDistractors";
@@ -126,10 +128,6 @@ const SCOPE_NUDGE_SESSION_KEY = "poke-memory:practice-session-counted:v1";
 // The nudge shows when EITHER signal crosses its threshold.
 const OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD = 3;
 const OFFLINE_NUDGE_SESSION_THRESHOLD = 5;
-
-// Module-scoped seed lookup map. Built once at module load - the 1025-entry
-// Map would be wasteful to rebuild on every render of ReviewSession.
-const SEED_BY_ID = new Map(SEED_POKEMON.map((p) => [p.id, p]));
 
 // ---------------------------------------------------------------------------
 // Types
@@ -741,6 +739,9 @@ function CountdownScreen({
 
 export function ReviewSession() {
   const t = useTranslations("practice");
+  const { seed: seedData, error: seedError, retry: seedRetry } = useSeed();
+  const seedPokemon: readonly SeedPokemon[] = seedData?.seedPokemon ?? [];
+  const seedEvolutionCards: readonly SeedEvolutionCard[] = seedData?.seedEvolutionCards ?? [];
   // null = SSR / not-yet-hydrated. Same pattern as before.
   //
   // MULTI-LOCALE: `cards` is the ACTIVE-LOCALE-FILTERED view of the session.
@@ -1042,6 +1043,14 @@ export function ReviewSession() {
     [user?.id],
   );
 
+  // Lookup map from Pokémon id to SeedPokemon. Built once per seed load rather
+  // than once at module load so that the JSON is NOT bundled into the boot chunk
+  // (#1677). Returns an empty Map while the seed is loading.
+  const seedById = useMemo(
+    () => new Map(seedPokemon.map((p) => [p.id, p])),
+    [seedPokemon],
+  );
+
   // Runtime context for the "Incomplete evolution chains" scope preset (#995).
   // An incomplete chain is one the user has started but not finished mastering;
   // membership shifts as progress is made, so it is recomputed from the current
@@ -1072,7 +1081,7 @@ export function ReviewSession() {
   const seenPokemon = useMemo(
     () =>
       cards !== null
-        ? getSeenPokemon(cards, SEED_POKEMON, alternateFormsEnabled, scope, {
+        ? getSeenPokemon(cards, seedPokemon, alternateFormsEnabled, scope, {
             incompleteChainSpeciesIds: incompleteChains,
           })
         : [],
@@ -1081,12 +1090,14 @@ export function ReviewSession() {
 
   // Higher-or-Lower signpost nudge (#1573): one-shot hint teasing the
   // post-session mini-game. Gate (in priority order):
-  //   1. seenPokemon.length < 1  -> suppress (no Pokémon seen yet; nothing to tease).
+  //   1. seenPokemon.length < 2  -> suppress. The game itself only renders at
+  //      seenPokemon.length >= 2 (the end-of-session screen), so teasing it
+  //      before then promises a game the user cannot yet reach (#1696).
   //   2. firstVisitDone false    -> suppress (first-visit modal still showing).
   //   3. Otherwise: show.
   // The OnboardingHint component handles the higherOrLowerNudgeDismissed flag.
   const higherOrLowerNudge = (
-    seenPokemon.length < 1 ||
+    seenPokemon.length < 2 ||
     !firstVisitDone
   ) ? null : (
     <div className="mb-3">
@@ -1111,6 +1122,8 @@ export function ReviewSession() {
   );
 
   useEffect(() => {
+    // Do not attempt to build a session until the async seed has loaded.
+    if (seedData === null) return;
     async function load() {
       const settings = loadSettings();
       const saved = await loadSession();
@@ -1141,8 +1154,8 @@ export function ReviewSession() {
         // FSRS states written by older app versions (#1506).
         const { cards: hydrated, anyHealed } = hydrateSession(
           saved.cards,
-          SEED_POKEMON,
-          SEED_EVOLUTION_CARDS,
+          seedPokemon,
+          seedEvolutionCards,
           now,
           {
             reverseEnabled: enabled,
@@ -1160,7 +1173,7 @@ export function ReviewSession() {
         }
         sessionCards = hydrated;
       } else {
-        const fresh = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, now, {
+        const fresh = buildSession(seedPokemon, seedEvolutionCards, now, {
           reverseEnabled: enabled,
           nameEnabled,
           evolutionEnabled,
@@ -1335,10 +1348,11 @@ export function ReviewSession() {
       }
     }
     void load();
-  // notifySaveResult is stable (useCallback with no deps). The dep is listed to
-  // satisfy the linter, but this effect is intentionally one-shot (mount only).
+  // notifySaveResult is stable (useCallback with no deps). seedData gates the
+  // effect - re-runs when the seed first resolves (null → SeedData) so the
+  // session builds immediately after the async fetch completes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notifySaveResult]);
+  }, [seedData, notifySaveResult]);
 
   // Reload on settings changes (cross-tab), same-tab locale switch, and cloud
   // pull events. Extracted to useSessionReloadListeners (#1520).
@@ -1619,7 +1633,34 @@ export function ReviewSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, learningQueue, eligibleCardIds, limits, extendedReview]);
 
-  // --- Loading skeleton (SSR + first client tick) ---
+  // --- Seed error state ---
+  // If the async seed fetch failed, surface a retry prompt. This is distinct
+  // from the loading skeleton: the skeleton is shown while the seed OR session
+  // is loading normally; the error state is only shown after a confirmed failure.
+  if (seedError !== null) {
+    return (
+      <div
+        role="alert"
+        className="flex flex-col items-center gap-4 text-center"
+      >
+        <p className="text-lg font-semibold text-foreground">
+          {t("seedLoadError")}
+        </p>
+        <p className={mutedText}>
+          {t("seedLoadErrorBody")}
+        </p>
+        <button
+          type="button"
+          onClick={seedRetry}
+          className="min-h-[44px] rounded-lg bg-theme-accent px-8 py-2 text-sm font-semibold text-theme-fg-on-primary transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2"
+        >
+          {t("seedLoadRetry")}
+        </button>
+      </div>
+    );
+  }
+
+  // --- Loading skeleton (SSR + first client tick + waiting for async seed) ---
   if (cards === null) {
     return (
       <div
@@ -1859,9 +1900,9 @@ export function ReviewSession() {
       if (c.cardType === "reverse") {
         // Expand the reverse card into its four picker tile sprites at the
         // same size SpritePicker renders them (PICKER_SPRITE_SIZE = 150 px).
-        const target = SEED_BY_ID.get(c.pokemonId);
+        const target = seedById.get(c.pokemonId);
         if (target) {
-          const distractors = pickDistractors(c.pokemonId, SEED_POKEMON, 3, String(c.id));
+          const distractors = pickDistractors(c.pokemonId, seedPokemon, 3, String(c.id));
           for (const pokemon of [target, ...distractors]) {
             preloadPickerUrls.push({ src: pokemon.spriteUrl, width: PICKER_SPRITE_SIZE });
           }
@@ -2072,7 +2113,7 @@ export function ReviewSession() {
       const facts = getPokemonFacts(effectiveCard);
       setCurrentFact(selectFact(facts));
     } else if (effectiveCard.cardType === "evolution") {
-      const evoPokemon = SEED_POKEMON.find((p) => p.id === effectiveCard.postEvoId);
+      const evoPokemon = seedPokemon.find((p) => p.id === effectiveCard.postEvoId);
       if (evoPokemon) {
         setCurrentFact(selectFact(getPokemonFacts(evoPokemon)));
       } else {
@@ -2081,7 +2122,7 @@ export function ReviewSession() {
       }
     } else if (effectiveCard.cardType === "reverse-evolution") {
       // Reverse direction: the answer is the pre-evo, so surface its facts.
-      const preEvo = SEED_POKEMON.find((p) => p.id === effectiveCard.preEvoId);
+      const preEvo = seedPokemon.find((p) => p.id === effectiveCard.preEvoId);
       if (preEvo) {
         setCurrentFact(selectFact(getPokemonFacts(preEvo)));
       } else {
@@ -2150,10 +2191,10 @@ export function ReviewSession() {
     if (cryOn) {
       if (effectiveCard.cardType === "name") cryUrlOnReveal = effectiveCard.cryUrl ?? null;
       else if (effectiveCard.cardType === "evolution") {
-        const target = SEED_POKEMON.find((p) => p.id === effectiveCard.postEvoId);
+        const target = seedPokemon.find((p) => p.id === effectiveCard.postEvoId);
         cryUrlOnReveal = target?.cryUrl ?? null;
       } else if (effectiveCard.cardType === "reverse-evolution") {
-        const target = SEED_POKEMON.find((p) => p.id === effectiveCard.preEvoId);
+        const target = seedPokemon.find((p) => p.id === effectiveCard.preEvoId);
         cryUrlOnReveal = target?.cryUrl ?? null;
       }
     }
@@ -2370,9 +2411,9 @@ export function ReviewSession() {
           // directly here instead.
           // Use the tighter grade-path ceiling (#1191) - sprites are
           // self-hosted and already network-warmed, so 150 ms is sufficient.
-          const target = SEED_BY_ID.get(nextCard.pokemonId);
+          const target = seedById.get(nextCard.pokemonId);
           if (target) {
-            const distractors = pickDistractors(nextCard.pokemonId, SEED_POKEMON, 3, String(nextCard.id));
+            const distractors = pickDistractors(nextCard.pokemonId, seedPokemon, 3, String(nextCard.id));
             await decodeSpriteUrls(
               [target, ...distractors].map((p) => p.spriteUrl),
               DECODE_GRADE_TIMEOUT_MS,
@@ -2842,11 +2883,11 @@ export function ReviewSession() {
     // only fails if the seed changes under a persisted session (e.g. after a
     // seed data update). Guard against a hard crash by rendering nothing in
     // that case; the user can reload to rebuild their session.
-    const reverseTarget = SEED_POKEMON.find((p) => p.id === effectiveCard.pokemonId);
+    const reverseTarget = seedPokemon.find((p) => p.id === effectiveCard.pokemonId);
     if (!reverseTarget) return null;
     const reverseDistractors = pickDistractors(
       effectiveCard.pokemonId,
-      SEED_POKEMON,
+      seedPokemon,
       3,
       String(effectiveCard.id),
     );
@@ -2963,7 +3004,7 @@ export function ReviewSession() {
           effectiveCard.id,
           // effectiveCard is a NameReviewCard (SeedPokemon fields are spread onto it).
           effectiveCard as Parameters<typeof buildMcOptions>[1],
-          SEED_POKEMON,
+          seedPokemon,
           String(effectiveCard.id),
         )
       : null;

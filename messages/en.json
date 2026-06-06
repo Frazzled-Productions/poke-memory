@@ -14,6 +14,7 @@
     "whatsNew": "What's new",
     "privacy": "Privacy",
     "terms": "Terms",
+    "moreFromFrazzled": "More from Frazzled Productions",
     "openMenu": "Open navigation menu",
     "closeMenu": "Close navigation menu",
     "navigationMenu": "Navigation menu",
@@ -335,7 +336,10 @@
       "whatsNewDescription": "See what shipped in recent releases.",
       "viewChangelog": "View changelog",
       "privacy": "Privacy",
-      "terms": "Terms"
+      "terms": "Terms",
+      "moreFromFrazzled": "More from Frazzled Productions",
+      "moreFromFrazzledDescription": "Discover our other apps.",
+      "moreFromFrazzledCta": "Visit frazzledproductions.com"
     },
     "feedback": {
       "rowLabel": "Send feedback",
@@ -441,6 +445,9 @@
     "undoLastGradeAriaLabel": "Undo last grade",
     "loadingCard": "Loading card...",
     "loadingAriaLabel": "Loading review session",
+    "seedLoadError": "Could not load game data",
+    "seedLoadErrorBody": "Check your connection and try again.",
+    "seedLoadRetry": "Try again",
     "noCardTypesEnabled": "No card types enabled",
     "noCardTypesEnabledBody": "Enable at least one card type in <link>Settings</link> to start reviewing.",
     "noScopeMatch": "No Pokémon match your scope",
@@ -535,7 +542,7 @@
     },
     "higherOrLowerNudge": {
       "title": "Finish your session for a bonus mini-game",
-      "body": "Once you have practised at least two Pokémon today, a Higher or Lower stat challenge unlocks below your session summary. Can you beat your best streak?"
+      "body": "When you finish today's cards, a Higher or Lower stat challenge appears below your session summary, as long as you have reviewed at least two Pokémon. Can you beat your best streak?"
     }
   },
   "review": {
@@ -1119,7 +1126,7 @@
     "childFriendlySummary": {
       "heading": "In plain language: what does Poké Memory do with your data?",
       "item1": "<s>Just playing (no sign-in).</s> When you play without signing in, the app saves your Pokémon progress only on your own device, and nothing is sent to us or stored anywhere on the internet.",
-      "item2": "<s>Signing in.</s> If you sign in with a GitHub or Google account, we save your card progress to a secure database so you can keep it across different devices. You need to be 13 or older to have a GitHub or Google account.",
+      "item2": "<s>Signing in.</s> If you sign in with GitHub, Google, or a username and password, we save your card progress to a secure database so you can keep it across different devices. If you are under 13, please use the app without signing in instead.",
       "item3": "<s>What we save.</s> We only save which Pokémon cards you've practised, how well you know them, and when you last practised, and nothing else. We don't know your name, your address, or anything about you as a person.",
       "item4": "<s>Who else can see it.</s> Nobody else can see your progress. Only you can see your own cards. We never share your progress with anyone else or use it to show you adverts.",
       "item5": "<s>You're in control.</s> You can <export>export your progress</export> or <reset>reset all progress</reset> at any time from the Settings page. You don't need to ask us; you can do it yourself, right now.",

@@ -14,6 +14,7 @@
     "whatsNew": "新機能",
     "privacy": "プライバシー",
     "terms": "利用規約",
+    "moreFromFrazzled": "Frazzled Productions の他のアプリ",
     "openMenu": "ナビゲーションメニューを開く",
     "closeMenu": "ナビゲーションメニューを閉じる",
     "navigationMenu": "ナビゲーションメニュー",
@@ -335,7 +336,10 @@
       "whatsNewDescription": "最近のリリースで追加された内容を確認できます。",
       "viewChangelog": "変更履歴を見る",
       "privacy": "プライバシー",
-      "terms": "利用規約"
+      "terms": "利用規約",
+      "moreFromFrazzled": "Frazzled Productions の他のアプリ",
+      "moreFromFrazzledDescription": "私たちの他のアプリをチェック。",
+      "moreFromFrazzledCta": "frazzledproductions.com を開く"
     },
     "feedback": {
       "rowLabel": "フィードバックを送る",
@@ -441,6 +445,9 @@
     "undoLastGradeAriaLabel": "最後の採点を取り消す",
     "loadingCard": "カードを読み込み中...",
     "loadingAriaLabel": "レビューセッションを読み込み中",
+    "seedLoadError": "ゲームデータを読み込めませんでした",
+    "seedLoadErrorBody": "接続を確認して、もう一度お試しください。",
+    "seedLoadRetry": "再試行",
     "noCardTypesEnabled": "有効なカードタイプがありません",
     "noCardTypesEnabledBody": "<link>設定</link>で少なくとも1つのカードタイプを有効にしてください。",
     "noScopeMatch": "スコープに一致する Pokémon がいません",
@@ -535,7 +542,7 @@
     },
     "higherOrLowerNudge": {
       "title": "セッションを完了してボーナスミニゲームをゲット",
-      "body": "今日2体以上のポケモンを練習すると、セッション結果の下に「大きい・小さい」ステータスチャレンジが解放されます。自己記録を更新できるかな？"
+      "body": "今日のカードをすべて終えると、2体以上のポケモンを確認した場合、セッション結果の下に「大きい・小さい」ステータスチャレンジが表示されます。自己記録を更新できるかな？"
     }
   },
   "review": {
@@ -1119,7 +1126,7 @@
     "childFriendlySummary": {
       "heading": "ポケモリーはあなたのデータをどう扱う?",
       "item1": "<s>サインインせずに遊ぶ場合。</s> サインインせずに遊ぶと、ポケモンの進捗はあなたのデバイスだけに保存され、外部には一切送信されません。",
-      "item2": "<s>サインインについて。</s> GitHubまたはGoogleアカウントでサインインすると、カードの進捗をデータベースに安全に保存でき、別のデバイスでも引き継げます。GitHubやGoogleのアカウントを持つには13歳以上である必要があります。",
+      "item2": "<s>サインインについて。</s> GitHub、Google、またはユーザー名とパスワードでサインインすると、カードの進捗をデータベースに安全に保存でき、別のデバイスでも引き継げます。13歳未満の場合は、サインインせずにアプリを使ってください。",
       "item3": "<s>保存する情報。</s> 保存するのは、練習したポケモンカード、その習熟度、最後に練習した日時のみです。あなたの名前・住所など、個人に関する情報は一切保存しません。",
       "item4": "<s>他の人は見られる?</s> あなたの進捗を見られるのはあなただけです。進捗を他者と共有したり、広告に利用したりすることはありません。",
       "item5": "<s>自分でコントロールできます。</s> 設定ページからいつでも<export>進捗をエクスポート</export>したり<reset>進捗をリセット</reset>したりできます。私たちに許可を求める必要はありません。今すぐ自分で行えます。",

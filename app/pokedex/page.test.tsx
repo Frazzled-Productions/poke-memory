@@ -35,8 +35,42 @@ vi.mock("next/link", () => ({
 // Hoisted fixtures.
 // ---------------------------------------------------------------------------
 
-const { mockLoadSession } = vi.hoisted(() => ({
+const { mockLoadSession, STABLE_SEED } = vi.hoisted(() => ({
   mockLoadSession: vi.fn(),
+  STABLE_SEED: {
+    seedPokemon: [
+      {
+        id: 1,
+        speciesId: 1,
+        isDefaultForm: true,
+        formCategory: "default",
+        formSlug: null,
+        displayName: "Bulbasaur",
+        name: "Bulbasaur",
+        spriteUrl: "/sprites/pokemon/1.png",
+        types: ["grass", "poison"],
+        stats: { hp: 45, attack: 49, defense: 49, specialAttack: 65, specialDefense: 65, speed: 45 },
+        flavorText: "A grass Pokémon.",
+        flavorTexts: ["A grass Pokémon."],
+        evolutionChain: [],
+        height: 7,
+        weight: 69,
+        baseExperience: 64,
+        genus: "Seed Pokémon",
+        generation: "generation-i",
+        captureRate: 45,
+        baseHappiness: 50,
+        growthRate: "medium-slow",
+        habitat: "grassland",
+        genderRate: 1,
+        isLegendary: false,
+        isMythical: false,
+        cryUrl: null,
+      },
+    ] as unknown[],
+    seedEvolutionCards: [] as unknown[],
+    seedReverseEvolutionCards: [] as unknown[],
+  },
 }));
 
 vi.mock("@/lib/review/persistence", () => ({
@@ -116,6 +150,14 @@ vi.mock("@/lib/pokemon/seed", () => ({
   REVERSE_ID_OFFSET: 2_000_000,
   REVERSE_EDGE_ID_BASE: 2_500_000,
   CRY_ID_OFFSET: 3_000_000,
+}));
+
+vi.mock("@/lib/pokemon/SeedContext", () => ({
+  useSeed: () => ({
+    seed: STABLE_SEED,
+    error: null,
+    retry: vi.fn(),
+  }),
 }));
 
 // Stub heavy child components so the render is fast and focused.
