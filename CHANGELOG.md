@@ -6,6 +6,58 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.10.35] - 2026-06-06
+
+### Added
+
+- Pasture now shows a one-shot hint on first visit ("Press and hold any Pokémon to see its name, mastery date, and review interval") so the long-press detail popover is discoverable. The hint is dismissed with a single tap and never re-appears.
+- Practice screen now shows a one-shot hint ("Finish your session for a bonus mini-game") once you have seen at least one Pokémon in a session, signposting the Higher or Lower stat challenge that unlocks after two Pokémon. The hint is dismissed with a single tap and never re-appears.
+- Added accessible info affordances for "Closest to mastery" sort and queue-state badges: a small circle-i `InfoButton` explains FSRS jargon in plain language, keyboard-reachable and localised across all four supported locales.
+- Stats page: new "Languages" card for multi-language learners, showing each enrolled locale's card count, mastery percentage, and last review date. Hidden for single-locale users.
+- Journey page now shows a "Languages" section for users studying multiple Pokémon name locales, with per-language mastery count and best review day. Visible only when the Languages lab flag is on and more than one language is enrolled.
+- Added "Send feedback" entry point in Settings (Account &amp; Data section) that opens a modal for reporting bugs, requesting features, or leaving general feedback. Works for both guests and signed-in users. The form captures the current page path and app version automatically and includes a privacy notice reminding users not to share personal information.
+- Added an accessible info affordance for the reps badge on the Pasture "Next arrivals" strip: a circle-i `InfoButton` in the section heading explains what reps means in plain language ("how many times you have reviewed this card so far"), keyboard-reachable and localised across all four supported locales.
+- Guest sign-up nudge on Stats and Journey pages: a one-shot loss-aversion callout appears for guests who have mastered 10 or more Pokémon, or completed 3 or more practice sessions, prompting them to create a free account before browser data is cleared.
+- Replace the `SignInPicker` dropdown with a `SignInSheet` bottom sheet / centred modal that leads with a value-prop heading and a full a11y contract (focus trap, inert backdrop, Escape to close, focus restore). The sheet is the single sign-in surface: the `GuestSignUpNudge` CTA now opens it instead of its own inline provider picker.
+- Added username/password sign-in as a secondary door in the SignInSheet. Accounts use a synthetic email internally; the username is the only identifier shown to the user. Sign-up includes prominent no-password-reset and no-real-name warnings in all four locales.
+- Added a low-key "More from Frazzled Productions" cross-promo link to frazzledproductions.com, in the footer and under Settings → About (so mobile bottom-nav users, who do not see the footer, still get it). Opens in a new tab. Copy added in all four locales.
+- Add QA cloud seeder script (`npm run qa:seed-cloud`) that creates five durable named users in the QA Supabase project (`qa-fresh`, `qa-mastery`, `qa-locale`, `qa-streak`, `qa-conflict`) and seeds each with a faithful, cloud-specific dataset via the service-role client. Includes `--dry-run` mode (no network calls or credentials required) and a forcing-function test suite that enforces FSRS bounds, name+reverse pairing, and locale consistency.
+
+### Changed
+
+- Privacy notice, Terms of Use, and DPIA updated to identify the data controller and service operator as Frazzled Productions Ltd (company number 17258540), registered in England and Wales.
+- Statutory trading disclosure (registered name, company number, and registered office) added to the site footer (desktop/hamburger-nav) and the Settings About section (bottom-nav mobile), so it is reachable from every page. Rendered from a single shared source component (`CompanyDisclosure`).
+- Internal: extracted shared `DismissableBanner` component from near-duplicate `GradeErrorBanner` and `StorageQuotaBanner` alert banners; no visual change.
+- Move all hardcoded English `aria-label` strings across 15 component and page files into the next-intl message catalogues. Dynamic labels use ICU parameters. All four locale catalogues (en, ja, zh-Hans, zh-Hant) updated; xx-pseudo regenerated.
+- Privacy notice and DPIA updated to cover the new feedback-submission data flow (lawful basis, retention period, cascade deletion on account delete, and child-friendly summary item).
+- Analytics: emit an `app_open` custom event on load with bucketed, non-PII properties (`userType` and `progressBucket`) to measure the guest-to-account funnel. Privacy notice updated to disclose the event.
+- Updated the privacy notice, Terms of Use, DPIA, and Children's Code assessment for the new username/password sign-in door (#1671): the OAuth-only framing is gone, the chosen username is documented as the personal data collected, the DPIA R4 child-account risk is re-assessed (the inherited 13+ age gate no longer applies to this door, mitigated by the uniform Children's Code standards), and the Terms warn that username/password accounts have no password-reset path. Email-related compliance copy (SMTP sub-processor, auth-email lawful basis) is deferred until magic-link sign-in ships, since no email is collected today.
+- Add async seed-loading infrastructure: `seed-constants.ts` (extracted ID-namespace constants), `buildSeed` pure function in `seed.ts`, `seed-async.ts` module-singleton loader that fetches `generated-core.json` + `generated-chains.json` from `public/pokemon-data/` at runtime, and `SeedContext.tsx` React context. Existing synchronous `SEED_POKEMON` / `SEED_EVOLUTION_CARDS` / `SEED_REVERSE_EVOLUTION_CARDS` exports are unchanged. Stage 1 of #1677.
+- Remove the ~1.28 MB Pokémon seed JSON from the first-load client bundles of all non-Practice routes (Pokédex, Stats, Settings, Pasture, Journey, Auth callback). The seed now loads asynchronously via `SeedContext`; pages gate their effects on `seed !== null` and render normally once data arrives. The QA-seed scenario builders and backup import/export read the loaded seed instead of value-importing it, and a `check:bundle` CI guard fails the build if the seed ever leaks back into a static chunk.
+
+### Fixed
+
+- Hotfix PRs merged directly to `main` now automatically backmerge into `qa` so the next promotion PR is never silently behind. Previously a hotfix could block auto-merge until a manual sync PR was raised.
+- Removed the hard horizontal divider line that appeared under the ProfileStatusBar on all non-Practice pages (Pokédex, Pasture, Stats, Journey). The non-theme zinc border read as a near-black line in dark mode; the Nav's own border already delimits the header region.
+- Pasture: resolve Pokémon names via `useLocalePokemonName` for the sprite button `aria-label`, `<Image alt>`, popover `aria-label`, and popover visible name. Screen-reader users in Japanese, Simplified Chinese, and Traditional Chinese now hear the locale-appropriate name rather than the English name. Popover visible name is wrapped in `<span lang>` for non-English locales.
+- The Pasture biome "Latest addition" name now renders in the active Pokémon name locale (ja / zh-Hans / zh-Hant) instead of always in English, on both the main Pasture screen and the per-biome detail page. The name is wrapped in a `lang` attribute for correct screen-reader pronunciation.
+- Release cut (`auto-release.yml`) no longer fails on changelog fragments that carry an extra `issue:` front-matter key. The cut and the PR-time lint now share one parser (`scripts/lib/changelog-fragment.mjs`), so they can never disagree on what a valid fragment is.
+- Added a daily `qa-drift-check` job that detects when `qa` was left un-reset after a release (main no longer an ancestor of qa) and opens a tracking issue, instead of the drift surfacing as merge conflicts at the next promotion.
+- Added iOS PWA splash screens for four common iPhone form-factors that previously cold-launched to a black screen (390×844, 428×926, 414×896 @2× and @3×, covering iPhone 12/13/14, the Pro Max line, XR/11, and XS Max/11 Pro Max). The device table is now a single source of truth (`lib/pwa/splashDevices.ts`) shared by the PNG generator and the layout metadata, with a CI guard asserting every device has correctly-sized PNGs and a matching media query.
+- Stage 2 of async seed loading (#1677 / #1604): `ReviewSession` now reads the seed from `useSeed()` (SeedContext) instead of a direct module-level import of `@/lib/pokemon/seed`. `SEED_POKEMON` and `SEED_EVOLUTION_CARDS` are no longer value-imported by the practice page at module level, so the seed JSON is not required to parse synchronously before the ReviewSession component can render. A branded loading skeleton and a retry-on-error state replace the previous synchronous block.
+- `<SeedProvider>` wired into `app/layout.tsx`, making the async seed available to all routes via `useSeed()`.
+- The `EvolutionCard` type alias conflict (component vs data type) in `ReviewSession.tsx` resolved by aliasing the data type as `SeedEvolutionCard`.
+- Missing `</SeedProvider>` closing tag in `app/layout.tsx` fixed.
+- `ReviewSession.test.tsx` updated: `vi.mock("@/lib/pokemon/SeedContext")` added, providing a stable `useSeed()` mock that returns seed data via the existing `mockSeedPokemon` fixture. All 103 existing tests continue to pass.
+- Boot-path (practice route `/`) consumer migration complete: `lib/review/scope.ts`, `lib/superuser/SuperuserContext.tsx`, and `lib/profile/useProfileStatus.ts` no longer value-import from `@/lib/pokemon/seed` at module level. `scope.ts` uses `getSeedIfLoaded()` with correct lazy-only memoisation (never caches an empty result); `SuperuserContext.tsx` calls `await loadSeed()` inside the async exit-cleanup effect; `useProfileStatus.ts` reads `seed?.seedPokemon.length` from `useSeed()` and re-runs when the seed loads. The settings route (which includes `KnownPokemonQuiz`) still statically imports seed data and will be decoupled in Stage 3.
+- `vitest.setup.node.ts` and `vitest.setup.ts` updated to call `_primeSeed()` with the full seed, so `getSeedIfLoaded()` returns real data in all test environments without triggering a fetch.
+- `GameScopePicker.test.tsx` updated to mock `@/lib/pokemon/SeedContext` (the component was migrated to `useSeed()` in Stage 2) so its 10 unit tests continue to pass.
+- Bundle verification: after the build, the 1.28 MB seed chunk (`0fw0.e~tljz7m.js`) is NOT referenced in `index.html` (the `/` route's first-load HTML). The seed JSON has left the boot path. `Ivysaur`, `captureRate`, and other seed-unique identifiers are absent from all 20 first-load chunks (~1.25 MB total, dominated by the React/Next.js/Supabase framework chunks).
+- Corrected the Higher or Lower hint copy so it accurately says the mini-game appears after you finish today's cards (with the at-least-two-Pokémon caveat), rather than implying it unlocks after reviewing two Pokémon. Updated in all four locales.
+- Sync: stop stale clients from clobbering `user_settings` sub-objects (streakProtection, onboarding, earnedBadges). The LWW pull branch now snapshots the applied settings so the next push sees a zero diff; first-push default-pruning prevents a fresh device from overwriting richer cloud values with defaults.
+- Integration tests no longer false-fail when run in a non-UTC timezone. Postgres `date` columns are now read back via local date components (a shared `pgDateToISO` helper) instead of `toISOString().slice(0, 10)`, which shifted the day in timezones behind UTC. Affects `pull-and-merge` and `reconcile-orphans`.
+- The Higher or Lower teaser no longer appears after the first card. It now shows only once at least two Pokémon have been seen, matching the mini-game's own minimum (the game renders at the end of the session and needs two Pokémon), so it never teases a game the user cannot reach.
+
 ## [0.10.34] - 2026-06-03
 
 ### Fixed
@@ -1595,7 +1647,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.34...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.35...HEAD
+[0.10.35]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.35
 [0.10.34]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.34
 [0.10.33]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.33
 [0.10.32]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.32
