@@ -3,6 +3,15 @@ import chainsData from "@/lib/pokemon/generated-chains.json";
 import type { EvolutionDetail } from "@/lib/pokemon/triggers";
 import { triggerPhrase } from "@/lib/pokemon/triggers";
 import type { FormCategory } from "@/lib/pokemon/forms";
+import {
+  EVOLUTION_ID_OFFSET,
+  EDGE_ID_BASE,
+  REVERSE_ID_OFFSET,
+  REVERSE_EDGE_ID_BASE,
+  CRY_ID_OFFSET,
+  reverseEdgeIdFor,
+  isReverseEdgeId,
+} from "@/lib/pokemon/seed-constants";
 
 // ---------------------------------------------------------------------------
 // Multi-locale name types (data-layer foundation for #1259).
@@ -152,7 +161,7 @@ export type SeedPokemon = {
   cryUrl: string | null;
   /**
    * PokéAPI version-group slugs whose pokedex includes this species/form.
-   * Sorted, deduplicated. Empty array is only used as a defensive fallback - 
+   * Sorted, deduplicated. Empty array is only used as a defensive fallback -
    * after `scripts/seed-version-groups.mjs` runs every entry has at least one
    * version-group.
    *
@@ -169,31 +178,9 @@ export type SeedPokemon = {
   versionGroups?: string[];
 };
 
-// Reconstruct the full SeedPokemon array by joining the core data with the
-// deduplicated evolution chains. Each Pokémon in generated-core.json omits
-// `flavorTexts` and `evolutionChain` to reduce the bundled JS chunk size
-// (~1.2 MB bundled vs ~2.9 MB with both fields inline). The chain for each
-// Pokémon is resolved from the compact chains map in generated-chains.json.
-// `flavorTexts` stays absent from the runtime SEED_POKEMON (it is
-// `FlavorTextEntry[] | string[] | undefined`); the facts panel loads it lazily
-// via `loadFlavorTexts()` in `lib/pokemon/facts.ts`.
-
-type ChainsPayload = {
-  chains: Record<string, EvolutionNode[]>;
-  pokemonChain: Record<string, string>;
-};
-
-const _chainsPayload = chainsData as unknown as ChainsPayload;
-const _chainMap = _chainsPayload.chains;
-const _pokemonChainRef = _chainsPayload.pokemonChain;
-
-export const SEED_POKEMON: readonly SeedPokemon[] = (
-  coreData as unknown as Array<Omit<SeedPokemon, "evolutionChain" | "flavorTexts">>
-).map((p) => {
-  const chainHash = _pokemonChainRef[String(p.id)];
-  const evolutionChain: EvolutionNode[] = chainHash ? (_chainMap[chainHash] ?? []) : [];
-  return { ...p, evolutionChain, flavorTexts: undefined } as SeedPokemon;
-});
+// ---------------------------------------------------------------------------
+// Card types
+// ---------------------------------------------------------------------------
 
 // One card per (preEvo, postEvo) edge, with the trigger interpolated into the
 // prompt. Branching pre-evolutions (Eevee → 8 forms) produce 8 cards, one per
@@ -214,92 +201,6 @@ export type EvolutionCard = {
   triggerPhrase: string | null;
 };
 
-// Card-id namespaces (kept disjoint by construction; validated at module load):
-//   1..MAX_NAME_ID                      name cards
-//   [1_000_001, 1_500_000]              LEGACY per-pre-evo evolution cards.
-//                                       Issue #262 retired this sub-range.
-//                                       Existing cloud rows are orphaned - 
-//                                       merge drops them via left-join. No
-//                                       local card ever lives here again.
-//   [1_500_001, 1_999_999]              forward edge cards (#262).
-//   [2_000_001, 2_500_000]              reverse name cards (sprite-picker).
-//   [2_500_001, 2_999_999]              reverse evolution edge cards (#343):
-//                                       reverseId = REVERSE_EDGE_ID_BASE +
-//                                                   (forwardEdgeId - EDGE_ID_BASE)
-//   [3_000_001, 3_999_999]              cry cards.
-export const EVOLUTION_ID_OFFSET = 1_000_000;
-export const EDGE_ID_BASE = 1_500_000; // first forward edge ID = 1_500_001
-export const REVERSE_ID_OFFSET = 2_000_000;
-export const REVERSE_EDGE_ID_BASE = 2_500_000; // first reverse edge ID = 2_500_001
-export const CRY_ID_OFFSET = 3_000_000;
-const MAX_NAME_ID = EVOLUTION_ID_OFFSET - 1;
-
-/** Map a forward edge ID to its reverse counterpart. */
-export function reverseEdgeIdFor(forwardEdgeId: number): number {
-  return REVERSE_EDGE_ID_BASE + (forwardEdgeId - EDGE_ID_BASE);
-}
-
-/** True when the id falls in the reverse-evolution edge sub-range. */
-export function isReverseEdgeId(id: number): boolean {
-  return id > REVERSE_EDGE_ID_BASE && id < CRY_ID_OFFSET;
-}
-
-export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] = (() => {
-  const cards: EvolutionCard[] = [];
-  const seenEdgeIds = new Set<number>();
-  // Each edge appears in every species record within its chain (e.g. the
-  // Eevee→Vaporeon edge is present in Eevee's, Vaporeon's, and every other
-  // eeveelution's record). Filtering on `evolvesFromId === pokemon.id` picks
-  // each edge from exactly one species (its parent), so dedupe is implicit;
-  // `seenEdgeIds` is a defensive belt for malformed seeds.
-  const pokemonById = new Map(SEED_POKEMON.map((p) => [p.id, p]));
-
-  for (const pokemon of SEED_POKEMON) {
-    if (pokemon.id <= 0 || pokemon.id > MAX_NAME_ID) {
-      // Alternate-form IDs (10001+) are outside the name-card namespace and
-      // must not produce evolution cards - their evolution edges are carried by
-      // the default-form record which shares the same chain. Skip rather than
-      // throwing so the seed can include forms without breaking this builder.
-      // Form-aware evolution cards are #447/#448.
-      continue;
-    }
-    for (const node of pokemon.evolutionChain) {
-      if (node.evolvesFromId !== pokemon.id) continue;
-      const edgeId = node.edgeId;
-      if (typeof edgeId !== "number") {
-        throw new Error(
-          `Chain edge ${pokemon.name} → ${node.name} is missing an edgeId. Re-run \`npm run seed\` so scripts/seed-pokemon.mjs can allocate stable edge IDs.`,
-        );
-      }
-      if (edgeId <= EDGE_ID_BASE || edgeId >= REVERSE_ID_OFFSET) {
-        throw new Error(
-          `Edge ID ${edgeId} (${pokemon.name} → ${node.name}) outside reserved sub-range [${EDGE_ID_BASE + 1}, ${REVERSE_ID_OFFSET - 1}].`,
-        );
-      }
-      if (seenEdgeIds.has(edgeId)) continue;
-      seenEdgeIds.add(edgeId);
-      const postEvo = pokemonById.get(node.speciesId);
-      if (!postEvo) {
-        throw new Error(
-          `Edge ${pokemon.name} → ${node.name} (speciesId ${node.speciesId}) has no matching pokemon in seed data - seed may be incomplete.`,
-        );
-      }
-      cards.push({
-        cardType: "evolution",
-        id: edgeId,
-        preEvoId: pokemon.id,
-        preEvoName: pokemon.name,
-        preEvoSpriteUrl: pokemon.spriteUrl,
-        postEvoId: postEvo.id,
-        postEvoName: postEvo.name,
-        postEvoSpriteUrl: postEvo.spriteUrl,
-        triggerPhrase: triggerPhrase(node.detail ?? null),
-      });
-    }
-  }
-  return cards;
-})();
-
 // One reverse-evolution card per forward edge - same edge data, different ID,
 // rendered with the prompt direction flipped ("Which Pokémon evolves into X
 // via Y?"). The trigger phrase is reused as-is; the rendering layer reads the
@@ -308,9 +209,157 @@ export type ReverseEvolutionCard = Omit<EvolutionCard, "cardType"> & {
   cardType: "reverse-evolution";
 };
 
+/**
+ * The three seed arrays produced from core + chains data.
+ * Returned by `buildSeed` and cached by `seed-async.ts`.
+ */
+export type SeedData = {
+  seedPokemon: readonly SeedPokemon[];
+  seedEvolutionCards: readonly EvolutionCard[];
+  seedReverseEvolutionCards: readonly ReverseEvolutionCard[];
+};
+
+// ---------------------------------------------------------------------------
+// Re-export constants and helpers from seed-constants.ts so every existing
+// import site (`import { EDGE_ID_BASE } from "@/lib/pokemon/seed"`) continues
+// to work without modification.
+// ---------------------------------------------------------------------------
+
+export {
+  EVOLUTION_ID_OFFSET,
+  EDGE_ID_BASE,
+  REVERSE_ID_OFFSET,
+  REVERSE_EDGE_ID_BASE,
+  CRY_ID_OFFSET,
+  reverseEdgeIdFor,
+  isReverseEdgeId,
+};
+
+// ---------------------------------------------------------------------------
+// Internal helper types for raw JSON shapes
+// ---------------------------------------------------------------------------
+
+type ChainsPayload = {
+  chains: Record<string, EvolutionNode[]>;
+  pokemonChain: Record<string, string>;
+};
+
+// ---------------------------------------------------------------------------
+// buildSeed - pure function; no module-level side-effects
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the three seed arrays from raw JSON payloads.
+ *
+ * This is the canonical logic for constructing `SEED_POKEMON`,
+ * `SEED_EVOLUTION_CARDS`, and `SEED_REVERSE_EVOLUTION_CARDS`.  It is a pure
+ * function so that both the synchronous (static-import) path in this module
+ * and the async (fetch) path in `seed-async.ts` can share it without
+ * duplicating logic.
+ *
+ * @param rawCoreData - Parsed content of `generated-core.json`.
+ * @param rawChainsData - Parsed content of `generated-chains.json`.
+ */
+export function buildSeed(
+  rawCoreData: unknown,
+  rawChainsData: unknown,
+): SeedData {
+  // --- reconstruct SEED_POKEMON ---
+  const _chainsPayload = rawChainsData as ChainsPayload;
+  const _chainMap = _chainsPayload.chains;
+  const _pokemonChainRef = _chainsPayload.pokemonChain;
+
+  const seedPokemon: readonly SeedPokemon[] = (
+    rawCoreData as Array<Omit<SeedPokemon, "evolutionChain" | "flavorTexts">>
+  ).map((p) => {
+    const chainHash = _pokemonChainRef[String(p.id)];
+    const evolutionChain: EvolutionNode[] = chainHash
+      ? (_chainMap[chainHash] ?? [])
+      : [];
+    return { ...p, evolutionChain, flavorTexts: undefined } as SeedPokemon;
+  });
+
+  // --- reconstruct SEED_EVOLUTION_CARDS ---
+  const MAX_NAME_ID = EVOLUTION_ID_OFFSET - 1;
+  const seedEvolutionCards: readonly EvolutionCard[] = (() => {
+    const cards: EvolutionCard[] = [];
+    const seenEdgeIds = new Set<number>();
+    const pokemonById = new Map(seedPokemon.map((p) => [p.id, p]));
+
+    for (const pokemon of seedPokemon) {
+      if (pokemon.id <= 0 || pokemon.id > MAX_NAME_ID) {
+        // Alternate-form IDs (10001+) are outside the name-card namespace and
+        // must not produce evolution cards - their evolution edges are carried by
+        // the default-form record which shares the same chain. Skip rather than
+        // throwing so the seed can include forms without breaking this builder.
+        // Form-aware evolution cards are #447/#448.
+        continue;
+      }
+      for (const node of pokemon.evolutionChain) {
+        if (node.evolvesFromId !== pokemon.id) continue;
+        const edgeId = node.edgeId;
+        if (typeof edgeId !== "number") {
+          throw new Error(
+            `Chain edge ${pokemon.name} → ${node.name} is missing an edgeId. Re-run \`npm run seed\` so scripts/seed-pokemon.mjs can allocate stable edge IDs.`,
+          );
+        }
+        if (edgeId <= EDGE_ID_BASE || edgeId >= REVERSE_ID_OFFSET) {
+          throw new Error(
+            `Edge ID ${edgeId} (${pokemon.name} → ${node.name}) outside reserved sub-range [${EDGE_ID_BASE + 1}, ${REVERSE_ID_OFFSET - 1}].`,
+          );
+        }
+        if (seenEdgeIds.has(edgeId)) continue;
+        seenEdgeIds.add(edgeId);
+        const postEvo = pokemonById.get(node.speciesId);
+        if (!postEvo) {
+          throw new Error(
+            `Edge ${pokemon.name} → ${node.name} (speciesId ${node.speciesId}) has no matching pokemon in seed data - seed may be incomplete.`,
+          );
+        }
+        cards.push({
+          cardType: "evolution",
+          id: edgeId,
+          preEvoId: pokemon.id,
+          preEvoName: pokemon.name,
+          preEvoSpriteUrl: pokemon.spriteUrl,
+          postEvoId: postEvo.id,
+          postEvoName: postEvo.name,
+          postEvoSpriteUrl: postEvo.spriteUrl,
+          triggerPhrase: triggerPhrase(node.detail ?? null),
+        });
+      }
+    }
+    return cards;
+  })();
+
+  // --- reconstruct SEED_REVERSE_EVOLUTION_CARDS ---
+  const seedReverseEvolutionCards: readonly ReverseEvolutionCard[] =
+    seedEvolutionCards.map((fwd) => ({
+      ...fwd,
+      cardType: "reverse-evolution" as const,
+      id: reverseEdgeIdFor(fwd.id),
+    }));
+
+  return { seedPokemon, seedEvolutionCards, seedReverseEvolutionCards };
+}
+
+// ---------------------------------------------------------------------------
+// Synchronous module-level exports (existing public API - unchanged)
+// ---------------------------------------------------------------------------
+
+// Reconstruct the full SeedPokemon array by joining the core data with the
+// deduplicated evolution chains. Each Pokémon in generated-core.json omits
+// `flavorTexts` and `evolutionChain` to reduce the bundled JS chunk size
+// (~1.2 MB bundled vs ~2.9 MB with both fields inline). The chain for each
+// Pokémon is resolved from the compact chains map in generated-chains.json.
+// `flavorTexts` stays absent from the runtime SEED_POKEMON (it is
+// `FlavorTextEntry[] | string[] | undefined`); the facts panel loads it lazily
+// via `loadFlavorTexts()` in `lib/pokemon/facts.ts`.
+
+const _built = buildSeed(coreData, chainsData);
+
+export const SEED_POKEMON: readonly SeedPokemon[] = _built.seedPokemon;
+export const SEED_EVOLUTION_CARDS: readonly EvolutionCard[] =
+  _built.seedEvolutionCards;
 export const SEED_REVERSE_EVOLUTION_CARDS: readonly ReverseEvolutionCard[] =
-  SEED_EVOLUTION_CARDS.map((fwd) => ({
-    ...fwd,
-    cardType: "reverse-evolution" as const,
-    id: reverseEdgeIdFor(fwd.id),
-  }));
+  _built.seedReverseEvolutionCards;
