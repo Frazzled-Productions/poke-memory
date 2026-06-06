@@ -81,8 +81,40 @@ vi.mock("@/lib/settings/persistence", () => ({
   },
 }));
 
+const { mockUseAuth } = vi.hoisted(() => ({
+  mockUseAuth: vi.fn(() => ({ user: null as unknown, supabase: null, loading: false })),
+}));
 vi.mock("@/lib/auth/AuthContext", () => ({
-  useAuth: () => ({ user: null, supabase: null, loading: false }),
+  useAuth: () => mockUseAuth(),
+}));
+
+// Mocks for account-block state (#1721 AC).
+const { mockUseRetryPush } = vi.hoisted(() => ({
+  mockUseRetryPush: vi.fn(() => ({
+    retryState: "idle" as import("@/lib/sync/useRetryPush").RetryState,
+    retryNow: vi.fn(),
+  })),
+}));
+vi.mock("@/lib/sync/useRetryPush", () => ({
+  useRetryPush: () => mockUseRetryPush(),
+}));
+
+const { mockLoadSyncStatus } = vi.hoisted(() => ({
+  mockLoadSyncStatus: vi.fn(() => ({
+    lastPushAt: null,
+    lastPushFailed: false,
+    lastPushAttemptAt: null,
+    failedCardCount: null,
+    lastPullAt: null,
+    lastSettingsPullAt: null,
+    lastSeenResetAt: null,
+    structuralSyncError: null,
+    ownerUserId: null,
+  })),
+}));
+vi.mock("@/lib/sync/persistence", () => ({
+  loadSyncStatus: () => mockLoadSyncStatus(),
+  STORAGE_KEY: "poke-memory:sync-status",
 }));
 
 const { mockSuperuserFlags, mockSuperuserState, mockSetFlag } = vi.hoisted(
@@ -203,6 +235,18 @@ vi.mock("@/lib/profile/masteredCountCache", () => ({
 // ---------------------------------------------------------------------------
 // Stub heavy sub-components that have their own test coverage.
 // ---------------------------------------------------------------------------
+
+// SyncStatusLine has its own unit tests; stub it here so the account-block
+// tests can assert on its presence without requiring a useFormatter mock.
+vi.mock("@/components/stats/SyncStatusLine", () => ({
+  SyncStatusLine: ({ retryState }: { retryState: string; retryNow: () => void; superuserPaused?: boolean }) => (
+    <div data-testid="sync-status-line" data-retry-state={retryState}>
+      {retryState === "error" || retryState === "retrying"
+        ? "Sync failed · Retry"
+        : "Synced"}
+    </div>
+  ),
+}));
 
 vi.mock("@/components/settings/FsrsOptimizerSection", () => ({
   FsrsOptimizerSection: () => <div data-testid="fsrs-optimizer" />,
@@ -412,6 +456,21 @@ beforeEach(() => {
   mockLoadSettings.mockReturnValue(defaultSettings());
   mockLoadSession.mockResolvedValue(null);
   mockSaveSession.mockResolvedValue({ ok: true });
+  // Reset auth to guest by default (matches prior static mock).
+  mockUseAuth.mockReturnValue({ user: null, supabase: null, loading: false });
+  // Reset retry/sync state to healthy defaults.
+  mockUseRetryPush.mockReturnValue({ retryState: "idle", retryNow: vi.fn() });
+  mockLoadSyncStatus.mockReturnValue({
+    lastPushAt: null,
+    lastPushFailed: false,
+    lastPushAttemptAt: null,
+    failedCardCount: null,
+    lastPullAt: null,
+    lastSettingsPullAt: null,
+    lastSeenResetAt: null,
+    structuralSyncError: null,
+    ownerUserId: null,
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1588,5 +1647,176 @@ describe("SettingsPage - statutory trading disclosure in About section (#1565 Pa
     await waitFor(() => {
       expect(screen.getByText(/Shelton Street/)).toBeInTheDocument();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Account block - signed-in states (#1721 AC)
+//
+// Covers: identity display, provider label, sync-status line, sign-out button,
+// and the amber border when sync has failed.
+// ---------------------------------------------------------------------------
+
+/** A minimal Supabase-shaped user fixture for account-block tests. */
+function makeUser(overrides?: Record<string, unknown>) {
+  return {
+    id: "user-123",
+    email: "test@example.com",
+    identities: [{ provider: "github" }],
+    user_metadata: { user_name: "testuser" },
+    ...overrides,
+  } as unknown;
+}
+
+describe("SettingsPage - account block signed-in states (#1721)", () => {
+  it("signed-in healthy: shows identity, provider label, sync status, and sign-out", async () => {
+    mockUseAuth.mockReturnValue({
+      user: makeUser(),
+      supabase: {} as unknown,
+      loading: false,
+    });
+    // Healthy sync - no failure flag.
+    mockLoadSyncStatus.mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: false,
+      lastPushAttemptAt: null,
+      failedCardCount: null,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: null,
+      ownerUserId: "user-123",
+    });
+
+    render(<SettingsPage />);
+
+    // Identity from user_metadata.user_name.
+    await waitFor(() => {
+      expect(screen.getByText("testuser")).toBeInTheDocument();
+    });
+
+    // Provider label (GitHub).
+    expect(screen.getByText("Signed in with GitHub")).toBeInTheDocument();
+
+    // Sync status line stub is present in healthy state.
+    expect(screen.getByTestId("sync-status-line")).toBeInTheDocument();
+    expect(screen.getByTestId("sync-status-line")).toHaveTextContent("Synced");
+
+    // Sign-out button is accessible.
+    expect(screen.getByRole("button", { name: /sign out/i })).toBeInTheDocument();
+  });
+
+  it("signed-in healthy: account card has zinc border (not amber)", async () => {
+    mockUseAuth.mockReturnValue({
+      user: makeUser(),
+      supabase: {} as unknown,
+      loading: false,
+    });
+    mockLoadSyncStatus.mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: false,
+      lastPushAttemptAt: null,
+      failedCardCount: null,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: null,
+      ownerUserId: "user-123",
+    });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("testuser")).toBeInTheDocument();
+    });
+
+    // The account card wrapper must NOT carry the amber border class.
+    const accountSection = screen.getByRole("region", { name: /account/i });
+    const card = accountSection.querySelector(".rounded-xl");
+    expect(card).not.toBeNull();
+    expect(card!.className).toMatch(/border-zinc-200/);
+    expect(card!.className).not.toMatch(/border-amber/);
+  });
+
+  it("signed-in sync-failed: shows the sync status line in failed state", async () => {
+    mockUseAuth.mockReturnValue({
+      user: makeUser(),
+      supabase: {} as unknown,
+      loading: false,
+    });
+    // Simulate a persisted push failure.
+    mockLoadSyncStatus.mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: true,
+      lastPushAttemptAt: "2024-01-01T12:00:00.000Z",
+      failedCardCount: 3,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: null,
+      ownerUserId: "user-123",
+    });
+    mockUseRetryPush.mockReturnValue({ retryState: "error", retryNow: vi.fn() });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("testuser")).toBeInTheDocument();
+    });
+
+    // Sync status stub reflects the error state.
+    const statusLine = screen.getByTestId("sync-status-line");
+    expect(statusLine).toHaveTextContent("Sync failed · Retry");
+  });
+
+  it("signed-in sync-failed: account card gets amber border", async () => {
+    mockUseAuth.mockReturnValue({
+      user: makeUser(),
+      supabase: {} as unknown,
+      loading: false,
+    });
+    mockLoadSyncStatus.mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: true,
+      lastPushAttemptAt: "2024-01-01T12:00:00.000Z",
+      failedCardCount: 3,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: null,
+      ownerUserId: "user-123",
+    });
+    mockUseRetryPush.mockReturnValue({ retryState: "error", retryNow: vi.fn() });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("testuser")).toBeInTheDocument();
+    });
+
+    // The account card must carry the amber border when sync has failed.
+    const accountSection = screen.getByRole("region", { name: /account/i });
+    const card = accountSection.querySelector(".rounded-xl");
+    expect(card).not.toBeNull();
+    expect(card!.className).toMatch(/border-amber/);
+    expect(card!.className).not.toMatch(/border-zinc-200/);
+  });
+
+  it("guest: shows guest state with inline sign-in link (not a filled button)", async () => {
+    // Default mock already returns user: null - just confirm the guest block renders.
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Practising as a guest")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Your progress is saved on this device only.")).toBeInTheDocument();
+
+    // Sign-in affordance must be an inline link (not a filled button).
+    const signInBtn = screen.getByRole("button", { name: /sign in to back up/i });
+    expect(signInBtn).toBeInTheDocument();
+    // Must have inline-flex class (not bg-foreground filled style).
+    expect(signInBtn.className).toMatch(/inline-flex/);
+    expect(signInBtn.className).not.toMatch(/bg-foreground/);
   });
 });

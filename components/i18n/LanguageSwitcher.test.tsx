@@ -74,15 +74,9 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("LanguageSwitcher", () => {
-  it("renders nothing when the languages Labs flag is off", () => {
-    mockCtx.mockReturnValue({
-      locale: "en",
-      languagesEnabled: false,
-      learningLocales: ["en"],
-    });
-    const { container } = renderWithIntl(<LanguageSwitcher />);
-    expect(container).toBeEmptyDOMElement();
-  });
+  // Note: the "renders nothing when languagesEnabled is false" test was removed
+  // because the guard was dead code - languagesEnabled is always true since
+  // multi-locale went GA (#1723).
 
   it("renders a pill showing the active locale endonym", () => {
     mockCtx.mockReturnValue({

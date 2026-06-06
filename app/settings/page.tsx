@@ -60,6 +60,7 @@ import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
 import { useRetryPush } from "@/lib/sync/useRetryPush";
+import { loadSyncStatus } from "@/lib/sync/persistence";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 import { CompanyDisclosure } from "@/components/CompanyDisclosure";
@@ -428,8 +429,8 @@ const ALL_ANCHOR_IDS = [
   "onboarding-heading",
   "backup-heading",
   "regional-heading",
-  "about-heading",
-  "language-heading",
+  // Note: "about-heading" and "language-heading" are already included via
+  // ...TOP_LEVEL_SECTION_IDS above - no explicit duplicates needed here.
   "languages-learning",
   "developer-heading",
   "danger-zone-heading",
@@ -458,9 +459,8 @@ const ANCHOR_TO_CATEGORY: Partial<Record<AnchorId, TopLevelId>> = {
   "onboarding-heading": "data-backup-heading",
   "backup-heading": "data-backup-heading",
   "regional-heading": "regional-reminders-heading",
-  // Legacy alias kept for back-compat with existing deep-links (#1720).
-  "about-heading": "about-heading",
-  "language-heading": "language-heading",
+  // Top-level ids resolve via the isTopLevel fallback in the hash handler -
+  // no explicit self-reference needed here for "about-heading" or "language-heading".
   "languages-learning": "language-heading",
   "developer-heading": "advanced-heading",
   "danger-zone-heading": "advanced-heading",
@@ -617,6 +617,20 @@ export default function SettingsPage() {
     anyFlagOn ? null : supabase,
     anyFlagOn ? null : (user?.id ?? null),
   );
+
+  // Derive whether sync is in a failed state for the amber border.
+  // Mirrors the isFailed / schemaError logic in SyncStatusLine - uses the
+  // same loadSyncStatus() read that SyncStatusLine already performs, so no
+  // new data source is introduced.
+  const syncHasFailed = (() => {
+    if (retryState === "error") return true;
+    const status = loadSyncStatus();
+    if (status.structuralSyncError !== null) return true;
+    if (!status.lastPushFailed) return false;
+    // failedCardCount === 0 is the edge case SyncStatusLine treats as success
+    // (the push flag cleared between the write and the .then() read).
+    return status.failedCardCount !== 0;
+  })();
 
   // Open the quiz and dismiss the discovery nudge (#1443).
   function openKnownQuiz() {
@@ -924,10 +938,10 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => setSignInSheetOpen(true)}
-                  className="min-h-[44px] self-end rounded-lg bg-foreground px-5 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 sm:self-auto sm:min-h-0 sm:rounded-md sm:px-3 sm:py-1.5 sm:text-xs"
+                  className="inline-flex min-h-[44px] items-center text-sm font-medium underline underline-offset-2 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 sm:min-h-0 sm:text-xs"
                   aria-label={t("settings.account.guest.signIn")}
                 >
-                  {t("settings.account.guest.signIn")}
+                  {t("settings.account.guest.signIn")} &rarr;
                 </button>
               </div>
             </div>
@@ -936,8 +950,9 @@ export default function SettingsPage() {
             <div
               className={cn(
                 "rounded-xl border bg-background px-4 py-3",
-                // Amber border when sync has failed
-                "border-zinc-200 dark:border-zinc-800",
+                syncHasFailed
+                  ? "border-amber-300 dark:border-amber-700"
+                  : "border-zinc-200 dark:border-zinc-800",
               )}
             >
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -1373,16 +1388,18 @@ export default function SettingsPage() {
                       />
                     </div>
                   </div>
-                  {/* Cross-link to Audio for playback options */}
-                  <p className={mutedTextXs}>
-                    {t("settings.cardTypes.cryAudioNote")}{" "}
-                    <a
-                      href="#audio-heading"
-                      className="underline underline-offset-2 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
-                    >
-                      {t("settings.cardTypes.cryAudioLink")}
-                    </a>
-                  </p>
+                  {/* Cross-link to Audio for playback options - only when cry cards are enabled (#1722) */}
+                  {settings.cryCardsEnabled && (
+                    <p className={mutedTextXs}>
+                      {t("settings.cardTypes.cryAudioNote")}{" "}
+                      <a
+                        href="#audio-heading"
+                        className="underline underline-offset-2 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 rounded"
+                      >
+                        {t("settings.cardTypes.cryAudioLink")}
+                      </a>
+                    </p>
+                  )}
                 </SettingsSubsection>
 
                 {/* Save */}

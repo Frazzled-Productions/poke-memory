@@ -168,6 +168,13 @@ describe("SETTINGS_SEARCH_INDEX", () => {
     expect(sectionMatchesQuery(entry, "japanese")).toBe(true);
   });
 
+  it("native-script query '日本語' also matches Language section (#1726 AC)", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "language-heading")!;
+    // sectionMatchesQuery receives a pre-normalised query; the native-script
+    // term is already in the index so no additional lowercasing is needed.
+    expect(sectionMatchesQuery(entry, "日本語")).toBe(true);
+  });
+
   it("'timezone' matches Regional & reminders section", () => {
     const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "regional-reminders-heading")!;
     expect(sectionMatchesQuery(entry, "timezone")).toBe(true);

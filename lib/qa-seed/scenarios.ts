@@ -560,10 +560,6 @@ function buildFsrsLocaleMastery(): SeedPayload {
     streakProtection: believableStreakProtection(),
     // Both name + reverse mastered for each id → filterMastered counts them all.
     masteredCountByLocale: { en: masteredIds.length, ja: jaMasteredIds.length },
-    // Enable the languages Labs flag so the language pill in the status bar
-    // is visible immediately after applying the seed, without requiring a
-    // manual toggle in Settings > Labs.
-    labsFlags: { languages: true },
   };
 }
 
