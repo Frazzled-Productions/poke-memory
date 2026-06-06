@@ -65,7 +65,7 @@ for (const name of targetDatasets) {
   }
 }
 
-// Guard: --user with 'all' is almost always a mistake — each dataset iteration
+// Guard: --user with 'all' is almost always a mistake: each dataset iteration
 // resets the same account, leaving only the last dataset's data on that account.
 if (userArg !== undefined && datasetArg === "all") {
   console.error(

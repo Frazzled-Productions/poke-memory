@@ -534,7 +534,7 @@ export const ALL_DATASET_NAMES: DatasetName[] = [
 /**
  * Datasets intentionally exempt from the name+reverse mastery-pairing invariant.
  * qa-fresh has no cards; qa-conflict seeds name-only rows for regression-trigger testing.
- * Shared by the dry-run validator and the test suite — single source of pairing-exemption policy.
+ * Shared by the dry-run validator and the test suite: single source of pairing-exemption policy.
  */
 export const PAIRING_EXEMPT_DATASETS: DatasetName[] = ["qa-fresh", "qa-conflict"];
 
