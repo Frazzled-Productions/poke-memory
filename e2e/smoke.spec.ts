@@ -1255,7 +1255,8 @@ test.describe("PWA / offline support", () => {
   test("the service worker script is served as JavaScript", async ({
     request,
   }) => {
-    // The Serwist Turbopack route at /sw/[path] bundles and serves the worker.
+    // The worker is built to a static public/sw/sw.js asset by
+    // scripts/build-sw.mjs and served by the CDN (#1752, no longer a route).
     const res = await request.get("/sw/sw.js");
     // Assert explicit 200 so a future 500 (e.g. a file-trace gap) fails the
     // build rather than silently passing because res.ok() is not checked.

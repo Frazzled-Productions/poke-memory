@@ -1,15 +1,17 @@
 /**
  * Poké Memory service worker (source).
  *
- * This file is the `swSrc` bundled by `@serwist/turbopack` via the route
- * handler at `app/sw/[path]/route.ts`. It is NOT a Next.js route itself - a
- * stray `.ts` file in `app/` is ignored by the App Router. esbuild bundles it
- * into `/sw/sw.js`, which the client registers.
+ * This file is the `swSrc` bundled at build time by `scripts/build-sw.mjs`
+ * (which reuses @serwist/build's `getFileManifestEntries` + esbuild, mirroring
+ * how `@serwist/turbopack` used to bundle it via a route handler - removed in
+ * #1752). It is NOT a Next.js route itself - a stray `.ts` file in `app/` is
+ * ignored by the App Router. esbuild bundles it into the static asset
+ * `public/sw/sw.js`, which the client registers.
  *
  * What it does:
  * - Precaches the app shell. `self.__SW_MANIFEST` is the injection point that
- *   `@serwist/turbopack` replaces at build time with the list of build-output
- *   files (JS and CSS - see the `globPatterns` in `app/sw/[path]/route.ts`).
+ *   `scripts/build-sw.mjs` replaces at build time with the list of build-output
+ *   files (JS and CSS - see the `globPatterns` in `scripts/build-sw.mjs`).
  *   HTML documents are not precached; they are runtime-cached network-first so
  *   an offline visit still falls back to the last-known shell. With the static
  *   assets precached, an installed PWA opens offline.
