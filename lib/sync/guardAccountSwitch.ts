@@ -120,6 +120,12 @@ export async function guardAccountSwitch(incomingUserId: string): Promise<void> 
     console.warn("[guardAccountSwitch] archive failed (continuing with wipe):", e);
   }
 
+  // Clear the IDB pending-grade queue BEFORE wiping localStorage. A Background
+  // Sync event fired in the await gap between wipeUserLocalStorage (which removes
+  // the LS queue) and clearIdbPendingQueue could read the IDB copy and POST A's
+  // grades under B's session cookie. Clearing IDB first closes that window. (#1712)
+  await clearIdbPendingQueue();
+
   // Wipe per-user LS keys including settings:* (clearLocalProgress spares them).
   wipeUserLocalStorage();
 
@@ -133,9 +139,6 @@ export async function guardAccountSwitch(incomingUserId: string): Promise<void> 
   } catch {
     // Best-effort.
   }
-
-  // Clear the IDB pending-grade queue so the SW does not replay outgoing grades.
-  await clearIdbPendingQueue();
 
   // Restore incoming user's archive (no-op if no archive exists).
   await restoreUserData(incomingUserId);

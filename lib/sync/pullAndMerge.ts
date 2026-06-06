@@ -583,11 +583,19 @@ export async function pullAndMerge(
       console.warn("[pullAndMerge] push-subscription pull failed (non-fatal)", e);
     }
 
+    // Use `userId` (the incoming authenticated user) as the ownerUserId anchor
+    // rather than relying on whatever syncStatus currently holds. On the reset
+    // path, clearLocalProgress wipes KEY_SYNC_STATUS and syncStatus is reloaded
+    // as ZERO (ownerUserId=null). Without the explicit userId here, the spread
+    // would re-null ownerUserId - clobbering the value guardAccountSwitch just
+    // stamped - and every subsequent sign-in from a third user would find null,
+    // skip the guard, and blend data. (#1712)
     saveSyncStatus({
       ...syncStatus,
       lastPullAt: maxCloudUpdatedAt(cloudRows),
       lastSettingsPullAt: nextLastSettingsPullAt,
       lastSeenResetAt: pulledRow?.lastResetAt ?? syncStatus.lastSeenResetAt,
+      ownerUserId: userId ?? syncStatus.ownerUserId,
     });
 
     return "ok";

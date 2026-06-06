@@ -121,7 +121,17 @@ export default function CallbackCompletePage() {
       }
       if (cancelled) return;
       const cloudHasData = cloudRows !== null && cloudRows.length > 0;
-      if (!hasLocal && !cloudHasData) { router.replace("/"); return; }
+      if (!hasLocal && !cloudHasData) {
+        // Brand-new user with no local and no cloud data. Stamp ownerUserId so
+        // guardAccountSwitch recognises this device as belonging to this user on
+        // the next sign-in. Without this, ownerUserId stays null forever and the
+        // guard treats every subsequent sign-in as a guest no-op, blending the
+        // prior user's local cards into the new user's cloud on pullAndMerge. (#1712)
+        const prev = loadSyncStatus();
+        saveSyncStatus({ ...prev, ownerUserId: user.id });
+        router.replace("/");
+        return;
+      }
 
       // Local cards exist, cloud has no cards → push local cards. Other tables
       // are intentionally NOT pushed in this branch; the per-grade push and

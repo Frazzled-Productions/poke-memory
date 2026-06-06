@@ -58,9 +58,12 @@ export type SyncStatus = {
    * Used by guardAccountSwitch (#1712) to detect when a different user signs
    * in and trigger the archive/restore cycle before pullAndMerge runs.
    *
-   * Intentionally survives clearLocalProgress (sync-status:v1 is under
-   * poke-memory:sync-status:v1, which IS wiped - but after the guard has
-   * already archived and the caller writes a fresh status with the new owner).
+   * Lifecycle: guardAccountSwitch runs BEFORE clearLocalProgress, archives the
+   * outgoing user, and writes a fresh SyncStatus stamped with the incoming
+   * userId. pullAndMerge then receives the authenticated userId as a parameter
+   * and re-stamps ownerUserId in its final saveSyncStatus call, so the value
+   * survives the reset path (where clearLocalProgress wipes KEY_SYNC_STATUS and
+   * reloads it as ZERO with ownerUserId=null).
    */
   ownerUserId: string | null;
 };

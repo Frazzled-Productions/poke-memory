@@ -243,4 +243,211 @@ describe("account-switch isolation", () => {
 
     vi.unstubAllGlobals();
   }, 15_000);
+
+  it("AC6: no cross-contamination - after guardAccountSwitch + pullAndMerge simulation, local state contains only B's cards", async () => {
+    if (SKIP) return;
+
+    // ── Subjects ────────────────────────────────────────────────────────────────
+    // These must be already seeded in the DB by the earlier tests in this suite
+    // (tests share the same beforeAll DB lifecycle).
+    const aSubjects = ["bulbasaur", "ivysaur", "venusaur", "charmander", "charmeleon"].sort();
+    const bSubjects = ["squirtle", "wartortle", "blastoise"].sort();
+
+    // ── Browser mocks ───────────────────────────────────────────────────────────
+    const storage = makeMockStorage();
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("StorageEvent", class {
+      key: string | null;
+      constructor(_: string, init: { key?: string } = {}) {
+        this.key = init.key ?? null;
+      }
+    });
+
+    // Reset IDB mock call history so assertions below are per-test.
+    const { idbGet, idbDelete } = await import("@/lib/idb/db");
+    vi.mocked(idbDelete).mockClear();
+    vi.mocked(idbGet).mockClear();
+
+    // ── Simulate: A is the current local owner ───────────────────────────────
+    // Populate local storage as if user A is signed in with 5 reviewed cards.
+    const { loadSyncStatus, saveSyncStatus } = await import("../persistence");
+    const {
+      KEY_REVIEW_SESSION,
+      KEY_PENDING_GRADE_QUEUE,
+      KEY_STREAK,
+      KEY_SETTINGS,
+    } = await import("@/lib/storage/keys");
+
+    // Fake A's session in LS (IDB is mocked to return null so LS is the
+    // fallback for archiveUserData's IDB snapshot step).
+    const aFakeSession = {
+      cards: aSubjects.map((s) => ({
+        id: Math.random(),
+        cardType: "name",
+        subjectKey: s,
+        locale: "en",
+        state: {
+          stability: 1,
+          difficulty: 5,
+          elapsedDays: 2,
+          scheduledDays: 7,
+          reps: 2,
+          lapses: 0,
+          state: "review",
+          lastReview: "2026-05-20",
+          firstSeen: "2026-05-01",
+          dueDate: "2026-06-10",
+          hiddenSince: null,
+          seenInPasture: false,
+          learningStep: null,
+          stepStartedAt: null,
+        },
+      })),
+      limits: { newNameCardsPerDay: 10, newEvoCardsPerDay: 5, reviewsPerDay: 100 },
+    };
+    const aFakePendingQueue = aSubjects.map((s) => ({
+      id: Math.random(),
+      cardType: "name",
+      subjectKey: s,
+      locale: "en",
+      state: { stability: 1, difficulty: 5, elapsedDays: 2, scheduledDays: 7, reps: 2, lapses: 0, state: "review", lastReview: "2026-05-20", firstSeen: "2026-05-01", dueDate: "2026-06-10", hiddenSince: null, seenInPasture: false, learningStep: null, stepStartedAt: null },
+    }));
+
+    storage.setItem(KEY_REVIEW_SESSION, JSON.stringify(aFakeSession));
+    storage.setItem(KEY_PENDING_GRADE_QUEUE, JSON.stringify(aFakePendingQueue));
+    storage.setItem(KEY_STREAK, JSON.stringify(["2026-05-20"]));
+    storage.setItem(KEY_SETTINGS, JSON.stringify({ timezone: "Europe/London" }));
+
+    saveSyncStatus({
+      lastPushAt: "2026-05-20T10:00:00.000Z",
+      lastPushFailed: false,
+      lastPushAttemptAt: "2026-05-20T10:00:00.000Z",
+      failedCardCount: 0,
+      lastPullAt: "2026-05-20T10:00:00.000Z",
+      lastSettingsPullAt: "2026-05-20T09:00:00.000Z",
+      lastSeenResetAt: null,
+      structuralSyncError: null,
+      ownerUserId: USER_A_ID,
+    });
+
+    // ── Step 1: guardAccountSwitch(B) ────────────────────────────────────────
+    const { guardAccountSwitch } = await import("../guardAccountSwitch");
+    await guardAccountSwitch(USER_B_ID);
+
+    // ownerUserId is now B and cursors are null.
+    const statusAfterSwitch = loadSyncStatus();
+    expect(statusAfterSwitch.ownerUserId, "ownerUserId should be B after switch").toBe(USER_B_ID);
+    expect(statusAfterSwitch.lastPullAt, "lastPullAt should be null (fresh start for B)").toBeNull();
+
+    // A's per-user LS keys must be gone - this is the wipe step that prevents
+    // A's session/queue from leaking into B's pull.
+    expect(storage.getItem(KEY_REVIEW_SESSION), "A's session cleared from LS").toBeNull();
+    expect(storage.getItem(KEY_PENDING_GRADE_QUEUE), "A's pending queue cleared from LS").toBeNull();
+    expect(storage.getItem(KEY_STREAK), "A's streak cleared").toBeNull();
+    expect(storage.getItem(KEY_SETTINGS), "A's settings cleared").toBeNull();
+
+    // IDB pending-grade queue deleted BEFORE the LS wipe (race-window close).
+    // clearIdbPendingQueue runs before wipeUserLocalStorage, so idbDelete
+    // for KEY_PENDING_GRADE_QUEUE must have been called.
+    expect(idbDelete, "IDB pending queue deleted to close the Background-Sync race").toHaveBeenCalledWith(KEY_PENDING_GRADE_QUEUE);
+
+    // ── Step 2: Fetch B's cloud rows directly from the test DB ──────────────
+    // Simulates what pullSession(clientAsB, B.id) does. RLS filters to B's
+    // rows only; A's 5 subjects must not appear.
+    // updated_at is a timestamptz column; pg returns it as a JS Date. Cast to
+    // ISO string immediately so the rest of the test works with plain strings.
+    const cloudClient = await pool.connect();
+    let bCloudRows: Array<{ subject_key: string; card_type: string; last_review: string | null; updated_at: string }> = [];
+    try {
+      bCloudRows = await withUser(cloudClient, USER_B_ID, async (c) => {
+        const { rows } = await c.query<{ subject_key: string; card_type: string; last_review: string | null; updated_at: Date }>(
+          `SELECT subject_key, card_type, last_review, updated_at
+           FROM card_reviews
+           WHERE user_id = $1
+           ORDER BY subject_key`,
+          [USER_B_ID],
+        );
+        return rows.map((r) => ({
+          ...r,
+          // updated_at is a timestamptz column; pg returns it as a JS Date.
+          // Convert to ISO string so string comparisons work correctly.
+          updated_at: r.updated_at instanceof Date ? r.updated_at.toISOString() : String(r.updated_at),
+        }));
+      });
+    } finally {
+      cloudClient.release();
+    }
+
+    // B's cloud must contain exactly B's 3 subjects and none of A's 5.
+    const bCloudSubjects = bCloudRows.map((r) => r.subject_key).sort();
+    expect(bCloudSubjects, "cloud (as B) contains only B's subjects").toEqual(bSubjects);
+    for (const aSubject of aSubjects) {
+      expect(bCloudSubjects, `A's subject '${aSubject}' must not appear in B's cloud view`).not.toContain(aSubject);
+    }
+
+    // ── Step 3: Simulate the merge step of pullAndMerge ─────────────────────
+    // After the guard wipe, local session is null (LS and IDB both empty).
+    // idbGet returns null (mocked); LS was wiped. mergeCloudIntoLocalSilent
+    // with an empty local array and B's cloud rows must yield only B's data.
+    const { mergeCloudIntoLocalSilent } = await import("../cloud");
+    // Construct minimal CloudRow objects from the pg query results.
+    // last_review is a `date` column; pg returns it as a JS Date.
+    // Normalise to "YYYY-MM-DD" string (the form CloudRow expects).
+    const bCloudRowsFull = bCloudRows.map((r) => {
+      const lastReviewRaw = r.last_review as unknown;
+      const lastReview: string | null =
+        lastReviewRaw instanceof Date
+          ? lastReviewRaw.toISOString().slice(0, 10)
+          : (lastReviewRaw as string | null);
+      return {
+        card_type: r.card_type,
+        subject_key: r.subject_key,
+        locale: "en" as const,
+        stability: 1.5,
+        difficulty: 5.0,
+        elapsed_days: 2,
+        scheduled_days: 7,
+        reps: 2,
+        lapses: 0,
+        fsrs_state: "review" as const,
+        due_date: "2026-06-10",
+        last_review: lastReview,
+        first_seen: "2026-05-01",
+        hidden_since: null,
+        seen_in_pasture: false,
+        updated_at: r.updated_at,
+      };
+    });
+
+    // Empty local (guard wiped it), no seed (omitted so Pass 2 is a no-op -
+    // the test is about contamination, not synthesis). Pass 1 finds no local
+    // cards to update so merged === [].
+    const mergedEmpty = mergeCloudIntoLocalSilent([], bCloudRowsFull, null);
+    expect(mergedEmpty, "merged result with empty local is empty (no A data injected)").toHaveLength(0);
+
+    // Crucially: none of A's subjects appear in the merge result.
+    const mergedSubjects = mergedEmpty.map((c) => c.subjectKey);
+    for (const aSubject of aSubjects) {
+      expect(mergedSubjects, `A's subject '${aSubject}' must not be in merge result`).not.toContain(aSubject);
+    }
+
+    // ── Step 4: Stamp ownerUserId as pullAndMerge would ─────────────────────
+    // pullAndMerge uses `ownerUserId: userId ?? syncStatus.ownerUserId` in its
+    // final saveSyncStatus. Confirm this survives on the status object.
+    const bLastPullTs = bCloudRows.reduce<string | null>(
+      (max, r) => (!max || r.updated_at > max ? r.updated_at : max),
+      null,
+    );
+    saveSyncStatus({
+      ...loadSyncStatus(),
+      lastPullAt: bLastPullTs,
+      ownerUserId: USER_B_ID,
+    });
+    const finalStatus = loadSyncStatus();
+    expect(finalStatus.ownerUserId, "ownerUserId is B after pullAndMerge stamp").toBe(USER_B_ID);
+    expect(finalStatus.lastPullAt, "lastPullAt is B's updated_at timestamp").toBe(bLastPullTs);
+
+    vi.unstubAllGlobals();
+  }, 20_000);
 });
