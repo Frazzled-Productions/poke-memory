@@ -49,6 +49,7 @@ vi.mock("@/lib/sync/persistence", () => ({
     lastSettingsPullAt: null,
     lastSeenResetAt: null,
     structuralSyncError: null,
+    ownerUserId: null,
   })),
   saveSyncStatus: vi.fn(),
 }));
@@ -153,6 +154,7 @@ const FAILED_STATUS: SyncStatus = {
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
   structuralSyncError: null,
+  ownerUserId: null,
 };
 
 function fireOnline() {

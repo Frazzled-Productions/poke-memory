@@ -34,6 +34,7 @@ const ZERO: SyncStatus = {
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
   structuralSyncError: null,
+  ownerUserId: null,
 };
 
 let storage: ReturnType<typeof makeMockStorage>;
@@ -97,9 +98,25 @@ describe("loadSyncStatus", () => {
       lastSettingsPullAt: "2026-05-01T07:00:00.000Z",
       lastSeenResetAt: "2026-04-30T00:00:00.000Z",
       structuralSyncError: null,
+      ownerUserId: "user-abc-123",
     };
     saveSyncStatus(status);
     expect(loadSyncStatus()).toEqual(status);
+  });
+
+  it("defaults ownerUserId to null when field is absent (legacy record)", () => {
+    storage.setItem(STORAGE_KEY, JSON.stringify({ lastPushFailed: false }));
+    expect(loadSyncStatus().ownerUserId).toBeNull();
+  });
+
+  it("defaults ownerUserId to null when field is not a string", () => {
+    storage.setItem(STORAGE_KEY, JSON.stringify({ ownerUserId: 42 }));
+    expect(loadSyncStatus().ownerUserId).toBeNull();
+  });
+
+  it("reads back ownerUserId when written as a string", () => {
+    storage.setItem(STORAGE_KEY, JSON.stringify({ ownerUserId: "user-xyz" }));
+    expect(loadSyncStatus().ownerUserId).toBe("user-xyz");
   });
 
   it("reads back structuralSyncError when written", () => {

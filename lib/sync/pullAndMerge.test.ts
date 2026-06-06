@@ -144,6 +144,7 @@ const baseSyncStatus = {
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
   structuralSyncError: null,
+  ownerUserId: null,
 };
 
 describe("pullAndMerge", () => {

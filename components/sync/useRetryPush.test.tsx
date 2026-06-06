@@ -99,6 +99,7 @@ const FAILED_STATUS: SyncStatus = {
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
   structuralSyncError: null,
+  ownerUserId: null,
 };
 
 const OK_STATUS: SyncStatus = {
@@ -110,6 +111,7 @@ const OK_STATUS: SyncStatus = {
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
   structuralSyncError: null,
+  ownerUserId: null,
 };
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

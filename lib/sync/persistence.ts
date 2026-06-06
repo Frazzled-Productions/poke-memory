@@ -50,6 +50,22 @@ export type SyncStatus = {
    * fixes require a deploy, not a user action).
    */
   structuralSyncError: string | null;
+  /**
+   * The Supabase user.id of the user whose data currently occupies local
+   * storage on this device. null = guest/never-signed-in. Written once on
+   * first sign-in (guest claim path) and updated on each account switch.
+   *
+   * Used by guardAccountSwitch (#1712) to detect when a different user signs
+   * in and trigger the archive/restore cycle before pullAndMerge runs.
+   *
+   * Lifecycle: guardAccountSwitch runs BEFORE clearLocalProgress, archives the
+   * outgoing user, and writes a fresh SyncStatus stamped with the incoming
+   * userId. pullAndMerge then receives the authenticated userId as a parameter
+   * and re-stamps ownerUserId in its final saveSyncStatus call, so the value
+   * survives the reset path (where clearLocalProgress wipes KEY_SYNC_STATUS and
+   * reloads it as ZERO with ownerUserId=null).
+   */
+  ownerUserId: string | null;
 };
 
 const ZERO: SyncStatus = {
@@ -61,6 +77,7 @@ const ZERO: SyncStatus = {
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
   structuralSyncError: null,
+  ownerUserId: null,
 };
 
 export function loadSyncStatus(): SyncStatus {
@@ -80,6 +97,7 @@ function parseSyncStatus(raw: string): SyncStatus {
     lastSettingsPullAt: typeof obj.lastSettingsPullAt === "string" ? obj.lastSettingsPullAt : null,
     lastSeenResetAt: typeof obj.lastSeenResetAt === "string" ? obj.lastSeenResetAt : null,
     structuralSyncError: typeof obj.structuralSyncError === "string" ? obj.structuralSyncError : null,
+    ownerUserId: typeof obj.ownerUserId === "string" ? obj.ownerUserId : null,
   };
 }
 
