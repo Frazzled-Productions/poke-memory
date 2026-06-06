@@ -43,6 +43,8 @@ test.describe("Settings page - collapsible sections (#660)", () => {
     await page.goto("/settings");
 
     // All top-level category buttons must be visible.
+    // Use exact-word anchors to avoid ambiguity with the Pokémon name language
+    // pill button (which contains "language" in its accessible name).
     for (const label of [
       "Practice schedule",
       "Card types",
@@ -50,13 +52,13 @@ test.describe("Settings page - collapsible sections (#660)", () => {
       "Language",
       "Appearance",
       "Offline",
-      "Regional",
-      "Data",
+      "Regional & reminders",
+      "Data & backup",
       "About",
       "Advanced",
     ]) {
       await expect(
-        page.getByRole("button", { name: new RegExp(label, "i") }),
+        page.getByRole("button", { name: new RegExp("^" + label + "$", "i") }),
       ).toBeVisible();
     }
 
@@ -105,14 +107,31 @@ test.describe("Settings page - collapsible sections (#660)", () => {
   });
 
   test("expanding Card types section reveals cry card toggle", async ({ page }) => {
-    await page.goto("/settings");
-
-    // Card types is default-open on the first visit; seed it as closed to
-    // make the test deterministic regardless of visit count.
+    // Seed the section as closed AND dismiss the default-open flag so that the
+    // click opens (not closes) the section. cardTypesDefaultOpen overrides the
+    // localStorage persisted state, so we must set cardTypesDefaultOpenDismissed
+    // to prevent the section from force-opening despite the "0" value.
     await page.addInitScript(() => {
       window.localStorage.setItem("poke-memory:settings-section:card-types-heading", "0");
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const raw = window.localStorage.getItem(KEY);
+        let existing: Record<string, unknown> = {};
+        if (raw !== null) {
+          try { existing = JSON.parse(raw) as Record<string, unknown>; } catch { /* ignore */ }
+        }
+        window.localStorage.setItem(KEY, JSON.stringify({
+          ...existing,
+          onboarding: {
+            ...(typeof existing.onboarding === "object" && existing.onboarding !== null
+              ? (existing.onboarding as Record<string, unknown>)
+              : {}),
+            cardTypesDefaultOpenDismissed: true,
+          },
+        }));
+      } catch { /* ignore */ }
     });
-    await page.reload();
+    await page.goto("/settings");
 
     await page.getByRole("button", { name: /^card types$/i }).click();
 
@@ -124,9 +143,36 @@ test.describe("Settings page - collapsible sections (#660)", () => {
 });
 
 test.describe("Settings page - alternate forms toggle (#658)", () => {
+  // Seed cardTypesDefaultOpenDismissed so Card types starts collapsed and
+  // clicking the button opens (not closes) it. Without this, the default-open
+  // behaviour on first visits means the first click closes the section.
+  async function dismissCardTypesDefault(page: import("@playwright/test").Page) {
+    await page.addInitScript(() => {
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const raw = window.localStorage.getItem(KEY);
+        let existing: Record<string, unknown> = {};
+        if (raw !== null) {
+          try { existing = JSON.parse(raw) as Record<string, unknown>; } catch { /* ignore */ }
+        }
+        window.localStorage.setItem(KEY, JSON.stringify({
+          ...existing,
+          onboarding: {
+            ...(typeof existing.onboarding === "object" && existing.onboarding !== null
+              ? (existing.onboarding as Record<string, unknown>)
+              : {}),
+            cardTypesDefaultOpenDismissed: true,
+          },
+        }));
+        window.localStorage.setItem("poke-memory:settings-section:card-types-heading", "0");
+      } catch { /* ignore */ }
+    });
+  }
+
   test("alternate forms toggle is present and off by default in Card types section", async ({
     page,
   }) => {
+    await dismissCardTypesDefault(page);
     await page.goto("/settings");
 
     // Expand "Card types".
@@ -145,6 +191,7 @@ test.describe("Settings page - alternate forms toggle (#658)", () => {
   test("toggling alternate forms on causes it to report as checked", async ({
     page,
   }) => {
+    await dismissCardTypesDefault(page);
     await page.goto("/settings");
     await page.getByRole("button", { name: /^card types$/i }).click();
 
@@ -174,6 +221,27 @@ test.describe("Alternate forms - ScopeControl visibility (#658)", () => {
   test("Alternate forms section appears in ScopeControl after enabling the toggle", async ({
     page,
   }) => {
+    // Seed cardTypesDefaultOpenDismissed so clicking the button opens the section.
+    await page.addInitScript(() => {
+      try {
+        const KEY = "poke-memory:settings:v1";
+        const raw = window.localStorage.getItem(KEY);
+        let existing: Record<string, unknown> = {};
+        if (raw !== null) {
+          try { existing = JSON.parse(raw) as Record<string, unknown>; } catch { /* ignore */ }
+        }
+        window.localStorage.setItem(KEY, JSON.stringify({
+          ...existing,
+          onboarding: {
+            ...(typeof existing.onboarding === "object" && existing.onboarding !== null
+              ? (existing.onboarding as Record<string, unknown>)
+              : {}),
+            cardTypesDefaultOpenDismissed: true,
+          },
+        }));
+        window.localStorage.setItem("poke-memory:settings-section:card-types-heading", "0");
+      } catch { /* ignore */ }
+    });
     // Enable the toggle on the Settings page and persist via Save.
     // handleToggle only updates React state; saveSettings is only called from
     // handleSave - so we must click Save before navigating away.
@@ -181,10 +249,13 @@ test.describe("Alternate forms - ScopeControl visibility (#658)", () => {
     await page.getByRole("button", { name: /^card types$/i }).click();
     await page.getByRole("switch", { name: /include alternate forms in practice/i }).click();
 
-    // Click Save and wait for the "Saved!" confirmation so we know the
-    // setting has been written to localStorage before we navigate.
-    await page.getByRole("button", { name: /^save$/i }).click();
-    await expect(page.getByText("Saved!")).toBeVisible();
+    // Click Save inside the Card types region and wait for "Saved!" confirmation
+    // so we know the setting has been written to localStorage before we navigate.
+    // Scoped to the Card types region to avoid strict-mode ambiguity when multiple
+    // sections are expanded simultaneously.
+    const cardTypesRegion = page.getByRole("region", { name: /^card types$/i });
+    await cardTypesRegion.getByRole("button", { name: /^save$/i }).click();
+    await expect(cardTypesRegion.getByText("Saved!")).toBeVisible();
 
     // Navigate to the practice page and open the scope panel.
     await page.goto("/");
@@ -244,6 +315,8 @@ test.describe("Settings page - search/filter (#662)", () => {
     await page.getByRole("button", { name: /clear search/i }).click();
 
     // All top-level sections must be visible again after clearing.
+    // Use exact-word anchors to avoid ambiguity with the Pokémon name language
+    // pill button (which contains "language" in its accessible name).
     for (const label of [
       "Practice schedule",
       "Card types",
@@ -251,12 +324,12 @@ test.describe("Settings page - search/filter (#662)", () => {
       "Language",
       "Appearance",
       "Offline",
-      "Regional",
+      "Regional & reminders",
       "About",
       "Advanced",
     ]) {
       await expect(
-        page.getByRole("button", { name: new RegExp(label, "i") }),
+        page.getByRole("button", { name: new RegExp("^" + label + "$", "i") }),
       ).toBeVisible();
     }
 
@@ -270,7 +343,9 @@ test.describe("Settings page - search/filter (#662)", () => {
     const input = page.getByRole("searchbox", { name: /search settings/i });
     await input.fill("xyzzynosuchthing");
 
-    // All section buttons must be gone.
+    // All section buttons must be gone. Use exact-word anchors to avoid
+    // ambiguity with the Pokémon name language pill (which contains "language"
+    // in its accessible name but is unaffected by the settings search filter).
     for (const label of [
       "Practice schedule",
       "Card types",
@@ -281,7 +356,7 @@ test.describe("Settings page - search/filter (#662)", () => {
       "Advanced",
     ]) {
       await expect(
-        page.getByRole("button", { name: new RegExp(label, "i") }),
+        page.getByRole("button", { name: new RegExp("^" + label + "$", "i") }),
       ).not.toBeVisible();
     }
 

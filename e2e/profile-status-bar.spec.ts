@@ -360,7 +360,7 @@ test.describe("ProfileStatusBar - populated state via QA-seed", () => {
 
     // Open the Advanced section.
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
-    const developerSection = page.getByRole("region", { name: /developer/i });
+    const developerSection = page.locator("#developer-heading");
     await expect(developerSection).toBeVisible({ timeout: 10_000 });
 
     const seedPanel = page.getByTestId("qa-seed-section");
