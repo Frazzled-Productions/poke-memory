@@ -119,9 +119,11 @@ export default async function TermsPage() {
             For signed-in users, your review history is stored in Supabase
             Postgres. We make reasonable efforts to maintain that data, but we
             do not provide any guarantee of availability or durability. In
-            particular, <strong>there is currently no point-in-time backup
-            (PITR) in place for this project</strong>: a destructive operation
-            or database failure could result in permanent data loss. We will not
+            particular, whilst daily database backups are retained for seven
+            days, <strong>there is no point-in-time backup (PITR) for this
+            project</strong>: a destructive operation affecting individual
+            records, or data loss within a daily backup window, could result
+            in permanent data loss. We will not
             be liable for any such loss.
           </p>
           <p className="mb-3">

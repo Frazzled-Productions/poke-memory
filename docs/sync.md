@@ -91,7 +91,7 @@ Cards are the primary contract - they flow through `usePerGradeSync` (per-grade 
 
 ### Catastrophic recovery
 
-Pro daily backups (7-day retention) are enabled, but Point-in-Time Recovery is not: PITR is a paid add-on ($100/mo per 7 days of retention), deferred while the app has no revenue (#298). Daily backups are a safety net against catastrophic loss, but a restore is **whole-database only** (you cannot restore a single user's rows) and rolls back to a daily snapshot, losing up to ~24h and affecting every user. So the regression trigger and the SQL audit you can run via `mcp__supabase__execute_sql` remain the primary defences against an unforeseen sync bug, and any production sync change should be treated as one-way until PITR is in place.
+Pro daily backups (7-day retention) are enabled, but Point-in-Time Recovery is not: PITR is a paid add-on ($100/mo per 7 days of retention), deferred while the app has no revenue (#298). Daily backups are a safety net against catastrophic loss, but **a restore is whole-database only** (you cannot restore a single user's rows) and rolls back to a daily snapshot, losing up to ~24h and affecting every user. So the regression trigger and the SQL audit you can run via `mcp__supabase__execute_sql` remain the primary defences against an unforeseen sync bug, and any production sync change should be treated as one-way until PITR is in place.
 
 ## Client-cannot-regress checklist
 

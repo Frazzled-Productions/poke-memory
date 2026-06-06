@@ -575,9 +575,12 @@ export default async function PrivacyPage() {
               Your rights
             </a>
             ), all rows associated with your user identifier are permanently
-            deleted from Supabase via a cascading delete. There is currently no
-            separate point-in-time backup retained for this project, so deletion
-            is effectively immediate and permanent.
+            deleted from Supabase via a cascading delete. Daily database backups
+            (7-day retention) are retained on the Pro plan, but these are
+            whole-database backups only — individual rows cannot be restored from
+            a backup. There is no point-in-time backup (PITR) for this project,
+            so deletion at the per-row level is effectively immediate and
+            permanent.
           </p>
           <p className="mt-3">
             Feedback submissions are retained for 12 months from the date of

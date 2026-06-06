@@ -95,7 +95,7 @@ GitHub and Google act as **independent controllers** for the OAuth authenticatio
 
 ### Retention
 
-Authenticated-path data is retained for the lifetime of the account. Account deletion triggers a cascading delete on all rows associated with the user's UUID across `card_reviews`, `streak_days`, `grade_log`, `user_settings`, and `feedback`. The self-service "Reset all progress" action deletes review history immediately. There is currently no point-in-time backup (issue #298), so deletion is permanent and immediate.
+Authenticated-path data is retained for the lifetime of the account. Account deletion triggers a cascading delete on all rows associated with the user's UUID across `card_reviews`, `streak_days`, `grade_log`, `user_settings`, and `feedback`. The self-service "Reset all progress" action deletes review history immediately. Daily backups (7-day retention) are enabled on the Pro plan, but there is no point-in-time backup (issue #298); backups are whole-database only and cannot restore individual rows, so deletion at the per-row level is permanent.
 
 Feedback rows are retained for 12 months from `created_at` and are then automatically deleted by a scheduled database function. For authenticated users, feedback rows are also deleted by cascade on account deletion.
 
@@ -230,7 +230,7 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 - Guest mode, which stores nothing server-side, is the default experience and requires no account. Children of any age can use the app's full feature set without creating an account.
 - The Children's Code uniform-standards approach is applied to all users regardless of age: minimal data, no profiling, no advertising, high-privacy defaults. The standard of care applied to any under-13 who does create an account is therefore the same as for all users, which satisfies the Code's requirement to treat the worst-case user as a child. The Children's Code assessment (`docs/childrens-code-assessment.md`) records this as the deliberate mitigation.
 - `public.usernames` stores only the user-chosen username alongside the UUID. No age, name, location, or contact details are solicited at account creation.
-- The absence of PITR (#298) means a parental erasure request results in immediate, permanent deletion.
+- Daily backups exist but are whole-database only; there is no PITR (#298). A parental erasure request therefore results in permanent, per-row deletion — the deleted rows cannot be recovered from a backup.
 
 **Residual risk:** Low–Medium. The inherited OAuth age gate is gone for the username/password door. Likelihood stays Low (guest mode is the default path, the privacy notice advises against signing in, and no age-relevant feature drives sign-up). Severity is Medium because authenticated accounts do store personal data (username, FSRS parameters) under the controller's responsibility, though that data is highly minimal and the uniform Children's Code standard applies.
 
@@ -244,7 +244,7 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 
 - Account deletion triggers a cascading delete on all rows linked to the user's UUID across all four tables, via Postgres `ON DELETE CASCADE` foreign-key constraints.
 - The "Reset all progress" action issues a direct delete of `card_reviews`, `streak_days`, `grade_log`, and `user_settings` rows without requiring account deletion.
-- There is currently no point-in-time backup (issue #298), so deletion is permanent and immediate - there is no backup retention that could extend the data's life after erasure.
+- Daily backups (7-day retention) are enabled on the Pro plan, but there is no point-in-time backup (issue #298); backups are whole-database only and cannot restore individual rows. Deletion is therefore permanent at the per-row level — there is no row-level backup retention that could extend the data's life after erasure.
 
 **Residual risk:** Low. The absence of a PITR backup means deleted data is not recoverable - which is both a retention-risk mitigation and a recovery-risk consideration. That trade-off is recorded in issue #298.
 
