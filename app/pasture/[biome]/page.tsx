@@ -19,6 +19,8 @@ import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { mutedTextXs } from "@/lib/utils/class-names";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 
 type Placement = {
   card: NameReviewCard;
@@ -68,6 +70,38 @@ function useIsLandscape(): boolean {
  *
  * Params are Promises in Next.js 16 - always await them.
  */
+
+/**
+ * Renders the per-biome "Latest addition" name, locale-resolved (#1662).
+ *
+ * Extracted as a sub-component so the `useLocalePokemonName` hook is called
+ * unconditionally: the parent page has early returns before `stats` is derived,
+ * which would otherwise put the hook after a conditional return.
+ */
+function BiomeLatestAddition({
+  latestAddition,
+}: {
+  latestAddition: { speciesId: number; name: string };
+}) {
+  const t = useTranslations("pasture");
+  const { name } = useLocalePokemonName(
+    latestAddition.speciesId,
+    latestAddition.name,
+  );
+  const { locale: pokemonLocale } = usePokemonLocaleContext();
+
+  return (
+    <div>
+      <dt className="sr-only">{t("biomeStats.latestAddition")}</dt>
+      <dd>
+        <span className="font-medium text-foreground">
+          <span lang={pokemonLocale}>{name}</span>
+        </span>
+      </dd>
+    </div>
+  );
+}
+
 export default function BiomeLandscapePage({
   params,
 }: {
@@ -281,15 +315,7 @@ export default function BiomeLandscapePage({
               </dd>
             </div>
             {stats.latestAddition !== null && (
-              <div>
-                <dt className="sr-only">Latest addition</dt>
-                <dd>
-                  <span className="opacity-60">Latest: </span>
-                  <span className="font-medium text-foreground">
-                    {stats.latestAddition}
-                  </span>
-                </dd>
-              </div>
+              <BiomeLatestAddition latestAddition={stats.latestAddition} />
             )}
           </dl>
         </div>

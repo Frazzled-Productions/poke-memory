@@ -6,7 +6,7 @@
  */
 
 import { act } from "@testing-library/react";
-import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
+import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -108,6 +108,25 @@ vi.mock("@/lib/pasture/stats", () => ({
   })),
 }));
 
+// Locale-name resolution for the per-biome "Latest addition" (#1662).
+let mockPokemonLocale = "en";
+const mockLocaleNames: Record<string, string> = {};
+
+vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
+  useLocalePokemonName: (_speciesId: number | undefined, englishName: string) => ({
+    name: mockLocaleNames[mockPokemonLocale] ?? englishName,
+    transliteration: null,
+  }),
+}));
+
+vi.mock("@/lib/i18n/PokemonLocaleContext", () => ({
+  usePokemonLocaleContext: () => ({
+    locale: mockPokemonLocale,
+    languagesEnabled: false,
+    learningLocales: ["en"],
+  }),
+}));
+
 vi.mock("@/lib/pokemon/seed", () => ({
   SEED_POKEMON: [],
   SEED_EVOLUTION_CARDS: [],
@@ -148,6 +167,7 @@ vi.mock("@/components/pasture/PastureZone", () => ({
 
 import BiomeLandscapePage from "@/app/pasture/[biome]/page";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
+import { biomeStats } from "@/lib/pasture/stats";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -198,5 +218,32 @@ describe("BiomeLandscapePage", () => {
 
     // While loading the component renders null - the container has no children.
     expect(container.firstChild).toBeNull();
+  });
+
+  it("renders the locale-resolved Latest addition name with a lang attribute (#1662)", async () => {
+    mockPokemonLocale = "ja";
+    mockLocaleNames["ja"] = "ピカチュウ";
+    vi.mocked(biomeStats).mockReturnValueOnce({
+      masteredCount: 1,
+      totalCount: 10,
+      capturedPercent: 10,
+      latestAddition: { speciesId: 25, name: "Pikachu" },
+    });
+    mockLoadSession.mockResolvedValue(null);
+    const params = Promise.resolve({ biome: "grassland" });
+
+    await act(async () => {
+      renderWithIntl(<BiomeLandscapePage params={params} />);
+      await params;
+    });
+    // Flush the async load() effect so masteredCards is set and the stats
+    // strip (with BiomeLatestAddition) renders.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const nameEl = screen.getByText("ピカチュウ");
+    expect(nameEl.tagName).toBe("SPAN");
+    expect(nameEl).toHaveAttribute("lang", "ja");
   });
 });

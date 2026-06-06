@@ -5,16 +5,41 @@
  * render the correct values in English and Japanese.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithIntl, renderJa, screen } from "@/components/test-utils/renderWithIntl";
 import { PastureBiomeStats } from "./PastureBiomeStats";
 import type { BiomeStats } from "@/lib/pasture/stats";
+
+// Locale-name resolution is exercised separately below; mock both axes so the
+// component renders the locale name + `lang` attribute deterministically (#1662).
+let mockPokemonLocale = "en";
+const mockLocaleNames: Record<string, string> = {};
+
+vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
+  useLocalePokemonName: (_speciesId: number | undefined, englishName: string) => ({
+    name: mockLocaleNames[mockPokemonLocale] ?? englishName,
+    transliteration: null,
+  }),
+}));
+
+vi.mock("@/lib/i18n/PokemonLocaleContext", () => ({
+  usePokemonLocaleContext: () => ({
+    locale: mockPokemonLocale,
+    languagesEnabled: false,
+    learningLocales: ["en"],
+  }),
+}));
+
+beforeEach(() => {
+  mockPokemonLocale = "en";
+  for (const k of Object.keys(mockLocaleNames)) delete mockLocaleNames[k];
+});
 
 const STATS: BiomeStats = {
   masteredCount: 5,
   totalCount: 10,
   capturedPercent: 50,
-  latestAddition: "Pikachu",
+  latestAddition: { speciesId: 25, name: "Pikachu" },
 };
 
 const STATS_NO_LATEST: BiomeStats = {
@@ -74,5 +99,35 @@ describe("PastureBiomeStats - Japanese locale coverage (mandatory #1393)", () =>
     renderJa(<PastureBiomeStats stats={STATS} />);
     // ja pasture.biomeStats.latestAddition = "最新追加"
     expect(screen.getByText("最新追加")).toBeInTheDocument();
+  });
+});
+
+describe("PastureBiomeStats - Latest addition name locale resolution (#1662)", () => {
+  // The biome "Latest addition" name must render in the active pokemonNameLocale,
+  // wrapped in <span lang=...> for screen-reader pronunciation, on every locale.
+  const cases: Array<{ locale: string; localeName: string }> = [
+    { locale: "en", localeName: "Pikachu" },
+    { locale: "ja", localeName: "ピカチュウ" },
+    { locale: "zh-Hans", localeName: "皮卡丘" },
+    { locale: "zh-Hant", localeName: "皮卡丘" },
+  ];
+
+  for (const { locale, localeName } of cases) {
+    it(`renders the locale-resolved name and lang attribute in ${locale}`, () => {
+      mockPokemonLocale = locale;
+      mockLocaleNames[locale] = localeName;
+
+      renderWithIntl(<PastureBiomeStats stats={STATS} />);
+
+      const nameEl = screen.getByText(localeName);
+      expect(nameEl).toBeInTheDocument();
+      expect(nameEl.tagName).toBe("SPAN");
+      expect(nameEl).toHaveAttribute("lang", locale);
+    });
+  }
+
+  it("does not render a name span when latestAddition is null", () => {
+    renderWithIntl(<PastureBiomeStats stats={STATS_NO_LATEST} />);
+    expect(screen.queryByText("Latest addition")).not.toBeInTheDocument();
   });
 });
