@@ -82,7 +82,7 @@ vi.mock("@/lib/settings/persistence", () => ({
 }));
 
 const { mockUseAuth } = vi.hoisted(() => ({
-  mockUseAuth: vi.fn(() => ({ user: null as unknown, supabase: null, loading: false })),
+  mockUseAuth: vi.fn(),
 }));
 vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
@@ -90,27 +90,14 @@ vi.mock("@/lib/auth/AuthContext", () => ({
 
 // Mocks for account-block state (#1721 AC).
 const { mockUseRetryPush } = vi.hoisted(() => ({
-  mockUseRetryPush: vi.fn(() => ({
-    retryState: "idle" as import("@/lib/sync/useRetryPush").RetryState,
-    retryNow: vi.fn(),
-  })),
+  mockUseRetryPush: vi.fn(),
 }));
 vi.mock("@/lib/sync/useRetryPush", () => ({
   useRetryPush: () => mockUseRetryPush(),
 }));
 
 const { mockLoadSyncStatus } = vi.hoisted(() => ({
-  mockLoadSyncStatus: vi.fn(() => ({
-    lastPushAt: null,
-    lastPushFailed: false,
-    lastPushAttemptAt: null,
-    failedCardCount: null,
-    lastPullAt: null,
-    lastSettingsPullAt: null,
-    lastSeenResetAt: null,
-    structuralSyncError: null,
-    ownerUserId: null,
-  })),
+  mockLoadSyncStatus: vi.fn(),
 }));
 vi.mock("@/lib/sync/persistence", () => ({
   loadSyncStatus: () => mockLoadSyncStatus(),
