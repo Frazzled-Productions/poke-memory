@@ -217,7 +217,7 @@ function buildStreakRows(days: number): StreakDayRow[] {
   return rows;
 }
 
-/** Build a grade-log entry (occurred_at is a deterministic ms timestamp). */
+/** Build a grade-log entry (occurred_at is wall-clock-relative, unique within a single run via seqIndex). */
 function gradeEntry(
   opts: {
     dayOffset: number;
@@ -530,6 +530,13 @@ export const ALL_DATASET_NAMES: DatasetName[] = [
   "qa-streak",
   "qa-conflict",
 ];
+
+/**
+ * Datasets intentionally exempt from the name+reverse mastery-pairing invariant.
+ * qa-fresh has no cards; qa-conflict seeds name-only rows for regression-trigger testing.
+ * Shared by the dry-run validator and the test suite — single source of pairing-exemption policy.
+ */
+export const PAIRING_EXEMPT_DATASETS: DatasetName[] = ["qa-fresh", "qa-conflict"];
 
 /** Default QA password (overridden by QA_SEED_PASSWORD env var). */
 export const DEFAULT_QA_PASSWORD = "QaSeed2025!";

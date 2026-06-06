@@ -17,8 +17,9 @@
  * --dry-run: builds and validates all datasets locally, makes NO network calls,
  *            requires NO environment variables. Safe to run in CI.
  *
- * Idempotent: if a QA user already exists, reset_all_progress RPC is called
- * before re-seeding. The auth user and usernames row are preserved.
+ * Idempotent: if a QA user already exists, existing progress rows (card_reviews,
+ * grade_log, streak_days) are deleted directly via the service-role client before
+ * re-seeding. The auth user, usernames row, and user_settings are preserved.
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -26,6 +27,7 @@ import {
   DATASET_BUILDERS,
   ALL_DATASET_NAMES,
   DEFAULT_QA_PASSWORD,
+  PAIRING_EXEMPT_DATASETS,
   type DatasetName,
   type CloudCardRow,
 } from "./qa-seed/cloud-datasets";
@@ -61,6 +63,19 @@ for (const name of targetDatasets) {
     console.error(`Unknown dataset: "${name}". Valid names: ${ALL_DATASET_NAMES.join(", ")}, all`);
     process.exit(1);
   }
+}
+
+// Guard: --user with 'all' is almost always a mistake — each dataset iteration
+// resets the same account, leaving only the last dataset's data on that account.
+if (userArg !== undefined && datasetArg === "all") {
+  console.error(
+    "Error: --user cannot be combined with 'all'.\n" +
+    "When seeding 'all', each dataset is seeded onto its own named account\n" +
+    "(qa-fresh, qa-mastery, qa-locale, qa-streak, qa-conflict).\n" +
+    "To seed a single dataset onto a custom account, name the dataset explicitly:\n" +
+    `  qa:seed-cloud <dataset> --user ${userArg}`,
+  );
+  process.exit(1);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,10 +168,8 @@ if (dryRun) {
         )
         .map((r) => `${r.subject_key}:${r.locale}`),
     );
-    // For datasets that seed mastered pairs, both sides must be present.
-    // qa-fresh has none; qa-conflict seeds name-only intentionally.
-    const requiresPairing: DatasetName[] = ["qa-mastery", "qa-locale", "qa-streak"];
-    if ((requiresPairing as string[]).includes(name)) {
+    // For datasets not in PAIRING_EXEMPT_DATASETS, both mastered name and reverse must be present.
+    if (!PAIRING_EXEMPT_DATASETS.includes(name)) {
       for (const key of masteredNames) {
         if (!masteredReverse.has(key)) {
           console.error(`  [FAIL] ${name}: mastered name ${key} has no matching mastered reverse (#1234 pairing)`);
@@ -231,11 +244,18 @@ const admin = createClient(supabaseUrl, serviceRoleKey, {
 async function ensureAuthUser(username: string): Promise<string> {
   const email = syntheticEmail(username);
 
-  // Look up by email first (admin API allows exact-match listing).
-  const { data: listData, error: listError } = await admin.auth.admin.listUsers();
-  if (listError) throw new Error(`listUsers failed: ${listError.message}`);
+  // Paginate listUsers to handle QA projects with > 50 auth rows (the default page size).
+  const allUsers: { id: string; email?: string }[] = [];
+  let page = 1;
+  for (;;) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(`listUsers failed: ${error.message}`);
+    allUsers.push(...data.users);
+    if (data.users.length < 1000) break;
+    page += 1;
+  }
 
-  const existing = listData.users.find((u) => u.email === email);
+  const existing = allUsers.find((u) => u.email === email);
   if (existing) {
     console.log(`  User '${username}' already exists (id=${existing.id})`);
     return existing.id;
@@ -340,7 +360,7 @@ async function upsertStreakRows(
   }
 }
 
-async function upsertGradeLogRows(
+async function insertGradeLogRows(
   userId: string,
   rows: {
     occurred_at: number;
@@ -359,12 +379,13 @@ async function upsertGradeLogRows(
       user_id: userId,
       ...r,
     }));
+    // resetUserProgress always deletes grade_log rows first, so a plain insert is correct here.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (admin as any)
       .from("grade_log")
-      .upsert(batch, { onConflict: "user_id,occurred_at", ignoreDuplicates: true });
+      .insert(batch);
     if (error) {
-      throw new Error(`grade_log upsert failed: ${error.message}`);
+      throw new Error(`grade_log insert failed: ${error.message}`);
     }
   }
 }
@@ -418,7 +439,7 @@ async function seedDataset(username: string, datasetName: DatasetName): Promise<
   }
 
   if (dataset.gradeLogRows.length > 0) {
-    await upsertGradeLogRows(userId, dataset.gradeLogRows);
+    await insertGradeLogRows(userId, dataset.gradeLogRows);
     console.log(`  grade_log: ${dataset.gradeLogRows.length} rows upserted.`);
   }
 

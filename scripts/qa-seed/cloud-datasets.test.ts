@@ -18,6 +18,7 @@ import {
   buildQaConflict,
   DATASET_BUILDERS,
   ALL_DATASET_NAMES,
+  PAIRING_EXEMPT_DATASETS,
   type CloudCardRow,
   type CloudDataset,
 } from "./cloud-datasets";
@@ -155,7 +156,7 @@ describe("FSRS state bounds (scheduler-derived, not hand-fabricated)", () => {
 // ---------------------------------------------------------------------------
 
 describe("name+reverse pairing (#1234)", () => {
-  const pairedDatasets: (typeof ALL_DATASET_NAMES)[number][] = ["qa-mastery", "qa-locale", "qa-streak"];
+  const pairedDatasets = ALL_DATASET_NAMES.filter((n) => !PAIRING_EXEMPT_DATASETS.includes(n));
 
   for (const name of pairedDatasets) {
     it(`${name}: every mastered name row has a matching mastered reverse row`, () => {
