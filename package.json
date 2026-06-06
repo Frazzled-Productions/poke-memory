@@ -36,7 +36,8 @@
     "test:e2e": "playwright test --project=chromium --project=mobile-safari --project=desktop-webkit --project=mobile-chrome",
     "test:visual": "playwright test --project=visual-chromium --project=visual-webkit",
     "typecheck": "tsc --noEmit",
-    "qa:seed-cloud": "node scripts/run-qa-seed-cloud.mjs"
+    "qa:seed-cloud": "node scripts/run-qa-seed-cloud.mjs",
+    "pre-pr": "node scripts/pre-pr.mjs"
   },
   "dependencies": {
     "@open-spaced-repetition/binding": "^0.3.1",
