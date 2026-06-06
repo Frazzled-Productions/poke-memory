@@ -1946,6 +1946,26 @@ export default function SettingsPage() {
 
                   <hr className="border-zinc-200 dark:border-zinc-800" />
 
+                  {/* Cross-promo to the company site (#1686, ADR 0009). External
+                      link, new tab. Reaches mobile bottom-nav users who never
+                      see the footer. */}
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{t("settings.about.moreFromFrazzled")}</p>
+                    <p className={`mt-1 ${mutedTextXs}`}>
+                      {t("settings.about.moreFromFrazzledDescription")}
+                    </p>
+                    <a
+                      href="https://frazzledproductions.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+                    >
+                      {t("settings.about.moreFromFrazzledCta")}
+                    </a>
+                  </div>
+
+                  <hr className="border-zinc-200 dark:border-zinc-800" />
+
                   <div className="flex flex-wrap gap-3">
                     <Link
                       href="/privacy"

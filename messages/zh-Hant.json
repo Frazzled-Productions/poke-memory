@@ -14,6 +14,7 @@
     "whatsNew": "新功能",
     "privacy": "隱私",
     "terms": "條款",
+    "moreFromFrazzled": "Frazzled Productions 的更多應用程式",
     "openMenu": "開啟導覽選單",
     "closeMenu": "關閉導覽選單",
     "navigationMenu": "導覽選單",
@@ -335,7 +336,10 @@
       "whatsNewDescription": "查看最近版本的更新內容。",
       "viewChangelog": "查看更新記錄",
       "privacy": "隱私",
-      "terms": "條款"
+      "terms": "條款",
+      "moreFromFrazzled": "Frazzled Productions 的更多應用程式",
+      "moreFromFrazzledDescription": "看看我們的其他應用程式。",
+      "moreFromFrazzledCta": "前往 frazzledproductions.com"
     },
     "feedback": {
       "rowLabel": "傳送意見回饋",

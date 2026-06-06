@@ -965,6 +965,24 @@ describe("SettingsPage - FSRS link in How this works", () => {
   });
 });
 
+describe("SettingsPage - cross-promo to Frazzled Productions (#1686)", () => {
+  it("renders the About cross-promo link to frazzledproductions.com in a new tab", async () => {
+    mockLoadSettings.mockReturnValue(defaultSettings());
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/how this works/i)).toBeInTheDocument();
+    });
+
+    const link = screen.getByRole("link", {
+      name: /visit frazzledproductions\.com/i,
+    });
+    expect(link).toHaveAttribute("href", "https://frazzledproductions.com");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Preview suffix localisation (#1392)
 //
