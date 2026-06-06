@@ -7,27 +7,17 @@
 // PR #1503 when a fragment shipped as the bare text `patch` instead of valid
 // front-matter; this gate makes the failure local and immediate instead.
 //
-// Contract (mirrors changelog.d/README.md):
-//   - YAML front-matter delimited by a leading `---` and a closing `---`.
-//   - A `kind:` field whose value is one of the VALID_KINDS below.
-//   - At least one `- ` bullet line in the body, EXCEPT for `minor-bump`,
-//     which carries no bullet (it only requests a minor version bump).
+// Contract (mirrors changelog.d/README.md): parsing/validation lives in the
+// shared parser at scripts/lib/changelog-fragment.mjs, which the release cut
+// (.github/scripts/cut-release.mjs) also uses, so this lint accepts exactly
+// what the release accepts, and rejects exactly what it would reject (#1664).
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseFragment } from "./lib/changelog-fragment.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const DIR = resolve(ROOT, "changelog.d", "unreleased");
-
-const VALID_KINDS = [
-  "added",
-  "changed",
-  "removed",
-  "deprecated",
-  "fixed",
-  "security",
-  "minor-bump",
-];
 
 // Files in the directory that are not fragments and must be skipped.
 const SKIP = new Set([".gitkeep"]);
@@ -37,52 +27,8 @@ const SKIP = new Set([".gitkeep"]);
  * problem strings (empty when the fragment is well-formed).
  */
 function problemsFor(text) {
-  const problems = [];
-  const lines = text.split("\n");
-
-  if (lines[0]?.trim() !== "---") {
-    problems.push(
-      "missing opening YAML front-matter delimiter `---` on line 1 " +
-        "(fragments need front-matter with a `kind:` field, see changelog.d/README.md)",
-    );
-    return problems;
-  }
-
-  // Find the closing delimiter.
-  let closeIdx = -1;
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim() === "---") {
-      closeIdx = i;
-      break;
-    }
-  }
-  if (closeIdx === -1) {
-    problems.push("missing closing YAML front-matter delimiter `---`");
-    return problems;
-  }
-
-  const frontMatter = lines.slice(1, closeIdx);
-  const kindLine = frontMatter.find((l) => /^\s*kind\s*:/.test(l));
-  if (!kindLine) {
-    problems.push("front-matter has no `kind:` field");
-    return problems;
-  }
-
-  const kind = kindLine.replace(/^\s*kind\s*:/, "").trim();
-  if (!VALID_KINDS.includes(kind)) {
-    problems.push(
-      `\`kind: ${kind || "(empty)"}\` is not valid; expected one of ${VALID_KINDS.join(", ")}`,
-    );
-    return problems;
-  }
-
-  const body = lines.slice(closeIdx + 1);
-  const hasBullet = body.some((l) => /^\s*-\s+\S/.test(l));
-  if (kind !== "minor-bump" && !hasBullet) {
-    problems.push("no `- ` bullet line in the body");
-  }
-
-  return problems;
+  const result = parseFragment(text);
+  return result.ok ? [] : result.problems;
 }
 
 let fileNames;

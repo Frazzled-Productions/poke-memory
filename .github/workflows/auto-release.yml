@@ -20,7 +20,10 @@ name: Auto Release
 # `migration-check.yml`).
 #
 # On a `qa -> main` trigger, a final step resets `qa` to `main` so the next
-# batch run starts from a clean integration branch.
+# batch run starts from a clean integration branch. If that reset is skipped
+# (a prior step failed), the daily `qa-drift-check` job detects the un-reset
+# `qa` and opens a tracking issue rather than letting the drift surface as
+# conflicts at the next promotion (#1664).
 #
 # One-time bootstrap: if no `v0.1.0` tag exists when this workflow first runs,
 # the bootstrap step creates the tag at SHA cddb3a8 (the last commit whose
@@ -155,8 +158,10 @@ jobs:
         # Requires poke-memory-bot to be a bypass actor on the `qa` ruleset.
         # `success() &&` is explicit: a custom `if:` otherwise drops the
         # implicit success check, which would reset `qa` even after a failed
-        # release push. On failure the reset is skipped and the next
-        # `/batch-issues` pre-flight surfaces the un-reset `qa`.
+        # release push. On failure the reset is skipped; the daily
+        # `qa-drift-check` job below then detects the un-reset `qa` and opens a
+        # tracking issue (with the `/batch-issues` pre-flight as a secondary
+        # backstop), rather than the drift being discovered at the next promotion.
         if: success() && github.event_name == 'pull_request'
         run: |
           set -euo pipefail
@@ -210,3 +215,106 @@ jobs:
           git merge --no-ff origin/main -m "chore: backmerge main into qa after hotfix (#${PR_NUMBER})"
           git push origin qa
           echo "Merged main ($(git rev-parse --short origin/main)) into qa."
+
+  qa-drift-check:
+    name: Check qa has not drifted from main
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Daily safety net for the "Reset qa to main" step. If that step is skipped
+    # (a prior step in the release job failed), qa keeps the released commits as
+    # un-reset history and the next qa -> main promotion comes up with merge
+    # conflicts (#1659, #1664). This job detects the drift and opens/updates a
+    # tracking issue. It does NOT auto-reset: qa may carry genuine un-promoted
+    # batch work that a blind force-reset would destroy, so reconciliation stays
+    # human-in-the-loop (the same channel as the /batch-issues pre-flight).
+    #
+    # Scoped to schedule/workflow_dispatch only: on a pull_request (qa -> main
+    # merge) the release job's own reset step handles the post-merge state, and
+    # running here would race it. The shared `auto-release` concurrency group also
+    # queues this behind any in-flight release, so a mid-promotion false positive
+    # cannot occur.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect qa drift and open/update tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git fetch origin main qa --quiet
+
+          MARKER="<!-- qa-drift-check -->"
+
+          # Healthy invariant: main is an ancestor of qa (qa == main, or qa is
+          # main + un-promoted batch work). Drift = main is NOT an ancestor.
+          if git merge-base --is-ancestor origin/main origin/qa; then
+            DRIFTED=false
+          else
+            DRIFTED=true
+          fi
+
+          # Marker-based dedup. The GitHub search index strips HTML comments
+          # (WORKFLOW.md), so we do NOT use `--search`: that pre-filter could
+          # drop the tracking issue unpredictably and, capped at a low limit,
+          # hide it from the jq match entirely. Instead pull the full open-issue
+          # list (capped at 100) and match the marker locally with jq, which is
+          # reliable. No `2>/dev/null` either: a gh failure must surface via
+          # `set -euo pipefail` rather than look like "no existing issue" and
+          # open a duplicate on every run.
+          EXISTING=$(gh issue list --repo "$REPO" --state open \
+            --json number,body --limit 100 \
+            | jq -r --arg m "$MARKER" '[.[] | select(.body | contains($m))] | .[0].number // empty')
+
+          if [ "$DRIFTED" = "false" ]; then
+            echo "qa is healthy: main is an ancestor of qa."
+            if [ -n "$EXISTING" ]; then
+              echo "Closing stale tracking issue #$EXISTING."
+              gh issue close "$EXISTING" --repo "$REPO" \
+                --comment "$MARKER"$'\n'"qa is back in sync with main (main is an ancestor of qa); closing automatically."
+            fi
+            exit 0
+          fi
+
+          MAIN_SHA=$(git rev-parse --short origin/main)
+          QA_SHA=$(git rev-parse --short origin/qa)
+          # --left-right --count yields "<main-only>\t<qa-only>", so the report is
+          # accurate even for a bidirectional divergence, not just the expected
+          # reset-skipped (qa-only) case.
+          COUNTS=$(git rev-list --left-right --count origin/main...origin/qa)
+          BEHIND=$(echo "$COUNTS" | cut -f1)
+          AHEAD=$(echo "$COUNTS" | cut -f2)
+          echo "DRIFT: main ($MAIN_SHA) is not an ancestor of qa ($QA_SHA); qa is $AHEAD ahead of and $BEHIND behind main."
+
+          BODY_FILE=$(mktemp)
+          cat >"$BODY_FILE" <<EOF
+          $MARKER
+          **qa has drifted from main**
+
+          \`main\` (\`$MAIN_SHA\`) is not an ancestor of \`qa\` (\`$QA_SHA\`); qa is $AHEAD commit(s) ahead of and $BEHIND behind main. This usually means the auto-release "Reset qa to main" step was skipped because a prior step in the release job failed, leaving qa with already-released commits as un-reset history. Left unreconciled, the next \`qa -> main\` promotion comes up with merge conflicts (#1659).
+
+          **How to reconcile (human-in-the-loop, since this job does not auto-reset, to avoid destroying un-promoted batch work):**
+          1. \`git fetch origin && git merge-base --is-ancestor origin/main origin/qa\` to confirm (a non-zero exit means drifted).
+          2. If qa carries genuine un-promoted batch work: merge main into qa, \`git checkout qa && git merge --no-ff origin/main && git push origin qa\`.
+          3. If qa only has already-released commits: reset qa to main, \`git push origin +origin/main:refs/heads/qa\` (needs poke-memory-bot bypass-actor credentials on the \`qa\` ruleset).
+
+          Opened by the \`qa-drift-check\` job in \`auto-release.yml\`. It updates in place on each daily run and closes automatically once main is an ancestor of qa again.
+          EOF
+
+          if [ -n "$EXISTING" ]; then
+            echo "Updating tracking issue #$EXISTING."
+            gh issue edit "$EXISTING" --repo "$REPO" --body-file "$BODY_FILE"
+          else
+            echo "Opening new tracking issue."
+            gh issue create --repo "$REPO" \
+              --title "qa branch has drifted from main" \
+              --body-file "$BODY_FILE"
+          fi
+          rm -f "$BODY_FILE"

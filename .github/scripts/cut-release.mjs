@@ -18,6 +18,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseFragment } from '../../scripts/lib/changelog-fragment.mjs';
 
 const CHANGELOG = 'CHANGELOG.md';
 const PACKAGE = 'package.json';
@@ -59,28 +60,26 @@ let hasMinorBump = false;
 
 for (const filename of fragmentFiles) {
   const filePath = path.join(FRAGMENTS_DIR, filename);
-  const raw = fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n');
+  const raw = fs.readFileSync(filePath, 'utf8');
 
-  const match = raw.match(/^---\s*\nkind:\s*(\S+)\s*\n---\s*\n?([\s\S]*)$/);
-  if (!match) {
-    fail(`Fragment ${filename} does not match expected front-matter format (---\\nkind: VALUE\\n---).`);
+  // Shared parser (single source of truth with scripts/lint-changelog-fragments.mjs,
+  // #1664). It tolerates extra front-matter keys such as `issue:`.
+  const result = parseFragment(raw);
+  if (!result.ok) {
+    fail(`Fragment ${filename}: ${result.problems.join('; ')} (see changelog.d/README.md).`);
   }
 
-  const kind = match[1].toLowerCase();
-  const body = match[2].trim();
+  const { kind, bullets } = result;
 
   if (kind === 'minor-bump') {
     hasMinorBump = true;
     continue;
   }
 
-  // Normalise kind to title-case for grouping (e.g. 'added' → 'Added').
+  // Normalise kind to title-case for grouping (e.g. 'added' → 'Added'). The
+  // parser has already validated `kind` against VALID_KINDS, so titleKind is
+  // guaranteed to be in KIND_ORDER.
   const titleKind = kind.charAt(0).toUpperCase() + kind.slice(1);
-  if (!KIND_ORDER.includes(titleKind)) {
-    fail(`Fragment ${filename} has unknown kind: "${kind}". Expected one of: minor-bump, ${KIND_ORDER.map((k) => k.toLowerCase()).join(', ')}.`);
-  }
-
-  const bullets = body.split('\n').filter((l) => /^\s*-\s+\S/.test(l));
   if (bullets.length > 0) {
     if (!bulletsByKind[titleKind]) bulletsByKind[titleKind] = [];
     bulletsByKind[titleKind].push(...bullets);
