@@ -28,6 +28,7 @@ import {
   dropTestDatabase,
   applyPreMigrationFixture,
   insertAuthUser,
+  pgDateToISO,
 } from "./setup";
 import { applyMigrations } from "./applyMigrations";
 import pg from "pg";
@@ -118,13 +119,14 @@ async function getCardReviewRows(
     [userId, subjectKey, locale],
   );
   // pg returns DATE columns (first_seen/last_review/due_date) as JS Date
-  // objects; normalise them to 'YYYY-MM-DD' (UTC) strings so date assertions
-  // compare ISO-to-ISO rather than against a locale-stringified Date.
+  // objects at LOCAL midnight; normalise them to 'YYYY-MM-DD' via local
+  // components (pgDateToISO) so the stored calendar date is returned in any
+  // timezone, not shifted a day in zones behind UTC (#1685).
   return res.rows.map((row) => {
     const out = { ...row };
     for (const col of ["first_seen", "last_review", "due_date"]) {
       if (out[col] instanceof Date) {
-        out[col] = (out[col] as Date).toISOString().slice(0, 10);
+        out[col] = pgDateToISO(out[col] as Date);
       }
     }
     return out;
