@@ -86,6 +86,8 @@ export default defineConfig({
             // CI tooling under scripts/lib/ (e.g. the shared changelog-fragment
             // parser, #1664) is pure and DOM-free, so it runs in the node project.
             "scripts/**/*.test.mjs",
+            // QA cloud-seed dataset tests (#1707). TypeScript, DOM-free.
+            "scripts/**/*.test.ts",
           ],
           exclude: ["lib/sync/integration/**"],
           environment: "node",
