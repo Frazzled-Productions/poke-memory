@@ -1640,7 +1640,7 @@ export function ReviewSession() {
   if (seedError !== null) {
     return (
       <div
-        role="status"
+        role="alert"
         className="flex flex-col items-center gap-4 text-center"
       >
         <p className="text-lg font-semibold text-foreground">

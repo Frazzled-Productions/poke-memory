@@ -14,7 +14,7 @@
  *   - The `KEY_MASTERED_COUNT_BY_LOCALE` localStorage cache (written by
  *     `ReviewSession`) for `masteryCount` - avoids a full ~1025-card parse on
  *     non-Stats routes (#1234 perf concern).
- *   - `SEED_POKEMON.length` for `totalSpecies` (locale-independent seed count).
+ *   - `seed.seedPokemon.length` from `useSeed()` for `totalSpecies` (locale-independent seed count).
  *
  * Mastery is locale-scoped per #1259: the count is keyed by the user's current
  * `pokemonNameLocale` setting.
@@ -54,7 +54,7 @@ export type ProfileStatus = {
   masteryCount: number | null;
   /**
    * Total species in the seed (locale-independent). Always the same value
-   * once loaded (`SEED_POKEMON.length`).
+   * once loaded (`seed.seedPokemon.length`).
    * `null` = not yet loaded.
    */
   totalSpecies: number | null;
@@ -95,10 +95,9 @@ export function useProfileStatus(): ProfileStatus {
   });
 
   useEffect(() => {
-    // Use the async-loaded seed length; 0 while the seed is still loading.
-    const total = seed?.seedPokemon.length ?? 0;
-
     function refreshMastery() {
+      if (!seed) return;
+      const total = seed.seedPokemon.length;
       if (flags.pretendAllMastered) {
         setMasteryState({
           masteryCount: total,
