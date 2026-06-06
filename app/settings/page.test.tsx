@@ -890,7 +890,7 @@ describe("SettingsPage - i18n key resolution (#1369)", () => {
     // Verify the Japanese heading value resolves correctly.
     expect(tJa("settings.heading")).toBe("設定");
     expect(tJa("settings.save")).toBe("保存");
-    expect(tJa("settings.section.practice")).toBe("練習");
+    expect(tJa("settings.section.practiceSchedule")).toBe("練習スケジュール");
     expect(tJa("settings.offline.downloadHeading")).toBe("ダウンロード");
   });
 
@@ -1014,7 +1014,8 @@ describe("SettingsPage - cross-promo to Frazzled Productions (#1686)", () => {
 // Preview suffix localisation (#1392)
 //
 // Asserts that the "(preview)" suffix on non-en locale options comes from the
-// catalog key settings.labs.languages.previewSuffix, not a hardcoded string.
+// catalog key settings.language.previewSuffix (moved from settings.labs.languages
+// in #1720), not a hardcoded string.
 // The en mock returns "(preview)"; a ja-keyed check verifies the key exists
 // in the Japanese catalog.
 // ---------------------------------------------------------------------------
@@ -1051,7 +1052,8 @@ describe("SettingsPage - preview suffix from catalog", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       any
     >;
-    const suffix = jaMessages?.settings?.labs?.languages?.previewSuffix;
+    // settings.language.previewSuffix (moved from settings.labs.languages in #1720).
+    const suffix = jaMessages?.settings?.language?.previewSuffix;
     expect(typeof suffix).toBe("string");
     expect(suffix.length).toBeGreaterThan(0);
     // The Japanese suffix should use fullwidth brackets.

@@ -5,10 +5,15 @@
  * is the set of strings that a query is matched against - it includes the
  * section heading, the labels and helper text of every control inside it,
  * and a handful of keyword aliases so common synonyms resolve correctly
- * (e.g. "dark mode" → Appearance, "spaced repetition" → Practice).
+ * (e.g. "dark mode" → Appearance, "spaced repetition" → Practice schedule).
  *
  * Matching is case-insensitive substring - if any term contains the query
  * the section is considered a match.
+ *
+ * Updated in #1720 to reflect the new 10-section IA:
+ *   practice-heading      → practice-schedule-heading + card-types-heading
+ *   account-data-heading  → about-heading + regional-reminders-heading + data-backup-heading
+ *   labs-heading          → language-heading (language is now GA, always-on)
  */
 export type SectionSearchEntry = {
   /** The sectionId prop passed to CollapsibleSection. */
@@ -19,30 +24,10 @@ export type SectionSearchEntry = {
 
 export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
   {
-    sectionId: "appearance-heading",
-    terms: [
-      "appearance",
-      "theme",
-      "colour",
-      "color",
-      "dark mode",
-      "light mode",
-      "mascot",
-      "app theme",
-      "intensity",
-      "accent",
-      "mobile navigation",
-      "bottom tab bar",
-      "hamburger menu",
-      "hamburger",
-      "tab bar",
-      "nav style",
-    ],
-  },
-  {
-    sectionId: "practice-heading",
+    sectionId: "practice-schedule-heading",
     terms: [
       "practice",
+      "practice schedule",
       "scheduler",
       "recall target",
       "retention",
@@ -63,6 +48,14 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
       "known pokemon",
       "fast-track",
       "skip new cards",
+      "daily limit",
+      "daily cap",
+    ],
+  },
+  {
+    sectionId: "card-types-heading",
+    terms: [
+      "card types",
       "name cards",
       "enable name cards",
       "new cards per day",
@@ -77,8 +70,11 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
       "megas",
       "reverse cards",
       "enable reverse cards",
-      "daily limit",
-      "daily cap",
+      "cry cards",
+      "enable cry cards",
+      "cry enable",
+      "card type",
+      "deck",
     ],
   },
   {
@@ -86,8 +82,6 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
     terms: [
       "audio",
       "cry",
-      "cry cards",
-      "enable cry cards",
       "play cry on reveal",
       "sound",
       "speak name",
@@ -110,6 +104,50 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
     ],
   },
   {
+    sectionId: "language-heading",
+    terms: [
+      "language",
+      "languages",
+      "locale",
+      "japanese",
+      "chinese",
+      "translation",
+      "pokémon names",
+      "pokemon names",
+      "app language",
+      "app interface language",
+      "enrolment",
+      "learning languages",
+      "practice language",
+      // Endonyms - single source from LOCALE_ENDONYMS in i18n/locales.ts (#1726).
+      "日本語",
+      "中文",
+      "繁體中文",
+      "简体中文",
+    ],
+  },
+  {
+    sectionId: "appearance-heading",
+    terms: [
+      "appearance",
+      "theme",
+      "colour",
+      "color",
+      "dark mode",
+      "light mode",
+      "mascot",
+      "app theme",
+      "intensity",
+      "accent",
+      "mobile navigation",
+      "bottom tab bar",
+      "hamburger menu",
+      "hamburger",
+      "tab bar",
+      "nav style",
+    ],
+  },
+  {
     sectionId: "offline-heading",
     terms: [
       "offline",
@@ -128,14 +166,24 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
     ],
   },
   {
-    sectionId: "account-data-heading",
+    sectionId: "regional-reminders-heading",
     terms: [
-      "account",
+      "regional",
+      "timezone",
+      "time zone",
+      "date format",
+      "daily reminder",
+      "notification hour",
+      "push notification",
+      "reminder time",
+      "reminders",
+      "notifications",
+    ],
+  },
+  {
+    sectionId: "data-backup-heading",
+    terms: [
       "data",
-      "how this works",
-      "onboarding",
-      "tips",
-      "show tips again",
       "backup",
       "export",
       "download",
@@ -147,49 +195,26 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
       "import",
       "restore",
       "progress",
-      "regional",
-      "timezone",
-      "time zone",
-      "date format",
-      "daily reminder",
-      "notification hour",
-      "push notification",
-      "reminder time",
+      "how this works",
+      "onboarding",
+      "tips",
+      "show tips again",
+    ],
+  },
+  {
+    sectionId: "about-heading",
+    terms: [
       "about",
       "version",
       "changelog",
       "what's new",
-      "sync",
-      "sign-in methods",
-      "sign in methods",
-      "connect",
-      "link",
-      "provider",
-      "github",
-      "google",
-      "identity",
-      "send feedback",
-      "feedback",
-      "bug report",
-      "feature request",
-      "report a bug",
-    ],
-  },
-  {
-    sectionId: "labs-heading",
-    terms: [
-      "labs",
-      "preview",
-      "experimental",
-      "beta",
-      "languages",
-      "locale",
-      "language",
-      "japanese",
-      "chinese",
-      "translation",
-      "pokémon names",
-      "pokemon names",
+      "privacy",
+      "terms",
+      "company",
+      "frazzled",
+      "fan project",
+      "legal",
+      "disclosure",
     ],
   },
   {

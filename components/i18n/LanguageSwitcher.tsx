@@ -289,9 +289,9 @@ export function LanguageSwitcher() {
             })}
           </div>
 
-          {/* Enrol more languages from the Settings section. */}
+          {/* Enrol more languages from the Settings Language section. */}
           <Link
-            href="/settings#languages-learning"
+            href="/settings#language-heading"
             onClick={close}
             className={`mt-1 flex min-h-[44px] w-full items-center rounded-lg px-2 py-1.5 text-left text-sm transition-colors [@media(hover:hover)]:hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:[@media(hover:hover)]:hover:bg-zinc-800 ${mutedTextXs}`}
           >

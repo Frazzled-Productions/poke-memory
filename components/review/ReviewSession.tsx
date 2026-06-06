@@ -676,7 +676,7 @@ function EndOfSessionScreen({
           <OnboardingHint
             id="cardTypesHintDismissed"
             title={t("readyForMoreVariety")}
-            ctaHref="/settings#practice-heading"
+            ctaHref="/settings#card-types-heading"
             ctaLabel={t("openPracticeSettings")}
           >
             <p>{t("readyForMoreVarietyBody")}</p>

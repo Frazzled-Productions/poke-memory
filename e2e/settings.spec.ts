@@ -43,22 +43,34 @@ test.describe("Settings page - collapsible sections (#660)", () => {
     await page.goto("/settings");
 
     // All top-level category buttons must be visible.
-    for (const label of ["Appearance", "Practice", "Audio", "Offline", "Account & Data", "Advanced"]) {
+    for (const label of [
+      "Practice schedule",
+      "Card types",
+      "Audio",
+      "Language",
+      "Appearance",
+      "Offline",
+      "Regional",
+      "Data",
+      "About",
+      "Advanced",
+    ]) {
       await expect(
         page.getByRole("button", { name: new RegExp(label, "i") }),
       ).toBeVisible();
     }
 
     // No section content should be visible on a fresh load (all collapsed).
-    // We check that the "Recall target" slider is not visible - it lives inside Practice.
+    // Card types is default-open on the first visit but once dismissed stays closed.
+    // We check that the "Recall target" slider is not visible - it lives inside Practice schedule.
     await expect(page.getByRole("slider", { name: /recall target/i })).not.toBeVisible();
   });
 
   test("expanding a section reveals its controls", async ({ page }) => {
     await page.goto("/settings");
 
-    // Expand "Practice".
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    // Expand "Practice schedule".
+    await page.getByRole("button", { name: /^practice schedule$/i }).click();
 
     // The recall target slider should now be visible.
     await expect(page.getByRole("slider", { name: /recall target/i })).toBeVisible();
@@ -67,7 +79,7 @@ test.describe("Settings page - collapsible sections (#660)", () => {
   test("collapsing a section hides its controls again", async ({ page }) => {
     await page.goto("/settings");
 
-    const practiceBtn = page.getByRole("button", { name: /^practice$/i });
+    const practiceBtn = page.getByRole("button", { name: /^practice schedule$/i });
 
     // Expand then collapse.
     await practiceBtn.click();
@@ -77,27 +89,34 @@ test.describe("Settings page - collapsible sections (#660)", () => {
     await expect(page.getByRole("slider", { name: /recall target/i })).not.toBeVisible();
   });
 
-  test("/settings#onboarding-heading auto-expands Account & Data section", async ({
+  test("/settings#onboarding-heading auto-expands Data & backup section", async ({
     page,
   }) => {
     await page.goto("/settings#onboarding-heading");
 
     // Wait for the accordion to open before asserting nested content.
     await expect(
-      page.getByRole("button", { name: "Account & Data" }),
+      page.getByRole("button", { name: /data.*backup/i }),
     ).toHaveAttribute("aria-expanded", "true");
-    // The "Show onboarding again" button lives inside Account & Data → onboarding sub-section.
+    // The "Show onboarding again" button lives inside Data & backup.
     await expect(
       page.getByRole("button", { name: /show onboarding again/i }),
     ).toBeVisible();
   });
 
-  test("expanding Audio section reveals cry card toggle", async ({ page }) => {
+  test("expanding Card types section reveals cry card toggle", async ({ page }) => {
     await page.goto("/settings");
 
-    await page.getByRole("button", { name: /^audio$/i }).click();
+    // Card types is default-open on the first visit; seed it as closed to
+    // make the test deterministic regardless of visit count.
+    await page.addInitScript(() => {
+      window.localStorage.setItem("poke-memory:settings-section:card-types-heading", "0");
+    });
+    await page.reload();
 
-    // The cry cards toggle switch must be visible.
+    await page.getByRole("button", { name: /^card types$/i }).click();
+
+    // The cry cards toggle switch must be visible inside Card types.
     await expect(
       page.getByRole("switch", { name: /enable cry cards/i }),
     ).toBeVisible();
@@ -105,13 +124,13 @@ test.describe("Settings page - collapsible sections (#660)", () => {
 });
 
 test.describe("Settings page - alternate forms toggle (#658)", () => {
-  test("alternate forms toggle is present and off by default in Practice section", async ({
+  test("alternate forms toggle is present and off by default in Card types section", async ({
     page,
   }) => {
     await page.goto("/settings");
 
-    // Expand "Practice".
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    // Expand "Card types".
+    await page.getByRole("button", { name: /^card types$/i }).click();
 
     // The toggle must be visible.
     const toggle = page.getByRole("switch", {
@@ -127,7 +146,7 @@ test.describe("Settings page - alternate forms toggle (#658)", () => {
     page,
   }) => {
     await page.goto("/settings");
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("button", { name: /^card types$/i }).click();
 
     const toggle = page.getByRole("switch", {
       name: /include alternate forms in practice/i,
@@ -159,7 +178,7 @@ test.describe("Alternate forms - ScopeControl visibility (#658)", () => {
     // handleToggle only updates React state; saveSettings is only called from
     // handleSave - so we must click Save before navigating away.
     await page.goto("/settings");
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("button", { name: /^card types$/i }).click();
     await page.getByRole("switch", { name: /include alternate forms in practice/i }).click();
 
     // Click Save and wait for the "Saved!" confirmation so we know the
@@ -184,7 +203,7 @@ test.describe("Settings page - search/filter (#662)", () => {
     await expect(input).toBeVisible();
   });
 
-  test("typing 'cry' filters to only the Audio section and auto-expands it", async ({
+  test("typing 'cry' filters to Audio and Card types sections and auto-expands them", async ({
     page,
   }) => {
     await page.goto("/settings");
@@ -192,11 +211,11 @@ test.describe("Settings page - search/filter (#662)", () => {
     const input = page.getByRole("searchbox", { name: /search settings/i });
     await input.fill("cry");
 
-    // Audio section must be visible and expanded (cry cards toggle is visible).
+    // Both Audio and Card types match "cry" - the cry cards toggle lives in Card types.
     await expect(page.getByRole("switch", { name: /enable cry cards/i })).toBeVisible();
 
-    // The Practice section button must be absent - it is filtered out.
-    await expect(page.getByRole("button", { name: /^practice$/i })).not.toBeVisible();
+    // The Practice schedule section button must be absent - it is filtered out.
+    await expect(page.getByRole("button", { name: /^practice schedule$/i })).not.toBeVisible();
   });
 
   test("typing a known setting name surfaces its section", async ({ page }) => {
@@ -217,15 +236,25 @@ test.describe("Settings page - search/filter (#662)", () => {
     const input = page.getByRole("searchbox", { name: /search settings/i });
     await input.fill("backup");
 
-    // Only Account & Data should be visible while filtering.
-    await expect(page.getByRole("button", { name: /^practice$/i })).not.toBeVisible();
+    // Only Data & backup should be visible while filtering.
+    await expect(page.getByRole("button", { name: /^practice schedule$/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /^audio$/i })).not.toBeVisible();
 
     // Clear via the clear button.
     await page.getByRole("button", { name: /clear search/i }).click();
 
     // All top-level sections must be visible again after clearing.
-    for (const label of ["Appearance", "Practice", "Audio", "Offline", "Account & Data", "Advanced"]) {
+    for (const label of [
+      "Practice schedule",
+      "Card types",
+      "Audio",
+      "Language",
+      "Appearance",
+      "Offline",
+      "Regional",
+      "About",
+      "Advanced",
+    ]) {
       await expect(
         page.getByRole("button", { name: new RegExp(label, "i") }),
       ).toBeVisible();
@@ -242,7 +271,15 @@ test.describe("Settings page - search/filter (#662)", () => {
     await input.fill("xyzzynosuchthing");
 
     // All section buttons must be gone.
-    for (const label of ["Appearance", "Practice", "Audio", "Offline", "Account & Data", "Advanced"]) {
+    for (const label of [
+      "Practice schedule",
+      "Card types",
+      "Audio",
+      "Language",
+      "Appearance",
+      "Offline",
+      "Advanced",
+    ]) {
       await expect(
         page.getByRole("button", { name: new RegExp(label, "i") }),
       ).not.toBeVisible();
@@ -274,9 +311,14 @@ test.describe("Settings page - search/filter (#662)", () => {
     await page.addInitScript(() => {
       const keys = [
         "appearance-heading",
-        "practice-heading",
+        "practice-schedule-heading",
+        "card-types-heading",
         "audio-heading",
-        "account-data-heading",
+        "language-heading",
+        "offline-heading",
+        "regional-reminders-heading",
+        "data-backup-heading",
+        "about-heading",
         "advanced-heading",
       ];
       for (const k of keys) {
@@ -290,33 +332,33 @@ test.describe("Settings page - search/filter (#662)", () => {
 
     // Type a query - the matching section should be visible and expanded.
     await input.fill("backup");
-    await expect(page.getByRole("button", { name: /account & data/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /data.*backup/i })).toBeVisible();
 
     // Clear the search.
     await page.getByRole("button", { name: /clear search/i }).click();
 
     // All sections must be back to collapsed (content hidden).
-    // The recall-target slider lives inside Practice; it must not be visible.
+    // The recall-target slider lives inside Practice schedule; it must not be visible.
     await expect(page.getByRole("slider", { name: /recall target/i })).not.toBeVisible();
 
     // Confirm localStorage still records the section as closed (not overwritten).
-    const accountDataPersistedState = await page.evaluate(() =>
-      window.localStorage.getItem("poke-memory:settings-section:account-data-heading"),
+    const dataBackupPersistedState = await page.evaluate(() =>
+      window.localStorage.getItem("poke-memory:settings-section:data-backup-heading"),
     );
-    expect(accountDataPersistedState).toBe("0");
+    expect(dataBackupPersistedState).toBe("0");
   });
 
   test("hash deep-link target section remains visible even when a query is active", async ({
     page,
   }) => {
-    // Navigate to a hash that targets Practice via a sub-section anchor.
-    // With a query of 'backup' (matches only Account & Data), Practice would
+    // Navigate to a hash that targets Practice schedule via a sub-section anchor.
+    // With a query of 'backup' (matches only Data & backup), Practice schedule would
     // normally be filtered out - but the hash target must keep it present.
     await page.goto("/settings#scheduler-heading");
 
-    // The Practice button must be visible (hash target always included).
-    await expect(page.getByRole("button", { name: /^practice$/i })).toBeVisible();
-    // The Practice section must be expanded (hash-forced open).
+    // The Practice schedule button must be visible (hash target always included).
+    await expect(page.getByRole("button", { name: /^practice schedule$/i })).toBeVisible();
+    // The Practice schedule section must be expanded (hash-forced open).
     await expect(page.getByRole("slider", { name: /recall target/i })).toBeVisible();
   });
 });
@@ -335,7 +377,7 @@ test.describe("Settings - CSV review history export (#918)", () => {
     // The CSV export control is gated on a signed-in session. E2E runs in
     // guest mode only, so the link must not render.
     await page.goto("/settings");
-    await page.getByRole("button", { name: /account & data/i }).click();
+    await page.getByRole("button", { name: /data.*backup/i }).click();
 
     await expect(
       page.getByRole("link", { name: /download csv/i }),
@@ -394,10 +436,10 @@ test.describe("Settings page - Web Push opt-in (#1056)", () => {
     // absent - not just hidden via CSS.
     await page.goto("/settings");
 
-    // Expand Account & Data so the would-be parent section is open.
-    await page.getByRole("button", { name: /account & data/i }).click();
+    // Expand Regional & reminders so the would-be parent section is open.
+    await page.getByRole("button", { name: /regional.*reminders/i }).click();
     await expect(
-      page.getByRole("button", { name: /account & data/i }),
+      page.getByRole("button", { name: /regional.*reminders/i }),
     ).toHaveAttribute("aria-expanded", "true");
 
     // The opt-in switch must not render. Use a data-testid match so the
@@ -410,12 +452,12 @@ test.describe("Settings page - Web Push opt-in (#1056)", () => {
   }) => {
     // Even with display-mode emulated to standalone, the test browser in CI
     // does not provide a real PushManager + Notification surface that
-    // isPushSupported considers valid. The toggle must still not render - 
+    // isPushSupported considers valid. The toggle must still not render -
     // we don't want to show a control that can't actually subscribe.
     await page.emulateMedia({ media: "screen", colorScheme: "light" });
 
     await page.goto("/settings");
-    await page.getByRole("button", { name: /account & data/i }).click();
+    await page.getByRole("button", { name: /regional.*reminders/i }).click();
     await expect(page.getByTestId("push-optin-button")).toHaveCount(0);
   });
 
@@ -514,9 +556,9 @@ test.describe("Settings page - Web Push opt-in (#1056)", () => {
       .catch(() => false);
     test.skip(!signedIn, "mock-auth seam not active on this deployment");
 
-    // Navigate to the settings page with the Account & Data hash so the
+    // Navigate to the settings page with the Regional & reminders hash so the
     // accordion auto-expands without an extra click.
-    await page.goto("/settings#onboarding-heading");
+    await page.goto("/settings#regional-reminders-heading");
 
     // The toggle must render with its expected accessible name. Both the
     // role+name selector and the data-testid lookup must match - that is
@@ -660,60 +702,37 @@ test.describe("Settings - Offline section (#1168)", () => {
   });
 });
 
-test.describe("Settings - Labs section (#1258)", () => {
-  // The Labs section only renders when the LABS_FLAGS registry has at least
-  // one entry. This issue ships the infrastructure with an empty registry; the
-  // section is intentionally absent until a subsequent issue registers the
-  // first flag.
-  //
-  // The positive-path render test (section heading visible, toggle interactive)
-  // is covered by the unit tests in lib/labs/flags.test.ts. The E2E positive-
-  // path test for the section itself will be added when the first flag is
-  // registered - see AGENTS.md "E2E tests" for the requirement.
+test.describe("Settings - Language section (#1720 / #1726)", () => {
+  // Language is now GA (no Labs flag gate). The Language section renders
+  // unconditionally as the fourth top-level section.
 
-  test("Labs section is absent on the settings page while the registry is empty", async ({
+  test("Language section is always visible on the settings page", async ({
     page,
   }) => {
     await page.goto("/settings");
 
-    // The Labs collapsible section must not render when LABS_FLAGS is empty.
+    // The Language collapsible section must be present without any flag setup.
     await expect(
-      page.getByRole("button", { name: /^labs$/i }),
-    ).toHaveCount(0);
+      page.getByRole("button", { name: /^language$/i }),
+    ).toBeVisible();
   });
 
-  test("all other top-level settings sections remain visible when Labs is absent", async ({
+  test("Language section contains the app-language picker and enrolment list", async ({
     page,
   }) => {
     await page.goto("/settings");
 
-    // The Labs-absent state must not displace any existing section.
-    for (const label of ["Appearance", "Practice", "Audio", "Offline", "Account & Data", "Advanced"]) {
-      await expect(
-        page.getByRole("button", { name: new RegExp(label, "i") }),
-      ).toBeVisible();
-    }
-  });
+    await page.getByRole("button", { name: /^language$/i }).click();
 
-  test("Labs section heading renders and flag toggle is interactive when a flag is present (positive-path with seeded flag)", async ({
-    page,
-  }) => {
-    // Positive-path coverage per AGENTS.md "At least one test must assert the
-    // feature actually renders and its core interaction succeeds in the happy path."
-    //
-    // We seed a Labs flag into localStorage's settings blob before the page
-    // loads AND inject a script that patches window.__poke_memory_labs_flags__
-    // so the settings page's Labs section guard resolves to non-empty.
-    //
-    // Because LABS_FLAGS is a compile-time constant in the bundle, we cannot
-    // patch it from addInitScript. Instead, we test the positive path for the
-    // sub-components (back-fill, parseLabsFlags, isLabsFlagEnabled) at the
-    // unit level (lib/labs/flags.test.ts). The E2E render positive path is
-    // deferred to when the first real flag is registered (the next Labs issue).
-    test.skip(
-      true,
-      "Positive render path deferred to first real flag registration - the section is intentionally hidden on initial infrastructure-only ship.",
-    );
+    // App interface language select must be present.
+    await expect(
+      page.getByLabel(/app interface language/i),
+    ).toBeVisible();
+
+    // Pokémon name practice languages heading must be present.
+    await expect(
+      page.getByText(/Pokémon name practice languages/i),
+    ).toBeVisible();
   });
 });
 
@@ -722,15 +741,12 @@ test.describe("Settings - Labs section (#1258)", () => {
 // ─── #1622: Feedback modal ───────────────────────────────────────────────────
 
 test.describe("Settings - Send feedback modal (#1622)", () => {
-  test("'Send feedback' row is visible in Account & Data section", async ({
+  test("'Send feedback' button is visible below all sections (persistent, not inside an accordion)", async ({
     page,
   }) => {
     await page.goto("/settings");
 
-    // Expand the Account & Data section.
-    await page.getByRole("button", { name: /account & data/i }).click();
-
-    // The Send feedback row must be present.
+    // The Send feedback button sits below all accordions - always visible.
     const sendFeedbackBtn = page.getByRole("button", { name: /send feedback/i });
     await expect(sendFeedbackBtn).toBeVisible();
   });
@@ -739,9 +755,8 @@ test.describe("Settings - Send feedback modal (#1622)", () => {
     page,
   }) => {
     await page.goto("/settings");
-    await page.getByRole("button", { name: /account & data/i }).click();
 
-    // Open the modal.
+    // Open the modal - no accordion expand needed.
     await page.getByRole("button", { name: /send feedback/i }).click();
 
     // The dialog title must be visible.
@@ -776,7 +791,6 @@ test.describe("Settings - Send feedback modal (#1622)", () => {
     // test below, which relies on the real env-less 500 and is deterministic.
 
     await page.goto("/settings");
-    await page.getByRole("button", { name: /account & data/i }).click();
     await page.getByRole("button", { name: /send feedback/i }).click();
 
     // Modal title must be visible.
@@ -820,7 +834,6 @@ test.describe("Settings - Send feedback modal (#1622)", () => {
     });
 
     await page.goto("/settings");
-    await page.getByRole("button", { name: /account & data/i }).click();
     await page.getByRole("button", { name: /send feedback/i }).click();
 
     await page.getByLabel(/category/i).selectOption({ label: "Feature request" });
@@ -839,13 +852,13 @@ test.describe("Settings - Send feedback modal (#1622)", () => {
 });
 
 test.describe("Settings - push notification hour picker (#1315)", () => {
-  test("hour picker renders in Account & Data > Regional section and can be set", async ({
+  test("hour picker renders in Regional & reminders section and can be set", async ({
     page,
   }) => {
     await page.goto("/settings");
 
-    // Expand "Account & Data".
-    await page.getByRole("button", { name: /account & data/i }).click();
+    // Expand "Regional & reminders".
+    await page.getByRole("button", { name: /regional.*reminders/i }).click();
 
     // The 'Daily reminder time' picker must be visible in the Regional sub-section.
     const select = page.getByLabel(/daily reminder time/i);
@@ -863,7 +876,7 @@ test.describe("Settings - push notification hour picker (#1315)", () => {
     page,
   }) => {
     await page.goto("/settings");
-    await page.getByRole("button", { name: /account & data/i }).click();
+    await page.getByRole("button", { name: /regional.*reminders/i }).click();
 
     const select = page.getByLabel(/daily reminder time/i);
     await expect(select).toBeVisible();

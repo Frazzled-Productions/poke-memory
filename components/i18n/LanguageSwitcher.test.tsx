@@ -155,7 +155,7 @@ describe("LanguageSwitcher", () => {
     renderWithIntl(<LanguageSwitcher />);
     fireEvent.click(screen.getByRole("button", { name: /Pokémon name language/i }));
     const link = screen.getByRole("link", { name: /add a language/i });
-    expect(link).toHaveAttribute("href", "/settings#languages-learning");
+    expect(link).toHaveAttribute("href", "/settings#language-heading");
   });
 
   it("closes on Escape", () => {

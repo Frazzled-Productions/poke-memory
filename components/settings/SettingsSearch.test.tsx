@@ -120,11 +120,16 @@ describe("sectionMatchesQuery", () => {
 describe("SETTINGS_SEARCH_INDEX", () => {
   const sectionIds = SETTINGS_SEARCH_INDEX.map((e) => e.sectionId);
 
-  it("contains all five top-level section ids", () => {
-    expect(sectionIds).toContain("appearance-heading");
-    expect(sectionIds).toContain("practice-heading");
+  it("contains all ten top-level section ids", () => {
+    expect(sectionIds).toContain("practice-schedule-heading");
+    expect(sectionIds).toContain("card-types-heading");
     expect(sectionIds).toContain("audio-heading");
-    expect(sectionIds).toContain("account-data-heading");
+    expect(sectionIds).toContain("language-heading");
+    expect(sectionIds).toContain("appearance-heading");
+    expect(sectionIds).toContain("offline-heading");
+    expect(sectionIds).toContain("regional-reminders-heading");
+    expect(sectionIds).toContain("data-backup-heading");
+    expect(sectionIds).toContain("about-heading");
     expect(sectionIds).toContain("advanced-heading");
   });
 
@@ -133,13 +138,13 @@ describe("SETTINGS_SEARCH_INDEX", () => {
     expect(sectionMatchesQuery(entry, "dark mode")).toBe(true);
   });
 
-  it("'fsrs' matches Practice section", () => {
-    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "practice-heading")!;
+  it("'fsrs' matches Practice schedule section", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "practice-schedule-heading")!;
     expect(sectionMatchesQuery(entry, "fsrs")).toBe(true);
   });
 
-  it("'alternate forms' matches Practice section", () => {
-    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "practice-heading")!;
+  it("'alternate forms' matches Card types section", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "card-types-heading")!;
     expect(sectionMatchesQuery(entry, "alternate forms")).toBe(true);
   });
 
@@ -148,14 +153,29 @@ describe("SETTINGS_SEARCH_INDEX", () => {
     expect(sectionMatchesQuery(entry, "tts")).toBe(true);
   });
 
-  it("'backup' matches Account & Data section", () => {
-    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "account-data-heading")!;
+  it("'backup' matches Data & backup section", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "data-backup-heading")!;
     expect(sectionMatchesQuery(entry, "backup")).toBe(true);
   });
 
   it("'danger zone' matches Advanced section", () => {
     const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "advanced-heading")!;
     expect(sectionMatchesQuery(entry, "danger zone")).toBe(true);
+  });
+
+  it("'japanese' matches Language section", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "language-heading")!;
+    expect(sectionMatchesQuery(entry, "japanese")).toBe(true);
+  });
+
+  it("'timezone' matches Regional & reminders section", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "regional-reminders-heading")!;
+    expect(sectionMatchesQuery(entry, "timezone")).toBe(true);
+  });
+
+  it("'cry cards' matches Card types section", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "card-types-heading")!;
+    expect(sectionMatchesQuery(entry, "cry cards")).toBe(true);
   });
 });
 
@@ -175,37 +195,50 @@ function getVisibleSectionIds(query: string): Set<string> {
 }
 
 describe("Settings page filter logic", () => {
-  it("returns all 7 sections when query is empty", () => {
+  it("returns all 10 sections when query is empty", () => {
     const visible = getVisibleSectionIds("");
-    expect(visible.size).toBe(7);
-    for (const id of ["appearance-heading", "practice-heading", "audio-heading", "offline-heading", "account-data-heading", "labs-heading", "advanced-heading"]) {
+    expect(visible.size).toBe(10);
+    for (const id of [
+      "practice-schedule-heading",
+      "card-types-heading",
+      "audio-heading",
+      "language-heading",
+      "appearance-heading",
+      "offline-heading",
+      "regional-reminders-heading",
+      "data-backup-heading",
+      "about-heading",
+      "advanced-heading",
+    ]) {
       expect(visible.has(id)).toBe(true);
     }
   });
 
-  it("returns all 7 sections when query is whitespace-only", () => {
-    expect(getVisibleSectionIds("   ").size).toBe(7);
+  it("returns all 10 sections when query is whitespace-only", () => {
+    expect(getVisibleSectionIds("   ").size).toBe(10);
   });
 
-  it("filters to only Audio when query is 'cry'", () => {
+  it("filters to Audio and Card types when query is 'cry'", () => {
     const visible = getVisibleSectionIds("cry");
+    // "cry" now matches both Audio (play cry on reveal) and Card types (cry cards).
     expect(visible.has("audio-heading")).toBe(true);
+    expect(visible.has("card-types-heading")).toBe(true);
     expect(visible.has("appearance-heading")).toBe(false);
-    expect(visible.has("practice-heading")).toBe(false);
-    expect(visible.has("account-data-heading")).toBe(false);
+    expect(visible.has("practice-schedule-heading")).toBe(false);
     expect(visible.has("advanced-heading")).toBe(false);
   });
 
-  it("filters to only Practice when query is 'recall'", () => {
+  it("filters to only Practice schedule when query is 'recall'", () => {
     const visible = getVisibleSectionIds("recall");
-    expect(visible.has("practice-heading")).toBe(true);
+    expect(visible.has("practice-schedule-heading")).toBe(true);
     expect(visible.has("audio-heading")).toBe(false);
   });
 
-  it("filters to only Account & Data when query is 'timezone'", () => {
+  it("filters to only Regional & reminders when query is 'timezone'", () => {
     const visible = getVisibleSectionIds("timezone");
-    expect(visible.has("account-data-heading")).toBe(true);
-    expect(visible.has("practice-heading")).toBe(false);
+    expect(visible.has("regional-reminders-heading")).toBe(true);
+    expect(visible.has("practice-schedule-heading")).toBe(false);
+    expect(visible.has("data-backup-heading")).toBe(false);
   });
 
   it("filters to only Advanced when query is 'danger'", () => {
@@ -219,18 +252,24 @@ describe("Settings page filter logic", () => {
     expect(getVisibleSectionIds("xyzzynosuchthing").size).toBe(0);
   });
 
-  it("is case-insensitive - 'BACKUP' matches Account & Data", () => {
-    expect(getVisibleSectionIds("BACKUP").has("account-data-heading")).toBe(true);
+  it("is case-insensitive - 'BACKUP' matches Data & backup", () => {
+    expect(getVisibleSectionIds("BACKUP").has("data-backup-heading")).toBe(true);
   });
 
-  it("clearing the query restores all 7 sections", () => {
-    expect(getVisibleSectionIds("cry").size).toBe(1);
-    expect(getVisibleSectionIds("").size).toBe(7);
+  it("clearing the query restores all 10 sections", () => {
+    expect(getVisibleSectionIds("voice").size).toBe(1);
+    expect(getVisibleSectionIds("").size).toBe(10);
   });
 
   it("'voice' matches only Audio", () => {
     const visible = getVisibleSectionIds("voice");
     expect(visible.has("audio-heading")).toBe(true);
+    expect(visible.size).toBe(1);
+  });
+
+  it("'japanese' matches only Language", () => {
+    const visible = getVisibleSectionIds("japanese");
+    expect(visible.has("language-heading")).toBe(true);
     expect(visible.size).toBe(1);
   });
 });

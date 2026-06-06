@@ -87,12 +87,15 @@
     },
     "section": {
       "appearance": "Appearance",
-      "practice": "Practice",
       "audio": "Audio",
       "offline": "Offline",
-      "accountData": "Account & Data",
       "advanced": "Advanced",
-      "labs": "Labs"
+      "practiceSchedule": "Practice schedule",
+      "cardTypes": "Card types",
+      "language": "Language",
+      "about": "About",
+      "regionalReminders": "Regional & reminders",
+      "dataBackup": "Data & backup"
     },
     "appearance": {
       "mobileNav": {
@@ -118,36 +121,6 @@
         "tintedDescription": "A light wash of your mascot colour tints the page background.",
         "fullLabel": "Full mascot theme",
         "fullDescription": "Your mascot colour drives all backgrounds: loud by design."
-      }
-    },
-    "labs": {
-      "description": "Preview features that are in active development. These may change or be removed. Your feedback helps shape what ships.",
-      "languages": {
-        "label": "Languages",
-        "description": "Show Pokémon names in Japanese, Simplified Chinese, or Traditional Chinese.",
-        "locale": {
-          "en": "English",
-          "ja": "Japanese",
-          "zh-Hans": "Simplified Chinese",
-          "zh-Hant": "Traditional Chinese"
-        },
-        "selectLocale": "Language",
-        "appLanguageLabel": "App interface language",
-        "appLanguageDescription": "Controls the app's UI text.",
-        "pokemonNameLanguageLabel": "Pokémon name language",
-        "pokemonNameLanguageDescription": "Switch the Pokémon-name language from the language pill in the status bar at the top of every page.",
-        "previewSuffix": "(preview)",
-        "enrolment": {
-          "heading": "Pokémon name practice languages",
-          "description": "Switch the active one from the language pill in the bar.",
-          "lockedEnglishNote": "Always included",
-          "machineTranslationNote": "Machine translation",
-          "checkboxAriaLabel": "Practise Pokémon names in {language}",
-          "masteredCount": "{count, number} mastered",
-          "unenrolConfirmMessage": "Removing {language} will switch your practice to English. Continue?",
-          "unenrolConfirm": "Confirm",
-          "unenrolCancel": "Cancel"
-        }
       }
     },
     "practice": {
@@ -269,7 +242,8 @@
         "volumeLabel": "Speech volume ({pct}%)",
         "volumeMute": "0% mute",
         "volumeFull": "100% full"
-      }
+      },
+      "cryDisabledNote": "Cry cards are disabled. Enable them in Card types above."
     },
     "offline": {
       "downloadHeading": "Download",
@@ -413,6 +387,56 @@
     },
     "deleteAccount": {
       "inputAriaLabel": "Type DELETE to confirm account deletion"
+    },
+    "language": {
+      "label": "Languages",
+      "description": "Show Pokémon names in Japanese, Simplified Chinese, or Traditional Chinese.",
+      "locale": {
+        "en": "English",
+        "ja": "Japanese",
+        "zh-Hans": "Simplified Chinese",
+        "zh-Hant": "Traditional Chinese"
+      },
+      "selectLocale": "Language",
+      "appLanguageLabel": "App interface language",
+      "appLanguageDescription": "Controls the app's UI text.",
+      "pokemonNameLanguageLabel": "Pokémon name language",
+      "pokemonNameLanguageDescription": "Switch the Pokémon-name language from the language pill in the status bar at the top of every page.",
+      "previewSuffix": "(preview)",
+      "enrolment": {
+        "heading": "Pokémon name practice languages",
+        "description": "Switch the active one from the language pill in the bar.",
+        "lockedEnglishNote": "Always included",
+        "machineTranslationNote": "Machine translation",
+        "checkboxAriaLabel": "Practise Pokémon names in {language}",
+        "masteredCount": "{count, number} mastered",
+        "unenrolConfirmMessage": "Removing {language} will switch your practice to English. Continue?",
+        "unenrolConfirm": "Confirm",
+        "unenrolCancel": "Cancel"
+      }
+    },
+    "account": {
+      "guest": {
+        "practising": "Practising as a guest",
+        "savedLocally": "Your progress is saved on this device only.",
+        "signIn": "Sign in to back up"
+      },
+      "signedIn": {
+        "signOut": "Sign out",
+        "manageSignIn": "Manage sign-in methods"
+      },
+      "provider": {
+        "github": "Signed in with GitHub",
+        "google": "Signed in with Google",
+        "email": "Signed in with email",
+        "username": "Signed in with username",
+        "unknown": "Signed in"
+      },
+      "sectionAriaLabel": "Account"
+    },
+    "cardTypes": {
+      "cryAudioNote": "For cry playback options, see Audio below.",
+      "cryAudioLink": "Audio section"
     }
   },
   "practice": {

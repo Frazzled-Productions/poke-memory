@@ -3,11 +3,15 @@
 // Shared context for the Pokémon-name locale and languages-flag state (#1329).
 //
 // The context is the single subscription point for `pokemonNameLocale` and the
-// `languages` Labs flag. With N cards on screen, the old per-hook model
+// `languages` feature state. With N cards on screen, the old per-hook model
 // registered N event listeners and called loadSettings() N times per render.
 // This provider registers exactly one pair of listeners regardless of how many
 // components call `usePokemonLocaleContext()`, reducing hydration cost from
 // O(N) to O(1) for the locale-subscription leg.
+//
+// Multi-locale is now always-on (#1723): `languagesEnabled` is always `true`.
+// The field is kept in the context shape for back-compat with consumers that
+// already read it; they will always see `true` and can be simplified over time.
 //
 // Place <PokemonLocaleProvider> high in the tree (app/layout.tsx, inside
 // <LocaleProvider>) so all review and Pokédex surfaces share the same
@@ -15,7 +19,6 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
-import { isLabsFlagEnabled } from "@/lib/labs/flags";
 import { DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
 
 // ---------------------------------------------------------------------------
@@ -26,8 +29,8 @@ export type PokemonLocaleContextValue = {
   /** The active Pokémon-name locale, already gated by the languages flag. */
   locale: AppLocale;
   /**
-   * Whether the `languages` Labs flag is enabled. When false, `locale` is
-   * always `DEFAULT_LOCALE` and the hook skips all async resolution.
+   * Whether the languages feature is enabled. Always `true` since multi-locale
+   * went GA (#1723). Kept in the context shape for back-compat.
    */
   languagesEnabled: boolean;
   /**
@@ -40,7 +43,8 @@ export type PokemonLocaleContextValue = {
 
 const PokemonLocaleCtx = createContext<PokemonLocaleContextValue>({
   locale: DEFAULT_LOCALE,
-  languagesEnabled: false,
+  // Multi-locale is always-on since GA (#1723).
+  languagesEnabled: true,
   learningLocales: [DEFAULT_LOCALE],
 });
 
@@ -52,27 +56,23 @@ function readLocaleState(): PokemonLocaleContextValue {
   if (typeof window === "undefined") {
     return {
       locale: DEFAULT_LOCALE,
-      languagesEnabled: false,
+      // Multi-locale is always-on since GA (#1723).
+      languagesEnabled: true,
       learningLocales: [DEFAULT_LOCALE],
     };
   }
   const settings = loadSettings();
-  const languagesEnabled = isLabsFlagEnabled(settings.labsFlags, "languages");
+  // Multi-locale is always-on since GA (#1723): languagesEnabled is always true.
   // Active locale (#1484): activePokemonNameLocale is authoritative;
   // pokemonNameLocale is the back-compat alias; DEFAULT_LOCALE the safety net.
-  const locale = languagesEnabled
-    ? (settings.activePokemonNameLocale ??
-        settings.pokemonNameLocale ??
-        DEFAULT_LOCALE)
-    : DEFAULT_LOCALE;
+  const locale =
+    settings.activePokemonNameLocale ??
+    settings.pokemonNameLocale ??
+    DEFAULT_LOCALE;
   return {
     locale,
-    languagesEnabled,
-    // Only meaningful when the flag is on (the switcher is hidden otherwise);
-    // collapse to the default set when off so consumers never see a stale list.
-    learningLocales: languagesEnabled
-      ? (settings.learningLocales ?? [DEFAULT_LOCALE])
-      : [DEFAULT_LOCALE],
+    languagesEnabled: true,
+    learningLocales: settings.learningLocales ?? [DEFAULT_LOCALE],
   };
 }
 
@@ -119,11 +119,12 @@ export function PokemonLocaleProvider({ children }: { children: React.ReactNode 
   const value = useMemo(
     () => ({
       locale: state.locale,
-      languagesEnabled: state.languagesEnabled,
+      // Multi-locale is always-on since GA (#1723).
+      languagesEnabled: true as const,
       learningLocales: state.learningLocales,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.locale, state.languagesEnabled, learningKey],
+    [state.locale, learningKey],
   );
 
   return <PokemonLocaleCtx.Provider value={value}>{children}</PokemonLocaleCtx.Provider>;

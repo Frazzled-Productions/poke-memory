@@ -1,8 +1,8 @@
 // e2e/i18n.spec.ts
-// Smoke tests for multi-locale UI (#1260).
+// Smoke tests for multi-locale UI (#1260, updated #1726 GA).
 //
-// The `languages` Labs flag must be enabled and a locale set in the cookie for
-// locale-specific content to render. We seed both via init scripts.
+// Multi-locale is now GA (no Labs flag gate). The Language section renders
+// unconditionally. A locale cookie is still needed to serve localised content.
 
 import { test, expect } from "@playwright/test";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
@@ -10,8 +10,8 @@ import { addOnboardingPreDismiss } from "./helpers/onboarding";
 const SETTINGS_KEY = "poke-memory:settings:v1";
 const LOCALE_COOKIE = "poke-memory:locale";
 
-/** Seed localStorage to enable the `languages` Labs flag. */
-async function enableLanguagesFlag(page: import("@playwright/test").Page): Promise<void> {
+/** Seed localStorage with multiple learning locales for Language section tests. */
+async function seedLearningLocales(page: import("@playwright/test").Page): Promise<void> {
   await page.addInitScript(() => {
     try {
       const KEY = "poke-memory:settings:v1";
@@ -31,12 +31,6 @@ async function enableLanguagesFlag(page: import("@playwright/test").Page): Promi
         mobileNav: "bottom",
         ...existing,
         learningLocales: ["en", "zh-Hans"],
-        labsFlags: {
-          ...(typeof existing.labsFlags === "object" && existing.labsFlags !== null
-            ? (existing.labsFlags as Record<string, unknown>)
-            : {}),
-          languages: true,
-        },
         onboarding: {
           ...(typeof existing.onboarding === "object" && existing.onboarding !== null
             ? (existing.onboarding as Record<string, unknown>)
@@ -124,42 +118,33 @@ test.describe("i18n - MachineTranslationBanner (#1381)", () => {
   });
 });
 
-test.describe("i18n - Languages Labs flag (#1260)", () => {
+test.describe("i18n - Language section GA (#1726)", () => {
+  // Language is now GA - no Labs flag needed. The Language section renders
+  // unconditionally as the fourth top-level section.
+
   test.beforeEach(async ({ page }) => {
     await addOnboardingPreDismiss(page);
   });
 
-  test("Labs section appears in Settings once the languages flag is in the registry", async ({
+  test("Language section appears in Settings without any flag setup", async ({
     page,
   }) => {
     await page.goto("/settings");
 
-    // The Labs section is rendered when LABS_FLAGS has at least one entry.
-    // Since languages was registered in #1260, the section must be present.
-    const labsButton = page.getByRole("button", { name: /^labs$/i });
-    await expect(labsButton).toBeVisible();
+    // The Language section renders unconditionally (no flag gate).
+    const langButton = page.getByRole("button", { name: /^language$/i });
+    await expect(langButton).toBeVisible();
   });
 
-  test("Languages toggle appears inside Labs section", async ({ page }) => {
-    await page.goto("/settings");
-
-    // Expand Labs section.
-    await page.getByRole("button", { name: /^labs$/i }).click();
-
-    // The Languages flag label must be visible.
-    await expect(page.getByText("Languages")).toBeVisible();
-  });
-
-  test("enabling Languages flag reveals the app-language selector and the bar language pill", async ({
+  test("Language section contains the app-language selector and enrolment list", async ({
     page,
   }) => {
-    await enableLanguagesFlag(page);
     await page.goto("/settings");
 
-    // Expand Labs section.
-    await page.getByRole("button", { name: /^labs$/i }).click();
+    // Expand Language section.
+    await page.getByRole("button", { name: /^language$/i }).click();
 
-    // The app-language selector stays in Settings and offers all four locales.
+    // The app-language selector must offer all four locales.
     const appLocaleSelect = page.locator("#labs-app-locale-select");
     await expect(appLocaleSelect).toBeVisible();
     await expect(appLocaleSelect.locator('option[value="en"]')).toHaveCount(1);
@@ -167,8 +152,7 @@ test.describe("i18n - Languages Labs flag (#1260)", () => {
     await expect(appLocaleSelect.locator('option[value="zh-Hans"]')).toHaveCount(1);
     await expect(appLocaleSelect.locator('option[value="zh-Hant"]')).toHaveCount(1);
 
-    // The Pokémon-name language was relocated out of Settings: it is now switched
-    // from the language pill in the status bar, visible on /settings.
+    // The Pokémon-name language is switched from the status-bar pill.
     await expect(
       page.getByRole("button", { name: /Pokémon name language/ }),
     ).toBeVisible();
@@ -178,11 +162,11 @@ test.describe("i18n - Languages Labs flag (#1260)", () => {
     page,
     context,
   }) => {
-    await enableLanguagesFlag(page);
+    await seedLearningLocales(page);
     await page.goto("/settings");
 
-    // Expand Labs section.
-    await page.getByRole("button", { name: /^labs$/i }).click();
+    // Expand Language section.
+    await page.getByRole("button", { name: /^language$/i }).click();
 
     // Switch the Pokémon name language to Simplified Chinese via the bar pill
     // FIRST, while the chrome is still English (the pill's accessible name is
@@ -220,11 +204,10 @@ test.describe("i18n - Languages Labs flag (#1260)", () => {
     page,
     context,
   }) => {
-    await enableLanguagesFlag(page);
     await page.goto("/settings");
 
-    // Expand Labs section.
-    await page.getByRole("button", { name: /^labs$/i }).click();
+    // Expand Language section.
+    await page.getByRole("button", { name: /^language$/i }).click();
 
     const appLocaleSelect = page.locator("#labs-app-locale-select");
     await expect(appLocaleSelect).toBeVisible();
@@ -251,7 +234,6 @@ test.describe("i18n - Languages Labs flag (#1260)", () => {
     context,
   }) => {
     // Set the locale cookie before loading the page.
-    await enableLanguagesFlag(page);
     await context.addCookies([
       {
         name: LOCALE_COOKIE,
