@@ -307,14 +307,24 @@ None of these conditions apply to Poké Memory:
 
 **Conclusion:** No DPO is appointed, and none is required under UK GDPR Article 37. This is a hobby project operated by a sole individual.
 
+### ICO registration
+
+| Field | Value |
+|---|---|
+| ICO data protection fee | Paid 2026-06-03, Tier 1, ~£52/yr direct debit |
+| Public register number | ZC165261 (Frazzled Productions Ltd) |
+| Internal application reference | ICO:00014322369 |
+
+The registration number ZC165261 appears on the public ICO register and is cited in the privacy notice (§1). The internal application reference and payment credentials are not published anywhere in this codebase.
+
 ### Sign-off
 
 | Field | Value |
 |---|---|
 | Approved by | Frazzled Productions Ltd (company no. 17258540) - privacy@pokememory.com |
 | Date | June 2026 |
-| Reference | Issues #721, #1623, #1672 |
-| Outcome | No residual risk is rated above Low–Medium. No unacceptable risks identified. No ICO pre-consultation required. |
+| Reference | Issues #698, #721, #1623, #1672 |
+| Outcome | No residual risk is rated above Low–Medium. No unacceptable risks identified. No ICO pre-consultation required. ICO data protection fee paid; registration number ZC165261. |
 
 ### Review triggers
 

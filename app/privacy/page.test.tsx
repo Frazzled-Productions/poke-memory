@@ -159,9 +159,19 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 6 June 2026 (#1672)", async () => {
+    it("shows the last updated date as 7 June 2026 (#698)", async () => {
       await renderPage();
-      expect(screen.getByText(/6 june 2026/i)).toBeTruthy();
+      expect(screen.getByText(/7 june 2026/i)).toBeTruthy();
+    });
+
+    it("states the ICO registration number in section 1 (#698)", async () => {
+      await renderPage();
+      // The controller section must disclose ICO registration so users can
+      // verify controller status on the public register.
+      expect(screen.getByText(/ZC165261/)).toBeTruthy();
+      expect(
+        screen.getByText(/registered with the information commissioner/i),
+      ).toBeTruthy();
     });
 
     it("documents the username and password sign-in option (#1672)", async () => {
