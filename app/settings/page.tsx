@@ -1946,9 +1946,9 @@ export default function SettingsPage() {
 
                   <hr className="border-zinc-200 dark:border-zinc-800" />
 
-                  {/* Cross-promo to the company site (#1686, ADR 0009). External
-                      link, new tab. Reaches mobile bottom-nav users who never
-                      see the footer. */}
+                  {/* Cross-promo to the company site (#1686). External link,
+                      new tab. Reaches mobile bottom-nav users who never see
+                      the footer. */}
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("settings.about.moreFromFrazzled")}</p>
                     <p className={`mt-1 ${mutedTextXs}`}>
