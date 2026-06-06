@@ -5,7 +5,7 @@ import { useTranslations, useFormatter } from "next-intl";
 import { useCountUp } from "@/lib/stats/useCountUp";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS } from "@/lib/review/session";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import type { MasterySnapshot } from "@/lib/stats/dashboard-snapshot";
 import { useDashboardSnapshot, useProvideDashboardSnapshotInput } from "@/components/stats/DashboardSnapshotContext";
 import { EMPTY_SCOPE, type EligibilitySettings } from "@/lib/review/scope";
@@ -405,6 +405,7 @@ export default function JourneyPage() {
   const t = useTranslations("journey");
   const { user, supabase } = useAuth();
   const { flags, anyFlagOn } = useSuperuser();
+  const { seed } = useSeed();
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   const [cards, setCards] = useState<Awaited<ReturnType<typeof buildSession>> | null>(null);
   const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
@@ -426,13 +427,15 @@ export default function JourneyPage() {
   const [practiceSessionsCount, setPracticeSessionsCount] = useState<number | null>(null);
 
   useEffect(() => {
+    if (seed === null) return; // wait for seed to load
+    const currentSeed = seed; // capture non-null reference for async closure
     async function load() {
       const settings = loadSettings();
       const saved = await loadSession();
       const localOpts = seedOptsFromSettings(settings);
       let sessionCards: ReviewableCard[];
       if (saved !== null) {
-        const { cards: hydrated, anyHealed } = hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts);
+        const { cards: hydrated, anyHealed } = hydrateSession(saved.cards, currentSeed.seedPokemon, currentSeed.seedEvolutionCards, undefined, localOpts);
         // Persist healed cards so the fixed point is durable across all entry
         // points, not only Practice (#1506).
         if (anyHealed) {
@@ -440,7 +443,7 @@ export default function JourneyPage() {
         }
         sessionCards = hydrated;
       } else {
-        sessionCards = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, localOpts);
+        sessionCards = buildSession(currentSeed.seedPokemon, currentSeed.seedEvolutionCards, undefined, localOpts);
       }
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
@@ -505,8 +508,8 @@ export default function JourneyPage() {
           if (cloudRows !== null) {
             const opts = seedOptsFromSettings(settings);
             const cloudCards = applyCloudAuthoritative(
-              SEED_POKEMON,
-              SEED_EVOLUTION_CARDS,
+              currentSeed.seedPokemon,
+              currentSeed.seedEvolutionCards,
               cloudRows,
               opts,
             );
@@ -527,7 +530,7 @@ export default function JourneyPage() {
       const tl = buildCollectionTimeline({
         log,
         currentNameCards: nameCardMap,
-        totalSpecies: SEED_POKEMON.filter((p) => p.isDefaultForm).length,
+        totalSpecies: currentSeed.seedPokemon.filter((p) => p.isDefaultForm).length,
         masteryRepetitions: settings.masteryRepetitions,
         retentionTarget: settings.retentionTarget,
         forceAllMastered: flags.pretendAllMastered,
@@ -552,7 +555,7 @@ export default function JourneyPage() {
     }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageVersion, anyFlagOn, supabase, user]);
+  }, [storageVersion, anyFlagOn, supabase, user, seed]);
 
   // Provide the full snapshot input to the shared DashboardSnapshotContext.
   // Journey reads only the mastery axis from the returned snapshot (#1139,

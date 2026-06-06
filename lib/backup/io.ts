@@ -1,18 +1,30 @@
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
+import type { SeedPokemon } from "@/lib/pokemon/seed";
+import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-constants";
+import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import type { ReviewableCard, DailyLimits } from "@/lib/review/session";
 import type { UserSettings } from "@/lib/settings/persistence";
 import { BACKUP_VERSION, isBackupFile } from "./schema";
 import { isoDate } from "@/lib/utils/format-date";
 
-// Built once at module load - SEED_POKEMON and SEED_EVOLUTION_CARDS are constants.
-const VALID_IDS = new Set<number>([
-  ...SEED_POKEMON.map((p) => p.id),
-  ...SEED_EVOLUTION_CARDS.map((e) => e.id),
-  ...SEED_POKEMON.map((p) => REVERSE_ID_OFFSET + p.id),
-]);
+// Lazy valid-id set - memoised only once the seed has loaded.
+// Returns a new (empty) Set on each call until the seed is available so the
+// caller falls through to the "not found" error path naturally.
+let _validIdsCache: ReadonlySet<number> | null = null;
+
+function getValidIds(): ReadonlySet<number> {
+  if (_validIdsCache !== null) return _validIdsCache;
+  const seed = getSeedIfLoaded();
+  if (!seed) return new Set<number>();
+  _validIdsCache = new Set<number>([
+    ...seed.seedPokemon.map((p: SeedPokemon) => p.id),
+    ...seed.seedEvolutionCards.map((e: { id: number }) => e.id),
+    ...seed.seedPokemon.map((p: SeedPokemon) => REVERSE_ID_OFFSET + p.id),
+  ]);
+  return _validIdsCache;
+}
 
 export type ValidatedBackup = {
   cards: ReviewableCard[];
@@ -72,8 +84,9 @@ export async function validateBackup(
     return { ok: false, error: "This file isn't a valid poke-memory backup." };
   }
 
+  const validIds = getValidIds();
   for (const card of parsed.cards) {
-    if (!VALID_IDS.has(card.id)) {
+    if (validIds.size > 0 && !validIds.has(card.id)) {
       return { ok: false, error: "This file isn't a valid poke-memory backup." };
     }
   }

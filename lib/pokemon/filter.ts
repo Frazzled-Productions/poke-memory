@@ -1,6 +1,6 @@
 import { generationOf } from "@/lib/stats/derive";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
 import type { CardClass } from "@/lib/stats/derive";
 import type { MasteryProgress } from "@/lib/pokedex/sort";
 
@@ -24,24 +24,35 @@ export type PokedexFilters = {
   masteryStatus: MasteryStatus; // "all" = no mastery filter; "mastered" / "not-yet-mastered" = filter by cardClass
 };
 
-// Pre-compute a map from speciesId → non-default form displayNames for fast
-// lookup in the query filter. Built once at module load time.
-const FORM_DISPLAY_NAMES_BY_SPECIES_ID: ReadonlyMap<number, string[]> = (() => {
+// Lazily-derived lookup maps - memoised only once the seed has loaded.
+let _formDisplayNameCache: ReadonlyMap<number, string[]> | null = null;
+let _speciesWithFormsCache: ReadonlySet<number> | null = null;
+
+function getFormDisplayNames(): ReadonlyMap<number, string[]> {
+  if (_formDisplayNameCache !== null) return _formDisplayNameCache;
+  const seed = getSeedIfLoaded();
+  if (!seed) return new Map();
   const map = new Map<number, string[]>();
-  for (const p of SEED_POKEMON) {
+  for (const p of seed.seedPokemon) {
     if (!p.isDefaultForm && p.speciesId !== undefined && p.displayName !== undefined) {
       const existing = map.get(p.speciesId) ?? [];
       existing.push(p.displayName);
       map.set(p.speciesId, existing);
     }
   }
+  _formDisplayNameCache = map;
   return map;
-})();
+}
 
-// Pre-compute the set of speciesIds that have at least one non-default form.
-const SPECIES_WITH_ALTERNATE_FORMS: ReadonlySet<number> = new Set(
-  FORM_DISPLAY_NAMES_BY_SPECIES_ID.keys(),
-);
+function getSpeciesWithAlternateForms(): ReadonlySet<number> {
+  if (_speciesWithFormsCache !== null) return _speciesWithFormsCache;
+  const seed = getSeedIfLoaded();
+  if (!seed) return new Set();
+  // Build from the seed directly so the set is consistent with getFormDisplayNames.
+  const map = getFormDisplayNames();
+  _speciesWithFormsCache = new Set(map.keys());
+  return _speciesWithFormsCache;
+}
 
 export function filterPokemon(
   pokemon: PokemonCellData[],
@@ -51,7 +62,7 @@ export function filterPokemon(
     if (filters.query !== "") {
       const q = filters.query.toLowerCase().trim();
       const nameMatches = p.name.toLowerCase().includes(q);
-      const formNames = FORM_DISPLAY_NAMES_BY_SPECIES_ID.get(p.speciesId ?? p.id) ?? [];
+      const formNames = getFormDisplayNames().get(p.speciesId ?? p.id) ?? [];
       const formMatches = formNames.some((fn) => fn.toLowerCase().includes(q));
       if (!nameMatches && !formMatches) {
         return false;
@@ -73,7 +84,7 @@ export function filterPokemon(
     }
 
     if (filters.hasAlternateForms) {
-      if (!SPECIES_WITH_ALTERNATE_FORMS.has(p.speciesId ?? p.id)) {
+      if (!getSpeciesWithAlternateForms().has(p.speciesId ?? p.id)) {
         return false;
       }
     }

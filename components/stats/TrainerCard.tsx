@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import type { GenerationStats } from "@/lib/stats/derive";
 import type { BadgeDefinition } from "@/lib/badges/catalog";
-import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
 import { mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 
 type Props = {
@@ -52,14 +52,25 @@ export function nextLevelMastered(level: number): number {
  * the seed. Equals 1025 for the v1 seed, grows with future seed expansions.
  * Level calculation is pinned to this value so existing users' levels are
  * unaffected when alternate-form cards are added.
+ *
+ * Computed lazily once the seed has loaded; falls back to 1025 (the known
+ * v1 value) so callers that run before seed load still see a sensible number.
  */
-export const BASE_SPECIES_COUNT = SEED_POKEMON.filter((p) => p.isDefaultForm).length || 1025;
+export function BASE_SPECIES_COUNT(): number {
+  const seed = getSeedIfLoaded();
+  return seed ? seed.seedPokemon.filter((p) => p.isDefaultForm).length || 1025 : 1025;
+}
 
 /**
  * Total card count - all entries in the seed (base + alternate forms).
  * Grows beyond BASE_SPECIES_COUNT once alternate forms are seeded.
+ *
+ * Computed lazily once the seed has loaded; falls back to 1025.
  */
-export const TOTAL_CARD_COUNT = SEED_POKEMON.length;
+export function TOTAL_CARD_COUNT(): number {
+  const seed = getSeedIfLoaded();
+  return seed ? seed.seedPokemon.length : 1025;
+}
 
 const GEN_LABELS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"];
 
@@ -106,7 +117,7 @@ export function TrainerCard({
         </div>
       </div>
       <p className={`mt-1 ${mutedTextXs}`}>
-        {totalMastered >= BASE_SPECIES_COUNT
+        {totalMastered >= BASE_SPECIES_COUNT()
           ? t("allMastered")
           : t("masteryProgress", { mastered: totalMastered, next, needed, levelNext: level + 1 })}
       </p>

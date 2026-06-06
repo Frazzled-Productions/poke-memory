@@ -4,6 +4,10 @@ import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl
 import { TrainerCard, trainerLevel, nextLevelMastered, BASE_SPECIES_COUNT } from "./TrainerCard";
 import type { GenerationStats } from "@/lib/stats/derive";
 
+// BASE_SPECIES_COUNT is now a lazy getter function - call it once to get the number.
+// The vitest setup primes the seed so it returns the real count (1025) in tests.
+const BASE_SPECIES_COUNT_VALUE = BASE_SPECIES_COUNT();
+
 function gen(g: number, mastered: number, total: number): GenerationStats {
   return { gen: g, name: `Generation ${g}`, total, introduced: mastered, mastered };
 }
@@ -20,7 +24,7 @@ describe("trainerLevel", () => {
 
   it("monotonic in mastered count", () => {
     let last = trainerLevel(1);
-    for (let m = 2; m < BASE_SPECIES_COUNT; m += 50) {
+    for (let m = 2; m < BASE_SPECIES_COUNT_VALUE; m += 50) {
       const lvl = trainerLevel(m);
       expect(lvl).toBeGreaterThanOrEqual(last);
       last = lvl;
@@ -32,8 +36,8 @@ describe("trainerLevel", () => {
     expect(trainerLevel(10)).toBe(5);
     // 100 -> 16
     expect(trainerLevel(100)).toBe(16);
-    // BASE_SPECIES_COUNT (1025) -> 51
-    expect(trainerLevel(BASE_SPECIES_COUNT)).toBe(51);
+    // BASE_SPECIES_COUNT_VALUE (1025) -> 51
+    expect(trainerLevel(BASE_SPECIES_COUNT_VALUE)).toBe(51);
   });
 });
 
@@ -48,7 +52,7 @@ describe("nextLevelMastered", () => {
   });
 
   it("always returns more than the mastered count for the same level (full species range)", () => {
-    for (let m = 0; m <= BASE_SPECIES_COUNT; m++) {
+    for (let m = 0; m <= BASE_SPECIES_COUNT_VALUE; m++) {
       expect(nextLevelMastered(trainerLevel(m))).toBeGreaterThan(m);
     }
   });
@@ -98,7 +102,7 @@ describe("TrainerCard", () => {
 
   it("shows 'All mastered' when totalMastered reaches the base species cap", () => {
     renderWithIntl(
-      <TrainerCard handle={null} totalMastered={BASE_SPECIES_COUNT} perGeneration={ALL_INCOMPLETE} />,
+      <TrainerCard handle={null} totalMastered={BASE_SPECIES_COUNT_VALUE} perGeneration={ALL_INCOMPLETE} />,
     );
     expect(screen.getByText("All mastered")).toBeInTheDocument();
   });
@@ -234,7 +238,7 @@ describe("TrainerCard - locale coverage (i18n #1393)", () => {
 
   it("renders the Japanese 'all mastered' string in ja locale", () => {
     renderJa(
-      <TrainerCard handle={null} totalMastered={BASE_SPECIES_COUNT} perGeneration={perGen} />,
+      <TrainerCard handle={null} totalMastered={BASE_SPECIES_COUNT_VALUE} perGeneration={perGen} />,
     );
     // ja stats.trainerCard.allMastered = "すべて習得済み"
     expect(screen.getByText("すべて習得済み")).toBeInTheDocument();

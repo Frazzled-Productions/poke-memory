@@ -143,7 +143,11 @@ describe("MasteryOverTimeChart -- forceAllMastered contract", () => {
 // "all mastered" copy rather than the progress copy.
 // ---------------------------------------------------------------------------
 
-import { TrainerCard, BASE_SPECIES_COUNT } from "@/components/stats/TrainerCard";
+import { TrainerCard, BASE_SPECIES_COUNT as getBaseSpeciesCount } from "@/components/stats/TrainerCard";
+
+// BASE_SPECIES_COUNT is now a lazy getter function; call it once in test setup.
+// The vitest setup primes the seed so it returns the real count (1025).
+const BASE_SPECIES_COUNT = getBaseSpeciesCount();
 import type { GenerationStats } from "@/lib/stats/derive";
 
 function makeGen(g: number, mastered: number, total: number): GenerationStats {

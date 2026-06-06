@@ -15,7 +15,7 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { hydrateSession } from "@/lib/review/session";
 import type { NameReviewCard } from "@/lib/review/session";
 import type { AnchorSlot, SubRegion } from "@/lib/pasture/zones";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { mutedTextXs } from "@/lib/utils/class-names";
@@ -111,6 +111,7 @@ export default function BiomeLandscapePage({
   const router = useRouter();
   const t = useTranslations("pasture");
   const { flags } = useSuperuser();
+  const { seed } = useSeed();
   const isLandscape = useIsLandscape();
   const [masteredCards, setMasteredCards] = useState<NameReviewCard[] | null>(
     null,
@@ -133,11 +134,13 @@ export default function BiomeLandscapePage({
   }, []);
 
   useEffect(() => {
+    if (seed === null) return; // wait for seed to load
+    const currentSeed = seed; // capture non-null reference for async closure
     async function load() {
       if (flags.pretendAllMastered) {
         // Superuser mode: synthesise every species as mastered.
         // seenInPasture forced true so synthesised cards don't sparkle in QA.
-        const all: NameReviewCard[] = SEED_POKEMON.map((p) => ({
+        const all: NameReviewCard[] = currentSeed.seedPokemon.map((p) => ({
           ...p,
           cardType: "name" as const,
           subjectKey: String(p.id),
@@ -148,11 +151,11 @@ export default function BiomeLandscapePage({
         const session = await loadSession();
         const { masteryRepetitions, pokemonNameLocale } = loadSettings();
         if (session) {
-          // Hydrate so each card carries the full SEED_POKEMON fields (habitat,
+          // Hydrate so each card carries the full seed fields (habitat,
           // isDefaultForm, etc.) that biomeStats and the biome filter depend on.
           // All *Enabled flags are false - only refresh existing cards from seed
           // (backfill habitat, isDefaultForm, etc.) without adding ~1 000 new unseen cards.
-          const { cards: hydrated, anyHealed } = hydrateSession(session.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, {
+          const { cards: hydrated, anyHealed } = hydrateSession(session.cards, currentSeed.seedPokemon, currentSeed.seedEvolutionCards, undefined, {
             reverseEnabled: false,
             nameEnabled: false,
             evolutionEnabled: false,
@@ -182,7 +185,7 @@ export default function BiomeLandscapePage({
       }
     }
     void load();
-  }, [storageVersion, settingsVersion, flags.pretendAllMastered]);
+  }, [storageVersion, settingsVersion, flags.pretendAllMastered, seed]);
 
   // Not a recognised habitat - render a 404.
   if (!zone) return notFound();

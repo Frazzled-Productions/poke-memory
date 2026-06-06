@@ -43,7 +43,7 @@ import { loadSession, saveSession } from "@/lib/review/persistence";
 import { loadSettings } from "@/lib/settings/persistence";
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
 import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { appendGradeEntry } from "@/lib/gradelog/persistence";
 import { generationOf, GEN_RANGES } from "@/lib/stats/derive";
@@ -136,6 +136,7 @@ const DEFAULT_GEN = 1;
 
 export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }: Props) {
   const tQuiz = useTranslations("onboarding.knownQuiz");
+  const { seed } = useSeed();
   // The quiz only writes when the user clicks Apply, so a single snapshot of
   // the session at mount is enough. Re-loading on every render would risk
   // stamping over a concurrent grade from a different tab.
@@ -157,10 +158,13 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
 
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  // Load session once on mount. When the session is missing (Settings opened
-  // before Practice ever ran), fall back to building a fresh seed-derived
-  // card set so the quiz can serve as a true first-touch entry point.
+  // Load session once on mount (or once seed has loaded). When the session is
+  // missing (Settings opened before Practice ever ran), fall back to building a
+  // fresh seed-derived card set so the quiz can serve as a true first-touch
+  // entry point.
   useEffect(() => {
+    if (seed === null) return;
+    const currentSeed = seed; // capture non-null reference for async closure
     let cancelled = false;
     async function load() {
       const session = await loadSession();
@@ -168,8 +172,8 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
       const settings = loadSettings();
       const opts = seedOptsFromSettings(settings);
       const cards: ReviewableCard[] = session?.cards ?? buildSession(
-        SEED_POKEMON,
-        SEED_EVOLUTION_CARDS,
+        currentSeed.seedPokemon,
+        currentSeed.seedEvolutionCards,
         new Date(),
         opts,
       );
@@ -186,7 +190,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [seed]);
 
   // Group eligible cards by generation so the tab switcher is O(1) on click.
   const cardsByGen = useMemo(() => {
@@ -269,8 +273,8 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
       const existing = await loadSession();
       const opts = seedOptsFromSettings(settings);
       const currentCards = existing?.cards ?? buildSession(
-        SEED_POKEMON,
-        SEED_EVOLUTION_CARDS,
+        seed?.seedPokemon ?? [],
+        seed?.seedEvolutionCards ?? [],
         now,
         opts,
       );

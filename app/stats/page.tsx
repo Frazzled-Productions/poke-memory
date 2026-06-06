@@ -11,7 +11,7 @@ import { type DateFormat } from "@/lib/utils/format-date";
 import { cn } from "@/lib/utils/cn";
 import { colStack, mutedText, mutedTextXs } from "@/lib/utils/class-names";
 import { loadSession, saveSession, bumpSessionStorageKey, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
-import { SEED_POKEMON, SEED_EVOLUTION_CARDS } from "@/lib/pokemon/seed";
+import { useSeed } from "@/lib/pokemon/SeedContext";
 import { MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
 import type { StrugglingCard } from "@/lib/stats/derive";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
@@ -200,6 +200,7 @@ function ForcePullSection({
   onSuccess: (cards: ReviewableCard[]) => void;
 }) {
   const t = useTranslations("stats");
+  const { seed } = useSeed();
   const [status, setStatus] = useState<ForcePullStatus>("idle");
 
   async function handleForcePull() {
@@ -246,8 +247,8 @@ function ForcePullSection({
       const settings = loadSettings();
       const opts = seedOptsFromSettings(settings);
       const cards = applyCloudAuthoritative(
-        SEED_POKEMON,
-        SEED_EVOLUTION_CARDS,
+        seed?.seedPokemon ?? [],
+        seed?.seedEvolutionCards ?? [],
         cloudRows,
         opts,
       );
@@ -351,6 +352,7 @@ export default function StatsPage() {
   const tCommon = useTranslations("common");
   const { user, supabase } = useAuth();
   const { flags, anyFlagOn } = useSuperuser();
+  const { seed } = useSeed();
   const client = anyFlagOn ? null : supabase;
   const userId = anyFlagOn ? null : (user?.id ?? null);
   const { retryState, retryNow } = useRetryPush(client, userId);
@@ -383,6 +385,8 @@ export default function StatsPage() {
   const [practiceSessionsCount, setPracticeSessionsCount] = useState<number | null>(null);
 
   useEffect(() => {
+    if (seed === null) return;
+    const currentSeed = seed; // capture non-null reference for async closure
     async function load() {
       // Load settings first so the protection pass can evaluate `today` in
       // the user's timezone - the `streakDates` set is populated using the
@@ -398,7 +402,7 @@ export default function StatsPage() {
       const saved = await loadSession();
       let sessionCards: ReviewableCard[];
       if (saved !== null) {
-        const { cards: hydrated, anyHealed } = hydrateSession(saved.cards, SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
+        const { cards: hydrated, anyHealed } = hydrateSession(saved.cards, currentSeed.seedPokemon, currentSeed.seedEvolutionCards, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
         // Persist healed cards so the fixed point is durable across all entry
         // points, not only Practice (#1506).
         if (anyHealed) {
@@ -406,7 +410,7 @@ export default function StatsPage() {
         }
         sessionCards = hydrated;
       } else {
-        sessionCards = buildSession(SEED_POKEMON, SEED_EVOLUTION_CARDS, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
+        sessionCards = buildSession(currentSeed.seedPokemon, currentSeed.seedEvolutionCards, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
       }
       setCards(sessionCards);
       setMasteryRepetitions(settings.masteryRepetitions);
@@ -473,8 +477,8 @@ export default function StatsPage() {
           if (cloudRows !== null) {
             const opts = seedOptsFromSettings(settings);
             const cloudCards = applyCloudAuthoritative(
-              SEED_POKEMON,
-              SEED_EVOLUTION_CARDS,
+              currentSeed.seedPokemon,
+              currentSeed.seedEvolutionCards,
               cloudRows,
               opts,
             );
@@ -487,20 +491,19 @@ export default function StatsPage() {
     }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageVersion, anyFlagOn, supabase, user]);
+  }, [storageVersion, anyFlagOn, supabase, user, seed]);
 
   // Per-game mastery breakdown (#1313). Recomputed whenever cards change or
-  // the superuser flag toggles. SEED_POKEMON is a stable module-level const so
-  // it does not need to be in the deps array.
+  // the superuser flag toggles.
   const perGame = useMemo<GameStats[]>(() => {
-    if (cards === null || masteryRepetitions === null) return [];
+    if (cards === null || masteryRepetitions === null || seed === null) return [];
     return computePerGameStats(
       cards,
-      SEED_POKEMON,
+      seed.seedPokemon,
       masteryRepetitions,
       flags.pretendAllMastered,
     );
-  }, [cards, masteryRepetitions, flags.pretendAllMastered]);
+  }, [cards, masteryRepetitions, flags.pretendAllMastered, seed]);
 
   // Provide the full snapshot input to the shared DashboardSnapshotContext.
   // Stats reads all axes from the returned snapshot (#1139, simplified in #1151).
