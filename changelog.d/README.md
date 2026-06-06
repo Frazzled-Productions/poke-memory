@@ -27,6 +27,18 @@ Valid `kind` values (maps to Keep-a-Changelog subsection):
 | `security`   | Security |
 | `minor-bump` | *(no bullet — requests a minor version bump instead of the default patch)* |
 
+`kind` is the only required front-matter field. Extra keys are permitted and ignored, so an optional `issue:` line for traceability is fine:
+
+```markdown
+---
+kind: fixed
+issue: 1664
+---
+- Your changelog bullet here.
+```
+
+Parsing is shared between the PR-time lint (`scripts/lint-changelog-fragments.mjs`) and the release cut (`.github/scripts/cut-release.mjs`) via `scripts/lib/changelog-fragment.mjs`, so the lint accepts exactly what the release accepts. A fragment that the cut would reject fails `npm run lint:changelog` at PR time.
+
 ## Requesting a minor version bump
 
 Add a fragment with `kind: minor-bump` (no bullet body needed):
