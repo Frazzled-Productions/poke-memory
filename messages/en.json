@@ -402,7 +402,6 @@
       "appLanguageDescription": "Controls the app's UI text.",
       "pokemonNameLanguageLabel": "Pokémon name language",
       "pokemonNameLanguageDescription": "Switch the Pokémon-name language from the language pill in the status bar at the top of every page.",
-      "previewSuffix": "(preview)",
       "enrolment": {
         "heading": "Pokémon name practice languages",
         "description": "Switch the active one from the language pill in the bar.",

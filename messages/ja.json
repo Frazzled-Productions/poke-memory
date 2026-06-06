@@ -402,7 +402,6 @@
       "appLanguageDescription": "アプリの UI テキストを制御します。",
       "pokemonNameLanguageLabel": "Pokémon 名前の言語",
       "pokemonNameLanguageDescription": "Pokémon の名前の言語は、各ページ上部のステータスバーにある言語ピルから切り替えられます。",
-      "previewSuffix": "（プレビュー）",
       "enrolment": {
         "heading": "ポケモン名前練習言語",
         "description": "バーの言語ピルからアクティブな言語を切り替えます。",

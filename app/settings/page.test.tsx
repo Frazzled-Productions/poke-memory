@@ -77,6 +77,7 @@ vi.mock("@/lib/settings/persistence", () => ({
     installNudgeDismissed: true,
     audioHintDismissed: true,
     cardTypesHintDismissed: true,
+    cardTypesDefaultOpenDismissed: false,
   },
 }));
 
@@ -366,6 +367,7 @@ function defaultSettings() {
       installNudgeDismissed: true,
       audioHintDismissed: true,
       cardTypesHintDismissed: true,
+      cardTypesDefaultOpenDismissed: true, // already-seen: prevents auto-open in tests
     },
     appVisitCount: 0,
     mobileNav: "bottom" as const,
@@ -387,7 +389,7 @@ function defaultSettings() {
     verifiedTypedEntryMode: false,
     typedEntryOnboardingShown: false,
     mcCardOnboardingShown: false,
-    labsFlags: { languages: false },
+    labsFlags: {},
     removedLocales: [] as AppLocale[],
     pokemonNameLocale: "en" as const,
     pushNotificationHour: null,
@@ -927,10 +929,10 @@ describe("SettingsPage - locale picker endonyms", () => {
     // The Pokémon-name-language picker was relocated to the status-bar pill
     // (#1484 Phase 2); only the app-language selector remains in Settings. The
     // pill's endonyms are covered by LanguageSwitcher.test.tsx.
+    // Language is now GA (#1723) - no Labs flag needed; always visible.
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
       pokemonNameLocale: "en",
-      labsFlags: { languages: true }, // enable the Languages labs flag to show the picker
     });
 
     render(<SettingsPage />);
@@ -945,21 +947,20 @@ describe("SettingsPage - locale picker endonyms", () => {
     const texts = options.map((o) => o.textContent ?? "");
 
     // The picker must show endonyms (native script), not English translations.
-    // Non-English locales are marked "(preview)" - the endonym must still appear
-    // as a substring of each option.
+    // Language is GA - no "(preview)" suffix on any option.
     expect(texts.some((t) => t.startsWith("日本語"))).toBe(true);
     expect(texts.some((t) => t.startsWith("简体中文"))).toBe(true);
     expect(texts.some((t) => t.startsWith("繁體中文"))).toBe(true);
 
-    // Non-English options must include the preview marker.
-    expect(texts.some((t) => t.includes("(preview)"))).toBe(true);
+    // No preview markers now that language is GA.
+    expect(texts.every((t) => !t.includes("(preview)"))).toBe(true);
 
     // Must NOT contain English-translated labels.
     expect(texts).not.toContain("Japanese");
     expect(texts).not.toContain("Simplified Chinese");
     expect(texts).not.toContain("Traditional Chinese");
 
-    // English option must have no preview marker.
+    // English option present.
     expect(texts).toContain("English");
   });
 });
@@ -1011,20 +1012,17 @@ describe("SettingsPage - cross-promo to Frazzled Productions (#1686)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Preview suffix localisation (#1392)
+// Language section GA (#1723)
 //
-// Asserts that the "(preview)" suffix on non-en locale options comes from the
-// catalog key settings.language.previewSuffix (moved from settings.labs.languages
-// in #1720), not a hardcoded string.
-// The en mock returns "(preview)"; a ja-keyed check verifies the key exists
-// in the Japanese catalog.
+// The language section is now always visible (no Labs flag needed). Asserts
+// that the picker shows endonyms without any "(preview)" suffix since the
+// multi-locale feature is GA.
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage - preview suffix from catalog", () => {
-  it("preview suffix on locale picker options is sourced from the catalog (en)", async () => {
+describe("SettingsPage - language section is always visible (GA, #1723)", () => {
+  it("shows the app-language picker without any preview suffix", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
     });
 
     render(<SettingsPage />);
@@ -1035,29 +1033,18 @@ describe("SettingsPage - preview suffix from catalog", () => {
 
     const select = screen.getByLabelText(/app interface language/i);
     const options = Array.from(select.querySelectorAll("option"));
-    const nonEnglishTexts = options
-      .filter((o) => o.getAttribute("value") !== "en")
-      .map((o) => o.textContent ?? "");
+    const texts = options.map((o) => o.textContent ?? "");
 
-    // Every non-English option must carry the catalog suffix "(preview)".
-    for (const text of nonEnglishTexts) {
-      expect(text).toMatch(/\(preview\)$/);
+    // Language is GA - no "(preview)" suffix on any option.
+    for (const text of texts) {
+      expect(text).not.toMatch(/preview/i);
     }
-  });
 
-  it("Japanese catalog has a non-empty previewSuffix key", () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const jaMessages = require("../../messages/ja.json") as Record<
-      string,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      any
-    >;
-    // settings.language.previewSuffix (moved from settings.labs.languages in #1720).
-    const suffix = jaMessages?.settings?.language?.previewSuffix;
-    expect(typeof suffix).toBe("string");
-    expect(suffix.length).toBeGreaterThan(0);
-    // The Japanese suffix should use fullwidth brackets.
-    expect(suffix).toContain("プレビュー");
+    // All four locales present as endonyms.
+    expect(texts).toContain("English");
+    expect(texts.some((t) => t.startsWith("日本語"))).toBe(true);
+    expect(texts.some((t) => t.startsWith("简体中文"))).toBe(true);
+    expect(texts.some((t) => t.startsWith("繁體中文"))).toBe(true);
   });
 });
 
@@ -1219,7 +1206,6 @@ describe("SettingsPage - clarity polish: Settings labels (item 1)", () => {
   it("app-language heading reads 'App interface language'", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
     });
     render(<SettingsPage />);
 
@@ -1233,7 +1219,6 @@ describe("SettingsPage - clarity polish: Settings labels (item 1)", () => {
   it("enrolment heading reads 'Pokémon name practice languages'", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
     });
     render(<SettingsPage />);
 
@@ -1247,7 +1232,6 @@ describe("SettingsPage - clarity polish: Settings labels (item 1)", () => {
   it("enrolment description reads 'Switch the active one from the language pill'", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
     });
     render(<SettingsPage />);
 
@@ -1281,7 +1265,6 @@ describe("SettingsPage - clarity polish: enrolment mastery count respects preten
     });
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja"],
     });
 
@@ -1319,7 +1302,6 @@ describe("SettingsPage - clarity polish: enrolment mastery count respects preten
     });
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja"],
     });
 
@@ -1351,7 +1333,6 @@ describe("SettingsPage - clarity polish: unenrol active language confirm (item 3
   function settingsWithJaActive() {
     return {
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja"] as string[],
       activePokemonNameLocale: "ja" as const,
     };
@@ -1361,7 +1342,6 @@ describe("SettingsPage - clarity polish: unenrol active language confirm (item 3
     // Active = ja; removing zh-Hans (not active) should apply immediately.
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja", "zh-Hans"] as string[],
       activePokemonNameLocale: "ja" as const,
     });
@@ -1476,7 +1456,6 @@ describe("SettingsPage - enrolment maintains removedLocales tombstone (#1568)", 
   function settingsWithJaActive() {
     return {
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja"] as string[],
       activePokemonNameLocale: "ja" as const,
       removedLocales: [] as AppLocale[],
@@ -1487,7 +1466,6 @@ describe("SettingsPage - enrolment maintains removedLocales tombstone (#1568)", 
     // Start with zh-Hans in the tombstone set (previously removed).
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja"] as string[],
       activePokemonNameLocale: "ja" as const,
       removedLocales: ["zh-Hans"],
@@ -1514,7 +1492,6 @@ describe("SettingsPage - enrolment maintains removedLocales tombstone (#1568)", 
   it("removing a non-active locale adds it to removedLocales", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja", "zh-Hans"] as string[],
       activePokemonNameLocale: "ja" as const,
       removedLocales: [] as AppLocale[],
@@ -1573,7 +1550,6 @@ describe("SettingsPage - enrolment maintains removedLocales tombstone (#1568)", 
     // Verify that the removedLocales on any saveSettings call never includes "en".
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja", "zh-Hans"] as string[],
       activePokemonNameLocale: "ja" as const,
       removedLocales: [] as AppLocale[],

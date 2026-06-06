@@ -145,7 +145,7 @@ test.describe("i18n - Language section GA (#1726)", () => {
     await page.getByRole("button", { name: /^language$/i }).click();
 
     // The app-language selector must offer all four locales.
-    const appLocaleSelect = page.locator("#labs-app-locale-select");
+    const appLocaleSelect = page.locator("#app-locale-select");
     await expect(appLocaleSelect).toBeVisible();
     await expect(appLocaleSelect.locator('option[value="en"]')).toHaveCount(1);
     await expect(appLocaleSelect.locator('option[value="ja"]')).toHaveCount(1);
@@ -176,7 +176,7 @@ test.describe("i18n - Language section GA (#1726)", () => {
     await page.getByRole("radio", { name: /简体中文/ }).click();
 
     // Switch the app language to Japanese via the Settings selector - writes the cookie.
-    const appLocaleSelect = page.locator("#labs-app-locale-select");
+    const appLocaleSelect = page.locator("#app-locale-select");
     await expect(appLocaleSelect).toBeVisible();
     await appLocaleSelect.selectOption("ja");
     await page.waitForFunction(
@@ -209,7 +209,7 @@ test.describe("i18n - Language section GA (#1726)", () => {
     // Expand Language section.
     await page.getByRole("button", { name: /^language$/i }).click();
 
-    const appLocaleSelect = page.locator("#labs-app-locale-select");
+    const appLocaleSelect = page.locator("#app-locale-select");
     await expect(appLocaleSelect).toBeVisible();
 
     // Switch to Japanese.

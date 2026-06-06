@@ -402,7 +402,6 @@
       "appLanguageDescription": "控制應用程式的 UI 文字。",
       "pokemonNameLanguageLabel": "寶可夢名稱語言",
       "pokemonNameLanguageDescription": "寶可夢名稱語言可從每個頁面頂部狀態列中的語言按鈕切換。",
-      "previewSuffix": "（預覽）",
       "enrolment": {
         "heading": "寶可夢名稱練習語言",
         "description": "從狀態列中的語言按鈕切換目前語言。",
