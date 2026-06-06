@@ -31,9 +31,12 @@ export function MobileNavPaddingWrapper({ children }: { children: React.ReactNod
   }, []);
 
   return (
-    // The "page is at least 100dvh tall" guarantee that anchors the iOS Safari
-    // toolbar / bottom tab bar (#1086) lives on <body> (`min-h-dvh`), not here.
-    // Putting it on the wrapper forced wrapper height to 100dvh on top of the
+    // The "page is at least as tall as the initial viewport" guarantee that
+    // anchors the iOS Safari toolbar / bottom tab bar (#1086) lives on <body>
+    // (`min-h-[100svh]`), not here. `svh` (URL-bar-expanded height) is correct
+    // at first paint; the original `dvh` (URL-bar-collapsed height) resolved to
+    // the wrong value before any scroll reconciled the viewports (#1728).
+    // Putting the min-height on the wrapper forced it to 100svh on top of the
     // Nav and any sibling banners (e.g. GuestStorageNotice), pushing the page
     // past the viewport and re-introducing the Practice scroll (#1087).
     // Keeping the wrapper as `flex-1` lets it absorb only the space body has

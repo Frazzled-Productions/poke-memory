@@ -14,8 +14,11 @@ test.describe("PWA cold-start theme application", () => {
     );
     expect(bg).not.toBe("");
 
-    // The Pokéball overlay (#pwa-splash) was removed in #1727. Verify no
-    // residual splash element is present after hydration.
+    // Tombstone / regression-guard: #pwa-splash was removed entirely in #1727
+    // and is never injected into the DOM. This assertion will always pass by
+    // design (the element does not exist), but it is kept as a belt-and-
+    // suspenders guard so a future accidental re-introduction of the overlay
+    // is caught immediately without needing to write a new test.
     await expect(page.locator("#pwa-splash")).not.toBeAttached();
   });
 });
