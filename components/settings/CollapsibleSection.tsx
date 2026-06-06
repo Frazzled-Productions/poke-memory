@@ -42,6 +42,14 @@ type Props = {
    * is active but revert to their persisted state once the query is cleared.
    */
   transientOpen?: boolean;
+  /**
+   * Called the first time the user manually collapses this section (toggle
+   * goes from open → closed via user interaction). Used for one-shot
+   * "default open" dismissal - e.g. Card types starts open on first visit
+   * and records dismissal when the user first collapses it.
+   * Only fires when supplied; subsequent collapses do not re-fire.
+   */
+  onFirstCollapse?: () => void;
 };
 
 export function CollapsibleSection({
@@ -51,6 +59,7 @@ export function CollapsibleSection({
   children,
   forceOpen = false,
   transientOpen = false,
+  onFirstCollapse,
 }: Props) {
   // Initialise from localStorage so there is no layout flash on re-mount.
   const [open, setOpen] = useState<boolean>(() => readOpenState(sectionId));
@@ -82,6 +91,10 @@ export function CollapsibleSection({
     const next = !open;
     setOpen(next);
     writeOpenState(sectionId, next);
+    // Fire onFirstCollapse once, on the first user-initiated collapse.
+    if (!next && onFirstCollapse) {
+      onFirstCollapse();
+    }
   }
 
   return (

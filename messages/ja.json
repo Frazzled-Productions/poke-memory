@@ -87,12 +87,15 @@
     },
     "section": {
       "appearance": "外観",
-      "practice": "練習",
       "audio": "オーディオ",
       "offline": "オフライン",
-      "accountData": "アカウントとデータ",
       "advanced": "詳細設定",
-      "labs": "ラボ"
+      "practiceSchedule": "練習スケジュール",
+      "cardTypes": "カードの種類",
+      "language": "言語",
+      "about": "情報",
+      "regionalReminders": "地域設定とリマインダー",
+      "dataBackup": "データとバックアップ"
     },
     "appearance": {
       "mobileNav": {
@@ -118,36 +121,6 @@
         "tintedDescription": "マスコットカラーが薄く背景に重なります。",
         "fullLabel": "フルマスコットテーマ",
         "fullDescription": "マスコットカラーがすべての背景を彩ります。鮮やかなデザインです。"
-      }
-    },
-    "labs": {
-      "description": "開発中のプレビュー機能です。変更または削除される場合があります。ご意見をお寄せください。",
-      "languages": {
-        "label": "言語",
-        "description": "Pokémon の名前を日本語、簡体字中国語、繁体字中国語で表示します。",
-        "locale": {
-          "en": "English",
-          "ja": "日本語",
-          "zh-Hans": "简体中文",
-          "zh-Hant": "繁體中文"
-        },
-        "selectLocale": "言語",
-        "appLanguageLabel": "アプリのインターフェース言語",
-        "appLanguageDescription": "アプリの UI テキストを制御します。",
-        "pokemonNameLanguageLabel": "Pokémon 名前の言語",
-        "pokemonNameLanguageDescription": "Pokémon の名前の言語は、各ページ上部のステータスバーにある言語ピルから切り替えられます。",
-        "previewSuffix": "（プレビュー）",
-        "enrolment": {
-          "heading": "ポケモン名前練習言語",
-          "description": "バーの言語ピルからアクティブな言語を切り替えます。",
-          "lockedEnglishNote": "常に含まれます",
-          "machineTranslationNote": "機械翻訳",
-          "checkboxAriaLabel": "{language} でポケモンの名前を練習",
-          "masteredCount": "{count, number} 習得済み",
-          "unenrolConfirmMessage": "{language} を削除すると、練習が英語に切り替わります。続けますか？",
-          "unenrolConfirm": "確認",
-          "unenrolCancel": "キャンセル"
-        }
       }
     },
     "practice": {
@@ -269,7 +242,8 @@
         "volumeLabel": "読み上げ音量（{pct}%）",
         "volumeMute": "0%（ミュート）",
         "volumeFull": "100%（最大）"
-      }
+      },
+      "cryDisabledNote": "鳴き声カードは無効です。上のカードの種類で有効にしてください。"
     },
     "offline": {
       "downloadHeading": "ダウンロード",
@@ -413,6 +387,55 @@
     },
     "deleteAccount": {
       "inputAriaLabel": "DELETE と入力してアカウント削除を確認"
+    },
+    "language": {
+      "label": "言語",
+      "description": "Pokémon の名前を日本語、簡体字中国語、繁体字中国語で表示します。",
+      "locale": {
+        "en": "English",
+        "ja": "日本語",
+        "zh-Hans": "简体中文",
+        "zh-Hant": "繁體中文"
+      },
+      "selectLocale": "言語",
+      "appLanguageLabel": "アプリのインターフェース言語",
+      "appLanguageDescription": "アプリの UI テキストを制御します。",
+      "pokemonNameLanguageLabel": "Pokémon 名前の言語",
+      "pokemonNameLanguageDescription": "Pokémon の名前の言語は、各ページ上部のステータスバーにある言語ピルから切り替えられます。",
+      "enrolment": {
+        "heading": "ポケモン名前練習言語",
+        "description": "バーの言語ピルからアクティブな言語を切り替えます。",
+        "lockedEnglishNote": "常に含まれます",
+        "machineTranslationNote": "機械翻訳",
+        "checkboxAriaLabel": "{language} でポケモンの名前を練習",
+        "masteredCount": "{count, number} 習得済み",
+        "unenrolConfirmMessage": "{language} を削除すると、練習が英語に切り替わります。続けますか？",
+        "unenrolConfirm": "確認",
+        "unenrolCancel": "キャンセル"
+      }
+    },
+    "account": {
+      "guest": {
+        "practising": "ゲストとして練習中",
+        "savedLocally": "進行状況はこのデバイスにのみ保存されます。",
+        "signIn": "バックアップのためにサインイン"
+      },
+      "signedIn": {
+        "signOut": "サインアウト",
+        "manageSignIn": "サインイン方法を管理"
+      },
+      "provider": {
+        "github": "GitHubでサインイン済み",
+        "google": "Googleでサインイン済み",
+        "email": "メールでサインイン済み",
+        "username": "ユーザー名でサインイン済み",
+        "unknown": "サインイン済み"
+      },
+      "sectionAriaLabel": "アカウント"
+    },
+    "cardTypes": {
+      "cryAudioNote": "鳴き声の再生オプションは、下のオーディオをご覧ください。",
+      "cryAudioLink": "オーディオセクション"
     }
   },
   "practice": {

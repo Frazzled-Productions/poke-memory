@@ -90,9 +90,12 @@ describe("scenario payload builders", () => {
     expect(payload.pokemonNameLocale).toBe("en");
   });
 
-  it("fsrs-locale-mastery: sets labsFlags.languages = true so the language pill is visible (#1562)", () => {
+  it("fsrs-locale-mastery: enrolls en + ja so the language pill is visible (#1562, GA since #1726)", () => {
+    // Multi-locale is GA - the pill renders for any user with multiple learningLocales.
+    // The labsFlags.languages gate has been removed.
     const payload = SCENARIO_BY_SLUG.get("fsrs-locale-mastery")!.build();
-    expect(payload.labsFlags?.languages).toBe(true);
+    expect(payload.learningLocales).toContain("en");
+    expect(payload.learningLocales).toContain("ja");
   });
 
   it("fsrs-locale-mastery: stages both en and ja name cards and enrols both languages (#1562)", () => {

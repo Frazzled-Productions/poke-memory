@@ -621,7 +621,7 @@ describe("ReviewSession onboarding nudges (#702)", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /open practice settings/i }),
-    ).toHaveAttribute("href", "/settings#practice-heading");
+    ).toHaveAttribute("href", "/settings#card-types-heading");
   });
 
   it("hides the card-types hint when every card type is already on", async () => {

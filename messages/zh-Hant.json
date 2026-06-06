@@ -87,12 +87,15 @@
     },
     "section": {
       "appearance": "外觀",
-      "practice": "練習",
       "audio": "音訊",
       "offline": "離線",
-      "accountData": "帳號與資料",
       "advanced": "進階",
-      "labs": "實驗室"
+      "practiceSchedule": "練習計畫",
+      "cardTypes": "卡片類型",
+      "language": "語言",
+      "about": "關於",
+      "regionalReminders": "地區與提醒",
+      "dataBackup": "資料與備份"
     },
     "appearance": {
       "mobileNav": {
@@ -118,36 +121,6 @@
         "tintedDescription": "主題色以淡淡的色調覆蓋頁面背景。",
         "fullLabel": "完整主題",
         "fullDescription": "主題色覆蓋所有背景，個性鮮明。"
-      }
-    },
-    "labs": {
-      "description": "正在開發中的預覽功能。這些功能可能會更改或移除。您的意見回饋有助於決定最終形態。",
-      "languages": {
-        "label": "語言",
-        "description": "以日語、簡體中文或繁體中文顯示寶可夢名稱。",
-        "locale": {
-          "en": "English",
-          "ja": "日本語",
-          "zh-Hans": "简体中文",
-          "zh-Hant": "繁體中文"
-        },
-        "selectLocale": "語言",
-        "appLanguageLabel": "應用程式介面語言",
-        "appLanguageDescription": "控制應用程式的 UI 文字。",
-        "pokemonNameLanguageLabel": "寶可夢名稱語言",
-        "pokemonNameLanguageDescription": "寶可夢名稱語言可從每個頁面頂部狀態列中的語言按鈕切換。",
-        "previewSuffix": "（預覽）",
-        "enrolment": {
-          "heading": "寶可夢名稱練習語言",
-          "description": "從狀態列中的語言按鈕切換目前語言。",
-          "lockedEnglishNote": "始終包含",
-          "machineTranslationNote": "機器翻譯",
-          "checkboxAriaLabel": "用 {language} 練習寶可夢名稱",
-          "masteredCount": "已掌握 {count, number}",
-          "unenrolConfirmMessage": "移除 {language} 後，練習將切換回英語。繼續嗎？",
-          "unenrolConfirm": "確認",
-          "unenrolCancel": "取消"
-        }
       }
     },
     "practice": {
@@ -269,7 +242,8 @@
         "volumeLabel": "朗讀音量（{pct}%）",
         "volumeMute": "0%（靜音）",
         "volumeFull": "100%（最大）"
-      }
+      },
+      "cryDisabledNote": "叫聲卡片已停用。請在上方卡片類型中啟用。"
     },
     "offline": {
       "downloadHeading": "下載",
@@ -413,6 +387,55 @@
     },
     "deleteAccount": {
       "inputAriaLabel": "輸入 DELETE 以確認刪除帳戶"
+    },
+    "language": {
+      "label": "語言",
+      "description": "以日語、簡體中文或繁體中文顯示寶可夢名稱。",
+      "locale": {
+        "en": "English",
+        "ja": "日本語",
+        "zh-Hans": "简体中文",
+        "zh-Hant": "繁體中文"
+      },
+      "selectLocale": "語言",
+      "appLanguageLabel": "應用程式介面語言",
+      "appLanguageDescription": "控制應用程式的 UI 文字。",
+      "pokemonNameLanguageLabel": "寶可夢名稱語言",
+      "pokemonNameLanguageDescription": "寶可夢名稱語言可從每個頁面頂部狀態列中的語言按鈕切換。",
+      "enrolment": {
+        "heading": "寶可夢名稱練習語言",
+        "description": "從狀態列中的語言按鈕切換目前語言。",
+        "lockedEnglishNote": "始終包含",
+        "machineTranslationNote": "機器翻譯",
+        "checkboxAriaLabel": "用 {language} 練習寶可夢名稱",
+        "masteredCount": "已掌握 {count, number}",
+        "unenrolConfirmMessage": "移除 {language} 後，練習將切換回英語。繼續嗎？",
+        "unenrolConfirm": "確認",
+        "unenrolCancel": "取消"
+      }
+    },
+    "account": {
+      "guest": {
+        "practising": "以訪客身份練習",
+        "savedLocally": "您的進度僅儲存在此裝置上。",
+        "signIn": "登入以備份"
+      },
+      "signedIn": {
+        "signOut": "登出",
+        "manageSignIn": "管理登入方式"
+      },
+      "provider": {
+        "github": "已透過 GitHub 登入",
+        "google": "已透過 Google 登入",
+        "email": "已透過電子郵件登入",
+        "username": "已透過使用者名稱登入",
+        "unknown": "已登入"
+      },
+      "sectionAriaLabel": "帳號"
+    },
+    "cardTypes": {
+      "cryAudioNote": "叫聲播放選項，請見下方音訊。",
+      "cryAudioLink": "音訊區段"
     }
   },
   "practice": {

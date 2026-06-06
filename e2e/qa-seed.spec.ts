@@ -53,7 +53,7 @@ test.describe("QA seed mode", () => {
     // Expand Advanced section.
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
     // Developer section should be visible.
-    const developerSection = page.getByRole("region", { name: /developer/i });
+    const developerSection = page.locator("#developer-heading");
     await expect(developerSection).toBeVisible({ timeout: 10_000 });
     // QA seed panel should NOT be visible.
     await expect(page.getByTestId("qa-seed-section")).toHaveCount(0);
@@ -64,7 +64,7 @@ test.describe("QA seed mode", () => {
     await page.goto("/settings");
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
 
-    const developerSection = page.getByRole("region", { name: /developer/i });
+    const developerSection = page.locator("#developer-heading");
     await expect(developerSection).toBeVisible({ timeout: 10_000 });
 
     // The QA seed panel must be present.
@@ -88,7 +88,7 @@ test.describe("QA seed mode", () => {
     page.on("dialog", (dialog) => { void dialog.accept(); });
 
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
-    const developerSection = page.getByRole("region", { name: /developer/i });
+    const developerSection = page.locator("#developer-heading");
     await expect(developerSection).toBeVisible({ timeout: 10_000 });
 
     const seedPanel = page.getByTestId("qa-seed-section");
@@ -128,7 +128,7 @@ test.describe("QA seed mode", () => {
     page.on("dialog", (dialog) => { void dialog.accept(); });
 
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
-    const developerSection = page.getByRole("region", { name: /developer/i });
+    const developerSection = page.locator("#developer-heading");
     await expect(developerSection).toBeVisible({ timeout: 10_000 });
 
     const seedPanel = page.getByTestId("qa-seed-section");
@@ -178,7 +178,7 @@ test.describe("QA seed mode", () => {
     await page.goto("/settings");
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
 
-    const developerSection = page.getByRole("region", { name: /developer/i });
+    const developerSection = page.locator("#developer-heading");
     await expect(developerSection).toBeVisible({ timeout: 10_000 });
 
     const seedPanel = page.getByTestId("qa-seed-section");
@@ -214,7 +214,7 @@ test.describe("QA seed mode", () => {
     await page.goto("/settings");
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
 
-    const developerSection = page.getByRole("region", { name: /developer/i });
+    const developerSection = page.locator("#developer-heading");
     await expect(developerSection).toBeVisible({ timeout: 10_000 });
 
     // The qaSeedMode toggle must be present with aria-checked=false.
