@@ -63,7 +63,7 @@ const SeedCtx = createContext<SeedContextValue>({
 export function SeedProvider({ children }: { children: React.ReactNode }) {
   const [seed, setSeed] = useState<SeedData | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const mountedRef = useRef(true);
+  const mountedRef = useRef(false);
 
   const doLoad = useCallback(() => {
     loadSeed().then(

@@ -26,16 +26,12 @@ import chainsData from "./generated-chains.json";
 function makeFetchMock(overrides?: {
   coreStatus?: number;
   chainsStatus?: number;
-  coreThrows?: boolean;
-  chainsThrows?: boolean;
 }) {
-  const { coreStatus = 200, chainsStatus = 200, coreThrows = false, chainsThrows = false } =
-    overrides ?? {};
+  const { coreStatus = 200, chainsStatus = 200 } = overrides ?? {};
 
   return vi.fn(async (url: string | URL | Request) => {
     const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : (url as Request).url;
     if (urlStr.includes("generated-core.json")) {
-      if (coreThrows) throw new Error("network error: core");
       return {
         ok: coreStatus === 200,
         status: coreStatus,
@@ -43,7 +39,6 @@ function makeFetchMock(overrides?: {
       } as Response;
     }
     if (urlStr.includes("generated-chains.json")) {
-      if (chainsThrows) throw new Error("network error: chains");
       return {
         ok: chainsStatus === 200,
         status: chainsStatus,

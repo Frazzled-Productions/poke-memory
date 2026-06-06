@@ -9,8 +9,8 @@
 // fall back to empty data). The React SeedContext surfaces the error so the UI
 // can show a reload prompt.
 
-import { buildSeed } from "@/lib/pokemon/seed";
-import type { SeedData } from "@/lib/pokemon/seed";
+import { buildSeed } from "@/lib/pokemon/seed-builder";
+import type { SeedData } from "@/lib/pokemon/seed-builder";
 
 // Re-export SeedData so consumers can import from one place.
 export type { SeedData };
@@ -87,11 +87,12 @@ export async function loadSeed(): Promise<SeedData> {
     return data;
   })();
 
-  // If the inner async block throws (after resetting _loadPromise), we must
-  // not leave a settled-rejected promise in _loadPromise - it was already
-  // reset to null inside the block before throwing, so the caller will get
-  // a fresh attempt on the next call. We still need to propagate the rejection
-  // to this caller, so we do NOT catch here - just return the promise.
+  // _loadPromise is assigned synchronously (before any await runs), so this
+  // return always hands the caller the pending Promise - never null. When the
+  // IIFE rejects it resets _loadPromise = null *after* the caller has already
+  // captured the reference, so the current caller still receives the rejection
+  // and the next caller gets a fresh attempt. We do NOT catch here so the
+  // rejection propagates correctly.
   return _loadPromise;
 }
 
