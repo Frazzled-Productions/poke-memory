@@ -535,7 +535,7 @@
     },
     "higherOrLowerNudge": {
       "title": "[Finish your session for a bonus mini-game]",
-      "body": "[Once you have practised at least two Pokémon today, a Higher or Lower stat challenge unlocks below your session summary. Can you beat your best streak?]"
+      "body": "[When you finish today's cards, a Higher or Lower stat challenge appears below your session summary, as long as you have reviewed at least two Pokémon. Can you beat your best streak?]"
     }
   },
   "review": {

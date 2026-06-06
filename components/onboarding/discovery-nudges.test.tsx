@@ -461,7 +461,7 @@ describe("locale coverage - message catalogue keys", () => {
 
     renderWithIntl(
       <OnboardingHint id="higherOrLowerNudgeDismissed" title="Finish your session for a bonus mini-game">
-        <p>Once you have practised at least two Pokémon today, a Higher or Lower stat challenge unlocks below your session summary.</p>
+        <p>When you finish today&apos;s cards, a Higher or Lower stat challenge appears below your session summary, as long as you have reviewed at least two Pokémon.</p>
       </OnboardingHint>,
       { locale: "en" },
     );
