@@ -578,11 +578,13 @@ test.describe("Pasture page - biome stats (#623)", () => {
     await page.goto("/pasture/forest");
     await awaitSeedIdb(page);
 
-    // "X / Y species" is rendered in a <dd> inside the stats <dl>.
+    // "X / Y mastered" is rendered in a <dd> inside the stats <dl>.
+    // The visible label uses the translated biomeStats.mastered key (#1733 - was
+    // hardcoded "species" before the i18n pass).
     // Scope to the <dl aria-label="Biome statistics"> and target the <dd>
-    // to avoid matching the sr-only <dt> "Species mastered".
+    // to avoid matching the sr-only <dt>.
     const statsPanel = page.locator('[aria-label="Biome statistics"]');
-    await expect(statsPanel.locator("dd").filter({ hasText: /\d+ \/ \d+ species/ })).toBeVisible();
+    await expect(statsPanel.locator("dd").filter({ hasText: /\d+ \/ \d+ mastered/i })).toBeVisible();
   });
 });
 
