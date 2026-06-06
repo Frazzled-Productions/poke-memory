@@ -111,7 +111,7 @@ describe("BadgeGallery accordion", () => {
   it("renders the section heading", () => {
     render(<BadgeGallery earnedBadges={[]} />);
     expect(
-      screen.getByRole("heading", { level: 2, name: "Gym badges" }),
+      screen.getByRole("heading", { level: 3, name: "Gym badges" }),
     ).toBeInTheDocument();
   });
 

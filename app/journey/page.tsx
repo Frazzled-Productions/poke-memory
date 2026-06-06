@@ -671,21 +671,21 @@ export default function JourneyPage() {
               />
 
               {/* Collection timeline - the hero scrubber.
+                  CollectionTimelineWidget owns its own <section aria-labelledby>
+                  so we do NOT re-wrap it here (avoids duplicate heading ids).
                   Show a placeholder while the cloud pull is in flight so the
                   section's layout slot is reserved and nothing shifts when the
                   data lands (fixes #961). */}
-              <section aria-labelledby="timeline-heading">
-                {timeline !== null ? (
-                  <CollectionTimelineWidget timeline={timeline} />
-                ) : (
-                  <>
-                    <SectionHeading level={3} id="timeline-heading" className="mb-4">
-                      {t("collectionTimeline")}
-                    </SectionHeading>
-                    <SkeletonBlock className="h-[200px] w-full" />
-                  </>
-                )}
-              </section>
+              {timeline !== null ? (
+                <CollectionTimelineWidget timeline={timeline} />
+              ) : (
+                <section aria-labelledby="timeline-heading">
+                  <SectionHeading level={3} id="timeline-heading" className="mb-4">
+                    {t("collectionTimeline")}
+                  </SectionHeading>
+                  <SkeletonBlock className="h-[200px] w-full" />
+                </section>
+              )}
 
               {/* Streak */}
               <section aria-labelledby="streak-heading">
@@ -705,11 +705,10 @@ export default function JourneyPage() {
                 )}
               </section>
 
-              {/* Records */}
+              {/* Records - RecordsCard owns its own <section aria-labelledby>
+                  so we do NOT re-wrap it here. */}
               {records !== null ? (
-                <section aria-labelledby="records-heading">
-                  <RecordsCard records={records} />
-                </section>
+                <RecordsCard records={records} />
               ) : null}
             </div>
           </section>
@@ -729,37 +728,37 @@ export default function JourneyPage() {
 
             <div className="flex flex-col gap-10">
               {/* Evolution wall.
+                  EvolutionWall owns its own <section aria-labelledby> (using
+                  useId() for the heading id) so we do NOT re-wrap it here.
                   Per-section skeleton approach to avoid layout shift
                   while evolutionFamilies is still null (fixes #961). */}
-              <section aria-labelledby="evo-wall-heading">
-                {evolutionFamilies !== null ? (
-                  <EvolutionWall families={evolutionFamilies} />
-                ) : (
-                  <>
-                    <SectionHeading level={3} id="evo-wall-heading" className="mb-3">
-                      {t("evolutionWall")}
-                    </SectionHeading>
-                    <SkeletonBlock className="h-10 w-full" />
-                  </>
-                )}
-              </section>
+              {evolutionFamilies !== null ? (
+                <EvolutionWall families={evolutionFamilies} />
+              ) : (
+                <section aria-labelledby="evo-wall-heading">
+                  <SectionHeading level={3} id="evo-wall-heading" className="mb-3">
+                    {t("evolutionWall")}
+                  </SectionHeading>
+                  <SkeletonBlock className="h-10 w-full" />
+                </section>
+              )}
 
               {/* Close to mastery.
+                  CloseToMastery owns its own <section aria-labelledby> so we
+                  do NOT re-wrap it here.
                   Shown whenever the entries are loaded (even if empty - the
                   empty state is informative). Same skeleton approach used for
                   other deferred sections to avoid layout shift. */}
-              <section aria-labelledby="ctm-heading">
-                {closeToMasteryEntries !== null ? (
-                  <CloseToMastery entries={closeToMasteryEntries} />
-                ) : (
-                  <>
-                    <SectionHeading level={3} id="ctm-heading" className="mb-3">
-                      {t("closeToMastery")}
-                    </SectionHeading>
-                    <SkeletonBlock className="h-10 w-full" />
-                  </>
-                )}
-              </section>
+              {closeToMasteryEntries !== null ? (
+                <CloseToMastery entries={closeToMasteryEntries} />
+              ) : (
+                <section aria-labelledby="ctm-heading">
+                  <SectionHeading level={3} id="ctm-heading" className="mb-3">
+                    {t("closeToMastery")}
+                  </SectionHeading>
+                  <SkeletonBlock className="h-10 w-full" />
+                </section>
+              )}
 
               {/* Badges */}
               <BadgeGallery

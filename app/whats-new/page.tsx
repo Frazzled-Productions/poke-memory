@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
-import { getFormatter } from "next-intl/server";
+import { getTranslations, getFormatter } from "next-intl/server";
 import { getChangelog } from "@/lib/changelog/parse";
 import { BulletText } from "@/components/whats-new/BulletText";
 import { MarkVisited } from "@/components/whats-new/MarkVisited";
-import { mutedTextXs, sectionLabelSm, pageTitle } from "@/lib/utils/class-names";
+import { mutedTextXs, sectionHeading, sectionLabelSm, pageTitle } from "@/lib/utils/class-names";
 import { PageShell } from "@/components/ui/PageShell";
 
 export const metadata: Metadata = {
@@ -51,12 +50,12 @@ export default async function WhatsNewPage() {
             <li key={release.version}>
               <div className="mb-3 flex items-baseline justify-between gap-4 border-b border-zinc-200 pb-2 dark:border-zinc-800">
                 {/*
-                  Version h2 intentionally stays at text-lg (sectionHeading) rather
-                  than text-xl (sectionHeadingLg): text-xl looks oversized alongside
+                  Version h2 uses sectionHeading (text-lg) rather than
+                  sectionHeadingLg (text-xl): text-xl looks oversized alongside
                   the small inline date. Documented exception to the text-xl h2
-                  convention (AGENTS.md / #1733).
+                  convention (AGENTS.md / SectionHeading.tsx / #1733).
                 */}
-                <h2 className="text-lg font-semibold">v{release.version}</h2>
+                <h2 className={sectionHeading}>v{release.version}</h2>
                 <time
                   dateTime={release.date}
                   className={mutedTextXs}

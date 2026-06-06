@@ -667,4 +667,38 @@ describe("PokemonDetailDisclosure - locked h1 (#1734)", () => {
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1.textContent).toBe("Bulbasaur");
   });
+
+  // ── Locale matrix for locked aria-label (#1729 concern) ──────────────────
+  // The lockedAriaLabel key is translated in all four supported locales;
+  // verify each emits the correct localised aria-label on the h1.
+
+  it("locked: h1 aria-label is localised in Japanese", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon({ id: 25, speciesId: 25, displayName: "Pikachu", name: "pikachu" });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />, { locale: "ja" });
+
+    const h1 = screen.getByRole("heading", { level: 1 });
+    // ja catalogue: pokedex.lockedAriaLabel = "#{number}（ロック中）"
+    expect(h1).toHaveAttribute("aria-label", "#025（ロック中）");
+  });
+
+  it("locked: h1 aria-label is localised in Simplified Chinese", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon({ id: 25, speciesId: 25, displayName: "Pikachu", name: "pikachu" });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />, { locale: "zh-Hans" });
+
+    const h1 = screen.getByRole("heading", { level: 1 });
+    // zh-Hans catalogue: pokedex.lockedAriaLabel = "#{number}（已锁定）"
+    expect(h1).toHaveAttribute("aria-label", "#025（已锁定）");
+  });
+
+  it("locked: h1 aria-label is localised in Traditional Chinese", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon({ id: 25, speciesId: 25, displayName: "Pikachu", name: "pikachu" });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />, { locale: "zh-Hant" });
+
+    const h1 = screen.getByRole("heading", { level: 1 });
+    // zh-Hant catalogue: pokedex.lockedAriaLabel = "#{number}（已鎖定）"
+    expect(h1).toHaveAttribute("aria-label", "#025（已鎖定）");
+  });
 });

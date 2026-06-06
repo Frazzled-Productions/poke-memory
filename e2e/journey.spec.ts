@@ -57,6 +57,26 @@ test.describe("Journey page - basic load", () => {
   });
 });
 
+test.describe("Journey page - structural heading outline", () => {
+  test("three super-section h2 headings are present", async ({ page }) => {
+    await page.goto("/journey");
+    // Wait for hydration past the loading skeleton.
+    await expect(
+      page.getByRole("region", { name: "Trainer card" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // Each super-section must emit a level-2 heading.
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Your progress" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Collection" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Breakdown" }),
+    ).toBeVisible();
+  });
+});
+
 test.describe("Journey page - badge gallery", () => {
   test("badge gallery section is visible", async ({ page }) => {
     await page.goto("/journey");
@@ -70,7 +90,7 @@ test.describe("Journey page - badge gallery", () => {
   }) => {
     await page.goto("/journey");
     await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
+      page.getByRole("heading", { level: 3, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
     // A fresh guest has no earned badges - locked tiles must not be visible yet.
     await expect(
@@ -98,7 +118,7 @@ test.describe("Journey page - badge gallery", () => {
     await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
     await page.goto("/journey");
     await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
+      page.getByRole("heading", { level: 3, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByLabel("Boulder Badge, earned")).toBeVisible();
   });
@@ -112,7 +132,7 @@ test.describe("Journey page - superuser flag", () => {
     await page.goto("/journey");
     // Wait for hydration.
     await expect(
-      page.getByRole("heading", { level: 2, name: "Mastery distribution" }),
+      page.getByRole("heading", { level: 3, name: "Mastery distribution" }),
     ).toBeVisible({ timeout: 15_000 });
     // Under the flag every species is mastered - the "Mastered" ring label
     // should show a non-zero count. The exact count is the full species count;
@@ -413,7 +433,7 @@ test.describe("Journey page - next badge proximity hint", () => {
     // so it wins the tie and appears as the hint target.
     await page.goto("/journey");
     await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
+      page.getByRole("heading", { level: 3, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
     const hint = page.getByTestId("next-badge-hint");
     await expect(hint).toBeVisible();
@@ -485,7 +505,7 @@ test.describe("Journey page - next badge proximity hint", () => {
     }, REVERSE_ID_OFFSET);
     await page.goto("/journey");
     await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
+      page.getByRole("heading", { level: 3, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
     const hint = page.getByTestId("next-badge-hint");
     await expect(hint).toBeVisible();
@@ -498,7 +518,7 @@ test.describe("Journey page - next badge proximity hint", () => {
     await seedSuperuser(page, { unlocked: true, pretendAllMastered: true });
     await page.goto("/journey");
     await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
+      page.getByRole("heading", { level: 3, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("next-badge-hint")).toHaveCount(0);
   });

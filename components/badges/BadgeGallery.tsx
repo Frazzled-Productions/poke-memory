@@ -99,12 +99,12 @@ export function BadgeGallery({
 
   return (
     <section aria-labelledby="badge-gallery-heading">
-      <h2
+      <h3
         id="badge-gallery-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
         {t("heading")}
-      </h2>
+      </h3>
 
       {nextBadge !== null && (
         <p
