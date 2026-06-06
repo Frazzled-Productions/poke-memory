@@ -9,7 +9,7 @@ name: QA Issue Label
 #
 # Two paths, both on `pull_request: [closed]` filtered to merged PRs:
 #
-#   1. A PR merged into `qa` — parse its body and commit messages for
+#   1. A PR merged into `qa` - parse its body and commit messages for
 #      `closes/fixes/resolves #N` keywords and add `status:in-qa` to each
 #      referenced issue. The label is created idempotently on first run.
 #
@@ -29,7 +29,7 @@ name: QA Issue Label
 #
 # Idempotency: `gh label create ... || true` is a no-op once the label
 # exists, and `gh issue edit --add-label` / `--remove-label` are idempotent
-# by nature — re-adding a present label or removing an absent one is a
+# by nature - re-adding a present label or removing an absent one is a
 # harmless no-op, so a re-run of this workflow changes nothing.
 
 on:
@@ -58,7 +58,7 @@ jobs:
       issues: write
       pull-requests: read
     steps:
-      # No checkout — every input comes from the event payload or the `gh`
+      # No checkout - every input comes from the event payload or the `gh`
       # API (all `gh` calls pass `--repo`), so the repo tree is not needed.
       - name: Mint App installation token
         id: app-token
@@ -84,15 +84,24 @@ jobs:
           # /batch-issues skill) may omit those keywords, which previously left
           # the issues open and still labelled. Closing an already-closed issue
           # and removing an absent label are both no-ops, so re-runs are safe.
+          #
+          # Assumption: status:in-qa marks issues genuinely staged in the current
+          # batch. Do NOT hand-apply it to an issue that is not being promoted (a
+          # re-opened regression, say): this path would then close it on the next
+          # promotion. `--limit 200` because `gh issue list` defaults to 30 and a
+          # silently-truncated list would leave the overflow open + labelled.
           if [ "$BASE_REF" = "main" ]; then
             STAGED=$(gh issue list --repo "$REPO" --label "status:in-qa" \
-              --state all --json number,state \
+              --state all --limit 200 --json number,state \
               --jq '.[] | "\(.number) \(.state)"' || true)
             if [ -z "$STAGED" ]; then
               echo "No status:in-qa issues to reconcile."
               exit 0
             fi
-            printf '%s\n' "$STAGED" | while read -r NUM STATE; do
+            # `< <(printf ...)` (process substitution) rather than a pipe so the
+            # loop body runs in THIS shell, not a pipefail subshell whose EOF
+            # exit code could turn the step red after doing all the work.
+            while read -r NUM STATE; do
               [ -n "$NUM" ] || continue
               if [ "$STATE" = "OPEN" ]; then
                 echo "Closing #$NUM (shipped via promotion PR #$PR)"
@@ -103,7 +112,7 @@ jobs:
               gh issue edit "$NUM" --repo "$REPO" \
                 --remove-label "status:in-qa" \
                 || echo "  (could not strip label from #$NUM; continuing)"
-            done
+            done < <(printf '%s\n' "$STAGED")
             exit 0
           fi
 
@@ -146,11 +155,11 @@ jobs:
           gh label create "status:in-qa" --repo "$REPO" \
             --color "0E8A16" \
             --description "Work merged into the qa staging branch, awaiting promotion to main" \
-            2>/dev/null || echo "Label status:in-qa already exists — continuing."
+            2>/dev/null || echo "Label status:in-qa already exists - continuing."
 
           for ISSUE in $ISSUES; do
             echo "Adding status:in-qa to #$ISSUE"
             gh issue edit "$ISSUE" --repo "$REPO" \
               --add-label "status:in-qa" || \
-              echo "  (could not edit #$ISSUE — may not exist; skipping)"
+              echo "  (could not edit #$ISSUE - may not exist; skipping)"
           done
