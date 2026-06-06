@@ -32,7 +32,7 @@
 
 import { screen, fireEvent, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   renderWithIntl,
   renderJa,
@@ -565,5 +565,84 @@ describe("SignInSheet - pseudo-locale (no English-leak)", () => {
     for (const note of notes) {
       expect(note.textContent).toMatch(/\[.*\]/);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Successful auth must navigate so the server-action session is picked up.
+//
+// signUpWithUsername / signInWithUsername are server actions that set the
+// Supabase session in cookies server-side; the browser client's
+// onAuthStateChange does NOT fire for that out-of-band write, so the sheet must
+// force a full navigation to reflect the signed-in state (#1671 regression -
+// previously the sheet just closed and the UI stayed signed-out).
+// ---------------------------------------------------------------------------
+
+describe("SignInSheet - successful auth navigates", () => {
+  // jsdom's window.location is non-configurable, so we replace the whole
+  // location property with a writable one carrying an assign spy (#1520 pattern).
+  const assignSpy = vi.fn();
+
+  beforeEach(() => {
+    assignSpy.mockReset();
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, assign: assignSpy },
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    assignSpy.mockReset();
+  });
+
+  it("navigates to / after a successful sign-up", async () => {
+    renderSheet();
+
+    await userEvent.type(screen.getByLabelText(/username/i), "trainer99");
+    await userEvent.type(screen.getByLabelText(/password/i), "correct-horse-battery");
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+    });
+
+    await waitFor(() => {
+      expect(assignSpy).toHaveBeenCalledWith("/");
+    });
+  });
+
+  it("navigates to / after a successful sign-in", async () => {
+    renderSheet();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /already have an account/i }),
+    );
+    await userEvent.type(screen.getByLabelText(/username/i), "trainer99");
+    await userEvent.type(screen.getByLabelText(/password/i), "correct-horse-battery");
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+    });
+
+    await waitFor(() => {
+      expect(assignSpy).toHaveBeenCalledWith("/");
+    });
+  });
+
+  it("does NOT navigate when the server action returns an error", async () => {
+    mockSignUpWithUsername.mockResolvedValueOnce({ ok: false, error: "username_taken" });
+    renderSheet();
+
+    await userEvent.type(screen.getByLabelText(/username/i), "trainer99");
+    await userEvent.type(screen.getByLabelText(/password/i), "correct-horse-battery");
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+    expect(assignSpy).not.toHaveBeenCalled();
   });
 });
