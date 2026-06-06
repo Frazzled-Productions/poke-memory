@@ -30,12 +30,14 @@ export type BiomeStats = {
   /** Percentage of the biome captured, as a number in [0, 100]. */
   capturedPercent: number;
   /**
-   * Name of the most recently mastered Pokémon in this biome, or null if the
-   * biome has no mastered species. Sort key is `state.firstSeen` - an
+   * The most recently mastered Pokémon in this biome, or null if the biome has
+   * no mastered species. Carries both the `speciesId` (so the renderer can
+   * resolve the locale-appropriate name via `useLocalePokemonName`, #1662) and
+   * the English `name` as a fallback. Sort key is `state.firstSeen` - an
    * acceptable approximation noted in the issue; the precise mastery-transition
    * date is more expensive to derive.
    */
-  latestAddition: string | null;
+  latestAddition: { speciesId: number; name: string } | null;
 };
 
 /**
@@ -69,7 +71,8 @@ export function biomeStats(
       masteredCount: totalCount,
       totalCount,
       capturedPercent: totalCount > 0 ? 100 : 0,
-      latestAddition: latest?.name ?? null,
+      latestAddition:
+        latest != null ? { speciesId: latest.speciesId, name: latest.name } : null,
     };
   }
 
@@ -95,7 +98,8 @@ export function biomeStats(
     masteredCount,
     totalCount,
     capturedPercent,
-    latestAddition: latest?.name ?? null,
+    latestAddition:
+      latest != null ? { speciesId: latest.speciesId, name: latest.name } : null,
   };
 }
 
