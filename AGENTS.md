@@ -146,7 +146,7 @@ Canonical reference: **[docs/sync.md](docs/sync.md)** - read before touching any
 - **Pull before push.** Any orchestrator merging cloud and local cards pulls and merges before pushing; if `pullSession` fails, do not push. Pushing on stale local state wiped 2497 of 2513 cloud rows (#293). The push-only retry path (`useRetryPush`) is the deliberate exception.
 - **`card_reviews_reject_regression_trigger`** (migration 002, extended 015/016/017) blocks regressions at the DB layer - lifecycle timestamps, monotonic `reps`/`lapses`, same-date `scheduled_days` drops, one-way `seen_in_pasture`. Don't work around it. Only `reset_all_progress` (migration 018, SECURITY DEFINER RPC) bypasses the per-column guards.
 - **Cards are the primary contract.** Per-grade upsert + unload beacon drive the user-visible sync status. Every other leg (`pushSettings`, `pushStreak`, `pushGradeLog`, `pushRegionalPrefs`, the regional-prefs leg in `pullAndMerge`) is best-effort: `console.warn` and continue, never flip the overall sync into error.
-- **No PITR yet** (#298). Treat any production sync change as one-way until PITR is enabled.
+- **Backups: daily on, PITR deferred** (#298). Pro daily backups (7-day retention) are enabled; PITR (a paid add-on, $100/mo per 7 days) is deferred while the app has no revenue. Daily-only restore is coarse (whole-database, up to ~24h loss), so still treat any production sync change as one-way until PITR.
 
 ### Adding a feature that needs to persist data
 
