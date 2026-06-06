@@ -544,14 +544,15 @@ export default async function PrivacyPage() {
             7. International transfers
           </h2>
           <p>
-            The third-party services listed in §6 (Vercel, Supabase, and, if
-            you choose to sign in, GitHub or Google) may process data outside
-            the UK / EEA. Vercel and Supabase (our sub-processors) operate
-            under the EU Standard Contractual Clauses (SCCs), providing
-            equivalent safeguards via the UK International Data Transfer
-            Agreement (IDTA) addendum. GitHub and Google act as independent
-            controllers under their own applicable transfer mechanisms,
-            including their own published SCCs with end-users.
+            The third-party services listed in §6 (Vercel; Supabase if you
+            sign in by any method, including username and password; and, if
+            you sign in via GitHub or Google, those providers) may process
+            data outside the UK / EEA. Vercel and Supabase (our
+            sub-processors) operate under the EU Standard Contractual Clauses
+            (SCCs), providing equivalent safeguards via the UK International
+            Data Transfer Agreement (IDTA) addendum. GitHub and Google act as
+            independent controllers under their own applicable transfer
+            mechanisms, including their own published SCCs with end-users.
           </p>
         </section>
 

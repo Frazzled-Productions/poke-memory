@@ -314,7 +314,7 @@ None of these conditions apply to Poké Memory:
 | Approved by | Frazzled Productions Ltd (company no. 17258540) - privacy@pokememory.com |
 | Date | June 2026 |
 | Reference | Issues #721, #1623, #1672 |
-| Outcome | All residual risks assessed as Low or Very Low. No unacceptable risks identified. No ICO pre-consultation required. |
+| Outcome | No residual risk is rated above Low–Medium. No unacceptable risks identified. No ICO pre-consultation required. |
 
 ### Review triggers
 
