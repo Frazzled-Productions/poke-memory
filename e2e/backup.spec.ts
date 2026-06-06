@@ -11,13 +11,13 @@ test.beforeEach(async ({ page }) => {
 // ---------------------------------------------------------------------------
 
 /**
- * Navigates to /settings and expands the "Account & Data" section, which
+ * Navigates to /settings and expands the "Data & backup" section, which
  * houses the Backup sub-section.
  */
 async function openBackupSection(page: Page) {
   await page.goto("/settings");
   await expect(page.getByLabel("Loading settings")).toBeHidden();
-  await page.getByRole("button", { name: /account & data/i, exact: true }).click();
+  await page.getByRole("button", { name: /data & backup/i, exact: true }).click();
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ const MINIMAL_BACKUP = {
 // ---------------------------------------------------------------------------
 
 test.describe("Backup section - export (#766)", () => {
-  test("Export button is visible inside Account & Data", async ({ page }) => {
+  test("Export button is visible inside Data & backup", async ({ page }) => {
     await openBackupSection(page);
 
     // The backup sub-section heading must be present.
@@ -115,7 +115,7 @@ test.describe("Backup section - export (#766)", () => {
 });
 
 test.describe("Backup section - import (#766)", () => {
-  test("Import button is visible inside Account & Data", async ({ page }) => {
+  test("Import button is visible inside Data & backup", async ({ page }) => {
     await openBackupSection(page);
 
     await expect(
@@ -239,7 +239,7 @@ test.describe("Backup - export then import round-trip (#766)", () => {
     await page.goto("/settings");
     await awaitSeedIdb(page);
     await expect(page.getByLabel("Loading settings")).toBeHidden();
-    await page.getByRole("button", { name: /account & data/i, exact: true }).click();
+    await page.getByRole("button", { name: /data & backup/i, exact: true }).click();
 
     // Step 1: Export - capture the downloaded file contents.
     const [download] = await Promise.all([

@@ -263,10 +263,10 @@ test.describe("Mobile nav - footer hidden and legal pages via Settings → About
     await tabBar.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveURL("/settings");
 
-    // The Privacy link lives inside the "Account & Data" accordion. Expand it.
-    await page.getByRole("button", { name: "Account & Data" }).click();
+    // The Privacy link lives inside the "About" accordion. Expand it.
+    await page.getByRole("button", { name: "About" }).click();
     await expect(
-      page.getByRole("button", { name: "Account & Data" }),
+      page.getByRole("button", { name: "About" }),
     ).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("link", { name: "Privacy" })).toBeVisible();
     await page.getByRole("link", { name: "Privacy" }).click();
@@ -294,12 +294,12 @@ test.describe("Mobile nav - footer hidden and legal pages via Settings → About
     });
     await page.reload();
 
-    // The Terms link lives inside the "Account & Data" accordion. Navigate to
+    // The Terms link lives inside the "About" accordion. Navigate to
     // /settings fresh so the component mounts cleanly, then expand the accordion.
     await page.goto("/settings");
-    await page.getByRole("button", { name: "Account & Data" }).click();
+    await page.getByRole("button", { name: "About" }).click();
     await expect(
-      page.getByRole("button", { name: "Account & Data" }),
+      page.getByRole("button", { name: "About" }),
     ).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("link", { name: "Terms" })).toBeVisible();
     await page.getByRole("link", { name: "Terms" }).click();
@@ -316,9 +316,9 @@ test.describe("Mobile nav - footer hidden and legal pages via Settings → About
     );
 
     await page.goto("/settings#about-heading");
-    // The "Account & Data" section opens via the hash deep-link.
+    // The "About" section opens via the hash deep-link.
     await expect(
-      page.getByRole("button", { name: "Account & Data" }),
+      page.getByRole("button", { name: "About" }),
     ).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("link", { name: "Privacy" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Terms" })).toBeVisible();

@@ -18,10 +18,10 @@ test.describe("Privacy notice page", () => {
   // canonical path for bottom-nav users. This test exercises that path.
   test("Settings → About link navigates to /privacy", async ({ page }) => {
     await page.goto("/settings#about-heading");
-    // The "Account & Data" section force-expands via the hash deep-link; wait
+    // The "About" section force-expands via the hash deep-link; wait
     // for the accordion button to confirm it is open before asserting the link.
     await expect(
-      page.getByRole("button", { name: "Account & Data" }),
+      page.getByRole("button", { name: "About" }),
     ).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("link", { name: "Privacy" })).toBeVisible();
     await page.getByRole("link", { name: "Privacy" }).click();
