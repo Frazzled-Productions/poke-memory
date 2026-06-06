@@ -102,6 +102,19 @@ describe("Footer - English locale", () => {
     });
   });
 
+  it("renders the cross-promo link to frazzledproductions.com in a new tab (#1686)", async () => {
+    renderWithIntl(<Footer />);
+
+    await waitFor(() => {
+      const link = screen.getByRole("link", {
+        name: "More from Frazzled Productions",
+      });
+      expect(link).toHaveAttribute("href", "https://frazzledproductions.com");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
+  });
+
   it("hides the footer in bottom-nav mode after the effect fires", async () => {
     mockLoadSettings.mockReturnValue({ mobileNav: "bottom", masteryRepetitions: 3 });
 
@@ -153,6 +166,16 @@ describe("Footer - Japanese locale", () => {
       expect(screen.getByRole("link", { name: "新機能" })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "プライバシー" })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "利用規約" })).toBeInTheDocument();
+    });
+  });
+
+  it("renders the cross-promo link label in Japanese (#1686)", async () => {
+    renderJa(<Footer />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("link", { name: "Frazzled Productions の他のアプリ" }),
+      ).toBeInTheDocument();
     });
   });
 });

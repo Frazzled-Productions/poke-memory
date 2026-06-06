@@ -884,6 +884,24 @@ describe("SettingsPage - i18n key resolution (#1369)", () => {
     expect(tJa("settings.section.practice")).toBe("練習");
     expect(tJa("settings.offline.downloadHeading")).toBe("ダウンロード");
   });
+
+  it("settings.about.moreFromFrazzled keys resolve in all locales (#1686)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const en = require("../../messages/en.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ja = require("../../messages/ja.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const zhHans = require("../../messages/zh-Hans.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const zhHant = require("../../messages/zh-Hant.json") as Record<string, Record<string, Record<string, string>>>;
+    expect(en.settings.about.moreFromFrazzled).toBe("More from Frazzled Productions");
+    for (const catalogue of [ja, zhHans, zhHant]) {
+      expect(catalogue.settings.about.moreFromFrazzled).toBeTruthy();
+      expect(catalogue.settings.about.moreFromFrazzled).not.toBe("settings.about.moreFromFrazzled");
+      expect(catalogue.settings.about.moreFromFrazzledDescription).toBeTruthy();
+      expect(catalogue.settings.about.moreFromFrazzledCta).toBeTruthy();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -962,6 +980,24 @@ describe("SettingsPage - FSRS link in How this works", () => {
     );
     expect(fsrsLink).toHaveAttribute("target", "_blank");
     expect(fsrsLink).toHaveAttribute("rel", "noopener noreferrer");
+  });
+});
+
+describe("SettingsPage - cross-promo to Frazzled Productions (#1686)", () => {
+  it("renders the About cross-promo link to frazzledproductions.com in a new tab", async () => {
+    mockLoadSettings.mockReturnValue(defaultSettings());
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/how this works/i)).toBeInTheDocument();
+    });
+
+    const link = screen.getByRole("link", {
+      name: /visit frazzledproductions\.com/i,
+    });
+    expect(link).toHaveAttribute("href", "https://frazzledproductions.com");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 });
 

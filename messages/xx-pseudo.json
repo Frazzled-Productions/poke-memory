@@ -14,6 +14,7 @@
     "whatsNew": "[What's new]",
     "privacy": "[Privacy]",
     "terms": "[Terms]",
+    "moreFromFrazzled": "[More from Frazzled Productions]",
     "openMenu": "[Open navigation menu]",
     "closeMenu": "[Close navigation menu]",
     "navigationMenu": "[Navigation menu]",
@@ -335,7 +336,10 @@
       "whatsNewDescription": "[See what shipped in recent releases.]",
       "viewChangelog": "[View changelog]",
       "privacy": "[Privacy]",
-      "terms": "[Terms]"
+      "terms": "[Terms]",
+      "moreFromFrazzled": "[More from Frazzled Productions]",
+      "moreFromFrazzledDescription": "[Discover our other apps.]",
+      "moreFromFrazzledCta": "[Visit frazzledproductions.com]"
     },
     "feedback": {
       "rowLabel": "[Send feedback]",
