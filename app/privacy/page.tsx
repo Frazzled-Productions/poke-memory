@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 6 June 2026
+          Last updated: 7 June 2026
         </p>
       </header>
 
@@ -53,8 +53,10 @@ export default async function PrivacyPage() {
           </h2>
           <p>
             Poké Memory is operated by Frazzled Productions Ltd (company number{" "}
-            {COMPANY_NUMBER}), registered in England and Wales. For questions
-            about this notice or your personal data, contact{" "}
+            {COMPANY_NUMBER}), registered in England and Wales. Frazzled
+            Productions Ltd is registered with the Information
+            Commissioner&rsquo;s Office (ICO), registration number ZC165261.
+            For questions about this notice or your personal data, contact{" "}
             <a
               href="mailto:privacy@pokememory.com"
               className={inlineLink}
