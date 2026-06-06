@@ -88,7 +88,7 @@ const SW_REPLAY_MESSAGE = "BACKGROUND_SYNC_REPLAY";
  * file for the real worker scope at build time, where the globals do exist.
  */
 interface ServiceWorkerScope {
-  /** Build-time injection point replaced by @serwist/turbopack. */
+  /** Build-time injection point replaced by scripts/build-sw.mjs. */
   __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
   location: { origin: string };
   skipWaiting(): Promise<void>;

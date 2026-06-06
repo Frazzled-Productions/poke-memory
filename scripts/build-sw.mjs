@@ -42,6 +42,15 @@ import * as esbuild from "esbuild";
 
 const projectRoot = path.resolve(fileURLToPath(import.meta.url), "..", "..");
 
+// Make the script self-correcting regardless of the invoking directory. The
+// Serwist schema resolves `config.cwd` from `process.cwd()`, and that cwd is
+// what `getFileManifestEntries`, the `.next/static` glob, and esbuild's
+// entryPoints/outdir all resolve against. `projectRoot` (from import.meta.url)
+// is the only reliable anchor, so pin the process cwd to it up front: invoked
+// from any subdirectory the globs would otherwise find nothing and the
+// empty-manifest guard below would throw opaquely.
+process.chdir(projectRoot);
+
 /**
  * The same options object the route handler passed to `createSerwistRoute`.
  * Kept byte-identical to `app/sw/[path]/route.ts` (pre-removal) so the precache

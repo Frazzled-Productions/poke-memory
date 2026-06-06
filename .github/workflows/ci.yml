@@ -109,7 +109,13 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: next-build
-          path: .next/
+          # `public/sw/` carries the statically-built service worker
+          # (scripts/build-sw.mjs, #1752). It is gitignored, so the e2e job's
+          # fresh checkout does not have it; without bundling it here `npm start`
+          # would 404 on /sw/sw.js and the smoke SW assertion would fail.
+          path: |
+            .next/
+            public/sw/
           retention-days: 1
           include-hidden-files: true
 
@@ -160,7 +166,11 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: next-build
-          path: .next/
+          # Extract to the workspace root: the artifact preserves the structure
+          # relative to the least-common-ancestor of the uploaded paths
+          # (`.next/` and `public/sw/`), so this restores both at the repo root
+          # rather than nesting them under a `.next/` prefix (#1752).
+          path: .
       - name: Start Next.js and run Playwright
         if: needs.changes.outputs.e2e_relevant == 'true'
         env:

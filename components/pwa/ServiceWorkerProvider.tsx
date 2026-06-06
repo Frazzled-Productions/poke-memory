@@ -8,10 +8,10 @@ import { isSessionActive } from "@/lib/review/sessionActive";
  * Registers the Poké Memory service worker and silently activates new builds
  * at safe moments.
  *
- * The service worker is built and served by `@serwist/turbopack` at
- * `/sw/sw.js` (see `app/sw/[path]/route.ts`). Once registered it precaches the
- * app shell and runtime-caches sprites, so an installed PWA works offline for
- * a practice session.
+ * The service worker is built to a static `public/sw/sw.js` asset by
+ * `scripts/build-sw.mjs` and served by the CDN at `/sw/sw.js` (#1752). Once
+ * registered it precaches the app shell and runtime-caches sprites, so an
+ * installed PWA works offline for a practice session.
  *
  * Update handling (silent-activate, #1162) - the classic PWA footgun is a
  * stale cache. The service worker is built with `skipWaiting: false`, so a

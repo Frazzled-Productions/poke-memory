@@ -41,7 +41,6 @@
   },
   "dependencies": {
     "@open-spaced-repetition/binding": "^0.3.1",
-    "@serwist/turbopack": "^9.5.11",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "@vercel/analytics": "^2.0.1",
@@ -63,6 +62,7 @@
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@serwist/build": "^9.5.11",
+    "@serwist/turbopack": "^9.5.11",
     "@serwist/utils": "^9.5.11",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",

@@ -104,7 +104,7 @@ const nextConfig: NextConfig = {
 // Handler, so the `withSerwist` wrapper (which only marked esbuild/esbuild-wasm
 // as server-external for that route) is gone. The worker is now bundled to a
 // static `public/sw/sw.js` asset by `scripts/build-sw.mjs` after `next build`.
-// Offline support for the installed PWA is unchanged — see issues #703, #1752.
+// Offline support for the installed PWA is unchanged, see issues #703, #1752.
 //
 // `withNextIntl` wraps the config so next-intl can wire up its server-side
 // request config (i18n/request.ts) and message imports without the

@@ -20,7 +20,7 @@ const eslintConfig = defineConfig([
     "coverage/**",
     // Generated service-worker bundle (built by scripts/build-sw.mjs after
     // `next build`; gitignored). It is minified esbuild output, so linting it
-    // flags spurious errors (e.g. no-this-alias on the bundled runtime) — #1752.
+    // flags spurious errors (e.g. no-this-alias on the bundled runtime), #1752.
     "public/sw/**",
   ]),
   // Baseline for adopting ESLint into CI (#614). The react-hooks plugin v7
