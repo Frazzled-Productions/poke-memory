@@ -196,6 +196,7 @@ export function SignInSheet({ open, onClose }: Props) {
                   ? t("signInSheet.username.errorSignupFailed")
                   : t("signInSheet.username.errorSigninFailed"),
         );
+        setIsSubmitting(false);
       } else {
         // Success. signUpWithUsername / signInWithUsername are SERVER ACTIONS:
         // they set the Supabase session in cookies server-side. The browser
@@ -214,7 +215,6 @@ export function SignInSheet({ open, onClose }: Props) {
           ? t("signInSheet.username.errorSignupFailed")
           : t("signInSheet.username.errorSigninFailed"),
       );
-    } finally {
       setIsSubmitting(false);
     }
   }

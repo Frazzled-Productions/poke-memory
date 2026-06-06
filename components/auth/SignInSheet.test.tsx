@@ -592,10 +592,6 @@ describe("SignInSheet - successful auth navigates", () => {
     });
   });
 
-  afterEach(() => {
-    assignSpy.mockReset();
-  });
-
   it("navigates to / after a successful sign-up", async () => {
     renderSheet();
 
@@ -631,6 +627,23 @@ describe("SignInSheet - successful auth navigates", () => {
 
   it("does NOT navigate when the server action returns an error", async () => {
     mockSignUpWithUsername.mockResolvedValueOnce({ ok: false, error: "username_taken" });
+    renderSheet();
+
+    await userEvent.type(screen.getByLabelText(/username/i), "trainer99");
+    await userEvent.type(screen.getByLabelText(/password/i), "correct-horse-battery");
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+    expect(assignSpy).not.toHaveBeenCalled();
+  });
+
+  it("does NOT navigate when the server action throws", async () => {
+    mockSignUpWithUsername.mockRejectedValueOnce(new Error("network error"));
     renderSheet();
 
     await userEvent.type(screen.getByLabelText(/username/i), "trainer99");
