@@ -83,6 +83,7 @@ function BiomeLatestAddition({
 }: {
   latestAddition: { speciesId: number; name: string };
 }) {
+  const t = useTranslations("pasture");
   const { name } = useLocalePokemonName(
     latestAddition.speciesId,
     latestAddition.name,
@@ -91,9 +92,8 @@ function BiomeLatestAddition({
 
   return (
     <div>
-      <dt className="sr-only">Latest addition</dt>
+      <dt className="sr-only">{t("biomeStats.latestAddition")}</dt>
       <dd>
-        <span className="opacity-60">Latest: </span>
         <span className="font-medium text-foreground">
           <span lang={pokemonLocale}>{name}</span>
         </span>

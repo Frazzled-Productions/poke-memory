@@ -220,12 +220,10 @@ describe("BiomeLandscapePage", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  // Kept last: overrides the biomeStats mock return value, which leaks past
-  // vi.clearAllMocks (it only clears call history, not the implementation).
   it("renders the locale-resolved Latest addition name with a lang attribute (#1662)", async () => {
     mockPokemonLocale = "ja";
     mockLocaleNames["ja"] = "ピカチュウ";
-    vi.mocked(biomeStats).mockReturnValue({
+    vi.mocked(biomeStats).mockReturnValueOnce({
       masteredCount: 1,
       totalCount: 10,
       capturedPercent: 10,
