@@ -18,6 +18,10 @@ const eslintConfig = defineConfig([
     // holds vitest's generated reports.
     ".claude/**",
     "coverage/**",
+    // Generated service-worker bundle (built by scripts/build-sw.mjs after
+    // `next build`; gitignored). It is minified esbuild output, so linting it
+    // flags spurious errors (e.g. no-this-alias on the bundled runtime), #1752.
+    "public/sw/**",
   ]),
   // Baseline for adopting ESLint into CI (#614). The react-hooks plugin v7
   // (bundled with eslint-config-next 16) ships several new rules at `error`

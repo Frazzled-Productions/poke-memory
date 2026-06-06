@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { withSerwist } from "@serwist/turbopack";
 import createNextIntlPlugin from "next-intl/plugin";
 import pkg from "./package.json";
 import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
@@ -38,32 +37,33 @@ const nextConfig: NextConfig = {
   // include it explicitly so the file ships with the deployment in any
   // output mode.
   //
-  // /sw/[path] is the Serwist service-worker route. Under cacheComponents:true,
-  // Next 16 ignores the route's `dynamic = "force-static"` / `revalidate = false`
-  // segment exports and ships the route as a request-time serverless function.
-  // That function pulls in next/dist/server/config.js transitively, but
-  // @vercel/nft's file-tracer does not include it in the bundle, so every
-  // request 500s with "Cannot find module .../next/dist/server/config.js".
-  // Explicitly tracing the next/dist/server and next/dist/shared trees forces
-  // the module into the function bundle and restores SW serving immediately.
-  // The proper fix (serving the SW as a static public/ asset) is tracked in a
-  // separate follow-up issue.
+  // The service worker is NO LONGER a route: it is built to a static
+  // `public/sw/sw.js` asset by `scripts/build-sw.mjs` (post-`next build`) and
+  // served by Vercel's CDN, so there is no serverless function and therefore
+  // no file-trace gap to patch (the previous `/sw/[path]` entry that forced
+  // `next/dist/server/config.js` into the function bundle is gone, #1752,
+  // superseding the #1751 hotfix for #1749).
   outputFileTracingIncludes: {
     "/whats-new": ["./CHANGELOG.md"],
-    "/sw/[path]": [
-      "./node_modules/next/dist/server/**/*.js",
-      "./node_modules/next/dist/shared/**/*.js",
-    ],
   },
-  // Explicit no-cache header for the service-worker script. The SW spec
-  // requires no-cache so the browser always revalidates before deciding
-  // whether to install a new version; without it, a future edge-cache change
-  // could silently freeze updates for all installed PWAs.
+  // Headers for the statically-generated service-worker script (built to
+  // public/sw/ by scripts/build-sw.mjs).
+  //
+  // - `Cache-Control: no-cache` - the SW spec requires the browser to always
+  //   revalidate the worker script before deciding whether to install a new
+  //   version; without it, a future edge-cache change could silently freeze
+  //   updates for all installed PWAs (#1749).
+  // - `Service-Worker-Allowed: /` - the worker is registered from /sw/sw.js but
+  //   must claim the whole-site scope "/". The Route Handler previously set this
+  //   header itself; for the static asset it is applied here.
   async headers() {
     return [
       {
         source: "/sw/sw.js",
-        headers: [{ key: "Cache-Control", value: "no-cache" }],
+        headers: [
+          { key: "Cache-Control", value: "no-cache" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
       },
       {
         source: "/sw/sw.js.map",
@@ -100,13 +100,14 @@ const nextConfig: NextConfig = {
   },
 };
 
-// `withSerwist` keeps Next.js 16's default Turbopack in place (no `--webpack`
-// regression) and marks the esbuild bundler used by the service-worker route
-// (`app/sw/[path]/route.ts`) as server-external so Turbopack does not try to
-// bundle it. Offline support for the installed PWA — see issue #703.
+// The Serwist service worker is no longer built through a Next.js Route
+// Handler, so the `withSerwist` wrapper (which only marked esbuild/esbuild-wasm
+// as server-external for that route) is gone. The worker is now bundled to a
+// static `public/sw/sw.js` asset by `scripts/build-sw.mjs` after `next build`.
+// Offline support for the installed PWA is unchanged, see issues #703, #1752.
 //
 // `withNextIntl` wraps the config so next-intl can wire up its server-side
 // request config (i18n/request.ts) and message imports without the
 // "Couldn't find next-intl config" runtime error (#1260).
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
-export default withNextIntl(withSerwist(nextConfig));
+export default withNextIntl(nextConfig);
