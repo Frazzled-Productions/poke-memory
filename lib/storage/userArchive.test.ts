@@ -227,7 +227,7 @@ describe("restoreUserData", () => {
 
     await restoreUserData(USER_B);
 
-    const keys = dispatchEvent.mock.calls.map((c: [{ key: string | null }]) => c[0].key);
+    const keys = dispatchEvent.mock.calls.map((c) => (c[0] as { key: string | null }).key);
     expect(keys).toContain(KEY_REVIEW_SESSION);
     expect(keys).toContain(KEY_GRADE_LOG);
   });
