@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("PWA cold-start splash", () => {
-  test("inline script creates splash before JS runs, then React removes it", async ({
+test.describe("PWA cold-start theme application", () => {
+  test("inline script applies theme background before JS runs", async ({
     page,
   }) => {
     await page.goto("/");
@@ -14,7 +14,11 @@ test.describe("PWA cold-start splash", () => {
     );
     expect(bg).not.toBe("");
 
-    // React removed the splash div after hydrating
+    // Tombstone / regression-guard: #pwa-splash was removed entirely in #1727
+    // and is never injected into the DOM. This assertion will always pass by
+    // design (the element does not exist), but it is kept as a belt-and-
+    // suspenders guard so a future accidental re-introduction of the overlay
+    // is caught immediately without needing to write a new test.
     await expect(page.locator("#pwa-splash")).not.toBeAttached();
   });
 });

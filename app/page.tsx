@@ -42,7 +42,7 @@ export default function Home({
     /*
       On mobile the page must fill the available height between the top nav and
       the bottom nav without scrolling (#1087). The height chain is:
-        body (flex flex-col min-h-dvh)            ← anchors page to 100dvh (#1086)
+        body (flex flex-col min-h-[100svh])       ← anchors page to 100svh (#1086/#1728)
         → MobileNavPaddingWrapper (flex-1 flex-col min-h-0)
         → this div (flex-1 flex-col min-h-0) ← fills the gap
         → inner container → main → ReviewSession wrapper
