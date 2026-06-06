@@ -252,8 +252,10 @@ export default function BiomeLandscapePage({
               }
         }
       >
-        {/* Back button + biome heading - top-left in the rotated (landscape) frame */}
-        <div className="sticky top-0 z-20 bg-background/90 px-4 py-2 backdrop-blur-sm">
+        {/* Back button + biome heading - top-left in the rotated (landscape) frame.
+            Wrapped in <header> as a landmark for the biome page's sticky top bar.
+            The biome page is exempt from PageShell (fixed full-bleed rotated layout). */}
+        <header className="sticky top-0 z-20 bg-background/90 px-4 py-2 backdrop-blur-sm">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -300,28 +302,28 @@ export default function BiomeLandscapePage({
             aria-label={t("biome.statsAriaLabel")}
           >
             <div>
-              <dt className="sr-only">Species mastered</dt>
+              <dt className="sr-only">{t("biomeStats.mastered")}</dt>
               <dd>
                 <span className="font-medium text-foreground">
                   {stats.masteredCount}
                 </span>
-                <span className="opacity-60"> / {stats.totalCount} species</span>
+                <span className="opacity-60"> / {stats.totalCount} {t("biomeStats.mastered").toLowerCase()}</span>
               </dd>
             </div>
             <div>
-              <dt className="sr-only">Captured</dt>
+              <dt className="sr-only">{t("biomeStats.captured")}</dt>
               <dd>
                 <span className="font-medium text-foreground">
                   {stats.capturedPercent}%
                 </span>
-                <span className="opacity-60"> captured</span>
+                <span className="opacity-60"> {t("biomeStats.captured").toLowerCase()}</span>
               </dd>
             </div>
             {stats.latestAddition !== null && (
               <BiomeLatestAddition latestAddition={stats.latestAddition} />
             )}
           </dl>
-        </div>
+        </header>
 
         <main className="px-4 pb-8 pt-2">
           {isEmpty ? (

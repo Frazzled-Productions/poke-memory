@@ -259,6 +259,22 @@ export function PokemonDetailDisclosure({
   const stages = buildStages(evolutionChain);
   const showEvolution = stages.length > 1;
 
+  // Client-side document.title update (#1734 / #1729).
+  // When the species is unlocked/learned, update the browser tab to show the
+  // localised species name (e.g. "Pikachu - Pokédex - Poké Memory") so the
+  // user's own tab is informative. Locked species keep the server-rendered
+  // number-only title so names never appear in share/search contexts.
+  useEffect(() => {
+    if (!isLocked && !isPending && pokemonLocaleName) {
+      document.title = `${pokemonLocaleName} - Pokédex - Poké Memory`;
+    }
+    // Restore the server-rendered title on unmount so navigating back to the
+    // Pokédex list doesn't retain a stale species name.
+    return () => {
+      document.title = `Pokémon #${zeroPad(id)} - Pokédex - Poké Memory`;
+    };
+  }, [isLocked, isPending, pokemonLocaleName, id]);
+
   if (isPending) {
     return (
       <div className="flex flex-col items-center gap-4 animate-pulse">
@@ -309,7 +325,22 @@ export function PokemonDetailDisclosure({
           ].join(" ")}
         />
         {isLocked ? (
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-300 dark:text-zinc-700">???</h1>
+          /*
+           * Locked h1: display the national-dex number (e.g. "#025") in muted
+           * styling so there is a meaningful visible label (#1734 / #1729).
+           * The aria-label ("Pokémon #025") prevents digit-by-digit
+           * screen-reader reading of the pound sign + digits.
+           *
+           * Owner decision: show #{zeroPad(id)} visually - NOT "???" - so both
+           * sighted and AT users see a purposeful label rather than three
+           * question marks.
+           */
+          <h1
+            className="text-3xl font-bold tracking-tight text-zinc-300 dark:text-zinc-700"
+            aria-label={t("lockedAriaLabel", { number: zeroPad(id) })}
+          >
+            #{zeroPad(id)}
+          </h1>
         ) : (
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">{pokemonLocaleName}</h1>

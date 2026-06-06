@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
+import { getFormatter } from "next-intl/server";
 import { getChangelog } from "@/lib/changelog/parse";
 import { BulletText } from "@/components/whats-new/BulletText";
 import { MarkVisited } from "@/components/whats-new/MarkVisited";
-import { mutedTextXs, sectionLabelSm } from "@/lib/utils/class-names";
+import { mutedTextXs, sectionLabelSm, pageTitle } from "@/lib/utils/class-names";
+import { PageShell } from "@/components/ui/PageShell";
 
 export const metadata: Metadata = {
   title: "What's New - Poké Memory",
@@ -13,16 +16,24 @@ export const metadata: Metadata = {
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
 const RELEASES_TO_SHOW = 20;
 
-export default function WhatsNewPage() {
+export default async function WhatsNewPage() {
+  const t = await getTranslations("whatsNew");
+  const format = await getFormatter();
   const releases = getChangelog().slice(0, RELEASES_TO_SHOW);
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+    <PageShell width="reading">
       <MarkVisited version={APP_VERSION} />
       <header className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">What&apos;s new</h1>
+        {/* text-foreground token added per #1733 acceptance criteria */}
+        <h1 className={pageTitle}>{t("heading")}</h1>
+        {/*
+          subtitle text ends with "You're on version" (or locale equivalent);
+          the <code> element is rendered inline at the call site, not via t.rich,
+          per the brief (#1733 / #1729).
+        */}
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Recent changes to poke-memory. You&apos;re on version{" "}
+          {t("subtitle")}{" "}
           <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-[0.85em] text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
             {APP_VERSION}
           </code>
@@ -32,26 +43,32 @@ export default function WhatsNewPage() {
 
       {releases.length === 0 ? (
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          No release notes available.
+          {t("empty")}
         </p>
       ) : (
         <ol className="space-y-8">
           {releases.map((release) => (
             <li key={release.version}>
               <div className="mb-3 flex items-baseline justify-between gap-4 border-b border-zinc-200 pb-2 dark:border-zinc-800">
+                {/*
+                  Version h2 intentionally stays at text-lg (sectionHeading) rather
+                  than text-xl (sectionHeadingLg): text-xl looks oversized alongside
+                  the small inline date. Documented exception to the text-xl h2
+                  convention (AGENTS.md / #1733).
+                */}
                 <h2 className="text-lg font-semibold">v{release.version}</h2>
                 <time
                   dateTime={release.date}
                   className={mutedTextXs}
                 >
-                  {release.date}
+                  {format.dateTime(new Date(release.date), { dateStyle: "medium" })}
                 </time>
               </div>
               <div className="space-y-4">
                 {release.sections.map((section) => (
                   <section key={section.kind}>
                     <h3 className={`mb-1 ${sectionLabelSm}`}>
-                      {section.kind}
+                      {t(`sectionKind.${section.kind.toLowerCase() as "added" | "changed" | "removed" | "deprecated" | "fixed" | "security"}`)}
                     </h3>
                     <ul
                       className="list-disc space-y-1 pl-5 text-sm text-zinc-800 dark:text-zinc-200"
@@ -70,6 +87,6 @@ export default function WhatsNewPage() {
           ))}
         </ol>
       )}
-    </main>
+    </PageShell>
   );
 }

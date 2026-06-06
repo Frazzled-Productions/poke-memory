@@ -6,8 +6,8 @@
  *   2. When signed out, only local data is used (no pullSession call).
  *
  * Note: the trainer card and badges have moved to the Journey page (#852).
- * Cloud-hydration correctness is still tested here via the mastery-over-time
- * chart stub and the force-pull button, which remain on Stats.
+ * The ForcePullSection has moved to the Settings page (#1732 / #1729);
+ * Stats now shows a "Restore from cloud" link to /settings instead.
  */
 
 import { renderWithIntl as render, screen, waitFor } from "@/components/test-utils/renderWithIntl";
@@ -575,8 +575,11 @@ describe("StatsPage - guest user reads only from local", () => {
   });
 });
 
-describe("StatsPage - Force pull from cloud button", () => {
-  it("is not visible when the user is a guest", async () => {
+describe("StatsPage - Restore from cloud link (#1732 / #1729)", () => {
+  // ForcePullSection has moved to Settings. Stats now shows a "Restore from cloud"
+  // link to /settings for signed-in users, and nothing for guests.
+
+  it("does not show the force-pull button in Stats (it moved to Settings)", async () => {
     mockLoadSession.mockResolvedValue(null);
     mockAuthValue.user = null;
     mockAuthValue.supabase = null;
@@ -587,10 +590,11 @@ describe("StatsPage - Force pull from cloud button", () => {
       expect(screen.getByTestId("review-heatmap")).toBeInTheDocument();
     });
 
+    // Force-pull button is gone from Stats; it lives in Settings now.
     expect(screen.queryByRole("button", { name: /force pull from cloud/i })).toBeNull();
   });
 
-  it("is visible when the user is signed in", async () => {
+  it("shows 'Restore from cloud' link to /settings for signed-in users", async () => {
     mockLoadSession.mockResolvedValue(null);
     mockPullSession.mockResolvedValue([]);
     mockAuthValue.user = mockSuiteUser;
@@ -599,65 +603,25 @@ describe("StatsPage - Force pull from cloud button", () => {
     render(<StatsPage />);
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /force pull from cloud/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /restore from cloud/i })).toBeInTheDocument();
     });
+
+    const link = screen.getByRole("link", { name: /restore from cloud/i });
+    expect(link).toHaveAttribute("href", "/settings");
   });
 
-  it("clicking the button pulls all five tables and persists each cloud-authoritative", async () => {
-    // Pulls run in parallel via Promise.all; assert each was called and that
-    // the destructured results were applied to the right local sink. Catches
-    // a future regression where the parallel array order is transposed.
-    const { pullSettingsWithTimestamp, pullRegionalPrefs } = await import(
-      "@/lib/sync/settings"
-    );
-    const { pullStreak } = await import("@/lib/sync/streak");
-    const { pullGradeLog } = await import("@/lib/sync/gradeLog");
-    const { saveStreakData } = await import("@/lib/streak/persistence");
-    const { saveGradeLog } = await import("@/lib/gradelog/persistence");
-    const settingsMod = await import("@/lib/settings/persistence");
-
+  it("does not show 'Restore from cloud' link for guests", async () => {
     mockLoadSession.mockResolvedValue(null);
-    mockPullSession.mockResolvedValue([makeCloudRow(1)]);
-    vi.mocked(pullSettingsWithTimestamp).mockResolvedValueOnce({
-      settings: { masteryRepetitions: 3 } as never,
-      updatedAt: "2026-05-14T10:00:00.000Z",
-    });
-    vi.mocked(pullRegionalPrefs).mockResolvedValueOnce({
-      timezone: "Europe/London",
-      dateFormat: "dmy",
-      pushNotificationHour: null,
-    });
-    vi.mocked(pullStreak).mockResolvedValueOnce(["2026-05-13", "2026-05-14"]);
-    vi.mocked(pullGradeLog).mockResolvedValueOnce([
-      { occurredAt: 1, date: "2026-05-14", cardType: "name", grade: 4 },
-    ]);
-
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.user = null;
+    mockAuthValue.supabase = null;
 
     render(<StatsPage />);
 
-    const button = await screen.findByRole("button", {
-      name: /force pull from cloud/i,
-    });
-    button.click();
-
     await waitFor(() => {
-      expect(pullSettingsWithTimestamp).toHaveBeenCalled();
-      expect(pullRegionalPrefs).toHaveBeenCalled();
-      expect(pullStreak).toHaveBeenCalled();
-      expect(pullGradeLog).toHaveBeenCalled();
-      expect(saveStreakData).toHaveBeenCalledWith(["2026-05-13", "2026-05-14"]);
-      expect(saveGradeLog).toHaveBeenCalledWith([
-        { occurredAt: 1, date: "2026-05-14", cardType: "name", grade: 4 },
-      ]);
-      expect(settingsMod.saveSettings).toHaveBeenCalled();
+      expect(screen.getByTestId("review-heatmap")).toBeInTheDocument();
     });
 
-    confirmSpy.mockRestore();
+    expect(screen.queryByRole("link", { name: /restore from cloud/i })).toBeNull();
   });
 });
 

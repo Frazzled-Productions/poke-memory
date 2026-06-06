@@ -44,6 +44,25 @@ vi.mock("@/components/onboarding/FirstVisitOnboardingModal", () => ({
   FirstVisitOnboardingModal: () => <div data-testid="first-visit-onboarding-modal" />,
 }));
 
+// Mock next-intl/server so getTranslations resolves synchronously in jsdom.
+// AuthErrorBanner (async server component) uses getTranslations("practice").
+vi.mock("next-intl/server", () => ({
+  getTranslations: async (namespace: string) => {
+    const catalogues: Record<string, Record<string, string>> = {
+      nav: { practice: "Practice", whatsNew: "What's new" },
+      practice: { signInFailed: "Sign-in failed. Please try again." },
+    };
+    const ns = catalogues[namespace] ?? {};
+    return (key: string) => ns[key] ?? key;
+  },
+}));
+
+// Mock PracticeH1 client component so it renders the h1 without needing
+// the full Next-intl client provider. The page.test uses bare `render`.
+vi.mock("@/components/practice/PracticeH1", () => ({
+  PracticeH1: () => <h1 className="sr-only">Practice</h1>,
+}));
+
 // ---------------------------------------------------------------------------
 // Subject under test
 // ---------------------------------------------------------------------------
@@ -69,6 +88,15 @@ describe("Practice page (Home) - layout shell", () => {
 
     expect(screen.getByTestId("review-session")).toBeInTheDocument();
     expect(screen.getByTestId("practice-sidebar")).toBeInTheDocument();
+  });
+
+  it("renders a visually-hidden sr-only h1 with accessible name 'Practice' (#1730)", () => {
+    // PracticeH1 is mocked to render synchronously in jsdom.
+    render(<Home searchParams={pendingSearchParams()} />);
+
+    const h1 = screen.getByRole("heading", { level: 1, name: "Practice" });
+    expect(h1).toBeInTheDocument();
+    expect(h1).toHaveClass("sr-only");
   });
 
   it("renders the StreakBadge and FirstVisitOnboardingModal", () => {

@@ -29,6 +29,8 @@ import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { generationOf } from "@/lib/stats/derive";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
+import { PageShell } from "@/components/ui/PageShell";
+import { pageTitle } from "@/lib/utils/class-names";
 
 type Placement = {
   card: NameReviewCard;
@@ -312,8 +314,8 @@ export default function PasturePage() {
 
   if (masteredCards.length === 0) {
     return (
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+      <PageShell width="wide">
+        <h1 className={pageTitle}>
           {t("title")}
         </h1>
         <p className="mt-4 text-zinc-500 dark:text-zinc-400">
@@ -325,7 +327,7 @@ export default function PasturePage() {
           </OnboardingHint>
         </div>
         <NextArrivalsStrip arrivals={arrivals} />
-      </main>
+      </PageShell>
     );
   }
 
@@ -340,8 +342,8 @@ export default function PasturePage() {
   const filtered = isFiltered(filters);
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-      <h1 className="mb-6 text-2xl font-bold tracking-tight text-foreground">
+    <PageShell width="wide">
+      <h1 className={`mb-6 ${pageTitle}`}>
         {t("title")}
         <span className="ml-2 text-base font-normal text-zinc-500 dark:text-zinc-400">
           {t("pokemonCount", { count: masteredCards.length })}
@@ -381,6 +383,6 @@ export default function PasturePage() {
       )}
 
       <NextArrivalsStrip arrivals={arrivals} />
-    </main>
+    </PageShell>
   );
 }

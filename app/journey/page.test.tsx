@@ -26,8 +26,9 @@ vi.mock("next/link", () => ({
 // Hoisted fixtures
 // ---------------------------------------------------------------------------
 
-const { mockLoadSession, STABLE_SEED } = vi.hoisted(() => ({
+const { mockLoadSession, mockUseAuth, STABLE_SEED } = vi.hoisted(() => ({
   mockLoadSession: vi.fn(),
+  mockUseAuth: vi.fn(() => ({ user: null as unknown, supabase: null, loading: false })),
   STABLE_SEED: { seedPokemon: [] as unknown[], seedEvolutionCards: [] as unknown[], seedReverseEvolutionCards: [] as unknown[] },
 }));
 
@@ -71,7 +72,7 @@ vi.mock("@/lib/settings/persistence", () => ({
 }));
 
 vi.mock("@/lib/auth/AuthContext", () => ({
-  useAuth: () => ({ user: null, supabase: null, loading: false }),
+  useAuth: () => mockUseAuth(),
 }));
 
 vi.mock("@/lib/superuser/SuperuserContext", () => ({
@@ -224,6 +225,14 @@ vi.mock("@/components/badges/BadgeGallery", () => ({
   BadgeGallery: () => null,
 }));
 
+vi.mock("@/components/onboarding/GuestSignUpNudge", () => ({
+  GuestSignUpNudge: () => <div data-testid="guest-sign-up-nudge" />,
+}));
+
+vi.mock("@/components/onboarding/OnboardingHint", () => ({
+  OnboardingHint: () => null,
+}));
+
 // ---------------------------------------------------------------------------
 // Subject under test
 // ---------------------------------------------------------------------------
@@ -236,6 +245,9 @@ import JourneyPage from "@/app/journey/page";
 
 beforeEach(async () => {
   mockLoadSession.mockResolvedValue(null);
+  // Reset mockUseAuth to the guest default so tests don't bleed auth state.
+  mockUseAuth.mockReset();
+  mockUseAuth.mockReturnValue({ user: null, supabase: null, loading: false });
   // Reset computeStreak to its default (0 = no active streak) so tests don't
   // bleed streak state into each other.
   const { computeStreak } = vi.mocked(await import("@/lib/streak"));
@@ -363,5 +375,77 @@ describe("JourneyPage - Japanese locale", () => {
         expect(screen.getByText("日連続")).toBeInTheDocument();
       });
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Super-section structure (#1734 / #1729)
+// ---------------------------------------------------------------------------
+
+describe("JourneyPage - super-section headings (#1734)", () => {
+  it("renders all three super-section h2 headings in English", async () => {
+    renderWithIntl(<JourneyPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Your progress" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Collection" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Breakdown" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("renders super-section h2 headings in Japanese", async () => {
+    renderJa(<JourneyPage />);
+
+    await waitFor(() => {
+      // ja: journey.superSectionProgress / superSectionCollection / superSectionBreakdown
+      expect(
+        screen.getByRole("heading", { level: 2, name: "あなたの進捗" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 2, name: "コレクション" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 2, name: "内訳" }),
+      ).toBeInTheDocument();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GuestSignUpNudge placement (#1731 / #1729)
+// ---------------------------------------------------------------------------
+
+describe("JourneyPage - GuestSignUpNudge (#1731)", () => {
+  it("renders the nudge for guests (user === null)", async () => {
+    renderWithIntl(<JourneyPage />);
+
+    // Default mock: user === null (guest). Nudge should be present.
+    await waitFor(() => {
+      expect(screen.getByTestId("guest-sign-up-nudge")).toBeInTheDocument();
+    });
+  });
+
+  it("does not render the nudge for signed-in users", async () => {
+    // Override mockUseAuth to simulate a signed-in user for ALL calls in this test.
+    mockUseAuth.mockReturnValue({
+      user: { id: "u1" },
+      supabase: null,
+      loading: false,
+    });
+
+    renderWithIntl(<JourneyPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Your progress" }),
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("guest-sign-up-nudge")).not.toBeInTheDocument();
   });
 });

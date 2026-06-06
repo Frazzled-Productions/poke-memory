@@ -604,3 +604,67 @@ describe("PokemonDetailDisclosure - async flavour re-render (#1559)", () => {
     expect(screen.getByText("Red · Blue")).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests - locked h1 and document.title (#1734 / #1729)
+// Verifies the locked species shows #{zeroPad(id)} as the visible h1 text
+// with an aria-label, and the unlocked species shows the localised name.
+// ---------------------------------------------------------------------------
+
+describe("PokemonDetailDisclosure - locked h1 (#1734)", () => {
+  beforeEach(() => {
+    mockSpeakName.mockClear();
+    mockPlayCry.mockClear();
+    mockPretendAllMastered.value = false;
+  });
+
+  it("locked: h1 shows #{zeroPad(id)} as the visible text (not ???)", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon({ id: 25, speciesId: 25, displayName: "Pikachu", name: "pikachu" });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1).toBeInTheDocument();
+    // Visible text must be the zero-padded dex number, not "???"
+    expect(h1.textContent).toBe("#025");
+    expect(h1.textContent).not.toBe("???");
+  });
+
+  it("locked: h1 has aria-label '#025 (locked)' to prevent digit-by-digit reading", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon({ id: 25, speciesId: 25, displayName: "Pikachu", name: "pikachu" });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    const h1 = screen.getByRole("heading", { level: 1 });
+    // en catalogue: pokedex.lockedAriaLabel = "#{number} (locked)"
+    expect(h1).toHaveAttribute("aria-label", "#025 (locked)");
+  });
+
+  it("locked: h1 has muted styling (zinc-300 / zinc-700)", () => {
+    mockCardClass.value = "locked";
+    const pokemon = makePokemon({ id: 1, speciesId: 1, displayName: "Bulbasaur", name: "bulbasaur" });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.className).toMatch(/zinc-300|zinc-700/);
+  });
+
+  it("unlocked (mastered): h1 shows the localised Pokémon name, not the dex number", () => {
+    mockCardClass.value = "mastered";
+    const pokemon = makePokemon({ id: 1, speciesId: 1, displayName: "Bulbasaur", name: "Bulbasaur" });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.textContent).toBe("Bulbasaur");
+    expect(h1.textContent).not.toContain("#");
+  });
+
+  it("unlocked (learning): h1 shows the Pokémon name, not the dex number", () => {
+    mockCardClass.value = "learning";
+    const pokemon = makePokemon({ id: 1, speciesId: 1, displayName: "Bulbasaur", name: "Bulbasaur" });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={pokemon} />);
+
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.textContent).toBe("Bulbasaur");
+  });
+});
