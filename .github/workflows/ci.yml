@@ -268,8 +268,9 @@ jobs:
           npm start &
           echo $! > /tmp/next.pid
           npx wait-on http://localhost:3000 --timeout 60000
-          # chromium only: real auth does not need the mobile-safari matrix.
-          npx playwright test --project=chromium e2e/auth-real.spec.ts
+          # Dedicated auth-real project (Desktop Chrome); all functional
+          # projects testIgnore this spec so it only runs here with the QA env.
+          npx playwright test --project=auth-real
       - name: Stop Next.js
         if: always() && needs.changes.outputs.e2e_relevant == 'true'
         run: |

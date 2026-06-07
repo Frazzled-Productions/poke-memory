@@ -75,12 +75,22 @@ export default defineConfig({
     {
       name: "desktop-webkit",
       use: { ...devices["Desktop Safari"] },
-      testIgnore: VISUAL_SPEC,
+      testIgnore: [VISUAL_SPEC, AUTH_REAL_SPEC],
     },
     {
       name: "mobile-chrome",
       use: { ...devices["Pixel 7"] },
-      testIgnore: VISUAL_SPEC,
+      testIgnore: [VISUAL_SPEC, AUTH_REAL_SPEC],
+    },
+    // --- Real-auth project -------------------------------------------------
+    // Runs ONLY the real-auth spec against the QA Supabase project. The
+    // e2e-real-auth CI job builds with the QA env baked in and selects this
+    // project; all functional projects testIgnore the spec so it never runs
+    // without that env.
+    {
+      name: "auth-real",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: AUTH_REAL_SPEC,
     },
     // --- Visual-regression projects ----------------------------------------
     // These run ONLY the visual snapshot spec. The spec drives both a mobile
