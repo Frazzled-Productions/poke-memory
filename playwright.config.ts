@@ -11,6 +11,12 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 // See WORKFLOW.md → "Visual-regression gate".
 const VISUAL_SPEC = "**/visual.spec.ts";
 
+// Real-auth spec runs ONLY under the dedicated `e2e-real-auth` CI job, which
+// bakes the QA Supabase env into its own build. The functional projects exclude
+// it so `e2e-browser` never picks it up without that env (beforeAll throws on
+// missing NEXT_PUBLIC_SUPABASE_URL, turning every retry into a hard failure).
+const AUTH_REAL_SPEC = "**/auth-real.spec.ts";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -59,22 +65,32 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: VISUAL_SPEC,
+      testIgnore: [VISUAL_SPEC, AUTH_REAL_SPEC],
     },
     {
       name: "mobile-safari",
       use: { ...devices["iPhone 14"] },
-      testIgnore: VISUAL_SPEC,
+      testIgnore: [VISUAL_SPEC, AUTH_REAL_SPEC],
     },
     {
       name: "desktop-webkit",
       use: { ...devices["Desktop Safari"] },
-      testIgnore: VISUAL_SPEC,
+      testIgnore: [VISUAL_SPEC, AUTH_REAL_SPEC],
     },
     {
       name: "mobile-chrome",
       use: { ...devices["Pixel 7"] },
-      testIgnore: VISUAL_SPEC,
+      testIgnore: [VISUAL_SPEC, AUTH_REAL_SPEC],
+    },
+    // --- Real-auth project -------------------------------------------------
+    // Runs ONLY the real-auth spec against the QA Supabase project. The
+    // e2e-real-auth CI job builds with the QA env baked in and selects this
+    // project; all functional projects testIgnore the spec so it never runs
+    // without that env.
+    {
+      name: "auth-real",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: AUTH_REAL_SPEC,
     },
     // --- Visual-regression projects ----------------------------------------
     // These run ONLY the visual snapshot spec. The spec drives both a mobile
