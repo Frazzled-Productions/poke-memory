@@ -134,6 +134,8 @@ describe("isFavouriteEarned", () => {
     return {
       ...initialReviewState(new Date("2026-05-13")),
       reps: 5,
+      // stability >= 21 is the mastery gate since #1765.
+      stability: 21,
       scheduledDays: MASTERY_INTERVAL_DAYS + 1,
       lastReview: "2026-05-12",
     };
@@ -143,35 +145,37 @@ describe("isFavouriteEarned", () => {
     return {
       ...initialReviewState(new Date("2026-05-13")),
       reps: 2,
+      stability: 5,
       scheduledDays: 3,
       lastReview: "2026-05-12",
     };
   }
 
   it("returns true when favourite is null", () => {
-    expect(isFavouriteEarned(null, [], 3)).toBe(true);
+    expect(isFavouriteEarned(null, [])).toBe(true);
   });
 
   it("returns true when the underlying card is mastered", () => {
     const cards = [{ id: SAMPLE.id, state: masteredState() }];
-    expect(isFavouriteEarned(SAMPLE_FAV, cards, 3)).toBe(true);
+    expect(isFavouriteEarned(SAMPLE_FAV, cards)).toBe(true);
   });
 
   it("returns false when the underlying card exists but is not mastered", () => {
     const cards = [{ id: SAMPLE.id, state: learningState() }];
-    expect(isFavouriteEarned(SAMPLE_FAV, cards, 3)).toBe(false);
+    expect(isFavouriteEarned(SAMPLE_FAV, cards)).toBe(false);
   });
 
   it("returns false when there is no card for the favourite", () => {
     const cards = [{ id: 999, state: masteredState() }];
-    expect(isFavouriteEarned(SAMPLE_FAV, cards, 3)).toBe(false);
+    expect(isFavouriteEarned(SAMPLE_FAV, cards)).toBe(false);
   });
 
-  it("respects a higher masteryRepetitions threshold", () => {
-    // reps = 5 satisfies the default 3 but not a 6-rep threshold; the
-    // scheduledDays gate also still applies.
-    const cards = [{ id: SAMPLE.id, state: masteredState() }];
-    expect(isFavouriteEarned(SAMPLE_FAV, cards, 3)).toBe(true);
-    expect(isFavouriteEarned(SAMPLE_FAV, cards, 6)).toBe(false);
+  it("mastered when stability >= 21; not mastered when stability < 21 (#1765 stability gate)", () => {
+    // stability = 21 → mastered.
+    const masteredCards = [{ id: SAMPLE.id, state: masteredState() }];
+    expect(isFavouriteEarned(SAMPLE_FAV, masteredCards)).toBe(true);
+    // stability = 5 → not mastered.
+    const learningCards = [{ id: SAMPLE.id, state: learningState() }];
+    expect(isFavouriteEarned(SAMPLE_FAV, learningCards)).toBe(false);
   });
 });

@@ -88,12 +88,14 @@ function makeCard(
   };
 }
 
-/** A card that is fully mastered (reps >= 3, scheduledDays >= 21). */
+/** A card that is fully mastered (stability >= 21, #1765). */
 function masteredCard(id: number): NameReviewCard {
   return makeCard(id, {
     lastReview: "2026-04-01",
     firstSeen: "2026-02-01",
     reps: 5,
+    // stability >= 21 is the mastery gate since #1765.
+    stability: 30,
     scheduledDays: 30,
     dueDate: "2026-05-01",
     fsrsState: "review",
@@ -653,6 +655,8 @@ function masteredReverseCard(pokemonId: number): ReverseReviewCard {
     lastReview: "2026-04-01",
     firstSeen: "2026-02-01",
     reps: 5,
+    // stability >= 21 is the mastery gate since #1765.
+    stability: 30,
     scheduledDays: 30,
     dueDate: "2026-05-01",
     fsrsState: "review",
@@ -801,7 +805,8 @@ describe("projection axis", () => {
 
   it("returns complete when all species are mastered (both legs, #1448)", () => {
     // Species-level mastery requires both name + reverse legs to be mastered.
-    const masteredState = { lastReview: "2026-04-01", firstSeen: "2026-02-01", reps: 5, scheduledDays: 30, dueDate: "2026-05-01", fsrsState: "review" as const };
+    // stability >= 21 is the gate since #1765.
+    const masteredState = { lastReview: "2026-04-01", firstSeen: "2026-02-01", reps: 5, stability: 30, scheduledDays: 30, dueDate: "2026-05-01", fsrsState: "review" as const };
     const cards: ReviewableCard[] = [
       makeCard(1, masteredState),
       makeReverseCard(1, masteredState),
@@ -810,7 +815,6 @@ describe("projection axis", () => {
     ];
     const snapshot = computeDashboardSnapshot(cards, makeSettings(), DEFAULT_LIMITS, TODAY, {
       include: ["projection"],
-      masteryRepetitions: 3,
     });
     expect(snapshot.projection?.kind).toBe("complete");
   });
@@ -819,7 +823,6 @@ describe("projection axis", () => {
     const cards: ReviewableCard[] = [newCard(1), learningCard(2)];
     const snapshot = computeDashboardSnapshot(cards, makeSettings(), DEFAULT_LIMITS, TODAY, {
       include: ["projection"],
-      masteryRepetitions: 3,
     });
     expect(snapshot.projection?.kind).toBe("insufficient-history");
   });
@@ -841,7 +844,6 @@ describe("firstMastery axis", () => {
     const cards: ReviewableCard[] = [newCard(1), newCard(2)];
     const snapshot = computeDashboardSnapshot(cards, makeSettings(), DEFAULT_LIMITS, TODAY, {
       include: ["firstMastery"],
-      masteryRepetitions: 3,
     });
     expect(snapshot.firstMasteryDays).toBeNull();
   });
@@ -850,7 +852,6 @@ describe("firstMastery axis", () => {
     const cards: ReviewableCard[] = [masteredCard(1), learningCard(2)];
     const snapshot = computeDashboardSnapshot(cards, makeSettings(), DEFAULT_LIMITS, TODAY, {
       include: ["firstMastery"],
-      masteryRepetitions: 3,
     });
     // mastered > 0, so firstMasteryDays gate excludes the projection
     expect(snapshot.firstMasteryDays).toBeNull();
@@ -884,7 +885,6 @@ describe("firstMastery axis", () => {
     ];
     const snapshot = computeDashboardSnapshot(cards, makeSettings(), DEFAULT_LIMITS, TODAY, {
       include: ["firstMastery", "mastery"],
-      masteryRepetitions: 3,
     });
     // Both cards introduced, none mastered - should get a projection
     expect(snapshot.firstMasteryDays).toBeGreaterThan(0);

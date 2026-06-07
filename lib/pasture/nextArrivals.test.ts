@@ -237,8 +237,8 @@ describe("nextArrivals", () => {
   it("locale scoping: cards without locale field default to 'en'", () => {
     // Cards from pre-#1259 storage have no locale field.
     const card = makeNameCard(1, learningState(2)); // no locale
-    expect(nextArrivals([card], false, 3, "en")).toHaveLength(1);
-    expect(nextArrivals([card], false, 3, "ja")).toHaveLength(0);
+    expect(nextArrivals([card], false, "en")).toHaveLength(1);
+    expect(nextArrivals([card], false, "ja")).toHaveLength(0);
   });
 
   it("returns correct id, name, spriteUrl, and state on returned entries", () => {

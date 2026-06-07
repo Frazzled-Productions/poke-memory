@@ -96,6 +96,7 @@ function masteredPair(id: number, daysAgo: number): ReviewableCard[] {
     fsrsState: "review",
     lastReview,
     firstSeen: isoMinusDays(TODAY, daysAgo + 30),
+    // stability >= 21 is the mastery gate since #1765.
     stability: 30,
     difficulty: 5,
   };
@@ -117,13 +118,13 @@ function lockedCard(id: number): NameReviewCard {
 describe("forceAllMastered", () => {
   it("returns complete when forceAllMastered is on, regardless of state", () => {
     const cards = [lockedCard(1), lockedCard(2), lockedCard(3)];
-    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS, true);
+    const result = computeCompletionProjection(cards, TODAY, true);
     expect(result.kind).toBe("complete");
   });
 
   it("returns complete even when there are many remaining cards", () => {
     const cards = Array.from({ length: 1000 }, (_, i) => lockedCard(i + 1));
-    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS, true);
+    const result = computeCompletionProjection(cards, TODAY, true);
     expect(result.kind).toBe("complete");
   });
 });
@@ -140,7 +141,7 @@ describe("all species mastered", () => {
       ...masteredPair(2, 10),
       ...masteredPair(3, 10),
     ];
-    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
+    const result = computeCompletionProjection(cards, TODAY);
     expect(result.kind).toBe("complete");
   });
 
@@ -157,7 +158,7 @@ describe("all species mastered", () => {
         difficulty: 5,
       }),
     ];
-    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
+    const result = computeCompletionProjection(cards, TODAY);
     // remaining = 1 (name card exists but species not mastered), no events in window → insufficient.
     expect(result.kind).toBe("insufficient-history");
   });
@@ -170,7 +171,7 @@ describe("all species mastered", () => {
 describe("insufficient history", () => {
   it("returns insufficient-history when no cards are mastered at all", () => {
     const cards = [lockedCard(1), lockedCard(2), lockedCard(3)];
-    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
+    const result = computeCompletionProjection(cards, TODAY);
     expect(result.kind).toBe("insufficient-history");
   });
 
@@ -199,7 +200,7 @@ describe("insufficient history", () => {
       lockedCard(2),
       lockedCard(3),
     ];
-    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
+    const result = computeCompletionProjection(cards, TODAY);
     expect(result.kind).toBe("insufficient-history");
   });
 
@@ -209,7 +210,7 @@ describe("insufficient history", () => {
       lockedCard(2),
       lockedCard(3),
     ];
-    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
+    const result = computeCompletionProjection(cards, TODAY);
     expect(result.kind).toBe("insufficient-history");
   });
 
@@ -219,7 +220,7 @@ describe("insufficient history", () => {
       lockedCard(2),
       lockedCard(3),
     ];
-    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
+    const result = computeCompletionProjection(cards, TODAY);
     expect(result.kind).toBe("projected");
   });
 
@@ -230,7 +231,6 @@ describe("insufficient history", () => {
     const result = computeCompletionProjection(
       [...fewMastered, ...manyLocked],
       TODAY,
-      MASTERY_REPETITIONS,
     );
     expect(result.kind).toBe("insufficient-history");
   });
@@ -251,7 +251,6 @@ describe("projected", () => {
     const result = computeCompletionProjection(
       [...mastered, ...locked],
       TODAY,
-      MASTERY_REPETITIONS,
     );
     expect(result.kind).toBe("projected");
     if (result.kind !== "projected") throw new Error("unreachable");
@@ -261,8 +260,8 @@ describe("projected", () => {
     expect(result.projectedDate > TODAY).toBe(true);
   });
 
-  it("respects the masteryRepetitions parameter", () => {
-    // With masteryRepetitions=5, a pair with reps=3 is not species-mastered.
+  it("stability gate: a pair with stability < 21 is not species-mastered (#1765)", () => {
+    // With stability=10, neither leg is mastered → no mastery events → insufficient-history.
     const notMastered: ReviewableCard[] = [
       nameCard(1, {
         reps: 3,
@@ -270,7 +269,8 @@ describe("projected", () => {
         fsrsState: "review",
         lastReview: isoMinusDays(TODAY, 10),
         firstSeen: isoMinusDays(TODAY, 40),
-        stability: 30,
+        // stability < 21 → not mastered under the new gate.
+        stability: 10,
         difficulty: 5,
       }),
       reverseCard(1, {
@@ -279,12 +279,12 @@ describe("projected", () => {
         fsrsState: "review",
         lastReview: isoMinusDays(TODAY, 10),
         firstSeen: isoMinusDays(TODAY, 40),
-        stability: 30,
+        stability: 10,
         difficulty: 5,
       }),
       lockedCard(2),
     ];
-    const result = computeCompletionProjection(notMastered, TODAY, 5);
+    const result = computeCompletionProjection(notMastered, TODAY);
     expect(result.kind).toBe("insufficient-history");
   });
 
@@ -297,7 +297,6 @@ describe("projected", () => {
     const result = computeCompletionProjection(
       [...mastered, ...locked],
       TODAY,
-      MASTERY_REPETITIONS,
     );
     if (result.kind !== "projected") {
       expect(result.kind).not.toBe("complete");
@@ -318,7 +317,6 @@ describe("projected", () => {
     const result = computeCompletionProjection(
       [...mastered, ...locked],
       TODAY,
-      MASTERY_REPETITIONS,
     );
     expect(result.kind).toBe("projected");
     if (result.kind !== "projected") throw new Error("unreachable");
@@ -332,7 +330,7 @@ describe("projected", () => {
 
 describe("edge cases", () => {
   it("handles an empty card array (no remaining, no mastered → complete)", () => {
-    const result = computeCompletionProjection([], TODAY, MASTERY_REPETITIONS);
+    const result = computeCompletionProjection([], TODAY);
     expect(result.kind).toBe("complete");
   });
 
@@ -341,7 +339,7 @@ describe("edge cases", () => {
       ...masteredPair(1, PROJECTION_WINDOW_DAYS - 1),
       ...Array.from({ length: 5 }, (_, i) => lockedCard(i + 100)),
     ];
-    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
+    const result = computeCompletionProjection(cards, TODAY);
     if (PROJECTION_WINDOW_DAYS - 1 >= MIN_HISTORY_DAYS) {
       expect(result.kind).toBe("projected");
     } else {

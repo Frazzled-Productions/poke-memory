@@ -62,6 +62,8 @@ function masteredPair(
 ): ReviewableCard[] {
   const masteryState = {
     reps: MASTERY_REPETITIONS,
+    // stability >= 21 is the mastery gate since #1765.
+    stability: 21,
     scheduledDays: MASTERY_INTERVAL_DAYS,
   };
   return [
@@ -141,7 +143,7 @@ describe("computeBestReviewDay", () => {
 
 describe("computeRecords - species-level mastery (both legs, #1448)", () => {
   it("empty inputs produce zeros and nulls", () => {
-    const r = computeRecords([], [], [], MASTERY_REPETITIONS);
+    const r = computeRecords([], [], []);
     expect(r).toEqual({
       longestStreak: 0,
       bestReviewDay: 0,
@@ -160,7 +162,7 @@ describe("computeRecords - species-level mastery (both legs, #1448)", () => {
         lastReview: "2026-05-12",
       }),
     ];
-    const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
+    const r = computeRecords(cards, [], []);
     expect(r.avgDaysToMastery).toBeNull();
     expect(r.mostMasteredIn7d).toBeNull();
   });
@@ -186,7 +188,7 @@ describe("computeRecords - species-level mastery (both legs, #1448)", () => {
       }),
       reverseCard(3, { reps: 1, scheduledDays: 1 }), // not mastered
     ];
-    const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
+    const r = computeRecords(cards, [], []);
     expect(r.avgDaysToMastery).toBe(15);
   });
 
@@ -200,7 +202,7 @@ describe("computeRecords - species-level mastery (both legs, #1448)", () => {
         { firstSeen: "2026-05-01", lastReview: "2026-05-10" },
       ),
     ];
-    const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
+    const r = computeRecords(cards, [], []);
     expect(r.avgDaysToMastery).toBe(9);
   });
 
@@ -211,7 +213,7 @@ describe("computeRecords - species-level mastery (both legs, #1448)", () => {
         { firstSeen: "2026-05-12", lastReview: "2026-05-12" },
       ),
     ];
-    const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
+    const r = computeRecords(cards, [], []);
     expect(r.avgDaysToMastery).toBe(0);
   });
 
@@ -229,7 +231,7 @@ describe("computeRecords - species-level mastery (both legs, #1448)", () => {
       ...mk(5, "2026-05-20"),
       ...mk(6, "2026-05-21"),
     ];
-    const r = computeRecords(cards, [], [], MASTERY_REPETITIONS);
+    const r = computeRecords(cards, [], []);
     expect(r.mostMasteredIn7d).toBe(4);
   });
 
@@ -238,7 +240,6 @@ describe("computeRecords - species-level mastery (both legs, #1448)", () => {
       [],
       [entry("2026-05-12"), entry("2026-05-12"), entry("2026-05-11")],
       ["2026-05-10", "2026-05-11", "2026-05-12"],
-      MASTERY_REPETITIONS,
     );
     expect(r.longestStreak).toBe(3);
     expect(r.bestReviewDay).toBe(2);
@@ -247,7 +248,7 @@ describe("computeRecords - species-level mastery (both legs, #1448)", () => {
   describe("with forceAllMastered (superuser pretendAllMastered)", () => {
     it("avgDaysToMastery is 0 and mostMasteredIn7d equals name-card count", () => {
       const cards: ReviewableCard[] = [nameCard(1), nameCard(2), nameCard(3)];
-      const r = computeRecords(cards, [], [], MASTERY_REPETITIONS, true);
+      const r = computeRecords(cards, [], [], true);
       expect(r.avgDaysToMastery).toBe(0);
       expect(r.mostMasteredIn7d).toBe(3);
     });
@@ -258,7 +259,6 @@ describe("computeRecords - species-level mastery (both legs, #1448)", () => {
         cards,
         [entry("2026-05-12"), entry("2026-05-12"), entry("2026-05-11")],
         ["2026-05-10", "2026-05-11", "2026-05-12"],
-        MASTERY_REPETITIONS,
         true,
       );
       expect(r.longestStreak).toBe(3);
@@ -266,7 +266,7 @@ describe("computeRecords - species-level mastery (both legs, #1448)", () => {
     });
 
     it("with zero cards, falls through to the honest computation (null)", () => {
-      const r = computeRecords([], [], [], MASTERY_REPETITIONS, true);
+      const r = computeRecords([], [], [], true);
       expect(r.avgDaysToMastery).toBeNull();
       expect(r.mostMasteredIn7d).toBeNull();
     });

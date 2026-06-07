@@ -737,7 +737,7 @@ describe("scenario streak + protection-token seeding", () => {
         new Date(),
         { reverseEnabled: true, nameEnabled: true, evolutionEnabled: true },
       );
-      const actual = filterMastered(hydrated, false, MASTERY_REPETITIONS, "en").length;
+      const actual = filterMastered(hydrated, false, "en").length;
       expect(payload.masteredCountByLocale?.en).toBe(actual);
       expect(actual).toBeGreaterThan(0);
     });

@@ -668,8 +668,11 @@ function buildPastureProgression(): SeedPayload {
 
   const desyncedReverseAdvancedIds = [190, 193, 196, 199, 200];
   for (const id of desyncedReverseAdvancedIds) {
-    // Reverse is graduated/advanced; name is deliberately NOT seeded (new candidate).
+    // Reverse is graduated/advanced; name card is new (never reviewed) representing
+    // a species where the user learnt the reverse leg first. The name card must be
+    // present to satisfy the pairing invariant (#1234) even though it is locked.
     cards.push(reverseCard(id, deriveDueSoonState({ dueDaysFromNow: 2 + (id % 4) }), "en"));
+    cards.push(nameCard(id, initialReviewState(T0), "en"));
   }
 
   // 20 graduated / due-soon (in progress, not yet mastered)

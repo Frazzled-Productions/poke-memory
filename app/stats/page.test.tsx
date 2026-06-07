@@ -419,28 +419,28 @@ describe("StatsPage - Japanese locale", () => {
 });
 
 describe("StatsPage - masteryMeaning.body em emphasis", () => {
-  it("renders the mastery meaning body with <em> emphasis around 'and'", async () => {
+  it("renders the mastery meaning body with <em> emphasis around 'stabilised' (#1765)", async () => {
     renderWithIntl(<StatsPage />);
 
-    // stats.masteryMeaning.body contains <em>and</em> in EN.
+    // stats.masteryMeaning.body contains <em>stabilised</em> in EN since #1765.
     // t.rich renders the em tag as a real <em> element.
     await waitFor(() => {
       const emEl = document.querySelector("em");
       expect(emEl).not.toBeNull();
-      // The emphasised text should be "and" in English
-      expect(emEl?.textContent).toBe("and");
+      // The emphasised text should be "stabilised" in English (#1765 changed from "and").
+      expect(emEl?.textContent).toBe("stabilised");
     });
   });
 
-  it("renders the mastery meaning body with <em> emphasis in Japanese", async () => {
+  it("renders the mastery meaning body with <em> emphasis in Japanese (#1765)", async () => {
     renderJa(<StatsPage />);
 
-    // ja: stats.masteryMeaning.body contains <em>、かつ</em>
+    // ja: stats.masteryMeaning.body contains <em>安定した</em> since #1765.
     await waitFor(() => {
       const emEl = document.querySelector("em");
       expect(emEl).not.toBeNull();
-      // The emphasised text should be the Japanese conjunction
-      expect(emEl?.textContent).toBe("、かつ");
+      // The emphasised text should be the Japanese word for "stabilised".
+      expect(emEl?.textContent).toBe("安定した");
     });
   });
 });
