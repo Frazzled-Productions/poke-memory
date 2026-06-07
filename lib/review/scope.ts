@@ -638,6 +638,7 @@ export function scopeLabel(scope: PracticeScope): string {
   if (scope.presets.includes("starters")) parts.push("Starters");
   if (scope.presets.includes("legendaries")) parts.push("Legendaries");
   if (scope.presets.includes("incomplete-chains")) parts.push("Incomplete chains");
+  if (scope.presets.includes("mastery-blockers")) parts.push("Almost mastered");
   const fc = scope.formCategories ?? { mode: "all" };
   if (fc.mode === "default-only") parts.push("Default forms only");
   else if (fc.mode === "include" && fc.categories.length > 0) {

@@ -519,6 +519,8 @@
       "presetStarters": "御三家",
       "presetLegendaries": "传说宝可梦",
       "presetIncompleteChains": "未完成进化链",
+      "presetMasteryBlockers": "即将掌握",
+      "presetMasteryBlockersDescription": "一个方向已掌握、另一个方向尚未掌握的宝可梦。专注于此来缩小差距。",
       "formIncludeAll": "包含全部",
       "formDefaultOnly": "仅默认形态",
       "formChooseCategories": "选择类别…",
@@ -566,6 +568,10 @@
     "higherOrLowerNudge": {
       "title": "完成本轮练习，解锁额外小游戏",
       "body": "完成今日所有卡片后，只要你已复习了至少两只宝可梦，会话摘要下方就会出现「高低」属性挑战。看看能否打破你的最佳连击纪录？"
+    },
+    "masteryBlockersNudge": {
+      "title": "提示：更快缩小掌握差距",
+      "body": "使用「即将掌握」范围筛选器，专门练习一侧已完成的种类中落后方向的卡片。"
     }
   },
   "review": {
@@ -899,7 +905,15 @@
       "listAriaLabel": "按语言划分的掌握情况"
     },
     "restoreFromCloud": "从云端恢复",
-    "restoreFromCloudDescription": "恢复选项在设置中。"
+    "restoreFromCloudDescription": "恢复选项在设置中。",
+    "legStatus": {
+      "nameDirection": "名称卡",
+      "reverseDirection": "反向卡",
+      "blockedOnName": "名称卡未掌握",
+      "blockedOnReverse": "反向卡未掌握",
+      "blockedHint": "掌握<direction>{dirName}</direction>以解锁完全掌握。",
+      "practiseToComplete": "练习反向卡以完成掌握。"
+    }
   },
   "journey": {
     "title": "旅程",

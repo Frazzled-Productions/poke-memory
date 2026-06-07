@@ -191,6 +191,18 @@ export type OnboardingFlags = {
    * visit, which is exactly the desired first-visit orientation behaviour.
    */
   cardTypesDefaultOpenDismissed: boolean;
+  /**
+   * One-shot hint for the "Almost mastered" scope preset (#1767). Shown on
+   * the active-card practice screen (near ScopeControl) for users who have
+   * completed the first-visit onboarding and have at least one blocked species
+   * (i.e. one leg mastered, the other not). Teases the mastery-blockers preset.
+   * `true` = user dismissed it.
+   *
+   * `=== true` coercion: absent key in pre-#1767 blobs resolves to `false`
+   * → every existing user who meets the threshold sees the hint once on their
+   * next practice session.
+   */
+  masteryBlockersNudgeDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -234,6 +246,9 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   // Card types section opens once on first Settings visit, then respects
   // whatever state the user last left it in after their first collapse).
   cardTypesDefaultOpenDismissed: false,
+  // Default false: absent in pre-#1767 blobs resolves to false (not dismissed;
+  // hint shows on next practice session for existing users with blocked species).
+  masteryBlockersNudgeDismissed: false,
 };
 
 /**
@@ -895,6 +910,9 @@ export function validateOnboarding(value: unknown): OnboardingFlags {
     // === true coercion: absent key in pre-#1726 blobs resolves to false (not dismissed;
     // Card types section defaults open on first Settings visit).
     cardTypesDefaultOpenDismissed: v.cardTypesDefaultOpenDismissed === true,
+    // === true coercion: absent key in pre-#1767 blobs resolves to false (not dismissed;
+    // hint shows on next practice session for existing users with blocked species).
+    masteryBlockersNudgeDismissed: v.masteryBlockersNudgeDismissed === true,
   };
 }
 

@@ -4,8 +4,10 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import type { NameReviewCard } from "@/lib/review/session";
+import type { SpeciesLegStatus } from "@/lib/stats/legStatus";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
+import type { LegStatus } from "@/lib/stats/legStatus";
 import { ArrivalSparkle } from "./ArrivalSparkle";
 import styles from "./Pasture.module.css";
 import { PASTURE_SPRITE_SIZE } from "@/lib/sprites/sizes";
@@ -15,10 +17,50 @@ import { formatDate } from "@/lib/utils/format-date";
 type Props = {
   card: NameReviewCard;
   onMarkSeen: (cardId: number) => void;
+  /**
+   * Per-leg mastery status for this species (#1766). When provided, the
+   * long-press popover shows name and reverse direction status rows.
+   * When absent the rows are suppressed (e.g. on the biome-landscape page
+   * which doesn't have access to the full card set).
+   */
+  legStatus?: SpeciesLegStatus;
 };
 
 const LONG_PRESS_MS = 500;
 const HOP_DURATION_MS = 600;
+
+// ---------------------------------------------------------------------------
+// Sub-component
+// ---------------------------------------------------------------------------
+
+/**
+ * Single row in the popover's per-leg status section.
+ *
+ * WCAG 1.4.1: colour is always paired with a text token (the i18n keys from
+ * `journey.masteryMastered` / `journey.masteryLearning` / `journey.masteryLocked`)
+ * so status is never communicated by colour alone.
+ */
+function LegRow({ label, status }: { label: string; status: LegStatus }) {
+  const tJourney = useTranslations("journey");
+  const statusClass =
+    status === "mastered"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : status === "learning"
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-zinc-400 dark:text-zinc-500";
+  const statusText =
+    status === "mastered"
+      ? tJourney("masteryMastered")
+      : status === "learning"
+      ? tJourney("masteryLearning")
+      : tJourney("masteryLocked");
+  return (
+    <div className="flex justify-between pt-0.5">
+      <dt>{label}</dt>
+      <dd className={statusClass}>{statusText}</dd>
+    </div>
+  );
+}
 
 /**
  * Individual Pokémon sprite rendered in a pasture zone.
@@ -30,8 +72,9 @@ const HOP_DURATION_MS = 600;
  * - Long-press (500 ms): opens a detail popover with name, mastery date, and
  *   scheduledDays. Tap-outside or Escape dismisses.
  */
-export function PasturePokemon({ card, onMarkSeen }: Props) {
+export function PasturePokemon({ card, onMarkSeen, legStatus }: Props) {
   const t = useTranslations("pasture");
+  const tLeg = useTranslations("stats.legStatus");
   const { name: localeName } = useLocalePokemonName(card.speciesId, card.name);
   const { locale: pokemonLocale } = usePokemonLocaleContext();
   // Stable per-sprite animation delay so sprites bob asynchronously.
@@ -213,6 +256,29 @@ export function PasturePokemon({ card, onMarkSeen }: Props) {
               <dt>{t("interval")}</dt>
               <dd>{card.state.scheduledDays}d</dd>
             </div>
+            {legStatus !== undefined && (
+              <>
+                {/* Per-leg mastery rows (#1766). WCAG 1.4.1: status is conveyed
+                    in text as well as colour. */}
+                <LegRow label={tLeg("nameDirection")} status={legStatus.name} />
+                <LegRow label={tLeg("reverseDirection")} status={legStatus.reverse} />
+                {/* Positive footer note: only when exactly one leg is mastered.
+                    Uses blockedHint with t.rich to preserve the <direction> bold tag.
+                    See i18n-expert note on t.rich for inline markup (#memory). */}
+                {legStatus.isBlocked && (
+                  <p className="pt-1 text-xs text-amber-700 dark:text-amber-400">
+                    {tLeg.rich("blockedHint", {
+                      dirName:
+                        legStatus.blockingLeg === "name"
+                          ? tLeg("nameDirection")
+                          : tLeg("reverseDirection"),
+                      // eslint-disable-next-line react/display-name
+                      direction: (chunks) => <strong>{chunks}</strong>,
+                    })}
+                  </p>
+                )}
+              </>
+            )}
           </dl>
           <button
             type="button"
