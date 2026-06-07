@@ -101,22 +101,22 @@ jobs:
             2>/dev/null | jq -r --arg marker "$MARKER" \
             '[.[] | select(.body | contains($marker))] | .[0].number // empty')
 
-          # The heredoc sits inside a `run: |` block, so every line carries the
-          # 10-space YAML indent. Strip exactly that indent so the issue body is
-          # not rendered as a Markdown code block.
+          # Build the body with printf rather than a heredoc: a plain heredoc
+          # inside a `run: |` block cannot have its closing delimiter at column
+          # 0 (YAML indentation), and a delimiter that carries the YAML indent
+          # is not recognised by the shell - so the body is assembled line by
+          # line instead. Leading whitespace is therefore never introduced, and
+          # the issue body does not render as a Markdown code block.
           BODY_FILE=$(mktemp)
-          sed 's/^          //' >"$BODY_FILE" <<EOF
-          $MARKER
-          **PokéAPI has species we have not seeded.**
-
-          - Live \`/pokemon-species\` count: **$LIVE**
-          - Seeded default-form count (\`generated-core.json\`, \`isDefaultForm\`): **$SEEDED**
-          - New species ids (in 1..$LIVE, not seeded): **$NEW_IDS**
-
-          **What to do:** run the re-seed flow for the new species and review the binaries (sprites / evolution chains) by hand before committing. See #1644 for the re-seed strategy. This is intentionally kept manual (option 3) - no auto-PR.
-
-          This issue was opened by the \`pokeapi-species-monitor\` workflow. It updates in place each month and is keyed on \`$MARKER\`.
-          EOF
+          {
+            printf '%s\n' "$MARKER"
+            printf '%s\n\n' "**PokéAPI has species we have not seeded.**"
+            printf '%s\n' "- Live \`/pokemon-species\` count: **$LIVE**"
+            printf '%s\n' "- Seeded default-form count (\`generated-core.json\`, \`isDefaultForm\`): **$SEEDED**"
+            printf '%s\n\n' "- New species ids (in 1..$LIVE, not seeded): **$NEW_IDS**"
+            printf '%s\n\n' "**What to do:** run the re-seed flow for the new species and review the binaries (sprites / evolution chains) by hand before committing. See #1644 for the re-seed strategy. This is intentionally kept manual (option 3) - no auto-PR."
+            printf '%s\n' "This issue was opened by the \`pokeapi-species-monitor\` workflow. It updates in place each month and is keyed on \`$MARKER\`."
+          } >"$BODY_FILE"
 
           if [ -n "$EXISTING" ]; then
             echo "Updating existing tracking issue #$EXISTING"
