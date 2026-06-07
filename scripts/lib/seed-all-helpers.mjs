@@ -35,6 +35,7 @@ export function parseArgs(argv) {
  *
  * @param {{ force: boolean, hasTtsKey: boolean }} opts
  * @returns {Array<{ name: string, script: string, skipReason: string|null, forceFlag: boolean }>}
+ *
  */
 export function buildStepList({ force, hasTtsKey }) {
   const ttsSkip = hasTtsKey

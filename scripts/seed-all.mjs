@@ -20,6 +20,7 @@
 // cloud. See docs/reseed.md for the full runbook.
 
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -32,10 +33,32 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Return true when the given environment variable key is present in the
+ * dotenv-style file at `filePath` (used to detect keys in .env.local that
+ * are not yet in the parent process environment).
+ *
+ * @param {string} filePath  Absolute path to the env file.
+ * @param {string} key       Variable name to look for.
+ * @returns {boolean}
+ */
+function envFileContainsKey(filePath, key) {
+  try {
+    const content = readFileSync(filePath, "utf8");
+    return content.split(/\r?\n/).some((line) => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith("#") && trimmed.startsWith(key + "=");
+    });
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Run an npm script as a child process and wait for it to exit.
@@ -51,7 +74,7 @@ function runScript(script, extraArgs = []) {
     if (extraArgs.length > 0) {
       args.push("--", ...extraArgs);
     }
-    const child = spawn("npm", args, {
+    const child = spawn(npm, args, {
       cwd: repoRoot,
       stdio: "inherit",
       shell: false,
@@ -69,7 +92,14 @@ function runScript(script, extraArgs = []) {
 // ---------------------------------------------------------------------------
 
 const { force } = parseArgs(process.argv.slice(2));
-const hasTtsKey = Boolean(process.env.GOOGLE_CLOUD_TTS_API_KEY);
+// `seed:tts` loads .env.local via --env-file-if-exists, so check both the
+// parent process environment and .env.local to avoid a false-negative skip.
+const hasTtsKey =
+  Boolean(process.env.GOOGLE_CLOUD_TTS_API_KEY) ||
+  envFileContainsKey(
+    resolve(repoRoot, ".env.local"),
+    "GOOGLE_CLOUD_TTS_API_KEY",
+  );
 
 const steps = buildStepList({ force, hasTtsKey });
 const total = steps.length;

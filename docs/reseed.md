@@ -24,7 +24,7 @@ The TTS step requires `GOOGLE_CLOUD_TTS_API_KEY` in the environment or `.env.loc
 Steps run in this order:
 
 1. `seed` - fetches all species from PokéAPI, writes `generated.json`, downloads sprite PNGs and Pokémon-cry audio.
-2. `seed:sprites` - converts PNGs to committed WebP variants at every app render size. macOS only (uses `sharp`; runs after `npm ci`).
+2. `seed:sprites` - converts PNGs to committed WebP variants at every app render size (uses `sharp`; runs after `npm ci`).
 3. `seed:tts` - generates Google Cloud TTS MP3s under `public/audio/names/`. Skipped if key is absent.
 4. `seed:split` - splits `generated.json` into the four committed shards (`generated-core.json`, `generated-chains.json`, `generated-flavor.json`, `generated-locale-names.json`).
 5. `generate:scope-lookup` - regenerates `lib/pokemon/scopeLookup.ts` from `generated.json`. Required to avoid `scope-lookup-drift.yml` CI failures.
