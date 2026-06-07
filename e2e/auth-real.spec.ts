@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { test, expect } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { syntheticEmail } from "@/lib/auth/username";
@@ -67,7 +68,7 @@ const E2E_PASSWORD = "e2e-real-auth-pw-2026";
 function makeUsername(): string {
   const seed =
     process.env.E2E_RUN_ID ??
-    `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    `${Date.now().toString(36)}${randomUUID().replace(/-/g, "").slice(0, 6)}`;
   // Strip to allowed chars, prefix with a fixed marker so QA rows are
   // identifiable, and clamp to 30 chars.
   const cleaned = `e2e_${seed}`.toLowerCase().replace(/[^a-z0-9_-]/g, "");
