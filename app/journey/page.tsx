@@ -401,7 +401,6 @@ export default function JourneyPage() {
   const { seed } = useSeed();
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   const [cards, setCards] = useState<Awaited<ReturnType<typeof buildSession>> | null>(null);
-  const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [pokemonNameLocale, setPokemonNameLocale] = useState<AppLocale>("en");
   const [eligibilitySettings, setEligibilitySettings] = useState<EligibilitySettings>({
     evolutionCardsEnabled: true,
@@ -439,7 +438,6 @@ export default function JourneyPage() {
         sessionCards = buildSession(currentSeed.seedPokemon, currentSeed.seedEvolutionCards, undefined, localOpts);
       }
       setCards(sessionCards);
-      setMasteryRepetitions(settings.masteryRepetitions);
       setPokemonNameLocale(settings.pokemonNameLocale);
       // Defensive: older mocks and pre-#1668 settings blobs may omit `onboarding`.
       setPracticeSessionsCount(settings.onboarding?.practiceSessionsCount ?? 0);
@@ -471,7 +469,6 @@ export default function JourneyPage() {
       if (!anyFlagOn) {
         const masteredIds = masteredSpeciesIds(
           sessionCards,
-          settings.masteryRepetitions,
           false,
         );
         const earnedIdSet = new Set(settings.earnedBadges.map((b) => b.id));
@@ -524,7 +521,6 @@ export default function JourneyPage() {
         log,
         currentNameCards: nameCardMap,
         totalSpecies: currentSeed.seedPokemon.filter((p) => p.isDefaultForm).length,
-        masteryRepetitions: settings.masteryRepetitions,
         retentionTarget: settings.retentionTarget,
         forceAllMastered: flags.pretendAllMastered,
       });
@@ -533,7 +529,6 @@ export default function JourneyPage() {
       // Derive evolution families from the final card set.
       const evoFamilies = deriveEvolutionFamilies(
         finalCards as readonly ReviewableCard[],
-        settings.masteryRepetitions,
         flags.pretendAllMastered,
       );
       setEvolutionFamilies(evoFamilies);
@@ -541,7 +536,6 @@ export default function JourneyPage() {
       // Derive close-to-mastery entries from the final card set.
       const ctm = deriveCloseToMastery(
         finalCards as readonly ReviewableCard[],
-        settings.masteryRepetitions,
         flags.pretendAllMastered,
       );
       setCloseToMasteryEntries(ctm);
@@ -554,13 +548,12 @@ export default function JourneyPage() {
   // Journey reads only the mastery axis from the returned snapshot (#1139,
   // simplified in #1151 - the include-filter abstraction was dropped).
   const snapshotOptions = useMemo(() => ({
-    masteryRepetitions: masteryRepetitions ?? undefined,
     forceAllMastered: flags.pretendAllMastered,
     locale: pokemonNameLocale,
-  }), [masteryRepetitions, flags.pretendAllMastered, pokemonNameLocale]);
+  }), [flags.pretendAllMastered, pokemonNameLocale]);
 
   const snapshotInput = useMemo(() => {
-    if (cards === null || masteryRepetitions === null) return null;
+    if (cards === null) return null;
     return {
       cards,
       settings: eligibilitySettings,
@@ -568,7 +561,7 @@ export default function JourneyPage() {
       today: todayString(new Date()),
       options: snapshotOptions,
     };
-  }, [cards, masteryRepetitions, eligibilitySettings, snapshotOptions]);
+  }, [cards, eligibilitySettings, snapshotOptions]);
 
   useProvideDashboardSnapshotInput(snapshotInput);
 
@@ -592,19 +585,18 @@ export default function JourneyPage() {
   // When forceAllMastered is on, every badge is earned and no hint is needed
   // (BadgeGallery skips the hint when forceAllMastered is true).
   const masteredIds: ReadonlySet<number> | undefined =
-    cards !== null && masteryRepetitions !== null
-      ? masteredSpeciesIds(cards, masteryRepetitions, flags.pretendAllMastered)
+    cards !== null
+      ? masteredSpeciesIds(cards, flags.pretendAllMastered)
       : undefined;
 
   // Pass the full card array so computeRecords can apply species-level
   // (both-legs) mastery counting (#1448).
   const records: Records | null =
-    cards !== null && masteryRepetitions !== null
+    cards !== null
       ? computeRecords(
           cards,
           gradeLog,
           streakDates,
-          masteryRepetitions,
           flags.pretendAllMastered,
           pokemonNameLocale,
         )
@@ -798,7 +790,7 @@ export default function JourneyPage() {
                 <p>{t("masteryExplainer.lockedBody")}</p>
                 <p className="mt-1">{t("masteryExplainer.learningBody")}</p>
                 <p className="mt-1">
-                  {t.rich("masteryExplainer.masteredBody", { reps: masteryRepetitions ?? 3, em: (chunks) => <em>{chunks}</em> })}
+                  {t("masteryExplainer.masteredBody")}
                 </p>
                 <p className="mt-1">{t("masteryExplainer.introducedNote")}</p>
               </OnboardingHint>
@@ -813,12 +805,11 @@ export default function JourneyPage() {
               <TypeBreakdown perType={masterySnapshot.perType} />
 
               {/* Language breakdown - only renders when >1 locale enrolled */}
-              {cards !== null && masteryRepetitions !== null ? (
+              {cards !== null ? (
                 <LanguageBreakdown
                   cards={cards}
                   gradeLog={gradeLog}
                   today={todayString(new Date())}
-                  masteryRepetitions={masteryRepetitions}
                 />
               ) : null}
             </div>

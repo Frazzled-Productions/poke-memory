@@ -1,6 +1,6 @@
 /**
  * Project the number of days until a user reaches their first mastery
- * (`reps >= masteryRepetitions && scheduledDays >= MASTERY_INTERVAL_DAYS`).
+ * (`stability >= MASTERY_STABILITY_DAYS`).
  *
  * Used by the Stats page hint introduced in #1083: a new user with a streak
  * and zero masteries has no in-app signal that mastery legitimately takes
@@ -30,10 +30,7 @@ import {
   type NextReviewOptions,
 } from "@/lib/srs/scheduler";
 import { relearningStepsFor } from "@/lib/srs/constants";
-import {
-  isMastered,
-  MASTERY_REPETITIONS,
-} from "@/lib/stats/derive";
+import { isMastered } from "@/lib/stats/derive";
 import type { NameReviewCard } from "@/lib/review/session";
 
 /** Cap the per-card simulation depth so a degenerate state cannot loop forever. */
@@ -54,8 +51,6 @@ export type TimeToMasteryResult = {
  * @param cards              All session cards (any type). Only introduced,
  *                           not-yet-mastered cards are simulated.
  * @param now                Reference timestamp; the projection counts from here.
- * @param masteryRepetitions Mastery threshold (matches the user's setting).
- *                           Defaults to MASTERY_REPETITIONS.
  * @param forceAllMastered   Superuser flag - when on, returns `{ days: null }`
  *                           because mastery is "complete" under the cheat.
  * @param options            FSRS overrides (retention target, per-user weights);
@@ -66,7 +61,6 @@ export type TimeToMasteryResult = {
 export function projectTimeToFirstMastery(
   cards: readonly NameReviewCard[],
   now: Date,
-  masteryRepetitions: number = MASTERY_REPETITIONS,
   forceAllMastered = false,
   options: NextReviewOptions = {},
 ): TimeToMasteryResult {
@@ -79,9 +73,9 @@ export function projectTimeToFirstMastery(
     // hides entirely once any card is mastered, but the function still
     // needs to be robust against being called with a mixed set.
     if (card.state.lastReview === null) continue;
-    if (isMastered(card.state, masteryRepetitions)) continue;
+    if (isMastered(card.state)) continue;
 
-    const days = simulateOne(card.state, now, masteryRepetitions, options);
+    const days = simulateOne(card.state, now, options);
     if (days === null) continue;
 
     if (bestDays === null || days < bestDays) {
@@ -105,7 +99,6 @@ export function projectTimeToFirstMastery(
 function simulateOne(
   initial: ReviewState,
   start: Date,
-  masteryRepetitions: number,
   options: NextReviewOptions,
 ): number | null {
   let state = initial;
@@ -122,7 +115,7 @@ function simulateOne(
     const cursor = new Date(cursorMs);
     state = nextReview(state, GOOD, cursor, options);
 
-    if (isMastered(state, masteryRepetitions)) {
+    if (isMastered(state)) {
       const elapsedMs = cursorMs - start.getTime();
       return elapsedMs / 86_400_000;
     }

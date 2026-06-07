@@ -3,6 +3,7 @@ import { deriveCloseToMastery } from "./closeToMastery";
 import type { NameReviewCard, ReverseReviewCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
+import { MASTERY_STABILITY_DAYS } from "@/lib/stats/derive";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -28,9 +29,10 @@ function baseState(overrides: Partial<ReviewState> = {}): ReviewState {
   };
 }
 
-/** A state that satisfies the mastery gate (reps >= 3 AND scheduledDays >= 21). */
+/** A state that satisfies the mastery gate (stability >= MASTERY_STABILITY_DAYS). */
 function masteredState(overrides: Partial<ReviewState> = {}): ReviewState {
   return baseState({
+    stability: MASTERY_STABILITY_DAYS,
     scheduledDays: 28,
     reps: 4,
     lastReview: "2026-01-01",
@@ -138,7 +140,7 @@ describe("deriveCloseToMastery - no results", () => {
       nameCard(1, masteredState()),
       reverseCard(1, { reps: 1, scheduledDays: 5, lastReview: "2026-01-01" }),
     ];
-    expect(deriveCloseToMastery(cards, 3, true)).toHaveLength(0);
+    expect(deriveCloseToMastery(cards, true)).toHaveLength(0);
   });
 });
 
@@ -253,17 +255,31 @@ describe("deriveCloseToMastery - sort order", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: custom masteryRepetitions
+// Tests: stability gate boundary
 // ---------------------------------------------------------------------------
 
-describe("deriveCloseToMastery - custom masteryRepetitions", () => {
-  it("respects a higher masteryRepetitions threshold", () => {
-    // With masteryRepetitions = 5, reps=4 is not mastered for name card.
+describe("deriveCloseToMastery - stability gate", () => {
+  it("name card with stability exactly at threshold is treated as mastered", () => {
+    // stability === MASTERY_STABILITY_DAYS passes the gate.
     const cards = [
-      nameCard(1, { reps: 4, scheduledDays: 28, lastReview: "2026-01-01" }),
+      nameCard(1, masteredState({ stability: MASTERY_STABILITY_DAYS })),
     ];
-    // Default threshold: reps 4 >= 3, so qualifies. Custom threshold: reps 4 < 5, excluded.
-    expect(deriveCloseToMastery(cards, 3)).toHaveLength(1);
-    expect(deriveCloseToMastery(cards, 5)).toHaveLength(0);
+    expect(deriveCloseToMastery(cards)).toHaveLength(1);
+  });
+
+  it("name card with stability below threshold is NOT treated as mastered", () => {
+    // stability < MASTERY_STABILITY_DAYS - not mastered, so nothing to show as close-to-mastery.
+    const cards = [
+      nameCard(1, { stability: MASTERY_STABILITY_DAYS - 1, scheduledDays: 28, reps: 4, lastReview: "2026-01-01" }),
+    ];
+    expect(deriveCloseToMastery(cards)).toHaveLength(0);
+  });
+
+  it("high reps + scheduledDays but low stability does NOT qualify name card as mastered", () => {
+    // Old reps gate would have passed this; new stability gate does not.
+    const cards = [
+      nameCard(1, { stability: 5, scheduledDays: 60, reps: 10, lastReview: "2026-01-01" }),
+    ];
+    expect(deriveCloseToMastery(cards)).toHaveLength(0);
   });
 });

@@ -653,6 +653,25 @@ function buildPastureProgression(): SeedPayload {
   // the review session filter by active locale (closing the #1394 id-collision
   // class). Keeping the two demos separate keeps each one's assertion crisp.
 
+  // Convergence-priority slab (#1764): species with one advanced leg and one new
+  // candidate leg. These exercise the queue-bias that introduces the missing leg
+  // first when a species is already partway there, so desynced accounts converge.
+  //
+  // 10 species with name card advanced (graduated), reverse card absent (new candidate).
+  // 5 species with reverse card advanced (graduated), name card absent (new candidate).
+  // IDs in Gen II (152+) to avoid collision with the Gen-I masteredIds above.
+  const desyncedNameAdvancedIds = [152, 155, 158, 161, 164, 167, 170, 175, 180, 185];
+  for (const id of desyncedNameAdvancedIds) {
+    // Name is graduated/advanced; reverse is deliberately NOT seeded (new candidate).
+    cards.push(nameCard(id, deriveDueSoonState({ dueDaysFromNow: 3 + (id % 5) }), "en"));
+  }
+
+  const desyncedReverseAdvancedIds = [190, 193, 196, 199, 200];
+  for (const id of desyncedReverseAdvancedIds) {
+    // Reverse is graduated/advanced; name is deliberately NOT seeded (new candidate).
+    cards.push(reverseCard(id, deriveDueSoonState({ dueDaysFromNow: 2 + (id % 4) }), "en"));
+  }
+
   // 20 graduated / due-soon (in progress, not yet mastered)
   const dueSoonIds = [
     95, 96, 98, 99, 100, 102, 104, 107, 109, 111,

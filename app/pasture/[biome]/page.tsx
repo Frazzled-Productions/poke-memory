@@ -117,9 +117,8 @@ export default function BiomeLandscapePage({
     null,
   );
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
-  // Re-derive when the user saves Settings, so a change to the
-  // masteryRepetitions threshold re-filters this biome without needing a
-  // session storage bump or a navigation away and back.
+  // Re-derive when the user saves Settings, so a locale change re-filters
+  // this biome without needing a session storage bump or navigation away and back.
   const [settingsVersion, setSettingsVersion] = useState(0);
 
   // Validate the biome slug against known habitats before loading anything.
@@ -149,7 +148,7 @@ export default function BiomeLandscapePage({
         setMasteredCards(all);
       } else {
         const session = await loadSession();
-        const { masteryRepetitions, pokemonNameLocale } = loadSettings();
+        const { pokemonNameLocale } = loadSettings();
         if (session) {
           // Hydrate so each card carries the full seed fields (habitat,
           // isDefaultForm, etc.) that biomeStats and the biome filter depend on.
@@ -175,7 +174,6 @@ export default function BiomeLandscapePage({
           const cards = filterMastered(
             hydrated,
             false,
-            masteryRepetitions,
             pokemonNameLocale,
           ) as NameReviewCard[];
           setMasteredCards(cards);

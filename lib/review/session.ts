@@ -774,13 +774,57 @@ export function buildSessionQueues(
     cards,
   );
 
-  // Stable-shuffle species IDs so day-to-day ordering within the admitted set
-  // is deterministic and rotates daily.
+  // Convergence-priority bias (#1764): species with one advanced leg and one
+  // new-candidate leg are introduced first so desynced accounts converge rather
+  // than drift further. An "advanced" leg is any card in the active locale whose
+  // lastReview !== null (i.e. it has been graded at least once). A "new
+  // candidate" leg is a card whose lastReview === null (appears in the new-card
+  // pool). When a species has a new-candidate name leg AND its reverse leg is
+  // already advanced, or vice versa, the two legs belong in a desynced pair
+  // that should converge. Collecting these species into tier 1 ensures they are
+  // offered before fully-fresh species in tier 2. The underlying species-grouped
+  // atomic admission and all daily caps are unchanged.
+  const advancedNameSpecies = new Set<number>();
+  const advancedReverseSpecies = new Set<number>();
+  for (const card of cards) {
+    if ((card.locale ?? "en") !== activeLocale) continue;
+    if (card.state.lastReview === null) continue;
+    if (card.cardType === "name") {
+      advancedNameSpecies.add(card.id);
+    } else if (card.cardType === "reverse") {
+      // Reverse card id = REVERSE_ID_OFFSET + pokemonId; pokemonId is the speciesId.
+      advancedReverseSpecies.add((card as ReverseReviewCard).pokemonId);
+    }
+  }
+
+  function isConvergencePriority(speciesId: number, group: SpeciesNewGroup): boolean {
+    const hasNewName    = group.name    !== undefined;
+    const hasNewReverse = group.reverse !== undefined;
+    // Priority: exactly one direction is new AND the other is already advanced.
+    return (
+      (hasNewName    && !hasNewReverse && advancedReverseSpecies.has(speciesId)) ||
+      (hasNewReverse && !hasNewName    && advancedNameSpecies.has(speciesId))
+    );
+  }
+
+  const tier1SpeciesIds: number[] = [];
+  const tier2SpeciesIds: number[] = [];
+  // Stable-shuffle species IDs so day-to-day ordering within each tier is
+  // deterministic and rotates daily.
   const shuffledSpeciesIds = shuffle([...speciesGroups.keys()]);
+  for (const speciesId of shuffledSpeciesIds) {
+    const group = speciesGroups.get(speciesId)!;
+    if (isConvergencePriority(speciesId, group)) {
+      tier1SpeciesIds.push(speciesId);
+    } else {
+      tier2SpeciesIds.push(speciesId);
+    }
+  }
+  const orderedSpeciesIds = [...tier1SpeciesIds, ...tier2SpeciesIds];
 
   const speciesNewIds: number[] = [];
 
-  for (const speciesId of shuffledSpeciesIds) {
+  for (const speciesId of orderedSpeciesIds) {
     const group = speciesGroups.get(speciesId)!;
 
     // Check whether all directions present in this group still have budget.

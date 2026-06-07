@@ -224,9 +224,8 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
     if (!cardsTrusted) return;
     const favourite = loadFavourite();
     if (favourite === null) return;
-    const settings = loadSettings();
     const cards = (await loadSession())?.cards ?? [];
-    if (!isFavouriteEarned(favourite, cards, settings.masteryRepetitions)) {
+    if (!isFavouriteEarned(favourite, cards)) {
       // `saveFavourite` → `saveSettings` already fires `SETTINGS_SAVED_EVENT`,
       // which `FavouriteThemeProvider` listens for - no synthetic StorageEvent
       // is needed for same-tab refresh.

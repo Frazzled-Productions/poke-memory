@@ -198,7 +198,6 @@ export default function StatsPage() {
   const { retryState, retryNow } = useRetryPush(client, userId);
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
-  const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const [pokemonNameLocale, setPokemonNameLocale] = useState<AppLocale>("en");
   const [cardTypeSettings, setCardTypeSettings] = useState<{
     evolutionCardsEnabled: boolean;
@@ -253,7 +252,6 @@ export default function StatsPage() {
         sessionCards = buildSession(currentSeed.seedPokemon, currentSeed.seedEvolutionCards, undefined, { reverseEnabled: true, nameEnabled: true, evolutionEnabled: settings.evolutionCardsEnabled });
       }
       setCards(sessionCards);
-      setMasteryRepetitions(settings.masteryRepetitions);
       setPokemonNameLocale(settings.pokemonNameLocale);
       setCardTypeSettings({
         evolutionCardsEnabled: settings.evolutionCardsEnabled,
@@ -296,7 +294,6 @@ export default function StatsPage() {
       if (!anyFlagOn) {
         const masteredIds = masteredSpeciesIds(
           sessionCards,
-          settings.masteryRepetitions,
           false,
         );
         const earnedIdSet = new Set(settings.earnedBadges.map((b) => b.id));
@@ -336,14 +333,13 @@ export default function StatsPage() {
   // Per-game mastery breakdown (#1313). Recomputed whenever cards change or
   // the superuser flag toggles.
   const perGame = useMemo<GameStats[]>(() => {
-    if (cards === null || masteryRepetitions === null || seed === null) return [];
+    if (cards === null || seed === null) return [];
     return computePerGameStats(
       cards,
       seed.seedPokemon,
-      masteryRepetitions,
       flags.pretendAllMastered,
     );
-  }, [cards, masteryRepetitions, flags.pretendAllMastered, seed]);
+  }, [cards, flags.pretendAllMastered, seed]);
 
   // Provide the full snapshot input to the shared DashboardSnapshotContext.
   // Stats reads all axes from the returned snapshot (#1139, simplified in #1151).
@@ -356,14 +352,13 @@ export default function StatsPage() {
   }), [cardTypeSettings, alternateFormsEnabled, practiceScope]);
 
   const snapshotOptions = useMemo(() => ({
-    masteryRepetitions: masteryRepetitions ?? undefined,
     forceAllMastered: flags.pretendAllMastered,
     retentionTarget,
     locale: pokemonNameLocale,
-  }), [masteryRepetitions, flags.pretendAllMastered, retentionTarget, pokemonNameLocale]);
+  }), [flags.pretendAllMastered, retentionTarget, pokemonNameLocale]);
 
   const snapshotInput = useMemo(() => {
-    if (cards === null || masteryRepetitions === null) return null;
+    if (cards === null) return null;
     return {
       cards,
       settings: snapshotSettings,
@@ -371,7 +366,7 @@ export default function StatsPage() {
       today: todayString(new Date()),
       options: snapshotOptions,
     };
-  }, [cards, masteryRepetitions, snapshotSettings, sessionLimits, snapshotOptions]);
+  }, [cards, snapshotSettings, sessionLimits, snapshotOptions]);
 
   useProvideDashboardSnapshotInput(snapshotInput);
 
@@ -400,7 +395,6 @@ export default function StatsPage() {
             masteryOverTime: computeMasteryOverTime(
               cards,
               today,
-              masteryRepetitions ?? undefined,
               flags.pretendAllMastered,
               pokemonNameLocale,
             ),
@@ -525,11 +519,10 @@ export default function StatsPage() {
             )}
 
             {/* Languages section - per-enrolled-locale mastery summary; hidden when single locale (#1619) */}
-            {cards !== null && masteryRepetitions !== null && (
+            {cards !== null && (
               <LanguageBreakdown
                 cards={cards}
                 today={todayString(new Date(), userTimezone)}
-                masteryRepetitions={masteryRepetitions}
                 dateFormat={userDateFormat}
                 timezone={userTimezone}
               />
@@ -542,13 +535,12 @@ export default function StatsPage() {
               </SectionHeading>
               <OnboardingHint id="statsHintDismissed" title={t("masteryMeaning.title")}>
                 <p>
-                  {t.rich("masteryMeaning.body", { reps: masteryRepetitions ?? 3, em: (chunks) => <em>{chunks}</em> })}
+                  {t.rich("masteryMeaning.body", { em: (chunks) => <em>{chunks}</em> })}
                 </p>
               </OnboardingHint>
-              {snapshot.firstMasteryDays !== null && masteryRepetitions !== null && (
+              {snapshot.firstMasteryDays !== null && (
                 <FirstMasteryHint
                   days={snapshot.firstMasteryDays}
-                  masteryReps={masteryRepetitions}
                   masteryDays={MASTERY_INTERVAL_DAYS}
                 />
               )}

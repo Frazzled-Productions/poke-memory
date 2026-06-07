@@ -2470,3 +2470,126 @@ describe('buildSessionQueues([]) - empty card list', () => {
     expect(resultZero.reviewQueue).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// buildSessionQueues - convergence-priority bias (#1764)
+// ---------------------------------------------------------------------------
+
+describe('buildSessionQueues - convergence-priority (#1764)', () => {
+  const TODAY = '2026-05-09';
+  // Generous limits so every candidate can be admitted; the test is about order,
+  // not caps.
+  const bigLimits: DailyLimits = {
+    name:      { maxNewPerDay: 20, maxReviewsPerDay: 50 },
+    evolution: { maxNewPerDay: 5,  maxReviewsPerDay: 10 },
+    reverse:   { maxNewPerDay: 20, maxReviewsPerDay: 50 },
+    cry:       { maxNewPerDay: 5,  maxReviewsPerDay: 10 },
+  };
+
+  const advancedState = { lastReview: '2026-05-01', firstSeen: '2026-04-01', reps: 1, scheduledDays: 7, dueDate: '2026-05-20' };
+
+  function nameCard(id: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): NameReviewCard {
+    return {
+      ...makeSeedPokemon(id),
+      cardType: 'name',
+      subjectKey: String(id),
+      state: { ...initialReviewState(NOW), ...partialState },
+    };
+  }
+  function reverseCard(pokemonId: number, partialState: Partial<ReturnType<typeof initialReviewState>> = {}): ReverseReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId),
+      id: REVERSE_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'reverse',
+      subjectKey: String(pokemonId),
+      state: { ...initialReviewState(NOW), ...partialState },
+    };
+  }
+
+  it('puts desynced species (advanced name + missing reverse) before fully-fresh species in the newQueue', () => {
+    // Desynced: species 10 has an advanced name card; its reverse is a new candidate.
+    // Fully fresh: species 20 has neither leg reviewed yet.
+    const cards: ReviewableCard[] = [
+      // Species 10: name is advanced; reverse is new (lastReview null = new candidate).
+      nameCard(10, advancedState),
+      reverseCard(10),  // new candidate
+      // Species 20: both are new candidates (fully fresh).
+      nameCard(20),
+      reverseCard(20),
+    ];
+    const queues = buildSessionQueues(cards, bigLimits, TODAY);
+    const newQueue = queues.newQueue;
+
+    // The reverse card for species 10 (convergence priority) should appear
+    // before any card from the fully-fresh species 20.
+    const reverseId10 = REVERSE_ID_OFFSET + 10;
+    const idx10 = newQueue.indexOf(reverseId10);
+    // nameCard 20 and reverseCard 20 are fully-fresh; their indices must all be > idx10.
+    const idx20name    = newQueue.indexOf(20);
+    const idx20reverse = newQueue.indexOf(REVERSE_ID_OFFSET + 20);
+    expect(idx10).toBeGreaterThanOrEqual(0); // reverse for species 10 is in the queue
+    // All components of fully-fresh species 20 come AFTER the convergence-priority entry.
+    if (idx20name >= 0) expect(idx20name).toBeGreaterThan(idx10);
+    if (idx20reverse >= 0) expect(idx20reverse).toBeGreaterThan(idx10);
+  });
+
+  it('puts desynced species (advanced reverse + missing name) before fully-fresh species', () => {
+    // Desynced: species 30 has an advanced reverse card; its name is a new candidate.
+    const cards: ReviewableCard[] = [
+      nameCard(30),                    // new candidate
+      reverseCard(30, advancedState),  // advanced
+      nameCard(40),                    // fully fresh
+      reverseCard(40),                 // fully fresh
+    ];
+    const queues = buildSessionQueues(cards, bigLimits, TODAY);
+    const newQueue = queues.newQueue;
+
+    const idx30name = newQueue.indexOf(30);
+    const idx40name = newQueue.indexOf(40);
+    const idx40rev  = newQueue.indexOf(REVERSE_ID_OFFSET + 40);
+
+    expect(idx30name).toBeGreaterThanOrEqual(0);
+    if (idx40name >= 0) expect(idx40name).toBeGreaterThan(idx30name);
+    if (idx40rev  >= 0) expect(idx40rev).toBeGreaterThan(idx30name);
+  });
+
+  it('does not prioritise a species where BOTH legs are new candidates', () => {
+    // Species 50: both legs are new candidates - not a desynced pair.
+    // Species 60: name is advanced; reverse is new - desynced pair (priority).
+    const cards: ReviewableCard[] = [
+      nameCard(50),          // fully fresh
+      reverseCard(50),       // fully fresh
+      nameCard(60, advancedState),    // advanced name
+      reverseCard(60),                // new candidate (convergence priority)
+    ];
+    const queues = buildSessionQueues(cards, bigLimits, TODAY);
+    const newQueue = queues.newQueue;
+
+    const reverseId60 = REVERSE_ID_OFFSET + 60;
+    const idx60rev  = newQueue.indexOf(reverseId60);
+    const idx50name = newQueue.indexOf(50);
+    const idx50rev  = newQueue.indexOf(REVERSE_ID_OFFSET + 50);
+
+    // Species 60's reverse (convergence priority) must appear before species 50.
+    expect(idx60rev).toBeGreaterThanOrEqual(0);
+    if (idx50name >= 0) expect(idx50name).toBeGreaterThan(idx60rev);
+    if (idx50rev  >= 0) expect(idx50rev).toBeGreaterThan(idx60rev);
+  });
+
+  it('does not alter FSRS state, daily counters, or review queue', () => {
+    // Convergence-priority is a pure introduction-order change.
+    const cards: ReviewableCard[] = [
+      nameCard(10, advancedState),
+      reverseCard(10),
+      nameCard(20),
+    ];
+    const queues = buildSessionQueues(cards, bigLimits, TODAY);
+    // Counters must reflect the actual persisted state, not the ordering tier.
+    expect(queues.reviewsDoneToday).toBe(0);
+    expect(queues.newIntroducedToday).toBe(0);
+    // All cards in the set have lastReview null (except name 10 which is due in the future)
+    // so the review queue should be empty (name 10 is due 2026-05-20, not on or before today).
+    expect(queues.reviewQueue).toHaveLength(0);
+  });
+});

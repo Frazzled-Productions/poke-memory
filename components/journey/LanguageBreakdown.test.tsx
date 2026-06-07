@@ -132,7 +132,6 @@ function defaultProps(overrides: Partial<LanguageBreakdownProps> = {}): Language
     cards: [],
     gradeLog: [],
     today: TODAY,
-    masteryRepetitions: MASTERY_REPETITIONS,
     ...overrides,
   };
 }

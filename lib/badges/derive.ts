@@ -8,12 +8,14 @@ const REVERSE_ID_OFFSET = 2_000_000;
 /**
  * Build the set of species IDs that are fully mastered in the given locale.
  * A species is mastered when BOTH its name card AND its reverse card have
- * cleared the FSRS mastery gate (`reps >= masteryRepetitions && scheduledDays >= 21`).
+ * cleared the FSRS mastery gate (stability >= MASTERY_STABILITY_DAYS).
  * Since #1234, reverse is a required practice direction, so species-level
  * mastery requires both legs.
  *
  * Since #1259, mastery is scoped to `locale` (defaults to `"en"` for
  * backward-compatibility). Only cards whose `locale` matches are counted.
+ *
+ * Since #1765, mastery uses FSRS stability (>= 21) rather than `reps >= 3`.
  *
  * Badges are locale-agnostic at award time - once earned, always earned.
  * The `locale` parameter scopes which cards count toward earning a badge,
@@ -27,7 +29,6 @@ const REVERSE_ID_OFFSET = 2_000_000;
  */
 export function masteredSpeciesIds(
   cards: readonly ReviewableCard[],
-  masteryRepetitions: number,
   forceAllMastered: boolean,
   locale: AppLocale = "en",
 ): Set<number> {
@@ -38,7 +39,7 @@ export function masteredSpeciesIds(
     if (card.cardType !== "reverse") continue;
     if ((card.locale ?? "en") !== locale) continue;
     const speciesId = card.id - REVERSE_ID_OFFSET;
-    if (speciesId > 0 && (forceAllMastered || isMastered(card.state, masteryRepetitions))) {
+    if (speciesId > 0 && (forceAllMastered || isMastered(card.state))) {
       masteredReverseSpecies.add(speciesId);
     }
   }
@@ -50,7 +51,7 @@ export function masteredSpeciesIds(
     if (forceAllMastered) {
       out.add(card.id);
     } else if (
-      isMastered(card.state, masteryRepetitions) &&
+      isMastered(card.state) &&
       masteredReverseSpecies.has(card.id)
     ) {
       out.add(card.id);

@@ -1,6 +1,5 @@
 import type { ReviewableCard } from "@/lib/review/session";
 import type { AppLocale } from "@/i18n/locales";
-import { MASTERY_REPETITIONS } from "./derive";
 import { masteredSpeciesEvents } from "./mastery-species-events";
 
 /**
@@ -39,15 +38,13 @@ export type MasteryPoint = {
  * **Empty state**: an empty array is returned when no species has been fully
  * mastered. The UI renders an empty state for `series.length === 0`.
  *
- * @param cards              Full mixed-type card array from the session.
- * @param today              YYYY-MM-DD string for the current date.
- * @param masteryRepetitions Mastery reps threshold (default `MASTERY_REPETITIONS`).
- * @param forceAllMastered   Superuser flag - when `true` collapse to a single point.
+ * @param cards            Full mixed-type card array from the session.
+ * @param today            YYYY-MM-DD string for the current date.
+ * @param forceAllMastered Superuser flag - when `true` collapse to a single point.
  */
 export function computeMasteryOverTime(
   cards: readonly ReviewableCard[],
   today: string,
-  masteryRepetitions = MASTERY_REPETITIONS,
   forceAllMastered = false,
   locale: AppLocale = "en",
 ): MasteryPoint[] {
@@ -62,7 +59,7 @@ export function computeMasteryOverTime(
 
   // Collect the species-level mastery date for every fully-mastered species.
   // masteredSpeciesEvents returns only species where BOTH name+reverse are mastered.
-  const events = masteredSpeciesEvents(cards, masteryRepetitions, false, locale);
+  const events = masteredSpeciesEvents(cards, false, locale);
   const masteryDates: string[] = events.map((e) => e.masteredDate);
 
   if (masteryDates.length === 0) return [];

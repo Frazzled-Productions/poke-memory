@@ -17,7 +17,6 @@
 import { isMastered } from "@/lib/stats/derive";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
-import { MASTERY_REPETITIONS } from "@/lib/stats/derive";
 import type { AppLocale } from "@/i18n/locales";
 
 /** The numeric offset added to a Pokémon ID to produce its reverse-card ID. */
@@ -41,7 +40,7 @@ export type NextArrival = {
  *
  * 1. Must be a name-type card in the given locale.
  * 2. Must have been seen at least once (firstSeen !== null) - "reviewed/seen".
- * 3. Must not already be mastered (honours masteryRepetitions threshold).
+ * 3. Must not already be mastered (stability >= MASTERY_STABILITY_DAYS).
  * 4. Must not have a mastered reverse card - once both legs are mastered the
  *    species is in the Pasture, not the arrivals list.
  *
@@ -54,7 +53,6 @@ export type NextArrival = {
 export function nextArrivals(
   cards: ReviewableCard[],
   forceAllMastered = false,
-  masteryRepetitions: number = MASTERY_REPETITIONS,
   locale: AppLocale = "en",
   limit = 5,
 ): NextArrival[] {
@@ -67,7 +65,7 @@ export function nextArrivals(
     if (card.cardType !== "reverse") continue;
     if ((card.locale ?? "en") !== locale) continue;
     const speciesId = card.id - REVERSE_ID_OFFSET;
-    if (speciesId > 0 && isMastered(card.state, masteryRepetitions)) {
+    if (speciesId > 0 && isMastered(card.state)) {
       masteredReverseSpecies.add(speciesId);
     }
   }
@@ -83,7 +81,7 @@ export function nextArrivals(
     if (!card.state.firstSeen) continue;
 
     // Skip already-mastered name cards.
-    if (isMastered(card.state, masteryRepetitions)) continue;
+    if (isMastered(card.state)) continue;
 
     // Skip species where the reverse is also mastered - that species is fully
     // mastered and belongs in the Pasture, not the arrivals list.

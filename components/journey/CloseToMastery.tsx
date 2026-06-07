@@ -4,8 +4,8 @@
  * CloseToMastery - "Focus here next" section on the Journey page.
  *
  * Shows species where the name card has cleared the mastery gate
- * (scheduledDays >= 21 AND reps >= masteryRepetitions) but the paired
- * reverse card has not yet reached that bar.
+ * (stability >= MASTERY_STABILITY_DAYS) but the paired reverse card has not
+ * yet reached that bar.
  *
  * Derived via the pure `deriveCloseToMastery` helper in lib/journey/; this
  * component handles rendering only.

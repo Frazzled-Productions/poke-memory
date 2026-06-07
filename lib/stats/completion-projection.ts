@@ -2,7 +2,6 @@ import type { ReviewableCard } from "@/lib/review/session";
 import type { AppLocale } from "@/i18n/locales";
 import { addDaysToIsoDate } from "@/lib/utils/dates";
 import { isoMinusDays } from "@/lib/stats/date";
-import { MASTERY_REPETITIONS } from "@/lib/stats/derive";
 import { masteredSpeciesEvents, nameCardsForLocale } from "./mastery-species-events";
 
 // ---------------------------------------------------------------------------
@@ -82,15 +81,13 @@ export const MAX_PROJECTION_DAYS = 365 * 10;
  *      `"insufficient-history"`.
  *   5. Extrapolate `remaining / weeklyRate * 7` days from today.
  *
- * @param cards              Full mixed-type card array from the session.
- * @param today              Today's date as YYYY-MM-DD.
- * @param masteryRepetitions Mastery threshold (matches the user's setting).
- * @param forceAllMastered   Superuser flag - when on, returns `"complete"`.
+ * @param cards            Full mixed-type card array from the session.
+ * @param today            Today's date as YYYY-MM-DD.
+ * @param forceAllMastered Superuser flag - when on, returns `"complete"`.
  */
 export function computeCompletionProjection(
   cards: readonly ReviewableCard[],
   today: string,
-  masteryRepetitions: number = MASTERY_REPETITIONS,
   forceAllMastered = false,
   locale: AppLocale = "en",
 ): CompletionProjection {
@@ -100,7 +97,7 @@ export function computeCompletionProjection(
   }
 
   // Derive species-level mastery events (both name + reverse legs, #1448).
-  const events = masteredSpeciesEvents(cards, masteryRepetitions, false, locale);
+  const events = masteredSpeciesEvents(cards, false, locale);
   const masteredSpeciesIdSet = new Set(events.map((e) => e.speciesId));
 
   // Count name cards (species) that are NOT yet mastered.

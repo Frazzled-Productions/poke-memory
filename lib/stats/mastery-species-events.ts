@@ -2,7 +2,7 @@
  * Species-level mastery event helpers.
  *
  * A species is mastered when BOTH its name card AND its paired reverse card
- * have cleared the FSRS mastery gate (`reps >= masteryRepetitions && scheduledDays >= 21`).
+ * have cleared the FSRS mastery gate (`stability >= MASTERY_STABILITY_DAYS`).
  * This module provides helpers that operate on the FULL card array (all card types)
  * rather than name cards alone, and return species-level mastery data.
  *
@@ -15,7 +15,7 @@ import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
 // Import the numeric constant from seed-builder (no JSON dependency) so
 // mastery-species-events.ts does NOT force the seed JSON into any shared chunk (#1677).
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-builder";
-import { isMastered, MASTERY_REPETITIONS } from "@/lib/stats/derive";
+import { isMastered } from "@/lib/stats/derive";
 import type { AppLocale } from "@/i18n/locales";
 
 // ---------------------------------------------------------------------------
@@ -51,13 +51,11 @@ export type SpeciesMasteryEvent = {
  *   - `computeCompletionProjection` (completion projection)
  *
  * @param cards              Full mixed-type card array from the session.
- * @param masteryRepetitions Mastery threshold from user settings.
  * @param forceAllMastered   Superuser pretendAllMastered flag.
  * @param locale             Card locale to scope mastery checks (default "en").
  */
 export function masteredSpeciesEvents(
   cards: readonly ReviewableCard[],
-  masteryRepetitions = MASTERY_REPETITIONS,
   forceAllMastered = false,
   locale: AppLocale = "en",
 ): SpeciesMasteryEvent[] {
@@ -69,7 +67,7 @@ export function masteredSpeciesEvents(
     if ((card.locale ?? "en") !== locale) continue;
     const speciesId = card.id - REVERSE_ID_OFFSET;
     if (speciesId <= 0) continue;
-    const mastered = forceAllMastered || isMastered(card.state, masteryRepetitions);
+    const mastered = forceAllMastered || isMastered(card.state);
     reverseInfo.set(speciesId, {
       mastered,
       lastReview: card.state.lastReview,
@@ -82,7 +80,7 @@ export function masteredSpeciesEvents(
     if (card.cardType !== "name") continue;
     if ((card.locale ?? "en") !== locale) continue;
 
-    const nameCardMastered = forceAllMastered || isMastered(card.state, masteryRepetitions);
+    const nameCardMastered = forceAllMastered || isMastered(card.state);
     if (!nameCardMastered) continue;
 
     const rev = reverseInfo.get(card.id);

@@ -19,8 +19,18 @@ import type { AppLocale } from "@/i18n/locales";
 
 export type CardClass = "locked" | "learning" | "mastered";
 
-/** Minimum consecutive successful reviews for mastery - mastery also requires interval >= MASTERY_INTERVAL_DAYS. */
+/**
+ * Minimum consecutive successful reviews used in the old reps-based mastery
+ * gate. No longer gates `isMastered` since #1765 (which replaced the reps
+ * sub-gate with a stability-based gate). Retained for:
+ *   - Settings UI explanatory text that references it.
+ *   - Test fixtures that seed believable card states.
+ *   - QA-seed scenarios that still use it to describe card states.
+ * Do NOT use this in any new mastery-checking code path.
+ */
 export const MASTERY_REPETITIONS = 3;
+/** A card is "mastered" once its FSRS stability reaches this many days (#1765). */
+export const MASTERY_STABILITY_DAYS = 21;
 /** A card is "mastered" once its projected review interval reaches this many days. */
 export const MASTERY_INTERVAL_DAYS = 21;
 
@@ -51,21 +61,29 @@ export const STRUGGLING_MIN_REPS = 3;
  */
 export const STRUGGLING_DIFFICULTY_CUTOFF = 7;
 
-export function isMastered(state: ReviewState, masteryRepetitions = MASTERY_REPETITIONS): boolean {
-  // FSRS swap: reps replaces repetitions, scheduledDays replaces interval.
-  // Mastery semantics are unchanged - N successful reviews and the next
-  // scheduled interval is ≥ MASTERY_INTERVAL_DAYS.
-  return state.reps >= masteryRepetitions && state.scheduledDays >= MASTERY_INTERVAL_DAYS;
+/**
+ * Returns true when the card's FSRS stability has reached the mastery
+ * threshold (#1765).
+ *
+ * Since #1765 mastery uses `stability` rather than the old `reps >= 3`
+ * sub-gate. At the default 0.9 retention target, stability is approximately
+ * equal to the next scheduled interval, so `stability >= 21` means the
+ * scheduler itself has confidence the user will retain the card for at least
+ * three weeks. A lapse that drives stability below 21 reverts the card to
+ * learning; gym badges (once earned) are latched separately and unaffected.
+ */
+export function isMastered(state: ReviewState): boolean {
+  return state.stability >= MASTERY_STABILITY_DAYS;
 }
 
 /**
  * Locked: card has never been graded (lastReview === null).
  * Learning: graded at least once, but not yet mastered.
- * Mastered: repetitions >= masteryRepetitions AND interval >= 21.
+ * Mastered: stability >= MASTERY_STABILITY_DAYS.
  */
-export function classifyCard(card: ReviewableCard, masteryRepetitions = MASTERY_REPETITIONS): CardClass {
+export function classifyCard(card: ReviewableCard): CardClass {
   if (card.state.lastReview === null) return "locked";
-  if (isMastered(card.state, masteryRepetitions)) return "mastered";
+  if (isMastered(card.state)) return "mastered";
   return "learning";
 }
 
@@ -115,7 +133,7 @@ export type GenerationStats = {
   name: string;
   total: number;       // species in this generation
   introduced: number;  // count where lastReview !== null
-  mastered: number;    // count where repetitions >= masteryRepetitions AND interval >= MASTERY_INTERVAL_DAYS
+  mastered: number;    // count where stability >= MASTERY_STABILITY_DAYS
 };
 
 export type StrugglingCard = {
@@ -143,7 +161,7 @@ export type StatsResult = {
   totalCards: number;                    // name cards only, ~1025
   introduced: number;                    // lastReview !== null
   learning: number;                      // introduced && !mastered
-  mastered: number;                      // repetitions >= masteryRepetitions param AND interval >= MASTERY_INTERVAL_DAYS
+  mastered: number;                      // stability >= MASTERY_STABILITY_DAYS
   locked: number;                        // lastReview === null (== totalCards - introduced)
   /**
    * 14-entry array, today first then 13 future days. Day 0 ("today") is the
@@ -193,8 +211,8 @@ export const DUE_FORECAST_DAYS = 14;
  *
  * Card filters:
  *   - `introduced` cards = `lastReview !== null`.
- *   - `learning` cards = introduced AND NOT isMastered (repetitions < masteryRepetitions OR interval < 21).
- *   - `mastered` cards = repetitions >= masteryRepetitions AND interval >= 21.
+ *   - `learning` cards = introduced AND NOT isMastered (stability < MASTERY_STABILITY_DAYS).
+ *   - `mastered` cards = stability >= MASTERY_STABILITY_DAYS.
  *   - `dueToday` excludes cards already reviewed today (matches the queue policy).
  *   - `dueTomorrow` is exact-match on tomorrow's ISO date.
  *   - `struggling` is the top `strugglingLimit` introduced cards that pass both
@@ -215,7 +233,6 @@ export function computeStats(
   cards: readonly ReviewableCard[],
   today: string,
   strugglingLimit = 10,
-  masteryRepetitions = MASTERY_REPETITIONS,
   forceAllMastered = false,
   locale: AppLocale = "en",
 ): StatsResult {
@@ -228,7 +245,7 @@ export function computeStats(
     if (card.cardType !== "reverse") continue;
     if ((card.locale ?? "en") !== locale) continue;
     const speciesId = card.id - REVERSE_ID_OFFSET;
-    if (speciesId > 0 && (forceAllMastered || isMastered(card.state, masteryRepetitions))) {
+    if (speciesId > 0 && (forceAllMastered || isMastered(card.state))) {
       masteredReverseSpecies.add(speciesId);
     }
   }
@@ -277,12 +294,10 @@ export function computeStats(
     // Since #1234, species-level mastery requires BOTH name AND reverse cards
     // to pass the FSRS gate. Check that the paired reverse card is also
     // mastered before counting this species as mastered.
-    const nameCardMastered = isMastered(state, masteryRepetitions);
+    const nameCardMastered = isMastered(state);
     const isSpeciesMastered = forceAllMastered
       ? true
       : nameCardMastered && masteredReverseSpecies.has(card.id);
-    const isCardMastered = forceAllMastered ? true : nameCardMastered;
-
     // Mastery / learning / locked tallies.
     if (isIntroduced) {
       introduced++;

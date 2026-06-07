@@ -31,7 +31,6 @@ export type LanguageBreakdownProps = {
   cards: readonly ReviewableCard[];
   gradeLog: GradeLog;
   today: string;
-  masteryRepetitions: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -84,7 +83,6 @@ function LanguageBreakdownInner({
   cards,
   gradeLog,
   today,
-  masteryRepetitions,
   learningLocales,
   forceAllMastered,
 }: LanguageBreakdownInnerProps) {
@@ -96,7 +94,6 @@ function LanguageBreakdownInner({
         cards,
         today,
         /* strugglingLimit */ 10,
-        masteryRepetitions,
         forceAllMastered,
         locale,
       );
@@ -105,7 +102,7 @@ function LanguageBreakdownInner({
       const bestDay = bestReviewDayForLocale(gradeLog, locale);
       return { locale, mastered: stats.mastered, bestDay };
     });
-  }, [cards, today, masteryRepetitions, forceAllMastered, gradeLog, learningLocales]);
+  }, [cards, today, forceAllMastered, gradeLog, learningLocales]);
 
   return (
     <section aria-labelledby="lang-breakdown-heading">
