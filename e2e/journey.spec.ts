@@ -81,7 +81,7 @@ test.describe("Journey page - badge gallery", () => {
   test("badge gallery section is visible", async ({ page }) => {
     await page.goto("/journey");
     await expect(
-      page.getByRole("heading", { level: 2, name: "Gym badges" }),
+      page.getByRole("heading", { level: 3, name: "Gym badges" }),
     ).toBeVisible({ timeout: 15_000 });
   });
 
