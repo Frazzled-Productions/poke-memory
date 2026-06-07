@@ -39,11 +39,10 @@ test.describe("What's new page", () => {
     const mainNav = page.getByRole("navigation", { name: "Main navigation" });
     const indicator = mainNav.getByRole("link", { name: "What's new" });
     await expect(indicator).toBeVisible();
-    // Wait for the anchor to be fully hydrated (its href rendered) before
-    // clicking. Clicking a not-yet-hydrated <Link> lands before the App Router
-    // is wired and the client navigation is silently dropped, leaving the URL
-    // at "/" - the intermittent failure tracked in #1784. Asserting the href
-    // first gates on hydration; waitForURL then tolerates the nav latency.
+    // Assert the href before clicking to ensure the link is fully rendered
+    // (visibility and href resolve at the same DOM-mutation event for this
+    // component). The primary flake defence is the extended waitForURL timeout
+    // below, which tolerates App Router client-navigation latency (#1784).
     await expect(indicator).toHaveAttribute("href", /\/whats-new$/);
     await indicator.click();
 
