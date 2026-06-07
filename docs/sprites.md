@@ -95,15 +95,17 @@ Current consumers:
 
 **Do not** preload an unbounded set. A blanket preload of all ~1025 grid sprites would saturate the network for no benefit - see the grid exemption below.
 
-## The Pokédex grid exemption (#932)
+## The Pokédex grid exemption (#932, updated #1740)
 
-The Pokédex grid (`components/pokedex/PokedexGrid.tsx`, ~1025 tiles) is the **one deliberate exemption** from the "default to `next/image`" rule. It keeps a plain lazy `<img>` pointing at the raw PNG (`/sprites/pokemon/<id>.png`).
+The Pokédex grid (`components/pokedex/PokedexGrid.tsx`, ~1025 tiles) is the **one deliberate exemption** from the "default to `next/image`" rule. It keeps a plain lazy `<img>` - but as of #1740 it points at the **pre-generated 64 px WebP variant** (`/sprites/pokemon/webp/<id>/64.webp`) via `spriteVariantUrl(id, POKEDEX_GRID_SPRITE_SIZE)`, not the raw PNG.
 
 **Decision (the maintainer, #932): exempt the grid.** Rationale:
 
 - Rendering ~1025 `next/image` wrappers adds per-cell DOM and component overhead with no responsive benefit - every tile is a fixed 64×64 square.
 - Off-screen tiles are *meant* to pop in as the user scrolls; `loading="lazy"` on a plain `<img>` is exactly the right behaviour and costs nothing.
 - A blanket preload or decode-ahead of the full set would be counter-productive (network saturation), and a viewport-aware prefetch was judged not worth the complexity for a surface whose lazy pop-in is by design.
+
+**#1740 update: WebP src, PNG no longer precached.** The 64 px WebP set is already in the offline precache (2.4 MB). Switching the grid to serve WebP instead of PNG eliminated the need to precache the full raw-PNG set (~144.6 MB), cutting the offline precache from ~212 MB to ~67.5 MB with no loss of offline capability. Raw PNGs remain in `public/` as the build-time source for `npm run seed:sprites` but are no longer included in `buildPrecacheUrls`.
 
 The exemption is recorded inline in `PokedexGrid.tsx` (the comment above the `<img>` element) and here. If the grid is ever revisited, the options weighed and rejected in #932 were: (b) a viewport-aware decode-warm of near-viewport tiles, and (c) `decode()`-on-scroll for upcoming rows. Both stay on the table but are not worth the cost today.
 

@@ -7,6 +7,7 @@ import type { PokemonCellData } from "@/lib/pokemon/filter";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { mutedText } from "@/lib/utils/class-names";
 import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
+import { spriteVariantUrl } from "@/lib/sprites/url";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,12 +29,11 @@ function zeroPad(id: number): string {
 // by-design pop-in we want for off-screen tiles, and a blanket preload of the
 // full set would be counter-productive.
 //
-// This surface intentionally serves the raw PNG (`/sprites/pokemon/<id>.png`),
-// not the pre-generated WebP variants. The raw PNG is slightly larger but
-// avoids loading 1025 of these images through the global imageLoader path.
-// The size literal below is intentionally kept inline - this surface opts out
-// of next/image entirely, so it does not participate in the loader's WebP
-// variant routing that the shared size constants exist for.
+// This surface serves the pre-generated 64 px WebP variant
+// (`/sprites/pokemon/webp/<id>/64.webp`) via `spriteVariantUrl`. The full 64 px
+// WebP set is already in the offline precache so the grid renders offline with
+// no additional download cost (#1740). The raw PNG path is no longer fetched
+// or precached for this surface.
 function PokemonCell({
   pokemon,
   localeOverride,
@@ -42,7 +42,7 @@ function PokemonCell({
   localeOverride?: LocaleNameOverride;
 }) {
   const { flags } = useSuperuser();
-  const { id, name, spriteUrl, cardClass: rawCardClass } = pokemon;
+  const { id, name, cardClass: rawCardClass } = pokemon;
   // PokemonCellData.cardClass is CardClass (never "pending"), so no pending guard needed.
   const cardClass = flags.pretendAllMastered ? "mastered" : rawCardClass;
 
@@ -105,10 +105,12 @@ function PokemonCell({
 
           {/* Sprite - using a plain <img> rather than next/image because we render
               1025 of these at fixed 64×64 sizes, where next/image's automatic
-              sizing wrapper adds DOM overhead per cell with no responsive benefit. */}
+              sizing wrapper adds DOM overhead per cell with no responsive benefit.
+              Src points at the pre-generated 64 px WebP variant, which is already
+              in the offline precache (#1740). */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={spriteUrl}
+            src={spriteVariantUrl(id, POKEDEX_GRID_SPRITE_SIZE)}
             alt={isLocked ? `#${zeroPad(id)} (locked)` : displayName}
             width={POKEDEX_GRID_SPRITE_SIZE}
             height={POKEDEX_GRID_SPRITE_SIZE}

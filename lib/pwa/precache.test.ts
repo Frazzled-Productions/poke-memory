@@ -58,9 +58,12 @@ describe("buildPrecacheUrls", () => {
     expect(nextImageUrls).toHaveLength(0);
   });
 
-  it("includes the raw sprite path for the Pokédex-grid <img> exemption", () => {
-    const urls = buildPrecacheUrls([1]);
-    expect(urls).toContain("/sprites/pokemon/1.png");
+  it("does NOT include any raw PNG paths (Pokédex grid switched to WebP in #1740)", () => {
+    // The grid now serves /sprites/pokemon/webp/<id>/64.webp; raw PNGs are no
+    // longer precached. A regression here means the precache grows by ~144 MB.
+    const urls = buildPrecacheUrls([1, 2, 3]);
+    const pngUrls = urls.filter((u) => u.match(/^\/sprites\/pokemon\/\d+\.png$/));
+    expect(pngUrls).toHaveLength(0);
   });
 
   it("includes the cry URL for each species", () => {
@@ -70,13 +73,13 @@ describe("buildPrecacheUrls", () => {
 
   it("produces a distinct set of URLs for multiple IDs", () => {
     const urls = buildPrecacheUrls([1, 2, 3]);
-    // Each ID contributes at least one raw sprite URL - three total.
-    const rawSprites = urls.filter(
-      (u) => u.match(/^\/sprites\/pokemon\/\d+\.png$/),
-    );
-    expect(rawSprites).toContain("/sprites/pokemon/1.png");
-    expect(rawSprites).toContain("/sprites/pokemon/2.png");
-    expect(rawSprites).toContain("/sprites/pokemon/3.png");
+    // Each ID contributes WebP variants for all render widths - no raw PNGs.
+    const webpFor1 = urls.filter((u) => u.startsWith("/sprites/pokemon/webp/1/"));
+    const webpFor2 = urls.filter((u) => u.startsWith("/sprites/pokemon/webp/2/"));
+    const webpFor3 = urls.filter((u) => u.startsWith("/sprites/pokemon/webp/3/"));
+    expect(webpFor1.length).toBeGreaterThan(0);
+    expect(webpFor2.length).toBeGreaterThan(0);
+    expect(webpFor3.length).toBeGreaterThan(0);
     // No duplicate URLs.
     expect(new Set(urls).size).toBe(urls.length);
   });
