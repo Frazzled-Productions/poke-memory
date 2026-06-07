@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { buildPrecacheUrls, precacheAll, OFFLINE_DOWNLOADED_AT_KEY } from "./precache";
 import { CACHE_NAMES, versionedCacheName } from "./cacheStrategy";
+import { GENERATED_SPRITE_WIDTHS } from "@/lib/sprites/imageLoaderHelpers";
 
 // ---------------------------------------------------------------------------
 // Helpers to build a minimal CacheStorage stub.
@@ -86,6 +87,20 @@ describe("buildPrecacheUrls", () => {
 
   it("returns an empty array for an empty ID list", () => {
     expect(buildPrecacheUrls([])).toHaveLength(0);
+  });
+
+  it("emits exactly (GENERATED_SPRITE_WIDTHS.length + 1) URLs per species", () => {
+    // +1 for the cry. This assertion is a CI gate: adding a new width to
+    // GENERATED_SPRITE_WIDTHS grows the precache by ~1025 × size KB and must
+    // be a conscious decision, not a silent side-effect.
+    const single = buildPrecacheUrls([1]);
+    expect(single).toHaveLength(GENERATED_SPRITE_WIDTHS.length + 1);
+
+    const three = buildPrecacheUrls([1, 2, 3]);
+    expect(three).toHaveLength((GENERATED_SPRITE_WIDTHS.length + 1) * 3);
+
+    // Snapshot the current width count so any addition fails CI explicitly.
+    expect(GENERATED_SPRITE_WIDTHS.length).toBe(10);
   });
 });
 
