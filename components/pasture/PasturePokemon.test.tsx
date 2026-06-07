@@ -367,3 +367,104 @@ describe("PasturePokemon - popover locale names", () => {
     expect(langSpan?.textContent).toBe("Bulbasaur");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests - per-direction leg status in the popover (#1766)
+// ---------------------------------------------------------------------------
+
+describe("PasturePokemon - per-direction leg status (#1766)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function openPopover(btn: HTMLElement) {
+    await act(async () => {
+      fireEvent.pointerDown(btn);
+      await vi.advanceTimersByTimeAsync(520);
+    });
+  }
+
+  it("shows name + reverse leg status and a blocked hint when one leg is blocked (en)", async () => {
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
+    render(
+      <PasturePokemon
+        card={card}
+        onMarkSeen={vi.fn()}
+        legStatus={{
+          speciesId: 1,
+          name: "mastered",
+          reverse: "learning",
+          isBlocked: true,
+          blockingLeg: "reverse",
+        }}
+      />,
+    );
+    await openPopover(screen.getByRole("button", { name: "Bulbasaur" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("Name card");
+    expect(dialog.textContent).toContain("Mastered");
+    expect(dialog.textContent).toContain("Reverse card");
+    expect(dialog.textContent).toContain("Learning");
+    // Blocked hint names the blocking (reverse) direction.
+    expect(dialog.textContent).toContain("Master the");
+    expect(dialog.textContent).toContain("to unlock full mastery");
+  });
+
+  it("shows locked status and no blocked hint when neither leg is mastered (en)", async () => {
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
+    render(
+      <PasturePokemon
+        card={card}
+        onMarkSeen={vi.fn()}
+        legStatus={{
+          speciesId: 1,
+          name: "locked",
+          reverse: "locked",
+          isBlocked: false,
+          blockingLeg: null,
+        }}
+      />,
+    );
+    await openPopover(screen.getByRole("button", { name: "Bulbasaur" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("Locked");
+    expect(dialog.textContent).not.toContain("to unlock full mastery");
+  });
+
+  it("renders leg-status labels in Japanese (ja)", async () => {
+    mockPokemonLocale = "ja";
+    mockUseLocalePokemonName.mockReturnValue({ name: LOCALE_NAMES["ja"], transliteration: null });
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
+    render(
+      <PasturePokemon
+        card={card}
+        onMarkSeen={vi.fn()}
+        legStatus={{
+          speciesId: 1,
+          name: "mastered",
+          reverse: "learning",
+          isBlocked: true,
+          blockingLeg: "reverse",
+        }}
+      />,
+      { locale: "ja" },
+    );
+    await openPopover(screen.getByRole("button", { name: LOCALE_NAMES["ja"] }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("名前カード");
+    expect(dialog.textContent).toContain("逆引きカード");
+    expect(dialog.textContent).toContain("習得済み");
+  });
+
+  it("suppresses leg-status rows when legStatus is absent", async () => {
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
+    render(<PasturePokemon card={card} onMarkSeen={vi.fn()} />);
+    await openPopover(screen.getByRole("button", { name: "Bulbasaur" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).not.toContain("Name card");
+    expect(dialog.textContent).not.toContain("Reverse card");
+  });
+});

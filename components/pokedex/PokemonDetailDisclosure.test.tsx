@@ -73,6 +73,30 @@ vi.mock("@/lib/review/useNextReviewDate", () => ({
   useNextReviewDate: () => ({ status: "not-started" }),
 }));
 
+// useSpeciesLegStatus internals (#1766): loadSession provides the cards;
+// computeSpeciesLegStatuses is stubbed so tests control the per-leg status
+// without constructing full card fixtures (the derivation itself is covered
+// in lib/stats/legStatus.test.ts).
+const { mockLoadSession, mockLegStatusMap } = vi.hoisted(() => ({
+  // Default: resolve null so the useSpeciesLegStatus hook no-ops in every
+  // existing test that renders the component (only the #1766 tests below
+  // opt into a populated session).
+  mockLoadSession: vi.fn(() => Promise.resolve(null)),
+  mockLegStatusMap: {
+    value: new Map<number, import("@/lib/stats/legStatus").SpeciesLegStatus>(),
+  },
+}));
+vi.mock("@/lib/review/persistence", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/review/persistence")>()),
+  loadSession: (() =>
+    mockLoadSession()) as typeof import("@/lib/review/persistence").loadSession,
+}));
+vi.mock("@/lib/stats/legStatus", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/stats/legStatus")>()),
+  computeSpeciesLegStatuses: (() =>
+    mockLegStatusMap.value) as typeof import("@/lib/stats/legStatus").computeSpeciesLegStatuses,
+}));
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -700,5 +724,62 @@ describe("PokemonDetailDisclosure - locked h1 (#1734)", () => {
     const h1 = screen.getByRole("heading", { level: 1 });
     // zh-Hant catalogue: pokedex.lockedAriaLabel = "#{number}（已鎖定）"
     expect(h1).toHaveAttribute("aria-label", "#025（已鎖定）");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests - per-direction leg status section (#1766)
+// ---------------------------------------------------------------------------
+
+describe("PokemonDetailDisclosure - per-direction leg status (#1766)", () => {
+  const blockedStatus = {
+    speciesId: 1,
+    name: "mastered",
+    reverse: "learning",
+    isBlocked: true,
+    blockingLeg: "reverse",
+  } as const;
+
+  beforeEach(() => {
+    mockCardClass.value = "mastered";
+    mockPretendAllMastered.value = false;
+    mockLoadSession.mockResolvedValue({ cards: [] });
+    mockLegStatusMap.value = new Map();
+  });
+
+  it("renders name + reverse leg status and the blocked-on hint (en)", async () => {
+    mockLegStatusMap.value = new Map([[1, blockedStatus]]);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+    expect(await screen.findByText("Blocked on reverse card")).toBeInTheDocument();
+    expect(screen.getByText("Name card")).toBeInTheDocument();
+    expect(screen.getByText("Reverse card")).toBeInTheDocument();
+    expect(screen.getByText("Mastered")).toBeInTheDocument();
+    expect(screen.getByText("Learning")).toBeInTheDocument();
+  });
+
+  it("renders leg-status labels in Japanese (ja)", async () => {
+    mockLegStatusMap.value = new Map([[1, blockedStatus]]);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "ja" });
+    expect(await screen.findByText("名前カード")).toBeInTheDocument();
+    expect(screen.getByText("逆引きカード")).toBeInTheDocument();
+  });
+
+  it("suppresses the section when pretendAllMastered is on", async () => {
+    mockPretendAllMastered.value = true;
+    mockLegStatusMap.value = new Map([[1, blockedStatus]]);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText("Name card")).not.toBeInTheDocument();
+  });
+
+  it("suppresses the section when no leg status is available", async () => {
+    mockLegStatusMap.value = new Map();
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText("Name card")).not.toBeInTheDocument();
   });
 });
