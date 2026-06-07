@@ -137,6 +137,11 @@ jobs:
           decide="${{ needs.decide.outputs.run }}"
           result="${{ needs.integration.result }}"
           echo "decide.run=$decide  integration.result=$result"
-          if [ "$decide" = "false" ]; then echo "Integration skipped (paths not matched) - gate passes."; exit 0; fi
-          if [ "$result" = "success" ]; then echo "Integration passed."; exit 0; fi
+          # `decide` did not request a run: explicit "false" (paths not matched)
+          # OR empty (job skipped, e.g. dependabot PRs where the `decide` job's
+          # `if:` excludes the actor and `needs.decide.outputs.run` is "").
+          if [ "$decide" != "true" ]; then echo "Integration not requested (decide.run='$decide') - gate passes."; exit 0; fi
+          # A skipped `integration` job also resolves to a pass, mirroring
+          # ci.yml's `e2e` aggregator.
+          if [ "$result" = "success" ] || [ "$result" = "skipped" ]; then echo "Integration passed (result: $result)."; exit 0; fi
           echo "::error::Integration tests did not pass (result: $result)."; exit 1

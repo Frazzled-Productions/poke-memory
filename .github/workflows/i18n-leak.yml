@@ -34,6 +34,11 @@ jobs:
     name: i18n-leak
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Skip fork PRs, matching changelog-gate.yml / coverage.yml: the gate is a
+    # maintainer-facing guardrail and a fork's head ref is not directly
+    # checkout-able here. workflow_dispatch has no head.repo, so the comparison
+    # is false-vs-undefined and the guard is satisfied for manual runs too.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.fork == false
     permissions:
       contents: read
 

@@ -18,7 +18,7 @@ name: Changelog Gate
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 concurrency:
   group: changelog-gate-${{ github.ref }}
