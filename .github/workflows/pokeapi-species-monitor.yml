@@ -1,0 +1,134 @@
+name: PokéAPI Species Monitor
+
+# Monthly detector for upstream species growth (#1739, parent #1644).
+#
+# PokéAPI lags new Pokémon releases by weeks-to-months (community backfill),
+# so day-one detection is impossible; the trigger is "PokéAPI now has species
+# we have not seeded". New gens land ~every 3 years, so this is near-free
+# insurance. This is NOT a CI failure monitor: the alert IS opening/updating
+# a tracking issue. The job never fails on growth - it files the issue and
+# exits 0. The actual re-seed + binary (sprite/chain) review stays human-driven
+# (option 3, not option 4's auto-PR).
+#
+# Method: compare the live `/pokemon-species` count to the seeded
+# default-form count derived from lib/pokemon/generated-core.json filtered to
+# isDefaultForm (1025 today). We deliberately compare species-count to
+# species-count: `/pokemon-species` is the clean canonical set and excludes
+# the 10001+ mega/regional/gigantamax `/pokemon` entries, so the diff avoids
+# that trap automatically. DO NOT switch the endpoint to `/pokemon`, and DO
+# NOT use the raw generated-core.json record count (1174) - it includes 149
+# alternate-form records at ids 10001+.
+#
+# Modelled on cron-health-monitor.yml / refresh-user-count.yml (schedule +
+# workflow_dispatch, open/update an issue in place via an HTML marker).
+
+on:
+  schedule:
+    - cron: '0 7 1 * *'   # 07:00 UTC on the 1st of each month
+  workflow_dispatch:
+
+concurrency:
+  group: pokeapi-species-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Detect new PokéAPI species
+    if: github.repository == 'Frazzled-Productions/poke-memory'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Compare live species count to seeded default-form count
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # --- Live count (one HTTP call) ------------------------------------
+          # limit=0 returns the total `count` without paging the results.
+          LIVE=$(curl -sf "https://pokeapi.co/api/v2/pokemon-species?limit=0" | jq '.count')
+          if ! [[ "$LIVE" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not read a numeric species count from PokéAPI (got: '$LIVE')."
+            exit 1
+          fi
+          echo "Live /pokemon-species count: $LIVE"
+
+          # --- Seeded default-form count + id set ---------------------------
+          # generated-core.json is a JSON array of records; isDefaultForm marks
+          # the canonical species rows (ids 1..1025 today). Alternate forms sit
+          # at ids 10001+ and are excluded.
+          SEEDED=$(node -e '
+            const d = require("./lib/pokemon/generated-core.json");
+            console.log(d.filter(r => r.isDefaultForm).length);
+          ')
+          echo "Seeded default-form count: $SEEDED"
+
+          if [ "$LIVE" -le "$SEEDED" ]; then
+            echo "No new species (live $LIVE <= seeded $SEEDED) - no-op."
+            exit 0
+          fi
+
+          # --- Identify the new species ids ---------------------------------
+          # New = ids in 1..LIVE that are not in the seeded isDefaultForm id
+          # set. Names are not in this catalogue (the issue lists ids; the
+          # re-seed step fetches names), so report ids.
+          NEW_IDS=$(node -e '
+            const d = require("./lib/pokemon/generated-core.json");
+            const seeded = new Set(d.filter(r => r.isDefaultForm).map(r => r.id));
+            const live = Number(process.argv[1]);
+            const missing = [];
+            for (let id = 1; id <= live; id++) if (!seeded.has(id)) missing.push(id);
+            console.log(missing.join(", "));
+          ' "$LIVE")
+          echo "New species ids: $NEW_IDS"
+
+          # --- Open or update the tracking issue in place -------------------
+          MARKER="<!-- pokeapi-species-monitor -->"
+
+          EXISTING=$(gh issue list \
+            --repo "$REPO" \
+            --state open \
+            --search "$MARKER in:body" \
+            --json number,body \
+            --limit 10 \
+            2>/dev/null | jq -r --arg marker "$MARKER" \
+            '[.[] | select(.body | contains($marker))] | .[0].number // empty')
+
+          # Build the body with printf rather than a heredoc: a plain heredoc
+          # inside a `run: |` block cannot have its closing delimiter at column
+          # 0 (YAML indentation), and a delimiter that carries the YAML indent
+          # is not recognised by the shell - so the body is assembled line by
+          # line instead. Leading whitespace is therefore never introduced, and
+          # the issue body does not render as a Markdown code block.
+          BODY_FILE=$(mktemp)
+          {
+            printf '%s\n' "$MARKER"
+            printf '%s\n\n' "**PokéAPI has species we have not seeded.**"
+            printf '%s\n' "- Live \`/pokemon-species\` count: **$LIVE**"
+            printf '%s\n' "- Seeded default-form count (\`generated-core.json\`, \`isDefaultForm\`): **$SEEDED**"
+            printf '%s\n\n' "- New species ids (in 1..$LIVE, not seeded): **$NEW_IDS**"
+            printf '%s\n\n' "**What to do:** run the re-seed flow for the new species and review the binaries (sprites / evolution chains) by hand before committing. See #1644 for the re-seed strategy. This is intentionally kept manual (option 3) - no auto-PR."
+            printf '%s\n' "This issue was opened by the \`pokeapi-species-monitor\` workflow. It updates in place each month and is keyed on \`$MARKER\`."
+          } >"$BODY_FILE"
+
+          if [ -n "$EXISTING" ]; then
+            echo "Updating existing tracking issue #$EXISTING"
+            gh issue edit "$EXISTING" --repo "$REPO" --body-file "$BODY_FILE"
+            gh issue comment "$EXISTING" --repo "$REPO" \
+              --body "$MARKER"$'\n'"Re-checked on $(date -u '+%Y-%m-%d %H:%M UTC') - live count is now $LIVE (seeded $SEEDED). Details above refreshed."
+          else
+            echo "Opening new tracking issue"
+            gh issue create --repo "$REPO" \
+              --title "New PokéAPI species detected ($LIVE vs $SEEDED seeded)" \
+              --label "priority:later" \
+              --body-file "$BODY_FILE"
+          fi
+
+          rm -f "$BODY_FILE"

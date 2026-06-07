@@ -1,0 +1,56 @@
+name: i18n Leak
+
+# Run the English-leak / pseudo-locale render gate in CI (#1737).
+#
+# `npm run test:i18n-leak` renders components under test via renderPseudo()
+# (the sentinel-bracketed xx-pseudo catalogue) and fails on any user-facing
+# string that is not in the catalogue and not on the allowlist - i.e. an
+# untranslated English leak. This is the strongest locale-correctness
+# guardrail in the repo; previously it had no CI backing and was enforced
+# only by /batch-issues step-2 agent discipline, so hand-rolled PRs bypassed
+# it entirely.
+#
+# Path-gated to UI / message changes so it does not run on docs-only PRs.
+# No build is needed - it is a vitest run.
+#
+# Deferred owner action: add `i18n-leak` to the qa-staging ruleset required
+# checks once stable, so a leak blocks merge. Until then the job goes red on
+# a leak without blocking.
+
+on:
+  pull_request:
+    paths:
+      - 'components/**'
+      - 'app/**/*.tsx'
+      - 'messages/**'
+  workflow_dispatch:
+
+concurrency:
+  group: i18n-leak-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  i18n-leak:
+    name: i18n-leak
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Skip fork PRs, matching changelog-gate.yml / coverage.yml: the gate is a
+    # maintainer-facing guardrail and a fork's head ref is not directly
+    # checkout-able here. workflow_dispatch has no head.repo, so the comparison
+    # is false-vs-undefined and the guard is satisfied for manual runs too.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.fork == false
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run i18n leak gate
+        run: npm run test:i18n-leak

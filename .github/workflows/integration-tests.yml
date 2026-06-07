@@ -117,3 +117,31 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:testpass@localhost:5432/poke_memory_test
         run: npm run test:integration
+
+  # Aggregator (#1738): a thin, always-reporting job so `integration` can be a
+  # required status check on the qa-staging ruleset without blocking PRs that
+  # don't touch the cloud-write surface. A skipped `integration` (paths not
+  # matched) resolves to a pass here; a real failure fails the gate. Modelled
+  # on ci.yml's `e2e` aggregator. Keeping a stable job named `integration-gate`
+  # means the required-check entry never has to change when the underlying
+  # jobs are renamed.
+  integration-gate:
+    name: integration-gate
+    needs: [decide, integration]
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 2
+    steps:
+      - name: Evaluate integration result
+        run: |
+          decide="${{ needs.decide.outputs.run }}"
+          result="${{ needs.integration.result }}"
+          echo "decide.run=$decide  integration.result=$result"
+          # `decide` did not request a run: explicit "false" (paths not matched)
+          # OR empty (job skipped, e.g. dependabot PRs where the `decide` job's
+          # `if:` excludes the actor and `needs.decide.outputs.run` is "").
+          if [ "$decide" != "true" ]; then echo "Integration not requested (decide.run='$decide') - gate passes."; exit 0; fi
+          # A skipped `integration` job also resolves to a pass, mirroring
+          # ci.yml's `e2e` aggregator.
+          if [ "$result" = "success" ] || [ "$result" = "skipped" ]; then echo "Integration passed (result: $result)."; exit 0; fi
+          echo "::error::Integration tests did not pass (result: $result)."; exit 1
