@@ -1,0 +1,66 @@
+name: Changelog Gate
+
+# Require a changelog fragment on user-facing PRs (#1741).
+#
+# `npm run lint:changelog` validates fragment *format* but does not require
+# that a user-facing PR *has* a fragment. The "add a
+# changelog.d/unreleased/<n>-<slug>.md fragment unless internal-only" rule
+# previously lived only in the /batch-issues step-2 agent brief, so a
+# hand-rolled user-facing PR could land with no fragment and silently produce
+# an empty release section.
+#
+# This gate fails a PR whose diff touches a user-facing surface (app/**,
+# components/**, lib/**) but adds zero changelog.d/unreleased/*.md files,
+# unless the PR carries the `no-changelog` escape-hatch label (use it for
+# genuinely internal-only changes that nonetheless touch those paths).
+#
+# Modelled on integration-tests.yml's decide job (dorny/paths-filter@v3).
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+concurrency:
+  group: changelog-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changelog-gate:
+    name: changelog-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Skip fork PRs: a fork's head ref is not directly checkout-able here, and
+    # the gate is a maintainer-facing guardrail. Same guard pattern as
+    # coverage.yml / auto-review.yml.
+    if: github.event.pull_request.head.repo.fork == false
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            user_facing:
+              - 'app/**'
+              - 'components/**'
+              - 'lib/**'
+            has_fragment:
+              - 'changelog.d/unreleased/**'
+
+      - name: Enforce changelog fragment presence
+        env:
+          USER_FACING: ${{ steps.filter.outputs.user_facing }}
+          HAS_FRAGMENT: ${{ steps.filter.outputs.has_fragment }}
+          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+        run: |
+          echo "user_facing=$USER_FACING  has_fragment=$HAS_FRAGMENT  no-changelog label=$HAS_LABEL"
+          if [ "$USER_FACING" = "true" ] && [ "$HAS_FRAGMENT" != "true" ] && [ "$HAS_LABEL" != "true" ]; then
+            echo "::error::This PR touches user-facing surfaces (app/**, components/**, lib/**) but adds no changelog.d/unreleased/*.md fragment. Add a fragment (see changelog.d/README.md) or apply the 'no-changelog' label if the change is genuinely internal-only."
+            exit 1
+          fi
+          echo "Changelog gate passes."

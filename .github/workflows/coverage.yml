@@ -10,8 +10,8 @@ name: Coverage
 #      lines in the PR to hit a 90% patch-coverage bar.
 #
 # The PR comment is posted on BOTH pass and fail so the numbers are always
-# visible. Make `coverage` a required check on the qa and main rulesets to
-# enforce the gate at merge time (owner action — not done by this workflow).
+# visible. `coverage` (`Test coverage report`) is a required check on the qa-staging and
+# main-protection rulesets (#1742). A gate failure blocks merge.
 
 on:
   pull_request:

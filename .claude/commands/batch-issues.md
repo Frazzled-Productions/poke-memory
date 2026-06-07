@@ -215,7 +215,7 @@ Once a batch's PRs are all open and reviewed in-session, merge them into `qa`:
 
 1. **No rebase tax.** The `qa` ruleset does not require strict-up-to-date, so a PR does not need rebasing when a sibling merges ahead of it, and merging one PR does not invalidate another's checks. Merge each PR as soon as its required checks are green - order does not matter:
    - `gh pr checks <PR>` - wait for required checks (`test`, `e2e`) green.
-   - **Also check the `integration` result, even though it is not required on `qa`.** A red `integration` is a real failure that surfaces on the eventual `qa -> main` release PR (where it *is* enforced) - do not filter it out of your merge-readiness check. In the #1394 batch an `integration`-only failure (a test-date bug) merged into `qa` because the readiness check looked only at `test`/`e2e`, then blocked the promotion PR. If `integration` is red for a reason unrelated to the PR, note it; if the PR caused it, fix before merge.
+   - **`integration-gate` is a required check on `qa-staging`.** Check it alongside `test` and `e2e` - a red `integration` is a real failure. If `integration` is red for a reason unrelated to the PR, note it; if the PR caused it, fix before merge.
    - If `Migration drift check` fails, the agent forgot to apply the migration via MCP - apply it now and the check re-runs.
    - `gh pr merge <PR> --squash --delete-branch`.
    - Loop until the queue is empty. **No rebase step** between merges - that strict-`main` cost is exactly what the qa flow removes.
