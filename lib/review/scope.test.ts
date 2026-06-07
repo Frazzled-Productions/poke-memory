@@ -493,6 +493,32 @@ describe("countMatchingSpecies", () => {
     const scope = { gens: [], types: [], presets: ["incomplete-chains" as const] };
     expect(countMatchingSpecies(SEED, scope, true)).toBe(0);
   });
+
+  it("counts only mastery-blocking species when the preset is active (#1767)", () => {
+    const scope = { gens: [], types: [], presets: ["mastery-blockers" as const] };
+    // Bulbasaur (1) and Charmander (4) are blocking; Squirtle (7) is not.
+    const ctx = { masteryBlockingSpeciesIds: new Set([1, 4]) };
+    expect(countMatchingSpecies(SEED, scope, true, ctx)).toBe(2);
+  });
+
+  it("counts 0 for the mastery-blockers preset with no context (#1767)", () => {
+    const scope = { gens: [], types: [], presets: ["mastery-blockers" as const] };
+    expect(countMatchingSpecies(SEED, scope, true)).toBe(0);
+  });
+
+  it("counts 0 for the mastery-blockers preset with an empty blocking set (#1767)", () => {
+    const scope = { gens: [], types: [], presets: ["mastery-blockers" as const] };
+    const ctx = { masteryBlockingSpeciesIds: new Set<number>() };
+    expect(countMatchingSpecies(SEED, scope, true, ctx)).toBe(0);
+  });
+
+  it("OR's mastery-blockers with gens: a Gen-I card counts even if not blocking (#1767)", () => {
+    // Squirtle (7) is Gen I; even if not in the blocking set it passes via gens:[1].
+    const scope = { gens: [1], types: [], presets: ["mastery-blockers" as const] };
+    const ctx = { masteryBlockingSpeciesIds: new Set<number>() };
+    // Gen I species in SEED: Bulbasaur (1), Charmander (4), Squirtle (7) - all 3 pass via gens.
+    expect(countMatchingSpecies(SEED, scope, true, ctx)).toBe(3);
+  });
 });
 
 // ─── readLegacyScope / clearLegacyScope ──────────────────────────────────
