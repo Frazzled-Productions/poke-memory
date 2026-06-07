@@ -107,10 +107,6 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
     });
   });
 
-  test.beforeEach(async ({ page }) => {
-    await addOnboardingPreDismiss(page);
-  });
-
   test.afterAll(async () => {
     // Teardown: sign in as the ephemeral user with a fresh anon-key client and
     // call delete_account(). Runs even if the test body failed so no QA user
@@ -149,6 +145,7 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
   test("sign up via the username door and the UI reflects the signed-in state", async ({
     page,
   }) => {
+    await addOnboardingPreDismiss(page);
     await page.goto("/");
 
     // The guest AuthButton renders the "Sign in" trigger. If it is absent the
