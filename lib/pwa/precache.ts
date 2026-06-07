@@ -9,8 +9,9 @@
  *  - Sprites are cached as pre-generated static WebP files at every render
  *    width used by the app. The browser fetches these directly from
  *    `/sprites/pokemon/webp/<id>/<width>.webp` - the `/_next/image` endpoint
- *    is no longer used for sprites. The raw `/sprites/pokemon/<id>.png` path
- *    is also cached for the Pokédex-grid plain-`<img>` exemption.
+ *    is no longer used for sprites. Raw PNGs (`/sprites/pokemon/<id>.png`) are
+ *    no longer precached: the Pokédex grid switched to the 64 px WebP variant
+ *    in #1740, and nothing else requests the raw PNGs at runtime.
  *  - Cries are cached once at their canonical /cries/<id>.ogg URL.
  *  - Each URL is checked with `cache.match` before fetching - already-cached
  *    assets are skipped, making the operation idempotent and resumable.
@@ -68,9 +69,14 @@ type PrecacheOptions = {
  *  - Pre-generated static WebP sprite paths at each render width
  *    (`/sprites/pokemon/webp/<id>/<width>.webp`) - served as static files,
  *    no `/_next/image` endpoint involvement.
- *  - The raw PNG sprite path for the Pokédex-grid <img> exemption
- *    (`/sprites/pokemon/<id>.png`).
  *  - The cry audio URL (`/cries/<id>.ogg`), if present in the seed.
+ *
+ * Raw PNG paths (`/sprites/pokemon/<id>.png`) are intentionally excluded:
+ * the Pokédex grid switched to the 64 px WebP variant in #1740, so nothing
+ * requests the PNGs at runtime. The PNG files remain in `public/` as the
+ * build-time source for the WebP seed script. The `/sprites/` CacheFirst
+ * route in `cacheStrategy.ts` remains unchanged - PNGs are still cacheable
+ * on demand if anything ever requests them.
  *
  * All sprite paths start with `/sprites/` so `classifyRequest` in
  * `cacheStrategy.ts` routes them to the sprites cache bucket via the
@@ -84,9 +90,6 @@ export function buildPrecacheUrls(ids: number[]): string[] {
     for (const w of SPRITE_RENDER_WIDTHS) {
       urls.push(spriteVariantUrl(id, w));
     }
-
-    // Raw PNG path for the Pokédex-grid <img> exemption.
-    urls.push(`/sprites/pokemon/${id}.png`);
 
     // Cry audio.
     urls.push(`/cries/${id}.ogg`);
