@@ -142,8 +142,8 @@ export function ServiceWorkerProvider() {
 
     // Belt-and-braces periodic check for tabs that never hide (e.g. a desktop
     // tab pinned on a second monitor). `registration.update()` is a no-op
-    // when no new SW exists, so the cost is a small HEAD request every 4
-    // hours.
+    // when no new SW exists, so the cost is a small HEAD request every 1
+    // hour.
     const intervalId = window.setInterval(() => {
       lastUpdateAtRef.current = Date.now();
       void serwistRef.current?.update();

@@ -143,3 +143,12 @@ export const sectionHeadingLg =
  */
 export const sectionHeading =
   "text-lg font-semibold text-foreground";
+
+/**
+ * Deep-subsection `<h4>` heading (text-base). Used for a fourth tier of
+ * nesting below a content-section `<h3>`, when a page needs a finer-grained
+ * heading hierarchy (added for #1759).
+ * `text-base font-semibold text-foreground`.
+ */
+export const sectionHeadingSm =
+  "text-base font-semibold text-foreground";
