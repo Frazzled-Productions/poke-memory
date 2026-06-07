@@ -207,12 +207,90 @@ jobs:
           # and leave the maintainer without diff images. See #1127.
           if-no-files-found: error
 
+  e2e-real-auth:
+    # Real-auth E2E (#1710): exercises the username/password door against the
+    # dedicated QA Supabase project on localhost (NOT the SSO-gated preview).
+    # This is the durable guard for the #1709 regression (sign-in succeeded
+    # server-side but the UI never reflected it).
+    #
+    # Builds its OWN server: NEXT_PUBLIC_* are inlined at BUILD time, and the
+    # shared `next-build` artifact from the `test` job is built with guest/no-
+    # Supabase env, so it cannot serve real auth. This job bakes the QA env into
+    # its own build + start.
+    #
+    # Fork guard: the QA_* secrets are not exposed to fork PRs, so the job would
+    # hard-fail. Skip on forks (the spec's beforeAll throws without the env).
+    needs: [changes, test]
+    if: github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    container:
+      # Same pinned Playwright image as e2e-browser (browsers + Node 24 baked in).
+      image: mcr.microsoft.com/playwright:v1.60.0-noble
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Skip notice (no e2e-relevant change)
+        if: needs.changes.outputs.e2e_relevant != 'true'
+        run: echo "No e2e-relevant changes detected — skipping real-auth Playwright suite."
+      - uses: actions/checkout@v6
+        if: needs.changes.outputs.e2e_relevant == 'true'
+      - name: Cache npm
+        if: needs.changes.outputs.e2e_relevant == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+      - run: npm ci
+        if: needs.changes.outputs.e2e_relevant == 'true'
+      - name: Build with QA Supabase env baked in
+        if: needs.changes.outputs.e2e_relevant == 'true'
+        env:
+          # NEXT_PUBLIC_* are inlined into the client bundle at build time, so the
+          # QA project must be provided HERE for real auth to work at runtime.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.QA_NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.QA_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: npm run build
+      - name: Start Next.js and run the real-auth spec
+        if: needs.changes.outputs.e2e_relevant == 'true'
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          # The spec (Node side) reads these to drive the RLS round-trip and the
+          # delete_account teardown via a fresh supabase-js client.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.QA_NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.QA_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # Unique per run+attempt so concurrent / repeated runs never collide on
+          # the ephemeral username, and no QA account accretes.
+          E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          npm start &
+          echo $! > /tmp/next.pid
+          npx wait-on http://localhost:3000 --timeout 60000
+          # chromium only: real auth does not need the mobile-safari matrix.
+          npx playwright test --project=chromium e2e/auth-real.spec.ts
+      - name: Stop Next.js
+        if: always() && needs.changes.outputs.e2e_relevant == 'true'
+        run: |
+          if [ -f /tmp/next.pid ]; then
+            kill "$(cat /tmp/next.pid)" 2>/dev/null || true
+          fi
+      - name: Upload Playwright report
+        if: failure() && needs.changes.outputs.e2e_relevant == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-real-auth
+          path: playwright-report/
+          retention-days: 14
+          if-no-files-found: error
+
   e2e:
     # Aggregator: the single required status check that gates on every
-    # `e2e-browser` matrix leg. Keeping a stable job named `e2e` means the
-    # required-check entry in the main-protection ruleset never has to change
-    # when matrix legs are added, removed, or renamed.
-    needs: [e2e-browser]
+    # `e2e-browser` matrix leg AND the `e2e-real-auth` job. Keeping a stable job
+    # named `e2e` means the required-check entry in the main-protection ruleset
+    # never has to change when matrix legs are added, removed, or renamed.
+    needs: [e2e-browser, e2e-real-auth]
     runs-on: ubuntu-latest
     if: always()
     timeout-minutes: 2
@@ -225,5 +303,15 @@ jobs:
           # success or skipped — failure, cancelled — fails the gate.
           if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
             echo "::error::One or more e2e matrix legs did not pass (result: $result)."
+            exit 1
+          fi
+      - name: Verify the real-auth job passed
+        run: |
+          result="${{ needs.e2e-real-auth.result }}"
+          echo "e2e-real-auth result: $result"
+          # Skipped is a pass: docs-only change (e2e_relevant false) or a fork PR
+          # (no QA secrets). Anything other than success or skipped fails the gate.
+          if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+            echo "::error::The e2e-real-auth job did not pass (result: $result)."
             exit 1
           fi
