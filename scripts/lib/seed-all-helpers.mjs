@@ -118,7 +118,7 @@ export function formatStepFailure(script, code) {
   return (
     `\nERROR: Step "npm run ${script}" failed with exit code ${code}.\n` +
     `  Fix the error above, then re-run:\n` +
-    `    npm run seed:all${code !== 0 ? "" : ""}\n` +
+    `    npm run seed:all\n` +
     `  Re-runs are safe: the orchestrator is additive by default.`
   );
 }
