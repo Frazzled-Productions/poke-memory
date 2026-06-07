@@ -131,12 +131,11 @@ export function loadFavourite(): StoredFavourite | null {
 export function isFavouriteEarned(
   favourite: StoredFavourite | null,
   cards: ReadonlyArray<{ id: number; state: ReviewState }>,
-  masteryRepetitions: number,
 ): boolean {
   if (favourite === null) return true;
   const card = cards.find((c) => c.id === favourite.id);
   if (card === undefined) return false;
-  return isMastered(card.state, masteryRepetitions);
+  return isMastered(card.state);
 }
 
 export function saveFavourite(

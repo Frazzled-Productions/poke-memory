@@ -1,0 +1,72 @@
+name: i18n Leak
+
+# Run the English-leak / pseudo-locale render gate in CI (#1737).
+#
+# `npm run test:i18n-leak` renders components under test via renderPseudo()
+# (the sentinel-bracketed xx-pseudo catalogue) and fails on any user-facing
+# string that is not in the catalogue and not on the allowlist - i.e. an
+# untranslated English leak. This is the strongest locale-correctness
+# guardrail in the repo; previously it had no CI backing and was enforced
+# only by /batch-issues step-2 agent discipline, so hand-rolled PRs bypassed
+# it entirely.
+#
+# The job ALWAYS runs (no workflow-level paths filter) and uses an internal
+# dorny/paths-filter to decide whether to execute the gate or pass as a no-op.
+# This makes the `i18n-leak` check always report, so it is safe as a required
+# status check on the qa-staging ruleset - a workflow-level paths filter would
+# skip the workflow on non-UI PRs and leave a required check pending forever
+# (the skipped-required-check trap that integration-gate / changelog-gate also
+# avoid). #1737.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: i18n-leak-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  i18n-leak:
+    name: i18n-leak
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Skip fork PRs, matching changelog-gate.yml / coverage.yml: the gate is a
+    # maintainer-facing guardrail and a fork's head ref is not directly
+    # checkout-able here. workflow_dispatch has no head.repo, so the comparison
+    # is false-vs-undefined and the guard is satisfied for manual runs too.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.fork == false
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Detect i18n-relevant changes
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            i18n:
+              - 'components/**'
+              - 'app/**/*.tsx'
+              - 'messages/**'
+
+      - uses: actions/setup-node@v6
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.i18n == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+
+      - run: npm ci
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.i18n == 'true'
+
+      - name: Run i18n leak gate
+        if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.i18n == 'true'
+        run: npm run test:i18n-leak
+
+      - name: No i18n-relevant changes - gate passes
+        if: github.event_name == 'pull_request' && steps.filter.outputs.i18n != 'true'
+        run: echo "No components/app/messages changes; i18n-leak gate passes (no-op)."

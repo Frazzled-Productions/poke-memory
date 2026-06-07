@@ -257,4 +257,69 @@ describe("BiomeLandscapePage", () => {
     expect(nameEl.tagName).toBe("SPAN");
     expect(nameEl).toHaveAttribute("lang", "ja");
   });
+
+  // ---------------------------------------------------------------------------
+  // Heading hierarchy (#1758)
+  // ---------------------------------------------------------------------------
+
+  describe("heading hierarchy", () => {
+    async function renderLoaded(biome = "grassland") {
+      const params = Promise.resolve({ biome });
+      await act(async () => {
+        renderWithIntl(<BiomeLandscapePage params={params} />);
+        await params;
+      });
+      // Flush async load() effect so masteredCards is set and the header renders.
+      await act(async () => {
+        await Promise.resolve();
+      });
+    }
+
+    it("renders exactly one h1 containing the biome label", async () => {
+      await renderLoaded("grassland");
+
+      const headings = screen.getAllByRole("heading", { level: 1 });
+      expect(headings).toHaveLength(1);
+      // The zone label from the HABITAT_ZONES mock is "Grassland".
+      expect(headings[0]).toHaveTextContent("Grassland");
+    });
+
+    it("h1 text includes the Pokémon count in parentheses", async () => {
+      await renderLoaded("grassland");
+
+      // biomeCards is empty in this test (filterMastered returns []) so count is 0.
+      const h1 = screen.getByRole("heading", { level: 1 });
+      expect(h1).toHaveTextContent("Grassland");
+      expect(h1).toHaveTextContent("(0)");
+    });
+
+    it("does not render any h2 or h3 directly in the page output", async () => {
+      // PastureZone is mocked to a plain <div> - it does not contribute
+      // headings in the test environment. Verifying the page itself does
+      // not accidentally skip levels by emitting h2/h3 without a prior h1.
+      await renderLoaded("grassland");
+
+      // h2 / h3 from the page's own markup (PastureZone is mocked away).
+      const h2s = screen.queryAllByRole("heading", { level: 2 });
+      const h3s = screen.queryAllByRole("heading", { level: 3 });
+      expect(h2s).toHaveLength(0);
+      expect(h3s).toHaveLength(0);
+    });
+
+    it("h1 is present in the empty-state branch (no mastered Pokémon)", async () => {
+      // loadSession returns null → filterMastered returns [] → isEmpty = true.
+      mockLoadSession.mockResolvedValue(null);
+      const params = Promise.resolve({ biome: "grassland" });
+      await act(async () => {
+        renderWithIntl(<BiomeLandscapePage params={params} />);
+        await params;
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Even with an empty biome the h1 must be present.
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Grassland");
+    });
+  });
 });

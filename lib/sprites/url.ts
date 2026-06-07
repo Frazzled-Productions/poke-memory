@@ -6,9 +6,12 @@
  *   `public/sprites/pokemon/webp/<id>/<width>.webp` and served directly
  *   without any Vercel Image Optimisation transformation.
  *
- * - `rawSpriteUrl` - returns the raw PNG path. Used by the Pokédex-grid
- *   plain-`<img>` exemption, which intentionally does not go through
- *   `next/image` or the WebP tree.
+ * - `rawSpriteUrl` - returns the raw PNG path
+ *   (`/sprites/pokemon/<id>.png`). The PNG files live in `public/` and are
+ *   the build-time source for `npm run seed:sprites`. After #1740 nothing
+ *   in the app requests these at runtime (the Pokédex grid switched to the
+ *   64 px WebP variant), but the function is retained for tooling that may
+ *   need the canonical raw path.
  */
 
 /**
@@ -23,10 +26,12 @@ export function spriteVariantUrl(id: number, width: number): string {
 /**
  * Raw PNG sprite URL for the given species ID.
  *
- * This is the path served directly from `public/sprites/pokemon/${id}.png`.
- * Use it only for the Pokédex-grid plain-`<img>` exemption - all other
- * surfaces should go through `next/image` which the global loader redirects
- * to the pre-generated WebP variant.
+ * Returns the path served directly from `public/sprites/pokemon/${id}.png`.
+ * After #1740 nothing in the app requests these at runtime - the Pokédex
+ * grid now serves `spriteVariantUrl(id, POKEDEX_GRID_SPRITE_SIZE)` instead.
+ * All other surfaces go through `next/image`, which the global loader
+ * redirects to the pre-generated WebP variant. Retained for tooling that
+ * references the canonical raw PNG path.
  */
 export function rawSpriteUrl(id: number): string {
   return `/sprites/pokemon/${id}.png`;

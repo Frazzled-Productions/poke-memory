@@ -26,6 +26,7 @@ import {
   type GenerationStats,
   type TypeStats,
   DUE_FORECAST_DAYS,
+  MASTERY_STABILITY_DAYS,
 } from "@/lib/stats/derive";
 import { addDaysToIsoDate } from "@/lib/utils/dates";
 import {
@@ -112,8 +113,6 @@ export type DashboardSnapshotOptions = {
   include?: SnapshotAxis[];
   /** Passed to `computeStats` - defaults to 10. */
   strugglingLimit?: number;
-  /** Mastery-repetitions threshold - defaults to MASTERY_REPETITIONS (3). */
-  masteryRepetitions?: number;
   /**
    * Superuser `pretendAllMastered` flag. Flows into every helper that accepts
    * it. When true, the snapshot reflects "everything mastered" state without
@@ -242,7 +241,6 @@ export function computeDashboardSnapshot(
   const {
     include,
     strugglingLimit = 10,
-    masteryRepetitions,
     forceAllMastered = false,
     retentionTarget = 0.9,
     now = new Date(),
@@ -275,7 +273,6 @@ export function computeDashboardSnapshot(
       cards,
       today,
       strugglingLimit,
-      masteryRepetitions,
       forceAllMastered,
     );
   }
@@ -382,7 +379,6 @@ export function computeDashboardSnapshot(
     projection = computeCompletionProjection(
       cards,
       today,
-      masteryRepetitions ?? 3,
       forceAllMastered,
       locale,
     );
@@ -400,14 +396,11 @@ export function computeDashboardSnapshot(
       introduced = statsResult.introduced;
       mastered = statsResult.mastered;
     } else {
-      // Compute a minimal pass for the gate check.
+      // Compute a minimal pass for the gate check (stability-based, #1765).
       for (const card of nameCards) {
         if (card.state.lastReview !== null) {
           introduced++;
-          if (
-            card.state.reps >= (masteryRepetitions ?? 3) &&
-            card.state.scheduledDays >= 21
-          ) {
+          if (card.state.stability >= MASTERY_STABILITY_DAYS) {
             mastered++;
           }
         }
@@ -418,7 +411,6 @@ export function computeDashboardSnapshot(
         projectTimeToFirstMastery(
           nameCards,
           now,
-          masteryRepetitions,
           forceAllMastered,
           { retentionTarget },
         ).days;

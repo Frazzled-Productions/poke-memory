@@ -129,8 +129,8 @@
         "hint": "[The scheduler aims to show each card just before you'd forget it. A higher recall target means more reviews and stronger retention; a lower target means fewer reviews and a bit more forgetting. Most people leave this at 90%.]"
       },
       "masteryThreshold": {
-        "label": "[Mastery threshold]",
-        "description": "[Cards with this many consecutive correct reviews count as mastered.]"
+        "label": "[Mastery threshold (deprecated)]",
+        "description": "[This setting no longer affects mastery. Mastery is now determined by FSRS stability, not review count. This control will be removed in a future update.]"
       },
       "recallTarget": {
         "label": "[Recall target ({percent}%)]",
@@ -519,6 +519,8 @@
       "presetStarters": "[Starters]",
       "presetLegendaries": "[Legendaries]",
       "presetIncompleteChains": "[Incomplete evolution chains]",
+      "presetMasteryBlockers": "[Almost mastered]",
+      "presetMasteryBlockersDescription": "[Pokémon where one direction is mastered but the other is not yet. Focus here to close the gap.]",
       "formIncludeAll": "[Include all]",
       "formDefaultOnly": "[Default form only]",
       "formChooseCategories": "[Choose categories…]",
@@ -566,6 +568,10 @@
     "higherOrLowerNudge": {
       "title": "[Finish your session for a bonus mini-game]",
       "body": "[When you finish today's cards, a Higher or Lower stat challenge appears below your session summary, as long as you have reviewed at least two Pokémon. Can you beat your best streak?]"
+    },
+    "masteryBlockersNudge": {
+      "title": "[Tip: close the mastery gap faster]",
+      "body": "[Use the \"Almost mastered\" scope filter to drill only the lagging direction of species where one side is already done.]"
     }
   },
   "review": {
@@ -736,7 +742,7 @@
     "schedulingHeading": "[Scheduling]",
     "masteryMeaning": {
       "title": "[What \"mastered\" means]",
-      "body": "[A card is mastered once you've recalled it correctly {reps} {reps, plural, one {time} other {times}} in a row <em>and</em> the next review is scheduled at least 21 days out: that's when the scheduler is confident you've actually learnt it, not just memorised it short term.]"
+      "body": "[A card is mastered once the scheduler's confidence in your recall has <em>stabilised</em> at 21 days or more: that's when it's confident you've actually learnt it, not just memorised it short term.]"
     },
     "strugglingCards": {
       "heading": "[Struggling cards]",
@@ -899,7 +905,14 @@
       "listAriaLabel": "[Mastery by language]"
     },
     "restoreFromCloud": "[Restore from cloud]",
-    "restoreFromCloudDescription": "[Recovery options are in Settings.]"
+    "restoreFromCloudDescription": "[Recovery options are in Settings.]",
+    "legStatus": {
+      "nameDirection": "[Name card]",
+      "reverseDirection": "[Reverse card]",
+      "blockedOnName": "[Blocked on name card]",
+      "blockedOnReverse": "[Blocked on reverse card]",
+      "blockedHint": "[Master the <direction>{dirName}</direction> to unlock full mastery.]"
+    }
   },
   "journey": {
     "title": "[Journey]",
@@ -996,7 +1009,7 @@
       "title": "[What the rings mean]",
       "lockedBody": "[Locked: you haven't seen this Pokémon in a practice session yet.]",
       "learningBody": "[Learning: you've seen it and are building the memory.]",
-      "masteredBody": "[Mastered: recalled correctly {reps} {reps, plural, one {time} other {times}} in a row with the next review at least 21 days out. That's when the scheduler is confident you've truly learnt it.]",
+      "masteredBody": "[Mastered: the scheduler's confidence in your recall has stabilised at 21 days or more. That's when it's confident you've truly learnt it.]",
       "introducedNote": "[Introduced counts any Pokémon you've seen at least once, whether or not it's fully mastered yet.]"
     },
     "languageBreakdown": {

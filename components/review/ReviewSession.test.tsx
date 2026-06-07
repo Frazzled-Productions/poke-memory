@@ -119,6 +119,8 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, GRADUATED_REVERSE_CARD, mockSeedPokemon, 
   // #1234) from adding a fresh unseen reverse card that would trigger newWall
   // with maxNewReversePerDay=0 (the default single-card fixture cap).
   // "Graduated" means lastReview !== null so hasMoreNewCardsOf("reverse") = false.
+  // Since #1765 mastery uses stability >= 21, so stability is set to 25 so the
+  // species-level mastery check in the hasMastered test can fire correctly.
   const graduatedReverseCard = {
     ...card,
     cardType: "reverse" as const,
@@ -126,7 +128,7 @@ const { FIXTURE_CARD, FIXTURE_CARDS_4, GRADUATED_REVERSE_CARD, mockSeedPokemon, 
     pokemonId: 1,
     subjectKey: "1",
     state: {
-      stability: 10,
+      stability: 25,
       difficulty: 5,
       elapsedDays: 25,
       scheduledDays: 25,
@@ -3133,8 +3135,10 @@ describe("ReviewCardLayout shared chrome (#1106)", () => {
     // by the time we reach this point. Switch to mockImplementation for the
     // entire remaining duration of this test so handleGrade gets the mastered
     // state regardless of call count.
+    // Since #1765 mastery uses stability >= 21, set stability to 21 so the
+    // transition from !isMastered (before) to isMastered (after) fires.
     vi.mocked(nextReview).mockImplementation(() => ({
-      stability: 10,
+      stability: 21,
       difficulty: 5,
       elapsedDays: 1,
       scheduledDays: 21,

@@ -39,9 +39,16 @@ test.describe("What's new page", () => {
     const mainNav = page.getByRole("navigation", { name: "Main navigation" });
     const indicator = mainNav.getByRole("link", { name: "What's new" });
     await expect(indicator).toBeVisible();
+    // The intermittent failure (#1784): a click can land before the App Router
+    // is wired, so the client navigation is silently dropped and the URL stays
+    // "/". The href assertion is a light readiness signal; the real defence is
+    // the explicit waitForURL below, which tolerates the navigation latency
+    // instead of racing it like the old bare toHaveURL("/whats-new") did.
+    await expect(indicator).toHaveAttribute("href", /\/whats-new$/);
     await indicator.click();
 
-    await expect(page).toHaveURL("/whats-new");
+    await page.waitForURL(/\/whats-new$/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/whats-new$/);
 
     await page.goto("/");
     // The page write should have updated last-seen to current; the nav

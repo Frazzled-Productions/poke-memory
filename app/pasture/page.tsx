@@ -28,6 +28,8 @@ import { useSeed } from "@/lib/pokemon/SeedContext";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { generationOf } from "@/lib/stats/derive";
+import { computeSpeciesLegStatuses } from "@/lib/stats/legStatus";
+import type { SpeciesLegStatus } from "@/lib/stats/legStatus";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { PageShell } from "@/components/ui/PageShell";
 import { pageTitle } from "@/lib/utils/class-names";
@@ -143,9 +145,8 @@ export default function PasturePage() {
   // via clearLocalProgress). Matches the pattern used by Stats and Pokédex; without
   // this, a reset that does not navigate away from /pasture would leave stale state.
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
-  // Re-render when the user saves Settings, so a change to the
-  // masteryRepetitions threshold re-filters the pasture without needing a
-  // session storage bump or a navigation away and back.
+  // Re-render when the user saves Settings, so a locale change re-filters
+  // the pasture without needing a session storage bump or navigation away and back.
   const [settingsVersion, setSettingsVersion] = useState(0);
 
   useEffect(() => {
@@ -198,13 +199,10 @@ export default function PasturePage() {
     void load();
   }, [storageVersion, seed]);
 
-  // The user's configured mastery threshold. loadSettings is synchronous and
-  // reads localStorage, so it is safe to call directly in render; it falls
-  // back to the default when no settings blob has been written. Reading
-  // `settingsVersion` here ties the value to the SETTINGS_SAVED_EVENT bump so
-  // a threshold change re-derives the filtered pasture immediately.
+  // Re-read settings on settingsVersion bump so a locale change re-derives
+  // the filtered pasture immediately.
   void settingsVersion;
-  const { masteryRepetitions, pokemonNameLocale } = loadSettings();
+  const { pokemonNameLocale } = loadSettings();
 
   // Derive mastered count so the reset-on-empty effect below can read it
   // without duplicating the full derivation logic.
@@ -213,7 +211,7 @@ export default function PasturePage() {
     : flags.pretendAllMastered
       ? (seed?.seedPokemon.length ?? 0)
       : session
-        ? filterMastered(session.cards, false, masteryRepetitions, pokemonNameLocale).length
+        ? filterMastered(session.cards, false, pokemonNameLocale).length
         : 0;
 
   // Reset filters whenever the mastered set transitions to empty
@@ -295,7 +293,6 @@ export default function PasturePage() {
       ? (filterMastered(
           session.cards,
           false,
-          masteryRepetitions,
           pokemonNameLocale,
         ) as NameReviewCard[])
       : [];
@@ -308,7 +305,6 @@ export default function PasturePage() {
   const arrivals = nextArrivals(
     session?.cards ?? [],
     flags.pretendAllMastered,
-    masteryRepetitions,
     pokemonNameLocale,
   );
 
@@ -338,6 +334,16 @@ export default function PasturePage() {
     masteredCards,
     flags.pretendAllMastered,
   );
+
+  // Per-species leg status for the popover (#1766). Computed from the full
+  // session card set (all card types, not just mastered name cards) so the
+  // reverse-card status is always accurate. Under pretendAllMastered, the
+  // helper returns all legs as mastered/not-blocked (empty map from the
+  // synthesized masteredCards which have no reverse cards, so we skip).
+  const legStatusMap: ReadonlyMap<number, SpeciesLegStatus> =
+    !flags.pretendAllMastered && session
+      ? computeSpeciesLegStatuses(session.cards, pokemonNameLocale, false)
+      : new Map();
 
   const filtered = isFiltered(filters);
 
@@ -377,6 +383,7 @@ export default function PasturePage() {
               onMarkSeen={handleMarkSeen}
               biomeHref={`/pasture/${zone.habitat}`}
               stats={zone.stats}
+              legStatusMap={legStatusMap}
             />
           ))}
         </div>

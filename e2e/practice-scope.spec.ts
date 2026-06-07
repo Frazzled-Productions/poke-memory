@@ -130,6 +130,42 @@ test.describe("Practice scope (#333)", () => {
     await expect(noMatch).not.toBeVisible();
   });
 
+  test("almost-mastered preset chip renders and toggles (#1767)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    const scopeToggle = page
+      .getByRole("button", { expanded: false })
+      .filter({ hasText: /scope/i })
+      .first();
+    await scopeToggle.click();
+    const scopePanel = page.locator("#scope-panel");
+    await expect(scopePanel).toBeVisible();
+
+    // Expand the "Groups" (presets) section - collapsed by default when no
+    // preset is active.
+    await scopePanel.getByRole("group", { name: "Groups" }).locator("summary").click();
+
+    // The new "Almost mastered" preset chip renders (#1767). Its accessible
+    // name is the descriptive aria-label; the visible text is "Almost mastered".
+    const chip = scopePanel.getByRole("button", {
+      name: /one direction is mastered but the other is not yet/i,
+    });
+    await expect(chip).toBeVisible();
+    await expect(scopePanel.getByText("Almost mastered")).toBeVisible();
+    await expect(chip).toHaveAttribute("aria-pressed", "false");
+
+    // Selecting it succeeds (the core interaction). This seed has no
+    // one-leg-mastered species (every card is freshly "new"), so the preset
+    // deterministically matches nothing and the no-match empty state appears -
+    // proof the scope change took effect. The desynced-match-and-build path is
+    // covered by unit tests (lib/review/scope.test.ts).
+    await chip.click();
+    await expect(page.getByText(/no Pok[ée]mon match your scope/i)).toBeVisible();
+  });
+
   test("scope change before any grade swaps the displayed card (#1088)", async ({
     page,
   }) => {

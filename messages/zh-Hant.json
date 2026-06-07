@@ -129,8 +129,8 @@
         "hint": "排程器會在您即將遺忘之前顯示每張卡片。記憶目標越高，複習次數越多，記憶越牢固；越低則複習次數越少，遺忘也會更多。大多數人保持預設的 90%。"
       },
       "masteryThreshold": {
-        "label": "掌握標準",
-        "description": "連續答對這麼多次的卡片將被視為已掌握。"
+        "label": "掌握標準（已廢棄）",
+        "description": "此設定不再影響掌握判定。掌握由FSRS穩定性決定。此控件將在未來版本中移除。"
       },
       "recallTarget": {
         "label": "記憶目標 ({percent}%)",
@@ -519,6 +519,8 @@
       "presetStarters": "御三家",
       "presetLegendaries": "傳說寶可夢",
       "presetIncompleteChains": "未完成進化鏈",
+      "presetMasteryBlockers": "即將掌握",
+      "presetMasteryBlockersDescription": "一個方向已掌握、另一個方向尚未掌握的寶可夢。專注於此來縮小差距。",
       "formIncludeAll": "包含全部",
       "formDefaultOnly": "僅預設形態",
       "formChooseCategories": "選擇類別…",
@@ -566,6 +568,10 @@
     "higherOrLowerNudge": {
       "title": "完成本輪練習，解鎖額外小遊戲",
       "body": "完成今日所有卡片後，只要你已複習了至少兩隻寶可夢，會話摘要下方就會出現「高低」屬性挑戰。看看能否打破你的最佳連擊紀錄？"
+    },
+    "masteryBlockersNudge": {
+      "title": "提示：更快縮小掌握差距",
+      "body": "使用「即將掌握」範圍篩選器，專門練習一側已完成的種類中落後方向的卡片。"
     }
   },
   "review": {
@@ -736,7 +742,7 @@
     "schedulingHeading": "排程",
     "masteryMeaning": {
       "title": "「已掌握」是什麼意思",
-      "body": "卡片在連續答對 {reps} 次<em>且</em>下次複習間隔至少 21 天後視為已掌握：這是排程器確認您真正學會而非短期記憶的時間點。"
+      "body": "當排程器對您記憶的置信度<em>穩定</em>在 21 天或以上時，卡片即視為已掌握：這是排程器確認您真正學會而非短期記憶的時間點。"
     },
     "strugglingCards": {
       "heading": "薄弱卡片",
@@ -899,7 +905,14 @@
       "listAriaLabel": "按語言劃分的掌握情況"
     },
     "restoreFromCloud": "從雲端恢復",
-    "restoreFromCloudDescription": "恢復選項在設定中。"
+    "restoreFromCloudDescription": "恢復選項在設定中。",
+    "legStatus": {
+      "nameDirection": "名稱卡",
+      "reverseDirection": "反向卡",
+      "blockedOnName": "名稱卡未掌握",
+      "blockedOnReverse": "反向卡未掌握",
+      "blockedHint": "掌握<direction>{dirName}</direction>以解鎖完全掌握。"
+    }
   },
   "journey": {
     "title": "旅程",
@@ -996,7 +1009,7 @@
       "title": "圓環含義",
       "lockedBody": "未開始：您還未在練習中見過此寶可夢。",
       "learningBody": "學習中：您已見過它，正在鞏固記憶。",
-      "masteredBody": "已掌握：連續答對 {reps} 次且下次複習間隔至少 21 天。這是排程器確認您真正學會的時間點。",
+      "masteredBody": "已掌握：排程器對您記憶的置信度已穩定在 21 天或以上。這是排程器確認您真正學會的時間點。",
       "introducedNote": "已引入統計您至少見過一次的寶可夢，無論是否已完全掌握。"
     },
     "languageBreakdown": {

@@ -133,14 +133,12 @@ const VALID_GRADES = new Set([1, 2, 4, 5]);
  * to the replay but do not create a separate species entry.
  *
  * @param log         Full grade log, any order (will be sorted internally).
- * @param masteryRepetitions   Mastery threshold (from user settings).
  * @param options     Optional FSRS weight/retention overrides (ignored in
  *                    replay - we use defaults, matching the approximation
  *                    blessed in the SRS-expert verdict above).
  */
 function replayLog(
   log: readonly GradeLogEntry[],
-  masteryRepetitions = MASTERY_REPETITIONS,
 ): Map<string, SpeciesEvent> {
   // Per-card state keyed by "cardType:subjectKey".
   const cardStates = new Map<string, ReviewState>();
@@ -186,7 +184,7 @@ function replayLog(
     cardStates.set(cardKey, nextState);
 
     const speciesKey = entry.subjectKey;
-    const nowMastered = isMastered(nextState, masteryRepetitions);
+    const nowMastered = isMastered(nextState);
 
     if (entry.cardType === "name") {
       // Track firstSeen for the species (from the name card).
@@ -450,10 +448,6 @@ export type BuildTimelineOptions = {
    */
   totalSpecies: number;
   /**
-   * Mastery threshold from user settings.
-   */
-  masteryRepetitions?: number;
-  /**
    * FSRS request_retention from user settings.
    */
   retentionTarget?: number;
@@ -494,7 +488,6 @@ export function buildCollectionTimeline(
     log,
     currentNameCards,
     totalSpecies,
-    masteryRepetitions = MASTERY_REPETITIONS,
     retentionTarget = 0.9,
     nowMs = Date.now(),
     horizonDays = 180,
@@ -513,7 +506,7 @@ export function buildCollectionTimeline(
       speciesEvents.set(key, { firstSeenMs: syntheticMs, masteredAtMs: syntheticMs });
     }
   } else {
-    speciesEvents = replayLog(log, masteryRepetitions);
+    speciesEvents = replayLog(log);
   }
 
   const past = buildPastTimeline(speciesEvents, nowMs);

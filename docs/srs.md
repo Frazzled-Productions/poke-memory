@@ -92,7 +92,9 @@ Single-step, session-only. `ReviewSession` captures a pre-grade snapshot of `car
 
 ## Mastery
 
-A **species** is mastered when **both** its name card and its reverse card satisfy the FSRS mastery gate: `reps >= masteryRepetitions && scheduledDays >= 21`. Both legs are required since #1234. Prior to that, only the name card was checked.
+A **species** is mastered when **both** its name card AND its reverse card satisfy `stability >= MASTERY_STABILITY_DAYS (21)`. `stability` is the FSRS core field; at the default 0.9 retention target it is approximately the next scheduled interval. The old `reps >= 3` sub-gate is removed (#1765): stability encodes the same evidence more precisely. Mastery is derived live, so a lapse that drops stability below 21 reverts a species to learning; gym badges, by contrast, are latched (once earned, always earned).
+
+Both legs are required since #1234. Prior to that, only the name card was checked.
 
 Reverse cards are a required practice direction since #1234 (not opt-in). The `reverseCardsEnabled` and `nameCardsEnabled` settings fields have been removed. `filterMastered` (pasture), `masteredSpeciesIds` (badges), and `computeStats` all build a set of mastered-reverse species IDs and require membership in that set before counting a species as mastered.
 

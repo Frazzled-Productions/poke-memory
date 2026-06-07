@@ -70,6 +70,7 @@ jobs:
             "auto-backlog-groom.yml|Auto Backlog Groom|240"
             "auto-retro-harvest.yml|Auto Retro Harvest|240"
             "auto-deep-audit.yml|Auto Deep Audit|840"
+            "pokeapi-species-monitor.yml|PokéAPI Species Monitor|840"
           )
 
           NOW=$(date -u +%s)

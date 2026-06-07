@@ -129,8 +129,8 @@
         "hint": "调度器会在您即将忘记之前显示每张卡片。记忆目标越高，复习次数越多，记忆越牢固；越低则复习次数越少，遗忘也会更多。大多数人保持默认的90%。"
       },
       "masteryThreshold": {
-        "label": "掌握标准",
-        "description": "连续答对这么多次的卡片将被视为已掌握。"
+        "label": "掌握标准（已弃用）",
+        "description": "此设置不再影响掌握判定。掌握由FSRS稳定性决定。此控件将在未来版本中移除。"
       },
       "recallTarget": {
         "label": "记忆目标 ({percent}%)",
@@ -519,6 +519,8 @@
       "presetStarters": "御三家",
       "presetLegendaries": "传说宝可梦",
       "presetIncompleteChains": "未完成进化链",
+      "presetMasteryBlockers": "即将掌握",
+      "presetMasteryBlockersDescription": "一个方向已掌握、另一个方向尚未掌握的宝可梦。专注于此来缩小差距。",
       "formIncludeAll": "包含全部",
       "formDefaultOnly": "仅默认形态",
       "formChooseCategories": "选择类别…",
@@ -566,6 +568,10 @@
     "higherOrLowerNudge": {
       "title": "完成本轮练习，解锁额外小游戏",
       "body": "完成今日所有卡片后，只要你已复习了至少两只宝可梦，会话摘要下方就会出现「高低」属性挑战。看看能否打破你的最佳连击纪录？"
+    },
+    "masteryBlockersNudge": {
+      "title": "提示：更快缩小掌握差距",
+      "body": "使用「即将掌握」范围筛选器，专门练习一侧已完成的种类中落后方向的卡片。"
     }
   },
   "review": {
@@ -736,7 +742,7 @@
     "schedulingHeading": "调度",
     "masteryMeaning": {
       "title": "「已掌握」是什么意思",
-      "body": "卡片在连续答对 {reps} 次<em>且</em>下次复习间隔至少 21 天后视为已掌握：这是调度器确认您真正学会而非短期记忆的时间点。"
+      "body": "当调度器对您记忆的置信度<em>稳定</em>在 21 天或以上时，卡片即视为已掌握：这是调度器确认您真正学会而非短期记忆的时间点。"
     },
     "strugglingCards": {
       "heading": "薄弱卡片",
@@ -899,7 +905,14 @@
       "listAriaLabel": "按语言划分的掌握情况"
     },
     "restoreFromCloud": "从云端恢复",
-    "restoreFromCloudDescription": "恢复选项在设置中。"
+    "restoreFromCloudDescription": "恢复选项在设置中。",
+    "legStatus": {
+      "nameDirection": "名称卡",
+      "reverseDirection": "反向卡",
+      "blockedOnName": "名称卡未掌握",
+      "blockedOnReverse": "反向卡未掌握",
+      "blockedHint": "掌握<direction>{dirName}</direction>以解锁完全掌握。"
+    }
   },
   "journey": {
     "title": "旅程",
@@ -996,7 +1009,7 @@
       "title": "圆环含义",
       "lockedBody": "未开始：您还未在练习中见过此宝可梦。",
       "learningBody": "学习中：您已见过它，正在巩固记忆。",
-      "masteredBody": "已掌握：连续答对 {reps} 次且下次复习间隔至少 21 天。这是调度器确认您真正学会的时间点。",
+      "masteredBody": "已掌握：调度器对您记忆的置信度已稳定在 21 天或以上。这是调度器确认您真正学会的时间点。",
       "introducedNote": "已引入统计您至少见过一次的宝可梦，无论是否已完全掌握。"
     },
     "languageBreakdown": {

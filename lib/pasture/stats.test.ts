@@ -28,10 +28,11 @@ function makeState(overrides: Partial<ReviewState> = {}): ReviewState {
   };
 }
 
-/** A state that satisfies the mastery predicate (reps >= 3, scheduledDays >= 21). */
+/** A state that satisfies the mastery predicate (stability >= 21, #1765). */
 function masteredState(firstSeen = "2026-04-01"): ReviewState {
   return makeState({
     reps: 3,
+    stability: 21,
     scheduledDays: 21,
     lastReview: "2026-05-01",
     firstSeen,
@@ -40,13 +41,13 @@ function masteredState(firstSeen = "2026-04-01"): ReviewState {
 }
 
 /**
- * A state mastered at threshold 2 but not at threshold 3.
- * reps=2, scheduledDays=21 - passes filterMastered(masteryRepetitions=2),
- * but would fail isMastered() with the default MASTERY_REPETITIONS=3.
+ * A state that is mastered (stability >= 21) but was introduced with fewer
+ * reps. Preserved for test-fixture variety; stability is the sole gate (#1765).
  */
 function masteredAtThreshold2State(firstSeen = "2026-04-01"): ReviewState {
   return makeState({
     reps: 2,
+    stability: 21,
     scheduledDays: 21,
     lastReview: "2026-05-01",
     firstSeen,
@@ -227,51 +228,47 @@ describe("biomeStats", () => {
 });
 
 // ---------------------------------------------------------------------------
-// biomeStats - masteryRepetitions below default (regression: #1013)
+// biomeStats - stability-based mastery gate (#1765)
 // ---------------------------------------------------------------------------
 
-describe("biomeStats - masteryRepetitions < 3 (regression #1013)", () => {
-  it("counts a card with reps=2 when the caller pre-filters at masteryRepetitions=2", () => {
-    // This is the exact scenario that was broken: a user sets masteryRepetitions=2.
-    // filterMastered passes the card (reps >= 2 && scheduledDays >= 21).
-    // biomeStats must count it - not silently drop it via a hardcoded isMastered() re-check.
-    // Since #1234, both name AND reverse must pass the threshold for species mastery.
-    const threshold2State = masteredAtThreshold2State();
+describe("biomeStats - stability-based mastery gate (#1765)", () => {
+  it("counts a species when both legs have stability >= 21 (mastered)", () => {
+    // Since #1765 mastery is stability >= 21; since #1234 both name + reverse must pass.
+    const fullyMastered = masteredAtThreshold2State(); // stability=21
     const allCards: ReviewableCard[] = [
-      makeCard(1, "Bulbasaur", "grassland", threshold2State),
-      makeReverseCard(1, threshold2State), // paired reverse at the same threshold
+      makeCard(1, "Bulbasaur", "grassland", fullyMastered),
+      makeReverseCard(1, fullyMastered),
     ];
-    // Simulate what the caller does: pre-filter at masteryRepetitions=2.
-    const preFiltered = filterMastered(allCards, false, 2) as NameReviewCard[];
-    expect(preFiltered.length).toBe(1); // confirm the pre-filter passes the card
+    const preFiltered = filterMastered(allCards, false) as NameReviewCard[];
+    expect(preFiltered.length).toBe(1); // confirm pre-filter passes the card
 
     const stats = biomeStats("grassland", preFiltered);
     expect(stats.masteredCount).toBe(1);
   });
 
-  it("counts a card with reps=1 when the caller pre-filters at masteryRepetitions=1", () => {
-    // Since #1234, supply a paired reverse card at the same threshold.
-    const at1RepState = makeState({ reps: 1, scheduledDays: 21, firstSeen: "2026-04-01", fsrsState: "review" });
-    const cardAt1Rep: NameReviewCard = makeCard(
-      4,
-      "Charmander",
-      "mountain",
-      at1RepState,
-    );
-    const reverseAt1Rep = makeReverseCard(4, at1RepState);
-    const preFiltered = filterMastered([cardAt1Rep, reverseAt1Rep], false, 1) as NameReviewCard[];
+  it("counts a species mastered via stability even with low reps", () => {
+    // stability >= 21 is the only gate; reps count is irrelevant for mastery (#1765).
+    const lowRepsHighStability = makeState({
+      reps: 1,
+      stability: 21,
+      scheduledDays: 21,
+      firstSeen: "2026-04-01",
+      fsrsState: "review",
+      lastReview: "2026-05-01",
+    });
+    const cardLowReps: NameReviewCard = makeCard(4, "Charmander", "mountain", lowRepsHighStability);
+    const reverseLowReps = makeReverseCard(4, lowRepsHighStability);
+    const preFiltered = filterMastered([cardLowReps, reverseLowReps], false) as NameReviewCard[];
     expect(preFiltered.length).toBe(1);
 
     const stats = biomeStats("mountain", preFiltered);
     expect(stats.masteredCount).toBe(1);
   });
 
-  it("returns zero masteredCount for a card excluded by the caller's pre-filter (interval too short)", () => {
-    // scheduledDays < 21 means the card is not mastered regardless of masteryRepetitions.
-    // filterMastered at masteryRepetitions=2 should exclude it, so biomeStats
-    // sees an empty input and returns masteredCount=0.
-    const card = makeCard(10, "Caterpie", "forest", learningState()); // reps=2, scheduledDays=10
-    const preFiltered = filterMastered([card], false, 2) as NameReviewCard[];
+  it("returns zero masteredCount when stability < 21 (not mastered)", () => {
+    // stability = 10 means not mastered, so filterMastered excludes it.
+    const card = makeCard(10, "Caterpie", "forest", learningState()); // stability=0
+    const preFiltered = filterMastered([card], false) as NameReviewCard[];
     expect(preFiltered.length).toBe(0);
 
     const stats = biomeStats("forest", preFiltered);

@@ -3,7 +3,6 @@ import type { GradeLog } from "@/lib/gradelog/persistence";
 import type { AppLocale } from "@/i18n/locales";
 import { isoDate } from "@/lib/utils/format-date";
 import { daysBetweenIsoDates } from "@/lib/utils/dates";
-import { MASTERY_REPETITIONS } from "./derive";
 import { masteredSpeciesEvents, nameCardsForLocale } from "./mastery-species-events";
 
 export type Records = {
@@ -86,16 +85,11 @@ export function bestReviewDayForLocale(log: GradeLog, locale: AppLocale): number
  * Since #1448, `avgDaysToMastery` and `mostMasteredIn7d` are derived from
  * species-level mastery (both name + reverse legs required, #1234). The full
  * card array is required so the reverse leg can be found.
- *
- * `masteryRepetitions` defaults to MASTERY_REPETITIONS for callers that pass
- * the full card array without an explicit threshold. Callers from `app/` should
- * always pass the value from user settings.
  */
 export function computeRecords(
   cards: readonly ReviewableCard[],
   log: GradeLog,
   streakDates: readonly string[],
-  masteryRepetitions: number = MASTERY_REPETITIONS,
   forceAllMastered = false,
   locale: AppLocale = "en",
 ): Records {
@@ -120,7 +114,7 @@ export function computeRecords(
   }
 
   // Derive species-level mastery events (both legs required, #1448).
-  const events = masteredSpeciesEvents(cards, masteryRepetitions, false, locale);
+  const events = masteredSpeciesEvents(cards, false, locale);
 
   let avgDaysToMastery: number | null = null;
   if (events.length > 0) {

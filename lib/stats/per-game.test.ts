@@ -198,24 +198,28 @@ describe("computePerGameStats", () => {
   it("forceAllMastered overrides everything - all species are mastered", () => {
     const seed = [makeSeedPokemon(1, ["red-blue"]), makeSeedPokemon(2, ["red-blue"])];
     // No cards at all - yet with forceAllMastered every species counts.
-    const result = computePerGameStats([], seed, 3, /* forceAllMastered = */ true);
+    const result = computePerGameStats([], seed, /* forceAllMastered = */ true);
     expect(result[0]).toMatchObject({ slug: "red-blue", total: 2, introduced: 0, mastered: 2 });
   });
 
-  it("respects a custom masteryRepetitions threshold", () => {
+  it("stability gate: mastered when stability >= 21; not mastered when stability < 21 (#1765)", () => {
     const seed = [makeSeedPokemon(1, ["red-blue"])];
-    // reps=5, scheduledDays=30 - passes default (3) but also a threshold of 5.
-    const state: Partial<ReviewState> = { ...MASTERED_STATE, reps: 5 };
-    const cards: ReviewableCard[] = [
-      makeNameCard(1, state),
-      makeReverseCard(1, state),
+    // MASTERED_STATE has stability=30 → mastered under the stability gate.
+    const masteredCards: ReviewableCard[] = [
+      makeNameCard(1, MASTERED_STATE),
+      makeReverseCard(1, MASTERED_STATE),
     ];
-    // With threshold 5: mastered.
-    const r5 = computePerGameStats(cards, seed, 5);
-    expect(r5[0]?.mastered).toBe(1);
-    // With threshold 6: NOT mastered (reps=5 < 6).
-    const r6 = computePerGameStats(cards, seed, 6);
-    expect(r6[0]?.mastered).toBe(0);
+    const masteredResult = computePerGameStats(masteredCards, seed);
+    expect(masteredResult[0]?.mastered).toBe(1);
+
+    // stability < 21 → not mastered.
+    const lowStabilityState: Partial<ReviewState> = { ...MASTERED_STATE, stability: 10 };
+    const learningCards: ReviewableCard[] = [
+      makeNameCard(1, lowStabilityState),
+      makeReverseCard(1, lowStabilityState),
+    ];
+    const learningResult = computePerGameStats(learningCards, seed);
+    expect(learningResult[0]?.mastered).toBe(0);
   });
 
   it("ignores non-English locale name cards to avoid double-counting", () => {

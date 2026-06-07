@@ -7,6 +7,7 @@ import {
   generationOfPokemonId,
   GEN_RANGES,
   MASTERY_REPETITIONS,
+  MASTERY_STABILITY_DAYS,
   MASTERY_INTERVAL_DAYS,
   STRUGGLING_MIN_REPS,
   STRUGGLING_DIFFICULTY_CUTOFF,
@@ -136,12 +137,11 @@ function reverseCard(
   };
 }
 
-/** A reverse card that passes the mastery gate: reps >= threshold, scheduledDays >= 21. */
+/** A reverse card that passes the stability mastery gate: stability >= MASTERY_STABILITY_DAYS. */
 function masteredReverse(pokemonId: number): ReverseReviewCard {
   return reverseCard(pokemonId, {
     lastReview: TODAY,
-    reps: MASTERY_REPETITIONS,
-    scheduledDays: MASTERY_INTERVAL_DAYS,
+    stability: MASTERY_STABILITY_DAYS,
   });
 }
 
@@ -191,34 +191,62 @@ describe("generationOfPokemonId", () => {
 // ---------------------------------------------------------------------------
 
 describe("isMastered", () => {
-  it("returns false for never-reviewed card", () => {
+  it("returns false for a never-reviewed card (stability = 0)", () => {
     expect(isMastered(state())).toBe(false);
   });
 
-  it("returns false when reps met but interval below threshold", () => {
-    expect(isMastered(state({ reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS - 1 }))).toBe(false);
+  it("returns false when stability is exactly one below the threshold", () => {
+    expect(isMastered(state({ stability: MASTERY_STABILITY_DAYS - 1 }))).toBe(false);
   });
 
-  it("returns false when interval met but reps below threshold", () => {
-    expect(isMastered(state({ reps:MASTERY_REPETITIONS - 1, scheduledDays: MASTERY_INTERVAL_DAYS }))).toBe(false);
+  it("returns true when stability is exactly at the threshold", () => {
+    expect(isMastered(state({ stability: MASTERY_STABILITY_DAYS }))).toBe(true);
   });
 
-  it("returns true when both reps and interval meet thresholds exactly", () => {
-    expect(isMastered(state({ reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }))).toBe(true);
+  it("returns true when stability is above the threshold", () => {
+    expect(isMastered(state({ stability: MASTERY_STABILITY_DAYS + 10 }))).toBe(true);
   });
 
-  it("returns true when both exceed thresholds", () => {
-    expect(isMastered(state({ reps:5, scheduledDays: 60 }))).toBe(true);
+  it("is independent of reps: high reps with stability=0 is NOT mastered (#1765)", () => {
+    expect(isMastered(state({ reps: MASTERY_REPETITIONS + 10, scheduledDays: MASTERY_INTERVAL_DAYS }))).toBe(false);
   });
 
-  it("respects a custom masteryRepetitions parameter", () => {
-    const s = state({ reps:5, scheduledDays: MASTERY_INTERVAL_DAYS });
-    expect(isMastered(s, 5)).toBe(true);
-    expect(isMastered(s, 6)).toBe(false);
+  it("is independent of scheduledDays: high scheduledDays with stability=0 is NOT mastered (#1765)", () => {
+    expect(isMastered(state({ scheduledDays: 60, reps: MASTERY_REPETITIONS }))).toBe(false);
   });
 
-  it("cards with high reps but interval < 21 are NOT mastered (regressions from old single-threshold gate)", () => {
-    expect(isMastered(state({ reps:10, scheduledDays: 20 }))).toBe(false);
+  it("returns true with sufficient stability even when reps is 1 and scheduledDays is low", () => {
+    expect(isMastered(state({ stability: MASTERY_STABILITY_DAYS, reps: 1, scheduledDays: 1 }))).toBe(true);
+  });
+
+  // --- #1765 acceptance-criteria test matrix (precise real-world values) ---
+
+  it("stability 0, new card -> false", () => {
+    expect(isMastered(state({ stability: 0, reps: 0, lastReview: null }))).toBe(false);
+  });
+
+  it("stability 10.96, reps 2 -> false", () => {
+    expect(isMastered(state({ stability: 10.96, reps: 2 }))).toBe(false);
+  });
+
+  it("stability 26.19, reps 2 -> true (was false under old reps gate; the #1765 fix)", () => {
+    expect(isMastered(state({ stability: 26.19, reps: 2 }))).toBe(true);
+  });
+
+  it("stability 41.28, reps 2 -> true", () => {
+    expect(isMastered(state({ stability: 41.28, reps: 2 }))).toBe(true);
+  });
+
+  it("stability 21.0 -> true (exact boundary)", () => {
+    expect(isMastered(state({ stability: 21.0 }))).toBe(true);
+  });
+
+  it("stability 20.99, reps 4 -> false (just below boundary)", () => {
+    expect(isMastered(state({ stability: 20.99, reps: 4 }))).toBe(false);
+  });
+
+  it("stability 1.29, reps 3 -> false (3x Hard, high reps low stability)", () => {
+    expect(isMastered(state({ stability: 1.29, reps: 3 }))).toBe(false);
   });
 });
 
@@ -231,22 +259,16 @@ describe("classifyCard", () => {
     expect(classifyCard(card(1))).toBe("locked");
   });
 
-  it("classifies card reviewed once but below mastery as learning", () => {
-    expect(classifyCard(card(1, { lastReview: TODAY, reps:1, scheduledDays: 1 }))).toBe("learning");
+  it("classifies card reviewed once but below mastery stability as learning", () => {
+    expect(classifyCard(card(1, { lastReview: TODAY, stability: 1 }))).toBe("learning");
   });
 
-  it("classifies card with high reps but low interval as learning", () => {
-    expect(classifyCard(card(1, { lastReview: TODAY, reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS - 1 }))).toBe("learning");
+  it("classifies card with high reps but stability below threshold as learning (#1765)", () => {
+    expect(classifyCard(card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS, stability: MASTERY_STABILITY_DAYS - 1 }))).toBe("learning");
   });
 
-  it("classifies card meeting both thresholds as mastered", () => {
-    expect(classifyCard(card(1, { lastReview: TODAY, reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }))).toBe("mastered");
-  });
-
-  it("respects custom masteryRepetitions", () => {
-    const c = card(1, { lastReview: TODAY, reps:3, scheduledDays: MASTERY_INTERVAL_DAYS });
-    expect(classifyCard(c, 3)).toBe("mastered");
-    expect(classifyCard(c, 4)).toBe("learning");
+  it("classifies card with stability at threshold as mastered", () => {
+    expect(classifyCard(card(1, { lastReview: TODAY, stability: MASTERY_STABILITY_DAYS }))).toBe("mastered");
   });
 });
 
@@ -255,8 +277,8 @@ describe("classifyCard", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeStats mastery boundary", () => {
-  it("does not count card with reps >= threshold but interval < 21 as mastered", () => {
-    const cards = [card(1, { lastReview: TODAY, reps:MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS - 1 })];
+  it("does not count card with stability below MASTERY_STABILITY_DAYS as mastered (#1765)", () => {
+    const cards = [card(1, { lastReview: TODAY, stability: MASTERY_STABILITY_DAYS - 1 })];
     const result = computeStats(cards, TODAY);
     expect(result.mastered).toBe(0);
     expect(result.learning).toBe(1);
@@ -264,41 +286,41 @@ describe("computeStats mastery boundary", () => {
 
   it("locale scoping: only counts name+reverse cards matching the given locale (#1259)", () => {
     // Species 1: mastered in "ja"; should count when locale="ja", not when locale="en"
-    const jaName = { ...card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }), locale: "ja" as const };
+    const jaName = { ...card(1, { lastReview: TODAY, stability: MASTERY_STABILITY_DAYS }), locale: "ja" as const };
     const jaReverse = { ...masteredReverse(1), locale: "ja" as const };
     // Species 2: mastered in "en" (default)
-    const enName = card(2, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS });
+    const enName = card(2, { lastReview: TODAY, stability: MASTERY_STABILITY_DAYS });
     const enReverse = masteredReverse(2);
     const all: ReviewableCard[] = [jaName, jaReverse, enName, enReverse];
 
-    const jaResult = computeStats(all, TODAY, 10, MASTERY_REPETITIONS, false, "ja");
+    const jaResult = computeStats(all, TODAY, 10, false, "ja");
     expect(jaResult.mastered).toBe(1); // only species 1 (ja)
     expect(jaResult.totalCards).toBe(1); // only 1 name card with locale "ja"
 
-    const enResult = computeStats(all, TODAY, 10, MASTERY_REPETITIONS, false, "en");
+    const enResult = computeStats(all, TODAY, 10, false, "en");
     expect(enResult.mastered).toBe(1); // only species 2 (en)
     expect(enResult.totalCards).toBe(1); // only 1 name card with locale "en"
   });
 
   it("locale scoping: en is the default - cards without locale field count as en (#1259)", () => {
     // Cards without a locale field (pre-#1259 state) should count under the "en" scope.
-    const enNameNoLocale = card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS });
+    const enNameNoLocale = card(1, { lastReview: TODAY, stability: MASTERY_STABILITY_DAYS });
     const enReverseNoLocale = masteredReverse(1);
     const cards: ReviewableCard[] = [enNameNoLocale, enReverseNoLocale];
 
-    const enResult = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, false, "en");
+    const enResult = computeStats(cards, TODAY, 10, false, "en");
     expect(enResult.mastered).toBe(1);
 
-    const jaResult = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, false, "ja");
+    const jaResult = computeStats(cards, TODAY, 10, false, "ja");
     expect(jaResult.mastered).toBe(0); // same cards, but scoped to "ja" - no matches
     expect(jaResult.totalCards).toBe(0);
   });
 
-  it("counts card meeting both thresholds as mastered when paired reverse card is also mastered", () => {
+  it("counts card with sufficient stability as mastered when paired reverse card is also mastered", () => {
     // Since #1234, species mastery requires BOTH name AND reverse cards to
     // pass the FSRS gate. Pass the full mixed array with a paired reverse card.
     const cards: ReviewableCard[] = [
-      card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }),
+      card(1, { lastReview: TODAY, stability: MASTERY_STABILITY_DAYS }),
       masteredReverse(1),
     ];
     const result = computeStats(cards, TODAY);
@@ -309,27 +331,18 @@ describe("computeStats mastery boundary", () => {
   it("does not count name card as mastered when paired reverse card is absent", () => {
     // Without a mastered reverse card the species is not species-mastered.
     const cards: ReviewableCard[] = [
-      card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }),
+      card(1, { lastReview: TODAY, stability: MASTERY_STABILITY_DAYS }),
     ];
     const result = computeStats(cards, TODAY);
     expect(result.mastered).toBe(0);
     expect(result.learning).toBe(1);  // introduced but not species-mastered
   });
 
-  it("respects caller-supplied masteryRepetitions parameter", () => {
-    const cards: ReviewableCard[] = [
-      card(1, { lastReview: TODAY, reps: 3, scheduledDays: MASTERY_INTERVAL_DAYS }),
-      masteredReverse(1),
-    ];
-    expect(computeStats(cards, TODAY, 10, 3).mastered).toBe(1);
-    expect(computeStats(cards, TODAY, 10, 4).mastered).toBe(0);
-  });
-
   it("totalCards reflects only name cards in the mixed array", () => {
     // computeStats accepts the full mixed array and counts only name cards
     // for totalCards. Reverse cards are excluded from the species count.
     const cards: ReviewableCard[] = [
-      card(1, { lastReview: TODAY, reps: MASTERY_REPETITIONS, scheduledDays: MASTERY_INTERVAL_DAYS }),
+      card(1, { lastReview: TODAY, stability: MASTERY_STABILITY_DAYS }),
       masteredReverse(1),
       card(2),
     ];
@@ -392,8 +405,7 @@ describe("computeStats.dueForecast", () => {
       {
         ...card(2, {
           lastReview: TODAY,
-          reps: MASTERY_REPETITIONS,
-          scheduledDays: MASTERY_INTERVAL_DAYS,
+          stability: MASTERY_STABILITY_DAYS,
         }),
         types: ["fire", "flying"],
       },
@@ -470,7 +482,7 @@ describe("computeStats with forceAllMastered", () => {
   ];
 
   it("reports everything mastered, nothing learning, nothing locked", () => {
-    const result = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, true);
+    const result = computeStats(cards, TODAY, 10, true);
     expect(result.totalCards).toBe(3);
     expect(result.introduced).toBe(3);
     expect(result.mastered).toBe(3);
@@ -479,7 +491,7 @@ describe("computeStats with forceAllMastered", () => {
   });
 
   it("per-generation tallies treat every card as introduced and mastered", () => {
-    const result = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, true);
+    const result = computeStats(cards, TODAY, 10, true);
     const gen1 = result.perGeneration.find((g) => g.gen === 1)!;
     expect(gen1.total).toBe(2);
     expect(gen1.introduced).toBe(2);
@@ -496,7 +508,7 @@ describe("computeStats with forceAllMastered", () => {
   });
 
   it("per-type tallies treat every type bucket's total as mastered", () => {
-    const result = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, true);
+    const result = computeStats(cards, TODAY, 10, true);
     const normal = result.perType.find((t) => t.type === "normal")!;
     expect(normal.total).toBe(3);
     expect(normal.mastered).toBe(3);
@@ -504,7 +516,7 @@ describe("computeStats with forceAllMastered", () => {
   });
 
   it("struggling list is empty under forceAllMastered", () => {
-    const result = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, true);
+    const result = computeStats(cards, TODAY, 10, true);
     expect(result.struggling).toHaveLength(0);
   });
 });
@@ -520,14 +532,12 @@ describe("computeStats form-card generation bucketing", () => {
     // Pair with a mastered reverse card so the species counts as mastered (#1234).
     const alolanRaichu = formCard(10100, 26, {
       lastReview: TODAY,
-      reps: MASTERY_REPETITIONS,
-      scheduledDays: MASTERY_INTERVAL_DAYS,
+      stability: MASTERY_STABILITY_DAYS,
     });
     // The reverse card ID uses the pokemon's own id (10100), not speciesId.
     const alolanRaichuReverse = reverseCard(10100, {
       lastReview: TODAY,
-      reps: MASTERY_REPETITIONS,
-      scheduledDays: MASTERY_INTERVAL_DAYS,
+      stability: MASTERY_STABILITY_DAYS,
     });
     const result = computeStats([alolanRaichu, alolanRaichuReverse], TODAY);
     const gen1 = result.perGeneration.find((g) => g.gen === 1)!;
@@ -544,8 +554,7 @@ describe("computeStats form-card generation bucketing", () => {
     // Alolan Raichu is only name-introduced but not species-mastered (no reverse card).
     const raichu = card(26, {
       lastReview: TODAY,
-      reps: MASTERY_REPETITIONS,
-      scheduledDays: MASTERY_INTERVAL_DAYS,
+      stability: MASTERY_STABILITY_DAYS,
     });
     const alolanRaichu = formCard(10100, 26, {
       lastReview: TODAY,
@@ -749,7 +758,7 @@ describe("computeStats([]) - empty card array", () => {
   });
 
   it("returns zero-initialised result with forceAllMastered=true on empty input", () => {
-    const result = computeStats([], TODAY, 10, 3, true);
+    const result = computeStats([], TODAY, 10, true);
     expect(result.totalCards).toBe(0);
     expect(result.introduced).toBe(0);
     expect(result.mastered).toBe(0);

@@ -285,7 +285,32 @@ in-memory fixture.
 | **What it does** | Runs `npm ci && npm run test:coverage` (vitest v8 provider), enforces two coverage gates, then posts the coverage summary (statements / branches / functions / lines) plus the diff-coverage result as a PR comment. The comment is keyed on the `<!-- coverage-report -->` HTML marker, so re-runs update the existing comment instead of posting duplicates (same idempotency pattern as `pr-check-monitor.yml`). The comment posts on both pass and fail. |
 | **Gates (#824)** | **Global floor** - values in `coverage-floor.json` at the repo root, imported by `vitest.config.ts`'s `coverage.thresholds`. `vitest run --coverage` exits non-zero if overall coverage regresses. **Diff coverage** - `scripts/diff-coverage.mjs` cross-references the PR's added/changed lines against the v8 per-statement hit counts in `coverage/coverage-final.json` and requires changed product lines to hit a 90% patch bar. The coverage step no longer carries `continue-on-error`; either gate failing fails the job. The numbers deliberately do not appear in this row, AGENTS.md, or the PR-comment template - they come from `coverage-floor.json` to prevent the drift #1333 cleaned up. The `/batch-issues` end-of-session ratchet updates the JSON file only. |
 | **Fork PRs** | Skipped (`head.repo.fork == false` guard - fork PRs run with a read-only token and cannot post comments). |
-| **Required check** | Not yet - the gates fail the job, but `coverage` must still be added as a required check on the `qa` and `main` rulesets (owner action) before a breach blocks merge. Until then the job goes red without blocking. (Originally non-blocking by design under #762; gated under #824.) |
+| **Required check** | Yes - `coverage` (`Test coverage report`) is a required check on both the `qa-staging` and `main-protection` rulesets. Either gate failing (global floor or 90% diff-coverage patch bar) blocks merge. The diff-coverage gate uses `pull_request.base.sha` as the base, so it is correct for `qa`-targeting PRs (#1742). |
+| **Concurrency** | Cancels concurrent runs on the same ref. |
+
+---
+
+### `changelog-gate.yml` - Changelog Gate
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` (opened, synchronize, reopened, labeled) |
+| **Job** | `changelog-gate` |
+| **What it does** | Uses `dorny/paths-filter` to classify the PR diff. If it touches a user-facing surface (`app/**`, `components/**`, `lib/**`) but adds **zero** `changelog.d/unreleased/*.md` files, the job fails - unless the PR carries the `no-changelog` escape-hatch label (for genuinely internal-only changes that nonetheless touch those paths). Promotes the previously prose-only "add a fragment unless internal-only" rule into CI (#1741). `lint:changelog` validates fragment *format*; this gate enforces *presence*. |
+| **Fork PRs** | Skipped (`head.repo.fork == false` guard). |
+| **Required check** | No - not yet on a ruleset. Promote once stable. |
+| **Concurrency** | Cancels concurrent runs on the same ref. |
+
+---
+
+### `i18n-leak.yml` - i18n Leak
+
+| | |
+|---|---|
+| **Trigger** | `pull_request` (all PRs, no workflow-level path filter) + `workflow_dispatch`. An internal `dorny/paths-filter` decides whether to run the gate (`components/**`, `app/**/*.tsx`, `messages/**`) or pass as a no-op, so the `i18n-leak` check ALWAYS reports and is safe as a required check (#1785). |
+| **Job** | `i18n-leak` |
+| **What it does** | Runs `npm run test:i18n-leak` - the English-leak / pseudo-locale render gate. Components under test render via `renderPseudo()` (the sentinel-bracketed `xx-pseudo` catalogue); any user-facing string not in the catalogue and not on the allowlist is an untranslated English leak and fails the job. Promotes the strongest locale-correctness guardrail from prose-only enforcement (#1737). On a PR touching none of the i18n paths the job is a no-op pass (it still reports). No build needed. |
+| **Required check** | Yes - required on the `qa-staging` ruleset. Because the job always reports (no-op pass on non-i18n PRs), a non-matching PR resolves to pass rather than being blocked by a never-reported required check (#1785). |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
 
 ---
@@ -307,10 +332,10 @@ in-memory fixture.
 | | |
 |---|---|
 | **Trigger** | `pull_request` (opened, synchronize, reopened, labeled); `workflow_dispatch` |
-| **Jobs** | `decide` (gate), `integration` |
-| **What it does** | The `decide` job runs on every PR and uses `dorny/paths-filter` to check whether the PR touches the cloud-write surface (`lib/sync/**`, `app/api/sync/**`, `db/migrations/**`, `lib/gradelog/**`, or this workflow file). If a path matches, the PR carries the `integration-tests` label, or the run is a manual dispatch, the `integration` job runs the DB-backed suite (`npm run test:integration`) against a `postgres:15` service container - migration apply, RLS isolation, and the regression trigger. No Supabase API calls, no branch quota. |
+| **Jobs** | `decide` (gate), `integration`, `integration-gate` (aggregator) |
+| **What it does** | The `decide` job runs on every PR and uses `dorny/paths-filter` to check whether the PR touches the cloud-write surface (`lib/sync/**`, `app/api/sync/**`, `db/migrations/**`, `lib/gradelog/**`, or this workflow file). If a path matches, the PR carries the `integration-tests` label, or the run is a manual dispatch, the `integration` job runs the DB-backed suite (`npm run test:integration`) against a `postgres:15` service container - migration apply, RLS isolation, and the regression trigger. No Supabase API calls, no branch quota. The `integration-gate` aggregator then reports a single stable status (skipped `integration` == pass). |
 | **Why a gate job** | A bare `on.pull_request.paths:` filter would also filter out `labeled` events on PRs that don't touch the paths, breaking the label escape hatch. The cheap `decide` job combines "paths OR label" so the opt-in label still works. |
-| **Required check** | No - `integration` is not a required status check, so PRs outside the path filter simply don't run it and aren't blocked. |
+| **Required check** | Yes (#1738) - `integration-gate` is a required status check on the `qa-staging` ruleset. It is a thin always-reporting aggregator over `decide` + `integration`: a PR outside the path filter resolves to skipped == pass and is not blocked; a real `integration` failure fails the gate. Modelled on `ci.yml`'s `e2e` aggregator so the required-check name stays stable. |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
 
 ---
@@ -764,6 +789,20 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
+### `pokeapi-species-monitor.yml` - PokéAPI Species Monitor
+
+| | |
+|---|---|
+| **Trigger** | Monthly `schedule` (`0 7 1 * *` - 07:00 UTC on the 1st); `workflow_dispatch`. Gated `if: github.repository == 'Frazzled-Productions/poke-memory'`. |
+| **Job** | `monitor` |
+| **What it does** | Detects upstream species growth (#1739, parent #1644). One HTTP call reads the live `/pokemon-species` `count`; it compares against the seeded default-form count derived from `lib/pokemon/generated-core.json` filtered to `isDefaultForm` (1025 today). On growth it opens, or updates in place (HTML marker `<!-- pokeapi-species-monitor -->`), a `priority:later` tracking issue listing the new species ids; no-op when counts match. The re-seed + binary review stay human-driven (no auto-PR). Species-count-to-species-count avoids the 10001+ mega/regional/gigantamax trap - never switch to `/pokemon`, never use the raw 1174 record count. |
+| **Why not a failure monitor** | The alert IS the issue. The job exits 0 on growth (it files/updates the issue), so `cron-health-monitor.yml` does not flag it as failing. |
+| **Health watch** | Registered in `cron-health-monitor.yml`'s `WORKFLOWS` list at 840h tolerance (matching the monthly `auto-deep-audit` entry). |
+| **Required check** | No - cron, not a PR gate. |
+| **Concurrency** | `group: pokeapi-species-monitor` with `cancel-in-progress: false`. |
+
+---
+
 ## Build gates
 
 Two separate gates catch type/build/test errors at different points:
@@ -785,7 +824,7 @@ Runs on every `pull_request` event and every push to `main`: the same `typecheck
 
 ### Coverage gate (`coverage.yml`)
 
-Runs on every `pull_request` event. Fails the `coverage` job on either a global-floor breach (`coverage.thresholds` in `vitest.config.ts`) or a diff-coverage breach (`scripts/diff-coverage.mjs`, 90% patch bar). See the `coverage.yml` catalog entry above for detail. Not yet a required check - owner must add `coverage` to the `qa` and `main` rulesets to block merge on a breach.
+Runs on every `pull_request` event. Fails the `coverage` job on either a global-floor breach (`coverage.thresholds` in `vitest.config.ts`) or a diff-coverage breach (`scripts/diff-coverage.mjs`, 90% patch bar). See the `coverage.yml` catalog entry above for detail. `coverage` (`Test coverage report`) is a required check on both the `qa-staging` and `main-protection` rulesets as of #1742, so a breach blocks merge.
 
 ### Visual-regression gate (`visual-regression.yml`)
 

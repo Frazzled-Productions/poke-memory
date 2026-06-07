@@ -24,8 +24,12 @@ import { initialReviewState } from "@/lib/srs/scheduler";
 
 const MASTERED_STATE = {
   ...initialReviewState(),
+  stability: 21,
   reps: 3,
   scheduledDays: 21,
+  lastReview: "2026-01-01",
+  firstSeen: "2025-12-01",
+  fsrsState: "review" as const,
 };
 
 const LEARNING_STATE = {
@@ -78,12 +82,12 @@ const IVYSAUR_TO_VENUSAUR = 1500002;
 
 describe("deriveEvolutionFamilies", () => {
   it("returns only families with at least one edge (excludes solo species)", () => {
-    const families = deriveEvolutionFamilies([], 3, false);
+    const families = deriveEvolutionFamilies([], false);
     expect(families.every((f) => f.edges.length > 0)).toBe(true);
   });
 
   it("does not return duplicate chains", () => {
-    const families = deriveEvolutionFamilies([], 3, false);
+    const families = deriveEvolutionFamilies([], false);
     // Check rootIds are all unique (each chain appears once).
     const rootIds = families.map((f) => f.rootId);
     const uniqueRootIds = new Set(rootIds);
@@ -91,13 +95,13 @@ describe("deriveEvolutionFamilies", () => {
   });
 
   it("returns all families as non-completed when no cards are mastered", () => {
-    const families = deriveEvolutionFamilies([], 3, false);
+    const families = deriveEvolutionFamilies([], false);
     expect(families.every((f) => !f.completed)).toBe(true);
   });
 
   it("marks an edge as forwardMastered when the forward card is mastered", () => {
     const cards: ReviewableCard[] = [masteredForward(BULBASAUR_TO_IVYSAUR)];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     // Find the Bulbasaur family.
     const bulbasaurFamily = families.find((f) => f.rootId === 1);
     expect(bulbasaurFamily).toBeDefined();
@@ -112,7 +116,7 @@ describe("deriveEvolutionFamilies", () => {
 
   it("marks an edge as reverseMastered when the reverse card is mastered", () => {
     const cards: ReviewableCard[] = [masteredReverse(BULBASAUR_TO_IVYSAUR)];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const bulbasaurFamily = families.find((f) => f.rootId === 1);
     expect(bulbasaurFamily).toBeDefined();
     const edge = bulbasaurFamily!.edges.find(
@@ -129,7 +133,7 @@ describe("deriveEvolutionFamilies", () => {
       masteredForward(BULBASAUR_TO_IVYSAUR),
       masteredReverse(BULBASAUR_TO_IVYSAUR),
     ];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const bulbasaurFamily = families.find((f) => f.rootId === 1);
     const edge = bulbasaurFamily!.edges.find(
       (e) => e.forwardEdgeId === BULBASAUR_TO_IVYSAUR,
@@ -145,7 +149,7 @@ describe("deriveEvolutionFamilies", () => {
       masteredForward(IVYSAUR_TO_VENUSAUR),
       masteredReverse(IVYSAUR_TO_VENUSAUR),
     ];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const bulbasaurFamily = families.find((f) => f.rootId === 1);
     expect(bulbasaurFamily!.completed).toBe(true);
   });
@@ -156,14 +160,14 @@ describe("deriveEvolutionFamilies", () => {
       masteredForward(BULBASAUR_TO_IVYSAUR),
       masteredReverse(BULBASAUR_TO_IVYSAUR),
     ];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const bulbasaurFamily = families.find((f) => f.rootId === 1);
     expect(bulbasaurFamily!.completed).toBe(false);
   });
 
   it("a learning (not mastered) card does not count toward mastery", () => {
     const cards: ReviewableCard[] = [learningForward(BULBASAUR_TO_IVYSAUR)];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const bulbasaurFamily = families.find((f) => f.rootId === 1);
     const edge = bulbasaurFamily!.edges.find(
       (e) => e.forwardEdgeId === BULBASAUR_TO_IVYSAUR,
@@ -172,7 +176,7 @@ describe("deriveEvolutionFamilies", () => {
   });
 
   it("forceAllMastered marks every edge in every family as fullyMastered", () => {
-    const families = deriveEvolutionFamilies([], 3, true);
+    const families = deriveEvolutionFamilies([], true);
     expect(families.length).toBeGreaterThan(0);
     for (const family of families) {
       expect(family.completed).toBe(true);
@@ -184,32 +188,34 @@ describe("deriveEvolutionFamilies", () => {
     }
   });
 
-  it("respects a custom masteryRepetitions threshold", () => {
-    // A card with reps=3, scheduledDays=21 is mastered at threshold=3 but NOT at threshold=5.
+  it("mastery gate uses stability: card with stability >= 21 is mastered; below is not (#1765)", () => {
+    // Under the stability gate, a mastered card has stability >= 21.
+    // A learning card with low stability is NOT mastered regardless of reps.
     const cards: ReviewableCard[] = [masteredForward(BULBASAUR_TO_IVYSAUR)];
-    const familiesThresh3 = deriveEvolutionFamilies(cards, 3, false);
-    const familiesThresh5 = deriveEvolutionFamilies(cards, 5, false);
-
-    const edge3 = familiesThresh3
+    const families = deriveEvolutionFamilies(cards, false);
+    const edge = families
       .find((f) => f.rootId === 1)!
       .edges.find((e) => e.forwardEdgeId === BULBASAUR_TO_IVYSAUR)!;
-    const edge5 = familiesThresh5
+    expect(edge.forwardMastered).toBe(true);
+
+    // A learning card with low stability is NOT mastered.
+    const learningCards: ReviewableCard[] = [learningForward(BULBASAUR_TO_IVYSAUR)];
+    const learningFamilies = deriveEvolutionFamilies(learningCards, false);
+    const learningEdge = learningFamilies
       .find((f) => f.rootId === 1)!
       .edges.find((e) => e.forwardEdgeId === BULBASAUR_TO_IVYSAUR)!;
-
-    expect(edge3.forwardMastered).toBe(true);
-    expect(edge5.forwardMastered).toBe(false);
+    expect(learningEdge.forwardMastered).toBe(false);
   });
 
   it("Eevee family has 8 edges (all 8 eeveelutions)", () => {
-    const families = deriveEvolutionFamilies([], 3, false);
+    const families = deriveEvolutionFamilies([], false);
     const eeveeFamily = families.find((f) => f.rootId === 133);
     expect(eeveeFamily).toBeDefined();
     expect(eeveeFamily!.edges.length).toBe(8);
   });
 
   it("Bulbasaur family has 2 edges", () => {
-    const families = deriveEvolutionFamilies([], 3, false);
+    const families = deriveEvolutionFamilies([], false);
     const bulbasaurFamily = families.find((f) => f.rootId === 1);
     expect(bulbasaurFamily).toBeDefined();
     expect(bulbasaurFamily!.edges.length).toBe(2);
@@ -218,7 +224,7 @@ describe("deriveEvolutionFamilies", () => {
   it("in-progress families sort before untouched families", () => {
     // Master one edge from Bulbasaur chain to make it "in progress".
     const cards: ReviewableCard[] = [masteredForward(BULBASAUR_TO_IVYSAUR)];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const bulbasaurIdx = families.findIndex((f) => f.rootId === 1);
     // Bulbasaur family is in progress - find an untouched family after it.
     // Any untouched family should sort after it.
@@ -243,7 +249,7 @@ describe("deriveEvolutionFamilies", () => {
       masteredForward(IVYSAUR_TO_VENUSAUR),
       masteredReverse(IVYSAUR_TO_VENUSAUR),
     ];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const bulbasaurIdx = families.findIndex((f) => f.rootId === 1);
     // Bulbasaur is now completed - it must sort after all untouched families.
     const untouchedFamilies = families.filter(
@@ -276,7 +282,7 @@ describe("deriveEvolutionFamilies", () => {
       masteredForward(CHARMELEON_TO_CHARIZARD),
       masteredReverse(CHARMELEON_TO_CHARIZARD),
     ];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const bulbasaurIdx = families.findIndex((f) => f.rootId === 1);
     const charmanderIdx = families.findIndex((f) => f.rootId === 4);
     // Any untouched family must sit between in-progress and completed.
@@ -296,14 +302,14 @@ describe("deriveEvolutionFamilies", () => {
 
 describe("computeEvolutionWallStats", () => {
   it("returns zero completedFamilies when no families are completed", () => {
-    const families = deriveEvolutionFamilies([], 3, false);
+    const families = deriveEvolutionFamilies([], false);
     const stats = computeEvolutionWallStats(families);
     expect(stats.totalFamilies).toBeGreaterThan(0);
     expect(stats.completedFamilies).toBe(0);
   });
 
   it("returns all families as completed under forceAllMastered", () => {
-    const families = deriveEvolutionFamilies([], 3, true);
+    const families = deriveEvolutionFamilies([], true);
     const stats = computeEvolutionWallStats(families);
     expect(stats.completedFamilies).toBe(stats.totalFamilies);
   });
@@ -316,7 +322,7 @@ describe("computeEvolutionWallStats", () => {
       masteredForward(IVYSAUR_TO_VENUSAUR),
       masteredReverse(IVYSAUR_TO_VENUSAUR),
     ];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const stats = computeEvolutionWallStats(families);
     expect(stats.completedFamilies).toBe(1);
     expect(stats.totalFamilies).toBeGreaterThan(1);
@@ -329,7 +335,7 @@ describe("computeEvolutionWallStats", () => {
 
 describe("familyInProgress", () => {
   it("is false for an untouched family (no mastered edges)", () => {
-    const families = deriveEvolutionFamilies([], 3, false);
+    const families = deriveEvolutionFamilies([], false);
     const family = families.find((f) => f.rootId === 1)!;
     expect(familyInProgress(family)).toBe(false);
   });
@@ -337,7 +343,7 @@ describe("familyInProgress", () => {
   it("is true when one edge has a mastered direction but the family is not complete", () => {
     // Bulbasaur → Ivysaur forward mastered; Ivysaur → Venusaur untouched.
     const cards: ReviewableCard[] = [masteredForward(BULBASAUR_TO_IVYSAUR)];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const family = families.find((f) => f.rootId === 1)!;
     expect(family.completed).toBe(false);
     expect(familyInProgress(family)).toBe(true);
@@ -350,7 +356,7 @@ describe("familyInProgress", () => {
       masteredForward(IVYSAUR_TO_VENUSAUR),
       masteredReverse(IVYSAUR_TO_VENUSAUR),
     ];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const family = families.find((f) => f.rootId === 1)!;
     expect(family.completed).toBe(true);
     expect(familyInProgress(family)).toBe(false);
@@ -359,7 +365,7 @@ describe("familyInProgress", () => {
 
 describe("incompleteChainSpeciesIds", () => {
   it("is empty when no cards are mastered (nothing started)", () => {
-    expect(incompleteChainSpeciesIds([], 3, false).size).toBe(0);
+    expect(incompleteChainSpeciesIds([], false).size).toBe(0);
   });
 
   it("includes every member of a started-but-not-finished chain", () => {
@@ -367,7 +373,7 @@ describe("incompleteChainSpeciesIds", () => {
     // family (Bulbasaur 1, Ivysaur 2, Venusaur 3) is in progress, so all
     // three species are in the set.
     const cards: ReviewableCard[] = [masteredForward(BULBASAUR_TO_IVYSAUR)];
-    const ids = incompleteChainSpeciesIds(cards, 3, false);
+    const ids = incompleteChainSpeciesIds(cards, false);
     expect(ids.has(1)).toBe(true);
     expect(ids.has(2)).toBe(true);
     expect(ids.has(3)).toBe(true);
@@ -380,7 +386,7 @@ describe("incompleteChainSpeciesIds", () => {
       masteredForward(IVYSAUR_TO_VENUSAUR),
       masteredReverse(IVYSAUR_TO_VENUSAUR),
     ];
-    const ids = incompleteChainSpeciesIds(cards, 3, false);
+    const ids = incompleteChainSpeciesIds(cards, false);
     expect(ids.has(1)).toBe(false);
     expect(ids.has(2)).toBe(false);
     expect(ids.has(3)).toBe(false);
@@ -390,13 +396,13 @@ describe("incompleteChainSpeciesIds", () => {
     // Cross-check: the set is the union of all families that familyInProgress
     // accepts. Any drift between the preset and the wall would fail here.
     const cards: ReviewableCard[] = [masteredForward(BULBASAUR_TO_IVYSAUR)];
-    const families = deriveEvolutionFamilies(cards, 3, false);
+    const families = deriveEvolutionFamilies(cards, false);
     const expected = new Set<number>();
     for (const family of families) {
       if (!familyInProgress(family)) continue;
       for (const node of family.nodes) expected.add(node.speciesId);
     }
-    expect([...incompleteChainSpeciesIds(cards, 3, false)].sort((a, b) => a - b)).toEqual(
+    expect([...incompleteChainSpeciesIds(cards, false)].sort((a, b) => a - b)).toEqual(
       [...expected].sort((a, b) => a - b),
     );
   });
@@ -404,7 +410,7 @@ describe("incompleteChainSpeciesIds", () => {
   it("returns an empty set under forceAllMastered (every chain is completed)", () => {
     // Superuser pretendAllMastered: every edge is mastered, so every family is
     // completed and none is in progress. The preset legitimately matches nothing.
-    const ids = incompleteChainSpeciesIds([], 3, true);
+    const ids = incompleteChainSpeciesIds([], true);
     expect(ids.size).toBe(0);
   });
 });

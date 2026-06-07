@@ -26,6 +26,7 @@
     "generate:pseudo-locale": "node scripts/generate-pseudo-locale.mjs",
     "test:i18n-leak": "vitest run --project jsdom --reporter=verbose components/**/*.i18n-leak.test.tsx",
     "audit:forms": "node scripts/audit-form-categories.mjs",
+    "seed:all": "node scripts/seed-all.mjs",
     "seed:tts": "node --env-file-if-exists=.env.local scripts/seed-tts-audio.mjs",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "animations": "node scripts/capture-animations.mjs",

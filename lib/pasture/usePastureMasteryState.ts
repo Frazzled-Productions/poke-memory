@@ -5,7 +5,7 @@ import { filterMastered } from "@/lib/pasture/arrivals";
 import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
-import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
+import { SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
 
 /**
@@ -18,8 +18,8 @@ import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
  *   written by ReviewSession on first mastery. A value of `"true"` short-
  *   circuits the full IDB load.
  * - Full path: loads the session from IDB and calls `filterMastered` when the
- *   flag is absent or `"false"` - needed on first load after upgrading, after a
- *   reset, or whenever the masteryRepetitions threshold changes.
+ *   flag is absent or `"false"` - needed on first load after upgrading or after
+ *   a session reset.
  * - Epoch guard: compares `window.__pokeMemorySessionWriteEpoch` on each effect
  *   run against the epoch seen at last attach. If a write happened before React
  *   hydrated and the listener was registered, a `requestAnimationFrame` catch-
@@ -32,7 +32,7 @@ import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
  * - The session storage key changes (cross-tab sync pull, E2E seed).
  * - `KEY_HAS_MASTERED` changes (ReviewSession writes it on mastery transition
  *   or clears it on reset).
- * - A `SETTINGS_SAVED_EVENT` fires (masteryRepetitions threshold change).
+ * - A `SETTINGS_SAVED_EVENT` fires (locale or other settings change).
  *
  * Returns `{ showPasture }` - `true` when the Pasture nav entry should be
  * visible.
@@ -46,9 +46,9 @@ export function usePastureMasteryState(): { showPasture: boolean } {
   // the Pasture link appears without re-parsing the full IDB blob on every
   // grade (#1191 Class A item 3).
   const sessionVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
-  // Bumped by the SETTINGS_SAVED_EVENT listener so a masteryRepetitions
-  // threshold change re-derives Pasture link visibility without waiting for
-  // an unrelated session storage bump.
+  // Bumped by the SETTINGS_SAVED_EVENT listener so a settings change
+  // re-derives Pasture link visibility without waiting for an unrelated
+  // session storage bump.
   const [settingsVersion, setSettingsVersion] = useState(0);
   // Responds to ReviewSession writing KEY_HAS_MASTERED when a card first
   // crosses the mastery threshold, or when the flag is cleared on reset.
@@ -82,10 +82,9 @@ export function usePastureMasteryState(): { showPasture: boolean } {
       }
       // Flag absent or "false" - do the full check.
       const session = await loadSession();
-      const masteryRepetitions = loadSettings().masteryRepetitions;
       const result =
         session !== null &&
-        filterMastered(session.cards, false, masteryRepetitions).length > 0;
+        filterMastered(session.cards, false).length > 0;
       setHasMastered(result);
     }
     void load();

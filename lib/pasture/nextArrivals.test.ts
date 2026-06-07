@@ -27,8 +27,9 @@ function makeState(overrides: Partial<ReviewState> = {}): ReviewState {
   };
 }
 
-/** A mastered state: reps >= 3, scheduledDays >= 21. */
+/** A mastered state: stability >= 21 (#1765 stability gate). */
 const masteredState = makeState({
+  stability: 21,
   reps: 3,
   scheduledDays: 21,
   lastReview: "2026-05-01",
@@ -170,7 +171,7 @@ describe("nextArrivals", () => {
     const cards = Array.from({ length: 10 }, (_, i) =>
       makeNameCard(i + 1, learningState(i + 1)),
     );
-    expect(nextArrivals(cards, false, 3, "en", 3)).toHaveLength(3);
+    expect(nextArrivals(cards, false, "en", 3)).toHaveLength(3);
   });
 
   it("defaults to limit 5", () => {
@@ -193,14 +194,30 @@ describe("nextArrivals", () => {
     expect(nextArrivals([evoCard as ReviewableCard])).toHaveLength(0);
   });
 
-  it("honours masteryRepetitions threshold (higher threshold includes near-mastered cards)", () => {
-    // Card has reps=3, scheduledDays=21 - mastered at default threshold (3) but
-    // not at threshold 5. Under threshold 5, the card should appear.
-    const cards = [makeNameCard(1, masteredState)];
-    // Default threshold: mastered → excluded
-    expect(nextArrivals(cards, false, 3)).toHaveLength(0);
-    // Higher threshold: not mastered → included (has firstSeen set)
-    expect(nextArrivals(cards, false, 5)).toHaveLength(1);
+  it("uses stability gate: a card with stability >= 21 is excluded (mastered); below 21 is included (#1765)", () => {
+    // Card with stability >= 21 is mastered → excluded from nextArrivals.
+    const highStabilityState = makeState({
+      stability: 21,
+      reps: 3,
+      scheduledDays: 21,
+      lastReview: "2026-05-01",
+      firstSeen: "2026-04-01",
+      fsrsState: "review",
+    });
+    const masteredCards = [makeNameCard(1, highStabilityState)];
+    expect(nextArrivals(masteredCards)).toHaveLength(0);
+
+    // Card with stability just below 21 is NOT mastered → included.
+    const lowStabilityState = makeState({
+      stability: 20.99,
+      reps: 3,
+      scheduledDays: 21,
+      lastReview: "2026-05-01",
+      firstSeen: "2026-04-01",
+      fsrsState: "review",
+    });
+    const learningCards = [makeNameCard(2, lowStabilityState)];
+    expect(nextArrivals(learningCards)).toHaveLength(1);
   });
 
   it("locale scoping: only includes name cards whose locale matches", () => {
@@ -208,11 +225,11 @@ describe("nextArrivals", () => {
     const enCard = { ...makeNameCard(2, learningState(2)), locale: "en" as const };
     const cards = [jaCard, enCard] as ReviewableCard[];
 
-    const enResult = nextArrivals(cards, false, 3, "en");
+    const enResult = nextArrivals(cards, false, "en");
     expect(enResult).toHaveLength(1);
     expect(enResult[0].id).toBe(2);
 
-    const jaResult = nextArrivals(cards, false, 3, "ja");
+    const jaResult = nextArrivals(cards, false, "ja");
     expect(jaResult).toHaveLength(1);
     expect(jaResult[0].id).toBe(1);
   });
@@ -220,8 +237,8 @@ describe("nextArrivals", () => {
   it("locale scoping: cards without locale field default to 'en'", () => {
     // Cards from pre-#1259 storage have no locale field.
     const card = makeNameCard(1, learningState(2)); // no locale
-    expect(nextArrivals([card], false, 3, "en")).toHaveLength(1);
-    expect(nextArrivals([card], false, 3, "ja")).toHaveLength(0);
+    expect(nextArrivals([card], false, "en")).toHaveLength(1);
+    expect(nextArrivals([card], false, "ja")).toHaveLength(0);
   });
 
   it("returns correct id, name, spriteUrl, and state on returned entries", () => {

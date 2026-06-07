@@ -206,7 +206,7 @@ function FavouritePicker({
     const state = cardStateById.get(entry.id);
     return (
       flags.pretendAllMastered ||
-      (state !== undefined && isMastered(state, settings.masteryRepetitions))
+      (state !== undefined && isMastered(state))
     );
   });
 

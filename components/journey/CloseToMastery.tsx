@@ -4,8 +4,12 @@
  * CloseToMastery - "Focus here next" section on the Journey page.
  *
  * Shows species where the name card has cleared the mastery gate
- * (scheduledDays >= 21 AND reps >= masteryRepetitions) but the paired
- * reverse card has not yet reached that bar.
+ * (stability >= MASTERY_STABILITY_DAYS) but the paired reverse card has not
+ * yet reached that bar.
+ *
+ * Each row now shows BOTH legs:
+ *   - Name card: always "Mastered" here (it is the filter criterion).
+ *   - Reverse card: progress bar driven by reverseStability vs MASTERY_STABILITY_DAYS.
  *
  * Derived via the pure `deriveCloseToMastery` helper in lib/journey/; this
  * component handles rendering only.
@@ -17,7 +21,7 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import type { CloseToMasteryEntry } from "@/lib/journey/closeToMastery";
-import { MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
+import { MASTERY_STABILITY_DAYS } from "@/lib/stats/derive";
 import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { cn } from "@/lib/utils/cn";
@@ -35,79 +39,115 @@ const INITIAL_VISIBLE = 10;
 // Sub-components
 // ---------------------------------------------------------------------------
 
-// IntervalBar replaced by MeterBar from @/components/ui/MeterBar.
-// The accessible label comes from the progressLabel string passed as the
-// `label` prop to MeterBar.
+/**
+ * Mastered indicator for the name leg.
+ * The name card is always mastered in this list (it is the filter criterion).
+ * Not colour-only: the label is also expressed via text to meet WCAG 1.4.1.
+ */
+function NameLegMastered({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {/* Solid filled bar at 100% - full width, emerald, not interactive */}
+      <div
+        role="meter"
+        aria-valuenow={MASTERY_STABILITY_DAYS}
+        aria-valuemin={0}
+        aria-valuemax={MASTERY_STABILITY_DAYS}
+        aria-label={label}
+        className="h-1.5 w-20 rounded-full bg-emerald-500 dark:bg-emerald-400"
+      />
+      <span className={cn("text-xs", mutedText)} aria-hidden="true">
+        {label}
+      </span>
+    </div>
+  );
+}
 
 /** A single row in the close-to-mastery list. */
 function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
   const tWidget = useTranslations("journey.closeToMasteryWidget");
+  const tLeg = useTranslations("stats.legStatus");
+  const tJourney = useTranslations("journey");
   const { name } = useLocalePokemonName(entry.speciesId, entry.englishName);
 
+  const stabilityRounded = Math.round(entry.reverseStability);
   const daysRemaining = Math.max(
     0,
-    MASTERY_INTERVAL_DAYS - entry.reverseScheduledDays,
+    MASTERY_STABILITY_DAYS - stabilityRounded,
   );
 
-  const progressLabel = entry.reverseIntroduced
-    ? tWidget("progressLabel", { current: entry.reverseScheduledDays, max: MASTERY_INTERVAL_DAYS })
+  const reverseProgressLabel = entry.reverseIntroduced
+    ? tWidget("progressLabel", { current: stabilityRounded, max: MASTERY_STABILITY_DAYS })
     : tWidget("notStartedLabel");
 
   return (
-    <li className="flex items-center gap-3 py-2">
-      {/* Sprite */}
-      <div className="shrink-0" aria-hidden="true">
-        <Image
-          src={entry.spriteUrl}
-          alt=""
-          width={STATS_SPRITE_SIZE}
-          height={STATS_SPRITE_SIZE}
-          className="object-contain"
-          loading="lazy"
-        />
-      </div>
-
-      {/* Name + progress */}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">{name}</p>
-        <div className="mt-1 flex items-center gap-2">
-          <MeterBar
-            value={Math.min(MASTERY_INTERVAL_DAYS, Math.max(0, entry.reverseScheduledDays))}
-            max={MASTERY_INTERVAL_DAYS}
-            fillClass="bg-amber-400 dark:bg-amber-500"
-            label={progressLabel}
-            transitionClass="transition-[width]"
-            className="w-20"
+    <li className="py-2.5">
+      {/* Top row: sprite + name */}
+      <div className="flex items-center gap-3">
+        <div className="shrink-0" aria-hidden="true">
+          <Image
+            src={entry.spriteUrl}
+            alt=""
+            width={STATS_SPRITE_SIZE}
+            height={STATS_SPRITE_SIZE}
+            className="object-contain"
+            loading="lazy"
           />
-          {/* aria-hidden: the meter's aria-label already carries the "Xd of 21d"
-              semantic; hiding the visual "Xd" avoids double announcement. */}
-          <span className={cn("text-xs tabular-nums", mutedText)} aria-hidden="true">
-            {entry.reverseIntroduced
-              ? `${entry.reverseScheduledDays}d`
-              : tWidget("notStarted")}
-          </span>
         </div>
+        <p className="truncate text-sm font-medium text-foreground">{name}</p>
       </div>
 
-      {/* Days remaining badge */}
-      <div className="shrink-0 text-right">
-        {entry.reverseIntroduced ? (
-          <span
-            className={cn(
-              "text-xs font-medium tabular-nums",
-              daysRemaining === 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-amber-600 dark:text-amber-400",
-            )}
-            aria-label={
-              daysRemaining === 0
-                ? tWidget("readyForMastery")
-                : tWidget("daysNeeded", { days: daysRemaining })
-            }
-          >
-            {daysRemaining === 0 ? tWidget("ready") : `-${daysRemaining}d`}
+      {/* Leg rows */}
+      <div className="mt-1.5 space-y-1 pl-1">
+        {/* Name leg - always mastered in this list */}
+        <div className="flex items-center gap-2">
+          <span className={cn("w-24 shrink-0 text-xs", mutedText)}>
+            {tLeg("nameDirection")}
           </span>
-        ) : null}
+          <NameLegMastered label={tJourney("masteryMastered")} />
+        </div>
+
+        {/* Reverse leg - in progress */}
+        <div className="flex items-center gap-2">
+          <span className={cn("w-24 shrink-0 text-xs", mutedText)}>
+            {tLeg("reverseDirection")}
+          </span>
+          <div className="flex items-center gap-2">
+            <MeterBar
+              value={Math.min(MASTERY_STABILITY_DAYS, Math.max(0, stabilityRounded))}
+              max={MASTERY_STABILITY_DAYS}
+              fillClass="bg-amber-400 dark:bg-amber-500"
+              label={reverseProgressLabel}
+              transitionClass="transition-[width]"
+              className="w-20"
+            />
+            {/* aria-hidden: the meter's aria-label already carries the "Xd of 21d"
+                semantic; hiding the visual "Xd" avoids double announcement. */}
+            <span className={cn("text-xs tabular-nums", mutedText)} aria-hidden="true">
+              {entry.reverseIntroduced
+                ? `${stabilityRounded}d`
+                : tWidget("notStarted")}
+            </span>
+          </div>
+          {/* Days remaining badge */}
+          {entry.reverseIntroduced ? (
+            <span
+              className={cn(
+                "ml-auto shrink-0 text-xs font-medium tabular-nums",
+                daysRemaining === 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-amber-600 dark:text-amber-400",
+              )}
+              aria-label={
+                daysRemaining === 0
+                  ? tWidget("readyForMastery")
+                  : tWidget("daysNeeded", { days: daysRemaining })
+              }
+            >
+              {daysRemaining === 0 ? tWidget("ready") : `-${daysRemaining}d`}
+            </span>
+          ) : null}
+        </div>
       </div>
     </li>
   );

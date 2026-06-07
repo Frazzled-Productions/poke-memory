@@ -36,6 +36,13 @@ type Props = {
    * `incomplete-chains` scope counts as matching nothing.
    */
   incompleteChainSpeciesIds?: ReadonlySet<number>;
+  /**
+   * Species ids where exactly one practice leg is mastered and the other is
+   * not (#1767). Supplied by `ReviewSession` so the live "X of N match" count
+   * is accurate when the "Almost mastered" preset is selected. When omitted,
+   * the preset counts as matching nothing.
+   */
+  masteryBlockingSpeciesIds?: ReadonlySet<number>;
 };
 
 const GENS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -44,7 +51,7 @@ const ROMAN: Record<number, string> = {
   6: "VI", 7: "VII", 8: "VIII", 9: "IX",
 };
 // Keys only - labels are resolved via t() at render time to support locale switching.
-const PRESET_KEYS: PracticeScopePreset[] = ["starters", "legendaries", "incomplete-chains"];
+const PRESET_KEYS: PracticeScopePreset[] = ["starters", "legendaries", "incomplete-chains", "mastery-blockers"];
 
 function toggleNum(arr: number[], v: number): number[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
@@ -136,6 +143,7 @@ export function ScopeControl({
   onChange,
   alternateFormsEnabled = false,
   incompleteChainSpeciesIds,
+  masteryBlockingSpeciesIds,
 }: Props) {
   const [open, setOpen] = useState(false);
   const { seed } = useSeed();
@@ -146,11 +154,11 @@ export function ScopeControl({
   const tTypes = useTranslations("types") as TypeTranslations;
   const tScope = useTranslations("practice.scope");
   const active = !isScopeEmpty(scope);
-  // Context for the "Incomplete evolution chains" preset (#995): the live
-  // count must consult the same incomplete-chain species set the session uses.
+  // Context for progress-dependent presets (#995, #1767): the live count must
+  // consult the same species sets the session uses, so both counts agree.
   const scopeContext: ScopeMatchContext = useMemo(
-    () => ({ incompleteChainSpeciesIds }),
-    [incompleteChainSpeciesIds],
+    () => ({ incompleteChainSpeciesIds, masteryBlockingSpeciesIds }),
+    [incompleteChainSpeciesIds, masteryBlockingSpeciesIds],
   );
   // When the forms gate is off, alternate-form entries are excluded from the
   // count so the "X of N" display is consistent with what the session builds.
@@ -295,7 +303,12 @@ export function ScopeControl({
                 const presetLabel =
                   key === "starters" ? tScope("presetStarters")
                   : key === "legendaries" ? tScope("presetLegendaries")
-                  : tScope("presetIncompleteChains");
+                  : key === "incomplete-chains" ? tScope("presetIncompleteChains")
+                  : tScope("presetMasteryBlockers");
+                const ariaLabel =
+                  key === "mastery-blockers"
+                    ? tScope("presetMasteryBlockersDescription")
+                    : presetLabel;
                 return (
                   <button
                     key={key}
@@ -304,6 +317,7 @@ export function ScopeControl({
                       onChange({ ...scope, presets: togglePreset(scope.presets, key) })
                     }
                     aria-pressed={selected}
+                    aria-label={ariaLabel}
                     className={
                       PILL_BASE + " " + (selected ? SELECTED_ACCENT : UNSELECTED_PILL)
                     }

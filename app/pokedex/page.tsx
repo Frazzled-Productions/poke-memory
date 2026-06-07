@@ -22,15 +22,12 @@ export default function PokedexPage() {
   const format = useFormatter();
   const { seed } = useSeed();
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
-  const [masteryRepetitions, setMasteryRepetitions] = useState<number | null>(null);
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
 
   useEffect(() => {
     if (seed === null) return;
     const currentSeed = seed; // capture non-null reference for async closure
     async function load() {
-      const { masteryRepetitions: mr } = loadSettings();
-      setMasteryRepetitions(mr);
       const saved = await loadSession();
       if (saved !== null) {
         const { cards: hydrated, anyHealed } = hydrateSession(saved.cards, currentSeed.seedPokemon, []);
@@ -49,10 +46,10 @@ export default function PokedexPage() {
 
   const cardClassById = new Map<number, CardClass>();
   const masteryProgressById = new Map<number, MasteryProgress>();
-  if (cards !== null && masteryRepetitions !== null) {
+  if (cards !== null) {
     for (const card of cards) {
       if (card.cardType !== "name") continue;
-      cardClassById.set(card.id, classifyCard(card, masteryRepetitions));
+      cardClassById.set(card.id, classifyCard(card));
       // Populate the mastery-progress snapshot used by "closest to mastery" sort.
       if (card.state.lastReview !== null) {
         masteryProgressById.set(card.id, {

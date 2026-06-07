@@ -192,6 +192,57 @@ describe("PokedexGrid - locale name rendering", () => {
 });
 
 // ---------------------------------------------------------------------------
+// WebP src assertion - locale matrix (#1740)
+// The grid now renders the 64 px WebP variant for every tile regardless of
+// locale. Verified here for all four supported locales to confirm the
+// spriteVariantUrl(id, POKEDEX_GRID_SPRITE_SIZE) path is emitted correctly
+// and does not accidentally regress to the raw PNG path.
+// ---------------------------------------------------------------------------
+
+describe("PokedexGrid - WebP sprite src across all locales (#1740)", () => {
+  const EXPECTED_SRC = "/sprites/pokemon/webp/1/64.webp";
+
+  it("renders the 64 px WebP src in English (en)", () => {
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);
+    const img = document.querySelector(`img[src="${EXPECTED_SRC}"]`);
+    expect(img).not.toBeNull();
+  });
+
+  it("renders the 64 px WebP src with a Japanese locale override", () => {
+    const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
+      [1, { name: "フシギダネ", lang: "ja" }],
+    ]);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    const img = document.querySelector(`img[src="${EXPECTED_SRC}"]`);
+    expect(img).not.toBeNull();
+  });
+
+  it("renders the 64 px WebP src with a Simplified Chinese locale override", () => {
+    const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
+      [1, { name: "妙蛙种子", lang: "zh-Hans" }],
+    ]);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    const img = document.querySelector(`img[src="${EXPECTED_SRC}"]`);
+    expect(img).not.toBeNull();
+  });
+
+  it("renders the 64 px WebP src with a Traditional Chinese locale override", () => {
+    const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
+      [1, { name: "妙蛙種子", lang: "zh-Hant" }],
+    ]);
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
+    const img = document.querySelector(`img[src="${EXPECTED_SRC}"]`);
+    expect(img).not.toBeNull();
+  });
+
+  it("does NOT render a raw PNG src for any tile", () => {
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);
+    const pngImg = document.querySelector('img[src$=".png"]');
+    expect(pngImg).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // masteryCount label locale coverage (#1393)
 // ---------------------------------------------------------------------------
 
