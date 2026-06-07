@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CollapsibleSection } from "@/components/settings/CollapsibleSection";
 
 const STORAGE_KEY = "poke-memory:settings-section:test-section";
@@ -248,6 +248,54 @@ describe("CollapsibleSection", () => {
       expect(
         screen.getByRole("button", { name: /test section/i }),
       ).toHaveAttribute("aria-expanded", "false");
+    });
+  });
+
+  // onFirstCollapse - one-shot "default open" dismissal
+  describe("onFirstCollapse", () => {
+    it("calls onFirstCollapse when the user manually collapses the section", async () => {
+      const user = userEvent.setup();
+      const onFirstCollapse = vi.fn();
+
+      render(
+        <CollapsibleSection
+          sectionId="test-section"
+          heading="Test Section"
+          forceOpen
+          onFirstCollapse={onFirstCollapse}
+        >
+          <p>Content</p>
+        </CollapsibleSection>,
+      );
+
+      // Section is force-opened; clicking collapses it.
+      const button = screen.getByRole("button", { name: /test section/i });
+      await user.click(button);
+
+      expect(button).toHaveAttribute("aria-expanded", "false");
+      expect(onFirstCollapse).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT call onFirstCollapse when the user expands (not collapses) the section", async () => {
+      const user = userEvent.setup();
+      const onFirstCollapse = vi.fn();
+
+      render(
+        <CollapsibleSection
+          sectionId="test-section"
+          heading="Test Section"
+          onFirstCollapse={onFirstCollapse}
+        >
+          <p>Content</p>
+        </CollapsibleSection>,
+      );
+
+      // Section starts collapsed; clicking expands it.
+      const button = screen.getByRole("button", { name: /test section/i });
+      await user.click(button);
+
+      expect(button).toHaveAttribute("aria-expanded", "true");
+      expect(onFirstCollapse).not.toHaveBeenCalled();
     });
   });
 });

@@ -59,7 +59,7 @@ export function WhatsNewIndicator() {
         aria-hidden="true"
         className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500"
       />
-      What&apos;s new
+      {t("whatsNew")}
     </Link>
   );
 }

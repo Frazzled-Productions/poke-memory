@@ -76,6 +76,7 @@ const SAMPLE: UserSettings = {
     pastureLongPressHintDismissed: false,
     higherOrLowerNudgeDismissed: false,
     guestSignUpNudgeDismissed: false,
+    cardTypesDefaultOpenDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

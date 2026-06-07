@@ -162,12 +162,12 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
   if (!hasData) {
     return (
       <section aria-labelledby="timeline-heading">
-        <h2
+        <h3
           id="timeline-heading"
           className="mb-4 text-lg font-semibold text-foreground"
         >
           {tWidget("heading")}
-        </h2>
+        </h3>
         <EmptyState />
       </section>
     );

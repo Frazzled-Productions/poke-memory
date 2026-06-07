@@ -51,6 +51,7 @@ const ZERO_STATUS: SyncStatus = {
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
   structuralSyncError: null,
+  ownerUserId: null,
 };
 
 function mockUnsynced(count: number) {

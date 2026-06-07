@@ -7,8 +7,7 @@
  *
  * Scope: this switches ONLY the Pokémon-name language, not the app/UI language
  * (that stays in Settings so a user cannot trap themselves in unreadable
- * chrome). Gated behind the `languages` Labs flag via `usePokemonLocaleContext`
- * - renders nothing until the flag is on.
+ * chrome). Multi-locale is GA since #1723 - always rendered for enrolled users.
  *
  * Responsive: a bottom sheet on mobile, a centred modal on desktop. The a11y
  * contract (role="dialog" + aria-modal, focus move-in, focus trap, Escape +
@@ -78,7 +77,7 @@ function CheckIcon() {
 
 export function LanguageSwitcher() {
   const t = useTranslations("languageSwitcher");
-  const { locale, languagesEnabled, learningLocales } =
+  const { locale, learningLocales } =
     usePokemonLocaleContext();
   const [open, setOpen] = useState(false);
   const [dueCounts, setDueCounts] = useState<DueCountByLocale | null>(null);
@@ -173,8 +172,6 @@ export function LanguageSwitcher() {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [open]);
-
-  if (!languagesEnabled) return null;
 
   function selectLocale(next: AppLocale) {
     // Block switching mid-card: the card is revealed and grade buttons are
@@ -289,9 +286,9 @@ export function LanguageSwitcher() {
             })}
           </div>
 
-          {/* Enrol more languages from the Settings section. */}
+          {/* Enrol more languages from the Settings Language section. */}
           <Link
-            href="/settings#languages-learning"
+            href="/settings#language-heading"
             onClick={close}
             className={`mt-1 flex min-h-[44px] w-full items-center rounded-lg px-2 py-1.5 text-left text-sm transition-colors [@media(hover:hover)]:hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground dark:[@media(hover:hover)]:hover:bg-zinc-800 ${mutedTextXs}`}
           >

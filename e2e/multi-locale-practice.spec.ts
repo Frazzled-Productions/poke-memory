@@ -2,9 +2,9 @@
 // Smoke tests for per-locale practice sessions (#1562, part of the #1484 epic).
 //
 // Scenarios:
-//   1. Baseline (en only, languages flag off) - Practice renders a card and a
-//      grade interaction succeeds. Regression guard for the default majority.
-//   2. Language pill is visible when the languages flag and learningLocales are set.
+//   1. Baseline (en only, default) - Practice renders a card and a grade
+//      interaction succeeds. Regression guard for the default majority.
+//   2. Language pill is always visible (multi-locale is GA since #1726).
 //   3. Switch to Japanese → non-empty ja session with a Japanese name rendered.
 //   4. Mid-card lock - while a card is revealed the pill opens but blocks switching
 //      and shows the lock message; grading the card re-enables switching.
@@ -19,9 +19,9 @@ import { practiceReadyLocator } from "./helpers/practiceCard";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Seeds localStorage so the languages Labs flag is enabled and the user is
- * enrolled in both English and Japanese, with English as the active locale.
- * Mirrors the pattern in i18n.spec.ts::enableLanguagesFlag.
+ * Seeds localStorage so the user is enrolled in both English and Japanese,
+ * with English as the active locale. Multi-locale is GA so no Labs flag is
+ * needed for the pill to appear.
  */
 async function seedLanguagesEnabled(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -44,12 +44,7 @@ async function seedLanguagesEnabled(page: Page): Promise<void> {
         ...existing,
         learningLocales: ["en", "ja"],
         activePokemonNameLocale: "en",
-        labsFlags: {
-          ...(typeof existing.labsFlags === "object" && existing.labsFlags !== null
-            ? (existing.labsFlags as Record<string, unknown>)
-            : {}),
-          languages: true,
-        },
+        // No labsFlags needed - multi-locale is GA (#1726).
         onboarding: {
           ...(typeof existing.onboarding === "object" && existing.onboarding !== null
             ? (existing.onboarding as Record<string, unknown>)
@@ -87,10 +82,9 @@ async function seedSuperuserQaSeed(page: Page): Promise<void> {
  * Opens Settings, applies the fsrs-locale-mastery QA seed scenario, waits for
  * confirmation, then reloads so the seeded IDB data is live.
  *
- * The seed enrols en + ja, sets activePokemonNameLocale to "en", enables the
- * `languages` Labs flag (so the pill is visible immediately), and writes an
- * independent ja card set (5 mastered + 5 due-soon name cards), giving a
- * non-empty Japanese session queue.
+ * The seed enrols en + ja, sets activePokemonNameLocale to "en" (the pill is
+ * always visible since multi-locale is GA), and writes an independent ja card
+ * set (5 mastered + 5 due-soon name cards), giving a non-empty Japanese session queue.
  */
 async function applyFsrsLocaleMasterySeed(page: Page): Promise<void> {
   // Accept the confirm dialog that "Apply seed" triggers.
@@ -100,7 +94,7 @@ async function applyFsrsLocaleMasterySeed(page: Page): Promise<void> {
 
   // Expand the Advanced section to reveal the Developer panel.
   await page.getByRole("button", { name: "Advanced", exact: true }).click();
-  const developerSection = page.getByRole("region", { name: /developer/i });
+  const developerSection = page.locator("#developer-heading");
   await expect(developerSection).toBeVisible({ timeout: 10_000 });
 
   const seedPanel = page.getByTestId("qa-seed-section");
@@ -150,12 +144,7 @@ async function seedJaAsActive(page: Page): Promise<void> {
         ...existing,
         learningLocales: ["en", "ja"],
         activePokemonNameLocale: "ja",
-        labsFlags: {
-          ...(typeof existing.labsFlags === "object" && existing.labsFlags !== null
-            ? (existing.labsFlags as Record<string, unknown>)
-            : {}),
-          languages: true,
-        },
+        // No labsFlags needed - multi-locale is GA (#1726).
         onboarding: {
           ...(typeof existing.onboarding === "object" && existing.onboarding !== null
             ? (existing.onboarding as Record<string, unknown>)
@@ -183,20 +172,14 @@ test.describe("Per-locale practice session (#1562)", () => {
     await addOnboardingPreDismiss(page);
   });
 
-  // ── Baseline: languages flag off, single language (en) ───────────────────
+  // ── Baseline: single language (en, default) ──────────────────────────────
 
-  test("baseline (flag off): practice page renders a card in the default English session", async ({
+  test("baseline: practice page renders a card in the default English session", async ({
     page,
   }) => {
-    // Default state - no labsFlags, no learningLocales override. A fresh
-    // guest session sees only English cards with the standard daily budget.
+    // Default state - no learningLocales override. A fresh guest session sees
+    // only English cards with the standard daily budget.
     await page.goto("/");
-
-    // The language switcher pill must NOT be visible when the flag is off.
-    // Pill aria-label is "Pokémon name language: {language}. Tap to change."
-    await expect(
-      page.getByRole("button", { name: /Pokémon name language/i }),
-    ).toHaveCount(0);
 
     // A practice card must render. Use practiceReadyLocator, which matches all
     // legitimate first-card surfaces (Reveal button, SpritePicker group,
@@ -226,7 +209,7 @@ test.describe("Per-locale practice session (#1562)", () => {
 
   // ── Per-locale: en + ja enrolled, language switcher pill ─────────────────
 
-  test("language switcher pill is visible when the languages flag is on", async ({
+  test("language switcher pill is visible when multiple locales are enrolled", async ({
     page,
   }) => {
     await seedLanguagesEnabled(page);
@@ -246,15 +229,15 @@ test.describe("Per-locale practice session (#1562)", () => {
     //   • 30 mastered + 10 due-soon + 5 in-learning name cards (locale: en).
     //   • 5 mastered + 5 due-soon name cards (locale: ja) for species 43, 52, 63, 66, 74.
     //   • learningLocales: ["en", "ja"], activePokemonNameLocale: "en".
-    //   • labsFlags: { languages: true } - pill visible immediately.
+    //   • learningLocales: ["en", "ja"] - pill shows the active locale.
     await seedSuperuserQaSeed(page);
     await applyFsrsLocaleMasterySeed(page);
 
     // Navigate to Practice now that the seed is live.
     await page.goto("/");
 
-    // The language pill must be visible - the seed enables the flag and sets
-    // learningLocales. Full accessible name: "Pokémon name language: English. Tap to change."
+    // The language pill must be visible - the seed sets learningLocales with
+    // two locales. Full accessible name: "Pokémon name language: English. Tap to change."
     const pill = page.getByRole("button", { name: /Pokémon name language.*English/i });
     await expect(pill).toBeVisible({ timeout: 15_000 });
 
@@ -330,10 +313,10 @@ test.describe("Per-locale practice session (#1562)", () => {
     await seedJaAsActive(page);
     await page.goto("/settings");
 
-    // Expand the Labs section to show the enrolment list.
-    const labsButton = page.getByRole("button", { name: "Labs", exact: true });
-    await expect(labsButton).toBeVisible({ timeout: 10_000 });
-    await labsButton.click();
+    // Expand the Language section to show the enrolment list.
+    const langButton = page.getByRole("button", { name: "Language", exact: true });
+    await expect(langButton).toBeVisible({ timeout: 10_000 });
+    await langButton.click();
 
     // The enrolment list must be visible.
     await expect(
@@ -437,7 +420,7 @@ test.describe("Per-locale practice session (#1562)", () => {
   }) => {
     // Use the fsrs-locale-mastery seed so the pill is visible and the ja
     // session is non-empty. The seed sets activePokemonNameLocale to "en"
-    // and enables the languages flag.
+    // and learningLocales: ["en", "ja"].
     await seedSuperuserQaSeed(page);
     await applyFsrsLocaleMasterySeed(page);
 

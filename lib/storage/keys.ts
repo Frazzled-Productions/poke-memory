@@ -221,6 +221,27 @@ export const KEY_POKEDEX_SORT = "poke-memory:pokedex-sort:v1";
  */
 export const KEY_CLIENT_SALT = "poke-memory:client-salt:v1";
 
+// ─── Per-user local-state archive ────────────────────────────────────────────
+
+/**
+ * Key prefix for per-user archived local state written when a different user
+ * signs in on the same device. The full key is:
+ *   `poke-memory:user-archive:<userId>`
+ *
+ * The value is a serialised JSON blob containing all "must-archive" keys for
+ * the outgoing user. On a subsequent sign-in by the same user the blob is
+ * deserialised and each key is restored so they continue where they left off.
+ *
+ * Archives are device-local. deleteAccountEverywhere sweeps all poke-memory:*
+ * keys, which includes any archive blobs stored here.
+ */
+const USER_ARCHIVE_PREFIX = "poke-memory:user-archive";
+
+/** Returns the localStorage key for a given user's archived local state. */
+export function userArchiveKey(userId: string): string {
+  return `${USER_ARCHIVE_PREFIX}:${userId}`;
+}
+
 // ─── Machine-translation banner dismissal ────────────────────────────────────
 
 /**

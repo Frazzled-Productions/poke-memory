@@ -8,8 +8,9 @@ import { useTranslations } from "next-intl";
 import { buildSession, hydrateSession, todayString, DEFAULT_LIMITS, type ReviewableCard, type DailyLimits } from "@/lib/review/session";
 import { EMPTY_SCOPE, type PracticeScope } from "@/lib/review/scope";
 import { type DateFormat } from "@/lib/utils/format-date";
-import { cn } from "@/lib/utils/cn";
-import { colStack, mutedText, mutedTextXs } from "@/lib/utils/class-names";
+import { colStack, mutedText, mutedTextXs, pageTitle } from "@/lib/utils/class-names";
+import { PageShell } from "@/components/ui/PageShell";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 import { loadSession, saveSession, bumpSessionStorageKey, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import { MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
@@ -140,12 +141,10 @@ function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[]
   const tCommon = useTranslations("common");
   return (
     <section aria-labelledby="struggling-heading">
-      <h2
-        id="struggling-heading"
-        className="mb-3 text-base font-semibold text-foreground"
-      >
+      {/* h3 because StrugglingCards is nested inside the Scheduling h2 section */}
+      <SectionHeading level={3} id="struggling-heading" className="mb-3">
         {t("strugglingCards.heading")}
-      </h2>
+      </SectionHeading>
 
       {struggling.length === 0 ? (
         <p className={mutedText}>
@@ -181,165 +180,6 @@ function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[]
         </ul>
       )}
     </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// ForcePullSection - recovery button visible only when signed in
-// ---------------------------------------------------------------------------
-
-type ForcePullStatus = "idle" | "pulling" | "success" | "error";
-
-function ForcePullSection({
-  supabase,
-  userId,
-  onSuccess,
-}: {
-  supabase: import("@supabase/supabase-js").SupabaseClient;
-  userId: string;
-  onSuccess: (cards: ReviewableCard[]) => void;
-}) {
-  const t = useTranslations("stats");
-  const { seed } = useSeed();
-  const [status, setStatus] = useState<ForcePullStatus>("idle");
-
-  async function handleForcePull() {
-    const confirmed = window.confirm(t("forcePull.confirmMessage"));
-    if (!confirmed) return;
-
-    setStatus("pulling");
-    try {
-      const [
-        cloudRows,
-        pulledSettings,
-        cloudPrefs,
-        cloudStreak,
-        cloudGradeLog,
-      ] = await Promise.all([
-        pullSession(supabase, userId),
-        pullSettingsWithTimestamp(supabase, userId).catch(() => null),
-        pullRegionalPrefs(supabase, userId).catch(() => null),
-        pullStreak(supabase, userId).catch(() => null),
-        pullGradeLog(supabase, userId).catch(() => null),
-      ]);
-
-      if (cloudRows === null) {
-        setStatus("error");
-        return;
-      }
-
-      if (pulledSettings !== null) {
-        saveSettings(pulledSettings.settings);
-      }
-
-      if (cloudPrefs !== null) {
-        const local = loadSettings();
-        const next = {
-          ...local,
-          ...(cloudPrefs.timezone !== null ? { timezone: cloudPrefs.timezone } : {}),
-          ...(cloudPrefs.dateFormat !== null ? { dateFormat: cloudPrefs.dateFormat } : {}),
-        };
-        if (next.timezone !== local.timezone || next.dateFormat !== local.dateFormat) {
-          saveSettings(next);
-        }
-      }
-
-      const settings = loadSettings();
-      const opts = seedOptsFromSettings(settings);
-      const cards = applyCloudAuthoritative(
-        seed?.seedPokemon ?? [],
-        seed?.seedEvolutionCards ?? [],
-        cloudRows,
-        opts,
-      );
-
-      if (cloudStreak !== null) {
-        saveStreakData([...cloudStreak].sort());
-      }
-      if (cloudGradeLog !== null) {
-        await saveGradeLog(cloudGradeLog);
-      }
-
-      const saved = await loadSession();
-      const limits = saved?.limits ?? DEFAULT_LIMITS;
-      const result = await saveSession({ cards, limits });
-
-      if (!result.ok) {
-        setStatus("error");
-        return;
-      }
-
-      const syncStatus = loadSyncStatus();
-      saveSyncStatus({
-        ...syncStatus,
-        lastPullAt: maxCloudUpdatedAt(cloudRows),
-        ...(pulledSettings?.updatedAt !== undefined &&
-        pulledSettings.updatedAt !== null
-          ? { lastSettingsPullAt: pulledSettings.updatedAt }
-          : {}),
-      });
-
-      bumpSessionStorageKey();
-
-      onSuccess(cards);
-      setStatus("success");
-      setTimeout(() => setStatus("idle"), 4000);
-    } catch {
-      setStatus("error");
-    }
-  }
-
-  return (
-    <section aria-labelledby="force-pull-heading">
-      <h2
-        id="force-pull-heading"
-        className="mb-1 text-base font-semibold text-foreground"
-      >
-        {t("forcePull.heading")}
-      </h2>
-      <p className={cn("mb-3", mutedText)}>
-        {t("forcePull.description")}
-      </p>
-      <button
-        type="button"
-        onClick={() => void handleForcePull()}
-        disabled={status === "pulling"}
-        aria-busy={status === "pulling"}
-        className="rounded-lg border border-zinc-200 bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-900"
-      >
-        {status === "pulling" ? t("forcePull.pulling") : t("forcePull.button")}
-      </button>
-      {status === "success" && (
-        <p
-          role="status"
-          aria-live="polite"
-          className="mt-2 text-sm text-emerald-600 dark:text-emerald-400"
-        >
-          {t("forcePull.success")}
-        </p>
-      )}
-      {status === "error" && (
-        <p
-          role="alert"
-          aria-live="assertive"
-          className="mt-2 text-sm text-rose-600 dark:text-rose-400"
-        >
-          {t("forcePull.error")}
-        </p>
-      )}
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Section heading
-// ---------------------------------------------------------------------------
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="text-lg font-semibold text-foreground">
-      {children}
-    </h2>
   );
 }
 
@@ -569,19 +409,36 @@ export default function StatsPage() {
       : null;
 
   return (
-    <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
-      <div className="w-full max-w-3xl lg:max-w-6xl">
-        <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
+    <PageShell width="reading">
+        <h1 className={`mb-2 ${pageTitle}`}>
           {t("title")}
         </h1>
         {user !== null && (
-          <div className="mb-8">
+          <div className="mb-1">
             <SyncStatusLine
               retryState={retryState}
               retryNow={retryNow}
               superuserPaused={anyFlagOn}
             />
           </div>
+        )}
+        {/*
+          "Restore from cloud" link - visible only when signed in (#1732 / #1729).
+          Telegraphs that recovery options are in Settings and links there directly.
+          Does NOT duplicate the ForcePullSection action (which has moved to Settings).
+          Gated on user !== null && supabase !== null && !anyFlagOn to match the
+          former ForcePullSection gate.
+        */}
+        {user !== null && supabase !== null && !anyFlagOn && (
+          <p className="mb-8 text-sm text-zinc-500 dark:text-zinc-400">
+            {t("restoreFromCloudDescription")}{" "}
+            <Link
+              href="/settings"
+              className="underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 rounded"
+            >
+              {t("restoreFromCloud")}
+            </Link>
+          </p>
         )}
 
         {user === null && !flags.pretendAllMastered && (
@@ -598,17 +455,11 @@ export default function StatsPage() {
         ) : (
           <div className="flex flex-col gap-10">
 
-            {/*
-              At lg: the Accuracy and Activity sections sit side-by-side in a
-              2-column grid. On smaller screens they stack vertically as before.
-            */}
-            <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-start">
-
-              {/* Accuracy section */}
-              <section aria-labelledby="accuracy-section-heading" className="flex flex-col gap-6">
-                <SectionHeading>
-                  <span id="accuracy-section-heading">{t("accuracyHeading")}</span>
-                </SectionHeading>
+            {/* Accuracy section - single column (max-w-3xl reading width, #1732 / #1729) */}
+            <section aria-labelledby="accuracy-section-heading" className="flex flex-col gap-6">
+              <SectionHeading level={2} id="accuracy-section-heading">
+                {t("accuracyHeading")}
+              </SectionHeading>
                 <GradeBreakdownBar
                   again={gradeTotals[1]}
                   hard={gradeTotals[2]}
@@ -639,37 +490,35 @@ export default function StatsPage() {
                 )}
               </section>
 
-              {/* Activity section */}
-              <section aria-labelledby="activity-section-heading" className="flex flex-col gap-6">
-                <SectionHeading>
-                  <span id="activity-section-heading">{t("activityHeading")}</span>
-                </SectionHeading>
-                <ReviewHeatmap
-                  columns={computeReviewHeatmap(gradeLog, todayString(new Date(), userTimezone))}
-                />
-                {reviewCharts !== null && (
-                  <>
-                    <ActivityHistoryChart
-                      series={reviewCharts.activityHistory}
-                      dateFormat={userDateFormat}
-                    />
-                    <MasteryOverTimeChart
-                      series={reviewCharts.masteryOverTime}
-                      totalCards={snapshot.mastery!.totalCards}
-                      dateFormat={userDateFormat}
-                      forceAllMastered={flags.pretendAllMastered}
-                    />
-                  </>
-                )}
-              </section>
+            {/* Activity section */}
+            <section aria-labelledby="activity-section-heading" className="flex flex-col gap-6">
+              <SectionHeading level={2} id="activity-section-heading">
+                {t("activityHeading")}
+              </SectionHeading>
+              <ReviewHeatmap
+                columns={computeReviewHeatmap(gradeLog, todayString(new Date(), userTimezone))}
+              />
+              {reviewCharts !== null && (
+                <>
+                  <ActivityHistoryChart
+                    series={reviewCharts.activityHistory}
+                    dateFormat={userDateFormat}
+                  />
+                  <MasteryOverTimeChart
+                    series={reviewCharts.masteryOverTime}
+                    totalCards={snapshot.mastery!.totalCards}
+                    dateFormat={userDateFormat}
+                    forceAllMastered={flags.pretendAllMastered}
+                  />
+                </>
+              )}
+            </section>
 
-            </div>
-
-            {/* Progress section - per-game mastery breakdown, full width on all breakpoints */}
+            {/* Progress section - per-game mastery breakdown */}
             {perGame.length > 0 && (
               <section aria-labelledby="progress-section-heading" className="flex flex-col gap-6">
-                <SectionHeading>
-                  <span id="progress-section-heading">{t("progressHeading")}</span>
+                <SectionHeading level={2} id="progress-section-heading">
+                  {t("progressHeading")}
                 </SectionHeading>
                 <GameBreakdown perGame={perGame} />
               </section>
@@ -686,10 +535,10 @@ export default function StatsPage() {
               />
             )}
 
-            {/* Scheduling section - full width on all breakpoints */}
+            {/* Scheduling section */}
             <section aria-labelledby="scheduling-section-heading" className="flex flex-col gap-6">
-              <SectionHeading>
-                <span id="scheduling-section-heading">{t("schedulingHeading")}</span>
+              <SectionHeading level={2} id="scheduling-section-heading">
+                {t("schedulingHeading")}
               </SectionHeading>
               <OnboardingHint id="statsHintDismissed" title={t("masteryMeaning.title")}>
                 <p>
@@ -718,16 +567,8 @@ export default function StatsPage() {
               <StrugglingCards struggling={snapshot.struggling ?? []} />
             </section>
 
-            {user !== null && supabase !== null && !anyFlagOn && (
-              <ForcePullSection
-                supabase={supabase}
-                userId={user.id}
-                onSuccess={setCards}
-              />
-            )}
           </div>
         )}
-      </div>
-    </div>
+    </PageShell>
   );
 }

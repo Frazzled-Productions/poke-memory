@@ -272,33 +272,9 @@ describe("settings merge", () => {
     expect((saved.streakProtection as { balance: number }).balance).toBe(2);
   });
 
-  it("merges labsFlags into existing labs flags (does not wipe pre-existing flags)", async () => {
-    // Prime an existing labs flag in settings via a direct write, then apply a
-    // scenario that only sets `languages`. The pre-existing flag must survive.
-    const { loadSettings: getSettings, saveSettings: putSettings } =
-      await import("@/lib/settings/persistence");
-
-    // Prime the settings with labsFlags.languages = false (the default).
-    const initial = getSettings() as Record<string, unknown>;
-    (putSettings as (s: unknown) => void)({
-      ...initial,
-      labsFlags: { languages: false },
-    });
-    vi.mocked(putSettings).mockClear();
-
-    // Apply a scenario that sets labsFlags.languages = true.
-    await applySeedScenario({
-      pokemonNameLocale: null,
-      labsFlags: { languages: true },
-    });
-
-    const saved = vi.mocked(putSettings).mock.calls[0][0] as Record<
-      string,
-      unknown
-    >;
-    const labsFlags = saved.labsFlags as Record<string, unknown>;
-    expect(labsFlags.languages).toBe(true);
-  });
+  // Note: the labsFlags.languages merge test was removed because labsFlags.languages
+  // is a dead key post-GA (#1726) - LabsFlags is Record<never, boolean> so the key
+  // is stripped on read. The fsrs-locale-mastery scenario no longer sets it.
 
   it("does NOT call saveSettings when the payload has no settings keys", async () => {
     const { saveSettings } = await import("@/lib/settings/persistence");

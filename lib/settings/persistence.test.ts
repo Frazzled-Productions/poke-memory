@@ -620,6 +620,7 @@ describe('themeIntensity setting (#411)', () => {
           pastureLongPressHintDismissed: false,
           higherOrLowerNudgeDismissed: false,
           guestSignUpNudgeDismissed: false,
+          cardTypesDefaultOpenDismissed: false,
         },
       });
       expect(loadSettings().onboarding).toEqual({
@@ -642,6 +643,7 @@ describe('themeIntensity setting (#411)', () => {
         pastureLongPressHintDismissed: false,
         higherOrLowerNudgeDismissed: false,
         guestSignUpNudgeDismissed: false,
+        cardTypesDefaultOpenDismissed: false,
       });
     });
 
@@ -690,6 +692,7 @@ describe('themeIntensity setting (#411)', () => {
         pastureLongPressHintDismissed: false,
         higherOrLowerNudgeDismissed: false,
         guestSignUpNudgeDismissed: false,
+        cardTypesDefaultOpenDismissed: false,
       });
     });
 

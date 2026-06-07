@@ -5,6 +5,7 @@ import { FirstVisitOnboardingModal } from "@/components/onboarding/FirstVisitOnb
 import { ReviewSession } from "@/components/review/ReviewSession";
 import { PracticeSidebar } from "@/components/review/PracticeSidebar";
 import { StreakBadge } from "@/components/review/StreakBadge";
+import { PracticeH1 } from "@/components/practice/PracticeH1";
 
 export const metadata: Metadata = {
   title: "Poké Memory - Learn every Pokémon",
@@ -42,7 +43,7 @@ export default function Home({
     /*
       On mobile the page must fill the available height between the top nav and
       the bottom nav without scrolling (#1087). The height chain is:
-        body (flex flex-col min-h-dvh)            ← anchors page to 100dvh (#1086)
+        body (flex flex-col min-h-[100svh])       ← anchors page to 100svh (#1086/#1728)
         → MobileNavPaddingWrapper (flex-1 flex-col min-h-0)
         → this div (flex-1 flex-col min-h-0) ← fills the gap
         → inner container → main → ReviewSession wrapper
@@ -83,6 +84,15 @@ export default function Home({
 
         {/* Main review session - always visible */}
         <main className="flex flex-1 flex-col min-h-0 w-full lg:flex-none">
+          {/*
+            sr-only h1 for the Practice route (#1730 / #1729). The compact
+            mobile layout has no visual title, but screen-reader users need a
+            top-level heading. Placed first so the heading is the first thing
+            announced when the page loads. PracticeH1 is a client component
+            using useTranslations so it resolves synchronously from the app's
+            intl context.
+          */}
+          <PracticeH1 />
           {/*
             First-visit onboarding modal (#1103). Renders as a fixed overlay;
             it reads its own persisted flag so no state is needed here.

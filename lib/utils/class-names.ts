@@ -115,3 +115,31 @@ export const inlineLink =
  */
 export const chartTooltipCard =
   "rounded-lg border border-zinc-200 bg-background px-3 py-2 text-xs shadow-lg dark:border-zinc-700";
+
+// ---------------------------------------------------------------------------
+// Page layout tokens (added for #1729 / #1735)
+// ---------------------------------------------------------------------------
+
+/**
+ * Page title: the single `<h1>` on every page.
+ * `text-2xl font-bold tracking-tight text-foreground`.
+ */
+export const pageTitle =
+  "text-2xl font-bold tracking-tight text-foreground";
+
+/**
+ * Super-section `<h2>` heading (text-xl). Used for top-level sections inside
+ * a page (e.g. Journey's "Your progress / Collection / Breakdown" groups).
+ * `text-xl font-semibold text-foreground`.
+ */
+export const sectionHeadingLg =
+  "text-xl font-semibold text-foreground";
+
+/**
+ * Content-section `<h3>` (or occasionally `<h2>`) heading (text-lg). Used
+ * for subsections below a super-section heading (or the sole heading level
+ * where no super-sections exist).
+ * `text-lg font-semibold text-foreground`.
+ */
+export const sectionHeading =
+  "text-lg font-semibold text-foreground";

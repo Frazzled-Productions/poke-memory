@@ -82,8 +82,8 @@ test.describe("First-visit onboarding modal (#1103)", () => {
     }
 
     await page.goto("/settings");
-    // "How this works" lives inside the collapsible "Account & Data" section.
-    await page.getByRole("button", { name: /account & data/i }).click();
+    // "How this works" lives inside the collapsible "Data & backup" section.
+    await page.getByRole("button", { name: /data.*backup/i }).click();
     await page.getByRole("button", { name: /show onboarding again/i }).click();
 
     await page.goto("/");
@@ -232,7 +232,7 @@ test.describe("PWA install nudge (#701)", () => {
     }, SETTINGS_KEY);
 
     await page.goto("/settings");
-    await page.getByRole("button", { name: /account & data/i }).click();
+    await page.getByRole("button", { name: /data.*backup/i }).click();
     await page.getByRole("button", { name: /show onboarding again/i }).click();
 
     // After the reset, installNudgeDismissed must be false in localStorage.

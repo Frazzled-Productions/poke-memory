@@ -8,10 +8,10 @@ import { isSessionActive } from "@/lib/review/sessionActive";
  * Registers the Poké Memory service worker and silently activates new builds
  * at safe moments.
  *
- * The service worker is built and served by `@serwist/turbopack` at
- * `/sw/sw.js` (see `app/sw/[path]/route.ts`). Once registered it precaches the
- * app shell and runtime-caches sprites, so an installed PWA works offline for
- * a practice session.
+ * The service worker is built to a static `public/sw/sw.js` asset by
+ * `scripts/build-sw.mjs` and served by the CDN at `/sw/sw.js` (#1752). Once
+ * registered it precaches the app shell and runtime-caches sprites, so an
+ * installed PWA works offline for a practice session.
  *
  * Update handling (silent-activate, #1162) - the classic PWA footgun is a
  * stale cache. The service worker is built with `skipWaiting: false`, so a
@@ -34,12 +34,12 @@ import { isSessionActive } from "@/lib/review/sessionActive";
  *      `controllerchange` handler reloads it the next time the user brings
  *      it back, fresh from the new bundle.
  *
- * Periodic update check (#1164) - `registration.update()` is a cheap no-op
- * when no new SW exists, so we call it on `visibilitychange → visible` after
- * the tab has been hidden for at least 5 minutes, and on a 4-hour interval
- * for tabs that never hide. This shrinks the discovery window for a fresh
- * deploy from the browser default (~24 h) to single-digit minutes for any
- * active tab.
+ * Periodic update check (#1164, tightened in #1750) - `registration.update()`
+ * is a cheap no-op when no new SW exists, so we call it on
+ * `visibilitychange → visible` after the tab has been hidden for at least
+ * 90 s, and on a 1-hour interval for tabs that never hide. This shrinks the
+ * discovery window for a fresh deploy from the browser default (~24 h) to
+ * well under two minutes for any active tab.
  *
  * Registration is skipped outside production builds so a `next dev` session
  * is never shadowed by a cached shell.
@@ -164,23 +164,27 @@ export function ServiceWorkerProvider() {
 
 /**
  * How long the tab must have been hidden before a visibilitychange→visible
- * triggers `registration.update()`. Below this threshold the user is
- * probably alt-tabbing between windows and not coming back from a long
- * absence; calling update() on every brief tab-switch would waste cycles.
+ * triggers `registration.update()`. 90 s filters routine alt-tabs while still
+ * catching a user returning from a notification, lock screen, or short
+ * break - the original 5 min felt too slow for a mobile-first app. 30 s was
+ * rejected as too aggressive on low-end devices.
  */
-const HIDDEN_FOR_UPDATE_CHECK_MS = 5 * 60 * 1000;
+const HIDDEN_FOR_UPDATE_CHECK_MS = 90 * 1000;
 
 /**
  * Minimum gap between two visibility-triggered `registration.update()`
- * calls. Belt-and-braces rate limit on top of HIDDEN_FOR_UPDATE_CHECK_MS so
- * a tab that flips hidden/visible at the threshold boundary cannot produce
- * a burst.
+ * calls. Kept at or above HIDDEN_FOR_UPDATE_CHECK_MS (2 min >= 90 s) so a
+ * tab that flips hidden/visible repeatedly at the threshold boundary cannot
+ * produce a burst of consecutive update() calls.
+ *
+ * INVARIANT: UPDATE_CHECK_THROTTLE_MS >= HIDDEN_FOR_UPDATE_CHECK_MS.
  */
-const UPDATE_CHECK_THROTTLE_MS = 5 * 60 * 1000;
+const UPDATE_CHECK_THROTTLE_MS = 2 * 60 * 1000;
 
 /**
  * Background `registration.update()` interval for tabs that never go hidden
- * (e.g. a pinned tab on a secondary display). 4 hours keeps the worst-case
- * discovery window for a fresh deploy bounded without measurable cost.
+ * (e.g. a pinned tab on a secondary display). 1 h is the community floor
+ * (web.dev / Vite PWA recommendations) and costs only one ~1 KB conditional
+ * GET per hour, down from the previous 4 h worst-case discovery window.
  */
-const BACKGROUND_UPDATE_INTERVAL_MS = 4 * 60 * 60 * 1000;
+const BACKGROUND_UPDATE_INTERVAL_MS = 60 * 60 * 1000;

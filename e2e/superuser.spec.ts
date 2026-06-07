@@ -82,10 +82,10 @@ const SESSION_BULBASAUR_LEARNING_ONLY = {
 test.describe("Superuser mode", () => {
   test("Developer panel is hidden by default", async ({ page }) => {
     await page.goto("/settings");
-    // The developer region is only rendered when superuser mode is unlocked.
+    // The developer section is only rendered when superuser mode is unlocked.
     // Without unlocked state, the element should not be in the DOM at all.
     await expect(
-      page.getByRole("region", { name: /developer/i }),
+      page.locator("#developer-heading"),
     ).toHaveCount(0);
   });
 
@@ -98,10 +98,8 @@ test.describe("Superuser mode", () => {
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
     // Wait for settings to hydrate - the Developer panel only renders once
     // `settings !== null` (useEffect) AND `unlocked` (SuperuserContext useEffect)
-    // are both resolved. Waiting for the region is the right gate.
-    const developerSection = page.getByRole("region", {
-      name: /developer/i,
-    });
+    // are both resolved. Waiting for the heading is the right gate.
+    const developerSection = page.locator("#developer-heading");
     await expect(developerSection).toBeVisible({ timeout: 10_000 });
     // The switch button inside the Developer section has no aria-label so we
     // find it by its position inside the section and confirm aria-checked.
@@ -147,7 +145,7 @@ test.describe("Superuser mode", () => {
     await seedSuperuser(page, { unlocked: true, pretendAllMastered: false, forceCardsGraduated: false });
     await page.goto("/settings");
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
-    const developerSection = page.getByRole("region", { name: /developer/i });
+    const developerSection = page.locator("#developer-heading");
     await expect(developerSection).toBeVisible({ timeout: 10_000 });
     // The force-cards-graduated toggle must be present in the Developer panel.
     const toggle = developerSection.getByRole("switch", { name: /force cards graduated/i });

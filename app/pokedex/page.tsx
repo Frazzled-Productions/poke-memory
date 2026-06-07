@@ -2,7 +2,8 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useTranslations, useFormatter } from "next-intl";
-import { mutedText } from "@/lib/utils/class-names";
+import { mutedText, pageTitle } from "@/lib/utils/class-names";
+import { PageShell } from "@/components/ui/PageShell";
 import { buildSession, hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
 import { loadSession, saveSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
@@ -84,9 +85,8 @@ export default function PokedexPage() {
   });
 
   return (
-    <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
-      <div className="w-full max-w-5xl">
-        <h1 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
+    <PageShell width="wide">
+        <h1 className={`mb-2 ${pageTitle}`}>
           {t("title")}
         </h1>
         <p className={`mb-8 ${mutedText} tabular-nums`}>
@@ -107,7 +107,6 @@ export default function PokedexPage() {
             <PokedexFiltered enrichedPokemon={enrichedPokemon} />
           </Suspense>
         )}
-      </div>
-    </div>
+    </PageShell>
   );
 }

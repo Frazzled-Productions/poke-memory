@@ -109,12 +109,12 @@ function LanguageBreakdownInner({
 
   return (
     <section aria-labelledby="lang-breakdown-heading">
-      <h2
+      <h3
         id="lang-breakdown-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
         {t("heading")}
-      </h2>
+      </h3>
       <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
         <ul
           role="list"

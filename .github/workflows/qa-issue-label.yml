@@ -13,9 +13,12 @@ name: QA Issue Label
 #      `closes/fixes/resolves #N` keywords and add `status:in-qa` to each
 #      referenced issue. The label is created idempotently on first run.
 #
-#   2. The `qa -> main` promotion PR merged (base `main`, head `qa`) — GitHub
-#      now auto-closes the referenced issues on `main`, so this run strips the
-#      now-stale `status:in-qa` label from them for tidiness.
+#   2. The `qa -> main` promotion PR merged (base `main`, head `qa`): every
+#      issue currently labelled `status:in-qa` is the qa batch being promoted,
+#      so this run CLOSES each open one and strips the label. Using the label as
+#      the source of truth (rather than the promotion PR's `Closes #N`) keeps a
+#      hand-rolled promotion - one not built by `/batch-issues`, which may omit
+#      those keywords - from leaving issues open and stale-labelled.
 #
 # Out of scope: project-board column transitions. `auto-status.yml` owns the
 # board; this workflow only touches the `status:in-qa` label.
@@ -74,20 +77,50 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Collect closing references from the PR body and from every commit
-          # message in the PR. GitHub honours `closes/fixes/resolves #N` in
-          # either place; we mirror that exact keyword set, case-insensitive:
-          # close, closes, closed, fix, fixes, fixed, resolve, resolves,
-          # resolved. The leading `\b` stops a match inside a longer word
-          # (e.g. "preclose"); GitHub also tolerates a colon after the
-          # keyword (`closes: #5`).
+          # qa -> main promotion merged: close every issue this qa batch staged
+          # and strip the label. The status:in-qa label is the authoritative set
+          # of staged issues, so this does NOT depend on the promotion PR
+          # carrying `Closes #N`. A hand-rolled promotion (one not built by the
+          # /batch-issues skill) may omit those keywords, which previously left
+          # the issues open and still labelled. Closing an already-closed issue
+          # and removing an absent label are both no-ops, so re-runs are safe.
+          if [ "$BASE_REF" = "main" ]; then
+            STAGED=$(gh issue list --repo "$REPO" --label "status:in-qa" \
+              --state all --json number,state \
+              --jq '.[] | "\(.number) \(.state)"' || true)
+            if [ -z "$STAGED" ]; then
+              echo "No status:in-qa issues to reconcile."
+              exit 0
+            fi
+            printf '%s\n' "$STAGED" | while read -r NUM STATE; do
+              [ -n "$NUM" ] || continue
+              if [ "$STATE" = "OPEN" ]; then
+                echo "Closing #$NUM (shipped via promotion PR #$PR)"
+                gh issue close "$NUM" --repo "$REPO" \
+                  --comment "Shipped to production via the qa->main promotion (#$PR)." \
+                  || echo "  (could not close #$NUM; continuing)"
+              fi
+              gh issue edit "$NUM" --repo "$REPO" \
+                --remove-label "status:in-qa" \
+                || echo "  (could not strip label from #$NUM; continuing)"
+            done
+            exit 0
+          fi
+
+          # Base is `qa` from here. Collect closing references from the PR body
+          # and from every commit message in the PR. GitHub honours
+          # `closes/fixes/resolves #N` in either place; we mirror that exact
+          # keyword set, case-insensitive: close, closes, closed, fix, fixes,
+          # fixed, resolve, resolves, resolved. The leading `\b` stops a match
+          # inside a longer word (e.g. "preclose"); GitHub also tolerates a
+          # colon after the keyword (`closes: #5`).
           REF='\b(close[sd]?|fix(es|ed)?|resolve[sd]?):? +#[0-9]+'
 
           # PR body references.
           BODY_REFS=$(printf '%s\n' "$PR_BODY" \
             | grep -oiE "$REF" || true)
 
-          # Commit-message references — pull every commit on the PR. The jq
+          # Commit-message references: pull every commit on the PR. The jq
           # expression emits one line per commit (headline + body, with a
           # null body coerced to an empty string), so commits are never
           # cross-joined against each other.
@@ -102,23 +135,11 @@ jobs:
             | grep -oE '[0-9]+' | sort -un || true)
 
           if [ -z "$ISSUES" ]; then
-            echo "No closing references found on PR #$PR — nothing to do."
+            echo "No closing references found on PR #$PR: nothing to do."
             exit 0
           fi
 
           echo "Closing references on PR #$PR: $(echo "$ISSUES" | tr '\n' ' ')"
-
-          if [ "$BASE_REF" = "main" ]; then
-            # Promotion PR merged: the issues auto-close on `main`. Strip the
-            # now-stale staging label. Removing an absent label is a no-op.
-            for ISSUE in $ISSUES; do
-              echo "Stripping status:in-qa from #$ISSUE"
-              gh issue edit "$ISSUE" --repo "$REPO" \
-                --remove-label "status:in-qa" || \
-                echo "  (could not edit #$ISSUE — may not exist or label absent; skipping)"
-            done
-            exit 0
-          fi
 
           # Base is `qa`: the work is staged but the issue stays open. Ensure
           # the label exists, then add it to each referenced issue.

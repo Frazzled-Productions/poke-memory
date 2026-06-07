@@ -653,27 +653,29 @@ test.describe("Settings page", () => {
 
     // Top-level collapsible section headings are rendered as <h2> disclosure
     // toggles and should be visible on fresh load (collapsed but present).
-    for (const heading of ["Appearance", "Practice", "Audio", "Account & Data", "Advanced"]) {
+    // Section names reflect the #1720 IA rework.
+    for (const heading of ["Appearance", "Practice schedule", "Audio", "Data & backup", "Advanced"]) {
       await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
     }
 
-    // Expand Practice to verify sub-section content is present.
-    await page.getByRole("button", { name: "Practice", exact: true }).click();
+    // Expand Practice schedule to verify sub-section content is present.
+    await page.getByRole("button", { name: "Practice schedule", exact: true }).click();
 
-    // Save button is inside the Practice panel.
+    // Save button is inside the Practice schedule panel.
     await expect(
-      page.getByRole("button", { name: "Save" }),
+      page.getByRole("button", { name: "Save" }).first(),
     ).toBeVisible();
 
-    // Sub-section label and FSRS section present inside Practice.
-    // exact: true avoids matching "Cry → name cards" added in #481.
-    await expect(page.getByText("Name cards", { exact: true })).toBeVisible();
-    await expect(page.getByText("Personalize my schedule", { exact: true })).toBeVisible();
+    // Scheduler sub-section present inside Practice schedule.
+    await expect(page.getByText("Scheduler", { exact: true })).toBeVisible();
 
-    // Expand Account & Data to verify Backup and About sub-sections.
-    await page.getByRole("button", { name: "Account & Data", exact: true }).click();
+    // Card types is default-open on first visit (localStorage cleared above).
+    // Verify Name cards sub-section is visible without expanding.
+    await expect(page.getByText("Name cards", { exact: true })).toBeVisible();
+
+    // Expand Data & backup to verify Backup sub-section.
+    await page.getByRole("button", { name: "Data & backup", exact: true }).click();
     await expect(page.getByText("Backup", { exact: true })).toBeVisible();
-    await expect(page.getByText("About", { exact: true })).toBeVisible();
 
     // Expand Advanced to verify Danger zone sub-section.
     await page.getByRole("button", { name: "Advanced", exact: true }).click();
@@ -685,12 +687,12 @@ test.describe("Settings page", () => {
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Expand the Practice section first - FSRS optimizer lives inside it.
-    await page.getByRole("button", { name: "Practice", exact: true }).click();
+    // Expand Practice schedule - FSRS optimizer lives inside it.
+    await page.getByRole("button", { name: "Practice schedule", exact: true }).click();
 
-    // Sub-section label is present inside the expanded panel.
+    // Scheduler sub-section label is present inside the expanded panel.
     await expect(
-      page.getByText("Personalize my schedule", { exact: true }),
+      page.getByText("Scheduler", { exact: true }),
     ).toBeVisible();
 
     // Guest state: sign-in prompt is visible
@@ -705,12 +707,15 @@ test.describe("Settings page", () => {
   });
 
   test("numeric field accepts mid-edit value and persists on Save", async ({ page }) => {
+    // Seed Card types as open so the test is deterministic regardless of
+    // whether cardTypesDefaultOpenDismissed is in localStorage.
+    await page.addInitScript(() => {
+      window.localStorage.setItem("poke-memory:settings-section:card-types-heading", "1");
+    });
     await page.goto("/settings");
     await expect(page.getByLabel("Loading settings")).toBeHidden();
 
-    // Expand the Practice section first - New cards per day and Save live inside it.
-    await page.getByRole("button", { name: "Practice", exact: true }).click();
-
+    // Card types is seeded open - New cards per day is directly accessible.
     const input = page.getByLabel("New cards per day").first();
     await input.click();
     await input.selectText();
@@ -718,12 +723,15 @@ test.describe("Settings page", () => {
     // Blur by clicking away so the draft commits before Save.
     await page.getByRole("heading", { level: 1, name: "Settings" }).click();
 
-    await page.getByRole("button", { name: "Save" }).click();
+    // Click the Save button that is visible (inside the expanded Card types section).
+    await page.getByLabel("Card types").getByRole("button", { name: "Save" }).click();
 
-    await expect(page.getByText("Saved!")).toBeVisible();
-    // Reload and verify the value persisted. The Practice section remains
-    // expanded after reload because the open state is persisted in localStorage
-    // (no addInitScript clear in this test), so we can read the input directly.
+    // "Saved!" appears in the section after saving - wait with a short poll.
+    await expect(
+      page.getByLabel("Card types").getByText("Saved!"),
+    ).toBeVisible({ timeout: 3000 });
+    // Reload and verify the value persisted. Card types remains expanded because
+    // its open state is persisted in localStorage from the initScript above.
     await page.reload();
     await expect(page.getByLabel("Loading settings")).toBeHidden();
     await expect(page.getByLabel("New cards per day").first()).toHaveValue("5");
@@ -1247,7 +1255,8 @@ test.describe("PWA / offline support", () => {
   test("the service worker script is served as JavaScript", async ({
     request,
   }) => {
-    // The Serwist Turbopack route at /sw/[path] bundles and serves the worker.
+    // The worker is built to a static public/sw/sw.js asset by
+    // scripts/build-sw.mjs and served by the CDN (#1752, no longer a route).
     const res = await request.get("/sw/sw.js");
     // Assert explicit 200 so a future 500 (e.g. a file-trace gap) fails the
     // build rather than silently passing because res.ok() is not checked.

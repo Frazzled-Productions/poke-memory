@@ -87,12 +87,15 @@
     },
     "section": {
       "appearance": "Appearance",
-      "practice": "Practice",
       "audio": "Audio",
       "offline": "Offline",
-      "accountData": "Account & Data",
       "advanced": "Advanced",
-      "labs": "Labs"
+      "practiceSchedule": "Practice schedule",
+      "cardTypes": "Card types",
+      "language": "Language",
+      "about": "About",
+      "regionalReminders": "Regional & reminders",
+      "dataBackup": "Data & backup"
     },
     "appearance": {
       "mobileNav": {
@@ -118,36 +121,6 @@
         "tintedDescription": "A light wash of your mascot colour tints the page background.",
         "fullLabel": "Full mascot theme",
         "fullDescription": "Your mascot colour drives all backgrounds: loud by design."
-      }
-    },
-    "labs": {
-      "description": "Preview features that are in active development. These may change or be removed. Your feedback helps shape what ships.",
-      "languages": {
-        "label": "Languages",
-        "description": "Show Pokémon names in Japanese, Simplified Chinese, or Traditional Chinese.",
-        "locale": {
-          "en": "English",
-          "ja": "Japanese",
-          "zh-Hans": "Simplified Chinese",
-          "zh-Hant": "Traditional Chinese"
-        },
-        "selectLocale": "Language",
-        "appLanguageLabel": "App interface language",
-        "appLanguageDescription": "Controls the app's UI text.",
-        "pokemonNameLanguageLabel": "Pokémon name language",
-        "pokemonNameLanguageDescription": "Switch the Pokémon-name language from the language pill in the status bar at the top of every page.",
-        "previewSuffix": "(preview)",
-        "enrolment": {
-          "heading": "Pokémon name practice languages",
-          "description": "Switch the active one from the language pill in the bar.",
-          "lockedEnglishNote": "Always included",
-          "machineTranslationNote": "Machine translation",
-          "checkboxAriaLabel": "Practise Pokémon names in {language}",
-          "masteredCount": "{count, number} mastered",
-          "unenrolConfirmMessage": "Removing {language} will switch your practice to English. Continue?",
-          "unenrolConfirm": "Confirm",
-          "unenrolCancel": "Cancel"
-        }
       }
     },
     "practice": {
@@ -269,7 +242,8 @@
         "volumeLabel": "Speech volume ({pct}%)",
         "volumeMute": "0% mute",
         "volumeFull": "100% full"
-      }
+      },
+      "cryDisabledNote": "Cry cards are disabled. Enable them in Card types above."
     },
     "offline": {
       "downloadHeading": "Download",
@@ -413,6 +387,55 @@
     },
     "deleteAccount": {
       "inputAriaLabel": "Type DELETE to confirm account deletion"
+    },
+    "language": {
+      "label": "Languages",
+      "description": "Show Pokémon names in Japanese, Simplified Chinese, or Traditional Chinese.",
+      "locale": {
+        "en": "English",
+        "ja": "Japanese",
+        "zh-Hans": "Simplified Chinese",
+        "zh-Hant": "Traditional Chinese"
+      },
+      "selectLocale": "Language",
+      "appLanguageLabel": "App interface language",
+      "appLanguageDescription": "Controls the app's UI text.",
+      "pokemonNameLanguageLabel": "Pokémon name language",
+      "pokemonNameLanguageDescription": "Switch the Pokémon-name language from the language pill in the status bar at the top of every page.",
+      "enrolment": {
+        "heading": "Pokémon name practice languages",
+        "description": "Switch the active one from the language pill in the bar.",
+        "lockedEnglishNote": "Always included",
+        "machineTranslationNote": "Machine translation",
+        "checkboxAriaLabel": "Practise Pokémon names in {language}",
+        "masteredCount": "{count, number} mastered",
+        "unenrolConfirmMessage": "Removing {language} will switch your practice to English. Continue?",
+        "unenrolConfirm": "Confirm",
+        "unenrolCancel": "Cancel"
+      }
+    },
+    "account": {
+      "guest": {
+        "practising": "Practising as a guest",
+        "savedLocally": "Your progress is saved on this device only.",
+        "signIn": "Sign in to back up"
+      },
+      "signedIn": {
+        "signOut": "Sign out",
+        "manageSignIn": "Manage sign-in methods"
+      },
+      "provider": {
+        "github": "Signed in with GitHub",
+        "google": "Signed in with Google",
+        "email": "Signed in with email",
+        "username": "Signed in with username",
+        "unknown": "Signed in"
+      },
+      "sectionAriaLabel": "Account"
+    },
+    "cardTypes": {
+      "cryAudioNote": "For cry playback options, see Audio below.",
+      "cryAudioLink": "Audio section"
     }
   },
   "practice": {
@@ -874,7 +897,9 @@
       "lastReview": "Last reviewed {date}",
       "neverReviewed": "Not yet reviewed",
       "listAriaLabel": "Mastery by language"
-    }
+    },
+    "restoreFromCloud": "Restore from cloud",
+    "restoreFromCloudDescription": "Recovery options are in Settings."
   },
   "journey": {
     "title": "Journey",
@@ -979,7 +1004,10 @@
       "masteredCount": "{count, plural, one {# mastered} other {# mastered}}",
       "bestDay": "{count, plural, one {# review on best day} other {# reviews on best day}}",
       "noBestDay": "No reviews yet"
-    }
+    },
+    "superSectionProgress": "Your progress",
+    "superSectionCollection": "Collection",
+    "superSectionBreakdown": "Breakdown"
   },
   "error": {
     "heading": "Something went wrong",
@@ -1131,6 +1159,19 @@
       "item4": "<s>Who else can see it.</s> Nobody else can see your progress. Only you can see your own cards. We never share your progress with anyone else or use it to show you adverts.",
       "item5": "<s>You're in control.</s> You can <export>export your progress</export> or <reset>reset all progress</reset> at any time from the Settings page. You don't need to ask us; you can do it yourself, right now.",
       "item6": "<s>Feedback.</s> If you send us feedback, we keep your message for up to 12 months to help us fix things, and then it is automatically deleted."
+    }
+  },
+  "whatsNew": {
+    "heading": "What's new",
+    "subtitle": "Recent changes to Poké Memory. You're on version",
+    "empty": "No release notes available.",
+    "sectionKind": {
+      "added": "Added",
+      "changed": "Changed",
+      "removed": "Removed",
+      "deprecated": "Deprecated",
+      "fixed": "Fixed",
+      "security": "Security"
     }
   }
 }

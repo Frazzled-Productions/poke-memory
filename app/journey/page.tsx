@@ -39,7 +39,9 @@ import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { GuestSignUpNudge } from "@/components/onboarding/GuestSignUpNudge";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
-import { cardPanel, cardPanelPadded, mutedText, sectionLabel } from "@/lib/utils/class-names";
+import { cardPanel, cardPanelPadded, mutedText, pageTitle, sectionHeading, sectionHeadingLg, sectionLabel } from "@/lib/utils/class-names";
+import { PageShell } from "@/components/ui/PageShell";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 import { MeterBar } from "@/components/ui/MeterBar";
 import type { AppLocale } from "@/i18n/locales";
 
@@ -244,12 +246,9 @@ function MasteryRings({ stats }: { stats: MasterySnapshot }) {
 
   return (
     <section aria-labelledby="mastery-heading">
-      <h2
-        id="mastery-heading"
-        className="mb-4 text-lg font-semibold text-foreground"
-      >
+      <SectionHeading level={3} id="mastery-heading" className="mb-4">
         {t("masteryDistribution")}
-      </h2>
+      </SectionHeading>
 
       <div
         className="grid grid-cols-3 gap-3"
@@ -300,12 +299,9 @@ function IntroducedRing({ stats }: { stats: MasterySnapshot }) {
 
   return (
     <section aria-labelledby="introduced-heading">
-      <h2
-        id="introduced-heading"
-        className="mb-3 text-base font-semibold text-foreground"
-      >
+      <SectionHeading level={3} id="introduced-heading" className="mb-3">
         {t("introduced")}
-      </h2>
+      </SectionHeading>
       <div className={cn("flex items-center gap-5", cardPanel)}>
         <div className="shrink-0" aria-hidden="true">
           <RadialRing
@@ -343,12 +339,9 @@ function GenerationBreakdown({ stats }: { stats: MasterySnapshot }) {
   const tCommon = useTranslations("common");
   return (
     <section aria-labelledby="gen-heading">
-      <h2
-        id="gen-heading"
-        className="mb-3 text-base font-semibold text-foreground"
-      >
+      <SectionHeading level={3} id="gen-heading" className="mb-3">
         {t("byGeneration")}
-      </h2>
+      </SectionHeading>
       <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
         <div className="grid grid-cols-[1fr_auto] items-center border-b border-zinc-200 bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
           <span>{t("byGenerationColumn")}</span>
@@ -618,168 +611,221 @@ export default function JourneyPage() {
       : null;
 
   return (
-    <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
-      <div className="w-full max-w-3xl">
-        <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
-          {t("title")}
-        </h1>
+    <PageShell width="reading">
+      <h1 className={`mb-8 ${pageTitle}`}>
+        {t("title")}
+      </h1>
 
-        {masterySnapshot === null || currentStreak === null ? (
-          <LoadingSkeleton ariaLabel={t("loadingAriaLabel")} />
-        ) : (
-          <div className="flex flex-col gap-10">
-            {/* Trainer card */}
-            <TrainerCard
-              handle={
-                ((user?.user_metadata?.user_name as string | undefined) ??
-                  (user?.user_metadata?.preferred_username as string | undefined) ??
-                  null)
-              }
-              totalMastered={masterySnapshot.mastered}
-              perGeneration={masterySnapshot.perGeneration}
-              earnedBadges={badgesToShow}
-            />
+      {masterySnapshot === null || currentStreak === null ? (
+        <LoadingSkeleton ariaLabel={t("loadingAriaLabel")} />
+      ) : (
+        <div className="flex flex-col gap-12">
 
-            {/* Milestone share - hidden during superuser sessions so fake
-                mastery cannot produce a real share card (#917). */}
-            <MilestoneShareButton
-              milestone={
-                anyFlagOn
-                  ? null
-                  : detectTopMilestone(masterySnapshot.mastered, masterySnapshot.perGeneration)
-              }
-            />
-
-            {/* Collection timeline - the hero scrubber.
-                Show a placeholder while the cloud pull is in flight so the
-                section's layout slot is reserved and nothing shifts when the
-                data lands (fixes #961). */}
-            {timeline !== null ? (
-              <CollectionTimelineWidget timeline={timeline} />
-            ) : (
-              <section aria-labelledby="timeline-skeleton-heading" aria-busy="true">
-                <h2
-                  id="timeline-skeleton-heading"
-                  className="mb-4 text-lg font-semibold text-foreground"
-                >
-                  {t("collectionTimeline")}
-                </h2>
-                <SkeletonBlock className="h-[200px] w-full" />
-              </section>
-            )}
-
-            {/* Evolution wall.
-                Same per-section skeleton approach to avoid layout shift
-                while evolutionFamilies is still null (fixes #961). */}
-            {evolutionFamilies !== null ? (
-              <EvolutionWall families={evolutionFamilies} />
-            ) : (
-              <section aria-labelledby="evo-wall-skeleton-heading" aria-busy="true">
-                <h2
-                  id="evo-wall-skeleton-heading"
-                  className="mb-3 text-base font-semibold text-foreground"
-                >
-                  {t("evolutionWall")}
-                </h2>
-                <SkeletonBlock className="h-10 w-full" />
-              </section>
-            )}
-
-            {/* Close to mastery.
-                Shown whenever the entries are loaded (even if empty - the
-                empty state is informative). Same skeleton approach used for
-                other deferred sections to avoid layout shift. */}
-            {closeToMasteryEntries !== null ? (
-              <CloseToMastery entries={closeToMasteryEntries} />
-            ) : (
-              <section aria-labelledby="ctm-skeleton-heading" aria-busy="true">
-                <h2
-                  id="ctm-skeleton-heading"
-                  className="mb-3 text-base font-semibold text-foreground"
-                >
-                  {t("closeToMastery")}
-                </h2>
-                <SkeletonBlock className="h-10 w-full" />
-              </section>
-            )}
-
-            {/* Badges */}
-            <BadgeGallery
-              earnedBadges={badgesToShow}
-              forceAllMastered={flags.pretendAllMastered}
-              masteredSpeciesIds={masteredIds}
-            />
-
-            {/* Streak */}
-            <section aria-labelledby="streak-heading">
-              <h2 id="streak-heading" className="mb-3 text-base font-semibold text-foreground">
-                {t("currentStreak")}
-              </h2>
-              {currentStreak > 0 ? (
-                <StatCard
-                  label={t("daysInARow", { count: currentStreak })}
-                  value={currentStreak}
-                  accent="text-amber-500 dark:text-amber-400"
-                />
-              ) : (
-                <p className={mutedText}>
-                  {t("noStreak")}
-                </p>
-              )}
-            </section>
-
-            {/* Records */}
-            {records !== null ? <RecordsCard records={records} /> : null}
-
-            {/* Guest sign-up value-prop nudge - shown to guests with real progress,
-                before the mastery-rings detail so it catches the eye. Hidden for
-                signed-in users; gate is masteredSpecies >= 10 OR sessions >= 3 (#1668). */}
-            {user === null && !flags.pretendAllMastered && (
-              <GuestSignUpNudge
-                masteredSpecies={masterySnapshot.mastered}
-                practiceSessionsCount={practiceSessionsCount}
-              />
-            )}
-
-            {/* Mastery rings */}
-            <MasteryRings stats={masterySnapshot} />
-
-            {/* Mastery-explainer hint - renders for all users (empty and populated)
-                until explicitly dismissed. Uses a dedicated flag so existing users
-                who pre-date this feature see it on their next Journey visit (#1441). */}
-            <OnboardingHint
-              id="journeyMasteryExplainerDismissed"
-              title={t("masteryExplainer.title")}
+          {/* ──────────────────────────────────────────────────────────────
+              1. YOUR PROGRESS super-section
+              TrainerCard, GuestSignUpNudge (guest-only, after TrainerCard and
+              before MilestoneShareButton), MilestoneShareButton,
+              CollectionTimeline, Streak, Records.
+          ─────────────────────────────────────────────────────────────── */}
+          <section aria-labelledby="journey-progress-heading">
+            <SectionHeading
+              level={2}
+              id="journey-progress-heading"
+              className="mb-6 border-b border-zinc-200 pb-2 dark:border-zinc-800"
             >
-              <p>{t("masteryExplainer.lockedBody")}</p>
-              <p className="mt-1">{t("masteryExplainer.learningBody")}</p>
-              <p className="mt-1">
-                {t.rich("masteryExplainer.masteredBody", { reps: masteryRepetitions ?? 3, em: (chunks) => <em>{chunks}</em> })}
-              </p>
-              <p className="mt-1">{t("masteryExplainer.introducedNote")}</p>
-            </OnboardingHint>
+              {t("superSectionProgress")}
+            </SectionHeading>
 
-            {/* Introduced ring */}
-            <IntroducedRing stats={masterySnapshot} />
-
-            {/* Generation breakdown */}
-            <GenerationBreakdown stats={masterySnapshot} />
-
-            {/* Type breakdown */}
-            <TypeBreakdown perType={masterySnapshot.perType} />
-
-            {/* Language breakdown - only renders when >1 locale enrolled */}
-            {cards !== null && masteryRepetitions !== null ? (
-              <LanguageBreakdown
-                cards={cards}
-                gradeLog={gradeLog}
-                today={todayString(new Date())}
-                masteryRepetitions={masteryRepetitions}
+            <div className="flex flex-col gap-10">
+              {/* Trainer card */}
+              <TrainerCard
+                handle={
+                  ((user?.user_metadata?.user_name as string | undefined) ??
+                    (user?.user_metadata?.preferred_username as string | undefined) ??
+                    null)
+                }
+                totalMastered={masterySnapshot.mastered}
+                perGeneration={masterySnapshot.perGeneration}
+                earnedBadges={badgesToShow}
               />
-            ) : null}
-          </div>
-        )}
-      </div>
-    </div>
+
+              {/* Guest sign-up value-prop nudge - shown to guests with real progress,
+                  immediately after TrainerCard and before MilestoneShareButton so it
+                  catches the eye (#1731 / #1729). Gate: masteredSpecies >= 10 OR
+                  sessions >= 3 (#1668). Hidden for signed-in users and superuser mode. */}
+              {user === null && !flags.pretendAllMastered && (
+                <GuestSignUpNudge
+                  masteredSpecies={masterySnapshot.mastered}
+                  practiceSessionsCount={practiceSessionsCount}
+                />
+              )}
+
+              {/* Milestone share - hidden during superuser sessions so fake
+                  mastery cannot produce a real share card (#917). */}
+              <MilestoneShareButton
+                milestone={
+                  anyFlagOn
+                    ? null
+                    : detectTopMilestone(masterySnapshot.mastered, masterySnapshot.perGeneration)
+                }
+              />
+
+              {/* Collection timeline - the hero scrubber.
+                  CollectionTimelineWidget owns its own <section aria-labelledby>
+                  so we do NOT re-wrap it here (avoids duplicate heading ids).
+                  Show a placeholder while the cloud pull is in flight so the
+                  section's layout slot is reserved and nothing shifts when the
+                  data lands (fixes #961). */}
+              {timeline !== null ? (
+                <CollectionTimelineWidget timeline={timeline} />
+              ) : (
+                <section aria-labelledby="timeline-heading">
+                  <SectionHeading level={3} id="timeline-heading" className="mb-4">
+                    {t("collectionTimeline")}
+                  </SectionHeading>
+                  <SkeletonBlock className="h-[200px] w-full" />
+                </section>
+              )}
+
+              {/* Streak */}
+              <section aria-labelledby="streak-heading">
+                <SectionHeading level={3} id="streak-heading" className="mb-3">
+                  {t("currentStreak")}
+                </SectionHeading>
+                {currentStreak > 0 ? (
+                  <StatCard
+                    label={t("daysInARow", { count: currentStreak })}
+                    value={currentStreak}
+                    accent="text-amber-500 dark:text-amber-400"
+                  />
+                ) : (
+                  <p className={mutedText}>
+                    {t("noStreak")}
+                  </p>
+                )}
+              </section>
+
+              {/* Records - RecordsCard owns its own <section aria-labelledby>
+                  so we do NOT re-wrap it here. */}
+              {records !== null ? (
+                <RecordsCard records={records} />
+              ) : null}
+            </div>
+          </section>
+
+          {/* ──────────────────────────────────────────────────────────────
+              2. COLLECTION super-section
+              EvolutionWall, CloseToMastery, BadgeGallery.
+          ─────────────────────────────────────────────────────────────── */}
+          <section aria-labelledby="journey-collection-heading">
+            <SectionHeading
+              level={2}
+              id="journey-collection-heading"
+              className="mb-6 border-b border-zinc-200 pb-2 dark:border-zinc-800"
+            >
+              {t("superSectionCollection")}
+            </SectionHeading>
+
+            <div className="flex flex-col gap-10">
+              {/* Evolution wall.
+                  EvolutionWall owns its own <section aria-labelledby> (using
+                  useId() for the heading id) so we do NOT re-wrap it here.
+                  Per-section skeleton approach to avoid layout shift
+                  while evolutionFamilies is still null (fixes #961). */}
+              {evolutionFamilies !== null ? (
+                <EvolutionWall families={evolutionFamilies} />
+              ) : (
+                <section aria-labelledby="evo-wall-heading">
+                  <SectionHeading level={3} id="evo-wall-heading" className="mb-3">
+                    {t("evolutionWall")}
+                  </SectionHeading>
+                  <SkeletonBlock className="h-10 w-full" />
+                </section>
+              )}
+
+              {/* Close to mastery.
+                  CloseToMastery owns its own <section aria-labelledby> so we
+                  do NOT re-wrap it here.
+                  Shown whenever the entries are loaded (even if empty - the
+                  empty state is informative). Same skeleton approach used for
+                  other deferred sections to avoid layout shift. */}
+              {closeToMasteryEntries !== null ? (
+                <CloseToMastery entries={closeToMasteryEntries} />
+              ) : (
+                <section aria-labelledby="ctm-heading">
+                  <SectionHeading level={3} id="ctm-heading" className="mb-3">
+                    {t("closeToMastery")}
+                  </SectionHeading>
+                  <SkeletonBlock className="h-10 w-full" />
+                </section>
+              )}
+
+              {/* Badges */}
+              <BadgeGallery
+                earnedBadges={badgesToShow}
+                forceAllMastered={flags.pretendAllMastered}
+                masteredSpeciesIds={masteredIds}
+              />
+            </div>
+          </section>
+
+          {/* ──────────────────────────────────────────────────────────────
+              3. BREAKDOWN super-section
+              MasteryRings + explainer hint (immediately after), IntroducedRing,
+              GenerationBreakdown, TypeBreakdown, LanguageBreakdown.
+          ─────────────────────────────────────────────────────────────── */}
+          <section aria-labelledby="journey-breakdown-heading">
+            <SectionHeading
+              level={2}
+              id="journey-breakdown-heading"
+              className="mb-6 border-b border-zinc-200 pb-2 dark:border-zinc-800"
+            >
+              {t("superSectionBreakdown")}
+            </SectionHeading>
+
+            <div className="flex flex-col gap-10">
+              {/* Mastery rings */}
+              <MasteryRings stats={masterySnapshot} />
+
+              {/* Mastery-explainer hint - immediately after MasteryRings (#1731).
+                  Renders for all users (empty and populated) until explicitly dismissed.
+                  Uses a dedicated flag so existing users who pre-date this feature see
+                  it on their next Journey visit (#1441). */}
+              <OnboardingHint
+                id="journeyMasteryExplainerDismissed"
+                title={t("masteryExplainer.title")}
+              >
+                <p>{t("masteryExplainer.lockedBody")}</p>
+                <p className="mt-1">{t("masteryExplainer.learningBody")}</p>
+                <p className="mt-1">
+                  {t.rich("masteryExplainer.masteredBody", { reps: masteryRepetitions ?? 3, em: (chunks) => <em>{chunks}</em> })}
+                </p>
+                <p className="mt-1">{t("masteryExplainer.introducedNote")}</p>
+              </OnboardingHint>
+
+              {/* Introduced ring */}
+              <IntroducedRing stats={masterySnapshot} />
+
+              {/* Generation breakdown */}
+              <GenerationBreakdown stats={masterySnapshot} />
+
+              {/* Type breakdown */}
+              <TypeBreakdown perType={masterySnapshot.perType} />
+
+              {/* Language breakdown - only renders when >1 locale enrolled */}
+              {cards !== null && masteryRepetitions !== null ? (
+                <LanguageBreakdown
+                  cards={cards}
+                  gradeLog={gradeLog}
+                  today={todayString(new Date())}
+                  masteryRepetitions={masteryRepetitions}
+                />
+              ) : null}
+            </div>
+          </section>
+
+        </div>
+      )}
+    </PageShell>
   );
 }

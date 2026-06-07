@@ -177,6 +177,35 @@ const SESSION_WITH_BULBASAUR_LEARNING = {
 
 test.beforeEach(async ({ page }) => {
   await addOnboardingPreDismiss(page);
+  // Dismiss the Card types default-open flag so that clicking the Card types
+  // button opens (not closes) the section on a fresh visit. Without this, the
+  // first-visit default-open behaviour makes the click close the section,
+  // hiding the toggle we are trying to interact with.
+  await page.addInitScript(() => {
+    try {
+      const KEY = "poke-memory:settings:v1";
+      const raw = window.localStorage.getItem(KEY);
+      let existing: Record<string, unknown> = {};
+      if (raw !== null) {
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (typeof parsed === "object" && parsed !== null) {
+            existing = parsed as Record<string, unknown>;
+          }
+        } catch { /* ignore */ }
+      }
+      window.localStorage.setItem(KEY, JSON.stringify({
+        ...existing,
+        onboarding: {
+          ...(typeof existing.onboarding === "object" && existing.onboarding !== null
+            ? (existing.onboarding as Record<string, unknown>)
+            : {}),
+          cardTypesDefaultOpenDismissed: true,
+        },
+      }));
+      window.localStorage.setItem("poke-memory:settings-section:card-types-heading", "0");
+    } catch { /* ignore */ }
+  });
 });
 
 test.describe("Verified typed entry - Settings toggle (#1251)", () => {
@@ -184,7 +213,7 @@ test.describe("Verified typed entry - Settings toggle (#1251)", () => {
     await page.goto("/settings");
 
     // Expand the Practice section.
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("button", { name: /^card types$/i }).click();
 
     // The toggle should be visible.
     const toggle = page.getByRole("switch", {
@@ -199,7 +228,7 @@ test.describe("Verified typed entry - Settings toggle (#1251)", () => {
     page,
   }) => {
     await page.goto("/settings");
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("button", { name: /^card types$/i }).click();
 
     const toggle = page.getByRole("switch", {
       name: /verified typed entry for name cards/i,
@@ -309,9 +338,16 @@ async function enableTypedEntryFirstTime(page: import("@playwright/test").Page) 
           verifiedTypedEntryMode: false,
           typedEntryOnboardingShown: false,
           mcCardOnboardingShown: false,
-          onboarding: { firstVisitOnboardingDismissed: true },
+          onboarding: {
+            firstVisitOnboardingDismissed: true,
+            // Dismiss the Card types default-open flag so clicking the button
+            // opens (not closes) the section on a fresh visit.
+            cardTypesDefaultOpenDismissed: true,
+          },
         }),
       );
+      // Also persist the section as explicitly closed so the click opens it.
+      localStorage.setItem("poke-memory:settings-section:card-types-heading", "0");
     } catch {
       /* localStorage unavailable */
     }
@@ -321,7 +357,7 @@ async function enableTypedEntryFirstTime(page: import("@playwright/test").Page) 
 test.describe("Typed entry onboarding (#1271) - Settings touch 1 (inline help)", () => {
   test("inline MC-ramp help text is always visible under the toggle", async ({ page }) => {
     await page.goto("/settings");
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("button", { name: /^card types$/i }).click();
 
     await expect(
       page.getByText(/new cards start as multiple choice during the learning phase/i),
@@ -335,7 +371,7 @@ test.describe("Typed entry onboarding (#1271) - Settings touch 2 (first-enable b
   }) => {
     await enableTypedEntryFirstTime(page);
     await page.goto("/settings");
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("button", { name: /^card types$/i }).click();
 
     // Banner should be absent before the toggle is flipped.
     await expect(page.getByText(/verified typed entry is on/i)).not.toBeVisible();
@@ -354,7 +390,7 @@ test.describe("Typed entry onboarding (#1271) - Settings touch 2 (first-enable b
 
     // Reload: banner must not reappear (typedEntryOnboardingShown now true).
     await page.reload();
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("button", { name: /^card types$/i }).click();
     await expect(page.getByText(/verified typed entry is on/i)).not.toBeVisible();
   });
 });

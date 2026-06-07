@@ -180,6 +180,17 @@ export type OnboardingFlags = {
    * Stats or Journey visit.
    */
   guestSignUpNudgeDismissed: boolean;
+  /**
+   * One-shot flag recording that the user has actively collapsed the "Card
+   * types" section at least once (#1726). Until this flag is `true` the
+   * section defaults open on every visit; once `true` normal persisted-state
+   * logic applies (the section remembers whatever state the user left it in).
+   *
+   * `=== true` coercion: absent key in pre-#1726 blobs resolves to `false`
+   * → every existing user sees the section open once on their next Settings
+   * visit, which is exactly the desired first-visit orientation behaviour.
+   */
+  cardTypesDefaultOpenDismissed: boolean;
 };
 
 export const DEFAULT_ONBOARDING: OnboardingFlags = {
@@ -219,6 +230,10 @@ export const DEFAULT_ONBOARDING: OnboardingFlags = {
   // nudge shows on next Stats or Journey visit for existing guests who meet the
   // progress threshold).
   guestSignUpNudgeDismissed: false,
+  // Default false: absent in pre-#1726 blobs resolves to false (not dismissed;
+  // Card types section opens once on first Settings visit, then respects
+  // whatever state the user last left it in after their first collapse).
+  cardTypesDefaultOpenDismissed: false,
 };
 
 /**
@@ -877,6 +892,9 @@ export function validateOnboarding(value: unknown): OnboardingFlags {
     // === true coercion: absent key in pre-#1668 blobs resolves to false (nudge shows
     // for existing guests who meet the progress threshold on their next visit).
     guestSignUpNudgeDismissed: v.guestSignUpNudgeDismissed === true,
+    // === true coercion: absent key in pre-#1726 blobs resolves to false (not dismissed;
+    // Card types section defaults open on first Settings visit).
+    cardTypesDefaultOpenDismissed: v.cardTypesDefaultOpenDismissed === true,
   };
 }
 

@@ -19,6 +19,10 @@
 /.next/
 /out/
 
+# generated service worker (built by scripts/build-sw.mjs after `next build`;
+# regenerated on every build incl. CI/Vercel, so not committed, #1752)
+/public/sw/
+
 # production
 /build
 

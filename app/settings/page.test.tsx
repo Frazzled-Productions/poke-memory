@@ -77,11 +77,31 @@ vi.mock("@/lib/settings/persistence", () => ({
     installNudgeDismissed: true,
     audioHintDismissed: true,
     cardTypesHintDismissed: true,
+    cardTypesDefaultOpenDismissed: false,
   },
 }));
 
+const { mockUseAuth } = vi.hoisted(() => ({
+  mockUseAuth: vi.fn(),
+}));
 vi.mock("@/lib/auth/AuthContext", () => ({
-  useAuth: () => ({ user: null, supabase: null, loading: false }),
+  useAuth: () => mockUseAuth(),
+}));
+
+// Mocks for account-block state (#1721 AC).
+const { mockUseRetryPush } = vi.hoisted(() => ({
+  mockUseRetryPush: vi.fn(),
+}));
+vi.mock("@/lib/sync/useRetryPush", () => ({
+  useRetryPush: () => mockUseRetryPush(),
+}));
+
+const { mockLoadSyncStatus } = vi.hoisted(() => ({
+  mockLoadSyncStatus: vi.fn(),
+}));
+vi.mock("@/lib/sync/persistence", () => ({
+  loadSyncStatus: () => mockLoadSyncStatus(),
+  STORAGE_KEY: "poke-memory:sync-status",
 }));
 
 const { mockSuperuserFlags, mockSuperuserState, mockSetFlag } = vi.hoisted(
@@ -202,6 +222,18 @@ vi.mock("@/lib/profile/masteredCountCache", () => ({
 // ---------------------------------------------------------------------------
 // Stub heavy sub-components that have their own test coverage.
 // ---------------------------------------------------------------------------
+
+// SyncStatusLine has its own unit tests; stub it here so the account-block
+// tests can assert on its presence without requiring a useFormatter mock.
+vi.mock("@/components/stats/SyncStatusLine", () => ({
+  SyncStatusLine: ({ retryState }: { retryState: string; retryNow: () => void; superuserPaused?: boolean }) => (
+    <div data-testid="sync-status-line" data-retry-state={retryState}>
+      {retryState === "error" || retryState === "retrying"
+        ? "Sync failed · Retry"
+        : "Synced"}
+    </div>
+  ),
+}));
 
 vi.mock("@/components/settings/FsrsOptimizerSection", () => ({
   FsrsOptimizerSection: () => <div data-testid="fsrs-optimizer" />,
@@ -366,6 +398,7 @@ function defaultSettings() {
       installNudgeDismissed: true,
       audioHintDismissed: true,
       cardTypesHintDismissed: true,
+      cardTypesDefaultOpenDismissed: true, // already-seen: prevents auto-open in tests
     },
     appVisitCount: 0,
     mobileNav: "bottom" as const,
@@ -387,7 +420,7 @@ function defaultSettings() {
     verifiedTypedEntryMode: false,
     typedEntryOnboardingShown: false,
     mcCardOnboardingShown: false,
-    labsFlags: { languages: false },
+    labsFlags: {},
     removedLocales: [] as AppLocale[],
     pokemonNameLocale: "en" as const,
     pushNotificationHour: null,
@@ -410,6 +443,21 @@ beforeEach(() => {
   mockLoadSettings.mockReturnValue(defaultSettings());
   mockLoadSession.mockResolvedValue(null);
   mockSaveSession.mockResolvedValue({ ok: true });
+  // Reset auth to guest by default (matches prior static mock).
+  mockUseAuth.mockReturnValue({ user: null, supabase: null, loading: false });
+  // Reset retry/sync state to healthy defaults.
+  mockUseRetryPush.mockReturnValue({ retryState: "idle", retryNow: vi.fn() });
+  mockLoadSyncStatus.mockReturnValue({
+    lastPushAt: null,
+    lastPushFailed: false,
+    lastPushAttemptAt: null,
+    failedCardCount: null,
+    lastPullAt: null,
+    lastSettingsPullAt: null,
+    lastSeenResetAt: null,
+    structuralSyncError: null,
+    ownerUserId: null,
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -890,7 +938,7 @@ describe("SettingsPage - i18n key resolution (#1369)", () => {
     // Verify the Japanese heading value resolves correctly.
     expect(tJa("settings.heading")).toBe("設定");
     expect(tJa("settings.save")).toBe("保存");
-    expect(tJa("settings.section.practice")).toBe("練習");
+    expect(tJa("settings.section.practiceSchedule")).toBe("練習スケジュール");
     expect(tJa("settings.offline.downloadHeading")).toBe("ダウンロード");
   });
 
@@ -927,10 +975,10 @@ describe("SettingsPage - locale picker endonyms", () => {
     // The Pokémon-name-language picker was relocated to the status-bar pill
     // (#1484 Phase 2); only the app-language selector remains in Settings. The
     // pill's endonyms are covered by LanguageSwitcher.test.tsx.
+    // Language is now GA (#1723) - no Labs flag needed; always visible.
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
       pokemonNameLocale: "en",
-      labsFlags: { languages: true }, // enable the Languages labs flag to show the picker
     });
 
     render(<SettingsPage />);
@@ -945,21 +993,20 @@ describe("SettingsPage - locale picker endonyms", () => {
     const texts = options.map((o) => o.textContent ?? "");
 
     // The picker must show endonyms (native script), not English translations.
-    // Non-English locales are marked "(preview)" - the endonym must still appear
-    // as a substring of each option.
+    // Language is GA - no "(preview)" suffix on any option.
     expect(texts.some((t) => t.startsWith("日本語"))).toBe(true);
     expect(texts.some((t) => t.startsWith("简体中文"))).toBe(true);
     expect(texts.some((t) => t.startsWith("繁體中文"))).toBe(true);
 
-    // Non-English options must include the preview marker.
-    expect(texts.some((t) => t.includes("(preview)"))).toBe(true);
+    // No preview markers now that language is GA.
+    expect(texts.every((t) => !t.includes("(preview)"))).toBe(true);
 
     // Must NOT contain English-translated labels.
     expect(texts).not.toContain("Japanese");
     expect(texts).not.toContain("Simplified Chinese");
     expect(texts).not.toContain("Traditional Chinese");
 
-    // English option must have no preview marker.
+    // English option present.
     expect(texts).toContain("English");
   });
 });
@@ -1011,19 +1058,17 @@ describe("SettingsPage - cross-promo to Frazzled Productions (#1686)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Preview suffix localisation (#1392)
+// Language section GA (#1723)
 //
-// Asserts that the "(preview)" suffix on non-en locale options comes from the
-// catalog key settings.labs.languages.previewSuffix, not a hardcoded string.
-// The en mock returns "(preview)"; a ja-keyed check verifies the key exists
-// in the Japanese catalog.
+// The language section is now always visible (no Labs flag needed). Asserts
+// that the picker shows endonyms without any "(preview)" suffix since the
+// multi-locale feature is GA.
 // ---------------------------------------------------------------------------
 
-describe("SettingsPage - preview suffix from catalog", () => {
-  it("preview suffix on locale picker options is sourced from the catalog (en)", async () => {
+describe("SettingsPage - language section is always visible (GA, #1723)", () => {
+  it("shows the app-language picker without any preview suffix", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
     });
 
     render(<SettingsPage />);
@@ -1034,28 +1079,18 @@ describe("SettingsPage - preview suffix from catalog", () => {
 
     const select = screen.getByLabelText(/app interface language/i);
     const options = Array.from(select.querySelectorAll("option"));
-    const nonEnglishTexts = options
-      .filter((o) => o.getAttribute("value") !== "en")
-      .map((o) => o.textContent ?? "");
+    const texts = options.map((o) => o.textContent ?? "");
 
-    // Every non-English option must carry the catalog suffix "(preview)".
-    for (const text of nonEnglishTexts) {
-      expect(text).toMatch(/\(preview\)$/);
+    // Language is GA - no "(preview)" suffix on any option.
+    for (const text of texts) {
+      expect(text).not.toMatch(/preview/i);
     }
-  });
 
-  it("Japanese catalog has a non-empty previewSuffix key", () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const jaMessages = require("../../messages/ja.json") as Record<
-      string,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      any
-    >;
-    const suffix = jaMessages?.settings?.labs?.languages?.previewSuffix;
-    expect(typeof suffix).toBe("string");
-    expect(suffix.length).toBeGreaterThan(0);
-    // The Japanese suffix should use fullwidth brackets.
-    expect(suffix).toContain("プレビュー");
+    // All four locales present as endonyms.
+    expect(texts).toContain("English");
+    expect(texts.some((t) => t.startsWith("日本語"))).toBe(true);
+    expect(texts.some((t) => t.startsWith("简体中文"))).toBe(true);
+    expect(texts.some((t) => t.startsWith("繁體中文"))).toBe(true);
   });
 });
 
@@ -1217,7 +1252,6 @@ describe("SettingsPage - clarity polish: Settings labels (item 1)", () => {
   it("app-language heading reads 'App interface language'", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
     });
     render(<SettingsPage />);
 
@@ -1231,7 +1265,6 @@ describe("SettingsPage - clarity polish: Settings labels (item 1)", () => {
   it("enrolment heading reads 'Pokémon name practice languages'", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
     });
     render(<SettingsPage />);
 
@@ -1245,7 +1278,6 @@ describe("SettingsPage - clarity polish: Settings labels (item 1)", () => {
   it("enrolment description reads 'Switch the active one from the language pill'", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
     });
     render(<SettingsPage />);
 
@@ -1279,7 +1311,6 @@ describe("SettingsPage - clarity polish: enrolment mastery count respects preten
     });
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja"],
     });
 
@@ -1317,7 +1348,6 @@ describe("SettingsPage - clarity polish: enrolment mastery count respects preten
     });
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja"],
     });
 
@@ -1349,7 +1379,6 @@ describe("SettingsPage - clarity polish: unenrol active language confirm (item 3
   function settingsWithJaActive() {
     return {
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja"] as string[],
       activePokemonNameLocale: "ja" as const,
     };
@@ -1359,7 +1388,6 @@ describe("SettingsPage - clarity polish: unenrol active language confirm (item 3
     // Active = ja; removing zh-Hans (not active) should apply immediately.
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja", "zh-Hans"] as string[],
       activePokemonNameLocale: "ja" as const,
     });
@@ -1474,7 +1502,6 @@ describe("SettingsPage - enrolment maintains removedLocales tombstone (#1568)", 
   function settingsWithJaActive() {
     return {
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja"] as string[],
       activePokemonNameLocale: "ja" as const,
       removedLocales: [] as AppLocale[],
@@ -1485,7 +1512,6 @@ describe("SettingsPage - enrolment maintains removedLocales tombstone (#1568)", 
     // Start with zh-Hans in the tombstone set (previously removed).
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja"] as string[],
       activePokemonNameLocale: "ja" as const,
       removedLocales: ["zh-Hans"],
@@ -1512,7 +1538,6 @@ describe("SettingsPage - enrolment maintains removedLocales tombstone (#1568)", 
   it("removing a non-active locale adds it to removedLocales", async () => {
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja", "zh-Hans"] as string[],
       activePokemonNameLocale: "ja" as const,
       removedLocales: [] as AppLocale[],
@@ -1571,7 +1596,6 @@ describe("SettingsPage - enrolment maintains removedLocales tombstone (#1568)", 
     // Verify that the removedLocales on any saveSettings call never includes "en".
     mockLoadSettings.mockReturnValue({
       ...defaultSettings(),
-      labsFlags: { languages: true },
       learningLocales: ["en", "ja", "zh-Hans"] as string[],
       activePokemonNameLocale: "ja" as const,
       removedLocales: [] as AppLocale[],
@@ -1610,5 +1634,176 @@ describe("SettingsPage - statutory trading disclosure in About section (#1565 Pa
     await waitFor(() => {
       expect(screen.getByText(/Shelton Street/)).toBeInTheDocument();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Account block - signed-in states (#1721 AC)
+//
+// Covers: identity display, provider label, sync-status line, sign-out button,
+// and the amber border when sync has failed.
+// ---------------------------------------------------------------------------
+
+/** A minimal Supabase-shaped user fixture for account-block tests. */
+function makeUser(overrides?: Record<string, unknown>) {
+  return {
+    id: "user-123",
+    email: "test@example.com",
+    identities: [{ provider: "github" }],
+    user_metadata: { user_name: "testuser" },
+    ...overrides,
+  } as unknown;
+}
+
+describe("SettingsPage - account block signed-in states (#1721)", () => {
+  it("signed-in healthy: shows identity, provider label, sync status, and sign-out", async () => {
+    mockUseAuth.mockReturnValue({
+      user: makeUser(),
+      supabase: {} as unknown,
+      loading: false,
+    });
+    // Healthy sync - no failure flag.
+    mockLoadSyncStatus.mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: false,
+      lastPushAttemptAt: null,
+      failedCardCount: null,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: null,
+      ownerUserId: "user-123",
+    });
+
+    render(<SettingsPage />);
+
+    // Identity from user_metadata.user_name.
+    await waitFor(() => {
+      expect(screen.getByText("testuser")).toBeInTheDocument();
+    });
+
+    // Provider label (GitHub).
+    expect(screen.getByText("Signed in with GitHub")).toBeInTheDocument();
+
+    // Sync status line stub is present in healthy state.
+    expect(screen.getByTestId("sync-status-line")).toBeInTheDocument();
+    expect(screen.getByTestId("sync-status-line")).toHaveTextContent("Synced");
+
+    // Sign-out button is accessible.
+    expect(screen.getByRole("button", { name: /sign out/i })).toBeInTheDocument();
+  });
+
+  it("signed-in healthy: account card has zinc border (not amber)", async () => {
+    mockUseAuth.mockReturnValue({
+      user: makeUser(),
+      supabase: {} as unknown,
+      loading: false,
+    });
+    mockLoadSyncStatus.mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: false,
+      lastPushAttemptAt: null,
+      failedCardCount: null,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: null,
+      ownerUserId: "user-123",
+    });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("testuser")).toBeInTheDocument();
+    });
+
+    // The account card wrapper must NOT carry the amber border class.
+    const accountSection = screen.getByRole("region", { name: /account/i });
+    const card = accountSection.querySelector(".rounded-xl");
+    expect(card).not.toBeNull();
+    expect(card!.className).toMatch(/border-zinc-200/);
+    expect(card!.className).not.toMatch(/border-amber/);
+  });
+
+  it("signed-in sync-failed: shows the sync status line in failed state", async () => {
+    mockUseAuth.mockReturnValue({
+      user: makeUser(),
+      supabase: {} as unknown,
+      loading: false,
+    });
+    // Simulate a persisted push failure.
+    mockLoadSyncStatus.mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: true,
+      lastPushAttemptAt: "2024-01-01T12:00:00.000Z",
+      failedCardCount: 3,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: null,
+      ownerUserId: "user-123",
+    });
+    mockUseRetryPush.mockReturnValue({ retryState: "error", retryNow: vi.fn() });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("testuser")).toBeInTheDocument();
+    });
+
+    // Sync status stub reflects the error state.
+    const statusLine = screen.getByTestId("sync-status-line");
+    expect(statusLine).toHaveTextContent("Sync failed · Retry");
+  });
+
+  it("signed-in sync-failed: account card gets amber border", async () => {
+    mockUseAuth.mockReturnValue({
+      user: makeUser(),
+      supabase: {} as unknown,
+      loading: false,
+    });
+    mockLoadSyncStatus.mockReturnValue({
+      lastPushAt: null,
+      lastPushFailed: true,
+      lastPushAttemptAt: "2024-01-01T12:00:00.000Z",
+      failedCardCount: 3,
+      lastPullAt: null,
+      lastSettingsPullAt: null,
+      lastSeenResetAt: null,
+      structuralSyncError: null,
+      ownerUserId: "user-123",
+    });
+    mockUseRetryPush.mockReturnValue({ retryState: "error", retryNow: vi.fn() });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("testuser")).toBeInTheDocument();
+    });
+
+    // The account card must carry the amber border when sync has failed.
+    const accountSection = screen.getByRole("region", { name: /account/i });
+    const card = accountSection.querySelector(".rounded-xl");
+    expect(card).not.toBeNull();
+    expect(card!.className).toMatch(/border-amber/);
+    expect(card!.className).not.toMatch(/border-zinc-200/);
+  });
+
+  it("guest: shows guest state with inline sign-in link (not a filled button)", async () => {
+    // Default mock already returns user: null - just confirm the guest block renders.
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Practising as a guest")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Your progress is saved on this device only.")).toBeInTheDocument();
+
+    // Sign-in affordance must be an inline link (not a filled button).
+    const signInBtn = screen.getByRole("button", { name: /sign in to back up/i });
+    expect(signInBtn).toBeInTheDocument();
+    // Must have inline-flex class (not bg-foreground filled style).
+    expect(signInBtn.className).toMatch(/inline-flex/);
+    expect(signInBtn.className).not.toMatch(/bg-foreground/);
   });
 });

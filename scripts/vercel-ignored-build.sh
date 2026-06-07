@@ -20,6 +20,7 @@ WATCH_PATHS=(
   lib/
   db/
   public/
+  scripts/
   next.config.ts
   tsconfig.json
   postcss.config.mjs
@@ -27,6 +28,10 @@ WATCH_PATHS=(
   package-lock.json
   vercel.json
 )
+# scripts/ is watched because build-time scripts shape the deployed output:
+# scripts/build-sw.mjs (#1752) generates public/sw/sw.js during `next build`,
+# so a change there alone (the service-worker logic) must trigger a rebuild or
+# the deployed worker goes stale.
 
 # Vercel shallow-clones at depth 10. If the previous SHA is outside the
 # clone window, attempt a targeted fetch before falling back to a full

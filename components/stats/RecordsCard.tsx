@@ -39,12 +39,12 @@ export function RecordsCard({ records }: Props) {
   const t = useTranslations("stats.records");
   return (
     <section aria-labelledby="records-heading">
-      <h2
+      <h3
         id="records-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
         {t("heading")}
-      </h2>
+      </h3>
       <div className={cn("grid grid-cols-2 gap-4 sm:grid-cols-4", cardPanel)}>
         <Stat
           label={records.longestStreak === 1 ? t("longestStreakDay") : t("longestStreakDays")}

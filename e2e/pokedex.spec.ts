@@ -353,9 +353,9 @@ test.describe("Pokédex detail - cry button (#476)", () => {
     await page.goto("/pokedex/1");
     await awaitSeedIdb(page);
 
-    // Locked species shows "???" heading and hides the cry button.
+    // Locked species: h1 shows the zero-padded dex number (#1734 / #1729).
     await expect(
-      page.getByRole("heading", { level: 1, name: "???" }),
+      page.getByRole("heading", { level: 1, name: /^#\d{3} \(locked\)$/i }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: /Play.*cry/i }),
@@ -383,9 +383,9 @@ test.describe("Pokédex detail - Forms section hidden when locked (#495)", () =>
     await page.goto("/pokedex/26");
     await awaitSeedIdb(page);
 
-    // Locked species shows "???" - verify the page loaded correctly.
+    // Locked species: h1 shows the zero-padded dex number (#1734 / #1729).
     await expect(
-      page.getByRole("heading", { level: 1, name: "???" }),
+      page.getByRole("heading", { level: 1, name: /^#\d{3} \(locked\)$/i }),
     ).toBeVisible();
 
     // The Forms h2 heading must not be visible regardless of whether the seed
@@ -572,7 +572,7 @@ test.describe("Pokédex - alternate-form surfaces (#450)", () => {
     await page.goto("/pokedex/26");
 
     // The page always renders the Pokémon name (locked or not).
-    // Verify the page loaded - either "Raichu" or the locked "???" heading.
+    // Verify the page loaded - either "Raichu" or the locked "#026 (locked)" heading.
     const heading = page.getByRole("heading", { level: 1 });
     await expect(heading).toBeVisible();
 
@@ -644,12 +644,14 @@ test.describe("Pokédex detail - bottom nav anchoring (#1086)", () => {
 
     // The #1086 invariant: the page itself must be at least as tall as the
     // viewport so iOS Safari keeps its toolbar hidden and `position: fixed;
-    // bottom: 0` on the tab bar stays anchored. As of #1104 that
-    // `min-h-dvh` guarantee lives on <body> (was on [data-page-content]),
-    // because pinning the wrapper to 100dvh on top of the Nav + sibling
-    // banners pushed the Practice page past the viewport and re-introduced
-    // the scroll #1087 was meant to remove. Assert the property at body so
-    // the test follows where the contract now lives.
+    // bottom: 0` on the tab bar stays anchored. As of #1104 the guarantee
+    // lives on <body> (was on [data-page-content]), because pinning the
+    // wrapper to 100svh on top of the Nav + sibling banners pushed the
+    // Practice page past the viewport and re-introduced the scroll #1087
+    // was meant to remove. As of #1728 the body uses `min-h-[100svh]`
+    // (svh = URL-bar-expanded height) rather than `min-h-dvh` so the body
+    // is correct at cold first paint before any scroll. Assert the property
+    // at body so the test follows where the contract now lives.
     const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
     expect(bodyHeight).toBeGreaterThanOrEqual(viewportSize!.height - 2);
   });
@@ -756,9 +758,9 @@ test.describe("Pokédex detail - next review date (#992)", () => {
     await page.goto("/pokedex/1");
     await awaitSeedIdb(page);
 
-    // Locked Pokémon shows "???" - no review-date line.
+    // Locked Pokémon: h1 shows the zero-padded dex number (#1734 / #1729).
     await expect(
-      page.getByRole("heading", { level: 1, name: "???" }),
+      page.getByRole("heading", { level: 1, name: /^#\d{3} \(locked\)$/i }),
     ).toBeVisible();
     await expect(page.getByText("Due today")).not.toBeVisible();
     await expect(page.getByText(/Next review:/)).not.toBeVisible();
@@ -1171,9 +1173,9 @@ test.describe("Pokédex detail - locked-state signposts (#1440)", () => {
     await page.goto("/pokedex/1");
     await awaitSeedIdb(page);
 
-    // Page loads with locked state (??? heading)
+    // Page loads with locked state: h1 shows zero-padded dex number (#1734 / #1729).
     await expect(
-      page.getByRole("heading", { level: 1, name: "???" }),
+      page.getByRole("heading", { level: 1, name: /^#\d{3} \(locked\)$/i }),
     ).toBeVisible();
 
     // Base Stats section heading is visible with the unlock hint

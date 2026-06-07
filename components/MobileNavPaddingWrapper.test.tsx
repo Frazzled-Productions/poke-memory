@@ -7,9 +7,9 @@
  *   - Applies pb-* padding class when mobileNav is "bottom".
  *   - Updates classes when SETTINGS_SAVED_EVENT fires.
  *
- * The 100dvh page-height guarantee that anchors the iOS Safari bottom tab bar
- * (#1086) now lives on <body> in app/layout.tsx (`min-h-dvh`), not on this
- * wrapper. Putting it here forced the wrapper to 100dvh on top of the Nav
+ * The page-height guarantee that anchors the iOS Safari bottom tab bar
+ * (#1086) now lives on <body> in app/layout.tsx (`min-h-[100svh]`), not on
+ * this wrapper. Putting it here forced the wrapper to 100svh on top of the Nav
  * and any sibling banners, pushing the Practice page past the viewport
  * (#1087 regression). The wrapper now only owns the bottom-tab-bar padding.
  */
@@ -67,11 +67,11 @@ describe("MobileNavPaddingWrapper", () => {
     expect(container.querySelector("[data-page-content]")).not.toBeNull();
   });
 
-  it("never applies min-h-dvh on the wrapper itself (#1087)", async () => {
-    // min-h-dvh now lives on <body> so the wrapper can be a true flex-1 child
-    // and shrink to fit alongside the Nav and any sibling banners. If this
-    // assertion regresses, the Practice page will require scrolling again on
-    // iPhone 17 Pro because the wrapper will push past the viewport.
+  it("never applies min-h-dvh or min-h-[100svh] on the wrapper itself (#1087)", async () => {
+    // min-h-[100svh] now lives on <body> so the wrapper can be a true flex-1
+    // child and shrink to fit alongside the Nav and any sibling banners. If
+    // this assertion regresses, the Practice page will require scrolling again
+    // on iPhone 17 Pro because the wrapper will push past the viewport.
     mockLoadSettings.mockReturnValue({ mobileNav: "bottom", masteryRepetitions: 3 });
 
     const { container } = render(
@@ -84,7 +84,9 @@ describe("MobileNavPaddingWrapper", () => {
       const wrapper = container.querySelector("[data-page-content]") as HTMLElement;
       // Effect has run; pb-* is the marker that "bottom" mode took effect.
       expect(wrapper.className).toContain("pb-[calc(4rem+env(safe-area-inset-bottom))]");
+      // The body's min-height anchor must never migrate to this wrapper.
       expect(wrapper.className).not.toContain("min-h-dvh");
+      expect(wrapper.className).not.toContain("min-h-[100svh]");
     });
   });
 

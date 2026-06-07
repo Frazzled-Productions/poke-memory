@@ -87,12 +87,15 @@
     },
     "section": {
       "appearance": "外观",
-      "practice": "练习",
       "audio": "音频",
       "offline": "离线",
-      "accountData": "账户与数据",
       "advanced": "高级",
-      "labs": "实验室"
+      "practiceSchedule": "练习计划",
+      "cardTypes": "卡片类型",
+      "language": "语言",
+      "about": "关于",
+      "regionalReminders": "地区与提醒",
+      "dataBackup": "数据与备份"
     },
     "appearance": {
       "mobileNav": {
@@ -118,36 +121,6 @@
         "tintedDescription": "主题色以淡淡的色调覆盖页面背景。",
         "fullLabel": "完整主题",
         "fullDescription": "主题色覆盖所有背景，个性鲜明。"
-      }
-    },
-    "labs": {
-      "description": "正在开发中的预览功能。这些功能可能会更改或删除。您的反馈有助于决定最终形态。",
-      "languages": {
-        "label": "语言",
-        "description": "以日语、简体中文或繁体中文显示 Pokémon 名称。",
-        "locale": {
-          "en": "English",
-          "ja": "日本語",
-          "zh-Hans": "简体中文",
-          "zh-Hant": "繁體中文"
-        },
-        "selectLocale": "语言",
-        "appLanguageLabel": "应用界面语言",
-        "appLanguageDescription": "控制应用的 UI 文字。",
-        "pokemonNameLanguageLabel": "宝可梦名称语言",
-        "pokemonNameLanguageDescription": "宝可梦名称语言可从每个页面顶部状态栏中的语言按钮切换。",
-        "previewSuffix": "（预览）",
-        "enrolment": {
-          "heading": "宝可梦名称练习语言",
-          "description": "从状态栏中的语言按钮切换当前语言。",
-          "lockedEnglishNote": "始终包含",
-          "machineTranslationNote": "机器翻译",
-          "checkboxAriaLabel": "用 {language} 练习宝可梦名称",
-          "masteredCount": "已掌握 {count, number}",
-          "unenrolConfirmMessage": "删除 {language} 后，练习将切换回英语。继续吗？",
-          "unenrolConfirm": "确认",
-          "unenrolCancel": "取消"
-        }
       }
     },
     "practice": {
@@ -269,7 +242,8 @@
         "volumeLabel": "朗读音量（{pct}%）",
         "volumeMute": "0%（静音）",
         "volumeFull": "100%（最大）"
-      }
+      },
+      "cryDisabledNote": "叫声卡片已禁用。请在上方卡片类型中启用。"
     },
     "offline": {
       "downloadHeading": "下载",
@@ -413,6 +387,55 @@
     },
     "deleteAccount": {
       "inputAriaLabel": "输入 DELETE 以确认删除账户"
+    },
+    "language": {
+      "label": "语言",
+      "description": "以日语、简体中文或繁体中文显示 Pokémon 名称。",
+      "locale": {
+        "en": "English",
+        "ja": "日本語",
+        "zh-Hans": "简体中文",
+        "zh-Hant": "繁體中文"
+      },
+      "selectLocale": "语言",
+      "appLanguageLabel": "应用界面语言",
+      "appLanguageDescription": "控制应用的 UI 文字。",
+      "pokemonNameLanguageLabel": "宝可梦名称语言",
+      "pokemonNameLanguageDescription": "宝可梦名称语言可从每个页面顶部状态栏中的语言按钮切换。",
+      "enrolment": {
+        "heading": "宝可梦名称练习语言",
+        "description": "从状态栏中的语言按钮切换当前语言。",
+        "lockedEnglishNote": "始终包含",
+        "machineTranslationNote": "机器翻译",
+        "checkboxAriaLabel": "用 {language} 练习宝可梦名称",
+        "masteredCount": "已掌握 {count, number}",
+        "unenrolConfirmMessage": "删除 {language} 后，练习将切换回英语。继续吗？",
+        "unenrolConfirm": "确认",
+        "unenrolCancel": "取消"
+      }
+    },
+    "account": {
+      "guest": {
+        "practising": "以访客身份练习",
+        "savedLocally": "您的进度仅保存在此设备上。",
+        "signIn": "登录以备份"
+      },
+      "signedIn": {
+        "signOut": "退出登录",
+        "manageSignIn": "管理登录方式"
+      },
+      "provider": {
+        "github": "已通过 GitHub 登录",
+        "google": "已通过 Google 登录",
+        "email": "已通过邮箱登录",
+        "username": "已通过用户名登录",
+        "unknown": "已登录"
+      },
+      "sectionAriaLabel": "账户"
+    },
+    "cardTypes": {
+      "cryAudioNote": "叫声播放选项，请见下方音频。",
+      "cryAudioLink": "音频部分"
     }
   },
   "practice": {
@@ -874,7 +897,9 @@
       "lastReview": "最近复习: {date}",
       "neverReviewed": "尚未复习",
       "listAriaLabel": "按语言划分的掌握情况"
-    }
+    },
+    "restoreFromCloud": "从云端恢复",
+    "restoreFromCloudDescription": "恢复选项在设置中。"
   },
   "journey": {
     "title": "旅程",
@@ -979,7 +1004,10 @@
       "masteredCount": "{count, plural, other {# 已掌握}}",
       "bestDay": "{count, plural, other {最佳日 # 次复习}}",
       "noBestDay": "暂无复习记录"
-    }
+    },
+    "superSectionProgress": "您的进度",
+    "superSectionCollection": "收集",
+    "superSectionBreakdown": "细分"
   },
   "error": {
     "heading": "发生错误",
@@ -1131,6 +1159,19 @@
       "item4": "<s>其他人能看到吗？</s> 没有人能看到你的进度。只有你自己能看到自己的卡片。我们绝不会与他人共享你的进度，也不会用它来向你展示广告。",
       "item5": "<s>你可以自己掌控。</s> 你可以随时在设置页面<export>导出进度</export>或<reset>重置所有进度</reset>，无需征得我们的同意，现在就可以自己操作。",
       "item6": "<s>反馈。</s> 如果你发送反馈，我们会将你的消息保存最多12个月以帮助我们修复问题，之后将自动删除。"
+    }
+  },
+  "whatsNew": {
+    "heading": "最新动态",
+    "subtitle": "Poké Memory的最近更新。您当前的版本:",
+    "empty": "暂无发布说明。",
+    "sectionKind": {
+      "added": "新增",
+      "changed": "更改",
+      "removed": "移除",
+      "deprecated": "已弃用",
+      "fixed": "修复",
+      "security": "安全"
     }
   }
 }

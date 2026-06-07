@@ -87,12 +87,15 @@
     },
     "section": {
       "appearance": "外観",
-      "practice": "練習",
       "audio": "オーディオ",
       "offline": "オフライン",
-      "accountData": "アカウントとデータ",
       "advanced": "詳細設定",
-      "labs": "ラボ"
+      "practiceSchedule": "練習スケジュール",
+      "cardTypes": "カードの種類",
+      "language": "言語",
+      "about": "情報",
+      "regionalReminders": "地域設定とリマインダー",
+      "dataBackup": "データとバックアップ"
     },
     "appearance": {
       "mobileNav": {
@@ -118,36 +121,6 @@
         "tintedDescription": "マスコットカラーが薄く背景に重なります。",
         "fullLabel": "フルマスコットテーマ",
         "fullDescription": "マスコットカラーがすべての背景を彩ります。鮮やかなデザインです。"
-      }
-    },
-    "labs": {
-      "description": "開発中のプレビュー機能です。変更または削除される場合があります。ご意見をお寄せください。",
-      "languages": {
-        "label": "言語",
-        "description": "Pokémon の名前を日本語、簡体字中国語、繁体字中国語で表示します。",
-        "locale": {
-          "en": "English",
-          "ja": "日本語",
-          "zh-Hans": "简体中文",
-          "zh-Hant": "繁體中文"
-        },
-        "selectLocale": "言語",
-        "appLanguageLabel": "アプリのインターフェース言語",
-        "appLanguageDescription": "アプリの UI テキストを制御します。",
-        "pokemonNameLanguageLabel": "Pokémon 名前の言語",
-        "pokemonNameLanguageDescription": "Pokémon の名前の言語は、各ページ上部のステータスバーにある言語ピルから切り替えられます。",
-        "previewSuffix": "（プレビュー）",
-        "enrolment": {
-          "heading": "ポケモン名前練習言語",
-          "description": "バーの言語ピルからアクティブな言語を切り替えます。",
-          "lockedEnglishNote": "常に含まれます",
-          "machineTranslationNote": "機械翻訳",
-          "checkboxAriaLabel": "{language} でポケモンの名前を練習",
-          "masteredCount": "{count, number} 習得済み",
-          "unenrolConfirmMessage": "{language} を削除すると、練習が英語に切り替わります。続けますか？",
-          "unenrolConfirm": "確認",
-          "unenrolCancel": "キャンセル"
-        }
       }
     },
     "practice": {
@@ -269,7 +242,8 @@
         "volumeLabel": "読み上げ音量（{pct}%）",
         "volumeMute": "0%（ミュート）",
         "volumeFull": "100%（最大）"
-      }
+      },
+      "cryDisabledNote": "鳴き声カードは無効です。上のカードの種類で有効にしてください。"
     },
     "offline": {
       "downloadHeading": "ダウンロード",
@@ -413,6 +387,55 @@
     },
     "deleteAccount": {
       "inputAriaLabel": "DELETE と入力してアカウント削除を確認"
+    },
+    "language": {
+      "label": "言語",
+      "description": "Pokémon の名前を日本語、簡体字中国語、繁体字中国語で表示します。",
+      "locale": {
+        "en": "English",
+        "ja": "日本語",
+        "zh-Hans": "简体中文",
+        "zh-Hant": "繁體中文"
+      },
+      "selectLocale": "言語",
+      "appLanguageLabel": "アプリのインターフェース言語",
+      "appLanguageDescription": "アプリの UI テキストを制御します。",
+      "pokemonNameLanguageLabel": "Pokémon 名前の言語",
+      "pokemonNameLanguageDescription": "Pokémon の名前の言語は、各ページ上部のステータスバーにある言語ピルから切り替えられます。",
+      "enrolment": {
+        "heading": "ポケモン名前練習言語",
+        "description": "バーの言語ピルからアクティブな言語を切り替えます。",
+        "lockedEnglishNote": "常に含まれます",
+        "machineTranslationNote": "機械翻訳",
+        "checkboxAriaLabel": "{language} でポケモンの名前を練習",
+        "masteredCount": "{count, number} 習得済み",
+        "unenrolConfirmMessage": "{language} を削除すると、練習が英語に切り替わります。続けますか？",
+        "unenrolConfirm": "確認",
+        "unenrolCancel": "キャンセル"
+      }
+    },
+    "account": {
+      "guest": {
+        "practising": "ゲストとして練習中",
+        "savedLocally": "進行状況はこのデバイスにのみ保存されます。",
+        "signIn": "バックアップのためにサインイン"
+      },
+      "signedIn": {
+        "signOut": "サインアウト",
+        "manageSignIn": "サインイン方法を管理"
+      },
+      "provider": {
+        "github": "GitHubでサインイン済み",
+        "google": "Googleでサインイン済み",
+        "email": "メールでサインイン済み",
+        "username": "ユーザー名でサインイン済み",
+        "unknown": "サインイン済み"
+      },
+      "sectionAriaLabel": "アカウント"
+    },
+    "cardTypes": {
+      "cryAudioNote": "鳴き声の再生オプションは、下のオーディオをご覧ください。",
+      "cryAudioLink": "オーディオセクション"
     }
   },
   "practice": {
@@ -874,7 +897,9 @@
       "lastReview": "最終復習: {date}",
       "neverReviewed": "まだ復習なし",
       "listAriaLabel": "言語別の習得状況"
-    }
+    },
+    "restoreFromCloud": "クラウドから復元",
+    "restoreFromCloudDescription": "復元オプションは設定にあります。"
   },
   "journey": {
     "title": "旅",
@@ -979,7 +1004,10 @@
       "masteredCount": "{count, plural, other {# 習得済み}}",
       "bestDay": "{count, plural, other {ベストデイ # レビュー}}",
       "noBestDay": "まだレビューなし"
-    }
+    },
+    "superSectionProgress": "あなたの進捗",
+    "superSectionCollection": "コレクション",
+    "superSectionBreakdown": "内訳"
   },
   "error": {
     "heading": "エラーが発生しました",
@@ -1131,6 +1159,19 @@
       "item4": "<s>他の人は見られる?</s> あなたの進捗を見られるのはあなただけです。進捗を他者と共有したり、広告に利用したりすることはありません。",
       "item5": "<s>自分でコントロールできます。</s> 設定ページからいつでも<export>進捗をエクスポート</export>したり<reset>進捗をリセット</reset>したりできます。私たちに許可を求める必要はありません。今すぐ自分で行えます。",
       "item6": "<s>フィードバック。</s> フィードバックを送信した場合、メッセージは問題の修正に役立てるため最大12か月間保存され、その後自動的に削除されます。"
+    }
+  },
+  "whatsNew": {
+    "heading": "新着情報",
+    "subtitle": "Poké Memoryの最近の変更点。現在のバージョン:",
+    "empty": "リリースノートはありません。",
+    "sectionKind": {
+      "added": "追加",
+      "changed": "変更",
+      "removed": "削除",
+      "deprecated": "非推奨",
+      "fixed": "修正",
+      "security": "セキュリティ"
     }
   }
 }

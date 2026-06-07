@@ -21,7 +21,7 @@ test.describe("Mark Pokémon I already know - deferred scroll (#1483 / #1486)", 
     await page.goto("/settings");
 
     // Expand the Practice section so the quiz row becomes visible.
-    await page.getByRole("button", { name: /^practice$/i }).click();
+    await page.getByRole("button", { name: /^practice schedule$/i }).click();
 
     // Wait for the quiz row to appear (scroll hasn't fired yet).
     const openBtn = page.getByRole("button", { name: /open quiz/i });

@@ -390,12 +390,12 @@ export function EvolutionWall({
     <section aria-labelledby={headingId}>
       {/* Section heading + disclosure toggle on the same row */}
       <div className="flex items-center justify-between gap-3">
-        <h2
+        <h3
           id={headingId}
           className="text-base font-semibold text-foreground"
         >
           {tWidget("heading")}
-        </h2>
+        </h3>
         <button
           type="button"
           aria-expanded={isOpen}

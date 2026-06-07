@@ -247,7 +247,7 @@ describe("BadgeGallery - locale coverage", () => {
   it("en: shows 'Gym badges' heading and no-badge message", () => {
     renderWithIntl(<BadgeGallery earnedBadges={[]} />);
     expect(
-      screen.getByRole("heading", { level: 2, name: "Gym badges" }),
+      screen.getByRole("heading", { level: 3, name: "Gym badges" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/No badges earned yet/i)).toBeInTheDocument();
   });
@@ -262,7 +262,7 @@ describe("BadgeGallery - locale coverage", () => {
   it("ja: heading in Japanese", () => {
     renderJa(<BadgeGallery earnedBadges={[]} />);
     expect(
-      screen.getByRole("heading", { level: 2, name: "ジムバッジ" }),
+      screen.getByRole("heading", { level: 3, name: "ジムバッジ" }),
     ).toBeInTheDocument();
   });
 
@@ -274,14 +274,14 @@ describe("BadgeGallery - locale coverage", () => {
   it("zh-Hans: heading in Simplified Chinese", () => {
     renderZhHans(<BadgeGallery earnedBadges={[]} />);
     expect(
-      screen.getByRole("heading", { level: 2, name: "道馆徽章" }),
+      screen.getByRole("heading", { level: 3, name: "道馆徽章" }),
     ).toBeInTheDocument();
   });
 
   it("zh-Hant: heading in Traditional Chinese", () => {
     renderZhHant(<BadgeGallery earnedBadges={[]} />);
     expect(
-      screen.getByRole("heading", { level: 2, name: "道館徽章" }),
+      screen.getByRole("heading", { level: 3, name: "道館徽章" }),
     ).toBeInTheDocument();
   });
 });

@@ -128,12 +128,12 @@ export function CloseToMastery({
 
   return (
     <section aria-labelledby="close-to-mastery-heading">
-      <h2
+      <h3
         id="close-to-mastery-heading"
         className="mb-1 text-base font-semibold text-foreground"
       >
         {tWidget("heading")}
-      </h2>
+      </h3>
 
       {entries.length > 0 && (
         <p className={cn("mb-3 text-sm", mutedText)}>

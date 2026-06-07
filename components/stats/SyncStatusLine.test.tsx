@@ -34,6 +34,7 @@ const BASE_STATUS: SyncStatus = {
   lastSettingsPullAt: null,
   lastSeenResetAt: null,
   structuralSyncError: null,
+  ownerUserId: null,
 };
 
 const { mockLoadSyncStatus } = vi.hoisted(() => ({

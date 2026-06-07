@@ -1,12 +1,11 @@
 /**
  * Tests for `PokemonLocaleProvider` / `usePokemonLocaleContext` (#1329).
  *
- * Covers the subscription wiring that used to live in `useLocalePokemonName`:
- * - Reads the initial locale + flag state from settings on mount.
+ * Covers the subscription wiring:
+ * - Reads the initial locale + learningLocales from settings on mount.
  * - Updates when `SETTINGS_SAVED_EVENT` fires (same-tab saves).
  * - Updates when a `storage` event fires (other-tab writes).
- * - Forces locale to en when the languages Labs flag is off, regardless of
- *   `pokemonNameLocale` value.
+ * - `languagesEnabled` is always true (multi-locale GA since #1723).
  * - Registers exactly one pair of listeners regardless of consumer count.
  */
 
@@ -22,11 +21,9 @@ import { SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 // is optional so tests can omit it to exercise the back-compat (pre-#1484)
 // path, where readLocaleState falls back to the default set.
 let mockSettingsStore: {
-  labsFlags: Record<string, boolean>;
   pokemonNameLocale: string;
   learningLocales?: string[];
 } = {
-  labsFlags: { languages: false },
   pokemonNameLocale: "en",
   learningLocales: ["en"],
 };
@@ -45,7 +42,6 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 beforeEach(() => {
   mockSettingsStore = {
-    labsFlags: { languages: false },
     pokemonNameLocale: "en",
     learningLocales: ["en"],
   };
@@ -56,27 +52,9 @@ afterEach(() => {
 });
 
 describe("PokemonLocaleProvider - initial state", () => {
-  it("reads locale en + flag false from settings on mount", async () => {
+  it("reads locale ja from settings on mount (languagesEnabled is always true)", async () => {
+    // Multi-locale is GA - the locale is read from settings regardless of any flag.
     mockSettingsStore = {
-      labsFlags: { languages: false },
-      pokemonNameLocale: "ja",
-      learningLocales: ["en", "ja"],
-    };
-    const { result } = renderHook(() => usePokemonLocaleContext(), { wrapper });
-    await waitFor(() => {
-      // Flag off forces locale to en regardless of stored pokemonNameLocale, and
-      // collapses learningLocales to the default set.
-      expect(result.current).toEqual({
-        locale: "en",
-        languagesEnabled: false,
-        learningLocales: ["en"],
-      });
-    });
-  });
-
-  it("reads locale ja + flag true from settings when flag is on", async () => {
-    mockSettingsStore = {
-      labsFlags: { languages: true },
       pokemonNameLocale: "ja",
       learningLocales: ["en", "ja"],
     };
@@ -90,9 +68,8 @@ describe("PokemonLocaleProvider - initial state", () => {
     });
   });
 
-  it("defaults locale to en when flag is on but pokemonNameLocale is unset", async () => {
+  it("defaults locale to en when pokemonNameLocale is unset", async () => {
     mockSettingsStore = {
-      labsFlags: { languages: true },
       // @ts-expect-error simulating missing field
       pokemonNameLocale: undefined,
       learningLocales: ["en"],
@@ -107,9 +84,8 @@ describe("PokemonLocaleProvider - initial state", () => {
     });
   });
 
-  it("exposes the full enrolled learningLocales set when the flag is on", async () => {
+  it("exposes the full enrolled learningLocales set", async () => {
     mockSettingsStore = {
-      labsFlags: { languages: true },
       pokemonNameLocale: "zh-Hans",
       learningLocales: ["en", "ja", "zh-Hans"],
     };
@@ -118,18 +94,30 @@ describe("PokemonLocaleProvider - initial state", () => {
       expect(result.current.learningLocales).toEqual(["en", "ja", "zh-Hans"]);
     });
   });
+
+  it("languagesEnabled is always true (multi-locale GA since #1723)", async () => {
+    // Regardless of what's in settings, languagesEnabled is always true.
+    mockSettingsStore = {
+      pokemonNameLocale: "en",
+      learningLocales: ["en"],
+    };
+    const { result } = renderHook(() => usePokemonLocaleContext(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.languagesEnabled).toBe(true);
+    });
+  });
 });
 
 describe("PokemonLocaleProvider - reactive updates", () => {
   it("updates when SETTINGS_SAVED_EVENT fires (same-tab save)", async () => {
-    mockSettingsStore = { labsFlags: { languages: true }, pokemonNameLocale: "en" };
+    mockSettingsStore = { pokemonNameLocale: "en" };
     const { result } = renderHook(() => usePokemonLocaleContext(), { wrapper });
     await waitFor(() => {
       expect(result.current.locale).toBe("en");
     });
 
     act(() => {
-      mockSettingsStore = { labsFlags: { languages: true }, pokemonNameLocale: "ja" };
+      mockSettingsStore = { pokemonNameLocale: "ja" };
       window.dispatchEvent(new CustomEvent(SETTINGS_SAVED_EVENT));
     });
 
@@ -139,14 +127,14 @@ describe("PokemonLocaleProvider - reactive updates", () => {
   });
 
   it("updates when a storage event fires (other-tab write)", async () => {
-    mockSettingsStore = { labsFlags: { languages: true }, pokemonNameLocale: "en" };
+    mockSettingsStore = { pokemonNameLocale: "en" };
     const { result } = renderHook(() => usePokemonLocaleContext(), { wrapper });
     await waitFor(() => {
       expect(result.current.locale).toBe("en");
     });
 
     act(() => {
-      mockSettingsStore = { labsFlags: { languages: true }, pokemonNameLocale: "zh-Hans" };
+      mockSettingsStore = { pokemonNameLocale: "zh-Hans" };
       window.dispatchEvent(new StorageEvent("storage"));
     });
 
@@ -155,9 +143,8 @@ describe("PokemonLocaleProvider - reactive updates", () => {
     });
   });
 
-  it("flips back to en when the flag is turned off, regardless of stored locale", async () => {
+  it("updates learningLocales when settings change", async () => {
     mockSettingsStore = {
-      labsFlags: { languages: true },
       pokemonNameLocale: "ja",
       learningLocales: ["en", "ja"],
     };
@@ -172,19 +159,14 @@ describe("PokemonLocaleProvider - reactive updates", () => {
 
     act(() => {
       mockSettingsStore = {
-        labsFlags: { languages: false },
         pokemonNameLocale: "ja",
-        learningLocales: ["en", "ja"],
+        learningLocales: ["en", "ja", "zh-Hans"],
       };
       window.dispatchEvent(new CustomEvent(SETTINGS_SAVED_EVENT));
     });
 
     await waitFor(() => {
-      expect(result.current).toEqual({
-        locale: "en",
-        languagesEnabled: false,
-        learningLocales: ["en"],
-      });
+      expect(result.current.learningLocales).toEqual(["en", "ja", "zh-Hans"]);
     });
   });
 
@@ -194,7 +176,6 @@ describe("PokemonLocaleProvider - reactive updates", () => {
     // versa). The Provider must read from settings only.
     document.cookie = "poke-memory:locale=ja";
     mockSettingsStore = {
-      labsFlags: { languages: true },
       pokemonNameLocale: "en",
       learningLocales: ["en"],
     };
@@ -214,7 +195,7 @@ describe("PokemonLocaleProvider - reactive updates", () => {
 
 describe("PokemonLocaleProvider - single subscription regardless of consumer count", () => {
   it("registers exactly one SETTINGS_SAVED_EVENT and one storage listener for N consumers", async () => {
-    mockSettingsStore = { labsFlags: { languages: true }, pokemonNameLocale: "en" };
+    mockSettingsStore = { pokemonNameLocale: "en" };
     const addSpy = vi.spyOn(window, "addEventListener");
 
     function Consumer() {

@@ -4,8 +4,7 @@
 //
 // Returns the English name immediately (synchronously from props), then
 // replaces it with the locale-appropriate name once the locale-names sidecar
-// has loaded. Falls back to the English name if the sidecar is unavailable or
-// if the languages Labs flag is off.
+// has loaded. Falls back to the English name if the sidecar is unavailable.
 //
 // The Pokémon-name locale is independent of the app UI locale (#1260 follow-up).
 // It is read from `UserSettings.pokemonNameLocale` (localStorage) via
