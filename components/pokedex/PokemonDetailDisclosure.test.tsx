@@ -81,7 +81,9 @@ const { mockLoadSession, mockLegStatusMap } = vi.hoisted(() => ({
   // Default: resolve null so the useSpeciesLegStatus hook no-ops in every
   // existing test that renders the component (only the #1766 tests below
   // opt into a populated session).
-  mockLoadSession: vi.fn(() => Promise.resolve(null)),
+  mockLoadSession: vi.fn(
+    (): Promise<{ cards: unknown[] } | null> => Promise.resolve(null),
+  ),
   mockLegStatusMap: {
     value: new Map<number, import("@/lib/stats/legStatus").SpeciesLegStatus>(),
   },
