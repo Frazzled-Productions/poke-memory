@@ -30,12 +30,12 @@ export function TypeBreakdown({ perType }: Props) {
 
   return (
     <section aria-labelledby="type-heading">
-      <h2
+      <h3
         id="type-heading"
         className="mb-3 text-base font-semibold text-foreground"
       >
         {tTB("heading")}
-      </h2>
+      </h3>
       <ul
         role="list"
         className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6"

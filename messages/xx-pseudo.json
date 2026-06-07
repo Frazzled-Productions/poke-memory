@@ -897,7 +897,9 @@
       "lastReview": "[Last reviewed {date}]",
       "neverReviewed": "[Not yet reviewed]",
       "listAriaLabel": "[Mastery by language]"
-    }
+    },
+    "restoreFromCloud": "[Restore from cloud]",
+    "restoreFromCloudDescription": "[Recovery options are in Settings.]"
   },
   "journey": {
     "title": "[Journey]",
@@ -1002,7 +1004,10 @@
       "masteredCount": "[{count, plural, one {# mastered} other {# mastered}}]",
       "bestDay": "[{count, plural, one {# review on best day} other {# reviews on best day}}]",
       "noBestDay": "[No reviews yet]"
-    }
+    },
+    "superSectionProgress": "[Your progress]",
+    "superSectionCollection": "[Collection]",
+    "superSectionBreakdown": "[Breakdown]"
   },
   "error": {
     "heading": "[Something went wrong]",
@@ -1154,6 +1159,19 @@
       "item4": "[<s>Who else can see it.</s> Nobody else can see your progress. Only you can see your own cards. We never share your progress with anyone else or use it to show you adverts.]",
       "item5": "[<s>You're in control.</s> You can <export>export your progress</export> or <reset>reset all progress</reset> at any time from the Settings page. You don't need to ask us; you can do it yourself, right now.]",
       "item6": "[<s>Feedback.</s> If you send us feedback, we keep your message for up to 12 months to help us fix things, and then it is automatically deleted.]"
+    }
+  },
+  "whatsNew": {
+    "heading": "[What's new]",
+    "subtitle": "[Recent changes to Poké Memory. You're on version]",
+    "empty": "[No release notes available.]",
+    "sectionKind": {
+      "added": "[Added]",
+      "changed": "[Changed]",
+      "removed": "[Removed]",
+      "deprecated": "[Deprecated]",
+      "fixed": "[Fixed]",
+      "security": "[Security]"
     }
   }
 }

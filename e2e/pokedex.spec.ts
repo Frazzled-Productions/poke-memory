@@ -353,9 +353,9 @@ test.describe("Pokédex detail - cry button (#476)", () => {
     await page.goto("/pokedex/1");
     await awaitSeedIdb(page);
 
-    // Locked species shows "???" heading and hides the cry button.
+    // Locked species: h1 shows the zero-padded dex number (#1734 / #1729).
     await expect(
-      page.getByRole("heading", { level: 1, name: "???" }),
+      page.getByRole("heading", { level: 1, name: /^#\d{3} \(locked\)$/i }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: /Play.*cry/i }),
@@ -383,9 +383,9 @@ test.describe("Pokédex detail - Forms section hidden when locked (#495)", () =>
     await page.goto("/pokedex/26");
     await awaitSeedIdb(page);
 
-    // Locked species shows "???" - verify the page loaded correctly.
+    // Locked species: h1 shows the zero-padded dex number (#1734 / #1729).
     await expect(
-      page.getByRole("heading", { level: 1, name: "???" }),
+      page.getByRole("heading", { level: 1, name: /^#\d{3} \(locked\)$/i }),
     ).toBeVisible();
 
     // The Forms h2 heading must not be visible regardless of whether the seed
@@ -572,7 +572,7 @@ test.describe("Pokédex - alternate-form surfaces (#450)", () => {
     await page.goto("/pokedex/26");
 
     // The page always renders the Pokémon name (locked or not).
-    // Verify the page loaded - either "Raichu" or the locked "???" heading.
+    // Verify the page loaded - either "Raichu" or the locked "#026 (locked)" heading.
     const heading = page.getByRole("heading", { level: 1 });
     await expect(heading).toBeVisible();
 
@@ -758,9 +758,9 @@ test.describe("Pokédex detail - next review date (#992)", () => {
     await page.goto("/pokedex/1");
     await awaitSeedIdb(page);
 
-    // Locked Pokémon shows "???" - no review-date line.
+    // Locked Pokémon: h1 shows the zero-padded dex number (#1734 / #1729).
     await expect(
-      page.getByRole("heading", { level: 1, name: "???" }),
+      page.getByRole("heading", { level: 1, name: /^#\d{3} \(locked\)$/i }),
     ).toBeVisible();
     await expect(page.getByText("Due today")).not.toBeVisible();
     await expect(page.getByText(/Next review:/)).not.toBeVisible();
@@ -1173,9 +1173,9 @@ test.describe("Pokédex detail - locked-state signposts (#1440)", () => {
     await page.goto("/pokedex/1");
     await awaitSeedIdb(page);
 
-    // Page loads with locked state (??? heading)
+    // Page loads with locked state: h1 shows zero-padded dex number (#1734 / #1729).
     await expect(
-      page.getByRole("heading", { level: 1, name: "???" }),
+      page.getByRole("heading", { level: 1, name: /^#\d{3} \(locked\)$/i }),
     ).toBeVisible();
 
     // Base Stats section heading is visible with the unlock hint

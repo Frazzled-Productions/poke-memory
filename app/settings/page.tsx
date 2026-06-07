@@ -36,6 +36,7 @@ import type { ReviewState } from "@/lib/srs/scheduler";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { countOptimizableReviews } from "@/lib/srs/optimizer";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
+import { ForcePullSection } from "@/components/settings/ForcePullSection";
 import { IntensityPicker } from "@/components/settings/IntensityPicker";
 import { KnownPokemonQuiz } from "@/components/onboarding/KnownPokemonQuiz";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
@@ -2083,6 +2084,16 @@ export default function SettingsPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Restore from cloud - authenticated users only (#1732 / #1729).
+                    Moved here from Stats page; Stats shows a link to /settings instead.
+                    Gated on signed-in + supabase available + superuser off. */}
+                {user && supabase && !anyFlagOn && (
+                  <div className={cn(cardPanelPadded, "flex flex-col gap-3")}>
+                    <h3 className={sectionLabel}>{t("stats.forcePull.heading")}</h3>
+                    <ForcePullSection supabase={supabase} userId={user.id} />
+                  </div>
+                )}
               </CollapsibleSection>
               )}
 
