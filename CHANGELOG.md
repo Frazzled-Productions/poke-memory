@@ -6,6 +6,24 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.0] - 2026-06-07
+
+### Changed
+
+- Privacy notice (§1) now states the ICO registration number (ZC165261) for Frazzled Productions Ltd, confirming the data protection fee has been paid.
+
+### Removed
+
+- Removed the Pokéball loading overlay (`#pwa-splash`) that appeared during PWA boot. Boot-perf work (#1677/#1705) resolved the blank-content gap it was covering, and the literal Pokéball SVG was gratuitous Pokémon branding. The neutral theme background now shows through during hydration. The iOS cold-launch fix (apple-touch-startup-image PNGs) is unaffected.
+
+### Fixed
+
+- Fixed multi-user data isolation: switching accounts on one device no longer blends one user's cards, streak, grade log, or settings into another's session, and no longer pushes the blended state to the incoming user's cloud account. Outgoing user's local data is preserved in a per-user archive so it is restored if they sign back in.
+- Fixed the iOS bottom tab bar detaching from the screen bottom on cold load and snapping into place after the first scroll. Changed `min-h-dvh` to `min-h-[100svh]` on `<body>`: `svh` (URL-bar-expanded height) is correct at first paint, whereas `dvh` (URL-bar-collapsed height) resolved to the wrong value before any scroll reconciled the viewports (#1728).
+- Fixed production `/sw/sw.js` returning HTTP 500 (file-trace gap under `cacheComponents: true`); PWA updates are now restored for all installed users.
+- PWA now discovers and adopts fresh builds faster: the hidden-tab update check fires after 90 s (down from 5 min) and the background interval runs every hour (down from 4 h).
+- The PWA service worker is now served as a true static asset (`public/sw/sw.js`) generated at build time, rather than by a request-time serverless function. This removes the class of bug behind the earlier production 500 (#1749) for good, instead of patching it: a Next.js upgrade can no longer reintroduce a missing-module failure, and the worker is served straight from the CDN. The registration URL is unchanged, so installed PWAs keep working without re-registering.
+
 ## [0.10.35] - 2026-06-06
 
 ### Added
@@ -1647,7 +1665,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.10.35...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.0
 [0.10.35]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.35
 [0.10.34]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.34
 [0.10.33]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.33
