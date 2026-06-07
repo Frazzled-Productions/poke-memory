@@ -621,6 +621,7 @@ describe('themeIntensity setting (#411)', () => {
           higherOrLowerNudgeDismissed: false,
           guestSignUpNudgeDismissed: false,
           cardTypesDefaultOpenDismissed: false,
+          masteryBlockersNudgeDismissed: false,
         },
       });
       expect(loadSettings().onboarding).toEqual({
@@ -644,6 +645,7 @@ describe('themeIntensity setting (#411)', () => {
         higherOrLowerNudgeDismissed: false,
         guestSignUpNudgeDismissed: false,
         cardTypesDefaultOpenDismissed: false,
+        masteryBlockersNudgeDismissed: false,
       });
     });
 
@@ -693,6 +695,7 @@ describe('themeIntensity setting (#411)', () => {
         higherOrLowerNudgeDismissed: false,
         guestSignUpNudgeDismissed: false,
         cardTypesDefaultOpenDismissed: false,
+        masteryBlockersNudgeDismissed: false,
       });
     });
 

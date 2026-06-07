@@ -881,23 +881,8 @@ export function ReviewSession() {
 
   // "Almost mastered" preset discovery nudge (#1767): one-shot hint pointing
   // users with blocked species to the mastery-blockers scope preset.
-  // Gate (in priority order):
-  //   1. firstVisitDone false             -> suppress (onboarding still showing).
-  //   2. masteryBlockingSpeciesIds empty  -> suppress (nothing is blocked; nudge would be misleading).
-  //   3. preset already active            -> suppress (user already knows about it).
-  //   4. Otherwise: show.
-  // OnboardingHint handles the masteryBlockersNudgeDismissed flag.
-  const masteryBlockersNudge = (
-    !firstVisitDone ||
-    masteryBlockingSpeciesIds.size === 0 ||
-    scope.presets.includes("mastery-blockers")
-  ) ? null : (
-    <div className="mb-3">
-      <OnboardingHint id="masteryBlockersNudgeDismissed" title={t("masteryBlockersNudge.title")}>
-        <p>{t("masteryBlockersNudge.body")}</p>
-      </OnboardingHint>
-    </div>
-  );
+  // The "Almost mastered" preset nudge (masteryBlockersNudge) is defined below,
+  // after the masteryBlockingSpeciesIds useMemo it depends on.
 
   function handleScopeChange(next: PracticeScope) {
     setScope(next);
@@ -1097,6 +1082,24 @@ export function ReviewSession() {
       [...legStatuses.values()].filter((s) => s.isBlocked).map((s) => s.speciesId),
     );
   }, [cards, activeLocale, superuserFlags.pretendAllMastered]);
+
+  // "Almost mastered" preset nudge (#1767). Gate (in priority order):
+  //   1. firstVisitDone false             -> suppress (onboarding still showing).
+  //   2. masteryBlockingSpeciesIds empty  -> suppress (nothing is blocked; nudge would be misleading).
+  //   3. preset already active            -> suppress (user already knows about it).
+  //   4. Otherwise: show.
+  // OnboardingHint handles the masteryBlockersNudgeDismissed flag.
+  const masteryBlockersNudge = (
+    !firstVisitDone ||
+    masteryBlockingSpeciesIds.size === 0 ||
+    scope.presets.includes("mastery-blockers")
+  ) ? null : (
+    <div className="mb-3">
+      <OnboardingHint id="masteryBlockersNudgeDismissed" title={t("masteryBlockersNudge.title")}>
+        <p>{t("masteryBlockersNudge.body")}</p>
+      </OnboardingHint>
+    </div>
+  );
 
   // Derive seen Pokémon for the Higher-or-Lower mini-game. Rendered on every
   // end-of-session variant (not just SESSION_COMPLETE) alongside the unified
