@@ -155,14 +155,15 @@ test.describe("Practice scope (#333)", () => {
     });
     await expect(chip).toBeVisible();
     await expect(scopePanel.getByText("Almost mastered")).toBeVisible();
-
-    // Selecting it succeeds (the core interaction): aria-pressed flips to true
-    // and the live match-count line stays present. The desynced-match logic
-    // itself is covered by unit tests (lib/review/scope.test.ts).
     await expect(chip).toHaveAttribute("aria-pressed", "false");
+
+    // Selecting it succeeds (the core interaction). This seed has no
+    // one-leg-mastered species (every card is freshly "new"), so the preset
+    // deterministically matches nothing and the no-match empty state appears -
+    // proof the scope change took effect. The desynced-match-and-build path is
+    // covered by unit tests (lib/review/scope.test.ts).
     await chip.click();
-    await expect(chip).toHaveAttribute("aria-pressed", "true");
-    await expect(scopePanel.getByText(/of \d+ Pok[ée]mon match/)).toBeVisible();
+    await expect(page.getByText(/no Pok[ée]mon match your scope/i)).toBeVisible();
   });
 
   test("scope change before any grade swaps the displayed card (#1088)", async ({
