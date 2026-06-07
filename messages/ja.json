@@ -911,8 +911,7 @@
       "reverseDirection": "逆引きカード",
       "blockedOnName": "名前カードが未習得",
       "blockedOnReverse": "逆引きカードが未習得",
-      "blockedHint": "<direction>{dirName}</direction> を習得して完全習得を解放しましょう。",
-      "practiseToComplete": "逆引きカードを練習して習得を完了しましょう。"
+      "blockedHint": "<direction>{dirName}</direction> を習得して完全習得を解放しましょう。"
     }
   },
   "journey": {

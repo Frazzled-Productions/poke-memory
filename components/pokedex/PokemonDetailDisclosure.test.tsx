@@ -766,6 +766,20 @@ describe("PokemonDetailDisclosure - per-direction leg status (#1766)", () => {
     expect(screen.getByText("逆引きカード")).toBeInTheDocument();
   });
 
+  it("renders leg-status labels in Simplified Chinese (zh-Hans)", async () => {
+    mockLegStatusMap.value = new Map([[1, blockedStatus]]);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "zh-Hans" });
+    expect(await screen.findByText("名称卡")).toBeInTheDocument();
+    expect(screen.getByText("反向卡")).toBeInTheDocument();
+  });
+
+  it("renders leg-status labels in Traditional Chinese (zh-Hant)", async () => {
+    mockLegStatusMap.value = new Map([[1, blockedStatus]]);
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "zh-Hant" });
+    expect(await screen.findByText("名稱卡")).toBeInTheDocument();
+    expect(screen.getByText("反向卡")).toBeInTheDocument();
+  });
+
   it("suppresses the section when pretendAllMastered is on", async () => {
     mockPretendAllMastered.value = true;
     mockLegStatusMap.value = new Map([[1, blockedStatus]]);

@@ -8,6 +8,7 @@ import type { SpeciesLegStatus } from "@/lib/stats/legStatus";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 import type { LegStatus } from "@/lib/stats/legStatus";
+import { LegStatusText } from "@/components/ui/LegStatusText";
 import { ArrivalSparkle } from "./ArrivalSparkle";
 import styles from "./Pasture.module.css";
 import { PASTURE_SPRITE_SIZE } from "@/lib/sprites/sizes";
@@ -41,23 +42,12 @@ const HOP_DURATION_MS = 600;
  * so status is never communicated by colour alone.
  */
 function LegRow({ label, status }: { label: string; status: LegStatus }) {
-  const tJourney = useTranslations("journey");
-  const statusClass =
-    status === "mastered"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : status === "learning"
-      ? "text-amber-600 dark:text-amber-400"
-      : "text-zinc-400 dark:text-zinc-500";
-  const statusText =
-    status === "mastered"
-      ? tJourney("masteryMastered")
-      : status === "learning"
-      ? tJourney("masteryLearning")
-      : tJourney("masteryLocked");
   return (
     <div className="flex justify-between pt-0.5">
       <dt>{label}</dt>
-      <dd className={statusClass}>{statusText}</dd>
+      <dd>
+        <LegStatusText status={status} />
+      </dd>
     </div>
   );
 }

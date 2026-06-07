@@ -911,8 +911,7 @@
       "reverseDirection": "反向卡",
       "blockedOnName": "名称卡未掌握",
       "blockedOnReverse": "反向卡未掌握",
-      "blockedHint": "掌握<direction>{dirName}</direction>以解锁完全掌握。",
-      "practiseToComplete": "练习反向卡以完成掌握。"
+      "blockedHint": "掌握<direction>{dirName}</direction>以解锁完全掌握。"
     }
   },
   "journey": {

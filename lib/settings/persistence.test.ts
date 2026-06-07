@@ -1167,6 +1167,29 @@ describe("validateOnboarding - offline nudge flags", () => {
     expect(loadSettings().onboarding.offlineDownloadNudgeDismissed).toBe(false);
   });
 
+  it("defaults masteryBlockersNudgeDismissed to false when absent (reaches existing users, #1767)", () => {
+    // An existing user's blob predates this key; it must resolve to false so
+    // the "Almost mastered" preset nudge is eligible to show.
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ onboarding: {} }));
+    expect(loadSettings().onboarding.masteryBlockersNudgeDismissed).toBe(false);
+  });
+
+  it("respects masteryBlockersNudgeDismissed: true when stored", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ onboarding: { masteryBlockersNudgeDismissed: true } }),
+    );
+    expect(loadSettings().onboarding.masteryBlockersNudgeDismissed).toBe(true);
+  });
+
+  it("coerces non-boolean masteryBlockersNudgeDismissed to false (=== true guard)", () => {
+    mockLocalStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ onboarding: { masteryBlockersNudgeDismissed: "yes" } }),
+    );
+    expect(loadSettings().onboarding.masteryBlockersNudgeDismissed).toBe(false);
+  });
+
   it("defaults slowSpriteLoadCount to 0 when absent (below threshold)", () => {
     mockLocalStorage.setItem(
       STORAGE_KEY,

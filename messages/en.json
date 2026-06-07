@@ -911,8 +911,7 @@
       "reverseDirection": "Reverse card",
       "blockedOnName": "Blocked on name card",
       "blockedOnReverse": "Blocked on reverse card",
-      "blockedHint": "Master the <direction>{dirName}</direction> to unlock full mastery.",
-      "practiseToComplete": "Practise the reverse card to complete mastery."
+      "blockedHint": "Master the <direction>{dirName}</direction> to unlock full mastery."
     }
   },
   "journey": {

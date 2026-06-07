@@ -26,6 +26,7 @@ import {
 import { loadSession } from "@/lib/review/persistence";
 import { computeSpeciesLegStatuses } from "@/lib/stats/legStatus";
 import type { SpeciesLegStatus } from "@/lib/stats/legStatus";
+import { LegStatusText } from "@/components/ui/LegStatusText";
 import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 
 function zeroPad(id: number): string {
@@ -72,23 +73,10 @@ function LegStatusRow({
   label: string;
   legStatus: import("@/lib/stats/legStatus").LegStatus;
 }) {
-  const tJourney = useTranslations("journey");
-  const statusClass =
-    legStatus === "mastered"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : legStatus === "learning"
-        ? "text-amber-600 dark:text-amber-400"
-        : "text-zinc-400 dark:text-zinc-500";
-  const statusText =
-    legStatus === "mastered"
-      ? tJourney("masteryMastered")
-      : legStatus === "learning"
-        ? tJourney("masteryLearning")
-        : tJourney("masteryLocked");
   return (
     <div className="flex items-center justify-between gap-2 py-0.5">
       <span className="text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
-      <span className={`text-xs font-medium ${statusClass}`}>{statusText}</span>
+      <LegStatusText status={legStatus} className="text-xs font-medium" />
     </div>
   );
 }

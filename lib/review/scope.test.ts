@@ -346,6 +346,11 @@ describe("scopeLabel", () => {
       scopeLabel({ gens: [], types: [], presets: ["incomplete-chains"] }),
     ).toBe("Incomplete chains");
   });
+  it("labels the mastery-blockers preset (#1767)", () => {
+    expect(
+      scopeLabel({ gens: [], types: [], presets: ["mastery-blockers"] }),
+    ).toBe("Almost mastered");
+  });
 });
 
 describe("loadScope / saveScope round-trip (deprecated shims)", () => {

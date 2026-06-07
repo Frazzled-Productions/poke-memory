@@ -459,6 +459,44 @@ describe("PasturePokemon - per-direction leg status (#1766)", () => {
     expect(dialog.textContent).toContain("習得済み");
   });
 
+  it("renders leg-status labels in Simplified Chinese (zh-Hans)", async () => {
+    mockPokemonLocale = "zh-Hans";
+    mockUseLocalePokemonName.mockReturnValue({ name: LOCALE_NAMES["zh-Hans"], transliteration: null });
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
+    render(
+      <PasturePokemon
+        card={card}
+        onMarkSeen={vi.fn()}
+        legStatus={{ speciesId: 1, name: "mastered", reverse: "learning", isBlocked: true, blockingLeg: "reverse" }}
+      />,
+      { locale: "zh-Hans" },
+    );
+    await openPopover(screen.getByRole("button", { name: LOCALE_NAMES["zh-Hans"] }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("名称卡");
+    expect(dialog.textContent).toContain("反向卡");
+    expect(dialog.textContent).toContain("已掌握");
+  });
+
+  it("renders leg-status labels in Traditional Chinese (zh-Hant)", async () => {
+    mockPokemonLocale = "zh-Hant";
+    mockUseLocalePokemonName.mockReturnValue({ name: LOCALE_NAMES["zh-Hant"], transliteration: null });
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
+    render(
+      <PasturePokemon
+        card={card}
+        onMarkSeen={vi.fn()}
+        legStatus={{ speciesId: 1, name: "mastered", reverse: "learning", isBlocked: true, blockingLeg: "reverse" }}
+      />,
+      { locale: "zh-Hant" },
+    );
+    await openPopover(screen.getByRole("button", { name: LOCALE_NAMES["zh-Hant"] }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("名稱卡");
+    expect(dialog.textContent).toContain("反向卡");
+    expect(dialog.textContent).toContain("已掌握");
+  });
+
   it("suppresses leg-status rows when legStatus is absent", async () => {
     const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
     render(<PasturePokemon card={card} onMarkSeen={vi.fn()} />);
