@@ -32,7 +32,6 @@ import { mutedText, mutedTextXs } from "@/lib/utils/class-names";
 export type LanguageBreakdownProps = {
   cards: readonly ReviewableCard[];
   today: string;
-  masteryRepetitions: number;
   dateFormat: DateFormat;
   timezone: string;
 };
@@ -102,7 +101,6 @@ type LanguageBreakdownInnerProps = LanguageBreakdownProps & {
 function LanguageBreakdownInner({
   cards,
   today,
-  masteryRepetitions,
   dateFormat,
   timezone,
   learningLocales,
@@ -116,7 +114,6 @@ function LanguageBreakdownInner({
         cards,
         today,
         /* strugglingLimit */ 10,
-        masteryRepetitions,
         forceAllMastered,
         locale,
       );
@@ -128,7 +125,7 @@ function LanguageBreakdownInner({
       const lastReview = lastReviewForLocale(cards, locale);
       return { locale, totalCards, masteryPct, lastReview };
     });
-  }, [cards, today, masteryRepetitions, forceAllMastered, learningLocales]);
+  }, [cards, today, forceAllMastered, learningLocales]);
 
   return (
     <section aria-labelledby="stats-lang-breakdown-heading">

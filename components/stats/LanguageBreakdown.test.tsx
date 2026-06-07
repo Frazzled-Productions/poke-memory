@@ -132,7 +132,6 @@ function defaultProps(overrides: Partial<LanguageBreakdownProps> = {}): Language
   return {
     cards: [],
     today: TODAY,
-    masteryRepetitions: MASTERY_REPETITIONS,
     dateFormat: "dmy",
     timezone: "UTC",
     ...overrides,

@@ -6,7 +6,7 @@
  * evolution cards that correspond to each link in the chain.
  *
  * Mastery rule (from docs/srs.md + lib/stats/derive.ts):
- *   reps >= masteryRepetitions && scheduledDays >= 21
+ *   stability >= MASTERY_STABILITY_DAYS (currently 21)
  */
 
 // Import pure numeric constants from seed-builder (no JSON dependency) so
@@ -86,13 +86,11 @@ function chainKey(nodes: SeedPokemon["evolutionChain"]): string {
  * Derives all evolution families with edge-mastery state from the seeded data
  * and the user's current card set.
  *
- * @param cards        The user's full ReviewableCard array (all card types).
- * @param masteryRepetitions  The user's mastery-repetitions setting (default 3).
- * @param forceAllMastered  Honour the `pretendAllMastered` superuser flag.
+ * @param cards              The user's full ReviewableCard array (all card types).
+ * @param forceAllMastered   Honour the `pretendAllMastered` superuser flag.
  */
 export function deriveEvolutionFamilies(
   cards: readonly ReviewableCard[],
-  masteryRepetitions = 3,
   forceAllMastered = false,
 ): EvolutionFamily[] {
   // Seed data is loaded asynchronously at runtime; fall back to empty arrays
@@ -115,12 +113,12 @@ export function deriveEvolutionFamilies(
     for (const card of cards) {
       if (card.cardType === "evolution") {
         const ec = card as EvolutionReviewCard;
-        if (isMastered(ec.state, masteryRepetitions)) {
+        if (isMastered(ec.state)) {
           forwardMasteredSet.add(ec.id);
         }
       } else if (card.cardType === "reverse-evolution") {
         const rc = card as ReverseEvolutionReviewCard;
-        if (isMastered(rc.state, masteryRepetitions)) {
+        if (isMastered(rc.state)) {
           // Reverse card id - store as-is for lookup.
           reverseMasteredSet.add(rc.id);
         }
@@ -248,17 +246,15 @@ export function familyInProgress(family: EvolutionFamily): boolean {
  * current card set rather than baked in as a static id list.
  *
  * @param cards               The user's full ReviewableCard array.
- * @param masteryRepetitions  The user's mastery-repetitions setting (default 3).
  * @param forceAllMastered    Honour the `pretendAllMastered` superuser flag.
  *   When true every edge is mastered, so every family is `completed` and none
  *   is in progress - the returned set is empty by design.
  */
 export function incompleteChainSpeciesIds(
   cards: readonly ReviewableCard[],
-  masteryRepetitions = 3,
   forceAllMastered = false,
 ): Set<number> {
-  const families = deriveEvolutionFamilies(cards, masteryRepetitions, forceAllMastered);
+  const families = deriveEvolutionFamilies(cards, forceAllMastered);
   const ids = new Set<number>();
   for (const family of families) {
     if (!familyInProgress(family)) continue;

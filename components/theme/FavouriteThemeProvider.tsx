@@ -32,7 +32,7 @@ async function resolveFavourite(): Promise<StoredFavourite | null> {
   const session = await loadSession();
   if (session === null) return stored;
   const settings = loadSettings();
-  if (isFavouriteEarned(stored, session.cards, settings.masteryRepetitions)) {
+  if (isFavouriteEarned(stored, session.cards)) {
     return stored;
   }
   saveFavourite(null);

@@ -139,10 +139,12 @@ describe("useCardClass", () => {
     expect(mockClassifyCard).not.toHaveBeenCalled();
   });
 
-  it("delegates to classifyCard with masteryRepetitions from settings", async () => {
+  it("delegates to classifyCard (stability-based gate, no masteryRepetitions param, #1765)", async () => {
+    // classifyCard no longer takes a masteryRepetitions argument since #1765.
+    // Verify it is called with just the card and returns the expected class.
     const card = makeNameCard(42);
     mockLoadSession.mockResolvedValue({ cards: [card], limits: {} });
-    mockLoadSettings.mockReturnValue(makeSettings(5));
+    mockLoadSettings.mockReturnValue(makeSettings());
     mockClassifyCard.mockReturnValue("learning");
 
     const { result } = renderHook(() => useCardClass(42));
@@ -151,7 +153,8 @@ describe("useCardClass", () => {
       expect(result.current).toBe("learning");
     });
 
-    expect(mockClassifyCard).toHaveBeenCalledWith(card, 5);
+    // classifyCard receives the card only (no repetitions threshold).
+    expect(mockClassifyCard).toHaveBeenCalledWith(card);
   });
 
   it('returns "learning" when classifyCard returns "learning"', async () => {

@@ -92,7 +92,7 @@ export function usePwaBadge(): void {
 
     void sync();
 
-    // Re-sync when settings change (e.g. timezone or masteryRepetitions updated).
+    // Re-sync when settings change (e.g. timezone updated).
     function onSettingsSaved() {
       void sync();
     }

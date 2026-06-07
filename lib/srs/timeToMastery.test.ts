@@ -105,7 +105,7 @@ describe("projectTimeToFirstMastery", () => {
       difficulty: 5,
     });
     expect(
-      projectTimeToFirstMastery([makeCard(1, introduced)], NOW, 3, true).days,
+      projectTimeToFirstMastery([makeCard(1, introduced)], NOW, true).days,
     ).toBeNull();
   });
 

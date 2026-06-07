@@ -592,12 +592,12 @@ describe("useProfileStatus - parity contract: masteryCount == computeStats.maste
     const cards = buildParityFixture();
 
     // Authoritative: what computeStats says.
-    const statsResult = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, false, "en");
+    const statsResult = computeStats(cards, TODAY, 10, false, "en");
     const statsCount = statsResult.mastered;
 
     // Cache write path: filterMastered (same derivation used by writeMasteredCountCache
     // inside ReviewSession).
-    const filterCount = filterMastered(cards, false, MASTERY_REPETITIONS, "en").length;
+    const filterCount = filterMastered(cards, false, "en").length;
 
     expect(filterCount).toBe(statsCount);
     expect(statsCount).toBe(1); // only species 1 fully mastered
@@ -607,11 +607,11 @@ describe("useProfileStatus - parity contract: masteryCount == computeStats.maste
     const cards = buildParityFixture();
 
     // Compute authoritative count.
-    const statsResult = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, false, "en");
+    const statsResult = computeStats(cards, TODAY, 10, false, "en");
     const expectedCount = statsResult.mastered; // 1
 
     // Simulate what ReviewSession.writeMasteredCountCache writes.
-    const filterCount = filterMastered(cards, false, MASTERY_REPETITIONS, "en").length;
+    const filterCount = filterMastered(cards, false, "en").length;
     writeMasteredCountForLocale("en", filterCount);
 
     mockLoadSettings.mockReturnValue({ pokemonNameLocale: "en", masteryRepetitions: 3 });
@@ -631,8 +631,8 @@ describe("useProfileStatus - parity contract: masteryCount == computeStats.maste
       makeReverseCard(2, unmasteredState(), "ja"),
     ];
 
-    const statsJa = computeStats(jaCards, TODAY, 10, MASTERY_REPETITIONS, false, "ja");
-    const filterJa = filterMastered(jaCards, false, MASTERY_REPETITIONS, "ja").length;
+    const statsJa = computeStats(jaCards, TODAY, 10, false, "ja");
+    const filterJa = filterMastered(jaCards, false, "ja").length;
 
     expect(filterJa).toBe(statsJa.mastered);
     expect(statsJa.mastered).toBe(1); // only species 1 fully mastered in ja
@@ -649,8 +649,8 @@ describe("useProfileStatus - parity contract: masteryCount == computeStats.maste
         makeReverseCard(2, unmasteredState(), locale),
       ];
 
-      const stats = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, false, locale);
-      const filterCount = filterMastered(cards, false, MASTERY_REPETITIONS, locale).length;
+      const stats = computeStats(cards, TODAY, 10, false, locale);
+      const filterCount = filterMastered(cards, false, locale).length;
 
       expect(filterCount).toBe(stats.mastered);
     }

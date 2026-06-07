@@ -9,8 +9,8 @@
  * by appending entries; users earn them the moment they meet the
  * criterion after the new build deploys.
  *
- * Mastery here means name-card mastery: `reps >= masteryRepetitions &&
- * scheduledDays >= 21` on the species' name card. Other card directions
+ * Mastery here means name-card mastery: `stability >= MASTERY_STABILITY_DAYS`
+ * on the species' name card. Other card directions
  * (evolution, reverse, cry) do not contribute. The species ID is the
  * raw PokéAPI species id (1..1025), which is also the name-card id.
  */

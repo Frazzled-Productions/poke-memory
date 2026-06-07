@@ -18,7 +18,7 @@ import {
 } from "@/lib/eligibility/scopeConstants";
 export { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter };
 
-export type PracticeScopePreset = "starters" | "legendaries" | "incomplete-chains";
+export type PracticeScopePreset = "starters" | "legendaries" | "incomplete-chains" | "mastery-blockers";
 
 /**
  * Runtime context the scope matcher needs for presets that depend on the
@@ -39,6 +39,13 @@ export type ScopeMatchContext = {
    * the caller (`ReviewSession`) whenever the card set changes.
    */
   incompleteChainSpeciesIds?: ReadonlySet<number>;
+  /**
+   * Species ids where exactly one practice leg is mastered and the other is
+   * not. Populated by the caller when the `mastery-blockers` preset is active
+   * (#1767 data layer). A missing set matches nothing, so the preset is a
+   * no-op until the UI PR wires the computation.
+   */
+  masteryBlockingSpeciesIds?: ReadonlySet<number>;
 };
 
 /**
@@ -182,6 +189,11 @@ function speciesMatchesScope(
   if (
     scope.presets.includes("incomplete-chains") &&
     (context.incompleteChainSpeciesIds?.has(speciesId) ?? false)
+  )
+    return true;
+  if (
+    scope.presets.includes("mastery-blockers") &&
+    (context.masteryBlockingSpeciesIds?.has(speciesId) ?? false)
   )
     return true;
   if (gamesActive) {
@@ -535,7 +547,7 @@ function parseScopeShape(value: unknown): PracticeScope | null {
   const presets = Array.isArray(obj.presets)
     ? (obj.presets as unknown[]).filter(
         (v): v is PracticeScopePreset =>
-          v === "starters" || v === "legendaries" || v === "incomplete-chains",
+          v === "starters" || v === "legendaries" || v === "incomplete-chains" || v === "mastery-blockers",
       )
     : [];
   // formCategories: absent in pre-#450 persisted scopes → default to {mode:'all'}.

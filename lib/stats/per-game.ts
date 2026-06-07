@@ -4,8 +4,7 @@
  * Aggregates mastered / introduced / total counts for each PokéAPI
  * version-group slug using the same mastery rule as `computeStats`:
  *   - A species is mastered when BOTH its name card AND its paired reverse
- *     card pass the FSRS gate (reps >= masteryRepetitions AND
- *     scheduledDays >= MASTERY_INTERVAL_DAYS).
+ *     card pass the FSRS gate (stability >= MASTERY_STABILITY_DAYS).
  *   - In forceAllMastered mode every species is treated as mastered.
  *
  * Only default-form species (isDefaultForm === true) are counted, mirroring
@@ -21,10 +20,7 @@ import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
 // per-game.ts does NOT force the seed JSON into any shared chunk (#1677).
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-builder";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
-import {
-  isMastered,
-  MASTERY_REPETITIONS,
-} from "@/lib/stats/derive";
+import { isMastered } from "@/lib/stats/derive";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -47,7 +43,6 @@ export type GameStats = {
  *
  * @param cards              Full mixed card array (name + reverse + others).
  * @param seed               `SEED_POKEMON` (provides versionGroups per species).
- * @param masteryRepetitions Mastery threshold - defaults to MASTERY_REPETITIONS (3).
  * @param forceAllMastered   Superuser flag: treats every species as mastered.
  * @returns                  One entry per version-group slug that appears in
  *                           at least one seed entry, in seed-insertion order
@@ -57,7 +52,6 @@ export type GameStats = {
 export function computePerGameStats(
   cards: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
-  masteryRepetitions: number = MASTERY_REPETITIONS,
   forceAllMastered = false,
 ): GameStats[] {
   // Build a lookup from pokemon ID → name card for fast per-species access.
@@ -76,7 +70,7 @@ export function computePerGameStats(
   for (const card of cards) {
     if (card.cardType !== "reverse") continue;
     const speciesId = card.id - REVERSE_ID_OFFSET;
-    if (speciesId > 0 && (forceAllMastered || isMastered(card.state, masteryRepetitions))) {
+    if (speciesId > 0 && (forceAllMastered || isMastered(card.state))) {
       masteredReverseSpecies.add(speciesId);
     }
   }
@@ -96,7 +90,7 @@ export function computePerGameStats(
     // Resolve name card for this species (pokemon.id for default forms).
     const nameCard = nameCardById.get(pokemon.id);
     const isIntroduced = nameCard !== undefined && nameCard.state.lastReview !== null;
-    const nameCardMastered = nameCard !== undefined && isMastered(nameCard.state, masteryRepetitions);
+    const nameCardMastered = nameCard !== undefined && isMastered(nameCard.state);
     const isSpeciesMastered = forceAllMastered
       ? true
       : nameCardMastered && masteredReverseSpecies.has(pokemon.id);

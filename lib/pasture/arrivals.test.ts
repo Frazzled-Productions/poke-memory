@@ -7,6 +7,7 @@ import {
 } from "./arrivals";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import type { ReviewableCard } from "@/lib/review/session";
+import { MASTERY_STABILITY_DAYS } from "@/lib/stats/derive";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -32,10 +33,11 @@ function makeState(overrides: Partial<ReviewState> = {}): ReviewState {
   };
 }
 
-/** A mastered state: reps >= 3, scheduledDays >= 21. */
+/** A mastered state: stability >= MASTERY_STABILITY_DAYS. */
 const masteredState = makeState({
-  reps: 3,
-  scheduledDays: 21,
+  stability: MASTERY_STABILITY_DAYS,
+  reps: 4,
+  scheduledDays: 28,
   lastReview: "2026-05-01",
   firstSeen: "2026-04-01",
   fsrsState: "review",
@@ -43,6 +45,7 @@ const masteredState = makeState({
 
 /** A non-mastered-but-introduced state. */
 const learningState = makeState({
+  stability: 5,
   reps: 2,
   scheduledDays: 10,
   lastReview: "2026-05-01",
@@ -96,20 +99,25 @@ function makeCard(
 // ---------------------------------------------------------------------------
 
 describe("isMastered", () => {
-  it("returns true when reps >= 3 and scheduledDays >= 21", () => {
+  it("returns true when stability >= MASTERY_STABILITY_DAYS", () => {
     expect(isMastered(masteredState)).toBe(true);
   });
 
-  it("returns false when reps < 3", () => {
-    expect(isMastered(makeState({ reps: 2, scheduledDays: 21 }))).toBe(false);
+  it("returns true when stability is exactly at the threshold", () => {
+    expect(isMastered(makeState({ stability: MASTERY_STABILITY_DAYS }))).toBe(true);
   });
 
-  it("returns false when scheduledDays < 21", () => {
-    expect(isMastered(makeState({ reps: 3, scheduledDays: 20 }))).toBe(false);
+  it("returns false when stability is one below the threshold", () => {
+    expect(isMastered(makeState({ stability: MASTERY_STABILITY_DAYS - 1 }))).toBe(false);
   });
 
-  it("returns false for a brand-new card", () => {
+  it("returns false when stability is zero (new card)", () => {
     expect(isMastered(newState)).toBe(false);
+  });
+
+  it("returns false when high reps + scheduledDays but low stability", () => {
+    // Old reps gate would have passed reps=3, scheduledDays=21; stability gate does not.
+    expect(isMastered(makeState({ reps: 10, scheduledDays: 60, stability: 5 }))).toBe(false);
   });
 });
 
@@ -138,28 +146,16 @@ describe("justBecameMastered", () => {
     expect(justBecameMastered(newState, masteredState)).toBe(true);
   });
 
-  it("honours a higher masteryRepetitions threshold", () => {
-    // masteredState has reps: 3 - mastered under the default but not under a
-    // custom threshold of 5, so the transition no longer counts as a crossing.
-    expect(justBecameMastered(learningState, masteredState, 5)).toBe(false);
+  it("stability just below threshold → just above counts as crossing", () => {
+    const below = makeState({ stability: MASTERY_STABILITY_DAYS - 1 });
+    const above = makeState({ stability: MASTERY_STABILITY_DAYS });
+    expect(justBecameMastered(below, above)).toBe(true);
   });
 
-  it("honours a lower masteryRepetitions threshold", () => {
-    // learningState has reps: 2, scheduledDays: 10 - not mastered under any
-    // threshold because scheduledDays < 21. Use a state that crosses only once
-    // the rep threshold drops to 2.
-    const lowRepMastered = makeState({
-      reps: 2,
-      scheduledDays: 21,
-      lastReview: "2026-05-01",
-      firstSeen: "2026-04-01",
-      fsrsState: "review",
-    });
-    // Under the default threshold of 3, lowRepMastered is not mastered, so the
-    // transition from newState is not a crossing.
-    expect(justBecameMastered(newState, lowRepMastered)).toBe(false);
-    // Drop the threshold to 2 and the same transition becomes a crossing.
-    expect(justBecameMastered(newState, lowRepMastered, 2)).toBe(true);
+  it("stability already at threshold before → not a new crossing", () => {
+    const atThreshold = makeState({ stability: MASTERY_STABILITY_DAYS });
+    const higher = makeState({ stability: MASTERY_STABILITY_DAYS + 10 });
+    expect(justBecameMastered(atThreshold, higher)).toBe(false);
   });
 });
 
@@ -252,37 +248,37 @@ describe("filterMastered", () => {
     expect(result[0].id).toBe(1);
   });
 
-  it("honours a higher masteryRepetitions threshold", () => {
-    // reps: 3 satisfies the default threshold but not a custom threshold of 5.
-    // Supply the paired reverse card too - both need to fail the higher threshold.
+  it("name card with stability below threshold is not mastered even with high reps+scheduledDays", () => {
+    // Verifies the old reps gate no longer applies.
+    const lowStabilityState = makeState({
+      stability: MASTERY_STABILITY_DAYS - 1,
+      reps: 10,
+      scheduledDays: 60,
+      lastReview: "2026-05-01",
+      firstSeen: "2026-04-01",
+      fsrsState: "review",
+    });
     const cards = [
-      makeCard(1, "name", masteredState),
-      makeCard(2000001, "reverse", masteredState),
+      makeCard(1, "name", lowStabilityState),
+      makeCard(2000001, "reverse", lowStabilityState),
     ];
-    expect(filterMastered(cards, false, 5)).toHaveLength(0);
+    expect(filterMastered(cards)).toHaveLength(0);
   });
 
-  it("honours a lower masteryRepetitions threshold", () => {
-    // reps: 2 is not mastered under the default threshold of 3, but is mastered
-    // once the threshold drops to 2 (scheduledDays is already >= 21). Supply a
-    // paired reverse card at the same state so BOTH legs clear the lower threshold.
-    const lowRepState = makeState({
-      reps: 2,
+  it("name card with stability at threshold is mastered", () => {
+    const atThreshold = makeState({
+      stability: MASTERY_STABILITY_DAYS,
+      reps: 1,
       scheduledDays: 21,
       lastReview: "2026-05-01",
       firstSeen: "2026-04-01",
       fsrsState: "review",
     });
-    const lowRepCard = makeCard(1, "name", lowRepState);
-    const lowRepReverse = makeCard(2000001, "reverse", lowRepState);
-    expect(filterMastered([lowRepCard, lowRepReverse], false)).toHaveLength(0);
-    expect(filterMastered([lowRepCard, lowRepReverse], false, 2)).toHaveLength(1);
-  });
-
-  it("forceAllMastered overrides a higher masteryRepetitions threshold", () => {
-    const cards = [makeCard(1, "name", learningState)];
-    // Even with a threshold the card cannot meet, forceAllMastered lets it through.
-    expect(filterMastered(cards, true, 10)).toHaveLength(1);
+    const cards = [
+      makeCard(1, "name", atThreshold),
+      makeCard(2000001, "reverse", atThreshold),
+    ];
+    expect(filterMastered(cards)).toHaveLength(1);
   });
 
   it("locale scoping: only returns name cards whose locale matches (#1259)", () => {
@@ -294,11 +290,11 @@ describe("filterMastered", () => {
 
     const all: ReturnType<typeof makeCard>[] = [jaName, jaReverse, enName, enReverse];
 
-    const jaResult = filterMastered(all as ReturnType<typeof makeCard>[], false, 3, "ja");
+    const jaResult = filterMastered(all as ReturnType<typeof makeCard>[], false, "ja");
     expect(jaResult).toHaveLength(1);
     expect(jaResult[0].id).toBe(1);
 
-    const enResult = filterMastered(all as ReturnType<typeof makeCard>[], false, 3, "en");
+    const enResult = filterMastered(all as ReturnType<typeof makeCard>[], false, "en");
     expect(enResult).toHaveLength(1);
     expect(enResult[0].id).toBe(2);
   });
@@ -310,9 +306,9 @@ describe("filterMastered", () => {
       makeCard(2_000_001, "reverse", masteredState), // no locale → en
     ];
     // Scoped to "en" - should find species 1
-    expect(filterMastered(cards, false, 3, "en")).toHaveLength(1);
+    expect(filterMastered(cards, false, "en")).toHaveLength(1);
     // Scoped to "ja" - should find nothing
-    expect(filterMastered(cards, false, 3, "ja")).toHaveLength(0);
+    expect(filterMastered(cards, false, "ja")).toHaveLength(0);
   });
 
   it("forceAllMastered with locale: only returns name cards for the given locale (#1259)", () => {
@@ -321,11 +317,11 @@ describe("filterMastered", () => {
     const enName = { ...makeCard(2, "name", newState), locale: "en" as const };
     const cards = [jaName, enName];
 
-    const jaResult = filterMastered(cards as ReturnType<typeof makeCard>[], true, 3, "ja");
+    const jaResult = filterMastered(cards as ReturnType<typeof makeCard>[], true, "ja");
     expect(jaResult).toHaveLength(1);
     expect(jaResult[0].id).toBe(1);
 
-    const enResult = filterMastered(cards as ReturnType<typeof makeCard>[], true, 3, "en");
+    const enResult = filterMastered(cards as ReturnType<typeof makeCard>[], true, "en");
     expect(enResult).toHaveLength(1);
     expect(enResult[0].id).toBe(2);
   });

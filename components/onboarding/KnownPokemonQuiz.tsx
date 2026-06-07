@@ -9,8 +9,8 @@
  * `nextReview(state, Easy, now)` - the brand-new + Easy graduation path A2 in
  * `lib/srs/scheduler.ts` - producing a real graduated FSRS state with
  * `reps = 1` and a long initial interval. We never synthesise a "mastered"
- * state: mastery requires `reps >= masteryRepetitions && scheduledDays >= 21`
- * (`lib/stats/derive.ts`) and a single tap cannot establish 21-day retention.
+ * state: mastery requires `stability >= MASTERY_STABILITY_DAYS`
+ * (`lib/stats/derive.ts`) and a single tap cannot establish that stability.
  * If the user is overconfident, the next live review's Again grade demotes the
  * card on the standard FSRS curve.
  *

@@ -70,6 +70,8 @@ function makeNameCard(
       lastReview,
       firstSeen: lastReview ?? null,
       reps: masteredOverride ? MASTERY_REPETITIONS : 0,
+      // stability >= 21 is the mastery gate since #1765.
+      stability: masteredOverride ? 21 : 0,
       scheduledDays: masteredOverride ? MASTERY_INTERVAL_DAYS : 0,
     }),
   };
@@ -93,6 +95,8 @@ function makeReverseCard(
       lastReview,
       firstSeen: lastReview ?? null,
       reps: masteredOverride ? MASTERY_REPETITIONS : 0,
+      // stability >= 21 is the mastery gate since #1765.
+      stability: masteredOverride ? 21 : 0,
       scheduledDays: masteredOverride ? MASTERY_INTERVAL_DAYS : 0,
     }),
   };
@@ -210,26 +214,37 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
     expect(series[0]).toEqual({ date: "2026-05-01", count: 3 });
   });
 
-  it("respects a custom masteryRepetitions threshold", () => {
-    // With threshold 10, cards with reps=3 are not mastered.
-    const stateWith3Reps = makeState({
+  it("stability gate: stability >= 21 is mastered; stability < 21 is not (#1765)", () => {
+    // stability=21 → mastered; stability=20 → not mastered.
+    const masteredState = makeState({
       lastReview: "2026-05-01",
       firstSeen: "2026-04-01",
       reps: 3,
+      stability: 21,
       scheduledDays: MASTERY_INTERVAL_DAYS,
     });
-    const cards: ReviewableCard[] = [
-      { ...makeNameCard(1, "2026-05-01", true), state: stateWith3Reps },
-      { ...makeReverseCard(1, "2026-05-01", true), state: stateWith3Reps },
+    const learningState = makeState({
+      lastReview: "2026-05-01",
+      firstSeen: "2026-04-01",
+      reps: 3,
+      // stability < 21 → not mastered.
+      stability: 20,
+      scheduledDays: MASTERY_INTERVAL_DAYS,
+    });
+    const masteredCards: ReviewableCard[] = [
+      { ...makeNameCard(1, "2026-05-01", true), state: masteredState },
+      { ...makeReverseCard(1, "2026-05-01", true), state: masteredState },
+    ];
+    const learningCards: ReviewableCard[] = [
+      { ...makeNameCard(2, "2026-05-01", true), state: learningState },
+      { ...makeReverseCard(2, "2026-05-01", true), state: learningState },
     ];
 
-    // Default threshold (3) - reps=3 meets the bar, species is mastered.
-    const seriesDefault = computeMasteryOverTime(cards, TODAY);
-    expect(seriesDefault).toHaveLength(1);
+    // stability=21 meets the gate → 1 species mastered.
+    expect(computeMasteryOverTime(masteredCards, TODAY)).toHaveLength(1);
 
-    // High threshold (10) - reps=3 < 10, species is NOT mastered.
-    const seriesHighThreshold = computeMasteryOverTime(cards, TODAY, 10);
-    expect(seriesHighThreshold).toHaveLength(0);
+    // stability=20 does not meet the gate → 0 species mastered.
+    expect(computeMasteryOverTime(learningCards, TODAY)).toHaveLength(0);
   });
 
   // ---------------------------------------------------------------------------
@@ -246,19 +261,19 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
       makeReverseCard(2, null, false),
       makeReverseCard(3, "2026-04-01", true),
     ];
-    const series = computeMasteryOverTime(cards, TODAY, MASTERY_REPETITIONS, true);
+    const series = computeMasteryOverTime(cards, TODAY, true);
     // 3 name cards → count should be 3 (not 6).
     expect(series).toEqual([{ date: TODAY, count: 3 }]);
   });
 
   it("forceAllMastered: returns the full name-card count even when nothing is mastered", () => {
     const cards: ReviewableCard[] = [makeNameCard(1, null, false), makeNameCard(2, null, false)];
-    const series = computeMasteryOverTime(cards, TODAY, MASTERY_REPETITIONS, true);
+    const series = computeMasteryOverTime(cards, TODAY, true);
     expect(series).toEqual([{ date: TODAY, count: 2 }]);
   });
 
   it("forceAllMastered: empty card list returns a single point at 0", () => {
-    const series = computeMasteryOverTime([], TODAY, MASTERY_REPETITIONS, true);
+    const series = computeMasteryOverTime([], TODAY, true);
     expect(series).toEqual([{ date: TODAY, count: 0 }]);
   });
 

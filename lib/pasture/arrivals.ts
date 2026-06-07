@@ -8,7 +8,7 @@
  */
 
 export { isMastered } from "@/lib/stats/derive";
-import { isMastered, MASTERY_REPETITIONS } from "@/lib/stats/derive";
+import { isMastered } from "@/lib/stats/derive";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
 import type { AppLocale } from "@/i18n/locales";
@@ -28,20 +28,15 @@ export type ReviewSession = {
  * Returns true when the card has just crossed the mastery threshold:
  * before the grade it was not mastered, after it is.
  *
- * `masteryRepetitions` is the user's configured mastery threshold (from
- * `loadSettings().masteryRepetitions`). It defaults to `MASTERY_REPETITIONS`
- * for backward-compatibility, but callers that have the user's settings to
- * hand must pass it through so the comparison honours a custom threshold.
+ * Since #1765 mastery is based on FSRS stability (>= 21) rather than the old
+ * `reps >= 3` sub-gate. Both `before` and `after` are evaluated with the same
+ * stability-based `isMastered` predicate.
  */
 export function justBecameMastered(
   before: ReviewState,
   after: ReviewState,
-  masteryRepetitions: number = MASTERY_REPETITIONS,
 ): boolean {
-  return (
-    !isMastered(before, masteryRepetitions) &&
-    isMastered(after, masteryRepetitions)
-  );
+  return !isMastered(before) && isMastered(after);
 }
 
 /**
@@ -60,17 +55,13 @@ export function justBecameMastered(
  * flows through. The cardType filter still applies so the pasture stays one
  * entry per species.
  *
- * `masteryRepetitions` is the user's configured mastery threshold (from
- * `loadSettings().masteryRepetitions`). It defaults to `MASTERY_REPETITIONS`
- * for backward-compatibility, but callers that have the user's settings to
- * hand must pass it through so the pasture honours a custom threshold.
+ * Since #1765, mastery uses FSRS stability (>= 21) rather than `reps >= 3`.
  *
  * `locale` defaults to `"en"` for backward-compatibility.
  */
 export function filterMastered(
   cards: ReviewableCard[],
   forceAllMastered = false,
-  masteryRepetitions: number = MASTERY_REPETITIONS,
   locale: AppLocale = "en",
 ): ReviewableCard[] {
   // Build a quick set of species IDs whose reverse card is mastered in this locale.
@@ -80,7 +71,7 @@ export function filterMastered(
     if (card.cardType !== "reverse") continue;
     if ((card.locale ?? "en") !== locale) continue;
     const speciesId = card.id - REVERSE_ID_OFFSET;
-    if (speciesId > 0 && (forceAllMastered || isMastered(card.state, masteryRepetitions))) {
+    if (speciesId > 0 && (forceAllMastered || isMastered(card.state))) {
       masteredReverseSpecies.add(speciesId);
     }
   }
@@ -91,7 +82,7 @@ export function filterMastered(
     if (forceAllMastered) return true;
     // Both name and reverse must be mastered for species-level mastery (#1234).
     return (
-      isMastered(card.state, masteryRepetitions) &&
+      isMastered(card.state) &&
       masteredReverseSpecies.has(card.id)
     );
   });

@@ -9,8 +9,8 @@
  * interval.
  *
  * Critical correctness rule: do NOT synthesise a "mastered" state. Mastery
- * means `reps >= masteryRepetitions && scheduledDays >= 21`; a single tap
- * can't prove 21-day retention. The simulated-Easy approach lets FSRS push
+ * means `stability >= MASTERY_STABILITY_DAYS`; a single tap can't establish
+ * that stability. The simulated-Easy approach lets FSRS push
  * cards toward mastery on the normal curve while leaving room for the user
  * to fall back to Again on a future review if they were overconfident.
  *

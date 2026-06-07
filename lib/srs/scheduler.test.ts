@@ -3,7 +3,7 @@ import { default_w } from "ts-fsrs";
 import { nextReview, initialReviewState, isFsrsInvalidState } from "@/lib/srs/scheduler";
 import type { ReviewState, Grade } from "@/lib/srs/scheduler";
 import { migrateReviewState } from "@/lib/review/persistence";
-import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS, isMastered } from "@/lib/stats/derive";
+import { MASTERY_REPETITIONS, MASTERY_STABILITY_DAYS, MASTERY_INTERVAL_DAYS, isMastered } from "@/lib/stats/derive";
 import {
   LEARNING_STEPS_MS,
   RELEARNING_STEPS_MS,
@@ -653,15 +653,15 @@ describe("invalid grade at runtime", () => {
 });
 
 // ============================================================
-// Mastery boundary - reps and scheduledDays thresholds
+// Mastery boundary - stability threshold (#1765)
 // ============================================================
 describe("mastery boundary (isMastered)", () => {
-  // isMastered lives in lib/stats/derive.ts and is the canonical gate. These
-  // tests exercise the exact-boundary conditions: one below, exactly at, and
-  // one above the thresholds. They also verify the reps dimension independently.
+  // isMastered lives in lib/stats/derive.ts and is the canonical gate.
+  // Since #1765 it checks `stability >= MASTERY_STABILITY_DAYS` only.
+  // These tests exercise the exact-boundary conditions for the stability gate.
 
   const BASE_STATE: ReviewState = {
-    stability: 30,
+    stability: MASTERY_STABILITY_DAYS, // exactly at threshold
     difficulty: 3,
     elapsedDays: 21,
     scheduledDays: 21,
@@ -677,70 +677,44 @@ describe("mastery boundary (isMastered)", () => {
     seenInPasture: false,
   };
 
-  it("is mastered at exactly MASTERY_REPETITIONS reps and MASTERY_INTERVAL_DAYS scheduledDays", () => {
-    const state: ReviewState = {
-      ...BASE_STATE,
-      reps: MASTERY_REPETITIONS,
-      scheduledDays: MASTERY_INTERVAL_DAYS,
-    };
+  it("is mastered when stability is exactly MASTERY_STABILITY_DAYS", () => {
+    const state: ReviewState = { ...BASE_STATE, stability: MASTERY_STABILITY_DAYS };
     expect(isMastered(state)).toBe(true);
   });
 
-  it("is NOT mastered when scheduledDays is exactly one below the threshold (20)", () => {
-    const state: ReviewState = {
-      ...BASE_STATE,
-      reps: MASTERY_REPETITIONS,
-      scheduledDays: MASTERY_INTERVAL_DAYS - 1, // 20
-    };
+  it("is NOT mastered when stability is exactly one below the threshold", () => {
+    const state: ReviewState = { ...BASE_STATE, stability: MASTERY_STABILITY_DAYS - 1 };
     expect(isMastered(state)).toBe(false);
   });
 
-  it("is mastered when scheduledDays is one above the threshold (22)", () => {
-    const state: ReviewState = {
-      ...BASE_STATE,
-      reps: MASTERY_REPETITIONS,
-      scheduledDays: MASTERY_INTERVAL_DAYS + 1, // 22
-    };
+  it("is mastered when stability is one above the threshold", () => {
+    const state: ReviewState = { ...BASE_STATE, stability: MASTERY_STABILITY_DAYS + 1 };
     expect(isMastered(state)).toBe(true);
   });
 
-  it("is NOT mastered when reps is exactly one below MASTERY_REPETITIONS", () => {
-    const state: ReviewState = {
-      ...BASE_STATE,
-      reps: MASTERY_REPETITIONS - 1,
-      scheduledDays: MASTERY_INTERVAL_DAYS,
-    };
-    expect(isMastered(state)).toBe(false);
+  it("is mastered with high stability even when reps is low", () => {
+    // Stability gate is independent of reps since #1765.
+    const state: ReviewState = { ...BASE_STATE, stability: MASTERY_STABILITY_DAYS, reps: 1 };
+    expect(isMastered(state)).toBe(true);
   });
 
-  it("is NOT mastered when both reps and scheduledDays are one below threshold", () => {
+  it("is NOT mastered when stability is 0 regardless of reps and scheduledDays", () => {
     const state: ReviewState = {
       ...BASE_STATE,
-      reps: MASTERY_REPETITIONS - 1,
-      scheduledDays: MASTERY_INTERVAL_DAYS - 1,
-    };
-    expect(isMastered(state)).toBe(false);
-  });
-
-  it("is mastered when reps is well above threshold and scheduledDays is exactly at threshold", () => {
-    const state: ReviewState = {
-      ...BASE_STATE,
+      stability: 0,
       reps: MASTERY_REPETITIONS + 10,
-      scheduledDays: MASTERY_INTERVAL_DAYS,
+      scheduledDays: MASTERY_INTERVAL_DAYS + 10,
     };
-    expect(isMastered(state)).toBe(true);
+    expect(isMastered(state)).toBe(false);
   });
 
-  it("isMastered does not gate on learningStep: a card mid-step with threshold-meeting reps/scheduledDays returns true", () => {
-    // isMastered checks reps and scheduledDays only - it does not inspect
-    // learningStep. A card in a learning step should never carry reps >=
-    // MASTERY_REPETITIONS in normal practice, but the function does not enforce
-    // that constraint. This test pins the current behaviour and will fail
-    // immediately if isMastered ever adds a learningStep guard.
+  it("isMastered does not gate on learningStep: a card mid-step with sufficient stability returns true", () => {
+    // isMastered checks stability only - it does not inspect learningStep.
+    // This test pins the current behaviour so any future learningStep guard
+    // causes a test failure and triggers a deliberate review.
     const inStepState: ReviewState = {
       ...BASE_STATE,
-      reps: MASTERY_REPETITIONS,
-      scheduledDays: MASTERY_INTERVAL_DAYS,
+      stability: MASTERY_STABILITY_DAYS,
       learningStep: 0,
       stepStartedAt: NOW.getTime(),
     };
@@ -749,6 +723,10 @@ describe("mastery boundary (isMastered)", () => {
 
   it("MASTERY_REPETITIONS constant itself is 3", () => {
     expect(MASTERY_REPETITIONS).toBe(3);
+  });
+
+  it("MASTERY_STABILITY_DAYS constant itself is 21", () => {
+    expect(MASTERY_STABILITY_DAYS).toBe(21);
   });
 
   it("MASTERY_INTERVAL_DAYS constant itself is 21", () => {

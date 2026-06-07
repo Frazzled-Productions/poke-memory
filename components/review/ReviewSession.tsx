@@ -211,7 +211,6 @@ function speciesBecameMastered(
   gradedCard: ReviewableCard,
   preGradeState: ReviewState,
   newCards: ReviewableCard[],
-  masteryRepetitions: number,
 ): boolean {
   let nameCardId: number;
   let reverseCardId: number;
@@ -232,20 +231,20 @@ function speciesBecameMastered(
   const reverseCardAfter = newCards.find((c) => c.id === reverseCardId && c.cardType === "reverse");
 
   if (nameCardAfter === undefined || reverseCardAfter === undefined) return false;
-  const nameAfterMastered = isMastered(nameCardAfter.state, masteryRepetitions);
-  const reverseAfterMastered = isMastered(reverseCardAfter.state, masteryRepetitions);
+  const nameAfterMastered = isMastered(nameCardAfter.state);
+  const reverseAfterMastered = isMastered(reverseCardAfter.state);
   if (!nameAfterMastered || !reverseAfterMastered) return false;
 
   // Before the grade: the graded card used preGradeState; all other cards are
   // unchanged in newCards (same object reference for non-graded entries).
   const nameBeforeMastered =
     gradedCard.id === nameCardId
-      ? isMastered(preGradeState, masteryRepetitions)
-      : isMastered(nameCardAfter.state, masteryRepetitions);
+      ? isMastered(preGradeState)
+      : isMastered(nameCardAfter.state);
   const reverseBeforeMastered =
     gradedCard.id === reverseCardId
-      ? isMastered(preGradeState, masteryRepetitions)
-      : isMastered(reverseCardAfter.state, masteryRepetitions);
+      ? isMastered(preGradeState)
+      : isMastered(reverseCardAfter.state);
 
   // Species transition: was NOT species-mastered before, IS now.
   return !(nameBeforeMastered && reverseBeforeMastered);
@@ -307,9 +306,8 @@ function writeHasMasteredFlag(val: boolean): void {
 function writeMasteredCountCache(
   cards: ReviewableCard[],
   locale: AppLocale,
-  masteryRepetitions: number,
 ): void {
-  const count = filterMastered(cards, false, masteryRepetitions, locale).length;
+  const count = filterMastered(cards, false, locale).length;
   writeMasteredCountForLocale(locale, count);
 }
 
@@ -797,11 +795,6 @@ export function ReviewSession() {
   const [slowSpriteLoadCount, setSlowSpriteLoadCount] = useState(OFFLINE_NUDGE_SLOW_LOAD_THRESHOLD);
   // true = user already has a download, or settings haven't loaded yet.
   const [offlineDownloaded, setOfflineDownloaded] = useState(true);
-  // Mirror of `UserSettings.masteryRepetitions` (#995). Held in state so the
-  // "Incomplete evolution chains" scope preset derives chain progress against
-  // the same mastery threshold the rest of the app uses. Defaults to 3 (the
-  // settings default) until the session load effect reads the real value.
-  const [masteryRepetitions, setMasteryRepetitions] = useState(3);
   // Onboarding nudges (#702). `cardTypesAllOn` is true when every
   // off-by-default card type is enabled - when that holds there is nothing
   // left to nudge towards on the session-complete screen.
@@ -1066,11 +1059,10 @@ export function ReviewSession() {
       cards !== null
         ? incompleteChainSpeciesIds(
             cards,
-            masteryRepetitions,
             superuserFlags.pretendAllMastered,
           )
         : new Set<number>(),
-    [cards, masteryRepetitions, superuserFlags.pretendAllMastered],
+    [cards, superuserFlags.pretendAllMastered],
   );
 
   // Derive seen Pokémon for the Higher-or-Lower mini-game. Rendered on every
@@ -1225,7 +1217,6 @@ export function ReviewSession() {
       const loadScopeContext: ScopeMatchContext = {
         incompleteChainSpeciesIds: incompleteChainSpeciesIds(
           sessionCards,
-          settings.masteryRepetitions,
           superuserFlags.pretendAllMastered,
         ),
       };
@@ -1268,7 +1259,6 @@ export function ReviewSession() {
         reverseEvolutionEnabledLocal && formsEnabled,
       );
       setScope(persistedScope);
-      setMasteryRepetitions(settings.masteryRepetitions);
       setEligibleCardIds(eligibleIds);
       setTimezone(settings.timezone ?? "UTC");
       // Capture the active locale and enrolled locales once at mount.
@@ -1342,7 +1332,6 @@ export function ReviewSession() {
         writeMasteredCountCache(
           sessionCards,
           (settings.activePokemonNameLocale ?? "en") as AppLocale,
-          settings.masteryRepetitions,
         );
         writeDueCountCacheFromCards(sessionCards, today);
       }
@@ -2325,15 +2314,14 @@ export function ReviewSession() {
     // the background persistence chain. Reuse `settings` already loaded at
     // the top of this handler (#1191).
     const wasNew = effectiveCard.state.firstSeen === null;
-    const wasMastered = isMastered(effectiveCard.state, settings.masteryRepetitions);
-    const nowMastered = isMastered(nextState, settings.masteryRepetitions);
+    const wasMastered = isMastered(effectiveCard.state);
+    const nowMastered = isMastered(nextState);
     // Species-level mastery crossing: BOTH name + reverse must cross the gate.
     // Used for the share card "Mastered" count and the daily summary (#1448).
     const speciesJustMastered = speciesBecameMastered(
       effectiveCard,
       effectiveCard.state,
       newCards,
-      settings.masteryRepetitions,
     );
 
     // Decode-ahead: fetch and decode the next card's sprite(s) before advancing
@@ -2521,7 +2509,6 @@ export function ReviewSession() {
       writeMasteredCountCache(
         newCards,
         (settings.activePokemonNameLocale ?? "en") as AppLocale,
-        settings.masteryRepetitions,
       );
     }
     if (!superuserGuarded) {
@@ -2685,7 +2672,6 @@ export function ReviewSession() {
         if (!isMountedRef.current) return;
         const masteredIds = masteredSpeciesIds(
           masteredCheckCards,
-          masteredCheckSettings.masteryRepetitions,
           false,
         );
         const earnedIds = new Set(masteredCheckSettings.earnedBadges.map((b) => b.id));

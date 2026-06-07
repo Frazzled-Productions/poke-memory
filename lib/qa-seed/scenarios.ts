@@ -653,6 +653,28 @@ function buildPastureProgression(): SeedPayload {
   // the review session filter by active locale (closing the #1394 id-collision
   // class). Keeping the two demos separate keeps each one's assertion crisp.
 
+  // Convergence-priority slab (#1764): species with one advanced leg and one new
+  // candidate leg. These exercise the queue-bias that introduces the missing leg
+  // first when a species is already partway there, so desynced accounts converge.
+  //
+  // 10 species with name card advanced (graduated), reverse card absent (new candidate).
+  // 5 species with reverse card advanced (graduated), name card absent (new candidate).
+  // IDs in Gen II (152+) to avoid collision with the Gen-I masteredIds above.
+  const desyncedNameAdvancedIds = [152, 155, 158, 161, 164, 167, 170, 175, 180, 185];
+  for (const id of desyncedNameAdvancedIds) {
+    // Name is graduated/advanced; reverse is deliberately NOT seeded (new candidate).
+    cards.push(nameCard(id, deriveDueSoonState({ dueDaysFromNow: 3 + (id % 5) }), "en"));
+  }
+
+  const desyncedReverseAdvancedIds = [190, 193, 196, 199, 200];
+  for (const id of desyncedReverseAdvancedIds) {
+    // Reverse is graduated/advanced; name card is new (never reviewed) representing
+    // a species where the user learnt the reverse leg first. The name card must be
+    // present to satisfy the pairing invariant (#1234) even though it is locked.
+    cards.push(reverseCard(id, deriveDueSoonState({ dueDaysFromNow: 2 + (id % 4) }), "en"));
+    cards.push(nameCard(id, initialReviewState(T0), "en"));
+  }
+
   // 20 graduated / due-soon (in progress, not yet mastered)
   const dueSoonIds = [
     95, 96, 98, 99, 100, 102, 104, 107, 109, 111,
@@ -708,12 +730,12 @@ function buildPastureProgression(): SeedPayload {
  *
  * (a) "Next arrivals" strip on the Pasture (#1316): requires reviewed-but-unmastered
  *     name cards - i.e. name cards that have been seen at least once but have not
- *     yet reached reps >= 3 AND scheduledDays >= 21. The strip ranks them by
+ *     yet reached stability >= MASTERY_STABILITY_DAYS. The strip ranks them by
  *     closest to mastery so QA can confirm real species appear rather than the
  *     "all reviewed Pokémon already in your Pasture" empty state.
  *
  * (b) "Close to mastery" on Journey (#1312): requires species where the NAME card
- *     IS mastered (reps >= 3, scheduledDays >= 21) but the matched REVERSE card
+ *     IS mastered (stability >= MASTERY_STABILITY_DAYS) but the matched REVERSE card
  *     has NOT yet reached that bar. Without this shape the list is empty.
  *
  * Mix:

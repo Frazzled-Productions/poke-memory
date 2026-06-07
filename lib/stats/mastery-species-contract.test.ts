@@ -43,6 +43,7 @@ function masteredState(lastReview = TODAY): Partial<ReviewState> {
     fsrsState: "review",
     lastReview,
     firstSeen: "2026-01-01",
+    // stability >= 21 is the mastery gate since #1765.
     stability: 30,
     difficulty: 5,
   };
@@ -153,7 +154,7 @@ describe("species-level mastery contract (#1448)", () => {
   const cards = buildFixture();
 
   // Ground truth: masteredSpeciesIds is the canonical set.
-  const masteredIds = masteredSpeciesIds(cards, MASTERY_REPETITIONS, false);
+  const masteredIds = masteredSpeciesIds(cards, false);
   // With the fixture above, only species 3 is fully mastered.
   const expectedMasteredCount = 1;
 
@@ -163,7 +164,7 @@ describe("species-level mastery contract (#1448)", () => {
   });
 
   it("masteredSpeciesEvents reports exactly 1 species event", () => {
-    const events = masteredSpeciesEvents(cards, MASTERY_REPETITIONS, false);
+    const events = masteredSpeciesEvents(cards, false);
     expect(events).toHaveLength(expectedMasteredCount);
     expect(events[0].speciesId).toBe(3);
     // masteredDate = later of "2026-05-12" (name) and "2026-05-20" (reverse) = "2026-05-20".
@@ -182,14 +183,14 @@ describe("species-level mastery contract (#1448)", () => {
   });
 
   it("computeRecords.mostMasteredIn7d: only 1 species mastered (within 7d window)", () => {
-    const records = computeRecords(cards, [], [], MASTERY_REPETITIONS);
+    const records = computeRecords(cards, [], []);
     // Species 3 masteredDate = "2026-05-20", which is within 10 days of TODAY.
     // mostMasteredIn7d = 1 (only one species in any 7-day window).
     expect(records.mostMasteredIn7d).toBe(expectedMasteredCount);
   });
 
   it("computeRecords.avgDaysToMastery reflects species count (not per-card count)", () => {
-    const records = computeRecords(cards, [], [], MASTERY_REPETITIONS);
+    const records = computeRecords(cards, [], []);
     // avgDaysToMastery should be non-null (1 mastered species).
     expect(records.avgDaysToMastery).not.toBeNull();
     // Days from firstSeen ("2026-01-01") to masteredDate ("2026-05-20").
@@ -201,7 +202,7 @@ describe("species-level mastery contract (#1448)", () => {
     // 4 name cards, 1 mastered species → 3 remaining.
     // With only 1 mastery event in the window, there may not be enough history
     // for a projection (depends on window timing) - check at least it is not "complete".
-    const result = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS);
+    const result = computeCompletionProjection(cards, TODAY);
     expect(result.kind).not.toBe("complete");
     // If projected, remaining must be 3 (name cards - mastered species).
     if (result.kind === "projected") {
@@ -221,7 +222,7 @@ describe("species-level mastery contract (#1448)", () => {
       makeNameCard(3, masteredState()),
     ];
 
-    const idsZero = masteredSpeciesIds(nameOnlyCards, MASTERY_REPETITIONS, false);
+    const idsZero = masteredSpeciesIds(nameOnlyCards, false);
     expect(idsZero.size).toBe(0);
 
     const statsZero = computeStats(nameOnlyCards, TODAY);
@@ -230,11 +231,11 @@ describe("species-level mastery contract (#1448)", () => {
     const seriesZero = computeMasteryOverTime(nameOnlyCards, TODAY);
     expect(seriesZero).toHaveLength(0);
 
-    const recordsZero = computeRecords(nameOnlyCards, [], [], MASTERY_REPETITIONS);
+    const recordsZero = computeRecords(nameOnlyCards, [], []);
     expect(recordsZero.mostMasteredIn7d).toBeNull();
     expect(recordsZero.avgDaysToMastery).toBeNull();
 
-    const projZero = computeCompletionProjection(nameOnlyCards, TODAY, MASTERY_REPETITIONS);
+    const projZero = computeCompletionProjection(nameOnlyCards, TODAY);
     expect(projZero.kind).toBe("insufficient-history");
   });
 
@@ -245,20 +246,20 @@ describe("species-level mastery contract (#1448)", () => {
   it("forceAllMastered: all helpers reflect 'everything mastered'", () => {
     const nameCount = cards.filter((c) => c.cardType === "name").length;
 
-    const idsForce = masteredSpeciesIds(cards, MASTERY_REPETITIONS, true);
+    const idsForce = masteredSpeciesIds(cards, true);
     expect(idsForce.size).toBe(nameCount);
 
-    const statsForce = computeStats(cards, TODAY, 10, MASTERY_REPETITIONS, true);
+    const statsForce = computeStats(cards, TODAY, 10, true);
     expect(statsForce.mastered).toBe(nameCount);
 
-    const seriesForce = computeMasteryOverTime(cards, TODAY, MASTERY_REPETITIONS, true);
+    const seriesForce = computeMasteryOverTime(cards, TODAY, true);
     expect(seriesForce).toHaveLength(1);
     expect(seriesForce[0].count).toBe(nameCount);
 
-    const recordsForce = computeRecords(cards, [], [], MASTERY_REPETITIONS, true);
+    const recordsForce = computeRecords(cards, [], [], true);
     expect(recordsForce.mostMasteredIn7d).toBe(nameCount);
 
-    const projForce = computeCompletionProjection(cards, TODAY, MASTERY_REPETITIONS, true);
+    const projForce = computeCompletionProjection(cards, TODAY, true);
     expect(projForce.kind).toBe("complete");
   });
 });

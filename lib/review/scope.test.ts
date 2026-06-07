@@ -280,6 +280,42 @@ describe("cardMatchesScope - incomplete-chains preset (#995)", () => {
   });
 });
 
+// ─── mastery-blockers preset (#1767 data layer) ───────────────────────────────
+//
+// The preset surfaces species where exactly one leg is mastered and the other
+// is not. Like incomplete-chains, it is progress-dependent: the caller
+// supplies a pre-computed `masteryBlockingSpeciesIds` set via `ScopeMatchContext`.
+// With no context (or an empty set) the preset matches nothing.
+
+describe("cardMatchesScope - mastery-blockers preset (#1767)", () => {
+  const scope = { gens: [], types: [], presets: ["mastery-blockers" as const] };
+
+  it("matches a name card whose species is in the mastery-blocking set", () => {
+    const ctx = { masteryBlockingSpeciesIds: new Set([1, 2, 3]) };
+    expect(cardMatchesScope(nameCard(1), scope, ctx)).toBe(true);
+  });
+
+  it("excludes a name card whose species is not in the mastery-blocking set", () => {
+    const ctx = { masteryBlockingSpeciesIds: new Set([1, 2, 3]) };
+    expect(cardMatchesScope(nameCard(50), scope, ctx)).toBe(false);
+  });
+
+  it("matches nothing when no context is supplied", () => {
+    expect(cardMatchesScope(nameCard(1), scope)).toBe(false);
+  });
+
+  it("matches nothing when the mastery-blocking set is empty", () => {
+    const ctx = { masteryBlockingSpeciesIds: new Set<number>() };
+    expect(cardMatchesScope(nameCard(1), scope, ctx)).toBe(false);
+  });
+
+  it("OR's with other axes: a Gen-I card passes gens:[1] even if not in the blocking set", () => {
+    const ctx = { masteryBlockingSpeciesIds: new Set<number>() };
+    const orScope = { gens: [1], types: [], presets: ["mastery-blockers" as const] };
+    expect(cardMatchesScope(nameCard(1), orScope, ctx)).toBe(true);
+  });
+});
+
 describe("isScopeEmpty", () => {
   it("returns true for the canonical empty scope", () => {
     expect(isScopeEmpty(EMPTY_SCOPE)).toBe(true);

@@ -87,9 +87,7 @@ export function biomeStats(
   // and regional variants would inflate masteredCount above totalCount.
   //
   // No isMastered() re-check here: callers pre-filter via filterMastered() with
-  // the user's configured masteryRepetitions before passing allMasteredCards in.
-  // Re-applying the default threshold (3) would silently undercount for users
-  // who set masteryRepetitions below 3 (e.g. 1 or 2). Trust the caller contract.
+  // the stability gate before passing allMasteredCards in. Trust the caller contract.
   const biomeCards = allMasteredCards.filter(
     (c) => (c.habitat ?? "unknown") === habitatKey && c.isDefaultForm,
   );

@@ -55,6 +55,8 @@ function masteredState(lastReview = TODAY): Partial<ReviewState> {
   return {
     reps: MASTERY_REPETITIONS,
     scheduledDays: MASTERY_INTERVAL_DAYS,
+    // stability >= 21 is the mastery gate since #1765.
+    stability: 21,
     lastReview,
     fsrsState: "review",
   };
@@ -121,12 +123,12 @@ function makeReverseCard(
 
 describe("masteredSpeciesEvents - empty input", () => {
   it("returns an empty array for an empty card list, no crash", () => {
-    const result = masteredSpeciesEvents([], MASTERY_REPETITIONS, false);
+    const result = masteredSpeciesEvents([], false);
     expect(result).toEqual([]);
   });
 
   it("returns an empty array for an empty card list with forceAllMastered=true", () => {
-    const result = masteredSpeciesEvents([], MASTERY_REPETITIONS, true);
+    const result = masteredSpeciesEvents([], true);
     expect(result).toEqual([]);
   });
 });
@@ -140,7 +142,7 @@ describe("masteredSpeciesEvents - null lastReview", () => {
     // Name card has lastReview=null (never reviewed) → isMastered returns false.
     const nameCard = makeNameCard(1);
     const reverseCard = makeReverseCard(1, masteredState());
-    const result = masteredSpeciesEvents([nameCard, reverseCard], MASTERY_REPETITIONS, false);
+    const result = masteredSpeciesEvents([nameCard, reverseCard], false);
     expect(result).toHaveLength(0);
   });
 
@@ -148,21 +150,21 @@ describe("masteredSpeciesEvents - null lastReview", () => {
     // Name card is mastered, but reverse has never been reviewed.
     const nameCard = makeNameCard(1, masteredState("2026-04-01"));
     const reverseCard = makeReverseCard(1); // lastReview = null (default)
-    const result = masteredSpeciesEvents([nameCard, reverseCard], MASTERY_REPETITIONS, false);
+    const result = masteredSpeciesEvents([nameCard, reverseCard], false);
     expect(result).toHaveLength(0);
   });
 
   it("excludes a species when both legs have null lastReview", () => {
     const nameCard = makeNameCard(1);
     const reverseCard = makeReverseCard(1);
-    const result = masteredSpeciesEvents([nameCard, reverseCard], MASTERY_REPETITIONS, false);
+    const result = masteredSpeciesEvents([nameCard, reverseCard], false);
     expect(result).toHaveLength(0);
   });
 
   it("includes the species when both lastReview dates are present and both legs are mastered", () => {
     const nameCard = makeNameCard(1, masteredState("2026-04-01"));
     const reverseCard = makeReverseCard(1, masteredState("2026-04-05"));
-    const result = masteredSpeciesEvents([nameCard, reverseCard], MASTERY_REPETITIONS, false);
+    const result = masteredSpeciesEvents([nameCard, reverseCard], false);
     expect(result).toHaveLength(1);
     expect(result[0].speciesId).toBe(1);
     // masteredDate is the LATER of the two dates.
@@ -173,13 +175,13 @@ describe("masteredSpeciesEvents - null lastReview", () => {
     // Reverse crossed the gate later than the name card.
     const nameCard = makeNameCard(7, masteredState("2026-03-01"));
     const reverseCard = makeReverseCard(7, masteredState("2026-05-01"));
-    const result = masteredSpeciesEvents([nameCard, reverseCard], MASTERY_REPETITIONS, false);
+    const result = masteredSpeciesEvents([nameCard, reverseCard], false);
     expect(result[0].masteredDate).toBe("2026-05-01");
 
     // Name card crossed the gate later.
     const nameFirst = makeNameCard(8, masteredState("2026-05-10"));
     const revFirst = makeReverseCard(8, masteredState("2026-04-01"));
-    const result2 = masteredSpeciesEvents([nameFirst, revFirst], MASTERY_REPETITIONS, false);
+    const result2 = masteredSpeciesEvents([nameFirst, revFirst], false);
     expect(result2[0].masteredDate).toBe("2026-05-10");
   });
 });
@@ -196,7 +198,7 @@ describe("masteredSpeciesEvents - forceAllMastered flag", () => {
       makeNameCard(2, masteredState("2026-04-02")),
       makeNameCard(3, { lastReview: "2026-04-03", reps: 1 }), // not naturally mastered
     ];
-    const result = masteredSpeciesEvents(cards, MASTERY_REPETITIONS, true);
+    const result = masteredSpeciesEvents(cards, true);
     expect(result).toHaveLength(3);
     const ids = result.map((e) => e.speciesId).sort((a, b) => a - b);
     expect(ids).toEqual([1, 2, 3]);
@@ -204,7 +206,7 @@ describe("masteredSpeciesEvents - forceAllMastered flag", () => {
 
   it("uses the sentinel date '1970-01-01' when both lastReview values are null in forceAllMastered mode", () => {
     const nameCard = makeNameCard(1); // lastReview = null
-    const result = masteredSpeciesEvents([nameCard], MASTERY_REPETITIONS, true);
+    const result = masteredSpeciesEvents([nameCard], true);
     expect(result).toHaveLength(1);
     expect(result[0].masteredDate).toBe("1970-01-01");
   });
@@ -212,7 +214,7 @@ describe("masteredSpeciesEvents - forceAllMastered flag", () => {
   it("uses the available date when only the name lastReview is present in forceAllMastered mode", () => {
     const nameCard = makeNameCard(5, masteredState("2026-04-10"));
     // No reverse card - rev?.lastReview is null.
-    const result = masteredSpeciesEvents([nameCard], MASTERY_REPETITIONS, true);
+    const result = masteredSpeciesEvents([nameCard], true);
     expect(result).toHaveLength(1);
     expect(result[0].masteredDate).toBe("2026-04-10");
   });
@@ -220,7 +222,7 @@ describe("masteredSpeciesEvents - forceAllMastered flag", () => {
   it("forceAllMastered: masteredDate is the later of name and reverse lastReview", () => {
     const nameCard = makeNameCard(3, masteredState("2026-03-01"));
     const reverseCard = makeReverseCard(3, { lastReview: "2026-04-15" });
-    const result = masteredSpeciesEvents([nameCard, reverseCard], MASTERY_REPETITIONS, true);
+    const result = masteredSpeciesEvents([nameCard, reverseCard], true);
     expect(result).toHaveLength(1);
     expect(result[0].masteredDate).toBe("2026-04-15");
   });
@@ -229,8 +231,8 @@ describe("masteredSpeciesEvents - forceAllMastered flag", () => {
     // One species: name mastered, NO reverse leg → excluded in normal mode,
     // included in forceAllMastered mode.
     const cards: ReviewableCard[] = [makeNameCard(1, masteredState())];
-    const normalResult = masteredSpeciesEvents(cards, MASTERY_REPETITIONS, false);
-    const forcedResult = masteredSpeciesEvents(cards, MASTERY_REPETITIONS, true);
+    const normalResult = masteredSpeciesEvents(cards, false);
+    const forcedResult = masteredSpeciesEvents(cards, true);
     expect(normalResult).toHaveLength(0);
     expect(forcedResult).toHaveLength(1);
   });
@@ -252,7 +254,6 @@ describe("masteredSpeciesEvents - locale filtering", () => {
     // Asking for "en" locale: only the "en" pair counts.
     const enResult = masteredSpeciesEvents(
       [enName, enReverse, jaName, jaReverse],
-      MASTERY_REPETITIONS,
       false,
       "en",
     );
@@ -261,7 +262,6 @@ describe("masteredSpeciesEvents - locale filtering", () => {
     // Asking for "ja" locale: only the "ja" pair counts.
     const jaResult = masteredSpeciesEvents(
       [enName, enReverse, jaName, jaReverse],
-      MASTERY_REPETITIONS,
       false,
       "ja",
     );
@@ -274,7 +274,6 @@ describe("masteredSpeciesEvents - locale filtering", () => {
     // Requesting zh-Hans but only "en" cards exist.
     const result = masteredSpeciesEvents(
       [enName, enReverse],
-      MASTERY_REPETITIONS,
       false,
       "zh-Hans",
     );
@@ -287,7 +286,6 @@ describe("masteredSpeciesEvents - locale filtering", () => {
     const enName = makeNameCard(3, { lastReview: null }, "en"); // en row not mastered
     const result = masteredSpeciesEvents(
       [zhHansName, zhHansReverse, enName],
-      MASTERY_REPETITIONS,
       false,
       "zh-Hans",
     );
@@ -302,7 +300,6 @@ describe("masteredSpeciesEvents - locale filtering", () => {
     const enName = makeNameCard(2, { lastReview: null }, "en"); // en row not mastered
     const result = masteredSpeciesEvents(
       [zhHantName, zhHantReverse, enName],
-      MASTERY_REPETITIONS,
       false,
       "zh-Hant",
     );
@@ -323,7 +320,6 @@ describe("masteredSpeciesEvents - locale filtering", () => {
     };
     const result = masteredSpeciesEvents(
       [nameNoLocale, reverseNoLocale],
-      MASTERY_REPETITIONS,
       false,
       "en",
     );
