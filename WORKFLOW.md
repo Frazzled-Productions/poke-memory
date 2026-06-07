@@ -307,10 +307,10 @@ in-memory fixture.
 
 | | |
 |---|---|
-| **Trigger** | `pull_request` path-filtered to `components/**`, `app/**/*.tsx`, `messages/**`; `workflow_dispatch` |
+| **Trigger** | `pull_request` (all PRs, no workflow-level path filter) + `workflow_dispatch`. An internal `dorny/paths-filter` decides whether to run the gate (`components/**`, `app/**/*.tsx`, `messages/**`) or pass as a no-op, so the `i18n-leak` check ALWAYS reports and is safe as a required check (#1785). |
 | **Job** | `i18n-leak` |
-| **What it does** | Runs `npm run test:i18n-leak` - the English-leak / pseudo-locale render gate. Components under test render via `renderPseudo()` (the sentinel-bracketed `xx-pseudo` catalogue); any user-facing string not in the catalogue and not on the allowlist is an untranslated English leak and fails the job. Promotes the strongest locale-correctness guardrail from prose-only enforcement (#1737). Path-gated so docs-only PRs don't run it. No build needed. |
-| **Required check** | No - deferred owner action to add `i18n-leak` to the `qa-staging` ruleset once stable. |
+| **What it does** | Runs `npm run test:i18n-leak` - the English-leak / pseudo-locale render gate. Components under test render via `renderPseudo()` (the sentinel-bracketed `xx-pseudo` catalogue); any user-facing string not in the catalogue and not on the allowlist is an untranslated English leak and fails the job. Promotes the strongest locale-correctness guardrail from prose-only enforcement (#1737). On a PR touching none of the i18n paths the job is a no-op pass (it still reports). No build needed. |
+| **Required check** | Yes - required on the `qa-staging` ruleset. Because the job always reports (no-op pass on non-i18n PRs), a non-matching PR resolves to pass rather than being blocked by a never-reported required check (#1785). |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
 
 ---

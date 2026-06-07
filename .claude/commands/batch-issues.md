@@ -233,11 +233,7 @@ Once a batch's PRs are all open and reviewed in-session, merge them into `qa`:
 
 After every batch is merged into `qa` and the queue is drained:
 
-1. **Re-enable Auto Review** (disabled in Pre-flight):
-
-   ```bash
-   gh workflow enable "Auto Review"
-   ```
+1. **Keep Auto Review OFF - do NOT re-enable it here (2026-06-07 directive).** It was disabled in Pre-flight and must stay disabled through ALL of wrap-up: the preview deploy, the mini-batch follow-up loop (step 3), AND any retro / improvement PRs into `qa`. Every one of those opens more PRs into `qa`, and a re-enabled Auto Review re-runs the redundant review on each - the exact token-waste-and-reconcile churn the disable exists to prevent. (Re-enabling at this step while improvement PRs were still landing was the mistake the maintainer caught on 2026-06-07.) Auto Review is re-enabled ONLY as the final action of the session (the last wrap-up step below), once no further PRs will be opened into `qa` and the maintainer is about to promote `qa -> main`. The graceful-exit guardrail still re-enables on any halt.
 
 2. **Fire the `qa` preview deploy:**
 
@@ -313,6 +309,14 @@ After every batch is merged into `qa` and the queue is drained:
    - **Blocked** issues skipped, with the reason.
 
    `/batch-issues` does **not** trigger `Auto Release` itself - merging the `qa -> main` PR does.
+
+8. **Re-enable Auto Review (the FINAL action of the session).** Only after the handoff is delivered, the draft `qa -> main` PR is open, and you are confident NO further PRs will be opened into `qa` this session (mini-batch and retro/improvement rounds all done):
+
+   ```bash
+   gh workflow enable "Auto Review"
+   ```
+
+   This is deliberately the last thing the session does, so Auto Review is off for every in-session PR into `qa` and on again only for the maintainer's eventual `qa -> main` promotion review. If a follow-up round reopens (more PRs into `qa`), disable it again (`gh workflow disable "Auto Review"`) and re-enable only when truly finished.
 
 ## Batch-drain lessons (2026-06-02)
 
