@@ -130,7 +130,7 @@
       },
       "masteryThreshold": {
         "label": "Mastery threshold (deprecated)",
-        "description": "This setting no longer affects mastery. Since version 0.10.22 mastery is determined by FSRS stability, not review count. This control will be removed in a future update."
+        "description": "This setting no longer affects mastery. Mastery is now determined by FSRS stability, not review count. This control will be removed in a future update."
       },
       "recallTarget": {
         "label": "Recall target ({percent}%)",

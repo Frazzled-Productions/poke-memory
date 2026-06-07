@@ -537,7 +537,7 @@ export default function JourneyPage() {
       const ctm = deriveCloseToMastery(
         finalCards as readonly ReviewableCard[],
         flags.pretendAllMastered,
-        pokemonNameLocale,
+        settings.pokemonNameLocale,
       );
       setCloseToMasteryEntries(ctm);
     }

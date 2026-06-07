@@ -130,7 +130,7 @@
       },
       "masteryThreshold": {
         "label": "掌握標準（已廢棄）",
-        "description": "此設定不再影響掌握判定。自0.10.22版本起，掌握由FSRS穩定性決定。此控件將在未來版本中移除。"
+        "description": "此設定不再影響掌握判定。掌握由FSRS穩定性決定。此控件將在未來版本中移除。"
       },
       "recallTarget": {
         "label": "記憶目標 ({percent}%)",
