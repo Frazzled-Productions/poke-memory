@@ -88,6 +88,7 @@ const VALID_SETTINGS: UserSettings = {
     higherOrLowerNudgeDismissed: false,
     guestSignUpNudgeDismissed: false,
     cardTypesDefaultOpenDismissed: false,
+    masteryBlockersNudgeDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

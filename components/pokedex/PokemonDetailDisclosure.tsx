@@ -23,9 +23,62 @@ import {
   POKEDEX_FORM_SPRITE_SIZE,
   POKEDEX_NODE_SPRITE_SIZE,
 } from "@/lib/sprites/sizes";
+import { loadSession } from "@/lib/review/persistence";
+import { computeSpeciesLegStatuses } from "@/lib/stats/legStatus";
+import type { SpeciesLegStatus } from "@/lib/stats/legStatus";
+import { LegStatusText } from "@/components/ui/LegStatusText";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 
 function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
+}
+
+// ---------------------------------------------------------------------------
+// Per-leg status hook + sub-component (#1766)
+// ---------------------------------------------------------------------------
+
+/**
+ * Loads the session and derives per-leg status for one species.
+ * Returns null while loading or when the species has no cards.
+ * Suppressed when pretendAllMastered is on (caller must check).
+ */
+function useSpeciesLegStatus(speciesId: number, locale: string): SpeciesLegStatus | null {
+  const [status, setStatus] = useState<SpeciesLegStatus | null>(null);
+
+  useEffect(() => {
+    void loadSession().then((session) => {
+      if (session === null) return;
+      // Cast locale: the helper accepts AppLocale; if an unsupported string
+      // is passed it degrades gracefully (no matching cards, null return).
+      const map = computeSpeciesLegStatuses(
+        session.cards,
+        locale as Parameters<typeof computeSpeciesLegStatuses>[1],
+        false,
+      );
+      setStatus(map.get(speciesId) ?? null);
+    });
+  }, [speciesId, locale]);
+
+  return status;
+}
+
+/**
+ * A single direction row in the per-leg status section.
+ * WCAG 1.4.1: colour paired with a text token, not colour-only.
+ */
+function LegStatusRow({
+  label,
+  legStatus,
+}: {
+  label: string;
+  legStatus: import("@/lib/stats/legStatus").LegStatus;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 py-0.5">
+      <span className="text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
+      <LegStatusText status={legStatus} className="text-xs font-medium" />
+    </div>
+  );
 }
 
 const STAT_ORDER = ["hp", "attack", "defense", "specialAttack", "specialDefense", "speed"] as const;
@@ -218,7 +271,9 @@ export function PokemonDetailDisclosure({
 }) {
   const t = useTranslations("pokedex");
   const tTypes = useTranslations("types");
+  const tLeg = useTranslations("stats.legStatus");
   const { flags } = useSuperuser();
+  const { locale: pokemonLocale } = usePokemonLocaleContext();
   const { id, name, spriteUrl, types, stats, flavorText, evolutionChain } = pokemon;
   const rawCardClass = useCardClass(id);
   const cardClass =
@@ -232,6 +287,10 @@ export function PokemonDetailDisclosure({
   // the SRS schedule, so showing schedule info alongside faked-mastery UI
   // would be misleading.
   const nextReview = useNextReviewDate(id);
+  // Per-leg status for the direction progress rows (#1766). Always called
+  // (hooks must not be conditional). Suppressed in render when pretendAllMastered
+  // is on or the species is locked/pending.
+  const legStatus = useSpeciesLegStatus(pokemon.speciesId, pokemonLocale);
   // Resolve locale-aware name for audio buttons on the main species heading.
   // Falls back to `name` synchronously until the locale sidecar loads (#1327).
   // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
@@ -379,6 +438,27 @@ export function PokemonDetailDisclosure({
               : t("nextReviewInDays", { count: nextReview.days })}
           </p>
         )}
+
+      {/* Per-direction leg status (#1766). Shown only when the species is
+          learning/mastered and pretendAllMastered is off - faked mastery
+          state would give a misleading picture. Suppressed while loading
+          (legStatus null) to avoid flicker. */}
+      {!isLocked && !isPending && !flags.pretendAllMastered && legStatus !== null && (
+        <div
+          className="mt-3 flex flex-col gap-0.5 rounded-lg border border-zinc-100 px-3 py-2 dark:border-zinc-800"
+          aria-label={tLeg("nameDirection") + " / " + tLeg("reverseDirection")}
+        >
+          <LegStatusRow label={tLeg("nameDirection")} legStatus={legStatus.name} />
+          <LegStatusRow label={tLeg("reverseDirection")} legStatus={legStatus.reverse} />
+          {legStatus.isBlocked && (
+            <p className={`mt-1 text-xs ${mutedTextXs}`}>
+              {legStatus.blockingLeg === "name"
+                ? tLeg("blockedOnName")
+                : tLeg("blockedOnReverse")}
+            </p>
+          )}
+        </div>
+      )}
 
       {isLocked ? (
         <p className="mt-8 text-sm text-zinc-400 dark:text-zinc-500 text-center">

@@ -77,6 +77,7 @@ const SAMPLE: UserSettings = {
     higherOrLowerNudgeDismissed: false,
     guestSignUpNudgeDismissed: false,
     cardTypesDefaultOpenDismissed: false,
+    masteryBlockersNudgeDismissed: false,
   },
   appVisitCount: 0,
   ttsVoice: null,

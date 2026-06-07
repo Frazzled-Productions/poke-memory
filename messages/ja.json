@@ -519,6 +519,8 @@
       "presetStarters": "御三家",
       "presetLegendaries": "伝説",
       "presetIncompleteChains": "未完成の進化チェーン",
+      "presetMasteryBlockers": "習得間近",
+      "presetMasteryBlockersDescription": "片方向が習得済みで、もう一方がまだのポケモン。差を縮めるにはここに集中しましょう。",
       "formIncludeAll": "すべて含む",
       "formDefaultOnly": "デフォルトフォルムのみ",
       "formChooseCategories": "カテゴリを選択…",
@@ -566,6 +568,10 @@
     "higherOrLowerNudge": {
       "title": "セッションを完了してボーナスミニゲームをゲット",
       "body": "今日のカードをすべて終えると、2体以上のポケモンを確認した場合、セッション結果の下に「大きい・小さい」ステータスチャレンジが表示されます。自己記録を更新できるかな？"
+    },
+    "masteryBlockersNudge": {
+      "title": "ヒント：習得のギャップを素早く縮める",
+      "body": "「習得間近」スコープフィルターを使って、片方向が完了済みの種類の遅れている方向だけを練習しましょう。"
     }
   },
   "review": {
@@ -899,7 +905,14 @@
       "listAriaLabel": "言語別の習得状況"
     },
     "restoreFromCloud": "クラウドから復元",
-    "restoreFromCloudDescription": "復元オプションは設定にあります。"
+    "restoreFromCloudDescription": "復元オプションは設定にあります。",
+    "legStatus": {
+      "nameDirection": "名前カード",
+      "reverseDirection": "逆引きカード",
+      "blockedOnName": "名前カードが未習得",
+      "blockedOnReverse": "逆引きカードが未習得",
+      "blockedHint": "<direction>{dirName}</direction> を習得して完全習得を解放しましょう。"
+    }
   },
   "journey": {
     "title": "旅",

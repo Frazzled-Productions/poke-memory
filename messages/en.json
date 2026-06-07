@@ -519,6 +519,8 @@
       "presetStarters": "Starters",
       "presetLegendaries": "Legendaries",
       "presetIncompleteChains": "Incomplete evolution chains",
+      "presetMasteryBlockers": "Almost mastered",
+      "presetMasteryBlockersDescription": "Pokémon where one direction is mastered but the other is not yet. Focus here to close the gap.",
       "formIncludeAll": "Include all",
       "formDefaultOnly": "Default form only",
       "formChooseCategories": "Choose categories…",
@@ -566,6 +568,10 @@
     "higherOrLowerNudge": {
       "title": "Finish your session for a bonus mini-game",
       "body": "When you finish today's cards, a Higher or Lower stat challenge appears below your session summary, as long as you have reviewed at least two Pokémon. Can you beat your best streak?"
+    },
+    "masteryBlockersNudge": {
+      "title": "Tip: close the mastery gap faster",
+      "body": "Use the \"Almost mastered\" scope filter to drill only the lagging direction of species where one side is already done."
     }
   },
   "review": {
@@ -899,7 +905,14 @@
       "listAriaLabel": "Mastery by language"
     },
     "restoreFromCloud": "Restore from cloud",
-    "restoreFromCloudDescription": "Recovery options are in Settings."
+    "restoreFromCloudDescription": "Recovery options are in Settings.",
+    "legStatus": {
+      "nameDirection": "Name card",
+      "reverseDirection": "Reverse card",
+      "blockedOnName": "Blocked on name card",
+      "blockedOnReverse": "Blocked on reverse card",
+      "blockedHint": "Master the <direction>{dirName}</direction> to unlock full mastery."
+    }
   },
   "journey": {
     "title": "Journey",

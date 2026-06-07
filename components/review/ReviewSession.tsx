@@ -104,6 +104,7 @@ import { ScopeControl } from "@/components/review/ScopeControl";
 import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
+import { computeSpeciesLegStatuses } from "@/lib/stats/legStatus";
 import { mutedText, mutedTextXs, sectionLabel, colStack } from "@/lib/utils/class-names";
 import { getOrCreateClientSalt } from "@/lib/identity/clientSalt";
 import { addDaysToIsoDate } from "@/lib/utils/dates";
@@ -878,6 +879,11 @@ export function ReviewSession() {
     </div>
   );
 
+  // "Almost mastered" preset discovery nudge (#1767): one-shot hint pointing
+  // users with blocked species to the mastery-blockers scope preset.
+  // The "Almost mastered" preset nudge (masteryBlockersNudge) is defined below,
+  // after the masteryBlockingSpeciesIds useMemo it depends on.
+
   function handleScopeChange(next: PracticeScope) {
     setScope(next);
     // Persist scope through user settings so it syncs cross-device (#333).
@@ -906,13 +912,13 @@ export function ReviewSession() {
       // of whether reconcile modified any card state. Pass the current
       // incompleteChains context so the "Incomplete evolution chains" scope
       // correctly identifies in-scope species during snooze reconciliation.
-      reconcileHiddenState(cards, next, today, { incompleteChainSpeciesIds: incompleteChains });
+      reconcileHiddenState(cards, next, today, { incompleteChainSpeciesIds: incompleteChains, masteryBlockingSpeciesIds });
       // `alternateFormsEnabled` and the card-type flags are captured from
       // component state set at mount. The Settings page triggers a full page
       // reload when toggling card-type gates, so the state is always current.
-      // Context for the "Incomplete evolution chains" preset (#995): the
-      // incomplete-chain set is derived from the current card set, which has
-      // not changed here (only the scope did), so `incompleteChains` is current.
+      // Context for progress-dependent presets (#995, #1767): both incomplete-chain
+      // and mastery-blocker sets are derived from the current card set, which has
+      // not changed here (only the scope did), so both are current.
       const eligibleIds = computeEligibleCardIds(
         cards,
         {
@@ -922,7 +928,7 @@ export function ReviewSession() {
           alternateFormsEnabled,
           practiceScope: next,
         },
-        { incompleteChainSpeciesIds: incompleteChains },
+        { incompleteChainSpeciesIds: incompleteChains, masteryBlockingSpeciesIds },
       );
       setEligibleCardIds(eligibleIds);
       // Clear the displayed-card render lock (#1088). The lock pins the
@@ -1065,6 +1071,36 @@ export function ReviewSession() {
     [cards, superuserFlags.pretendAllMastered],
   );
 
+  // Runtime context for the "Almost mastered" scope preset (#1767).
+  // A species is "mastery-blocking" when exactly one of its name/reverse legs
+  // has cleared the FSRS gate. Under pretendAllMastered every leg is treated as
+  // mastered, so nothing is blocked and the preset correctly matches nothing.
+  const masteryBlockingSpeciesIds = useMemo((): ReadonlySet<number> => {
+    if (cards === null || superuserFlags.pretendAllMastered) return new Set<number>();
+    const legStatuses = computeSpeciesLegStatuses(cards, activeLocale, false);
+    return new Set(
+      [...legStatuses.values()].filter((s) => s.isBlocked).map((s) => s.speciesId),
+    );
+  }, [cards, activeLocale, superuserFlags.pretendAllMastered]);
+
+  // "Almost mastered" preset nudge (#1767). Gate (in priority order):
+  //   1. firstVisitDone false             -> suppress (onboarding still showing).
+  //   2. masteryBlockingSpeciesIds empty  -> suppress (nothing is blocked; nudge would be misleading).
+  //   3. preset already active            -> suppress (user already knows about it).
+  //   4. Otherwise: show.
+  // OnboardingHint handles the masteryBlockersNudgeDismissed flag.
+  const masteryBlockersNudge = (
+    !firstVisitDone ||
+    masteryBlockingSpeciesIds.size === 0 ||
+    scope.presets.includes("mastery-blockers")
+  ) ? null : (
+    <div className="mb-3">
+      <OnboardingHint id="masteryBlockersNudgeDismissed" title={t("masteryBlockersNudge.title")}>
+        <p>{t("masteryBlockersNudge.body")}</p>
+      </OnboardingHint>
+    </div>
+  );
+
   // Derive seen Pokémon for the Higher-or-Lower mini-game. Rendered on every
   // end-of-session variant (not just SESSION_COMPLETE) alongside the unified
   // EndOfSessionScreen. Apply the same two-tier gate as the practice session:
@@ -1075,9 +1111,10 @@ export function ReviewSession() {
       cards !== null
         ? getSeenPokemon(cards, seedPokemon, alternateFormsEnabled, scope, {
             incompleteChainSpeciesIds: incompleteChains,
+            masteryBlockingSpeciesIds,
           })
         : [],
-    [cards, alternateFormsEnabled, scope, incompleteChains],
+    [cards, alternateFormsEnabled, scope, incompleteChains, masteryBlockingSpeciesIds],
   );
 
   // Higher-or-Lower signpost nudge (#1573): one-shot hint teasing the
@@ -1214,11 +1251,22 @@ export function ReviewSession() {
       // Computed before reconcileHiddenState so the same context is passed to
       // both - avoids a second pass over all cards and ensures reconciliation
       // uses the correct in-progress set when the scope is "incomplete-chains".
+      // Derive mastery-blocking species at load time using the freshly-built
+      // card set (same pattern as incompleteChainSpeciesIds above). Under
+      // pretendAllMastered nothing is blocked so the set is empty.
+      const loadMasteryBlockingSpeciesIds = superuserFlags.pretendAllMastered
+        ? new Set<number>()
+        : new Set(
+            [...computeSpeciesLegStatuses(sessionCards, settings.pokemonNameLocale ?? "en", false).values()]
+              .filter((s) => s.isBlocked)
+              .map((s) => s.speciesId),
+          );
       const loadScopeContext: ScopeMatchContext = {
         incompleteChainSpeciesIds: incompleteChainSpeciesIds(
           sessionCards,
           superuserFlags.pretendAllMastered,
         ),
+        masteryBlockingSpeciesIds: loadMasteryBlockingSpeciesIds,
       };
       const { changed: reconcileChanged } = reconcileHiddenState(sessionCards, persistedScope, today, loadScopeContext);
       const eligibleIds = computeEligibleCardIds(
@@ -2767,12 +2815,14 @@ export function ReviewSession() {
             <div className="flex w-full max-w-xl flex-col gap-2">
               {higherOrLowerNudge}
               {scopeNudge}
+              {masteryBlockersNudge}
               {offlineNudge}
               <ScopeControl
                 scope={scope}
                 onChange={handleScopeChange}
                 alternateFormsEnabled={alternateFormsEnabled}
                 incompleteChainSpeciesIds={incompleteChains}
+                masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
               />
             </div>
           </>
@@ -2894,12 +2944,14 @@ export function ReviewSession() {
             <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
             {higherOrLowerNudge}
             {scopeNudge}
+            {masteryBlockersNudge}
             {offlineNudge}
             <ScopeControl
               scope={scope}
               onChange={handleScopeChange}
               alternateFormsEnabled={alternateFormsEnabled}
               incompleteChainSpeciesIds={incompleteChains}
+              masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
             />
           </>
         }
@@ -3007,12 +3059,14 @@ export function ReviewSession() {
           <SpritePreloader urls={preloadSpriteUrls} sizedUrls={preloadPickerUrls} />
           {higherOrLowerNudge}
           {scopeNudge}
+          {masteryBlockersNudge}
           {offlineNudge}
           <ScopeControl
             scope={scope}
             onChange={handleScopeChange}
             alternateFormsEnabled={alternateFormsEnabled}
             incompleteChainSpeciesIds={incompleteChains}
+            masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
           />
         </>
       }
