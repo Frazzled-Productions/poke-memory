@@ -17,7 +17,7 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import type { CloseToMasteryEntry } from "@/lib/journey/closeToMastery";
-import { MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
+import { MASTERY_STABILITY_DAYS } from "@/lib/stats/derive";
 import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { cn } from "@/lib/utils/cn";
@@ -44,13 +44,14 @@ function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
   const tWidget = useTranslations("journey.closeToMasteryWidget");
   const { name } = useLocalePokemonName(entry.speciesId, entry.englishName);
 
+  const stabilityRounded = Math.round(entry.reverseStability);
   const daysRemaining = Math.max(
     0,
-    MASTERY_INTERVAL_DAYS - entry.reverseScheduledDays,
+    MASTERY_STABILITY_DAYS - stabilityRounded,
   );
 
   const progressLabel = entry.reverseIntroduced
-    ? tWidget("progressLabel", { current: entry.reverseScheduledDays, max: MASTERY_INTERVAL_DAYS })
+    ? tWidget("progressLabel", { current: stabilityRounded, max: MASTERY_STABILITY_DAYS })
     : tWidget("notStartedLabel");
 
   return (
@@ -72,8 +73,8 @@ function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
         <p className="truncate text-sm font-medium text-foreground">{name}</p>
         <div className="mt-1 flex items-center gap-2">
           <MeterBar
-            value={Math.min(MASTERY_INTERVAL_DAYS, Math.max(0, entry.reverseScheduledDays))}
-            max={MASTERY_INTERVAL_DAYS}
+            value={Math.min(MASTERY_STABILITY_DAYS, Math.max(0, stabilityRounded))}
+            max={MASTERY_STABILITY_DAYS}
             fillClass="bg-amber-400 dark:bg-amber-500"
             label={progressLabel}
             transitionClass="transition-[width]"
@@ -83,7 +84,7 @@ function CloseToMasteryRow({ entry }: { entry: CloseToMasteryEntry }) {
               semantic; hiding the visual "Xd" avoids double announcement. */}
           <span className={cn("text-xs tabular-nums", mutedText)} aria-hidden="true">
             {entry.reverseIntroduced
-              ? `${entry.reverseScheduledDays}d`
+              ? `${stabilityRounded}d`
               : tWidget("notStarted")}
           </span>
         </div>

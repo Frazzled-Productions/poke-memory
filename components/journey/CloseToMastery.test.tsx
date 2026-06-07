@@ -54,6 +54,7 @@ function makeEntry(
     speciesId,
     englishName: name,
     spriteUrl: `/sprites/pokemon/${speciesId}.png`,
+    reverseStability: overrides.reverseStability ?? 10,
     reverseScheduledDays: overrides.reverseScheduledDays ?? 10,
     reverseReps: overrides.reverseReps ?? 2,
     reverseIntroduced: overrides.reverseIntroduced ?? true,
@@ -95,8 +96,8 @@ describe("CloseToMastery - empty state", () => {
 
 describe("CloseToMastery - populated list", () => {
   const entries = [
-    makeEntry(1, "Bulbasaur", { reverseScheduledDays: 18, reverseReps: 5 }),
-    makeEntry(4, "Charmander", { reverseScheduledDays: 7, reverseReps: 2 }),
+    makeEntry(1, "Bulbasaur", { reverseStability: 18, reverseScheduledDays: 18, reverseReps: 5 }),
+    makeEntry(4, "Charmander", { reverseStability: 7, reverseScheduledDays: 7, reverseReps: 2 }),
   ];
 
   it("shows the section heading", () => {
@@ -171,6 +172,7 @@ describe("CloseToMastery - populated list", () => {
 
 describe("CloseToMastery - not-yet-started entry (reverseIntroduced = false)", () => {
   const entry = makeEntry(7, "Squirtle", {
+    reverseStability: 0,
     reverseScheduledDays: 0,
     reverseReps: 0,
     reverseIntroduced: false,
@@ -195,8 +197,9 @@ describe("CloseToMastery - not-yet-started entry (reverseIntroduced = false)", (
 });
 
 describe("CloseToMastery - ready-for-mastery entry (daysRemaining = 0)", () => {
-  // scheduledDays >= MASTERY_INTERVAL_DAYS (21) means daysRemaining = 0.
+  // reverseStability >= MASTERY_STABILITY_DAYS (21) means daysRemaining = 0.
   const entry = makeEntry(25, "Pikachu", {
+    reverseStability: 21,
     reverseScheduledDays: 21,
     reverseReps: 4,
     reverseIntroduced: true,
@@ -268,6 +271,7 @@ describe("CloseToMastery - locale coverage (i18n #1393)", () => {
     speciesId: 1,
     englishName: "Bulbasaur",
     spriteUrl: "/sprites/pokemon/1.png",
+    reverseStability: 10,
     reverseScheduledDays: 10,
     reverseReps: 2,
     reverseIntroduced: true,

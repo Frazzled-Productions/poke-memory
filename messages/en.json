@@ -129,8 +129,8 @@
         "hint": "The scheduler aims to show each card just before you'd forget it. A higher recall target means more reviews and stronger retention; a lower target means fewer reviews and a bit more forgetting. Most people leave this at 90%."
       },
       "masteryThreshold": {
-        "label": "Mastery threshold",
-        "description": "Cards with this many consecutive correct reviews count as mastered."
+        "label": "Mastery threshold (deprecated)",
+        "description": "This setting no longer affects mastery. Since version 0.10.22 mastery is determined by FSRS stability, not review count. This control will be removed in a future update."
       },
       "recallTarget": {
         "label": "Recall target ({percent}%)",

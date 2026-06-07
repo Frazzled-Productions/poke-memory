@@ -730,12 +730,12 @@ function buildPastureProgression(): SeedPayload {
  *
  * (a) "Next arrivals" strip on the Pasture (#1316): requires reviewed-but-unmastered
  *     name cards - i.e. name cards that have been seen at least once but have not
- *     yet reached reps >= 3 AND scheduledDays >= 21. The strip ranks them by
+ *     yet reached stability >= MASTERY_STABILITY_DAYS. The strip ranks them by
  *     closest to mastery so QA can confirm real species appear rather than the
  *     "all reviewed Pokémon already in your Pasture" empty state.
  *
  * (b) "Close to mastery" on Journey (#1312): requires species where the NAME card
- *     IS mastered (reps >= 3, scheduledDays >= 21) but the matched REVERSE card
+ *     IS mastered (stability >= MASTERY_STABILITY_DAYS) but the matched REVERSE card
  *     has NOT yet reached that bar. Without this shape the list is empty.
  *
  * Mix:

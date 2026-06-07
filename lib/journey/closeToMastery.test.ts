@@ -168,6 +168,7 @@ describe("deriveCloseToMastery - results present", () => {
     expect(entry!.speciesId).toBe(25);
     expect(entry!.englishName).toBe("Pokemon 25");
     expect(entry!.spriteUrl).toBe("/sprites/pokemon/25.png");
+    expect(entry!.reverseStability).toBe(0);
     expect(entry!.reverseScheduledDays).toBe(0);
     expect(entry!.reverseReps).toBe(0);
     expect(entry!.reverseIntroduced).toBe(false);
@@ -176,9 +177,10 @@ describe("deriveCloseToMastery - results present", () => {
   it("reflects the actual reverse card stats when the card exists but is not mastered", () => {
     const cards = [
       nameCard(7, masteredState()),
-      reverseCard(7, { reps: 2, scheduledDays: 15, lastReview: "2026-01-01" }),
+      reverseCard(7, { reps: 2, stability: 15, scheduledDays: 15, lastReview: "2026-01-01" }),
     ];
     const [entry] = deriveCloseToMastery(cards);
+    expect(entry!.reverseStability).toBe(15);
     expect(entry!.reverseScheduledDays).toBe(15);
     expect(entry!.reverseReps).toBe(2);
     expect(entry!.reverseIntroduced).toBe(true);
@@ -199,54 +201,53 @@ describe("deriveCloseToMastery - results present", () => {
 // ---------------------------------------------------------------------------
 
 describe("deriveCloseToMastery - sort order", () => {
-  it("sorts by reverseScheduledDays descending (closest to gate first)", () => {
+  it("sorts by reverseStability descending (closest to gate first)", () => {
     const cards = [
       nameCard(1, masteredState()),
       nameCard(2, masteredState()),
       nameCard(3, masteredState()),
-      reverseCard(1, { reps: 2, scheduledDays: 5, lastReview: "2026-01-01" }),
-      reverseCard(2, { reps: 2, scheduledDays: 18, lastReview: "2026-01-01" }),
-      reverseCard(3, { reps: 1, scheduledDays: 10, lastReview: "2026-01-01" }),
+      reverseCard(1, { reps: 2, stability: 5, scheduledDays: 5, lastReview: "2026-01-01" }),
+      reverseCard(2, { reps: 2, stability: 18, scheduledDays: 18, lastReview: "2026-01-01" }),
+      reverseCard(3, { reps: 1, stability: 10, scheduledDays: 10, lastReview: "2026-01-01" }),
     ];
     const result = deriveCloseToMastery(cards);
     expect(result.map((e) => e.speciesId)).toEqual([2, 3, 1]);
   });
 
   it("tie-breaks by reverseReps descending then speciesId ascending", () => {
-    // Species 5 and 6 both have scheduledDays 10; species 5 has more reps.
+    // Species 5 and 6 both have stability 10; species 5 has more reps.
     const cards = [
       nameCard(5, masteredState()),
       nameCard(6, masteredState()),
-      reverseCard(5, { reps: 3, scheduledDays: 10, lastReview: "2026-01-01" }),
-      reverseCard(6, { reps: 1, scheduledDays: 10, lastReview: "2026-01-01" }),
+      reverseCard(5, { reps: 3, stability: 10, scheduledDays: 10, lastReview: "2026-01-01" }),
+      reverseCard(6, { reps: 1, stability: 10, scheduledDays: 10, lastReview: "2026-01-01" }),
     ];
     const result = deriveCloseToMastery(cards);
-    // Species 5 wins the tie (more reps), but note: reps=3 with scheduledDays=10
-    // does not pass the mastery gate (scheduledDays must be >= 21), so both
-    // appear in the list. Species 5 comes first (higher reps).
+    // Species 5 wins the tie (more reps); stability=10 does not pass the mastery gate
+    // (stability must be >= MASTERY_STABILITY_DAYS=21), so both appear in the list.
     expect(result[0]!.speciesId).toBe(5);
     expect(result[1]!.speciesId).toBe(6);
   });
 
-  it("tie-breaks identical scheduledDays and reps by speciesId ascending", () => {
+  it("tie-breaks identical stability and reps by speciesId ascending", () => {
     const cards = [
       nameCard(10, masteredState()),
       nameCard(7, masteredState()),
-      reverseCard(10, { reps: 1, scheduledDays: 8, lastReview: "2026-01-01" }),
-      reverseCard(7, { reps: 1, scheduledDays: 8, lastReview: "2026-01-01" }),
+      reverseCard(10, { reps: 1, stability: 8, scheduledDays: 8, lastReview: "2026-01-01" }),
+      reverseCard(7, { reps: 1, stability: 8, scheduledDays: 8, lastReview: "2026-01-01" }),
     ];
     const result = deriveCloseToMastery(cards);
     expect(result[0]!.speciesId).toBe(7);
     expect(result[1]!.speciesId).toBe(10);
   });
 
-  it("species with no reverse card sorts after species with a high-scheduledDays reverse card", () => {
-    // Species 1: mastered name, reverse scheduledDays 18.
-    // Species 2: mastered name, no reverse card (scheduledDays 0).
+  it("species with no reverse card sorts after species with a high-stability reverse card", () => {
+    // Species 1: mastered name, reverse stability 18.
+    // Species 2: mastered name, no reverse card (stability 0).
     const cards = [
       nameCard(1, masteredState()),
       nameCard(2, masteredState()),
-      reverseCard(1, { reps: 2, scheduledDays: 18, lastReview: "2026-01-01" }),
+      reverseCard(1, { reps: 2, stability: 18, scheduledDays: 18, lastReview: "2026-01-01" }),
     ];
     const result = deriveCloseToMastery(cards);
     expect(result[0]!.speciesId).toBe(1);

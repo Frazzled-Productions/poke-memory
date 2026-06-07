@@ -26,6 +26,7 @@ import {
   type GenerationStats,
   type TypeStats,
   DUE_FORECAST_DAYS,
+  MASTERY_STABILITY_DAYS,
 } from "@/lib/stats/derive";
 import { addDaysToIsoDate } from "@/lib/utils/dates";
 import {
@@ -399,7 +400,7 @@ export function computeDashboardSnapshot(
       for (const card of nameCards) {
         if (card.state.lastReview !== null) {
           introduced++;
-          if (card.state.stability >= 21) {
+          if (card.state.stability >= MASTERY_STABILITY_DAYS) {
             mastered++;
           }
         }

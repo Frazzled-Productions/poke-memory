@@ -10,7 +10,7 @@ import {
   DEFAULT_LIMITS,
 } from "@/lib/review/session";
 import { SEED_POKEMON, SEED_EVOLUTION_CARDS, REVERSE_ID_OFFSET } from "@/lib/pokemon/seed";
-import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
+import { MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS, MASTERY_STABILITY_DAYS } from "@/lib/stats/derive";
 import { MAX_BALANCE, EARN_INTERVAL_DAYS } from "@/lib/streak/tokens";
 import { filterMastered } from "@/lib/pasture/arrivals";
 
@@ -258,9 +258,9 @@ describe("scenario payload builders", () => {
       // gate and dropped those two pairs from the list. A floor of >= 1 or even >= 5
       // would not have caught that regression (#1421 review).
       expect(closeToMastery.length).toBeGreaterThanOrEqual(10);
-      // Every entry should have a reverseScheduledDays < 21 (reverse is not yet mastered).
+      // Every entry should have a reverseStability < MASTERY_STABILITY_DAYS (reverse is not yet mastered).
       for (const entry of closeToMastery) {
-        expect(entry.reverseScheduledDays).toBeLessThan(MASTERY_INTERVAL_DAYS);
+        expect(entry.reverseStability).toBeLessThan(MASTERY_STABILITY_DAYS);
       }
     });
 

@@ -31,7 +31,7 @@ export type CardClass = "locked" | "learning" | "mastered";
 export const MASTERY_REPETITIONS = 3;
 /** A card is "mastered" once its FSRS stability reaches this many days (#1765). */
 export const MASTERY_STABILITY_DAYS = 21;
-/** A card is "mastered" once its projected review interval reaches this many days. */
+/** Progress-bar display bound for `scheduledDays`; the mastery gate is `MASTERY_STABILITY_DAYS`. */
 export const MASTERY_INTERVAL_DAYS = 21;
 
 // ---------------------------------------------------------------------------
