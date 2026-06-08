@@ -369,10 +369,13 @@ describe("PasturePokemon - popover locale names", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests - per-direction leg status in the popover (#1766)
+// Tests - Pasture popover content (#1786)
+// The Pasture only ever shows fully-mastered species, so per-direction leg
+// status rows were always redundant ("Mastered / Mastered"). They have been
+// removed from the Pasture popover (they remain on Pokédex detail + Journey).
 // ---------------------------------------------------------------------------
 
-describe("PasturePokemon - per-direction leg status (#1766)", () => {
+describe("PasturePokemon - popover content (#1786)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -387,122 +390,67 @@ describe("PasturePokemon - per-direction leg status (#1766)", () => {
     });
   }
 
-  it("shows name + reverse leg status and a blocked hint when one leg is blocked (en)", async () => {
-    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
-    render(
-      <PasturePokemon
-        card={card}
-        onMarkSeen={vi.fn()}
-        legStatus={{
-          speciesId: 1,
-          name: "mastered",
-          reverse: "learning",
-          isBlocked: true,
-          blockingLeg: "reverse",
-        }}
-      />,
-    );
+  it("popover shows firstSeen and interval rows (kept rows present)", async () => {
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true, scheduledDays: 21 }) });
+    render(<PasturePokemon card={card} onMarkSeen={vi.fn()} />);
     await openPopover(screen.getByRole("button", { name: "Bulbasaur" }));
     const dialog = screen.getByRole("dialog");
-    expect(dialog.textContent).toContain("Name card");
-    expect(dialog.textContent).toContain("Mastered");
-    expect(dialog.textContent).toContain("Reverse card");
-    expect(dialog.textContent).toContain("Learning");
-    // Blocked hint names the blocking (reverse) direction.
-    expect(dialog.textContent).toContain("Master the");
-    expect(dialog.textContent).toContain("to unlock full mastery");
+    // firstSeen row label
+    expect(dialog.textContent).toContain("First seen");
+    // interval row (scheduledDays)
+    expect(dialog.textContent).toContain("21d");
   });
 
-  it("shows locked status and no blocked hint when neither leg is mastered (en)", async () => {
-    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
-    render(
-      <PasturePokemon
-        card={card}
-        onMarkSeen={vi.fn()}
-        legStatus={{
-          speciesId: 1,
-          name: "locked",
-          reverse: "locked",
-          isBlocked: false,
-          blockingLeg: null,
-        }}
-      />,
-    );
-    await openPopover(screen.getByRole("button", { name: "Bulbasaur" }));
-    const dialog = screen.getByRole("dialog");
-    expect(dialog.textContent).toContain("Locked");
-    expect(dialog.textContent).not.toContain("to unlock full mastery");
-  });
-
-  it("renders leg-status labels in Japanese (ja)", async () => {
-    mockPokemonLocale = "ja";
-    mockUseLocalePokemonName.mockReturnValue({ name: LOCALE_NAMES["ja"], transliteration: null });
-    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
-    render(
-      <PasturePokemon
-        card={card}
-        onMarkSeen={vi.fn()}
-        legStatus={{
-          speciesId: 1,
-          name: "mastered",
-          reverse: "learning",
-          isBlocked: true,
-          blockingLeg: "reverse",
-        }}
-      />,
-      { locale: "ja" },
-    );
-    await openPopover(screen.getByRole("button", { name: LOCALE_NAMES["ja"] }));
-    const dialog = screen.getByRole("dialog");
-    expect(dialog.textContent).toContain("名前カード");
-    expect(dialog.textContent).toContain("逆引きカード");
-    expect(dialog.textContent).toContain("習得済み");
-  });
-
-  it("renders leg-status labels in Simplified Chinese (zh-Hans)", async () => {
-    mockPokemonLocale = "zh-Hans";
-    mockUseLocalePokemonName.mockReturnValue({ name: LOCALE_NAMES["zh-Hans"], transliteration: null });
-    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
-    render(
-      <PasturePokemon
-        card={card}
-        onMarkSeen={vi.fn()}
-        legStatus={{ speciesId: 1, name: "mastered", reverse: "learning", isBlocked: true, blockingLeg: "reverse" }}
-      />,
-      { locale: "zh-Hans" },
-    );
-    await openPopover(screen.getByRole("button", { name: LOCALE_NAMES["zh-Hans"] }));
-    const dialog = screen.getByRole("dialog");
-    expect(dialog.textContent).toContain("名称卡");
-    expect(dialog.textContent).toContain("反向卡");
-    expect(dialog.textContent).toContain("已掌握");
-  });
-
-  it("renders leg-status labels in Traditional Chinese (zh-Hant)", async () => {
-    mockPokemonLocale = "zh-Hant";
-    mockUseLocalePokemonName.mockReturnValue({ name: LOCALE_NAMES["zh-Hant"], transliteration: null });
-    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
-    render(
-      <PasturePokemon
-        card={card}
-        onMarkSeen={vi.fn()}
-        legStatus={{ speciesId: 1, name: "mastered", reverse: "learning", isBlocked: true, blockingLeg: "reverse" }}
-      />,
-      { locale: "zh-Hant" },
-    );
-    await openPopover(screen.getByRole("button", { name: LOCALE_NAMES["zh-Hant"] }));
-    const dialog = screen.getByRole("dialog");
-    expect(dialog.textContent).toContain("名稱卡");
-    expect(dialog.textContent).toContain("反向卡");
-    expect(dialog.textContent).toContain("已掌握");
-  });
-
-  it("suppresses leg-status rows when legStatus is absent", async () => {
+  it("popover does not show per-direction rows (Name card / Reverse card)", async () => {
     const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
     render(<PasturePokemon card={card} onMarkSeen={vi.fn()} />);
     await openPopover(screen.getByRole("button", { name: "Bulbasaur" }));
     const dialog = screen.getByRole("dialog");
     expect(dialog.textContent).not.toContain("Name card");
     expect(dialog.textContent).not.toContain("Reverse card");
+  });
+
+  it("popover does not show blocked hint", async () => {
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
+    render(<PasturePokemon card={card} onMarkSeen={vi.fn()} />);
+    await openPopover(screen.getByRole("button", { name: "Bulbasaur" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).not.toContain("to unlock full mastery");
+  });
+
+  it("popover shows firstSeen row in Japanese (ja) - locale coverage", async () => {
+    mockPokemonLocale = "ja";
+    mockUseLocalePokemonName.mockReturnValue({ name: LOCALE_NAMES["ja"], transliteration: null });
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
+    render(<PasturePokemon card={card} onMarkSeen={vi.fn()} />, { locale: "ja" });
+    await openPopover(screen.getByRole("button", { name: LOCALE_NAMES["ja"] }));
+    const dialog = screen.getByRole("dialog");
+    // firstSeen row label in Japanese
+    expect(dialog.textContent).toContain("初見");
+    // no per-direction rows
+    expect(dialog.textContent).not.toContain("名前カード");
+    expect(dialog.textContent).not.toContain("逆引きカード");
+  });
+
+  it("popover shows firstSeen row in Simplified Chinese (zh-Hans) - locale coverage", async () => {
+    mockPokemonLocale = "zh-Hans";
+    mockUseLocalePokemonName.mockReturnValue({ name: LOCALE_NAMES["zh-Hans"], transliteration: null });
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
+    render(<PasturePokemon card={card} onMarkSeen={vi.fn()} />, { locale: "zh-Hans" });
+    await openPopover(screen.getByRole("button", { name: LOCALE_NAMES["zh-Hans"] }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).not.toContain("名称卡");
+    expect(dialog.textContent).not.toContain("反向卡");
+  });
+
+  it("popover shows firstSeen row in Traditional Chinese (zh-Hant) - locale coverage", async () => {
+    mockPokemonLocale = "zh-Hant";
+    mockUseLocalePokemonName.mockReturnValue({ name: LOCALE_NAMES["zh-Hant"], transliteration: null });
+    const card = makeCard({ state: makeReviewState({ seenInPasture: true }) });
+    render(<PasturePokemon card={card} onMarkSeen={vi.fn()} />, { locale: "zh-Hant" });
+    await openPopover(screen.getByRole("button", { name: LOCALE_NAMES["zh-Hant"] }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).not.toContain("名稱卡");
+    expect(dialog.textContent).not.toContain("反向卡");
   });
 });

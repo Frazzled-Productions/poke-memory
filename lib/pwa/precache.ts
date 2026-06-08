@@ -6,8 +6,9 @@
  * without a network connection.
  *
  * Strategy:
- *  - Sprites are cached as pre-generated static WebP files at every render
- *    width used by the app. The browser fetches these directly from
+ *  - Sprites are cached as pre-generated static WebP files at a curated
+ *    subset of render widths - those actually used by offline-reachable
+ *    surfaces. The browser fetches these directly from
  *    `/sprites/pokemon/webp/<id>/<width>.webp` - the `/_next/image` endpoint
  *    is no longer used for sprites. Raw PNGs (`/sprites/pokemon/<id>.png`) are
  *    no longer precached: the Pokédex grid switched to the 64 px WebP variant
@@ -22,18 +23,58 @@
 
 import { CACHE_NAMES, versionedCacheName } from "./cacheStrategy";
 import { KEY_OFFLINE_DOWNLOADED_AT } from "@/lib/storage/keys";
-import { GENERATED_SPRITE_WIDTHS } from "@/lib/sprites/imageLoaderHelpers";
 import { spriteVariantUrl } from "@/lib/sprites/url";
 
 /** Bounded concurrency for parallel fetches. */
 const CONCURRENCY = 6;
 
 /**
- * All pre-generated WebP render widths. These match the folder names under
- * `public/sprites/pokemon/webp/<id>/`. Imported directly from the loader
- * helpers so the two stay in sync automatically.
+ * The subset of pre-generated WebP widths actually needed for offline use.
+ *
+ * All 10 widths are generated on disk by `npm run seed:sprites` (see
+ * `GENERATED_SPRITE_WIDTHS` in `lib/sprites/imageLoaderHelpers.ts`); this
+ * list is deliberately narrower - it contains only the widths whose
+ * offline-reachable surfaces would request them.
+ *
+ * Kept (9 widths - rationale per surface):
+ *   32  - `FAVOURITE_MASCOT_SPRITE_SIZE`: nav mascot badge, visible on every page.
+ *   40  - `POKEDEX_NODE_SPRITE_SIZE`: Pokédex detail evo-chain nodes; Journey EvolutionWall.
+ *   48  - `STATS_SPRITE_SIZE`: Stats "worst cards" list; Journey CloseToMastery.
+ *   56  - `PASTURE_SPRITE_SIZE`: Pasture tile sprites.
+ *   64  - `POKEDEX_GRID_SPRITE_SIZE`: Pokédex grid; Settings mascot; Onboarding quiz.
+ *  120  - `POKEDEX_FORM_SPRITE_SIZE`: Pokédex alt-form blocks; HigherOrLower minigame;
+ *          also the #1787 grid-retina srcset (1× 64 → 2× 120).
+ *  150  - `PICKER_SPRITE_SIZE`: SpritePicker four-tile grid in Practice.
+ *  192  - `POKEDEX_DETAIL_SPRITE_SIZE`: Pokédex detail main sprite;
+ *          also the #1787 grid-retina srcset (3× 64 → 3× 192).
+ *  320  - `PRACTICE_SPRITE_SIZE`: review flip cards (name, cry, evolution, reverse).
+ *
+ * Dropped (1 width):
+ *  180  - `THEME_WATERMARK_SPRITE_SIZE`: decorative background sprite only. The
+ *          watermark renders at low opacity as pure chrome; its absence offline
+ *          has zero impact on app functionality. Saves ~7.8 MB of precache.
+ *
+ * Size impact (#1789):
+ *   Pre-trim  (all 10 widths + cries): ~67.5 MB actual file bytes
+ *                                      (~96 MB by `du`, which counts 4 KB blocks).
+ *   Post-trim (these 9 widths + cries): ~59.7 MB actual file bytes.
+ *
+ * Do NOT change this list to add a new generated width without also auditing
+ * whether the new width's surface is offline-reachable. If it is reachable,
+ * add it here too; if not, leave it out. Changes here grow every user's
+ * offline download by ~1025 × (size per width).
  */
-const SPRITE_RENDER_WIDTHS: readonly number[] = GENERATED_SPRITE_WIDTHS;
+export const OFFLINE_PRECACHE_WIDTHS: readonly number[] = [
+  32,  // FAVOURITE_MASCOT_SPRITE_SIZE
+  40,  // POKEDEX_NODE_SPRITE_SIZE
+  48,  // STATS_SPRITE_SIZE
+  56,  // PASTURE_SPRITE_SIZE
+  64,  // POKEDEX_GRID_SPRITE_SIZE
+  120, // POKEDEX_FORM_SPRITE_SIZE (+ #1787 grid-retina 2×)
+  150, // PICKER_SPRITE_SIZE
+  192, // POKEDEX_DETAIL_SPRITE_SIZE (+ #1787 grid-retina 3×)
+  320, // PRACTICE_SPRITE_SIZE
+];
 
 /**
  * localStorage key that records the timestamp of the last completed download.
@@ -86,8 +127,10 @@ export function buildPrecacheUrls(ids: number[]): string[] {
   const urls: string[] = [];
 
   for (const id of ids) {
-    // Pre-generated WebP variants - one per render width.
-    for (const w of SPRITE_RENDER_WIDTHS) {
+    // Pre-generated WebP variants - one per offline-reachable render width.
+    // OFFLINE_PRECACHE_WIDTHS is a strict subset of GENERATED_SPRITE_WIDTHS;
+    // see its declaration for the rationale and size accounting.
+    for (const w of OFFLINE_PRECACHE_WIDTHS) {
       urls.push(spriteVariantUrl(id, w));
     }
 
@@ -111,13 +154,15 @@ export function buildPrecacheUrls(ids: number[]): string[] {
  * the exact bucket the SW reads from.
  *
  * Returns `'skipped'` when the entry already exists in the cache.
- * Returns `'failed'`  when the network request returns a non-ok response.
- * Returns `'downloaded'` when the entry was freshly fetched and stored.
+ * Returns `{ result: 'failed' }` when the network request returns a non-ok response.
+ * Returns `{ result: 'downloaded', bytes: number }` when the entry was freshly fetched
+ * and stored, with the real byte size from the Content-Length header (or the
+ * response body size as a fallback when the header is absent).
  */
 async function fetchAndCache(
   url: string,
   signal: AbortSignal,
-): Promise<"downloaded" | "skipped" | "failed"> {
+): Promise<"skipped" | "failed" | { result: "downloaded"; bytes: number }> {
   // Determine which cache bucket this URL belongs to and derive the versioned
   // name so the precache writes match the SW's CacheFirst reads exactly.
   const isCry = url.startsWith("/cries/");
@@ -152,13 +197,50 @@ async function fetchAndCache(
 
   if (!response.ok) return "failed";
 
-  try {
-    await cache.put(url, response);
-  } catch {
-    return "failed";
+  // Read the real byte size before consuming the body.
+  // Content-Length is present on same-origin static files (sprites, cries, seed JSON).
+  // If absent (e.g. chunked transfer or CORS response without the header), fall
+  // back to cloning the response and reading the blob size. The clone is consumed
+  // for the size check while the original goes into the cache.
+  const contentLength = response.headers.get("content-length");
+  let bytes: number;
+  if (contentLength !== null && contentLength !== "") {
+    bytes = parseInt(contentLength, 10);
+    if (!Number.isFinite(bytes) || bytes < 0) bytes = 0;
+    try {
+      await cache.put(url, response);
+    } catch {
+      return "failed";
+    }
+  } else {
+    // No Content-Length: clone, read blob for the size, cache the clone.
+    let cloned: Response;
+    try {
+      cloned = response.clone();
+    } catch {
+      // Clone failed (body already consumed) - skip size, just cache.
+      bytes = 0;
+      try {
+        await cache.put(url, response);
+      } catch {
+        return "failed";
+      }
+      return { result: "downloaded", bytes };
+    }
+    try {
+      const blob = await cloned.blob();
+      bytes = blob.size;
+    } catch {
+      bytes = 0;
+    }
+    try {
+      await cache.put(url, response);
+    } catch {
+      return "failed";
+    }
   }
 
-  return "downloaded";
+  return { result: "downloaded", bytes };
 }
 
 /**
@@ -190,7 +272,7 @@ export async function precacheAll(options: PrecacheOptions): Promise<PrecacheSum
       const url = urls[index++];
       if (url === undefined) return;
 
-      let result: "downloaded" | "skipped" | "failed";
+      let result: "skipped" | "failed" | { result: "downloaded"; bytes: number };
       try {
         result = await fetchAndCache(url, signal ?? new AbortController().signal);
       } catch (err) {
@@ -198,10 +280,10 @@ export async function precacheAll(options: PrecacheOptions): Promise<PrecacheSum
         result = "failed";
       }
 
-      if (result === "downloaded") {
+      if (typeof result === "object" && result.result === "downloaded") {
         downloaded++;
-        // Rough byte estimate: sprites ~25 KB, cries ~15 KB.
-        bytesSoFar += url.startsWith("/cries/") ? 15_000 : 25_000;
+        // Real bytes from Content-Length header (or blob fallback).
+        bytesSoFar += result.bytes;
       } else if (result === "skipped") {
         skipped++;
       } else {

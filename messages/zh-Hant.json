@@ -69,7 +69,8 @@
         "errorUsernameTaken": "該使用者名稱已被使用，請選擇其他名稱。",
         "errorInvalidCredentials": "使用者名稱或密碼不正確。",
         "errorSignupFailed": "註冊失敗，請重試。",
-        "errorSigninFailed": "登入失敗，請重試。"
+        "errorSigninFailed": "登入失敗，請重試。",
+        "errorRateLimited": "嘗試次數過多，請稍待幾分鐘後再試。"
       }
     }
   },
@@ -127,10 +128,6 @@
       "scheduler": {
         "heading": "排程器",
         "hint": "排程器會在您即將遺忘之前顯示每張卡片。記憶目標越高，複習次數越多，記憶越牢固；越低則複習次數越少，遺忘也會更多。大多數人保持預設的 90%。"
-      },
-      "masteryThreshold": {
-        "label": "掌握標準（已廢棄）",
-        "description": "此設定不再影響掌握判定。掌握由FSRS穩定性決定。此控件將在未來版本中移除。"
       },
       "recallTarget": {
         "label": "記憶目標 ({percent}%)",
@@ -249,7 +246,7 @@
       "downloadHeading": "下載",
       "downloadTitle": "下載離線內容",
       "downloadDescription": "預先擷取所有精靈圖和叫聲，以便在無網路時也能練習。建議在 Wi-Fi 下使用。約 166 MB。",
-      "storageUsage": "已使用 {usedMb}，共 {totalMb}。",
+      "storageUsage": "已使用 {usedGb}，共 {totalGb}。",
       "downloadedOn": "已於 {date} 下載。",
       "downloadButton": "下載",
       "updateButton": "更新",
@@ -476,6 +473,7 @@
     "noScopeMatch": "沒有符合您範圍的寶可夢",
     "noScopeMatchBody": "請調整上方的篩選條件，或清除後繼續練習。",
     "clearScope": "清除範圍",
+    "clearFilterToPractise": "清除篩選條件以繼續練習",
     "outOfScopeHint": "正在完成進行中的卡片",
     "gradeYourAnswer": "為您的回答評分",
     "showKeyboardShortcuts": "顯示鍵盤快速鍵",
@@ -712,7 +710,7 @@
       "upcomingAriaLabel": "即將加入牧場的寶可夢",
       "allCaughtUp": "所有已複習的寶可夢都已在您的牧場中。",
       "repsInfoAriaLabel": "「reps」是什麼意思？",
-      "repsInfoPanel": "Reps（複習次數）：您迄今為止複習該卡片的次數。數字越高，代表您越接近掌握。"
+      "repsInfoPanel": "Reps（複習次數）：您迄今為止複習該卡片的次數。Reps 數量本身不決定掌握，掌握由排程器對您的記憶置信度決定。"
     },
     "longPressHint": "長按任意寶可夢，查看其名稱、掌握日期和複習間隔。"
   },
@@ -763,7 +761,7 @@
       "trainerLabel": "訓練師",
       "trainerFallback": "訓練師",
       "levelLabel": "等級",
-      "levelDescription": "等級隨掌握的寶可夢名稱卡數量增長（至少3次正確且下次複習間隔不少於21天）。",
+      "levelDescription": "等級隨掌握的寶可夢名稱卡數量增長。當排程器確信您在三週或更長時間後仍能回憶起一張卡片時，該卡片即被視為已掌握。",
       "allMastered": "全部掌握",
       "masteryProgress": "{mastered} / {next} 已掌握 · 距 {levelNext} 級還差 {needed}",
       "formsMastered": "{mastered} / {total} 形態已掌握",

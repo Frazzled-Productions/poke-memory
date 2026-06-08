@@ -69,7 +69,8 @@
         "errorUsernameTaken": "该用户名已被使用，请选择其他用户名。",
         "errorInvalidCredentials": "用户名或密码不正确。",
         "errorSignupFailed": "注册失败，请重试。",
-        "errorSigninFailed": "登录失败，请重试。"
+        "errorSigninFailed": "登录失败，请重试。",
+        "errorRateLimited": "尝试次数过多，请稍等几分钟后再试。"
       }
     }
   },
@@ -127,10 +128,6 @@
       "scheduler": {
         "heading": "调度器",
         "hint": "调度器会在您即将忘记之前显示每张卡片。记忆目标越高，复习次数越多，记忆越牢固；越低则复习次数越少，遗忘也会更多。大多数人保持默认的90%。"
-      },
-      "masteryThreshold": {
-        "label": "掌握标准（已弃用）",
-        "description": "此设置不再影响掌握判定。掌握由FSRS稳定性决定。此控件将在未来版本中移除。"
       },
       "recallTarget": {
         "label": "记忆目标 ({percent}%)",
@@ -249,7 +246,7 @@
       "downloadHeading": "下载",
       "downloadTitle": "下载离线内容",
       "downloadDescription": "预先获取所有精灵图和叫声，以便在无网络时也能练习。建议在 Wi-Fi 下使用。约 166 MB。",
-      "storageUsage": "已使用 {usedMb}，共 {totalMb}。",
+      "storageUsage": "已使用 {usedGb}，共 {totalGb}。",
       "downloadedOn": "已于 {date} 下载。",
       "downloadButton": "下载",
       "updateButton": "更新",
@@ -476,6 +473,7 @@
     "noScopeMatch": "没有符合您范围的宝可梦",
     "noScopeMatchBody": "请调整上方的筛选条件，或清除后继续练习。",
     "clearScope": "清除范围",
+    "clearFilterToPractise": "清除筛选条件以继续练习",
     "outOfScopeHint": "正在完成进行中的卡片",
     "gradeYourAnswer": "为您的回答评分",
     "showKeyboardShortcuts": "显示键盘快捷键",
@@ -712,7 +710,7 @@
       "upcomingAriaLabel": "即将加入牧场的宝可梦",
       "allCaughtUp": "所有已复习的宝可梦都已在您的牧场中。",
       "repsInfoAriaLabel": "「reps」是什么意思？",
-      "repsInfoPanel": "Reps（复习次数）：您迄今为止复习该卡片的次数。数字越高，代表您越接近掌握。"
+      "repsInfoPanel": "Reps（复习次数）：您迄今为止复习该卡片的次数。Reps 数量本身不决定掌握，掌握由调度器对您的记忆置信度决定。"
     },
     "longPressHint": "长按任意宝可梦，查看其名称、掌握日期和复习间隔。"
   },
@@ -763,7 +761,7 @@
       "trainerLabel": "训练家",
       "trainerFallback": "训练家",
       "levelLabel": "等级",
-      "levelDescription": "等级随掌握的宝可梦名称卡数量增长（至少3次正确且下次复习间隔不少于21天）。",
+      "levelDescription": "等级随掌握的宝可梦名称卡数量增长。当调度器确信您在三周或更长时间后仍能回忆起一张卡片时，该卡片即被视为已掌握。",
       "allMastered": "全部掌握",
       "masteryProgress": "{mastered} / {next} 已掌握 · 距 {levelNext} 级还差 {needed}",
       "formsMastered": "{mastered} / {total} 形态已掌握",

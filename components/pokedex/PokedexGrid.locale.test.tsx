@@ -192,53 +192,66 @@ describe("PokedexGrid - locale name rendering", () => {
 });
 
 // ---------------------------------------------------------------------------
-// WebP src assertion - locale matrix (#1740)
-// The grid now renders the 64 px WebP variant for every tile regardless of
-// locale. Verified here for all four supported locales to confirm the
-// spriteVariantUrl(id, POKEDEX_GRID_SPRITE_SIZE) path is emitted correctly
-// and does not accidentally regress to the raw PNG path.
+// WebP src + srcSet assertion - locale matrix (#1740, #1787)
+// The grid renders the 64 px WebP src for every tile, plus a DPR-aware
+// srcSet with 2x (120 px) and 3x (192 px) variants so retina screens receive
+// a sharp source (#1787). Verified for all four supported locales.
 // ---------------------------------------------------------------------------
 
-describe("PokedexGrid - WebP sprite src across all locales (#1740)", () => {
+describe("PokedexGrid - WebP sprite src+srcSet across all locales (#1740 #1787)", () => {
   const EXPECTED_SRC = "/sprites/pokemon/webp/1/64.webp";
+  const EXPECTED_SRCSET_2X = "/sprites/pokemon/webp/1/120.webp 2x";
+  const EXPECTED_SRCSET_3X = "/sprites/pokemon/webp/1/192.webp 3x";
 
-  it("renders the 64 px WebP src in English (en)", () => {
+  function assertSpriteAttributes(img: Element | null) {
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute("srcset")).toContain(EXPECTED_SRCSET_2X);
+    expect(img!.getAttribute("srcset")).toContain(EXPECTED_SRCSET_3X);
+  }
+
+  it("renders the 64 px WebP src with DPR srcSet in English (en)", () => {
     renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);
     const img = document.querySelector(`img[src="${EXPECTED_SRC}"]`);
-    expect(img).not.toBeNull();
+    assertSpriteAttributes(img);
   });
 
-  it("renders the 64 px WebP src with a Japanese locale override", () => {
+  it("renders the 64 px WebP src with DPR srcSet with a Japanese locale override", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "フシギダネ", lang: "ja" }],
     ]);
     renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     const img = document.querySelector(`img[src="${EXPECTED_SRC}"]`);
-    expect(img).not.toBeNull();
+    assertSpriteAttributes(img);
   });
 
-  it("renders the 64 px WebP src with a Simplified Chinese locale override", () => {
+  it("renders the 64 px WebP src with DPR srcSet with a Simplified Chinese locale override", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "妙蛙种子", lang: "zh-Hans" }],
     ]);
     renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     const img = document.querySelector(`img[src="${EXPECTED_SRC}"]`);
-    expect(img).not.toBeNull();
+    assertSpriteAttributes(img);
   });
 
-  it("renders the 64 px WebP src with a Traditional Chinese locale override", () => {
+  it("renders the 64 px WebP src with DPR srcSet with a Traditional Chinese locale override", () => {
     const localeNames: ReadonlyMap<number, LocaleNameOverride> = new Map([
       [1, { name: "妙蛙種子", lang: "zh-Hant" }],
     ]);
     renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} localeNames={localeNames} />);
     const img = document.querySelector(`img[src="${EXPECTED_SRC}"]`);
-    expect(img).not.toBeNull();
+    assertSpriteAttributes(img);
   });
 
   it("does NOT render a raw PNG src for any tile", () => {
     renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);
     const pngImg = document.querySelector('img[src$=".png"]');
     expect(pngImg).toBeNull();
+  });
+
+  it("srcSet contains the 1x 64 px descriptor in all locales", () => {
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR]} />);
+    const img = document.querySelector(`img[src="${EXPECTED_SRC}"]`);
+    expect(img!.getAttribute("srcset")).toContain("/sprites/pokemon/webp/1/64.webp 1x");
   });
 });
 

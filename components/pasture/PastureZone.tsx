@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { HabitatZone } from "@/lib/pasture/zones";
 import type { BiomeStats } from "@/lib/pasture/stats";
-import type { SpeciesLegStatus } from "@/lib/stats/legStatus";
 import { PasturePokemon } from "./PasturePokemon";
 import { PastureBiomeStats } from "./PastureBiomeStats";
 import { GrasslandsBiome } from "./biomes/GrasslandsBiome";
@@ -48,12 +47,6 @@ type Props = {
   biomeHref?: string;
   /** Per-biome statistics to display below the heading. Optional for backwards-compat. */
   stats?: BiomeStats;
-  /**
-   * Per-species leg status map (#1766). Keyed by speciesId. When provided,
-   * each PasturePokemon popover shows name/reverse direction status rows.
-   * When absent the rows are suppressed.
-   */
-  legStatusMap?: ReadonlyMap<number, SpeciesLegStatus>;
 };
 
 /**
@@ -92,7 +85,7 @@ const CATALOGUED_HABITATS = new Set([
   "urban", "waters-edge", "rough-terrain", "rare", "unknown",
 ]);
 
-export function PastureZone({ zone, placements, onMarkSeen, biomeHref, stats, legStatusMap }: Props) {
+export function PastureZone({ zone, placements, onMarkSeen, biomeHref, stats }: Props) {
   const t = useTranslations("pasture");
   const biomeRenderer = BIOME_RENDERERS[zone.habitat];
   const tint = HABITAT_TINTS[zone.habitat] ?? HABITAT_TINTS.unknown;
@@ -190,7 +183,7 @@ export function PastureZone({ zone, placements, onMarkSeen, biomeHref, stats, le
                 className={styles.spriteWander}
                 data-sprite-id={card.id}
               >
-                <PasturePokemon card={card} onMarkSeen={onMarkSeen} legStatus={legStatusMap?.get(card.speciesId)} />
+                <PasturePokemon card={card} onMarkSeen={onMarkSeen} />
               </div>
             </div>
           );

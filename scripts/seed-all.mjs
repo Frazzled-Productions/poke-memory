@@ -20,7 +20,7 @@
 // cloud. See docs/reseed.md for the full runbook.
 
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -30,9 +30,17 @@ import {
   formatStepFailure,
   formatSuccess,
 } from "./lib/seed-all-helpers.mjs";
+import {
+  validateSpeciesCount,
+  validateShards,
+  validateSprites,
+  validateLocaleNames,
+} from "./lib/seed-validate.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
+const libDir = resolve(repoRoot, "lib/pokemon");
+const webpRoot = resolve(repoRoot, "public/sprites/pokemon/webp");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
 // ---------------------------------------------------------------------------
@@ -58,6 +66,113 @@ function envFileContainsKey(filePath, key) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Read generated.json and return the record count, or 0 if the file does not
+ * yet exist (fresh checkout before any seed run).
+ *
+ * @returns {number}
+ */
+function readGeneratedCount() {
+  const generatedPath = resolve(libDir, "generated.json");
+  if (!existsSync(generatedPath)) return 0;
+  try {
+    const records = JSON.parse(readFileSync(generatedPath, "utf-8"));
+    return Array.isArray(records) ? records.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Run between-step validation for a given step and exit the process if any
+ * check fails.  Prints the validation banner and individual results.
+ *
+ * @param {string} script  The npm script that just completed (used to choose which checks to run).
+ * @param {number} preSeedCount  Record count before "seed" ran (used for species-count check).
+ */
+function validateAfterStep(script, preSeedCount) {
+  console.log(`\n[validate] Running post-step checks for "${script}"...`);
+
+  const generatedPath = resolve(libDir, "generated.json");
+  let generated, defaultSpeciesIds;
+  if (existsSync(generatedPath)) {
+    try {
+      generated = JSON.parse(readFileSync(generatedPath, "utf-8"));
+      defaultSpeciesIds = generated.filter((p) => p.isDefaultForm).map((p) => p.speciesId);
+    } catch {
+      console.error("[validate] ERROR: Could not parse generated.json for validation.");
+      process.exit(1);
+    }
+  }
+
+  /** @param {{ ok: boolean, message: string }} r */
+  function report(r) {
+    if (r.ok) {
+      console.log(`  OK  ${r.message}`);
+    } else {
+      console.error(`  ${r.message}`);
+    }
+    return r.ok;
+  }
+
+  let allPassed = true;
+
+  if (script === "seed") {
+    // Assert species count did not shrink.
+    const currentCount = generated ? generated.length : 0;
+    if (!report(validateSpeciesCount(currentCount, preSeedCount))) allPassed = false;
+  }
+
+  if (script === "seed:split") {
+    // Assert all four shards cover every record in generated.json.
+    const tryRead = (name) => {
+      const p = resolve(libDir, name);
+      if (!existsSync(p)) {
+        console.error(`[validate] ERROR: ${name} not found - run npm run seed:split first.`);
+        process.exit(1);
+      }
+      return JSON.parse(readFileSync(p, "utf-8"));
+    };
+    const core = tryRead("generated-core.json");
+    const flavor = tryRead("generated-flavor.json");
+    const chains = tryRead("generated-chains.json");
+    const localeNames = tryRead("generated-locale-names.json");
+    for (const r of validateShards(generated, core, flavor, chains, localeNames)) {
+      if (!report(r)) allPassed = false;
+    }
+  }
+
+  if (script === "seed:sprites") {
+    // Assert that a WebP file exists for every default-form species.
+    if (!report(validateSprites(defaultSpeciesIds, webpRoot, existsSync))) allPassed = false;
+  }
+
+  if (script === "seed:locale-names") {
+    // Assert locale-name completeness.
+    const localeNamesPath = resolve(libDir, "generated-locale-names.json");
+    if (!existsSync(localeNamesPath)) {
+      console.error("[validate] ERROR: generated-locale-names.json not found - run npm run seed:locale-names first.");
+      process.exit(1);
+    }
+    const localeNames = JSON.parse(readFileSync(localeNamesPath, "utf-8"));
+    for (const r of validateLocaleNames(localeNames)) {
+      if (!report(r)) allPassed = false;
+    }
+  }
+
+  if (!allPassed) {
+    console.error(
+      `\n[validate] Post-step validation FAILED after "${script}".\n` +
+      `  See errors above. Fix the issues, then re-run:\n` +
+      `    npm run seed:all\n` +
+      `  Re-runs are safe: the orchestrator is additive by default.`,
+    );
+    process.exit(1);
+  }
+
+  console.log(`[validate] All checks passed.\n`);
 }
 
 /**
@@ -114,6 +229,13 @@ console.log(
 
 let skipped = 0;
 
+// Snapshot the species count before "seed" runs so the post-step validation
+// can assert the count did not shrink (additive invariant).
+const preSeedCount = readGeneratedCount();
+
+/** Steps that warrant between-step validation. */
+const VALIDATED_STEPS = new Set(["seed", "seed:split", "seed:sprites", "seed:locale-names"]);
+
 for (let i = 0; i < steps.length; i++) {
   const step = steps[i];
 
@@ -131,6 +253,10 @@ for (let i = 0; i < steps.length; i++) {
   if (code !== 0) {
     console.error(formatStepFailure(step.script, code));
     process.exit(code);
+  }
+
+  if (VALIDATED_STEPS.has(step.script)) {
+    validateAfterStep(step.script, preSeedCount);
   }
 }
 

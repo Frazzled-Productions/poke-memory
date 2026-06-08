@@ -313,26 +313,6 @@ type FieldConfig = {
   max: number;
 };
 
-type FieldGroup = {
-  heading: string | null; // null = ungrouped (renders without a heading)
-  fields: FieldConfig[];
-};
-
-const GROUPS: FieldGroup[] = [
-  {
-    heading: null,
-    fields: [
-      {
-        key: "masteryRepetitions",
-        labelKey: "settings.practice.masteryThreshold.label",
-        helperKey: "settings.practice.masteryThreshold.description",
-        min: 1,
-        max: 10,
-      },
-    ],
-  },
-];
-
 const NAME_NUMERIC_FIELDS: FieldConfig[] = [
   {
     key: "maxNewPerDay",
@@ -370,7 +350,6 @@ const EVOLUTION_NUMERIC_FIELDS: FieldConfig[] = [
 // Numeric fields only - used for clamping on save. Boolean fields are handled
 // separately in handleSave via spread.
 const ALL_NUMERIC_FIELDS: FieldConfig[] = [
-  ...GROUPS.flatMap((g) => g.fields),
   ...NAME_NUMERIC_FIELDS,
   ...EVOLUTION_NUMERIC_FIELDS,
 ];
@@ -1039,31 +1018,6 @@ export default function SettingsPage() {
                       {t("settings.practice.scheduler.hint")}
                     </p>
                   </OnboardingHint>
-                  {/* Mastery threshold */}
-                  {GROUPS.flatMap((g) =>
-                    g.fields.map(({ key, labelKey, helperKey, min, max }) => (
-                      <div key={key} className={cardPanelPadded}>
-                        <label
-                          htmlFor={key}
-                          className="block text-sm font-medium text-foreground"
-                        >
-                          {t(labelKey)}
-                        </label>
-                        <input
-                          id={key}
-                          type="number"
-                          min={min}
-                          max={max}
-                          step={1}
-                          value={draftValues[key] ?? String(settings[key])}
-                          onChange={(e) => handleChange(key, e.target.value)}
-                          onBlur={() => handleBlur(key, min)}
-                          className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-                        />
-                        <p className={`mt-1 ${mutedTextXs}`}>{t(helperKey)}</p>
-                      </div>
-                    ))
-                  )}
                   {/* Recall target slider */}
                   <div className={cardPanelPadded}>
                     <label

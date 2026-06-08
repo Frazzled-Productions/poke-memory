@@ -23,9 +23,9 @@ export type CardClass = "locked" | "learning" | "mastered";
  * Minimum consecutive successful reviews used in the old reps-based mastery
  * gate. No longer gates `isMastered` since #1765 (which replaced the reps
  * sub-gate with a stability-based gate). Retained for:
- *   - Settings UI explanatory text that references it.
  *   - Test fixtures that seed believable card states.
  *   - QA-seed scenarios that still use it to describe card states.
+ *   - Backup schema validation (existing exports include this field).
  * Do NOT use this in any new mastery-checking code path.
  */
 export const MASTERY_REPETITIONS = 3;

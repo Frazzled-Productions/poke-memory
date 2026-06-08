@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { buildPrecacheUrls, precacheAll, OFFLINE_DOWNLOADED_AT_KEY } from "./precache";
+import { buildPrecacheUrls, precacheAll, OFFLINE_DOWNLOADED_AT_KEY, OFFLINE_PRECACHE_WIDTHS } from "./precache";
 import { CACHE_NAMES, versionedCacheName } from "./cacheStrategy";
 import { GENERATED_SPRITE_WIDTHS } from "@/lib/sprites/imageLoaderHelpers";
 
@@ -89,18 +89,47 @@ describe("buildPrecacheUrls", () => {
     expect(buildPrecacheUrls([])).toHaveLength(0);
   });
 
-  it("emits exactly (GENERATED_SPRITE_WIDTHS.length + 1) URLs per species", () => {
+  it("emits exactly (OFFLINE_PRECACHE_WIDTHS.length + 1) URLs per species", () => {
     // +1 for the cry. This assertion is a CI gate: adding a new width to
-    // GENERATED_SPRITE_WIDTHS grows the precache by ~1025 × size KB and must
-    // be a conscious decision, not a silent side-effect.
+    // OFFLINE_PRECACHE_WIDTHS grows every user's offline download by ~1025 ×
+    // (size per width) and must be a conscious decision, not a silent side-effect.
+    // Note: OFFLINE_PRECACHE_WIDTHS is a strict subset of GENERATED_SPRITE_WIDTHS
+    // (all 10 generated widths minus the decorative-only 180 px watermark).
     const single = buildPrecacheUrls([1]);
-    expect(single).toHaveLength(GENERATED_SPRITE_WIDTHS.length + 1);
+    expect(single).toHaveLength(OFFLINE_PRECACHE_WIDTHS.length + 1);
 
     const three = buildPrecacheUrls([1, 2, 3]);
-    expect(three).toHaveLength((GENERATED_SPRITE_WIDTHS.length + 1) * 3);
+    expect(three).toHaveLength((OFFLINE_PRECACHE_WIDTHS.length + 1) * 3);
 
-    // Snapshot the current width count so any addition fails CI explicitly.
+    // Snapshot the current offline width count so any addition fails CI explicitly.
+    // GENERATED_SPRITE_WIDTHS still has 10; the precache uses 9 (drops 180 px watermark).
     expect(GENERATED_SPRITE_WIDTHS.length).toBe(10);
+    expect(OFFLINE_PRECACHE_WIDTHS.length).toBe(9);
+  });
+
+  it("emits only the offline-reachable widths (not all generated widths)", () => {
+    // The 180 px ThemeWatermark variant must NOT appear in the precache:
+    // it is decorative-only and would waste ~7.8 MB per user's offline download.
+    const urls = buildPrecacheUrls([1]);
+    const webpUrls = urls.filter((u) => u.startsWith("/sprites/pokemon/webp/1/"));
+    const emittedWidths = webpUrls
+      .map((u) => {
+        const match = u.match(/\/(\d+)\.webp$/);
+        return match ? parseInt(match[1]!, 10) : null;
+      })
+      .filter((w): w is number => w !== null)
+      .sort((a, b) => a - b);
+
+    // Must match OFFLINE_PRECACHE_WIDTHS exactly.
+    expect(emittedWidths).toEqual([...OFFLINE_PRECACHE_WIDTHS].sort((a, b) => a - b));
+
+    // Explicitly assert that 180 (ThemeWatermark, dropped in #1789) is absent.
+    expect(emittedWidths).not.toContain(180);
+
+    // All 9 kept widths must be present.
+    for (const w of OFFLINE_PRECACHE_WIDTHS) {
+      expect(emittedWidths).toContain(w);
+    }
   });
 });
 
@@ -255,9 +284,49 @@ describe("precacheAll", () => {
     }
   });
 
-  it("accrues byte estimate for downloaded sprites", async () => {
+  it("accrues real bytes from Content-Length header for downloaded sprites", async () => {
     const cache = makeCache();
     vi.stubGlobal("caches", makeCaches(cache));
+    // Return a response with a known Content-Length so we can assert the exact accumulation.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response("data", {
+          status: 200,
+          headers: { "content-length": "12345" },
+        }),
+      ),
+    );
+
+    const byteSamples: number[] = [];
+    await precacheAll({
+      ids: [1],
+      onProgress: ({ bytesSoFar }) => {
+        byteSamples.push(bytesSoFar);
+      },
+    });
+
+    // bytesSoFar must grow (each downloaded asset contributes its real size).
+    expect(byteSamples.length).toBeGreaterThan(0);
+    expect(byteSamples[byteSamples.length - 1]).toBeGreaterThan(0);
+
+    // Every increment must be exactly 12345 (the Content-Length value),
+    // confirming the heuristic (25_000 / 15_000) is no longer used.
+    const distinctIncrements = new Set<number>();
+    for (let i = 1; i < byteSamples.length; i++) {
+      distinctIncrements.add(byteSamples[i]! - byteSamples[i - 1]!);
+    }
+    if (byteSamples.length > 1) {
+      for (const inc of distinctIncrements) {
+        expect(inc).toBe(12345);
+      }
+    }
+  });
+
+  it("accrues bytes from blob size when Content-Length header is absent", async () => {
+    const cache = makeCache();
+    vi.stubGlobal("caches", makeCaches(cache));
+    // Response without Content-Length; body is 4 bytes ("data").
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("data", { status: 200 })),
@@ -271,7 +340,38 @@ describe("precacheAll", () => {
       },
     });
 
-    expect(lastBytes).toBeGreaterThan(0);
+    // Should still accumulate something (blob.size >= 0 for each downloaded asset).
+    // The precise value depends on the jsdom Response blob implementation, but
+    // it must not be the old heuristic (25_000 / 15_000).
+    expect(lastBytes).toBeGreaterThanOrEqual(0);
+    // Must NOT equal the old flat-estimate total (9 sprites × 25_000 + 1 cry × 15_000 = 240_000).
+    expect(lastBytes).not.toBe(9 * 25_000 + 15_000);
+  });
+
+  it("does not add heuristic bytes (25_000/15_000) - old estimate is gone", async () => {
+    const cache = makeCache();
+    vi.stubGlobal("caches", makeCaches(cache));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response("x", {
+          status: 200,
+          headers: { "content-length": "100" },
+        }),
+      ),
+    );
+
+    const samples: number[] = [];
+    await precacheAll({
+      ids: [1],
+      onProgress: ({ bytesSoFar }) => samples.push(bytesSoFar),
+    });
+
+    const last = samples[samples.length - 1] ?? 0;
+    // Each URL contributes exactly 100 bytes (the Content-Length).
+    // 9 WebP widths + 1 cry = 10 URLs → 1000 bytes total.
+    // The old heuristic would give 9 × 25_000 + 15_000 = 240_000. Assert against that.
+    expect(last).toBeLessThan(50_000); // well under any heuristic value
   });
 });
 

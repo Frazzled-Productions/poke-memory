@@ -69,7 +69,8 @@
         "errorUsernameTaken": "[That username is already taken. Please choose another.]",
         "errorInvalidCredentials": "[Incorrect username or password.]",
         "errorSignupFailed": "[Sign-up failed. Please try again.]",
-        "errorSigninFailed": "[Sign-in failed. Please try again.]"
+        "errorSigninFailed": "[Sign-in failed. Please try again.]",
+        "errorRateLimited": "[Too many attempts. Please wait a few minutes and try again.]"
       }
     }
   },
@@ -127,10 +128,6 @@
       "scheduler": {
         "heading": "[Scheduler]",
         "hint": "[The scheduler aims to show each card just before you'd forget it. A higher recall target means more reviews and stronger retention; a lower target means fewer reviews and a bit more forgetting. Most people leave this at 90%.]"
-      },
-      "masteryThreshold": {
-        "label": "[Mastery threshold (deprecated)]",
-        "description": "[This setting no longer affects mastery. Mastery is now determined by FSRS stability, not review count. This control will be removed in a future update.]"
       },
       "recallTarget": {
         "label": "[Recall target ({percent}%)]",
@@ -249,7 +246,7 @@
       "downloadHeading": "[Download]",
       "downloadTitle": "[Download for offline use]",
       "downloadDescription": "[Pre-fetches every sprite and cry so you can practise without a connection. Recommended on Wi-Fi. About 166 MB.]",
-      "storageUsage": "[Using {usedMb} of {totalMb} available.]",
+      "storageUsage": "[Using {usedGb} of {totalGb} available.]",
       "downloadedOn": "[Downloaded on {date}.]",
       "downloadButton": "[Download]",
       "updateButton": "[Update]",
@@ -476,6 +473,7 @@
     "noScopeMatch": "[No Pokémon match your scope]",
     "noScopeMatchBody": "[Adjust the filter above, or clear it to keep practising.]",
     "clearScope": "[Clear scope]",
+    "clearFilterToPractise": "[Clear filter to keep practising]",
     "outOfScopeHint": "[Finishing an in-progress card]",
     "gradeYourAnswer": "[Grade your answer]",
     "showKeyboardShortcuts": "[Show keyboard shortcuts]",
@@ -712,7 +710,7 @@
       "upcomingAriaLabel": "[Upcoming Pasture species]",
       "allCaughtUp": "[All reviewed Pokémon are already in your Pasture.]",
       "repsInfoAriaLabel": "[What does reps mean?]",
-      "repsInfoPanel": "[Reps: how many times you have reviewed this card so far. A higher number means you are closer to mastering it.]"
+      "repsInfoPanel": "[Reps: how many times you have reviewed this card so far. Reps alone do not determine mastery - the scheduler's confidence in your recall does.]"
     },
     "longPressHint": "[Press and hold any Pokémon to see its name, mastery date, and review interval.]"
   },
@@ -763,7 +761,7 @@
       "trainerLabel": "[Trainer]",
       "trainerFallback": "[Trainer]",
       "levelLabel": "[Lv]",
-      "levelDescription": "[Level grows with the number of Pokémon name cards you've mastered (reps ≥ 3 and scheduled interval ≥ 21 days).]",
+      "levelDescription": "[Level grows with the number of Pokémon name cards you've mastered. A card is mastered once the scheduler is confident you will still recall it in three weeks or more.]",
       "allMastered": "[All mastered]",
       "masteryProgress": "[{mastered} / {next} mastered · {needed} to Lv {levelNext}]",
       "formsMastered": "[{mastered} / {total} forms mastered]",

@@ -6,6 +6,11 @@
  *   `public/sprites/pokemon/webp/<id>/<width>.webp` and served directly
  *   without any Vercel Image Optimisation transformation.
  *
+ * - `spriteGridSrcSet` - returns a DPR-aware `srcset` string for the Pokédex
+ *   grid tile (64 CSS px). Uses the 64 px WebP for 1x, 120 px for 2x, and
+ *   192 px for 3x. All three variants are already in the offline precache
+ *   (#1789), so no extra download cost for offline users.
+ *
  * - `rawSpriteUrl` - returns the raw PNG path
  *   (`/sprites/pokemon/<id>.png`). The PNG files live in `public/` and are
  *   the build-time source for `npm run seed:sprites`. After #1740 nothing
@@ -21,6 +26,33 @@
  */
 export function spriteVariantUrl(id: number, width: number): string {
   return `/sprites/pokemon/webp/${id}/${width}.webp`;
+}
+
+/**
+ * DPR-aware `srcset` string for the Pokédex grid tile (64 CSS px).
+ *
+ * Returns a descriptor string suitable for the `srcSet` attribute on the
+ * grid `<img>` element. The browser automatically selects the best variant
+ * for the device pixel ratio:
+ *
+ * - 1x (non-retina): 64 px WebP
+ * - 2x (standard retina, e.g. iPhone non-Pro): 120 px WebP
+ * - 3x (super-retina, e.g. iPhone Pro): 192 px WebP
+ *
+ * All three widths (64, 120, 192) are in `GENERATED_SPRITE_WIDTHS` and are
+ * already included in the offline precache, so this attribute adds zero extra
+ * precache bytes for offline users. Online retina users fetch the larger
+ * variant on demand - the intended trade.
+ *
+ * Single source of truth: all grid srcset construction MUST go through this
+ * helper, never be inlined.
+ */
+export function spriteGridSrcSet(id: number): string {
+  return (
+    `${spriteVariantUrl(id, 64)} 1x, ` +
+    `${spriteVariantUrl(id, 120)} 2x, ` +
+    `${spriteVariantUrl(id, 192)} 3x`
+  );
 }
 
 /**
