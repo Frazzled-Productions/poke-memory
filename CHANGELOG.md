@@ -6,6 +6,30 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.2] - 2026-06-08
+
+### Changed
+
+- Corrected mastery descriptions in the Pasture reps info panel and the Trainer Card level tooltip to reflect the stability-based mastery rule introduced in #1765, removing references to the old reps >= 3 gate.
+- Removed the deprecated "Mastery threshold" setting control from Settings (the setting no longer affected mastery since #1765).
+
+### Removed
+
+- Removed always-redundant per-direction (name/reverse) mastery rows and blocked hint from the Pasture long-press popover. The Pasture only ever shows fully-mastered species, so both legs were invariably "Mastered". The rows remain on the Pokédex detail panel and Journey where they are meaningful.
+
+### Fixed
+
+- Pokédex grid sprites now render crisply on retina screens (2x/3x DPR). A `srcset` with 1x=64 px, 2x=120 px, and 3x=192 px WebP variants lets the browser pick the sharpest source for the device. The 120 and 192 px files were already in the offline precache, so no extra bytes are added for offline users.
+- The offline-download progress now counts real downloaded bytes instead of a flat per-file estimate, storage usage is shown in GB, and the storage figure refreshes while the download runs.
+- Offline precache now downloads only the 9 WebP widths used by offline-reachable surfaces (drops the 180 px `ThemeWatermark` decorative variant), cutting the precache from ~67.5 MB to ~59.7 MB of actual file bytes.
+- "Last synced" time on the Stats page now respects the user's configured timezone instead of the browser's local timezone.
+- Completing a scoped practice group no longer silently drops the filter on navigation. The active scope is now shown on the end-of-session screen, and a "Clear filter to keep practising" button makes resuming the full card set a deliberate action.
+
+### Security
+
+- Add per-IP rate-limit throttle on username sign-up and sign-in Server Actions (migration 041): salted-hash IP bucketing via `public.check_rate_limit` SECURITY DEFINER RPC, 5 sign-up/10 min + 10 sign-in/10 min caps, raw IP never persisted; `rate_limited` error surfaced in all four locales.
+- DB security audit: add explicit deny-all SELECT policy on `feedback` to document service-role-only intent; revoke `authenticated` execute on `reconcile_grade_log_orphans` maintenance RPC; document `delete_account`/`reset_all_progress` as intended SECURITY DEFINER; note `pg_net`-in-public WONTFIX.
+
 ## [0.11.1] - 2026-06-07
 
 ### Added
@@ -1678,7 +1702,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.2
 [0.11.1]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.1
 [0.11.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.0
 [0.10.35]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.10.35
