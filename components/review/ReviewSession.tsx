@@ -545,6 +545,7 @@ function EndOfSessionScreen({
   learningLocales,
   dueCountByLocale,
   onSwitchLocale,
+  onClearScope,
 }: {
   variant: EndOfSessionVariant;
   perType: PerTypeTodayCounts;
@@ -575,6 +576,12 @@ function EndOfSessionScreen({
   dueCountByLocale: DueCountByLocale;
   /** Called when the user taps the "switch to language with due cards" button (#1562). */
   onSwitchLocale: (locale: AppLocale) => void;
+  /**
+   * When a practice scope filter is active, this callback clears it so the
+   * user can keep practising the full card set. Its presence signals that a
+   * filter is active; absence means no filter is set (#1797).
+   */
+  onClearScope?: () => void;
 }) {
   const t = useTranslations("practice");
 
@@ -601,6 +608,15 @@ function EndOfSessionScreen({
           <p className="text-zinc-500 dark:text-zinc-400">
             {t("nothingDueBody")}
           </p>
+          {onClearScope !== undefined && (
+            <button
+              type="button"
+              className="min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+              onClick={onClearScope}
+            >
+              {t("clearFilterToPractise")}
+            </button>
+          )}
           {localeWithDue !== null && (
             <button
               type="button"
@@ -621,6 +637,15 @@ function EndOfSessionScreen({
           <p className="text-zinc-500 dark:text-zinc-400 max-w-xs">
             {t("newCardsLockedBody")}
           </p>
+          {onClearScope !== undefined && (
+            <button
+              type="button"
+              className="min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+              onClick={onClearScope}
+            >
+              {t("clearFilterToPractise")}
+            </button>
+          )}
         </>
       )}
       {variant.kind === "review-wall" && (
@@ -2103,6 +2128,20 @@ export function ReviewSession() {
 
     return (
       <div className="flex flex-col flex-1 min-h-0 w-full items-center overflow-y-auto">
+        {/* When a scope filter is active, show ScopeControl so the user can
+            see what filter is set and modify or clear it. This mirrors the
+            card-practice path where ScopeControl is always visible (#1797). */}
+        {!isScopeEmpty(scope) && (
+          <div className="w-full max-w-xl px-4 pt-4">
+            <ScopeControl
+              scope={scope}
+              onChange={handleScopeChange}
+              alternateFormsEnabled={alternateFormsEnabled}
+              incompleteChainSpeciesIds={incompleteChains}
+              masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+            />
+          </div>
+        )}
         <EndOfSessionScreen
           variant={variant}
           perType={perType}
@@ -2120,6 +2159,7 @@ export function ReviewSession() {
           learningLocales={learningLocales}
           dueCountByLocale={readDueCountCache()}
           onSwitchLocale={handleSwitchLocale}
+          onClearScope={!isScopeEmpty(scope) ? () => handleScopeChange(EMPTY_SCOPE) : undefined}
         />
         {seenPokemon.length >= 2 && (
           <HigherOrLowerGame seenPokemon={seenPokemon} />

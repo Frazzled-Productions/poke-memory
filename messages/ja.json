@@ -472,6 +472,7 @@
     "noScopeMatch": "スコープに一致する Pokémon がいません",
     "noScopeMatchBody": "上のフィルターを調整するか、クリアして練習を続けてください。",
     "clearScope": "スコープをクリア",
+    "clearFilterToPractise": "フィルターをクリアして練習を続ける",
     "outOfScopeHint": "進行中のカードを仕上げています",
     "gradeYourAnswer": "回答を採点する",
     "showKeyboardShortcuts": "キーボードショートカットを表示",
