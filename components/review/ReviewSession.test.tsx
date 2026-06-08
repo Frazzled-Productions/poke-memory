@@ -1759,7 +1759,7 @@ describe("Practice scope: completed-scope end state persists across remount (#17
     // a fresh reverse card that would trigger NEW_CARDS_LOCKED for reverse type.
     const outsideReverseCard = makeGraduatedReverseCard(152);
     // Update generation to match Chikorita.
-    (outsideReverseCard as NameReviewCard & { generation: string }).generation = "generation-ii";
+    (outsideReverseCard as ReverseReviewCard & { generation: string }).generation = "generation-ii";
     mockSeedPokemon.mockReturnValue([card, outsideCard]);
     vi.mocked(loadSession).mockResolvedValueOnce({
       cards: [card, reverseCard, outsideCard, outsideReverseCard],
