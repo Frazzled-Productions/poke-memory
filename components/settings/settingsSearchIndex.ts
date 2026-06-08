@@ -32,8 +32,6 @@ export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
       "recall target",
       "retention",
       "mastery",
-      "mastery threshold",
-      "repetitions",
       "personalise schedule",
       "personalize schedule",
       "fsrs",

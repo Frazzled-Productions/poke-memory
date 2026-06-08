@@ -187,6 +187,18 @@ describe("NextArrivalsStrip - InfoButton (populated state)", () => {
     expect(btn).toHaveAttribute("aria-expanded", "true");
   });
 
+  it("repsInfoPanel does not imply reps alone drive mastery (#1802)", async () => {
+    const user = userEvent.setup();
+    render(<NextArrivalsStrip arrivals={arrivals} />);
+    await user.click(screen.getByRole("button", { name: "What does reps mean?" }));
+    // Old misleading copy ("A higher number means you are closer to mastering it")
+    // was removed in #1802. The panel must describe scheduler confidence, not rep count.
+    expect(screen.queryByText(/closer to mastering/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/scheduler.*confidence/i),
+    ).toBeInTheDocument();
+  });
+
   it("clicking InfoButton a second time closes the panel", async () => {
     const user = userEvent.setup();
     render(<NextArrivalsStrip arrivals={arrivals} />);

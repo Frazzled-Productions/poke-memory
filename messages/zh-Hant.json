@@ -128,10 +128,6 @@
         "heading": "排程器",
         "hint": "排程器會在您即將遺忘之前顯示每張卡片。記憶目標越高，複習次數越多，記憶越牢固；越低則複習次數越少，遺忘也會更多。大多數人保持預設的 90%。"
       },
-      "masteryThreshold": {
-        "label": "掌握標準（已廢棄）",
-        "description": "此設定不再影響掌握判定。掌握由FSRS穩定性決定。此控件將在未來版本中移除。"
-      },
       "recallTarget": {
         "label": "記憶目標 ({percent}%)",
         "description": "降低此值可減少複習次數，但會忘記更多卡片。提高此值可增加複習次數，從而提高記憶保留率。預設值為 90%。"
@@ -712,7 +708,7 @@
       "upcomingAriaLabel": "即將加入牧場的寶可夢",
       "allCaughtUp": "所有已複習的寶可夢都已在您的牧場中。",
       "repsInfoAriaLabel": "「reps」是什麼意思？",
-      "repsInfoPanel": "Reps（複習次數）：您迄今為止複習該卡片的次數。數字越高，代表您越接近掌握。"
+      "repsInfoPanel": "Reps（複習次數）：您迄今為止複習該卡片的次數。Reps 數量本身不決定掌握，掌握由排程器對您的記憶置信度決定。"
     },
     "longPressHint": "長按任意寶可夢，查看其名稱、掌握日期和複習間隔。"
   },
@@ -763,7 +759,7 @@
       "trainerLabel": "訓練師",
       "trainerFallback": "訓練師",
       "levelLabel": "等級",
-      "levelDescription": "等級隨掌握的寶可夢名稱卡數量增長（至少3次正確且下次複習間隔不少於21天）。",
+      "levelDescription": "等級隨掌握的寶可夢名稱卡數量增長。當排程器確信您在三週或更長時間後仍能回憶起一張卡片時，該卡片即被視為已掌握。",
       "allMastered": "全部掌握",
       "masteryProgress": "{mastered} / {next} 已掌握 · 距 {levelNext} 級還差 {needed}",
       "formsMastered": "{mastered} / {total} 形態已掌握",
