@@ -69,7 +69,8 @@
         "errorUsernameTaken": "そのユーザー名はすでに使用されています。別のユーザー名を選んでください。",
         "errorInvalidCredentials": "ユーザー名またはパスワードが正しくありません。",
         "errorSignupFailed": "サインアップに失敗しました。もう一度お試しください。",
-        "errorSigninFailed": "サインインに失敗しました。もう一度お試しください。"
+        "errorSigninFailed": "サインインに失敗しました。もう一度お試しください。",
+        "errorRateLimited": "試行回数が多すぎます。しばらく時間をおいてからお試しください。"
       }
     }
   },
