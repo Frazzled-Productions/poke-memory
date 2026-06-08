@@ -4,11 +4,22 @@
  * Verifies that the Pokédex grid renders non-broken sprite images when the
  * device is offline and the service worker has cached the assets.
  *
- * Approach: visit the Pokédex grid once online so the service worker populates
- * its StaleWhileRevalidate cache for the visible sprites and the navigation
- * itself. Then switch the context offline, reload, and assert that at least one
- * sprite image is still visible with a non-zero naturalWidth (the browser
- * reports naturalWidth === 0 for broken/unloaded images).
+ * Approach:
+ *   1. Visit /pokedex online so the service worker registers and installs.
+ *   2. Wait for the SW to be in the "activated" state and controlling the page.
+ *      On a fresh browser context, the SW installs and activates immediately
+ *      (no waiting phase for first install). We post SKIP_WAITING defensively
+ *      so any "waiting" SW (e.g. from a prior stale registration) activates.
+ *      We reload once online to ensure the SW intercepts navigation + all
+ *      sub-resource fetches (JS bundles, seed data, sprites) and caches them.
+ *   3. Wait for the grid to fully render online: a role="list" element with at
+ *      least one img inside it must be visible. This confirms the SW has served
+ *      all the necessary resources and they are cached.
+ *   4. Poll until the pages cache contains the /pokedex navigation URL,
+ *      confirming the StaleWhileRevalidate background write has completed.
+ *   5. Switch offline and reload; the SW must serve from cache.
+ *   6. Wait for the grid list with images to render offline (React must hydrate
+ *      from cached JS bundles). Assert at least one sprite has naturalWidth > 0.
  *
  * This approach is deliberately lightweight compared to triggering the full
  * ~5.5 MB precache download from the Settings offline section. The SW caches
@@ -59,74 +70,149 @@ test.describe("Offline Pokédex grid (#1773)", () => {
       return;
     }
 
-    // --- Step 1: warm the SW cache by visiting the grid online ---
-    // Navigate to the Pokédex grid online. The service worker intercepts the
-    // navigation and all asset fetches (sprites, JSON, JS) and stores them in
-    // its StaleWhileRevalidate cache. Scroll to ensure at least the first
-    // above-the-fold Generation 1 tiles are fetched.
+    // --- Step 1: visit the Pokédex grid online to register + install the SW ---
     await page.goto("/pokedex");
 
-    // Wait for the grid to hydrate from IDB and render at least one tile.
-    // The Generation 1 section renders before the full IDB load completes, so
-    // waiting for the heading is a reliable signal the grid is mounted.
+    // Wait for the grid heading - confirms the page mounted and the SW had a
+    // chance to register.
     await expect(
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible();
 
-    // Wait for at least one sprite image to appear in the DOM (the first
-    // above-the-fold tile). The alt text for a locked tile is "#001 (locked)"
-    // and for an unlocked tile is the Pokémon's name. Either is fine here -
-    // we are warming the cache, not asserting state.
-    const firstSprite = page.locator("img").first();
-    await expect(firstSprite).toBeVisible({ timeout: 15_000 });
+    // --- Step 2: ensure the SW is active (post SKIP_WAITING defensively) ---
+    //
+    // The SW uses skipWaiting:false. On a completely fresh context (no prior SW
+    // registration), the SW installs and activates immediately - there is
+    // nothing to wait for. However, if a prior test run left a "waiting" SW,
+    // posting SKIP_WAITING moves it through to activated.
+    await page.evaluate(() => {
+      return navigator.serviceWorker?.ready.then((reg) => {
+        const sw = reg.waiting ?? reg.installing ?? reg.active;
+        if (sw && sw.state !== "activated") {
+          sw.postMessage({ type: "SKIP_WAITING" });
+        }
+      });
+    });
 
-    // Allow the SW time to finish caching the fetched resources. The SW's
-    // StaleWhileRevalidate handler caches synchronously on the response event,
-    // but we give a short grace period for any in-flight requests to settle.
-    // This is NOT a fixed sleep for the test assertion - it is a brief
-    // stabilisation window for the SW cache writes that backs the offline check.
-    await page.waitForTimeout(1_500);
+    // --- Step 3: reload once online so the SW claims this client and caches
+    //             all sub-resources (navigation, JS bundles, sprites) ---
+    //
+    // The SW may have activated mid-flight during the first goto(), meaning the
+    // /pokedex navigation response and its sub-resources (JS bundles for the
+    // route) were not intercepted. A single online reload navigates into the
+    // now-active SW's scope: the SW intercepts every fetch, caches the
+    // navigation via StaleWhileRevalidate, and caches JS bundles CacheFirst.
+    await page.reload({ waitUntil: "domcontentloaded" });
 
-    // --- Step 2: go offline ---
+    // --- Step 4: confirm the SW controls this page ---
+    await page.waitForFunction(
+      () => navigator.serviceWorker?.controller != null,
+      null,
+      { timeout: 30_000 },
+    );
+
+    // --- Step 5: wait for the grid to fully render online ---
+    //
+    // The Pokédex page transitions from LoadingSkeleton (no role="list", no
+    // imgs) to the rendered grid (role="list" elements with img children) once
+    // the seed + session data loads asynchronously. We wait for a list element
+    // that contains at least one img - this is the definitive "grid rendered"
+    // signal. The SW must have served and cached the JS bundles + sprites by
+    // the time this condition is met.
+    await page.waitForFunction(
+      () => {
+        const imgs = document.querySelectorAll('[role="list"] img');
+        return imgs.length > 0;
+      },
+      null,
+      { timeout: 30_000 },
+    );
+
+    // Confirm at least one of those images has loaded (naturalWidth > 0) while
+    // online, so the SW has actually cached the sprite bytes.
+    await page.waitForFunction(
+      () => {
+        const imgs = document.querySelectorAll('[role="list"] img');
+        for (const img of Array.from(imgs).slice(0, 5)) {
+          if ((img as HTMLImageElement).naturalWidth > 0) return true;
+        }
+        return false;
+      },
+      null,
+      { timeout: 15_000 },
+    );
+
+    // --- Step 6: poll until the SW pages cache contains the /pokedex URL ---
+    //
+    // StaleWhileRevalidate writes to the cache after returning the response.
+    // Polling ensures the write completed before we go offline.
+    await page.waitForFunction(
+      async () => {
+        try {
+          const keys = await caches.keys();
+          for (const name of keys) {
+            // The pages cache name contains "pages" per cacheStrategy.ts.
+            if (!name.includes("pages")) continue;
+            const cache = await caches.open(name);
+            const requests = await cache.keys();
+            if (requests.some((r) => r.url.includes("/pokedex"))) {
+              return true;
+            }
+          }
+          return false;
+        } catch {
+          return false;
+        }
+      },
+      null,
+      { timeout: 20_000 },
+    );
+
+    // --- Step 7: go offline ---
     await page.context().setOffline(true);
 
-    // --- Step 3: reload the Pokédex grid without network access ---
+    // --- Step 8: reload the Pokédex grid without network access ---
     // The service worker must serve the page and its assets from its cache.
     // Use domcontentloaded to avoid a hard timeout waiting for network requests
     // that will never complete offline.
     await page.reload({ waitUntil: "domcontentloaded" });
 
-    // --- Step 4: assert the grid renders a non-broken sprite ---
-    // Wait for the h1 heading - confirms the page itself loaded from SW cache.
+    // --- Step 9: wait for the grid heading from SW cache ---
     await expect(
       page.getByRole("heading", { level: 1, name: "Pokédex" }),
     ).toBeVisible({ timeout: 20_000 });
 
-    // Find all <img> elements in the grid. In offline mode with a warm SW
-    // cache, at least one sprite should have naturalWidth > 0. A broken
-    // image (network failure, missing cache entry) reports naturalWidth === 0.
+    // --- Step 10: wait for the grid list with images to render offline ---
     //
-    // We locate the first img inside the grid list to avoid counting any
-    // nav/header images. The Generation 1 list uses aria-label containing
-    // "Generation I" (from the t("generationPokemonAriaLabel") translation).
-    // The first visible grid img is the most reliable target regardless of
-    // mastery state.
-    const gridImages = page.getByRole("list").locator("img");
-    const count = await gridImages.count();
-    expect(count).toBeGreaterThan(0);
+    // After the offline reload, React hydrates from cached JS bundles. The
+    // grid builds a session in memory (IDB is empty in a fresh context, so
+    // buildSession() produces all-locked tiles). Both locked and unlocked
+    // tiles render a sprite <img>. We wait for the list+img signal to confirm
+    // full hydration.
+    await page.waitForFunction(
+      () => {
+        const imgs = document.querySelectorAll('[role="list"] img');
+        return imgs.length > 0;
+      },
+      null,
+      { timeout: 30_000 },
+    );
 
-    // Check at least one grid image loaded successfully (naturalWidth > 0).
-    let foundLoadedImage = false;
-    for (let i = 0; i < Math.min(count, 10); i++) {
-      const img = gridImages.nth(i);
-      const naturalWidth = await img.evaluate(
-        (el) => (el as HTMLImageElement).naturalWidth,
-      );
-      if (naturalWidth > 0) {
-        foundLoadedImage = true;
-        break;
-      }
-    }
+    // --- Step 11: assert at least one sprite has naturalWidth > 0 ---
+    //
+    // CacheFirst serves sprites from the SW cache offline; naturalWidth > 0
+    // confirms the cached bytes were decoded successfully.
+    const foundLoadedImage = await page.waitForFunction(
+      () => {
+        const imgs = document.querySelectorAll('[role="list"] img');
+        for (const img of Array.from(imgs).slice(0, 10)) {
+          if ((img as HTMLImageElement).naturalWidth > 0) return true;
+        }
+        return false;
+      },
+      null,
+      { timeout: 15_000 },
+    ).then(() => true).catch(() => false);
 
     expect(
       foundLoadedImage,
