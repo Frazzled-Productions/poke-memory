@@ -385,10 +385,9 @@ describe("SyncStatusLine", () => {
   // ─── 24-hour time format (#1537) ─────────────────────────────────────────
   //
   // Use a fixed ISO timestamp (evening UTC, so the local hour is clearly > 12
-  // somewhere) and derive the expected HH:MM string via plain JS date methods.
-  // Using new Intl.DateTimeFormat() directly is banned inside components/** by
-  // the no-restricted-syntax rule; plain getHours/getMinutes are fine and give
-  // the same timezone-local result the component's fmt.dateTime produces.
+  // somewhere) and assert the expected HH:MM string using the UTC value.
+  // The component now takes an explicit `tz` prop; these tests pass tz="UTC"
+  // so the expected hour is deterministic regardless of the CI runner's locale.
 
   it("last-synced time renders in 24-hour format (no AM/PM)", async () => {
     const ISO = "2026-05-30T20:03:00.000Z";
@@ -398,7 +397,7 @@ describe("SyncStatusLine", () => {
     });
 
     renderWithIntl(
-      <SyncStatusLine retryState="idle" retryNow={vi.fn()} superuserPaused={false} />,
+      <SyncStatusLine retryState="idle" retryNow={vi.fn()} superuserPaused={false} tz="UTC" />,
     );
 
     const el = await screen.findByText(/Last synced:/);
@@ -407,10 +406,10 @@ describe("SyncStatusLine", () => {
     // Must NOT contain AM/PM markers (case-insensitive, including narrow-NBSP variants).
     expect(text).not.toMatch(/[ap]\.?m\.?/i);
 
-    // Must contain the 24-hour HH:MM for this timestamp in the local timezone.
+    // Must contain the 24-hour HH:MM for this timestamp in UTC.
     const d = new Date(ISO);
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
+    const hh = String(d.getUTCHours()).padStart(2, "0");
+    const mm = String(d.getUTCMinutes()).padStart(2, "0");
     expect(text).toContain(`${hh}:${mm}`);
   });
 
@@ -424,7 +423,7 @@ describe("SyncStatusLine", () => {
     });
 
     renderWithIntl(
-      <SyncStatusLine retryState="idle" retryNow={vi.fn()} superuserPaused={false} />,
+      <SyncStatusLine retryState="idle" retryNow={vi.fn()} superuserPaused={false} tz="UTC" />,
     );
 
     const btn = await screen.findByRole("button");
@@ -433,11 +432,90 @@ describe("SyncStatusLine", () => {
     // Must NOT contain AM/PM markers.
     expect(text).not.toMatch(/[ap]\.?m\.?/i);
 
-    // Must contain the 24-hour HH:MM for this timestamp in the local timezone.
+    // Must contain the 24-hour HH:MM for this timestamp in UTC.
     const d = new Date(ISO);
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
+    const hh = String(d.getUTCHours()).padStart(2, "0");
+    const mm = String(d.getUTCMinutes()).padStart(2, "0");
     expect(text).toContain(`${hh}:${mm}`);
+  });
+
+  // ─── Timezone-respecting render (#1796) ──────────────────────────────────
+  //
+  // The component must display the time in the user's configured timezone, not
+  // the device/runner timezone. We use "Asia/Tokyo" (UTC+9) as the user tz and
+  // "America/New_York" (UTC-4 or -5) as a contrasting tz to confirm the rendered
+  // hour changes with the tz prop. 2026-05-30T15:00:00Z = 00:00 JST next day.
+
+  it("last-synced: time respects the tz prop (Asia/Tokyo differs from UTC)", async () => {
+    // 2026-05-30T15:00:00Z = 2026-05-31T00:00:00 JST (UTC+9)
+    const ISO = "2026-05-30T15:00:00.000Z";
+    mockLoadSyncStatus.mockReturnValue({
+      ...BASE_STATUS,
+      lastPushAt: ISO,
+    });
+
+    renderWithIntl(
+      <SyncStatusLine retryState="idle" retryNow={vi.fn()} superuserPaused={false} tz="Asia/Tokyo" />,
+    );
+
+    const el = await screen.findByText(/Last synced:/);
+    const text = el.textContent ?? "";
+
+    // In Asia/Tokyo (UTC+9), 15:00 UTC = 00:00 JST.
+    expect(text).toContain("00:00");
+    // Must NOT show the UTC hour (15:00).
+    expect(text).not.toContain("15:00");
+  });
+
+  it("error-state time suffix: time respects the tz prop (Asia/Tokyo differs from UTC)", async () => {
+    // 2026-05-30T15:00:00Z = 2026-05-31T00:00:00 JST (UTC+9)
+    const ISO = "2026-05-30T15:00:00.000Z";
+    mockLoadSyncStatus.mockReturnValue({
+      ...BASE_STATUS,
+      lastPushFailed: true,
+      failedCardCount: null,
+      lastPushAttemptAt: ISO,
+    });
+
+    renderWithIntl(
+      <SyncStatusLine retryState="idle" retryNow={vi.fn()} superuserPaused={false} tz="Asia/Tokyo" />,
+    );
+
+    const btn = await screen.findByRole("button");
+    const text = btn.textContent ?? "";
+
+    // In Asia/Tokyo (UTC+9), 15:00 UTC = 00:00 JST.
+    expect(text).toContain("00:00");
+    // Must NOT show the UTC hour (15:00).
+    expect(text).not.toContain("15:00");
+  });
+
+  it("last-synced: different tz props produce different rendered hours for the same UTC time", async () => {
+    // 2026-06-01T06:00:00Z = 15:00 JST (UTC+9) vs 02:00 EDT (UTC-4).
+    const ISO = "2026-06-01T06:00:00.000Z";
+    mockLoadSyncStatus.mockReturnValue({
+      ...BASE_STATUS,
+      lastPushAt: ISO,
+    });
+
+    const { unmount } = renderWithIntl(
+      <SyncStatusLine retryState="idle" retryNow={vi.fn()} superuserPaused={false} tz="Asia/Tokyo" />,
+    );
+    const elTokyo = await screen.findByText(/Last synced:/);
+    const tokyoText = elTokyo.textContent ?? "";
+    unmount();
+
+    renderWithIntl(
+      <SyncStatusLine retryState="idle" retryNow={vi.fn()} superuserPaused={false} tz="America/New_York" />,
+    );
+    const elNy = await screen.findByText(/Last synced:/);
+    const nyText = elNy.textContent ?? "";
+
+    // Tokyo: 06:00 UTC = 15:00 JST; New York: 06:00 UTC = 02:00 EDT.
+    expect(tokyoText).toContain("15:00");
+    expect(nyText).toContain("02:00");
+    // The two rendered strings must differ.
+    expect(tokyoText).not.toEqual(nyText);
   });
 
   // ─── Auxiliary leg errors must NOT set structuralSyncError ───────────────
