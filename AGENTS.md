@@ -154,7 +154,7 @@ Decision tree (JSONB on `user_settings` vs. column on `card_reviews` vs. new tab
 
 Two runtime reminders:
 
-- **Apply the migration BEFORE merging the PR** (deadline is merge, not open). `migration-check.yml` fails the required check until file-vs-applied parity holds - call `mcp__supabase__apply_migration(name, query)` (name is the form *without* the `0NN_` prefix).
+- **Apply the migration BEFORE merging the PR** (deadline is merge, not open), and apply it to **both** Supabase projects: prod via `mcp__supabase__apply_migration(name, query)` **and** QA via `mcp__supabase-qa__apply_migration(name, query)` (name is the form *without* the `0NN_` prefix). `migration-check.yml` today validates only the prod project, so a migration applied to prod but not QA passes CI yet silently drifts QA (the QA `feedback`/index drift found on 2026-06-08, #1798/#1806). Until the env-to-branch check lands, applying to both is a manual discipline, not an enforced one. **Intended model (tracked in #1806, deferred):** make `migration-check.yml` assert **QA** parity on PRs targeting `qa` and **prod** parity on push to `main` (promotion), so the staging DB is the rehearsal and prod is proven at promotion. That rewrite needs the `QA_SUPABASE_ACCESS_TOKEN` / `QA_SUPABASE_PROJECT_REF` Actions secrets added by the maintainer; QA's migration ledger was reconciled (001-041 backfilled) on 2026-06-08 so the future check starts from parity.
 - **Wire cross-device sync** by adding `lib/sync/<feature>.ts` exporting `push` / `pull` (+ `merge` when applicable). Plumb pull into `pullAndMerge` as a best-effort leg; plumb push wherever the feature's data is written (a new `AutoSyncOnChange` handler, or alongside the existing `saveX(...)`).
 
 ### Page params
