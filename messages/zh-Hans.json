@@ -69,7 +69,8 @@
         "errorUsernameTaken": "该用户名已被使用，请选择其他用户名。",
         "errorInvalidCredentials": "用户名或密码不正确。",
         "errorSignupFailed": "注册失败，请重试。",
-        "errorSigninFailed": "登录失败，请重试。"
+        "errorSigninFailed": "登录失败，请重试。",
+        "errorRateLimited": "尝试次数过多，请稍等几分钟后再试。"
       }
     }
   },

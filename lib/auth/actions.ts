@@ -1,8 +1,10 @@
 "use server";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import type { AuthProvider } from "./types";
 import { normaliseUsername, validateUsername, syntheticEmail, MIN_PASSWORD_LENGTH } from "./username";
+import { hashIp } from "./rateLimitIp";
 
 export async function signIn(provider: AuthProvider) {
   if (provider !== "github" && provider !== "google") redirect("/");
@@ -30,7 +32,7 @@ export async function signOut() {
 
 export type SignUpWithUsernameResult =
   | { ok: true }
-  | { ok: false; error: string };
+  | { ok: false; error: "username_too_short" | "username_too_long" | "username_invalid_chars" | "password_too_short" | "username_taken" | "signup_failed" | "rate_limited" };
 
 /**
  * Signs up a new user with a username + password.
@@ -61,7 +63,24 @@ export async function signUpWithUsername(
     return { ok: false, error: "password_too_short" };
   }
 
+  // Per-IP throttle: check before any GoTrue call to prevent account-creation
+  // floods and username enumeration. Raw IP is never persisted; only the
+  // salted sha256 hash is written to public.rate_limit_buckets via the RPC.
+  const hdrs = await headers();
+  const rawIp = (hdrs.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
+  const ipHash = hashIp(rawIp);
+
   const supabase = await createClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rlAllowed, error: rlError } = await (supabase as any).rpc(
+    "check_rate_limit",
+    { p_ip_hash: ipHash, p_action: "signup" },
+  );
+  if (rlError || rlAllowed === false) {
+    return { ok: false, error: "rate_limited" };
+  }
+
   const email = syntheticEmail(normalised);
 
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -145,7 +164,7 @@ export async function signUpWithUsername(
 
 export type SignInWithUsernameResult =
   | { ok: true }
-  | { ok: false; error: string };
+  | { ok: false; error: "invalid_credentials" | "rate_limited" };
 
 /**
  * Signs in an existing user with a username + password.
@@ -166,7 +185,25 @@ export async function signInWithUsername(
     return { ok: false, error: "invalid_credentials" };
   }
 
+  // Per-IP throttle: looser cap for sign-in (10 / 10 min, 40 / 1 hr) since
+  // a failed sign-in creates no account; still guards against credential stuffing.
+  // TODO: apply check_rate_limit('signin'/'magiclink') when #1670 lands for the
+  // magic-link door as well.
+  const hdrs = await headers();
+  const rawIp = (hdrs.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
+  const ipHash = hashIp(rawIp);
+
   const supabase = await createClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rlAllowed, error: rlError } = await (supabase as any).rpc(
+    "check_rate_limit",
+    { p_ip_hash: ipHash, p_action: "signin" },
+  );
+  if (rlError || rlAllowed === false) {
+    return { ok: false, error: "rate_limited" };
+  }
+
   const email = syntheticEmail(normalised);
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });

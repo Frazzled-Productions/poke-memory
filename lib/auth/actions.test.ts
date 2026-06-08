@@ -17,6 +17,10 @@
  *  8. signInWithPassword error -> {ok:false, error:"invalid_credentials"}.
  *  9. signInWithPassword success -> {ok:true}.
  * 10. Username normalisation applied before syntheticEmail in both actions.
+ * 11. check_rate_limit RPC returning false -> {ok:false, error:"rate_limited"} without
+ *     calling signUp / signInWithPassword.
+ * 12. check_rate_limit RPC error -> {ok:false, error:"rate_limited"} (fail-safe).
+ * 13. check_rate_limit returning true -> proceeds to the normal auth path.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -27,11 +31,14 @@ import { syntheticEmail, normaliseUsername, MIN_PASSWORD_LENGTH } from "./userna
 // vi.mock factory runs (vi.mock is hoisted to top of file by vitest).
 // ---------------------------------------------------------------------------
 
-const { mockSignUp, mockSignInWithPassword, mockInsert } = vi.hoisted(() => ({
-  mockSignUp: vi.fn(),
-  mockSignInWithPassword: vi.fn(),
-  mockInsert: vi.fn(),
-}));
+const { mockSignUp, mockSignInWithPassword, mockInsert, mockRpc, mockHeaders } =
+  vi.hoisted(() => ({
+    mockSignUp: vi.fn(),
+    mockSignInWithPassword: vi.fn(),
+    mockInsert: vi.fn(),
+    mockRpc: vi.fn(),
+    mockHeaders: vi.fn(),
+  }));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue({
@@ -40,12 +47,19 @@ vi.mock("@/lib/supabase/server", () => ({
       signInWithPassword: mockSignInWithPassword,
     },
     from: (_table: string) => ({ insert: mockInsert }),
+    rpc: mockRpc,
   }),
 }));
 
 // next/navigation redirect is irrelevant for these action tests.
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
+}));
+
+// Mock next/headers so the actions can read x-forwarded-for without a real
+// Next.js request context. Return a stub Headers-like object.
+vi.mock("next/headers", () => ({
+  headers: mockHeaders,
 }));
 
 // Import actions AFTER mocks are registered.
@@ -81,6 +95,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Default: INSERT succeeds.
   mockInsert.mockResolvedValue({ error: null });
+  // Default: rate limit allows the request.
+  mockRpc.mockResolvedValue({ data: true, error: null });
+  // Default: x-forwarded-for returns a stable test IP.
+  mockHeaders.mockResolvedValue({ get: (name: string) => (name === "x-forwarded-for" ? "1.2.3.4" : null) });
 });
 
 // ---------------------------------------------------------------------------
@@ -241,6 +259,48 @@ describe("signUpWithUsername", () => {
     expect(result).toEqual({ ok: false, error: "password_too_short" });
     expect(mockSignUp).not.toHaveBeenCalled();
   });
+
+  // --- Test 11: rate_limited branch -----------------------------------------
+
+  it("returns rate_limited without calling signUp when the RPC returns false", async () => {
+    mockRpc.mockResolvedValue({ data: false, error: null });
+
+    const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(result).toEqual({ ok: false, error: "rate_limited" });
+    expect(mockSignUp).not.toHaveBeenCalled();
+  });
+
+  // --- Test 12: RPC error -> fail-safe rate_limited -------------------------
+
+  it("returns rate_limited without calling signUp when the RPC returns an error", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "db error" } });
+
+    const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(result).toEqual({ ok: false, error: "rate_limited" });
+    expect(mockSignUp).not.toHaveBeenCalled();
+  });
+
+  // --- Test 13: RPC allowed -> proceeds to signUp ---------------------------
+
+  it("proceeds to signUp when the RPC returns true", async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
+    mockSignUp.mockResolvedValue(makeSignUpSuccess());
+
+    const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(result).toEqual({ ok: true });
+    expect(mockSignUp).toHaveBeenCalledOnce();
+  });
+
+  it("calls check_rate_limit RPC with action 'signup'", async () => {
+    mockSignUp.mockResolvedValue(makeSignUpSuccess());
+
+    await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(mockRpc).toHaveBeenCalledWith("check_rate_limit", expect.objectContaining({ p_action: "signup" }));
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -319,5 +379,43 @@ describe("signInWithUsername", () => {
     const result = await signInWithUsername("trainer99", VALID_PASSWORD);
 
     expect(JSON.stringify(result)).not.toContain("@");
+  });
+
+  // --- Rate-limit branches for signIn (Tests 11-13) -------------------------
+
+  it("returns rate_limited without calling signInWithPassword when the RPC returns false", async () => {
+    mockRpc.mockResolvedValue({ data: false, error: null });
+
+    const result = await signInWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(result).toEqual({ ok: false, error: "rate_limited" });
+    expect(mockSignInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("returns rate_limited without calling signInWithPassword when the RPC returns an error", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "db error" } });
+
+    const result = await signInWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(result).toEqual({ ok: false, error: "rate_limited" });
+    expect(mockSignInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("proceeds to signInWithPassword when the RPC returns true", async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
+    mockSignInWithPassword.mockResolvedValue({ error: null });
+
+    const result = await signInWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(result).toEqual({ ok: true });
+    expect(mockSignInWithPassword).toHaveBeenCalledOnce();
+  });
+
+  it("calls check_rate_limit RPC with action 'signin'", async () => {
+    mockSignInWithPassword.mockResolvedValue({ error: null });
+
+    await signInWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(mockRpc).toHaveBeenCalledWith("check_rate_limit", expect.objectContaining({ p_action: "signin" }));
   });
 });

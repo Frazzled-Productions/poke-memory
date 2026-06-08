@@ -192,9 +192,11 @@ export function SignInSheet({ open, onClose }: Props) {
               ? t("signInSheet.username.errorInvalidCredentials")
               : errKey === "password_too_short"
                 ? t("signInSheet.username.errorPasswordTooShort")
-                : usernameMode === "signup"
-                  ? t("signInSheet.username.errorSignupFailed")
-                  : t("signInSheet.username.errorSigninFailed"),
+                : errKey === "rate_limited"
+                  ? t("signInSheet.username.errorRateLimited")
+                  : usernameMode === "signup"
+                    ? t("signInSheet.username.errorSignupFailed")
+                    : t("signInSheet.username.errorSigninFailed"),
         );
         setIsSubmitting(false);
       } else {
