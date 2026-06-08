@@ -218,10 +218,17 @@ jobs:
     # Supabase env, so it cannot serve real auth. This job bakes the QA env into
     # its own build + start.
     #
-    # Fork guard: the QA_* secrets are not exposed to fork PRs, so the job would
-    # hard-fail. Skip on forks (the spec's beforeAll throws without the env).
+    # Fork / Dependabot guard: the QA_* secrets are exposed to neither fork PRs
+    # nor Dependabot PRs (Dependabot PRs run in a restricted secret context where
+    # secrets.QA_* resolve to empty), so the job would hard-fail (the spec's
+    # beforeAll throws without the env). Skip both, the `e2e` gate treats a
+    # skipped result as a pass. Use `pull_request.user.login`, NOT `github.actor`:
+    # actor changes to the maintainer on a manual re-run, which would un-skip the
+    # job and fail it again, whereas user.login is the stable PR author.
     needs: [changes, test]
-    if: github.event.pull_request.head.repo.fork == false
+    if: >-
+      github.event.pull_request.head.repo.fork == false
+      && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     container:
       # Same pinned Playwright image as e2e-browser (browsers + Node 24 baked in).
@@ -310,8 +317,9 @@ jobs:
         run: |
           result="${{ needs.e2e-real-auth.result }}"
           echo "e2e-real-auth result: $result"
-          # Skipped is a pass: docs-only change (e2e_relevant false) or a fork PR
-          # (no QA secrets). Anything other than success or skipped fails the gate.
+          # Skipped is a pass: docs-only change (e2e_relevant false), or a fork PR
+          # or Dependabot PR (no QA secrets). Anything other than success or
+          # skipped fails the gate.
           if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
             echo "::error::The e2e-real-auth job did not pass (result: $result)."
             exit 1
