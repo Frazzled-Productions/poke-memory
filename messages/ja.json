@@ -128,10 +128,6 @@
         "heading": "スケジューラー",
         "hint": "スケジューラーは、忘れる直前に各カードを表示することを目指しています。記憶目標を高くするとレビュー回数が増えて定着率が向上し、低くするとレビュー回数が減ります。多くの方は90%のままにしています。"
       },
-      "masteryThreshold": {
-        "label": "習得基準（廃止予定）",
-        "description": "この設定は習得判定に影響しなくなりました。習得はFSRSの安定性によって決まります。将来のアップデートで削除予定です。"
-      },
       "recallTarget": {
         "label": "記憶目標 ({percent}%)",
         "description": "低くするとレビュー回数が減りますが、より多くのカードを忘れます。高くするとレビュー回数が増えますが、記憶の定着率が向上します。デフォルトは90%です。"
@@ -712,7 +708,7 @@
       "upcomingAriaLabel": "牧場に来る予定のポケモン",
       "allCaughtUp": "レビュー済みのポケモンはすでにすべて牧場にいます。",
       "repsInfoAriaLabel": "「reps」とは？",
-      "repsInfoPanel": "Reps（復習回数）：これまでにこのカードを復習した回数です。数字が大きいほど、習得に近いことを意味します。"
+      "repsInfoPanel": "Reps（復習回数）：これまでにこのカードを復習した回数です。習得はReps数だけでは決まりません。スケジューラーがあなたの記憶への自信度で判断します。"
     },
     "longPressHint": "いずれかの Pokémon を長押しすると、名前、習得日、次回レビュー間隔が表示されます。"
   },
@@ -763,7 +759,7 @@
       "trainerLabel": "トレーナー",
       "trainerFallback": "トレーナー",
       "levelLabel": "Lv",
-      "levelDescription": "レベルは習得済みの Pokémon 名前カード数に応じて上がります（3回以上の正解かつ次回間隔21日以上）。",
+      "levelDescription": "レベルは習得済みの Pokémon 名前カード数に応じて上がります。スケジューラーが3週間以上後でも確実に思い出せると判断したカードが習得済みになります。",
       "allMastered": "すべて習得済み",
       "masteryProgress": "{mastered} / {next} 習得済み · Lv {levelNext} まであと {needed}",
       "formsMastered": "{mastered} / {total} フォルム習得済み",

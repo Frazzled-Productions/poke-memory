@@ -139,12 +139,13 @@ describe("TrainerCard", () => {
     expect(screen.getByText("0 / 50 forms mastered")).toBeInTheDocument();
   });
 
-  it("level number is described by the mastery criterion text", () => {
+  it("level number is described by the stability-based mastery criterion text", () => {
     renderWithIntl(
       <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />,
     );
-    // sr-only element carries the accessible description
-    const descEl = screen.getByText(/reps.*3.*interval.*21/i);
+    // sr-only element carries the accessible description; copy now references
+    // scheduler confidence, not the old reps >= 3 gate (removed in #1765).
+    const descEl = screen.getByText(/scheduler.*confident.*three weeks/i);
     expect(descEl).toHaveAttribute("id", "trainer-level-desc");
     // level span wires up to it
     const levelSpan = screen.getByText("1", { selector: '[aria-describedby="trainer-level-desc"]' });
@@ -265,5 +266,17 @@ describe("TrainerCard - locale coverage (i18n #1393)", () => {
     expect(
       screen.getByRole("list", { name: "獲得ジムバッジ" }),
     ).toBeInTheDocument();
+  });
+
+  it("levelDescription in ja locale references stability, not the old reps gate (#1802)", () => {
+    renderJa(
+      <TrainerCard handle={null} totalMastered={0} perGeneration={perGen} />,
+    );
+    // The old ja copy referenced "3回以上の正解" (3+ correct reviews).
+    // Updated copy describes scheduler confidence; assert the old text is gone.
+    expect(screen.queryByText(/3回以上/)).toBeNull();
+    // New ja levelDescription contains "スケジューラー" (scheduler)
+    const descEl = screen.getByText(/スケジューラー/);
+    expect(descEl).toHaveAttribute("id", "trainer-level-desc");
   });
 });

@@ -128,10 +128,6 @@
         "heading": "[Scheduler]",
         "hint": "[The scheduler aims to show each card just before you'd forget it. A higher recall target means more reviews and stronger retention; a lower target means fewer reviews and a bit more forgetting. Most people leave this at 90%.]"
       },
-      "masteryThreshold": {
-        "label": "[Mastery threshold (deprecated)]",
-        "description": "[This setting no longer affects mastery. Mastery is now determined by FSRS stability, not review count. This control will be removed in a future update.]"
-      },
       "recallTarget": {
         "label": "[Recall target ({percent}%)]",
         "description": "[Lower means fewer reviews but you will forget more cards. Higher means more reviews but better retention. Default 90%.]"
@@ -712,7 +708,7 @@
       "upcomingAriaLabel": "[Upcoming Pasture species]",
       "allCaughtUp": "[All reviewed Pokémon are already in your Pasture.]",
       "repsInfoAriaLabel": "[What does reps mean?]",
-      "repsInfoPanel": "[Reps: how many times you have reviewed this card so far. A higher number means you are closer to mastering it.]"
+      "repsInfoPanel": "[Reps: how many times you have reviewed this card so far. Reps alone do not determine mastery - the scheduler's confidence in your recall does.]"
     },
     "longPressHint": "[Press and hold any Pokémon to see its name, mastery date, and review interval.]"
   },
@@ -763,7 +759,7 @@
       "trainerLabel": "[Trainer]",
       "trainerFallback": "[Trainer]",
       "levelLabel": "[Lv]",
-      "levelDescription": "[Level grows with the number of Pokémon name cards you've mastered (reps ≥ 3 and scheduled interval ≥ 21 days).]",
+      "levelDescription": "[Level grows with the number of Pokémon name cards you've mastered. A card is mastered once the scheduler is confident you will still recall it in three weeks or more.]",
       "allMastered": "[All mastered]",
       "masteryProgress": "[{mastered} / {next} mastered · {needed} to Lv {levelNext}]",
       "formsMastered": "[{mastered} / {total} forms mastered]",
