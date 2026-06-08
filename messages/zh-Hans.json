@@ -246,7 +246,7 @@
       "downloadHeading": "下载",
       "downloadTitle": "下载离线内容",
       "downloadDescription": "预先获取所有精灵图和叫声，以便在无网络时也能练习。建议在 Wi-Fi 下使用。约 166 MB。",
-      "storageUsage": "已使用 {usedMb}，共 {totalMb}。",
+      "storageUsage": "已使用 {usedGb}，共 {totalGb}。",
       "downloadedOn": "已于 {date} 下载。",
       "downloadButton": "下载",
       "updateButton": "更新",

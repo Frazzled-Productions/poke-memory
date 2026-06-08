@@ -246,7 +246,7 @@
       "downloadHeading": "下載",
       "downloadTitle": "下載離線內容",
       "downloadDescription": "預先擷取所有精靈圖和叫聲，以便在無網路時也能練習。建議在 Wi-Fi 下使用。約 166 MB。",
-      "storageUsage": "已使用 {usedMb}，共 {totalMb}。",
+      "storageUsage": "已使用 {usedGb}，共 {totalGb}。",
       "downloadedOn": "已於 {date} 下載。",
       "downloadButton": "下載",
       "updateButton": "更新",

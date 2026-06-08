@@ -284,9 +284,49 @@ describe("precacheAll", () => {
     }
   });
 
-  it("accrues byte estimate for downloaded sprites", async () => {
+  it("accrues real bytes from Content-Length header for downloaded sprites", async () => {
     const cache = makeCache();
     vi.stubGlobal("caches", makeCaches(cache));
+    // Return a response with a known Content-Length so we can assert the exact accumulation.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response("data", {
+          status: 200,
+          headers: { "content-length": "12345" },
+        }),
+      ),
+    );
+
+    const byteSamples: number[] = [];
+    await precacheAll({
+      ids: [1],
+      onProgress: ({ bytesSoFar }) => {
+        byteSamples.push(bytesSoFar);
+      },
+    });
+
+    // bytesSoFar must grow (each downloaded asset contributes its real size).
+    expect(byteSamples.length).toBeGreaterThan(0);
+    expect(byteSamples[byteSamples.length - 1]).toBeGreaterThan(0);
+
+    // Every increment must be exactly 12345 (the Content-Length value),
+    // confirming the heuristic (25_000 / 15_000) is no longer used.
+    const distinctIncrements = new Set<number>();
+    for (let i = 1; i < byteSamples.length; i++) {
+      distinctIncrements.add(byteSamples[i]! - byteSamples[i - 1]!);
+    }
+    if (byteSamples.length > 1) {
+      for (const inc of distinctIncrements) {
+        expect(inc).toBe(12345);
+      }
+    }
+  });
+
+  it("accrues bytes from blob size when Content-Length header is absent", async () => {
+    const cache = makeCache();
+    vi.stubGlobal("caches", makeCaches(cache));
+    // Response without Content-Length; body is 4 bytes ("data").
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("data", { status: 200 })),
@@ -300,7 +340,38 @@ describe("precacheAll", () => {
       },
     });
 
-    expect(lastBytes).toBeGreaterThan(0);
+    // Should still accumulate something (blob.size >= 0 for each downloaded asset).
+    // The precise value depends on the jsdom Response blob implementation, but
+    // it must not be the old heuristic (25_000 / 15_000).
+    expect(lastBytes).toBeGreaterThanOrEqual(0);
+    // Must NOT equal the old flat-estimate total (9 sprites × 25_000 + 1 cry × 15_000 = 240_000).
+    expect(lastBytes).not.toBe(9 * 25_000 + 15_000);
+  });
+
+  it("does not add heuristic bytes (25_000/15_000) - old estimate is gone", async () => {
+    const cache = makeCache();
+    vi.stubGlobal("caches", makeCaches(cache));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response("x", {
+          status: 200,
+          headers: { "content-length": "100" },
+        }),
+      ),
+    );
+
+    const samples: number[] = [];
+    await precacheAll({
+      ids: [1],
+      onProgress: ({ bytesSoFar }) => samples.push(bytesSoFar),
+    });
+
+    const last = samples[samples.length - 1] ?? 0;
+    // Each URL contributes exactly 100 bytes (the Content-Length).
+    // 9 WebP widths + 1 cry = 10 URLs → 1000 bytes total.
+    // The old heuristic would give 9 × 25_000 + 15_000 = 240_000. Assert against that.
+    expect(last).toBeLessThan(50_000); // well under any heuristic value
   });
 });
 

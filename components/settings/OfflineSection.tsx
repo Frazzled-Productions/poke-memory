@@ -12,11 +12,7 @@ import {
   type DownloadState,
 } from "@/lib/pwa/downloadController";
 import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
-
-/** Format bytes as MB, e.g. 47.3 MB */
-function formatMb(bytes: number): string {
-  return `${(bytes / 1_000_000).toFixed(1)} MB`;
-}
+import { formatGb } from "@/lib/utils/format-bytes";
 
 /**
  * Offline section for the Settings page.
@@ -39,7 +35,7 @@ export function OfflineSection() {
   // an in-PWA navigation, or "done" if a previous download was completed.
   const [downloadState, setDownloadState] = useState<DownloadState>(getState);
 
-  const [storageInfo, setStorageInfo] = useState<{ usedMb: string; totalMb: string } | null>(null);
+  const [storageInfo, setStorageInfo] = useState<{ usedGb: string; totalGb: string } | null>(null);
 
   /**
    * Derive the update-available state from the persisted manifest vs. the
@@ -72,20 +68,25 @@ export function OfflineSection() {
     return subscribe(setDownloadState);
   }, []);
 
+  /** Read navigator.storage.estimate() and update storageInfo state. */
+  function refreshStorageEstimate() {
+    if (!("storage" in navigator) || !("estimate" in navigator.storage)) return;
+    void navigator.storage.estimate().then((estimate) => {
+      if (estimate.usage !== undefined && estimate.quota !== undefined) {
+        setStorageInfo({
+          usedGb: formatGb(estimate.usage),
+          totalGb: formatGb(estimate.quota),
+        });
+      }
+    });
+  }
+
   // Read storage estimate on mount. Skip when the initial phase is already
   // "done" - the phase-change effect below fires in that case and makes the
   // same call, so the mount call would be a duplicate.
   useEffect(() => {
     if (downloadState.phase === "done") return;
-    if (!("storage" in navigator) || !("estimate" in navigator.storage)) return;
-    void navigator.storage.estimate().then((estimate) => {
-      if (estimate.usage !== undefined && estimate.quota !== undefined) {
-        setStorageInfo({
-          usedMb: formatMb(estimate.usage),
-          totalMb: formatMb(estimate.quota),
-        });
-      }
-    });
+    refreshStorageEstimate();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional mount-only
 
   // Warn before a full page unload during an active download.
@@ -102,19 +103,20 @@ export function OfflineSection() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [downloadState.phase]);
 
+  // Poll storage estimate every 5 seconds while a download is in progress so
+  // the "Using X of Y" readout stays current rather than freezing on the
+  // mount-time snapshot. The interval is cleared on phase change or unmount.
+  useEffect(() => {
+    if (downloadState.phase !== "downloading") return;
+    const id = setInterval(refreshStorageEstimate, 5_000);
+    return () => clearInterval(id);
+  }, [downloadState.phase]); // eslint-disable-line react-hooks/exhaustive-deps -- refreshStorageEstimate is stable
+
   // Refresh storage estimate after a completed download.
   useEffect(() => {
     if (downloadState.phase !== "done") return;
-    if (!("storage" in navigator) || !("estimate" in navigator.storage)) return;
-    void navigator.storage.estimate().then((estimate) => {
-      if (estimate.usage !== undefined && estimate.quota !== undefined) {
-        setStorageInfo({
-          usedMb: formatMb(estimate.usage),
-          totalMb: formatMb(estimate.quota),
-        });
-      }
-    });
-  }, [downloadState.phase]);
+    refreshStorageEstimate();
+  }, [downloadState.phase]); // eslint-disable-line react-hooks/exhaustive-deps -- refreshStorageEstimate is stable
 
   function handleDownload() {
     // Derive species IDs from the context-provided seed rather than a static import.
@@ -134,7 +136,7 @@ export function OfflineSection() {
           </p>
           {storageInfo !== null && (
             <p className={`mt-1 ${mutedTextXs}`}>
-              {t("storageUsage", { usedMb: storageInfo.usedMb, totalMb: storageInfo.totalMb })}
+              {t("storageUsage", { usedGb: storageInfo.usedGb, totalGb: storageInfo.totalGb })}
             </p>
           )}
         </div>
@@ -198,7 +200,7 @@ export function OfflineSection() {
                   total: format.number(downloadState.progress.total),
                 })}
                 {downloadState.progress.bytesSoFar > 0 && (
-                  <> ({formatMb(downloadState.progress.bytesSoFar)})</>
+                  <> ({formatGb(downloadState.progress.bytesSoFar)})</>
                 )}
                 ...
               </p>
