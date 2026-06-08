@@ -154,13 +154,15 @@ export function buildPrecacheUrls(ids: number[]): string[] {
  * the exact bucket the SW reads from.
  *
  * Returns `'skipped'` when the entry already exists in the cache.
- * Returns `'failed'`  when the network request returns a non-ok response.
- * Returns `'downloaded'` when the entry was freshly fetched and stored.
+ * Returns `{ result: 'failed' }` when the network request returns a non-ok response.
+ * Returns `{ result: 'downloaded', bytes: number }` when the entry was freshly fetched
+ * and stored, with the real byte size from the Content-Length header (or the
+ * response body size as a fallback when the header is absent).
  */
 async function fetchAndCache(
   url: string,
   signal: AbortSignal,
-): Promise<"downloaded" | "skipped" | "failed"> {
+): Promise<"skipped" | "failed" | { result: "downloaded"; bytes: number }> {
   // Determine which cache bucket this URL belongs to and derive the versioned
   // name so the precache writes match the SW's CacheFirst reads exactly.
   const isCry = url.startsWith("/cries/");
@@ -195,13 +197,50 @@ async function fetchAndCache(
 
   if (!response.ok) return "failed";
 
-  try {
-    await cache.put(url, response);
-  } catch {
-    return "failed";
+  // Read the real byte size before consuming the body.
+  // Content-Length is present on same-origin static files (sprites, cries, seed JSON).
+  // If absent (e.g. chunked transfer or CORS response without the header), fall
+  // back to cloning the response and reading the blob size. The clone is consumed
+  // for the size check while the original goes into the cache.
+  const contentLength = response.headers.get("content-length");
+  let bytes: number;
+  if (contentLength !== null && contentLength !== "") {
+    bytes = parseInt(contentLength, 10);
+    if (!Number.isFinite(bytes) || bytes < 0) bytes = 0;
+    try {
+      await cache.put(url, response);
+    } catch {
+      return "failed";
+    }
+  } else {
+    // No Content-Length: clone, read blob for the size, cache the clone.
+    let cloned: Response;
+    try {
+      cloned = response.clone();
+    } catch {
+      // Clone failed (body already consumed) - skip size, just cache.
+      bytes = 0;
+      try {
+        await cache.put(url, response);
+      } catch {
+        return "failed";
+      }
+      return { result: "downloaded", bytes };
+    }
+    try {
+      const blob = await cloned.blob();
+      bytes = blob.size;
+    } catch {
+      bytes = 0;
+    }
+    try {
+      await cache.put(url, response);
+    } catch {
+      return "failed";
+    }
   }
 
-  return "downloaded";
+  return { result: "downloaded", bytes };
 }
 
 /**
@@ -233,7 +272,7 @@ export async function precacheAll(options: PrecacheOptions): Promise<PrecacheSum
       const url = urls[index++];
       if (url === undefined) return;
 
-      let result: "downloaded" | "skipped" | "failed";
+      let result: "skipped" | "failed" | { result: "downloaded"; bytes: number };
       try {
         result = await fetchAndCache(url, signal ?? new AbortController().signal);
       } catch (err) {
@@ -241,10 +280,10 @@ export async function precacheAll(options: PrecacheOptions): Promise<PrecacheSum
         result = "failed";
       }
 
-      if (result === "downloaded") {
+      if (typeof result === "object" && result.result === "downloaded") {
         downloaded++;
-        // Rough byte estimate: sprites ~25 KB, cries ~15 KB.
-        bytesSoFar += url.startsWith("/cries/") ? 15_000 : 25_000;
+        // Real bytes from Content-Length header (or blob fallback).
+        bytesSoFar += result.bytes;
       } else if (result === "skipped") {
         skipped++;
       } else {

@@ -9,7 +9,7 @@
 
 import { screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
 import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import * as precacheModule from "@/lib/pwa/precache";
@@ -145,6 +145,37 @@ describe("OfflineSection", () => {
     // Wait for the async chain to settle.
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: /stop/i })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("shows download progress byte size in GB, not MB (AC2)", async () => {
+    // Pass a realistic byte count from a real Content-Length (e.g. 60 MB real download).
+    let resolvePrecache!: (value: precacheModule.PrecacheSummary) => void;
+    vi.spyOn(precacheModule, "precacheAll").mockImplementation(
+      ({ onProgress }) => {
+        // 60_000_000 bytes = 0.1 GB (with toFixed(1)).
+        onProgress?.({ done: 50, total: 100, bytesSoFar: 60_000_000 });
+        return new Promise<precacheModule.PrecacheSummary>((resolve) => {
+          resolvePrecache = resolve;
+        });
+      },
+    );
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    await waitFor(() => {
+      // Byte progress must be shown as GB ("0.1 GB"), not MB ("60.0 MB").
+      // getAllByText tolerates the storage-usage paragraph also matching.
+      const matches = screen.getAllByText(/0\.1 GB/);
+      expect(matches.length).toBeGreaterThan(0);
+    });
+
+    resolvePrecache({ totalRequested: 100, downloaded: 100, skipped: 0, failed: 0 });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
     );
   });
 
@@ -356,6 +387,88 @@ describe("OfflineSection", () => {
 
     // Chinese Simplified locale: button should be enabled (update available).
     expect(screen.getByRole("button", { name: /更新/i })).toBeEnabled();
+  });
+
+  // ── Storage estimate formatting (AC2) ─────────────────────────────────────
+
+  it("shows storage usage in GB on mount (idle phase)", async () => {
+    // estimateMock returns usage: 50_000_000, quota: 2_000_000_000
+    // 50 MB → 0.1 GB; 2 GB → 2.0 GB
+    renderWithIntl(<OfflineSection />);
+
+    await waitFor(() =>
+      // The storage readout must appear in GB, not MB.
+      expect(screen.getByText(/0\.1 GB.*2\.0 GB|2\.0 GB.*0\.1 GB/)).toBeInTheDocument(),
+    );
+  });
+
+  it("shows storage usage in GB after download completes (done phase)", async () => {
+    vi.spyOn(precacheModule, "precacheAll").mockResolvedValue({
+      totalRequested: 10,
+      downloaded: 10,
+      skipped: 0,
+      failed: 0,
+    });
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
+    );
+
+    // Storage readout must still be GB after completion.
+    await waitFor(() =>
+      expect(screen.getByText(/GB.*available|available.*GB/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("sets up a polling interval for storage estimate during download (AC3)", async () => {
+    // Verify that:
+    // 1. estimate() is called on mount (idle phase).
+    // 2. A setInterval is registered when downloading starts.
+    // 3. The interval is cleared when the download finishes.
+    //
+    // We spy on setInterval/clearInterval directly so fake timers are not needed
+    // (fake timers + waitFor + async mocks deadlock in this test setup).
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+
+    let resolvePrecache!: (value: precacheModule.PrecacheSummary) => void;
+    vi.spyOn(precacheModule, "precacheAll").mockImplementation(
+      ({ onProgress }) => {
+        onProgress?.({ done: 1, total: 100, bytesSoFar: 10_000 });
+        return new Promise<precacheModule.PrecacheSummary>((resolve) => {
+          resolvePrecache = resolve;
+        });
+      },
+    );
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("progressbar")).toBeInTheDocument(),
+    );
+
+    // A setInterval must have been registered once the download starts.
+    expect(setIntervalSpy).toHaveBeenCalledWith(
+      expect.any(Function),
+      5_000,
+    );
+
+    resolvePrecache({ totalRequested: 100, downloaded: 100, skipped: 0, failed: 0 });
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
+    );
+
+    // The interval must be cleared when the phase changes away from "downloading".
+    expect(clearIntervalSpy).toHaveBeenCalled();
   });
 
   it("remounting during an active download shows live progress without aborting", async () => {

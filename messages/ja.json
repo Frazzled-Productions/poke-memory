@@ -246,7 +246,7 @@
       "downloadHeading": "ダウンロード",
       "downloadTitle": "オフライン用にダウンロード",
       "downloadDescription": "すべてのスプライトと鳴き声をキャッシュしてオフラインで練習できるようにします。Wi-Fi での使用を推奨します。約166MB。",
-      "storageUsage": "{totalMb} のうち {usedMb} 使用中。",
+      "storageUsage": "{totalGb} のうち {usedGb} 使用中。",
       "downloadedOn": "{date} にダウンロード済み。",
       "downloadButton": "ダウンロード",
       "updateButton": "更新",

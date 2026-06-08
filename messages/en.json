@@ -246,7 +246,7 @@
       "downloadHeading": "Download",
       "downloadTitle": "Download for offline use",
       "downloadDescription": "Pre-fetches every sprite and cry so you can practise without a connection. Recommended on Wi-Fi. About 166 MB.",
-      "storageUsage": "Using {usedMb} of {totalMb} available.",
+      "storageUsage": "Using {usedGb} of {totalGb} available.",
       "downloadedOn": "Downloaded on {date}.",
       "downloadButton": "Download",
       "updateButton": "Update",
