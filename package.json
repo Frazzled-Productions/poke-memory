@@ -41,7 +41,7 @@
     "pre-pr": "node scripts/pre-pr.mjs"
   },
   "dependencies": {
-    "@open-spaced-repetition/binding": "^0.3.1",
+    "@open-spaced-repetition/binding": "^0.5.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "@vercel/analytics": "^2.0.1",
