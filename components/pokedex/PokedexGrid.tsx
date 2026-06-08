@@ -7,7 +7,7 @@ import type { PokemonCellData } from "@/lib/pokemon/filter";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { mutedText } from "@/lib/utils/class-names";
 import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
-import { spriteVariantUrl } from "@/lib/sprites/url";
+import { spriteVariantUrl, spriteGridSrcSet } from "@/lib/sprites/url";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -29,11 +29,12 @@ function zeroPad(id: number): string {
 // by-design pop-in we want for off-screen tiles, and a blanket preload of the
 // full set would be counter-productive.
 //
-// This surface serves the pre-generated 64 px WebP variant
-// (`/sprites/pokemon/webp/<id>/64.webp`) via `spriteVariantUrl`. The full 64 px
-// WebP set is already in the offline precache so the grid renders offline with
-// no additional download cost (#1740). The raw PNG path is no longer fetched
-// or precached for this surface.
+// This surface serves the pre-generated 64 px WebP variant as the default
+// `src` (`/sprites/pokemon/webp/<id>/64.webp`), with a `srcSet` providing
+// 2x (120 px) and 3x (192 px) variants for retina screens (#1787). All three
+// widths are already in the offline precache (#1789), so the grid renders
+// offline with no additional download cost. The raw PNG path is no longer
+// fetched or precached for this surface.
 function PokemonCell({
   pokemon,
   localeOverride,
@@ -106,11 +107,16 @@ function PokemonCell({
           {/* Sprite - using a plain <img> rather than next/image because we render
               1025 of these at fixed 64×64 sizes, where next/image's automatic
               sizing wrapper adds DOM overhead per cell with no responsive benefit.
-              Src points at the pre-generated 64 px WebP variant, which is already
-              in the offline precache (#1740). */}
+              srcSet provides DPR variants (1x=64 px, 2x=120 px, 3x=192 px) so
+              retina screens (2x/3x DPR, e.g. iPhone) receive a sharp source
+              rather than upscaling the 64 px tile (#1787). All three WebP widths
+              are already in the offline precache (#1789), so no extra bytes for
+              offline users. Route all grid srcset construction through
+              spriteGridSrcSet - never inline the descriptor string. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={spriteVariantUrl(id, POKEDEX_GRID_SPRITE_SIZE)}
+            srcSet={spriteGridSrcSet(id)}
             alt={isLocked ? `#${zeroPad(id)} (locked)` : displayName}
             width={POKEDEX_GRID_SPRITE_SIZE}
             height={POKEDEX_GRID_SPRITE_SIZE}
