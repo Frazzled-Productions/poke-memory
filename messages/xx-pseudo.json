@@ -476,6 +476,7 @@
     "noScopeMatch": "[No Pokémon match your scope]",
     "noScopeMatchBody": "[Adjust the filter above, or clear it to keep practising.]",
     "clearScope": "[Clear scope]",
+    "clearFilterToPractise": "[Clear filter to keep practising]",
     "outOfScopeHint": "[Finishing an in-progress card]",
     "gradeYourAnswer": "[Grade your answer]",
     "showKeyboardShortcuts": "[Show keyboard shortcuts]",

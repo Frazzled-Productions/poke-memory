@@ -476,6 +476,7 @@
     "noScopeMatch": "沒有符合您範圍的寶可夢",
     "noScopeMatchBody": "請調整上方的篩選條件，或清除後繼續練習。",
     "clearScope": "清除範圍",
+    "clearFilterToPractise": "清除篩選條件以繼續練習",
     "outOfScopeHint": "正在完成進行中的卡片",
     "gradeYourAnswer": "為您的回答評分",
     "showKeyboardShortcuts": "顯示鍵盤快速鍵",

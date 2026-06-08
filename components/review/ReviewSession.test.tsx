@@ -1576,6 +1576,259 @@ describe("Practice scope: stale display lock clears on scope change (#1088)", ()
   });
 });
 
+describe("Practice scope: completed-scope end state persists across remount (#1797)", () => {
+  // Scenario: user completes all cards in a scoped group (Gen I filter applied).
+  // The scoped card has already been reviewed today so the session is complete.
+  // On the end-of-session screen the ScopeControl and a "Clear filter to keep
+  // practising" button must both be visible (so clearing is deliberate, not
+  // silent). Navigating away and back (unmount + remount) with the same
+  // persisted scope must still show the end-of-session screen - NOT silently
+  // fall back to unfiltered practice.
+
+  const TODAY = "2026-06-08";
+
+  function makeReviewedTodayCard(): NameReviewCard {
+    // Graduated name card already reviewed today. Not due again today (dueDate
+    // is far-future), so it is ineligible for the review queue.
+    return {
+      ...FIXTURE_CARD,
+      id: 1,
+      speciesId: 1,
+      generation: "generation-i",
+      state: {
+        stability: 25,
+        difficulty: 5,
+        elapsedDays: 25,
+        scheduledDays: 25,
+        reps: 5,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2099-01-01",
+        lastReview: TODAY,   // reviewed today - not due again
+        firstSeen: "2026-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+  }
+
+  function makeGraduatedReverseCard(speciesId: number): ReverseReviewCard {
+    // Graduated reverse card for a species - already reviewed some time ago and
+    // due far in the future. Included in saved sessions so hydrateSession does
+    // not inject a fresh unseen reverse card (which would trigger NEW_CARDS_LOCKED
+    // when maxNewReversePerDay=0). The id follows the REVERSE_ID_OFFSET convention.
+    const REVERSE_ID_OFFSET = 2_000_000;
+    return {
+      ...FIXTURE_CARD,
+      id: REVERSE_ID_OFFSET + speciesId,
+      speciesId,
+      pokemonId: speciesId,
+      cardType: "reverse" as const,
+      subjectKey: String(speciesId),
+      generation: "generation-i",
+      state: {
+        stability: 25,
+        difficulty: 5,
+        elapsedDays: 25,
+        scheduledDays: 25,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2099-01-01",
+        lastReview: "2026-01-01",  // reviewed a long time ago, not today
+        firstSeen: "2026-01-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+  }
+
+  function scopedSettings() {
+    return {
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      maxNewReversePerDay: 0,   // suppress reverse-card injection from session queues
+      maxReviewsReversePerDay: 100,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      // Gen I scope - includes Bulbasaur (speciesId 1, generation-i).
+      practiceScope: { gens: [1] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+      earnedBadges: [] as { id: string; earnedAt: string }[],
+    };
+  }
+
+  beforeEach(() => {
+    vi.setSystemTime(new Date(`${TODAY}T12:00:00Z`));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows the ScopeControl and a clear-filter button on the end-of-session screen when a scope is active", async () => {
+    const card = makeReviewedTodayCard();
+    // Include a graduated reverse card so hydrateSession does not inject a
+    // fresh unseen reverse card that would trigger NEW_CARDS_LOCKED.
+    const reverseCard = makeGraduatedReverseCard(1);
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [card, reverseCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue(scopedSettings());
+
+    renderWithIntl(<ReviewSession />);
+
+    // Session has no eligible due cards - renders the end-of-session screen.
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+
+    // The ScopeControl toggle must be visible so the user can see the active scope.
+    const scopeToggle = screen
+      .getAllByRole("button", { expanded: false })
+      .find((b) => /scope/i.test(b.textContent ?? ""));
+    expect(scopeToggle).toBeDefined();
+
+    // The explicit "Clear filter to keep practising" affordance must be present.
+    expect(
+      screen.getByRole("button", { name: /clear filter to keep practising/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("does NOT show the clear-filter button when no scope is active on the end-of-session screen", async () => {
+    // Empty seed → immediate SESSION_COMPLETE with no scope.
+    mockSeedPokemon.mockReturnValue([]);
+    mockLoadSettings.mockReturnValue({
+      ...scopedSettings(),
+      practiceScope: { gens: [], types: [], presets: [] },
+    });
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole("button", { name: /clear filter to keep practising/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("clicking clear-filter on end-of-session resumes practice with the full card set", async () => {
+    const user = userEvent.setup();
+    const card = makeReviewedTodayCard();
+    const reverseCard = makeGraduatedReverseCard(1);
+    // A second card outside the scope that is due for review (reviewed in the
+    // past, not today) - it enters the review queue once the scope is cleared.
+    // Gen II so it is excluded by the Gen-I scope at mount. Its reverse card is
+    // also graduated so no new-card injection triggers the newWall.
+    const outsideCard: NameReviewCard = {
+      ...FIXTURE_CARD,
+      id: 152,
+      speciesId: 152,
+      name: "Chikorita",
+      displayName: "Chikorita",
+      subjectKey: "152",
+      spriteUrl: "https://example.com/chikorita.png",
+      generation: "generation-ii",
+      state: {
+        stability: 5,
+        difficulty: 5,
+        elapsedDays: 5,
+        scheduledDays: 5,
+        reps: 2,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: TODAY,           // due today - enters review queue when unscoped
+        lastReview: "2026-06-03", // reviewed a few days ago, not today
+        firstSeen: "2026-06-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    };
+    // Graduated reverse card for Chikorita to prevent hydrateSession injecting
+    // a fresh reverse card that would trigger NEW_CARDS_LOCKED for reverse type.
+    const outsideReverseCard = makeGraduatedReverseCard(152);
+    // Update generation to match Chikorita.
+    (outsideReverseCard as NameReviewCard & { generation: string }).generation = "generation-ii";
+    mockSeedPokemon.mockReturnValue([card, outsideCard]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [card, reverseCard, outsideCard, outsideReverseCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue(scopedSettings());
+
+    renderWithIntl(<ReviewSession />);
+
+    // Wait for end-of-session (scoped card reviewed today, out-of-scope card
+    // excluded by eligibility).
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+
+    const clearBtn = screen.getByRole("button", {
+      name: /clear filter to keep practising/i,
+    });
+    await user.click(clearBtn);
+
+    // After clearing, Chikorita enters the queue. The Reveal button appears.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+    // End-of-session "all caught up" heading is gone.
+    expect(screen.queryByText(/all caught up/i)).not.toBeInTheDocument();
+  });
+
+  it("remount after scoped-session-complete still shows the end-of-session screen", async () => {
+    // Simulates navigate-away + navigate-back: unmount then remount with the
+    // same persisted scope. The session must re-show SESSION_COMPLETE (scoped
+    // cards still reviewed today), not fall back to unfiltered practice.
+    const card = makeReviewedTodayCard();
+    const reverseCard = makeGraduatedReverseCard(1);
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [card, reverseCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue(scopedSettings());
+
+    const { unmount } = renderWithIntl(<ReviewSession />);
+
+    // First mount - session complete under scope.
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+
+    // Navigate away (unmount component).
+    unmount();
+
+    // Navigate back (remount). Settings still have the Gen-I scope.
+    renderWithIntl(<ReviewSession />);
+
+    // Must still show end-of-session - NOT drop back into unfiltered practice.
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole("button", { name: /reveal/i }),
+    ).not.toBeInTheDocument();
+
+    // The clear-filter affordance must still be present.
+    expect(
+      screen.getByRole("button", { name: /clear filter to keep practising/i }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("ReviewSession TTS warm-up (#479)", () => {
   it("calls warmupTts on the reveal button click and again on the grade button click", async () => {
     const user = userEvent.setup();

@@ -476,6 +476,7 @@
     "noScopeMatch": "没有符合您范围的宝可梦",
     "noScopeMatchBody": "请调整上方的筛选条件，或清除后继续练习。",
     "clearScope": "清除范围",
+    "clearFilterToPractise": "清除筛选条件以继续练习",
     "outOfScopeHint": "正在完成进行中的卡片",
     "gradeYourAnswer": "为您的回答评分",
     "showKeyboardShortcuts": "显示键盘快捷键",
