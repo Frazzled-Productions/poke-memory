@@ -28,8 +28,6 @@ import { useSeed } from "@/lib/pokemon/SeedContext";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { generationOf } from "@/lib/stats/derive";
-import { computeSpeciesLegStatuses } from "@/lib/stats/legStatus";
-import type { SpeciesLegStatus } from "@/lib/stats/legStatus";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { PageShell } from "@/components/ui/PageShell";
 import { pageTitle } from "@/lib/utils/class-names";
@@ -335,16 +333,6 @@ export default function PasturePage() {
     flags.pretendAllMastered,
   );
 
-  // Per-species leg status for the popover (#1766). Computed from the full
-  // session card set (all card types, not just mastered name cards) so the
-  // reverse-card status is always accurate. Under pretendAllMastered, the
-  // helper returns all legs as mastered/not-blocked (empty map from the
-  // synthesized masteredCards which have no reverse cards, so we skip).
-  const legStatusMap: ReadonlyMap<number, SpeciesLegStatus> =
-    !flags.pretendAllMastered && session
-      ? computeSpeciesLegStatuses(session.cards, pokemonNameLocale, false)
-      : new Map();
-
   const filtered = isFiltered(filters);
 
   return (
@@ -383,7 +371,6 @@ export default function PasturePage() {
               onMarkSeen={handleMarkSeen}
               biomeHref={`/pasture/${zone.habitat}`}
               stats={zone.stats}
-              legStatusMap={legStatusMap}
             />
           ))}
         </div>
