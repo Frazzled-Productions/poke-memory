@@ -413,6 +413,7 @@ export default function StatsPage() {
               retryState={retryState}
               retryNow={retryNow}
               superuserPaused={anyFlagOn}
+              tz={userTimezone}
             />
           </div>
         )}
