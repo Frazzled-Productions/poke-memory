@@ -27,6 +27,8 @@
 --     (user_id, card_type, subject_key, locale), so WHERE user_id = $1 is
 --     already served; a standalone index would be strictly redundant.
 
+-- IF NOT EXISTS: intentional divergence from house style (bare CREATE INDEX per #1798 Notes);
+-- guards against re-run on partial failure without changing the net schema state.
 CREATE INDEX IF NOT EXISTS feedback_user ON public.feedback (user_id) WHERE user_id IS NOT NULL;
 
 DROP INDEX IF EXISTS public.idx_usernames_user_id;
