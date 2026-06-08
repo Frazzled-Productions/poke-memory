@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { buildPrecacheUrls, precacheAll, OFFLINE_DOWNLOADED_AT_KEY } from "./precache";
+import { buildPrecacheUrls, precacheAll, OFFLINE_DOWNLOADED_AT_KEY, OFFLINE_PRECACHE_WIDTHS } from "./precache";
 import { CACHE_NAMES, versionedCacheName } from "./cacheStrategy";
 import { GENERATED_SPRITE_WIDTHS } from "@/lib/sprites/imageLoaderHelpers";
 
@@ -89,18 +89,47 @@ describe("buildPrecacheUrls", () => {
     expect(buildPrecacheUrls([])).toHaveLength(0);
   });
 
-  it("emits exactly (GENERATED_SPRITE_WIDTHS.length + 1) URLs per species", () => {
+  it("emits exactly (OFFLINE_PRECACHE_WIDTHS.length + 1) URLs per species", () => {
     // +1 for the cry. This assertion is a CI gate: adding a new width to
-    // GENERATED_SPRITE_WIDTHS grows the precache by ~1025 × size KB and must
-    // be a conscious decision, not a silent side-effect.
+    // OFFLINE_PRECACHE_WIDTHS grows every user's offline download by ~1025 ×
+    // (size per width) and must be a conscious decision, not a silent side-effect.
+    // Note: OFFLINE_PRECACHE_WIDTHS is a strict subset of GENERATED_SPRITE_WIDTHS
+    // (all 10 generated widths minus the decorative-only 180 px watermark).
     const single = buildPrecacheUrls([1]);
-    expect(single).toHaveLength(GENERATED_SPRITE_WIDTHS.length + 1);
+    expect(single).toHaveLength(OFFLINE_PRECACHE_WIDTHS.length + 1);
 
     const three = buildPrecacheUrls([1, 2, 3]);
-    expect(three).toHaveLength((GENERATED_SPRITE_WIDTHS.length + 1) * 3);
+    expect(three).toHaveLength((OFFLINE_PRECACHE_WIDTHS.length + 1) * 3);
 
-    // Snapshot the current width count so any addition fails CI explicitly.
+    // Snapshot the current offline width count so any addition fails CI explicitly.
+    // GENERATED_SPRITE_WIDTHS still has 10; the precache uses 9 (drops 180 px watermark).
     expect(GENERATED_SPRITE_WIDTHS.length).toBe(10);
+    expect(OFFLINE_PRECACHE_WIDTHS.length).toBe(9);
+  });
+
+  it("emits only the offline-reachable widths (not all generated widths)", () => {
+    // The 180 px ThemeWatermark variant must NOT appear in the precache:
+    // it is decorative-only and would waste ~7.8 MB per user's offline download.
+    const urls = buildPrecacheUrls([1]);
+    const webpUrls = urls.filter((u) => u.startsWith("/sprites/pokemon/webp/1/"));
+    const emittedWidths = webpUrls
+      .map((u) => {
+        const match = u.match(/\/(\d+)\.webp$/);
+        return match ? parseInt(match[1]!, 10) : null;
+      })
+      .filter((w): w is number => w !== null)
+      .sort((a, b) => a - b);
+
+    // Must match OFFLINE_PRECACHE_WIDTHS exactly.
+    expect(emittedWidths).toEqual([...OFFLINE_PRECACHE_WIDTHS].sort((a, b) => a - b));
+
+    // Explicitly assert that 180 (ThemeWatermark, dropped in #1789) is absent.
+    expect(emittedWidths).not.toContain(180);
+
+    // All 9 kept widths must be present.
+    for (const w of OFFLINE_PRECACHE_WIDTHS) {
+      expect(emittedWidths).toContain(w);
+    }
   });
 });
 

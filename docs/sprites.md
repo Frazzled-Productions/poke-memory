@@ -2,7 +2,7 @@
 
 Canonical reference for how Pokémon sprites are rendered across the app. AGENTS.md keeps a short pointer here. Read this before adding a new sprite-rendering surface or touching `lib/sprites/`, `components/sprites/`, or any existing surface's `<Image>` / `<img>` call.
 
-**Status:** Updated 2026-05-22 (#1186 - static WebP pre-generation, custom `next/image` loader). Settled 2026-05-18 (#932, #933). Follows the shared-primitive extraction in #929 and the adoption work in #930/#931.
+**Status:** Updated 2026-06-08 (#1789 - precache trimmed to offline-reachable widths). Updated 2026-05-22 (#1186 - static WebP pre-generation, custom `next/image` loader). Settled 2026-05-18 (#932, #933). Follows the shared-primitive extraction in #929 and the adoption work in #930/#931.
 
 ## TL;DR
 
@@ -105,7 +105,14 @@ The Pokédex grid (`components/pokedex/PokedexGrid.tsx`, ~1025 tiles) is the **o
 - Off-screen tiles are *meant* to pop in as the user scrolls; `loading="lazy"` on a plain `<img>` is exactly the right behaviour and costs nothing.
 - A blanket preload or decode-ahead of the full set would be counter-productive (network saturation), and a viewport-aware prefetch was judged not worth the complexity for a surface whose lazy pop-in is by design.
 
-**#1740 update: WebP src, PNG no longer precached.** The 64 px WebP set is already in the offline precache (2.4 MB). Switching the grid to serve WebP instead of PNG eliminated the need to precache the full raw-PNG set (~144.6 MB), cutting the offline precache from ~212 MB to ~67.5 MB with no loss of offline capability. Raw PNGs remain in `public/` as the build-time source for `npm run seed:sprites` but are no longer included in `buildPrecacheUrls`.
+**#1740 update: WebP src, PNG no longer precached.** The 64 px WebP set is already in the offline precache (2.4 MB). Switching the grid to serve WebP instead of PNG eliminated the need to precache the full raw-PNG set (~144.6 MB), cutting the offline precache from ~212 MB with no loss of offline capability. Raw PNGs remain in `public/` as the build-time source for `npm run seed:sprites` but are no longer included in `buildPrecacheUrls`.
+
+**#1789 update: precache trimmed to offline-reachable widths.** `buildPrecacheUrls` now emits only the 9 widths actually requested by offline-reachable surfaces (all generated widths except the 180 px `ThemeWatermark` decorative background). The 180 px variant is dropped because its absence offline has zero impact on app functionality. Size accounting (actual file bytes, not `du` block counts):
+
+- Pre-trim (all 10 WebP widths + cries): ~67.5 MB (~96 MB by `du -sh`, which counts 4 KB filesystem blocks).
+- Post-trim (9 WebP widths + cries): ~59.7 MB.
+
+The kept widths and their rationale are documented in `OFFLINE_PRECACHE_WIDTHS` in `lib/pwa/precache.ts`. The generated width set (`GENERATED_SPRITE_WIDTHS`) is unchanged - `npm run seed:sprites` still produces all 10 variants for online use.
 
 The exemption is recorded inline in `PokedexGrid.tsx` (the comment above the `<img>` element) and here. If the grid is ever revisited, the options weighed and rejected in #932 were: (b) a viewport-aware decode-warm of near-viewport tiles, and (c) `decode()`-on-scroll for upcoming rows. Both stay on the table but are not worth the cost today.
 
