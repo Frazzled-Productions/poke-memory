@@ -1,0 +1,64 @@
+-- Migration: 040_security_audit
+-- Issue: #1799
+--
+-- Supabase security advisor pass. Four items reviewed; two require SQL changes,
+-- two are documented verdicts with no schema change.
+--
+-- ── Item 1: feedback table RLS (rls_enabled_no_policy) ───────────────────────
+--
+-- feedback has RLS enabled (migration 034) with zero policies. The advisor flags
+-- this as "enabled but no policy", which it cannot distinguish from intentional
+-- default-deny. The intended model IS service-role-only: all writes go through
+-- app/api/feedback/route.ts which uses the service-role/admin client; there is no
+-- browser read or write path. An authenticated SELECT policy would expose other
+-- users' free-text PII feedback, which is contrary to the UK-GDPR Art.5(1)(f)
+-- integrity/confidentiality principle.
+--
+-- FIX: add a single deny-all SELECT policy to make the service-role-only intent
+-- machine-readable, without opening any access. The service-role INSERT path
+-- bypasses RLS entirely and is unaffected. No INSERT policy is added.
+--
+-- ── Item 2: reconcile_grade_log_orphans REVOKE from authenticated ─────────────
+--
+-- Migration 032 created reconcile_grade_log_orphans(boolean) as SECURITY DEFINER
+-- and revoked EXECUTE from public and anon, but did not explicitly revoke from
+-- the `authenticated` role. Any signed-in user could therefore call this
+-- maintenance-only RPC directly, which would at minimum waste DB resources and
+-- at worst (if the live-run flag is enabled) insert placeholder rows in bulk.
+-- No in-app code path calls this function as authenticated.
+--
+-- FIX: REVOKE EXECUTE from authenticated. The function remains callable by
+-- pg_cron (which runs as the service role) and direct service-role invocations.
+--
+-- ── Item 3: delete_account() / reset_all_progress() ─────────────────────────
+-- (authenticated_security_definer_function_executable - NO SQL CHANGE)
+--
+-- Both functions are intentionally user-facing self-service RPCs:
+--   * delete_account(): removes the calling user's auth.users row (and all
+--     cascading data); guarded to auth.uid() internally; null-checked.
+--   * reset_all_progress(): clears the calling user's card_reviews via a
+--     SECURITY DEFINER bypass of the regression trigger; guarded to auth.uid();
+--     null-checked (migration 018).
+-- These must be callable by authenticated. INTENDED AND CORRECT - no change.
+--
+-- ── Item 4: pg_net extension in public schema (extension_in_public, WARN) ────
+-- (NO SQL CHANGE - WONTFIX)
+--
+-- pg_net was pulled in as a Supabase-managed extension by the web-push cron
+-- (migration 028). Moving it to a non-public schema requires dropping and
+-- recreating it and is both fiddly and low value: pg_net is a Supabase-internal
+-- extension not directly called by application code. WONTFIX - rationale noted
+-- here for future advisor runs.
+--
+-- ── Item 5: leaked-password protection ───────────────────────────────────────
+-- (OUT OF SCOPE - tracked in #1800)
+--
+-- HaveIBeenPwned check is a Supabase Auth dashboard toggle, relevant now that
+-- the sign-up epic added username/password sign-in. Enabling it requires no SQL
+-- migration. Tracked in #1800.
+
+-- Item 1: make the service-role-only intent explicit via a deny-all SELECT policy.
+CREATE POLICY "feedback_no_client_select" ON public.feedback FOR SELECT USING (false);
+
+-- Item 2: remove the authenticated execute grant from the maintenance-only RPC.
+REVOKE EXECUTE ON FUNCTION public.reconcile_grade_log_orphans(boolean) FROM authenticated;
