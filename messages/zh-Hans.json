@@ -255,7 +255,15 @@
       "stopButton": "停止",
       "upToDate": "已是最新",
       "updateAvailable": "有可用更新",
-      "updateAvailableCount": "有可用更新（新增 {count} 个）"
+      "updateAvailableCount": "有可用更新（新增 {count} 个）",
+      "downloadBytesLabel": "已下载",
+      "deleteButton": "删除离线缓存",
+      "deleteConfirmTitle": "删除离线缓存？",
+      "deleteConfirmBody": "这将删除所有已下载的精灵图和叫声（{size}）。您可以随时重新下载。",
+      "deleteConfirmBodyNoSize": "这将删除您的所有离线数据。您可以随时重新下载。",
+      "deleteConfirmConfirm": "删除",
+      "deleteConfirmCancel": "取消",
+      "deleteErrorMessage": "无法删除缓存。请尝试在浏览器设置中清除网站数据。"
     },
     "optimizerCooldown": "{count, plural, other {下次优化还需 # 天}}",
     "optimizerRetryAfter": "{count, plural, other {请在 # 天后重试。}}",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatGb } from "./format-bytes";
+import { formatGb, formatDownloadBytes } from "./format-bytes";
 
 describe("formatGb", () => {
   it("formats zero bytes as 0.0 GB", () => {
@@ -37,5 +37,54 @@ describe("formatGb", () => {
     const result = formatGb(1_500_000_000);
     expect(result).toMatch(/^\d+\.\d GB$/);
     expect(result).toBe("1.5 GB");
+  });
+});
+
+describe("formatDownloadBytes", () => {
+  it("formats zero bytes as 0.0 MB", () => {
+    expect(formatDownloadBytes(0)).toBe("0.0 MB");
+  });
+
+  it("formats a small download (25 KB) as 0.0 MB", () => {
+    // 25_000 bytes = 0.025 MB, rounds to 0.0
+    expect(formatDownloadBytes(25_000)).toBe("0.0 MB");
+  });
+
+  it("formats 1 MB as 1.0 MB (not 0.0 GB)", () => {
+    // This was the key failure with formatGb: 1_000_000 / 1e9 = 0.001 → 0.0 GB
+    expect(formatDownloadBytes(1_000_000)).toBe("1.0 MB");
+  });
+
+  it("formats 60 MB as 60.0 MB", () => {
+    expect(formatDownloadBytes(60_000_000)).toBe("60.0 MB");
+  });
+
+  it("formats 166 MB (realistic precache size) as 166.0 MB", () => {
+    expect(formatDownloadBytes(166_000_000)).toBe("166.0 MB");
+  });
+
+  it("formats 999 MB as 999.0 MB (stays in MB below 1 GB)", () => {
+    expect(formatDownloadBytes(999_000_000)).toBe("999.0 MB");
+  });
+
+  it("switches to GB at exactly 1,000 MB (1 GB)", () => {
+    expect(formatDownloadBytes(1_000_000_000)).toBe("1.0 GB");
+  });
+
+  it("formats 1.2 GB as 1.2 GB", () => {
+    expect(formatDownloadBytes(1_200_000_000)).toBe("1.2 GB");
+  });
+
+  it("always shows exactly one decimal place (MB range)", () => {
+    const result = formatDownloadBytes(123_456_789);
+    // 123_456_789 / 1e6 = 123.456789 → 123.5 MB
+    expect(result).toBe("123.5 MB");
+    expect(result).toMatch(/^\d+\.\d MB$/);
+  });
+
+  it("always shows exactly one decimal place (GB range)", () => {
+    const result = formatDownloadBytes(1_500_000_000);
+    expect(result).toBe("1.5 GB");
+    expect(result).toMatch(/^\d+\.\d GB$/);
   });
 });

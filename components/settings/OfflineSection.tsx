@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import {
@@ -8,11 +8,15 @@ import {
   subscribe,
   startDownload,
   stopDownload,
+  resetToIdle,
   getCurrentManifest,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
-import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
-import { formatGb } from "@/lib/utils/format-bytes";
+import { CACHE_NAMES, versionedCacheName } from "@/lib/pwa/cacheStrategy";
+import { OFFLINE_DOWNLOADED_AT_KEY } from "@/lib/pwa/precache";
+import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
+import { cardPanelPadded, colStack, colStackLg, dialogPanel, mutedText, mutedTextXs } from "@/lib/utils/class-names";
+import { formatGb, formatDownloadBytes } from "@/lib/utils/format-bytes";
 
 /**
  * Offline section for the Settings page.
@@ -36,6 +40,12 @@ export function OfflineSection() {
   const [downloadState, setDownloadState] = useState<DownloadState>(getState);
 
   const [storageInfo, setStorageInfo] = useState<{ usedGb: string; totalGb: string } | null>(null);
+
+  /** Ref to the native confirm-delete dialog element. */
+  const deleteDialogRef = useRef<HTMLDialogElement>(null);
+
+  /** Error message from a failed delete attempt, or null. */
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   /**
    * Derive the update-available state from the persisted manifest vs. the
@@ -118,10 +128,80 @@ export function OfflineSection() {
     refreshStorageEstimate();
   }, [downloadState.phase]); // eslint-disable-line react-hooks/exhaustive-deps -- refreshStorageEstimate is stable
 
+  // Wire the native dialog's "cancel" event (fired on Escape) to close cleanly.
+  useEffect(() => {
+    const dialog = deleteDialogRef.current;
+    if (!dialog) return;
+    function handleCancel(e: Event) {
+      e.preventDefault();
+      dialog!.close();
+    }
+    dialog.addEventListener("cancel", handleCancel);
+    return () => dialog.removeEventListener("cancel", handleCancel);
+  }, []);
+
+  function openDeleteDialog() {
+    deleteDialogRef.current?.showModal();
+  }
+
+  function closeDeleteDialog() {
+    deleteDialogRef.current?.close();
+  }
+
   function handleDownload() {
     // Derive species IDs from the context-provided seed rather than a static import.
     const ids = seed ? seed.seedPokemon.filter((p) => p.isDefaultForm).map((p) => p.id) : [];
     void startDownload(ids);
+  }
+
+  /**
+   * Delete all offline cache entries written by the precache orchestrator.
+   *
+   * Clears the versioned sprites and cries cache buckets (the same buckets
+   * that `lib/pwa/precache.ts::fetchAndCache` writes to, derived from the
+   * same `versionedCacheName` helper and `CACHE_NAMES` constants). This
+   * avoids hardcoding a second copy of the cache-name strings.
+   *
+   * After deletion:
+   *   - The download timestamp and manifest are cleared from localStorage so
+   *     the controller returns to idle on next seed.
+   *   - The download state singleton is reset to idle.
+   *   - The storage estimate is refreshed so "Using X of Y" updates.
+   */
+  async function handleDeleteCache(): Promise<void> {
+    closeDeleteDialog();
+    setDeleteError(null);
+
+    try {
+      if ("caches" in window) {
+        const spritesCacheName = versionedCacheName(CACHE_NAMES.sprites);
+        const criesCacheName = versionedCacheName(CACHE_NAMES.cries);
+        await Promise.all([
+          caches.delete(spritesCacheName),
+          caches.delete(criesCacheName),
+        ]);
+      }
+
+      // Clear the persisted download metadata so the controller seeds "idle"
+      // on next page load.
+      try {
+        localStorage.removeItem(OFFLINE_DOWNLOADED_AT_KEY);
+        localStorage.removeItem(KEY_OFFLINE_MANIFEST);
+      } catch {
+        // localStorage unavailable - non-fatal.
+      }
+
+      // Reset the singleton to idle via the public API so all subscribers
+      // (any other mounted OfflineSection instances, future listeners) see
+      // the cleared state immediately without waiting for a page reload.
+      // resetToIdle() also clears the storageSeedDone guard so a subsequent
+      // subscribe/getState call re-checks localStorage (which is now empty)
+      // and stays idle rather than re-seeding "done" from stale memory.
+      resetToIdle();
+      refreshStorageEstimate();
+    } catch {
+      setDeleteError(t("deleteErrorMessage"));
+    }
   }
 
   return (
@@ -174,15 +254,31 @@ export function OfflineSection() {
                 {downloadState.message}
               </p>
             )}
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={manifestStatus !== null && !manifestStatus.isStale}
-              aria-disabled={manifestStatus !== null && !manifestStatus.isStale}
-              className="self-start min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700"
-            >
-              {downloadState.phase === "done" ? t("updateButton") : t("downloadButton")}
-            </button>
+            {deleteError !== null && (
+              <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
+                {deleteError}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={manifestStatus !== null && !manifestStatus.isStale}
+                aria-disabled={manifestStatus !== null && !manifestStatus.isStale}
+                className="self-start min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700"
+              >
+                {downloadState.phase === "done" ? t("updateButton") : t("downloadButton")}
+              </button>
+              {downloadState.phase === "done" && (
+                <button
+                  type="button"
+                  onClick={openDeleteDialog}
+                  className="self-start min-h-[44px] rounded-lg border border-red-300 bg-background px-5 py-2 text-sm font-semibold text-red-600 transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:border-red-800 dark:text-red-400"
+                >
+                  {t("deleteButton")}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -200,7 +296,11 @@ export function OfflineSection() {
                   total: format.number(downloadState.progress.total),
                 })}
                 {downloadState.progress.bytesSoFar > 0 && (
-                  <> ({formatGb(downloadState.progress.bytesSoFar)})</>
+                  // bytesSoFar is the download's own bytes (sum of Content-Length
+                  // header values, or blob-size fallback) - NOT navigator.storage.estimate().usage.
+                  // The storage estimate above reflects all origin data; these two figures
+                  // measure different things. formatDownloadBytes shows MB-scale progress.
+                  <> ({formatDownloadBytes(downloadState.progress.bytesSoFar)} {t("downloadBytesLabel")})</>
                 )}
                 ...
               </p>
@@ -234,6 +334,41 @@ export function OfflineSection() {
           </div>
         )}
       </div>
+
+      {/* Delete confirm dialog - native <dialog> gives focus-trap, Escape, and backdrop for free. */}
+      <dialog
+        ref={deleteDialogRef}
+        aria-labelledby="delete-cache-dialog-title"
+        className={dialogPanel}
+      >
+        <h2
+          id="delete-cache-dialog-title"
+          className="text-base font-semibold text-foreground"
+        >
+          {t("deleteConfirmTitle")}
+        </h2>
+        <p className={`mt-2 ${mutedText}`}>
+          {storageInfo !== null
+            ? t("deleteConfirmBody", { size: storageInfo.usedGb })
+            : t("deleteConfirmBodyNoSize")}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={closeDeleteDialog}
+            className="min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+          >
+            {t("deleteConfirmCancel")}
+          </button>
+          <button
+            type="button"
+            onClick={() => { void handleDeleteCache(); }}
+            className="min-h-[44px] rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+          >
+            {t("deleteConfirmConfirm")}
+          </button>
+        </div>
+      </dialog>
     </div>
   );
 }
