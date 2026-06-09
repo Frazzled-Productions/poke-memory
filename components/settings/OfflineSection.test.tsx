@@ -148,12 +148,12 @@ describe("OfflineSection", () => {
     );
   });
 
-  it("shows download progress byte size in GB, not MB (AC2)", async () => {
-    // Pass a realistic byte count from a real Content-Length (e.g. 60 MB real download).
+  it("shows download progress byte size in MB, not GB (#1824)", async () => {
+    // 60 MB of download bytes: formatDownloadBytes(60_000_000) = "60.0 MB"
+    // Previously this showed "0.1 GB" (too coarse to indicate progress).
     let resolvePrecache!: (value: precacheModule.PrecacheSummary) => void;
     vi.spyOn(precacheModule, "precacheAll").mockImplementation(
       ({ onProgress }) => {
-        // 60_000_000 bytes = 0.1 GB (with toFixed(1)).
         onProgress?.({ done: 50, total: 100, bytesSoFar: 60_000_000 });
         return new Promise<precacheModule.PrecacheSummary>((resolve) => {
           resolvePrecache = resolve;
@@ -167,13 +167,55 @@ describe("OfflineSection", () => {
     await user.click(screen.getByRole("button", { name: /download/i }));
 
     await waitFor(() => {
-      // Byte progress must be shown as GB ("0.1 GB"), not MB ("60.0 MB").
-      // getAllByText tolerates the storage-usage paragraph also matching.
-      const matches = screen.getAllByText(/0\.1 GB/);
-      expect(matches.length).toBeGreaterThan(0);
+      // Byte progress must be shown at MB scale. The Intl formatter may insert
+      // locale digit-grouping (e.g. a narrow-NBSP separator for some locales),
+      // so match on the unit suffix rather than a raw digit literal (#1408).
+      // Use getAllByText because the description paragraph also contains "MB".
+      // The progress paragraph contains the exact string "60.0 MB" as a text node.
+      const elements = screen.getAllByText(/60\.0 MB/);
+      expect(elements.length).toBeGreaterThan(0);
     });
 
+    // The progress paragraph's full text content must include MB, not "0.1 GB".
+    // Note: the storage readout may show "0.1 GB" (which is correct for GB-scale
+    // storage estimates), so we only assert on the progress paragraph itself.
+    const progressPara = screen.getByText(/Downloading 50 of 100/);
+    expect(progressPara.textContent).toMatch(/MB/);
+    expect(progressPara.textContent).not.toMatch(/0\.1 GB/);
+
     resolvePrecache({ totalRequested: 100, downloaded: 100, skipped: 0, failed: 0 });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
+    );
+  });
+
+  it("shows download progress in MB at a sub-100-MB level (non-zero progress visible early)", async () => {
+    // 5 MB in: formatDownloadBytes(5_000_000) = "5.0 MB"
+    // With the old formatGb this would show "0.0 GB" - completely uninformative.
+    let resolvePrecache!: (value: precacheModule.PrecacheSummary) => void;
+    vi.spyOn(precacheModule, "precacheAll").mockImplementation(
+      ({ onProgress }) => {
+        onProgress?.({ done: 10, total: 1000, bytesSoFar: 5_000_000 });
+        return new Promise<precacheModule.PrecacheSummary>((resolve) => {
+          resolvePrecache = resolve;
+        });
+      },
+    );
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    await waitFor(() => {
+      // "5.0 MB" must appear somewhere in the progress line.
+      expect(screen.getByText(/5\.0 MB/)).toBeInTheDocument();
+    });
+
+    // Must NOT show "0.0 GB" (which was the old coarse GB display at 5 MB).
+    expect(screen.queryByText(/0\.0 GB/)).not.toBeInTheDocument();
+
+    resolvePrecache({ totalRequested: 1000, downloaded: 990, skipped: 10, failed: 0 });
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
     );
@@ -351,6 +393,179 @@ describe("OfflineSection", () => {
     // N new should be shown since current count > 50.
     // The exact number depends on the seed; just check the format.
     expect(screen.getByText(/update available.*new/i)).toBeInTheDocument();
+  });
+
+  // ── Delete offline cache (#1825) ─────────────────────────────────────────────
+
+  it("shows a 'Delete offline cache' button when in done state", () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      new Date().toISOString(),
+    );
+    renderWithIntl(<OfflineSection />);
+
+    expect(
+      screen.getByRole("button", { name: /delete offline cache/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("does NOT show a 'Delete offline cache' button in idle state", () => {
+    renderWithIntl(<OfflineSection />);
+
+    expect(
+      screen.queryByRole("button", { name: /delete offline cache/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a confirm dialog when 'Delete offline cache' is clicked", async () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      new Date().toISOString(),
+    );
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /delete offline cache/i }));
+
+    // Dialog must appear with title and confirm/cancel buttons.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /delete offline cache/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
+  });
+
+  it("cancelling the delete dialog leaves the state unchanged", async () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      new Date().toISOString(),
+    );
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /delete offline cache/i }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    // Dialog must be gone.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    // Should still be in "done" state (Update button visible).
+    expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
+    // Delete button must still be there too.
+    expect(screen.getByRole("button", { name: /delete offline cache/i })).toBeInTheDocument();
+  });
+
+  it("confirming delete resets to idle and removes localStorage keys", async () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      new Date().toISOString(),
+    );
+    window.localStorage.setItem(
+      "poke-memory:offline-manifest:v1",
+      JSON.stringify({ signature: "abc123", count: 100 }),
+    );
+
+    // Stub caches.delete so it resolves without error.
+    const cacheDeleteMock = vi.fn().mockResolvedValue(true);
+    Object.defineProperty(window, "caches", {
+      value: { delete: cacheDeleteMock },
+      configurable: true,
+      writable: true,
+    });
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /delete offline cache/i }));
+    await user.click(screen.getByRole("button", { name: /^delete$/i }));
+
+    // After deletion, should return to idle (Download button visible).
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^download$/i })).toBeInTheDocument(),
+    );
+
+    // Delete button must no longer be visible.
+    expect(
+      screen.queryByRole("button", { name: /delete offline cache/i }),
+    ).not.toBeInTheDocument();
+
+    // localStorage keys must be cleared.
+    expect(
+      window.localStorage.getItem(precacheModule.OFFLINE_DOWNLOADED_AT_KEY),
+    ).toBeNull();
+
+    // caches.delete must have been called (for sprites and cries caches).
+    expect(cacheDeleteMock).toHaveBeenCalled();
+  });
+
+  it("shows an error message when cache deletion fails", async () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      new Date().toISOString(),
+    );
+
+    // Stub caches.delete to throw.
+    Object.defineProperty(window, "caches", {
+      value: { delete: vi.fn().mockRejectedValue(new Error("Storage error")) },
+      configurable: true,
+      writable: true,
+    });
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /delete offline cache/i }));
+    await user.click(screen.getByRole("button", { name: /^delete$/i }));
+
+    // Error message must appear.
+    await waitFor(() =>
+      expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
+    );
+    expect(screen.getByText(/could not delete the cache/i)).toBeInTheDocument();
+  });
+
+  // ── Locale: delete button rendering ──────────────────────────────────────────
+
+  it("renders 'Delete offline cache' button in ja locale", () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      new Date().toISOString(),
+    );
+    renderWithIntl(<OfflineSection />, { locale: "ja" });
+
+    // Japanese: オフラインキャッシュを削除
+    expect(
+      screen.getByRole("button", { name: /オフラインキャッシュを削除/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders 'Delete offline cache' button in zh-Hans locale", () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      new Date().toISOString(),
+    );
+    renderWithIntl(<OfflineSection />, { locale: "zh-Hans" });
+
+    // Simplified Chinese: 删除离线缓存
+    expect(
+      screen.getByRole("button", { name: /删除离线缓存/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders 'Delete offline cache' button in zh-Hant locale", () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      new Date().toISOString(),
+    );
+    renderWithIntl(<OfflineSection />, { locale: "zh-Hant" });
+
+    // Traditional Chinese: 刪除離線快取
+    expect(
+      screen.getByRole("button", { name: /刪除離線快取/i }),
+    ).toBeInTheDocument();
   });
 
   it("disables the Update button and shows 'Up to date' - locale: ja", () => {

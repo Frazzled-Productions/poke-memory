@@ -255,7 +255,14 @@
       "stopButton": "停止",
       "upToDate": "已是最新",
       "updateAvailable": "有可用更新",
-      "updateAvailableCount": "有可用更新（新增 {count} 個）"
+      "updateAvailableCount": "有可用更新（新增 {count} 個）",
+      "downloadBytesLabel": "已下載",
+      "deleteButton": "刪除離線快取",
+      "deleteConfirmTitle": "刪除離線快取？",
+      "deleteConfirmBody": "這將刪除所有已下載的精靈圖和叫聲（{size}）。您可以隨時重新下載。",
+      "deleteConfirmConfirm": "刪除",
+      "deleteConfirmCancel": "取消",
+      "deleteErrorMessage": "無法刪除快取。請嘗試在瀏覽器設定中清除網站資料。"
     },
     "optimizerCooldown": "{count, plural, other {下次最佳化還需 # 天}}",
     "optimizerRetryAfter": "{count, plural, other {請在 # 天後重試。}}",
