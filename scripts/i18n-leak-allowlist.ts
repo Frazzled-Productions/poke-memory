@@ -138,6 +138,21 @@ export const ALLOWLIST: Array<string | RegExp> = [
   /^v\d+\.\d+\.\d+/,
 
   // -------------------------------------------------------------------------
+  // global-error.tsx crash-screen strings (#1822 follow-up).
+  //
+  // global-error.tsx replaces the root layout entirely when the root layout
+  // itself throws. next-intl's provider lives inside the root layout, so it
+  // is unavailable here. The handful of English strings it renders are
+  // hardcoded intentionally and allowlisted here rather than added to the
+  // message catalogue (which would require the provider that cannot exist in
+  // this context).
+  // -------------------------------------------------------------------------
+  "Something went wrong",
+  "An unexpected error occurred. Please reload the page, or return to the home screen.",
+  "Try again",
+  "Go to home",
+
+  // -------------------------------------------------------------------------
   // Empty / whitespace-only strings -- not meaningful text.
   // -------------------------------------------------------------------------
   /^\s*$/,
