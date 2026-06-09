@@ -2088,7 +2088,7 @@ export default function SettingsPage() {
                       swVersionState.version !== process.env.NEXT_PUBLIC_APP_VERSION && (
                         <p
                           className="mt-2 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400"
-                          role="alert"
+                          role="status"
                         >
                           <span aria-hidden="true">&#9888;</span>
                           <span>

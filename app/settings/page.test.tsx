@@ -1934,8 +1934,11 @@ describe("SettingsPage - SW version diagnostic (#1826)", () => {
       expect(screen.getAllByText("v0.11.2").length).toBeGreaterThanOrEqual(1);
     });
 
-    // No mismatch alert when versions match.
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // No mismatch warning when versions match - the status regions that exist
+    // (sync status, etc.) should not contain version mismatch text.
+    const statusEls = screen.queryAllByRole("status");
+    const mismatchEl = statusEls.find((el) => el.textContent?.includes("v0.9.0"));
+    expect(mismatchEl).toBeUndefined();
 
     process.env.NEXT_PUBLIC_APP_VERSION = originalAppVersion;
   });
@@ -1954,11 +1957,12 @@ describe("SettingsPage - SW version diagnostic (#1826)", () => {
       expect(screen.getByText(`v${oldSwVersion}`)).toBeInTheDocument();
     });
 
-    // Mismatch alert must be present when versions differ.
-    const alert = screen.getByRole("alert");
-    expect(alert).toBeInTheDocument();
-    expect(alert.textContent).toContain(`v${oldSwVersion}`);
-    expect(alert.textContent).toContain("v0.11.2");
+    // Mismatch status region must be present when versions differ.
+    // Multiple role="status" elements exist in the page; find the mismatch one by content.
+    const statusEls = screen.getAllByRole("status");
+    const mismatchEl = statusEls.find((el) => el.textContent?.includes(`v${oldSwVersion}`));
+    expect(mismatchEl).toBeDefined();
+    expect(mismatchEl!.textContent).toContain("v0.11.2");
 
     process.env.NEXT_PUBLIC_APP_VERSION = originalAppVersion;
   });

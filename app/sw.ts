@@ -92,9 +92,10 @@ interface ServiceWorkerScope {
   __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
   /**
    * Build-time version string injected by scripts/build-sw.mjs via the
-   * esbuild `define` block. Format: `"<appVersion>+<sha8>"`. Frozen into
-   * each deployed bundle so an old controlling worker always reports its
-   * own version, not the new app version (#1826).
+   * esbuild `define` block. Value is the bare semver from package.json
+   * (e.g. `"0.11.2"`). Frozen into each deployed bundle so an old
+   * controlling worker always reports its own version, not the new app
+   * version (#1826).
    */
   __SW_VERSION__: string;
   location: { origin: string };

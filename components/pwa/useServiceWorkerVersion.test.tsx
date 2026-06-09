@@ -19,26 +19,16 @@ import { useServiceWorkerVersion } from "@/lib/pwa/useServiceWorkerVersion";
 // Helpers to control the fake MessageChannel and navigator.serviceWorker
 // ---------------------------------------------------------------------------
 
-/** Captured postMessage call from the hook. */
-let capturedPostMessage: ((msg: unknown, transfer?: Transferable[]) => void) | null = null;
 /** The port1 onmessage handler set by the hook - used to simulate SW replies. */
 let capturedPort1: MessagePort | null = null;
 
 function makeController() {
   return {
-    postMessage: vi.fn((msg: unknown, transfer?: Transferable[]) => {
-      capturedPostMessage = (m: unknown, t?: Transferable[]) => {
-        void m;
-        void t;
-      };
-      void msg;
-      void transfer;
-    }),
+    postMessage: vi.fn(),
   };
 }
 
 beforeEach(() => {
-  capturedPostMessage = null;
   capturedPort1 = null;
 
   // Mock MessageChannel so we can intercept the ports.
@@ -115,27 +105,22 @@ describe("useServiceWorkerVersion", () => {
       }
     });
 
-    it("does not show a mismatch when SW version matches app version", async () => {
+    it("posts GET_SW_VERSION to the controller with a transferred MessageChannel port", async () => {
       const controller = makeController();
       setController(controller);
 
-      const { result } = renderHook(() => useServiceWorkerVersion());
+      renderHook(() => useServiceWorkerVersion());
 
-      await act(async () => {
-        if (capturedPort1?.onmessage) {
-          capturedPort1.onmessage(
-            new MessageEvent("message", {
-              data: { type: "SW_VERSION", version: "0.11.2" },
-            }),
-          );
-        }
-      });
+      // The hook posts synchronously inside useEffect - flush it.
+      await act(async () => {});
 
-      // When versions match there is no mismatch - the version is simply "ready"
-      expect(result.current.status).toBe("ready");
-      if (result.current.status === "ready") {
-        expect(result.current.version).toBe("0.11.2");
-      }
+      // Assert the hook sent the handshake message.
+      expect(controller.postMessage).toHaveBeenCalledOnce();
+      const [msg, transfer] = controller.postMessage.mock.calls[0] as [unknown, Transferable[]];
+      expect(msg).toEqual({ type: "GET_SW_VERSION" });
+      // The hook transfers port2 as a Transferable - the array must be non-empty.
+      expect(Array.isArray(transfer)).toBe(true);
+      expect((transfer as Transferable[]).length).toBe(1);
     });
   });
 

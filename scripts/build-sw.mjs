@@ -131,12 +131,11 @@ async function main() {
     );
   }
 
-  // Bake a version string into the SW bundle so the Settings diagnostic can
-  // detect a stale controlling worker (#1826). Format: "<appVersion>+<sha8>"
-  // where sha8 is computed AFTER writing the bundle (see below). For the
-  // define block we inject the app version only; the sha8 is appended later
-  // via a second pass if needed. Here we use just the package version so the
-  // frozen string is human-readable in the Settings UI.
+  // Bake the package.json version string into the SW bundle so the Settings
+  // diagnostic can detect a stale controlling worker (#1826). The injected
+  // value is the bare semver from NEXT_PUBLIC_APP_VERSION (e.g. "0.11.2").
+  // No sha8 suffix is appended; the Settings UI compares this value directly
+  // against process.env.NEXT_PUBLIC_APP_VERSION.
   const pkgJson = JSON.parse(
     await fs.readFile(path.join(projectRoot, "package.json"), "utf-8"),
   );

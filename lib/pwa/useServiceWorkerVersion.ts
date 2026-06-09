@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Hook that queries the controlling service worker for its baked-in version
  * string (#1826).
@@ -20,7 +22,6 @@
  *   - `{ status: "ready", version: string }` on success.
  *   - `{ status: "timeout" }` when the controller does not reply within 2 s.
  */
-"use client";
 
 import { useEffect, useState } from "react";
 
