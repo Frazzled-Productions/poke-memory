@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import {
@@ -15,7 +15,7 @@ import {
 import { CACHE_NAMES, versionedCacheName } from "@/lib/pwa/cacheStrategy";
 import { OFFLINE_DOWNLOADED_AT_KEY } from "@/lib/pwa/precache";
 import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
-import { cardPanelPadded, colStack, colStackLg, mutedTextXs } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, colStackLg, dialogPanel, mutedText, mutedTextXs } from "@/lib/utils/class-names";
 import { formatGb, formatDownloadBytes } from "@/lib/utils/format-bytes";
 
 /**
@@ -41,8 +41,8 @@ export function OfflineSection() {
 
   const [storageInfo, setStorageInfo] = useState<{ usedGb: string; totalGb: string } | null>(null);
 
-  /** Whether the confirm-delete dialog is open. */
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  /** Ref to the native confirm-delete dialog element. */
+  const deleteDialogRef = useRef<HTMLDialogElement>(null);
 
   /** Error message from a failed delete attempt, or null. */
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -128,6 +128,26 @@ export function OfflineSection() {
     refreshStorageEstimate();
   }, [downloadState.phase]); // eslint-disable-line react-hooks/exhaustive-deps -- refreshStorageEstimate is stable
 
+  // Wire the native dialog's "cancel" event (fired on Escape) to close cleanly.
+  useEffect(() => {
+    const dialog = deleteDialogRef.current;
+    if (!dialog) return;
+    function handleCancel(e: Event) {
+      e.preventDefault();
+      dialog!.close();
+    }
+    dialog.addEventListener("cancel", handleCancel);
+    return () => dialog.removeEventListener("cancel", handleCancel);
+  }, []);
+
+  function openDeleteDialog() {
+    deleteDialogRef.current?.showModal();
+  }
+
+  function closeDeleteDialog() {
+    deleteDialogRef.current?.close();
+  }
+
   function handleDownload() {
     // Derive species IDs from the context-provided seed rather than a static import.
     const ids = seed ? seed.seedPokemon.filter((p) => p.isDefaultForm).map((p) => p.id) : [];
@@ -149,7 +169,7 @@ export function OfflineSection() {
    *   - The storage estimate is refreshed so "Using X of Y" updates.
    */
   async function handleDeleteCache(): Promise<void> {
-    setShowDeleteConfirm(false);
+    closeDeleteDialog();
     setDeleteError(null);
 
     try {
@@ -252,7 +272,7 @@ export function OfflineSection() {
               {downloadState.phase === "done" && (
                 <button
                   type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
+                  onClick={openDeleteDialog}
                   className="self-start min-h-[44px] rounded-lg border border-red-300 bg-background px-5 py-2 text-sm font-semibold text-red-600 transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:border-red-800 dark:text-red-400"
                 >
                   {t("deleteButton")}
@@ -315,45 +335,40 @@ export function OfflineSection() {
         )}
       </div>
 
-      {/* Delete confirm dialog */}
-      {showDeleteConfirm && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-cache-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      {/* Delete confirm dialog - native <dialog> gives focus-trap, Escape, and backdrop for free. */}
+      <dialog
+        ref={deleteDialogRef}
+        aria-labelledby="delete-cache-dialog-title"
+        className={dialogPanel}
+      >
+        <h2
+          id="delete-cache-dialog-title"
+          className="text-base font-semibold text-foreground"
         >
-          <div className="w-full max-w-sm rounded-xl bg-background p-6 shadow-xl">
-            <h2
-              id="delete-cache-dialog-title"
-              className="text-base font-semibold text-foreground"
-            >
-              {t("deleteConfirmTitle")}
-            </h2>
-            <p className={`mt-2 ${mutedTextXs}`}>
-              {t("deleteConfirmBody", {
-                size: storageInfo !== null ? storageInfo.usedGb : "",
-              })}
-            </p>
-            <div className="mt-5 flex flex-wrap justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
-              >
-                {t("deleteConfirmCancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => { void handleDeleteCache(); }}
-                className="min-h-[44px] rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-              >
-                {t("deleteConfirmConfirm")}
-              </button>
-            </div>
-          </div>
+          {t("deleteConfirmTitle")}
+        </h2>
+        <p className={`mt-2 ${mutedText}`}>
+          {storageInfo !== null
+            ? t("deleteConfirmBody", { size: storageInfo.usedGb })
+            : t("deleteConfirmBodyNoSize")}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={closeDeleteDialog}
+            className="min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+          >
+            {t("deleteConfirmCancel")}
+          </button>
+          <button
+            type="button"
+            onClick={() => { void handleDeleteCache(); }}
+            className="min-h-[44px] rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+          >
+            {t("deleteConfirmConfirm")}
+          </button>
         </div>
-      )}
+      </dialog>
     </div>
   );
 }

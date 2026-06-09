@@ -260,6 +260,7 @@
       "deleteButton": "Delete offline cache",
       "deleteConfirmTitle": "Delete offline cache?",
       "deleteConfirmBody": "This will remove all downloaded sprites and cries ({size}). You can re-download at any time.",
+      "deleteConfirmBodyNoSize": "This will remove all your offline data. You can re-download at any time.",
       "deleteConfirmConfirm": "Delete",
       "deleteConfirmCancel": "Cancel",
       "deleteErrorMessage": "Could not delete the cache. Try clearing site data in your browser settings."

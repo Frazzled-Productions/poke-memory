@@ -260,6 +260,7 @@
       "deleteButton": "オフラインキャッシュを削除",
       "deleteConfirmTitle": "オフラインキャッシュを削除しますか？",
       "deleteConfirmBody": "ダウンロードしたすべてのスプライトと鳴き声（{size}）が削除されます。いつでも再ダウンロードできます。",
+      "deleteConfirmBodyNoSize": "オフラインデータをすべて削除します。いつでも再ダウンロードできます。",
       "deleteConfirmConfirm": "削除",
       "deleteConfirmCancel": "キャンセル",
       "deleteErrorMessage": "キャッシュを削除できませんでした。ブラウザの設定からサイトデータを消去してください。"

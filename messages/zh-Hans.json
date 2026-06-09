@@ -260,6 +260,7 @@
       "deleteButton": "删除离线缓存",
       "deleteConfirmTitle": "删除离线缓存？",
       "deleteConfirmBody": "这将删除所有已下载的精灵图和叫声（{size}）。您可以随时重新下载。",
+      "deleteConfirmBodyNoSize": "这将删除您的所有离线数据。您可以随时重新下载。",
       "deleteConfirmConfirm": "删除",
       "deleteConfirmCancel": "取消",
       "deleteErrorMessage": "无法删除缓存。请尝试在浏览器设置中清除网站数据。"

@@ -17,6 +17,7 @@ import { _resetForTesting } from "@/lib/pwa/downloadController";
 import { computeManifestSignature } from "@/lib/pwa/manifestSignature";
 import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
+import { CACHE_NAMES, versionedCacheName } from "@/lib/pwa/cacheStrategy";
 
 // ------------------------------------------------------------------
 // localStorage stub - jsdom does not always ship localStorage.
@@ -30,6 +31,20 @@ function makeLocalStorage(): Storage {
     key: (i) => Array.from(store.keys())[i] ?? null,
     removeItem: (k) => { store.delete(k); },
     setItem: (k, v) => { store.set(k, String(v)); },
+  };
+}
+
+// jsdom does not implement HTMLDialogElement.showModal / close. Polyfill them
+// so the confirm-delete dialog mounts; the open/closed state is what the
+// component drives via the ref.
+if (!HTMLDialogElement.prototype.showModal) {
+  HTMLDialogElement.prototype.showModal = function showModal() {
+    this.open = true;
+  };
+}
+if (!HTMLDialogElement.prototype.close) {
+  HTMLDialogElement.prototype.close = function close() {
+    this.open = false;
   };
 }
 
@@ -463,8 +478,10 @@ describe("OfflineSection", () => {
       precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
       new Date().toISOString(),
     );
+    // Use the imported constant - not a hardcoded string - so this stays in
+    // sync if the key ever changes.
     window.localStorage.setItem(
-      "poke-memory:offline-manifest:v1",
+      KEY_OFFLINE_MANIFEST,
       JSON.stringify({ signature: "abc123", count: 100 }),
     );
 
@@ -492,13 +509,20 @@ describe("OfflineSection", () => {
       screen.queryByRole("button", { name: /delete offline cache/i }),
     ).not.toBeInTheDocument();
 
-    // localStorage keys must be cleared.
+    // Both localStorage keys must be cleared.
     expect(
       window.localStorage.getItem(precacheModule.OFFLINE_DOWNLOADED_AT_KEY),
     ).toBeNull();
+    expect(
+      window.localStorage.getItem(KEY_OFFLINE_MANIFEST),
+    ).toBeNull();
 
-    // caches.delete must have been called (for sprites and cries caches).
-    expect(cacheDeleteMock).toHaveBeenCalled();
+    // caches.delete must have been called with the exact versioned cache names
+    // derived from CACHE_NAMES + versionedCacheName - the single source of truth.
+    const expectedSpritesCacheName = versionedCacheName(CACHE_NAMES.sprites);
+    const expectedCriesCacheName = versionedCacheName(CACHE_NAMES.cries);
+    expect(cacheDeleteMock).toHaveBeenCalledWith(expectedSpritesCacheName);
+    expect(cacheDeleteMock).toHaveBeenCalledWith(expectedCriesCacheName);
   });
 
   it("shows an error message when cache deletion fails", async () => {
