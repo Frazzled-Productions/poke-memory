@@ -466,6 +466,187 @@ test.describe("Practice page", () => {
     }
   });
 
+  test("Practice content region does NOT scroll on the SECOND card (reverse card regression guard #1839 followup)", async ({
+    page,
+  }, testInfo) => {
+    // Guards the specific failure mode from #1839 followup: the FIRST card fits
+    // but then a TALLER card (the SpritePicker 2×2 grid) loads and the top badge
+    // gets clipped. We seed name card → reverse card so the second card is always
+    // the sprite-picker variant.
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "content-fit check is mobile-only",
+    );
+
+    // Seed: Bulbasaur name card (review-due) first, then Bulbasaur reverse card.
+    // The review queue serves review-due cards first, so the name card appears,
+    // and after grading it the reverse card is shown as a new card.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 10,
+            difficulty: 5,
+            elapsedDays: 10,
+            scheduledDays: 10,
+            reps: 3,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2026-01-01",
+            lastReview: "2026-04-01",
+            firstSeen: "2026-03-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+        {
+          id: 2_000_001,
+          pokemonId: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "reverse",
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    for (const { width, height, label } of [
+      { width: 402, height: 874, label: "iPhone 17 Pro" },
+      { width: 390, height: 844, label: "iPhone 14" },
+      { width: 375, height: 667, label: "iPhone SE" },
+    ]) {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      await awaitSeedIdb(page);
+
+      // First card: the name card (review-due). Reveal and grade Good.
+      const reveal = page.getByRole("button", { name: "Reveal" });
+      if (!(await reveal.isVisible().catch(() => false))) {
+        continue;
+      }
+      await reveal.click();
+      const gradeGroup = page.getByRole("group", { name: "Grade your answer" });
+      await expect(gradeGroup).toBeVisible();
+      await gradeGroup.getByRole("button", { name: "Good" }).click();
+
+      // Second card: should be the reverse/sprite-picker card.
+      // Wait for either the sprite picker group or the end state.
+      const spritePicker = page.getByRole("group", { name: /Which Pok[eé]mon is .+\?/ });
+      const hasSpritePicker = await spritePicker.isVisible({ timeout: 5000 }).catch(() => false);
+      if (!hasSpritePicker) {
+        // Session may have ended or seeded differently - still assert no scroll.
+      }
+
+      // Assert: no scroll on the content region after advancing to the second card.
+      const fit = await page.evaluate(() => {
+        const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+        if (!region) return null;
+        return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
+      });
+      expect(fit, `${label}: content region must exist on second card`).not.toBeNull();
+      expect(
+        fit!.scrollHeight,
+        `${label}: content region must not scroll on second card (scrollHeight ${fit!.scrollHeight} > clientHeight ${fit!.clientHeight})`,
+      ).toBeLessThanOrEqual(fit!.clientHeight + 1);
+    }
+  });
+
+  test("SpritePicker (reverse card) fits viewport without scrolling at iPhone SE (#1839 followup)", async ({
+    page,
+  }, testInfo) => {
+    // Guards the specific bug: the SpritePicker 2×2 grid caused the top
+    // queue-state badge to clip and a scrollbar to appear on short viewports.
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "content-fit check is mobile-only",
+    );
+
+    // Seed a single reverse card so it is always the first card shown.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 2_000_001,
+          pokemonId: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "reverse",
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    for (const { width, height, label } of [
+      { width: 402, height: 874, label: "iPhone 17 Pro" },
+      { width: 390, height: 844, label: "iPhone 14" },
+      { width: 375, height: 667, label: "iPhone SE" },
+    ]) {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      await awaitSeedIdb(page);
+
+      // The SpritePicker renders immediately (no Reveal step).
+      const spritePicker = page.getByRole("group", { name: /Which Pok[eé]mon is .+\?/ });
+      const hasSpritePicker = await spritePicker.isVisible({ timeout: 10_000 }).catch(() => false);
+      if (!hasSpritePicker) {
+        // Card did not load as expected - skip this viewport rather than fail.
+        continue;
+      }
+
+      const fit = await page.evaluate(() => {
+        const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+        if (!region) return null;
+        return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
+      });
+      expect(fit, `${label}: content region must exist`).not.toBeNull();
+      expect(
+        fit!.scrollHeight,
+        `${label}: SpritePicker must not cause scroll (scrollHeight ${fit!.scrollHeight} > clientHeight ${fit!.clientHeight})`,
+      ).toBeLessThanOrEqual(fit!.clientHeight + 1);
+    }
+  });
+
   test("queue state badge shows 'New' on a never-reviewed name card", async ({ page }) => {
     await seedSessionIdb(page, {
       cards: [

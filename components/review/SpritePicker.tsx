@@ -57,12 +57,18 @@ function SpritePickerTile({ tile, answered, selectedId, onTap, tileClassName }: 
         : localeName;
 
   return (
+    /* The button fills its grid cell (h-full w-full) so the 2×2 grid can
+       absorb the available height on short viewports. The image uses
+       max-h-full / w-auto / object-contain so it scales down inside the
+       button without clipping. The intrinsic width/height props are kept
+       at PICKER_SPRITE_SIZE so the image loader serves the correct WebP
+       variant (#1839 followup, AGENTS.md sprite rules). */
     <button
       type="button"
       disabled={answered}
       aria-label={ariaLabel}
       onClick={() => onTap(tile)}
-      className={tileClassName(tile)}
+      className={`${tileClassName(tile)} flex items-center justify-center h-full w-full`}
     >
       <Image
         src={tile.spriteUrl}
@@ -71,7 +77,7 @@ function SpritePickerTile({ tile, answered, selectedId, onTap, tileClassName }: 
         width={PICKER_SPRITE_SIZE}
         height={PICKER_SPRITE_SIZE}
         loading="eager"
-        className="object-contain" style={{ width: PICKER_SPRITE_SIZE, height: PICKER_SPRITE_SIZE }}
+        className="max-h-full w-auto object-contain"
       />
       {/* Visually hidden name for screen readers */}
       <span className="sr-only">{localeName}</span>
@@ -206,10 +212,16 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 sm:gap-6">
-      <DirectionBadge direction="reverse" />
+    /* flex-1 min-h-0 fills the ReviewCardLayout card-region wrapper so the
+       2×2 grid can shrink on short viewports (e.g. iPhone SE) instead of
+       overflowing and causing the top badge to clip (#1839 followup). */
+    <div className="flex flex-1 min-h-0 flex-col items-center gap-2 sm:gap-4 w-full">
+      {/* flex-none chrome: badge, name prompt, feedback */}
+      <div className="flex-none">
+        <DirectionBadge direction="reverse" />
+      </div>
       {/* Name prompt */}
-      <div className="flex items-center gap-2">
+      <div className="flex-none flex items-center gap-2">
         <p className="text-3xl font-semibold tracking-wide capitalize text-foreground">
           {targetLocaleName}
         </p>
@@ -223,9 +235,10 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
         </button>
       </div>
 
-      {/* 2×2 sprite tile grid */}
+      {/* 2×2 sprite tile grid - flex-1 min-h-0 absorbs remaining height so
+          tiles scale to fit rather than overflowing on short viewports */}
       <div
-        className="grid grid-cols-2 gap-3"
+        className="flex-1 min-h-0 grid grid-cols-2 gap-3 w-full"
         role="group"
         aria-label={t("whichPokemon", { name: targetLocaleName })}
       >
@@ -242,7 +255,7 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
       </div>
 
       {/* Feedback label - announced to screen readers after answering */}
-      <div aria-live="polite" aria-atomic="true" className="min-h-[1.5rem]">
+      <div aria-live="polite" aria-atomic="true" className="flex-none min-h-[1.5rem]">
         {answered && selectedId !== null && (
           <p className="text-sm font-medium text-center text-zinc-600 dark:text-zinc-300">
             {tiles.find((tile) => tile.id === selectedId)?.isCorrect

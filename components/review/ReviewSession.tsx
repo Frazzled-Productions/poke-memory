@@ -2997,9 +2997,8 @@ export function ReviewSession() {
         }
         queueStateBadge={<QueueStateBadge state={effectiveCard.state} forceCardsGraduated={superuserFlags.forceCardsGraduated} />}
         cardRegion={
-          /* SpritePicker: overflow-y-auto is set by the "reverse" variant on
-             the card region so very short viewports (e.g. iPhone SE, 667 px)
-             can scroll rather than silently clip the tiles. */
+          /* SpritePicker: fills the flex-1 card region and scales its 2×2 grid
+             to the available height rather than scrolling (#1839 followup). */
           <SpritePicker
             key={`${effectiveCard.id}-${cardPresentationCount}`}
             targetPokemon={reverseTarget}
