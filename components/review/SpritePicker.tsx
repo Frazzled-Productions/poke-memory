@@ -212,10 +212,15 @@ export function SpritePicker({ targetPokemon, distractors, onGrade, playCryOnAns
   }
 
   return (
-    /* flex-1 min-h-0 fills the ReviewCardLayout card-region wrapper so the
-       2×2 grid can shrink on short viewports (e.g. iPhone SE) instead of
-       overflowing and causing the top badge to clip (#1839 followup). */
-    <div className="flex flex-1 min-h-0 flex-col items-center gap-2 sm:gap-4 w-full">
+    /* self-stretch h-full min-h-0 override the ReviewCardLayout card-region
+       wrapper's items-center so this child FILLS the available height rather
+       than being centred at its natural height. Without self-stretch the
+       wrapper's cross-axis centring keeps SpritePicker at its natural 2×2
+       size, so the internal flex-1 min-h-0 chain never gets a constrained
+       height to shrink within - the grid stays full-size and the top
+       queue-state pill + bottom controls get clipped by overflow-hidden
+       (#1840 followup). */
+    <div className="flex self-stretch h-full min-h-0 flex-col items-center gap-2 sm:gap-4 w-full">
       {/* flex-none chrome: badge, name prompt, feedback */}
       <div className="flex-none">
         <DirectionBadge direction="reverse" />
