@@ -101,6 +101,9 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
     if (!open) return;
 
     const previousOverflow = document.body.style.overflow;
+    // Guard desktop scroll: on mobile the body's Tailwind overflow-hidden
+    // (md:overflow-visible) already clips; this inline lock is still needed
+    // on desktop (md+) where the body reverts to overflow-visible (#1801).
     document.body.style.overflow = "hidden";
 
     function onKey(e: KeyboardEvent) {

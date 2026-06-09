@@ -166,6 +166,20 @@ describe("BottomTabBar", () => {
       expect(container.querySelector('[aria-label="Mobile tab navigation"]')).toBeNull();
     });
   });
+
+  it("renders as in-flow element (no 'fixed' positioning class) (#1801)", async () => {
+    // The bar must be in the normal flex flow so the app-shell model works on
+    // mobile. position:fixed caused a 21px gap on Practice on real iOS (#1801).
+    renderWithIntl(<BottomTabBar />);
+
+    await waitFor(() => {
+      const nav = document.querySelector('nav[aria-label="Mobile tab navigation"]');
+      expect(nav).not.toBeNull();
+      // Must not carry a fixed-positioning class.
+      expect(nav!.className).not.toContain("fixed");
+      expect(nav!.className).not.toContain("bottom-0");
+    });
+  });
 });
 
 describe("BottomTabBar - Japanese locale", () => {
@@ -179,6 +193,18 @@ describe("BottomTabBar - Japanese locale", () => {
 });
 
 describe("BottomTabBarFallback", () => {
+  it("renders as in-flow element matching BottomTabBarInner positioning (#1801)", () => {
+    // Fallback and inner must stay in sync so there is no hydration layout shift.
+    // Neither should carry fixed positioning; both are in-flow flex-none children
+    // of the app-shell.
+    const { container } = renderWithIntl(<BottomTabBarFallback />);
+    const fallback = container.firstChild as HTMLElement;
+    expect(fallback).not.toBeNull();
+    expect(fallback.className).not.toContain("fixed");
+    expect(fallback.className).not.toContain("bottom-0");
+    expect(fallback.className).toContain("flex-none");
+  });
+
   it("renders translated tab labels for all static tabs (English)", async () => {
     renderWithIntl(<BottomTabBarFallback />);
 
