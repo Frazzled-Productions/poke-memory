@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import * as Sentry from "@sentry/nextjs";
 import { clearLocalProgress } from "@/lib/storage/reset";
 import { useAuth } from "@/lib/auth/AuthContext";
 
@@ -26,6 +27,14 @@ export default function Error({
   const authSettled = !authLoading;
   const isSignedIn = authSettled && user !== null;
   const [offline, setOffline] = useState<boolean>(isOffline);
+
+  // Report the error to Sentry so client error-boundary errors reach the
+  // issue stream. The useEffect wrapper ensures this runs only in the browser,
+  // and only once per error instance. When the DSN is not configured Sentry
+  // init is a no-op and captureException does nothing.
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
 
   useEffect(() => {
     function handleOnline() {
