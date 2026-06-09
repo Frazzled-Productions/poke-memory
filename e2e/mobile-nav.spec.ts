@@ -101,6 +101,31 @@ test.describe("Mobile nav - bottom tab bar (default)", () => {
     }
   });
 
+  test("bottom tab bar bottom edge is flush with viewport on Practice route (#1801)", async ({ page }) => {
+    // The #1801 bug was Practice-specific: on the non-scrolling flex-1/min-h-0
+    // route the bar detached 21px above the visible bottom. This test is the
+    // regression guard for that exact failure.
+    await page.goto("/");
+
+    const tabBar = page.getByRole("navigation", {
+      name: "Mobile tab navigation",
+    });
+    await expect(tabBar).toBeVisible();
+
+    const viewportSize = page.viewportSize();
+    expect(viewportSize).not.toBeNull();
+
+    const box = await tabBar.boundingBox();
+    expect(box).not.toBeNull();
+
+    // Bar's bottom edge must align with the viewport bottom (within 2px for
+    // sub-pixel rounding across device-pixel ratios).
+    if (box && viewportSize) {
+      const barBottom = box.y + box.height;
+      expect(Math.abs(barBottom - viewportSize.height)).toBeLessThanOrEqual(2);
+    }
+  });
+
   test("active tab has aria-current='page'", async ({ page }) => {
     await page.goto("/stats");
 

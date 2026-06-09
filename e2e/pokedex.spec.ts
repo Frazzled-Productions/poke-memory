@@ -668,7 +668,7 @@ test.describe("Pokédex detail - bottom nav anchoring (#1086)", () => {
       return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
     });
     expect(scrollable).not.toBeNull();
-    expect(scrollable!.scrollHeight).toBeGreaterThanOrEqual(scrollable!.clientHeight);
+    expect(scrollable!.scrollHeight).toBeGreaterThan(scrollable!.clientHeight);
   });
 });
 
