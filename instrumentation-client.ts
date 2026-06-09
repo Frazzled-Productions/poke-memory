@@ -14,9 +14,12 @@ Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // Capture a small fraction of page-load and navigation transactions.
-  // Override at deploy time via SENTRY_TRACES_SAMPLE_RATE env var.
+  // Override at deploy time via NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE env var
+  // (must carry the NEXT_PUBLIC_ prefix so Vercel inlines it into the browser
+  // bundle; the non-public SENTRY_TRACES_SAMPLE_RATE is only available
+  // server-side and is always undefined in the browser).
   tracesSampleRate:
-    Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? "0.1"),
+    Number(process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE ?? "0.1"),
 
   // Session Replay is disabled (privacy + bandwidth). Set to a non-zero value
   // only if Replay is deliberately enabled and the privacy notice is updated.

@@ -128,9 +128,10 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 //   widenClientFileUpload - disabled; we do not need to upload additional
 //                      client files beyond the standard Next.js output.
 //   tunnelRoute      - proxies Sentry events through /monitoring so ad-blocker
-//                      extensions cannot block the DSN endpoint. The service
-//                      worker uses NetworkFirst for same-origin routes, so
-//                      POST requests to /monitoring pass through unaltered.
+//                      extensions cannot block the DSN endpoint. Serwist
+//                      runtimeCaching only intercepts GET requests, so POST
+//                      requests to /monitoring bypass the service-worker cache
+//                      matcher entirely and reach the server unaltered.
 //   org / project    - read from env; build-time only (not shipped to browser).
 //
 // NOTE: do NOT enable --turbopack for the build script. Turbopack does not run
