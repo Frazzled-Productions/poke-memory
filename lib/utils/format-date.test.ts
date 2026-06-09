@@ -63,6 +63,22 @@ describe("todayInTimezone", () => {
     const result = todayInTimezone("Not/A/Real_Zone", now);
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
+
+  it("returns the same value on repeated calls and stays per-timezone correct (cache, #1803)", () => {
+    // The per-timezone Intl.DateTimeFormat is now cached to avoid thousands of
+    // constructions on the cold-launch session build. Verify the cache neither
+    // changes a result across repeated calls nor leaks one timezone's formatter
+    // into another by interleaving zones.
+    const now = new Date("2026-05-14T20:00:00Z");
+    expect(todayInTimezone("UTC", now)).toBe("2026-05-14");
+    expect(todayInTimezone("Asia/Tokyo", now)).toBe("2026-05-15");
+    // Re-call UTC after Tokyo has been cached: must still be the UTC answer.
+    expect(todayInTimezone("UTC", now)).toBe("2026-05-14");
+    expect(todayInTimezone("Asia/Tokyo", now)).toBe("2026-05-15");
+    // A different clock through the same cached formatters must still reformat.
+    const later = new Date("2026-12-25T12:00:00Z");
+    expect(todayInTimezone("UTC", later)).toBe("2026-12-25");
+  });
 });
 
 // ---------------------------------------------------------------------------
