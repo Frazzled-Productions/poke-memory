@@ -215,16 +215,26 @@ export default function RootLayout({
                         the internal scroll (overflow-y-auto) so the bar remains visible
                         at all times without position:fixed. On desktop (md+) overflow
                         reverts to visible and the document scrolls normally (#1801).
-                        Footer scrolls with content here (it returns null in bottom-nav
-                        mode anyway, so it only appears in hamburger / desktop flows).
+
+                        The Footer is intentionally placed OUTSIDE this scroll region
+                        (as a sibling after it) rather than inside. Keeping the Footer
+                        inside the overflow-y-auto container triggered a WebKit
+                        actionability bug where the Footer was reported as intercepting
+                        pointer events on interactive elements inside the scroll region
+                        even when they did not visually overlap (#1838). On mobile the
+                        Footer is hidden entirely for bottom-nav mode anyway; for
+                        hamburger mode it renders as an in-flow element below the scroll
+                        region. On desktop (md+) the scroll region is overflow-visible
+                        so there is no internal scroll context and the Footer position
+                        relative to the scroll region is irrelevant.
                       */}
                       <div
                         className="flex flex-1 flex-col min-h-0 overflow-y-auto md:overflow-visible"
                         data-scroll-region
                       >
                         <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
-                        <Footer />
                       </div>
+                      <Footer />
                       {/*
                         BottomTabBar is always mounted but returns null internally when
                         mobileNav === 'hamburger'. The single Suspense boundary here is
