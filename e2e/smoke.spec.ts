@@ -574,14 +574,30 @@ test.describe("Practice page", () => {
     }
   });
 
-  test("SpritePicker (reverse card) fits viewport without scrolling at iPhone SE (#1839 followup)", async ({
+  test("SpritePicker (reverse card) - no clip at top/bottom at common mobile viewports (#1840 followup)", async ({
     page,
   }, testInfo) => {
-    // Guards the specific bug: the SpritePicker 2×2 grid caused the top
-    // queue-state badge to clip and a scrollbar to appear on short viewports.
+    // Guards the exact failure mode reported after #1840: the queue-state pill at
+    // the top and the controls/queue counter at the bottom were clipped by
+    // overflow-hidden even though scrollHeight === clientHeight (always true under
+    // overflow-hidden - the bogus check from the previous test).
+    //
+    // Root cause: ReviewCardLayout's card-region wrapper used items-center, which
+    // centres SpritePicker at its NATURAL height rather than stretching it to fill
+    // the flex-1 wrapper. SpritePicker's internal flex-1 min-h-0 chain never got
+    // a constrained height to shrink within, so the 2x2 grid stayed full-size and
+    // the outer ReviewCardLayout column overflowed - the top pill and bottom
+    // controls were clipped. Fix: SpritePicker root gets self-stretch h-full
+    // min-h-0 so it actually fills the wrapper (#1840 followup).
+    //
+    // CLIP CHECK (not scroll check): scrollHeight <= clientHeight is meaningless
+    // under overflow-hidden. Instead assert BOUNDS: the queue-state badge top must
+    // be >= the scroll-region top, and the queue counter bottom must be <=
+    // the scroll-region bottom. If either is clipped, the element's rect will be
+    // outside those bounds.
     test.skip(
       testInfo.project.name !== "mobile-safari",
-      "content-fit check is mobile-only",
+      "clip-bounds check is mobile-only",
     );
 
     // Seed a single reverse card so it is always the first card shown.
@@ -634,16 +650,54 @@ test.describe("Practice page", () => {
         continue;
       }
 
-      const fit = await page.evaluate(() => {
+      // Clip-bounds check: assert NOTHING is clipped by overflow-hidden.
+      // scrollHeight === clientHeight is always true under overflow-hidden and
+      // proves nothing; we must check actual element positions instead.
+      //
+      // - queue-state badge (top chrome, flex-none): its rect.top must be >= the
+      //   scroll-region rect.top (i.e. it is not clipped above the container).
+      // - queue counter (bottom chrome, flex-none): its rect.bottom must be <=
+      //   the scroll-region rect.bottom (i.e. not clipped below the container).
+      const bounds = await page.evaluate(() => {
         const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
         if (!region) return null;
-        return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
+        const regionRect = region.getBoundingClientRect();
+
+        // QueueStateBadge: role="status" aria-label contains "Card queue state:"
+        const badge = document.querySelector('[role="status"][aria-label*="Card queue state:"]') as HTMLElement | null;
+        // QueueCounterRow: role="status" aria-label contains "queue" (the "New / Learning / Review" counter row)
+        const counters = Array.from(
+          document.querySelectorAll('[role="status"]')
+        ).find((el) => {
+          const label = el.getAttribute("aria-label") ?? "";
+          return label.toLowerCase().includes("queue") && !label.toLowerCase().includes("card queue state");
+        }) as HTMLElement | null;
+
+        return {
+          regionTop: regionRect.top,
+          regionBottom: regionRect.bottom,
+          badgeTop: badge ? badge.getBoundingClientRect().top : null,
+          countersBottom: counters ? counters.getBoundingClientRect().bottom : null,
+        };
       });
-      expect(fit, `${label}: content region must exist`).not.toBeNull();
-      expect(
-        fit!.scrollHeight,
-        `${label}: SpritePicker must not cause scroll (scrollHeight ${fit!.scrollHeight} > clientHeight ${fit!.clientHeight})`,
-      ).toBeLessThanOrEqual(fit!.clientHeight + 1);
+
+      expect(bounds, `${label}: clip-bounds elements must be findable`).not.toBeNull();
+
+      if (bounds!.badgeTop !== null) {
+        // Allow 2 px tolerance for sub-pixel rounding.
+        expect(
+          bounds!.badgeTop,
+          `${label}: queue-state badge top (${bounds!.badgeTop}) must not be clipped above region top (${bounds!.regionTop})`,
+        ).toBeGreaterThanOrEqual(bounds!.regionTop - 2);
+      }
+
+      if (bounds!.countersBottom !== null) {
+        // Allow 2 px tolerance for sub-pixel rounding.
+        expect(
+          bounds!.countersBottom,
+          `${label}: queue counters bottom (${bounds!.countersBottom}) must not be clipped below region bottom (${bounds!.regionBottom})`,
+        ).toBeLessThanOrEqual(bounds!.regionBottom + 2);
+      }
     }
   });
 
