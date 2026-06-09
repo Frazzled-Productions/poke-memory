@@ -649,8 +649,9 @@ test.describe("Pokédex detail - bottom nav anchoring (#1086)", () => {
     //
     // The new invariants:
     // 1. The bar's bottom edge is at the viewport bottom (the bar is in-flow).
-    // 2. The content region ([data-scroll-region]) is scrollable, meaning
-    //    content is not clipped - it can be reached by scrolling the region.
+    // 2. The PageShell <main> element is scrollable (scroll ownership moved
+    //    from [data-scroll-region] to [data-page-shell-scroll] so that Practice
+    //    can fit without scrolling while content pages still scroll - #1087).
     const tabBar = page.getByRole("navigation", { name: "Mobile tab navigation" });
     await expect(tabBar).toBeVisible();
 
@@ -660,10 +661,10 @@ test.describe("Pokédex detail - bottom nav anchoring (#1086)", () => {
     const barBottom = box!.y + box!.height;
     expect(Math.abs(barBottom - viewportSize!.height)).toBeLessThanOrEqual(4);
 
-    // The content region must be scrollable (scrollHeight > clientHeight means
-    // there is overflow content, i.e. the page content is not clipped).
+    // The PageShell main element must be scrollable (scrollHeight > clientHeight
+    // means there is overflow content, i.e. the page content is not clipped).
     const scrollable = await page.evaluate(() => {
-      const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+      const region = document.querySelector("[data-page-shell-scroll]") as HTMLElement | null;
       if (!region) return null;
       return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
     });

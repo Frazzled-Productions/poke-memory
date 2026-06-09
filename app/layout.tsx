@@ -210,26 +210,29 @@ export default function RootLayout({
                       */}
                       <FunnelTracker />
                       {/*
-                        Scroll region: the single flex-1 child between the sticky header
-                        chrome and the in-flow BottomTabBar. On mobile this region owns
-                        the internal scroll (overflow-y-auto) so the bar remains visible
-                        at all times without position:fixed. On desktop (md+) overflow
-                        reverts to visible and the document scrolls normally (#1801).
+                        Fit region: the single flex-1 child between the sticky header
+                        chrome and the in-flow BottomTabBar. On mobile this region is
+                        overflow-hidden (a fit container, not a scroller) so Practice
+                        can fill the available height without triggering scroll (#1087).
+                        Pages that need to scroll (Pokédex, Pasture, Stats, etc.) own
+                        their own internal overflow-y-auto via PageShell's <main>
+                        element, so tall content is still reachable. On desktop (md+)
+                        overflow reverts to visible and the document scrolls normally
+                        (#1801).
 
-                        The Footer is intentionally placed OUTSIDE this scroll region
-                        (as a sibling after it) rather than inside. Keeping the Footer
-                        inside the overflow-y-auto container triggered a WebKit
-                        actionability bug where the Footer was reported as intercepting
-                        pointer events on interactive elements inside the scroll region
-                        even when they did not visually overlap (#1838). On mobile the
-                        Footer is hidden entirely for bottom-nav mode anyway; for
-                        hamburger mode it renders as an in-flow element below the scroll
-                        region. On desktop (md+) the scroll region is overflow-visible
-                        so there is no internal scroll context and the Footer position
-                        relative to the scroll region is irrelevant.
+                        The Footer is intentionally placed OUTSIDE this region (as a
+                        sibling after it) rather than inside. Keeping the Footer inside
+                        the overflow container triggered a WebKit actionability bug where
+                        the Footer was reported as intercepting pointer events on
+                        interactive elements inside the region even when they did not
+                        visually overlap (#1838). On mobile the Footer is hidden entirely
+                        for bottom-nav mode anyway; for hamburger mode it renders as an
+                        in-flow element below the fit region. On desktop (md+) the
+                        region is overflow-visible so there is no internal scroll context
+                        and the Footer position relative to it is irrelevant.
                       */}
                       <div
-                        className="flex flex-1 flex-col min-h-0 overflow-y-auto md:overflow-visible"
+                        className="flex flex-1 flex-col min-h-0 overflow-hidden md:overflow-visible"
                         data-scroll-region
                       >
                         <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>

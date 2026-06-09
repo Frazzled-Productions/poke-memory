@@ -60,10 +60,11 @@ test.describe("Mobile nav - bottom tab bar (default)", () => {
   });
 
   test("tab bar stays at viewport bottom when the content region scrolls (#1801)", async ({ page }) => {
-    // Under the app-shell model the document itself does not scroll; the internal
-    // content region ([data-scroll-region]) scrolls while the BottomTabBar remains
-    // the in-flow last child of the shell. Scrolling the content region must not
-    // move the bar.
+    // Under the app-shell model the document itself does not scroll. The
+    // app-shell fit region ([data-scroll-region]) is overflow-hidden on mobile;
+    // pages that need to scroll own their internal scroll via the PageShell
+    // <main data-page-shell-scroll> element. Scrolling that element must not
+    // move the BottomTabBar, which is the in-flow last child of the shell.
     await page.goto("/pokedex");
 
     const tabBar = page.getByRole("navigation", {
@@ -78,9 +79,10 @@ test.describe("Mobile nav - bottom tab bar (default)", () => {
     const boxBefore = await tabBar.boundingBox();
     expect(boxBefore).not.toBeNull();
 
-    // Scroll the content region (not the document) down
+    // Scroll the PageShell scroll region (not the document or the app-shell
+    // fit container) down. On Pokédex the main element is scrollable.
     await page.evaluate(() => {
-      const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+      const region = document.querySelector("[data-page-shell-scroll]") as HTMLElement | null;
       if (region) {
         region.scrollTop = 300;
       }
