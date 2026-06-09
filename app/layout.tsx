@@ -122,7 +122,23 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-[100svh] flex flex-col">
+      {/*
+        Mobile app-shell: h-[100lvh] pins the body to the large viewport height
+        (874px on iPhone 17 Pro), which is the only viewport unit that resolves
+        to the true visible bottom on a non-scrolling page like Practice. dvh and
+        svh both resolve to innerHeight (853px when the URL bar is visible),
+        which left a 21px gap above the visible bottom. overflow-hidden confines
+        scrolling to the internal content region so the BottomTabBar is always
+        in-flow at the bottom of the visible screen (#1801).
+
+        On desktop (md+) we revert to normal document scroll: h-auto removes the
+        fixed height, min-h-[100svh] preserves the #1728 cold-paint guarantee
+        (body is at least the expanded-URL-bar height at first paint), and
+        overflow-visible allows the page to grow beyond the viewport. The bottom
+        tab bar is hidden at md+ via md:hidden so no positioning adjustment is
+        needed there.
+      */}
+      <body className="h-[100lvh] overflow-hidden flex flex-col md:h-auto md:min-h-[100svh] md:overflow-visible">
         {/*
           LocaleProvider is wrapped in Suspense so the cookie read it performs
           (resolveLocale → cookies()) is isolated from the static shell.
@@ -194,18 +210,28 @@ export default function RootLayout({
                       */}
                       <FunnelTracker />
                       {/*
-                        MobileNavPaddingWrapper adds bottom padding on mobile only when
-                        the bottom tab bar is active, so the fixed bar never overlaps content.
-                        The padding is removed automatically when the user switches to the
-                        hamburger nav style via Settings.
+                        Scroll region: the single flex-1 child between the sticky header
+                        chrome and the in-flow BottomTabBar. On mobile this region owns
+                        the internal scroll (overflow-y-auto) so the bar remains visible
+                        at all times without position:fixed. On desktop (md+) overflow
+                        reverts to visible and the document scrolls normally (#1801).
+                        Footer scrolls with content here (it returns null in bottom-nav
+                        mode anyway, so it only appears in hamburger / desktop flows).
                       */}
-                      <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
-                      <Footer />
+                      <div
+                        className="flex flex-1 flex-col min-h-0 overflow-y-auto md:overflow-visible"
+                        data-scroll-region
+                      >
+                        <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
+                        <Footer />
+                      </div>
                       {/*
                         BottomTabBar is always mounted but returns null internally when
                         mobileNav === 'hamburger'. The single Suspense boundary here is
                         sufficient - the component has its own inner Suspense for the
                         async mastery check.
+                        In-flow (not fixed) as of #1801 - see BottomTabBar.tsx for
+                        the positioning change.
                       */}
                       <BottomTabBar />
                     </FavouriteThemeProvider>

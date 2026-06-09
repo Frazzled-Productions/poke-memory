@@ -196,7 +196,7 @@ function BottomTabBarInner() {
   return (
     <nav
       aria-label={t("mobileTabAriaLabel")}
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-theme-secondary bg-theme-primary md:hidden"
+      className="flex-none border-t border-theme-secondary bg-theme-primary md:hidden"
     >
       <ul
         role="list"
@@ -251,7 +251,7 @@ export function BottomTabBarFallback() {
   return (
     <div
       aria-hidden="true"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-theme-secondary bg-theme-primary md:hidden"
+      className="flex-none border-t border-theme-secondary bg-theme-primary md:hidden"
     >
       <ul
         role="list"

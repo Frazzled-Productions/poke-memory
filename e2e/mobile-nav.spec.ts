@@ -59,7 +59,11 @@ test.describe("Mobile nav - bottom tab bar (default)", () => {
     }
   });
 
-  test("tab bar is fixed - does not scroll with the page", async ({ page }) => {
+  test("tab bar stays at viewport bottom when the content region scrolls (#1801)", async ({ page }) => {
+    // Under the app-shell model the document itself does not scroll; the internal
+    // content region ([data-scroll-region]) scrolls while the BottomTabBar remains
+    // the in-flow last child of the shell. Scrolling the content region must not
+    // move the bar.
     await page.goto("/pokedex");
 
     const tabBar = page.getByRole("navigation", {
@@ -67,19 +71,33 @@ test.describe("Mobile nav - bottom tab bar (default)", () => {
     });
     await expect(tabBar).toBeVisible();
 
-    // Record position before scrolling
+    const viewportSize = page.viewportSize();
+    expect(viewportSize).not.toBeNull();
+
+    // Record bar position before scrolling
     const boxBefore = await tabBar.boundingBox();
     expect(boxBefore).not.toBeNull();
 
-    // Scroll the page down
-    await page.evaluate(() => window.scrollBy(0, 300));
+    // Scroll the content region (not the document) down
+    await page.evaluate(() => {
+      const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+      if (region) {
+        region.scrollTop = 300;
+      }
+    });
 
-    // Position should be unchanged (fixed positioning)
+    // Bar position must be unchanged - it is in-flow at the shell bottom
     const boxAfter = await tabBar.boundingBox();
     expect(boxAfter).not.toBeNull();
 
     if (boxBefore && boxAfter) {
       expect(Math.abs(boxAfter.y - boxBefore.y)).toBeLessThanOrEqual(2);
+    }
+
+    // Bar's bottom edge must align with the viewport bottom (the core #1801 invariant)
+    if (boxAfter && viewportSize) {
+      const barBottom = boxAfter.y + boxAfter.height;
+      expect(Math.abs(barBottom - viewportSize.height)).toBeLessThanOrEqual(4);
     }
   });
 
