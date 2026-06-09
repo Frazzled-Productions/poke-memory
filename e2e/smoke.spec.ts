@@ -408,6 +408,64 @@ test.describe("Practice page", () => {
     await expect(gradeButtons).toBeInViewport();
   });
 
+  test("Practice content region does NOT scroll at common mobile viewports (#1087 regression guard)", async ({
+    page,
+  }, testInfo) => {
+    // This is the regression guard for the #1801 app-shell follow-up: the
+    // app-shell fit region ([data-scroll-region]) must be overflow-hidden on
+    // mobile so Practice never scrolls. The PageShell element owns its own
+    // overflow for pages that need to scroll.
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "content-fit check is mobile-only",
+    );
+
+    for (const { width, height, label } of [
+      { width: 402, height: 874, label: "iPhone 17 Pro" },
+      { width: 390, height: 844, label: "iPhone 14" },
+      { width: 375, height: 667, label: "iPhone SE" },
+    ]) {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+
+      const reveal = page.getByRole("button", { name: "Reveal" });
+      const hasCard = await reveal.isVisible().catch(() => false);
+      if (!hasCard) {
+        // No reviewable card at this viewport - skip size, don't fail.
+        continue;
+      }
+
+      // Before reveal: no scroll on the content region
+      const fitBefore = await page.evaluate(() => {
+        const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+        if (!region) return null;
+        return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
+      });
+      expect(fitBefore, `${label}: content region must exist`).not.toBeNull();
+      // Allow 1px tolerance for sub-pixel rounding.
+      expect(
+        fitBefore!.scrollHeight,
+        `${label}: content region must not scroll before reveal (scrollHeight ${fitBefore!.scrollHeight} > clientHeight ${fitBefore!.clientHeight})`,
+      ).toBeLessThanOrEqual(fitBefore!.clientHeight + 1);
+
+      // After reveal: grade buttons visible, still no scroll
+      await reveal.click();
+      const gradeButtons = page.getByRole("group", { name: "Grade your answer" });
+      await expect(gradeButtons).toBeVisible();
+
+      const fitAfter = await page.evaluate(() => {
+        const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+        if (!region) return null;
+        return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
+      });
+      expect(fitAfter, `${label}: content region must exist after reveal`).not.toBeNull();
+      expect(
+        fitAfter!.scrollHeight,
+        `${label}: content region must not scroll after reveal (scrollHeight ${fitAfter!.scrollHeight} > clientHeight ${fitAfter!.clientHeight})`,
+      ).toBeLessThanOrEqual(fitAfter!.clientHeight + 1);
+    }
+  });
+
   test("queue state badge shows 'New' on a never-reviewed name card", async ({ page }) => {
     await seedSessionIdb(page, {
       cards: [
