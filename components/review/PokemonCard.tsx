@@ -27,13 +27,17 @@ export function PokemonCard({ spriteUrl, name, revealed, fact, direction = "name
   return (
     <div className="flex flex-col items-center gap-1 sm:gap-4">
       <DirectionBadge direction={direction} />
+      {/* The intrinsic width/height serve the correct WebP variant from the
+          image loader. CSS caps the painted size: max-h-36 on mobile shrinks
+          to the available height on very short viewports (iPhone SE); sm:max-h-80
+          on wider screens. w-auto preserves aspect ratio. (#1839 followup) */}
       <Image
         src={spriteUrl}
         alt={revealed ? displayName : "A Pokémon sprite, answer hidden"}
         width={PRACTICE_SPRITE_SIZE}
         height={PRACTICE_SPRITE_SIZE}
         priority
-        className="h-36 w-36 object-contain sm:h-80 sm:w-80"
+        className="max-h-36 w-auto object-contain sm:max-h-80"
       />
       {/*
         Reserve the revealed-state height (name row + transliteration + fact,

@@ -10,7 +10,10 @@ import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { sectionLabelSubtle } from "@/lib/utils/class-names";
 import { PRACTICE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
-export const SPRITE_CLASS = "h-24 w-24 object-contain sm:h-48 sm:w-48";
+// Intrinsic size is PRACTICE_SPRITE_SIZE so the loader serves the right WebP
+// variant; CSS max-h-24/sm:max-h-48 caps the painted height so the pair shrinks
+// on short viewports (e.g. iPhone SE) instead of overflowing (#1839 followup).
+export const SPRITE_CLASS = "max-h-24 w-auto object-contain sm:max-h-48";
 export const ARROW_CLASS =
   "text-2xl font-semibold text-zinc-400 dark:text-zinc-500 sm:text-5xl";
 export const PLACEHOLDER_CLASS =
