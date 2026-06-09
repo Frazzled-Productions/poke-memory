@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { withSentryConfig } from "@sentry/nextjs";
 import pkg from "./package.json";
 import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
 
@@ -110,4 +111,50 @@ const nextConfig: NextConfig = {
 // request config (i18n/request.ts) and message imports without the
 // "Couldn't find next-intl config" runtime error (#1260).
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
-export default withNextIntl(nextConfig);
+
+// `withSentryConfig` is the outermost wrapper so it can instrument webpack
+// fully. Wrapping order: Sentry(next-intl(nextConfig)).
+//
+// Key options:
+//   silent           - suppresses Sentry CLI output during `next build`.
+//   sourcemaps.deleteSourcemapsAfterUpload
+//                    - strips source maps from the build output after they are
+//                      uploaded so they are not served publicly. Defaults to
+//                      true in v10; set explicitly for clarity.
+//   webpack.treeshake.removeDebugLogging
+//                    - removes the Sentry SDK debug-logging code from the
+//                      client bundle to reduce bundle size. Replaces the
+//                      deprecated `disableLogger` option.
+//   widenClientFileUpload - disabled; we do not need to upload additional
+//                      client files beyond the standard Next.js output.
+//   tunnelRoute      - proxies Sentry events through /monitoring so ad-blocker
+//                      extensions cannot block the DSN endpoint. The service
+//                      worker uses NetworkFirst for same-origin routes, so
+//                      POST requests to /monitoring pass through unaltered.
+//   org / project    - read from env; build-time only (not shipped to browser).
+//
+// NOTE: do NOT enable --turbopack for the build script. Turbopack does not run
+// webpack plugins, which silently disables source-map upload. Use the default
+// webpack-based `next build` to keep source maps uploading correctly.
+//
+// INERT WITHOUT SECRETS: When NEXT_PUBLIC_SENTRY_DSN is not set, Sentry.init
+// is a no-op (no network, no throw). When SENTRY_AUTH_TOKEN is absent,
+// withSentryConfig warns and skips map upload - it does NOT fail the build.
+export default withSentryConfig(withNextIntl(nextConfig), {
+  silent: true,
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+  // Remove Sentry SDK debug logging from the client bundle to reduce bundle
+  // size. `webpack.treeshake.removeDebugLogging` is the current API; the
+  // older `disableLogger` flag is deprecated and not supported with Turbopack.
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
+  widenClientFileUpload: false,
+  tunnelRoute: "/monitoring",
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+});
