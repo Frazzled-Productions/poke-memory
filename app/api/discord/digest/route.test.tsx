@@ -7,9 +7,14 @@
  *   - window_days parsing and clamping
  *   - Empty-week branch (0 submissions): still posts a zero-count digest
  *   - Populated branch: correct category grouping (total, auth, guest)
- *   - CRITICAL: query never selects or sends `message`; response body contains no message
+ *   - CRITICAL: query never selects or sends `message` or `user_id`
  *   - 502 on DB query error
  *   - 502 on Discord webhook error
+ *
+ * PII note: the route uses TWO queries to avoid selecting user_id into JS:
+ *   1. SELECT id, category, created_at for all rows.
+ *   2. SELECT id, category filtered by user_id IS NOT NULL (server-side filter only).
+ * The mock reflects this two-query design.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -54,14 +59,47 @@ function makeRequest(body: unknown = { window_days: 7 }, authHeader: string | nu
   });
 }
 
-/** Build a mock admin client whose `from("feedback").select(...).gte(...)` resolves to data. */
-function buildAdminMock(rows: Array<Record<string, unknown>>, queryError?: unknown) {
-  const gteChain = vi.fn(() =>
-    Promise.resolve({ data: queryError ? null : rows, error: queryError ?? null }),
+/**
+ * Build a mock Supabase admin client for the two-query digest design.
+ *
+ * The route fires two parallel queries via Promise.all:
+ *   Query 1: .from("feedback").select("id, category, created_at").gte(...)
+ *   Query 2: .from("feedback").select("id, category").gte(...).not(...)
+ *
+ * allRows:   rows returned by query 1 (all in window, no user_id).
+ * authRows:  rows returned by query 2 (authenticated subset, id+category only).
+ * queryError: if set, both queries return an error (simulates a DB failure).
+ */
+function buildAdminMock(
+  allRows: Array<Record<string, unknown>>,
+  authRows: Array<Record<string, unknown>> = [],
+  queryError?: unknown,
+) {
+  // Each call sequence: .from("feedback").select(...).gte(...)[.not(...)]
+  // We track how many times .select() has been called to distinguish the two queries.
+  let selectCallCount = 0;
+  const selectChains: Array<ReturnType<typeof vi.fn>> = [];
+
+  const notChain1 = vi.fn(() =>
+    Promise.resolve({ data: queryError ? null : authRows, error: queryError ?? null }),
   );
-  const selectChain = vi.fn(() => ({ gte: gteChain }));
+  const gteChain1 = vi.fn(() => Promise.resolve({ data: queryError ? null : allRows, error: queryError ?? null }));
+  const gteChain2 = vi.fn(() => ({ not: notChain1 }));
+
+  const selectChain = vi.fn(() => {
+    selectCallCount++;
+    if (selectCallCount === 1) {
+      // First select call: all-rows query (select id, category, created_at)
+      return { gte: gteChain1 };
+    } else {
+      // Second select call: auth-rows query (select id, category, then .not())
+      return { gte: gteChain2 };
+    }
+  });
+  selectChains.push(selectChain);
+
   const fromFn = vi.fn(() => ({ select: selectChain }));
-  return { client: { from: fromFn }, fromFn, selectChain, gteChain };
+  return { client: { from: fromFn }, fromFn, selectChain, gteChain1, gteChain2, notChain1 };
 }
 
 // ── fetch mock ───────────────────────────────────────────────────────────────
@@ -112,7 +150,7 @@ describe("POST /api/discord/digest - misconfiguration", () => {
 
 describe("POST /api/discord/digest - auth", () => {
   it("returns 401 when Authorization header is missing", async () => {
-    const adminMock = buildAdminMock([]);
+    const adminMock = buildAdminMock([], []);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
     const res = await POST(makeRequest({ window_days: 7 }, null));
     expect(res.status).toBe(401);
@@ -120,7 +158,7 @@ describe("POST /api/discord/digest - auth", () => {
   });
 
   it("returns 401 for a wrong bearer token", async () => {
-    const adminMock = buildAdminMock([]);
+    const adminMock = buildAdminMock([], []);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
     const res = await POST(makeRequest({ window_days: 7 }, "Bearer wrong-secret"));
     expect(res.status).toBe(401);
@@ -132,7 +170,7 @@ describe("POST /api/discord/digest - auth", () => {
 
 describe("POST /api/discord/digest - empty week", () => {
   it("posts a zero-count digest embed when there are no submissions", async () => {
-    const adminMock = buildAdminMock([]);
+    const adminMock = buildAdminMock([], []);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
 
     const res = await POST(makeRequest({ window_days: 7 }));
@@ -159,19 +197,28 @@ describe("POST /api/discord/digest - empty week", () => {
 // ── Populated branch (category grouping) ──────────────────────────────────────
 
 describe("POST /api/discord/digest - populated week", () => {
-  const SAMPLE_ROWS = [
-    // Bugs: 2 authenticated, 1 guest
-    { id: "id-1", category: "bug", user_id: "user-1", created_at: "2026-06-02T10:00:00Z" },
-    { id: "id-2", category: "bug", user_id: "user-2", created_at: "2026-06-03T10:00:00Z" },
-    { id: "id-3", category: "bug", user_id: null,     created_at: "2026-06-04T10:00:00Z" },
+  // All-rows result: id, category, created_at only (no user_id).
+  const ALL_ROWS = [
+    // Bugs: 3 total (id-1, id-2 authenticated; id-3 guest)
+    { id: "id-1", category: "bug",     created_at: "2026-06-02T10:00:00Z" },
+    { id: "id-2", category: "bug",     created_at: "2026-06-03T10:00:00Z" },
+    { id: "id-3", category: "bug",     created_at: "2026-06-04T10:00:00Z" },
     // Features: 1 authenticated
-    { id: "id-4", category: "feature", user_id: "user-3", created_at: "2026-06-05T10:00:00Z" },
+    { id: "id-4", category: "feature", created_at: "2026-06-05T10:00:00Z" },
     // Other: 1 guest
-    { id: "id-5", category: "other", user_id: null, created_at: "2026-06-06T10:00:00Z" },
+    { id: "id-5", category: "other",   created_at: "2026-06-06T10:00:00Z" },
+  ];
+
+  // Auth-rows result: rows where user_id IS NOT NULL, selected by server-side filter.
+  // user_id never appears in JS; only id+category are projected.
+  const AUTH_ROWS = [
+    { id: "id-1", category: "bug" },
+    { id: "id-2", category: "bug" },
+    { id: "id-4", category: "feature" },
   ];
 
   it("groups counts by category correctly", async () => {
-    const adminMock = buildAdminMock(SAMPLE_ROWS);
+    const adminMock = buildAdminMock(ALL_ROWS, AUTH_ROWS);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
 
     const res = await POST(makeRequest({ window_days: 7 }));
@@ -196,25 +243,37 @@ describe("POST /api/discord/digest - populated week", () => {
     expect(findField("Other").value).toBe("1 (0 auth, 1 guest)");
   });
 
-  it("selects only safe fields (id, category, user_id, created_at) - never message", async () => {
-    const adminMock = buildAdminMock(SAMPLE_ROWS);
+  // PII defence-in-depth: user_id must NEVER appear in any SELECT string.
+  it("CRITICAL: SELECT strings never contain user_id", async () => {
+    const adminMock = buildAdminMock(ALL_ROWS, AUTH_ROWS);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
 
     await POST(makeRequest({ window_days: 7 }));
 
-    // Verify the select call does NOT request the message column.
-    const selectCall = (adminMock.selectChain.mock.calls as unknown as string[][])[0][0];
-    expect(selectCall).not.toContain("message");
-    // Verify it selects the safe columns.
-    expect(selectCall).toContain("id");
-    expect(selectCall).toContain("category");
-    expect(selectCall).toContain("user_id");
-    expect(selectCall).toContain("created_at");
+    // All select() calls must not include user_id in the projected columns.
+    const selectCalls = (adminMock.selectChain.mock.calls as unknown as string[][]).map((c) => c[0]);
+    for (const selectStr of selectCalls) {
+      expect(selectStr).not.toContain("user_id");
+    }
+
+    // First query selects id, category, created_at for all rows.
+    expect(selectCalls[0]).toContain("id");
+    expect(selectCalls[0]).toContain("category");
+    expect(selectCalls[0]).toContain("created_at");
+
+    // Second query selects id, category (no created_at needed) for auth rows.
+    expect(selectCalls[1]).toContain("id");
+    expect(selectCalls[1]).toContain("category");
+
+    // Neither query selects message.
+    for (const selectStr of selectCalls) {
+      expect(selectStr).not.toContain("message");
+    }
   });
 
   // CRITICAL: Discord payload must NEVER include message or user_id values.
   it("CRITICAL: Discord webhook payload contains NO message field", async () => {
-    const adminMock = buildAdminMock(SAMPLE_ROWS);
+    const adminMock = buildAdminMock(ALL_ROWS, AUTH_ROWS);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
 
     await POST(makeRequest({ window_days: 7 }));
@@ -224,18 +283,16 @@ describe("POST /api/discord/digest - populated week", () => {
     expect(payloadStr).not.toContain('"message"');
   });
 
-  it("CRITICAL: Discord webhook payload contains NO user_id values", async () => {
-    const adminMock = buildAdminMock(SAMPLE_ROWS);
+  it("CRITICAL: Discord webhook payload contains NO user_id field or user UUIDs", async () => {
+    const adminMock = buildAdminMock(ALL_ROWS, AUTH_ROWS);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
 
     await POST(makeRequest({ window_days: 7 }));
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const payloadStr = init.body as string;
-    // user_id values should not appear in the Discord payload.
-    expect(payloadStr).not.toContain("user-1");
-    expect(payloadStr).not.toContain("user-2");
-    expect(payloadStr).not.toContain("user-3");
+    // user_id key must not appear in the Discord payload.
+    expect(payloadStr).not.toContain('"user_id"');
   });
 });
 
@@ -243,7 +300,7 @@ describe("POST /api/discord/digest - populated week", () => {
 
 describe("POST /api/discord/digest - window_days", () => {
   it("defaults to 7 when window_days is missing from the body", async () => {
-    const adminMock = buildAdminMock([]);
+    const adminMock = buildAdminMock([], []);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
 
     const res = await POST(makeRequest({}));
@@ -253,7 +310,7 @@ describe("POST /api/discord/digest - window_days", () => {
   });
 
   it("clamps window_days above 90 to 90", async () => {
-    const adminMock = buildAdminMock([]);
+    const adminMock = buildAdminMock([], []);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
 
     const res = await POST(makeRequest({ window_days: 999 }));
@@ -262,7 +319,7 @@ describe("POST /api/discord/digest - window_days", () => {
   });
 
   it("clamps window_days below 1 to 1", async () => {
-    const adminMock = buildAdminMock([]);
+    const adminMock = buildAdminMock([], []);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
 
     const res = await POST(makeRequest({ window_days: 0 }));
@@ -271,7 +328,7 @@ describe("POST /api/discord/digest - window_days", () => {
   });
 
   it("defaults to 7 when the body is invalid JSON", async () => {
-    const adminMock = buildAdminMock([]);
+    const adminMock = buildAdminMock([], []);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
 
     const headers: Record<string, string> = {
@@ -295,7 +352,7 @@ describe("POST /api/discord/digest - window_days", () => {
 
 describe("POST /api/discord/digest - error handling", () => {
   it("returns 502 when the DB query errors", async () => {
-    const adminMock = buildAdminMock([], { message: "DB error" });
+    const adminMock = buildAdminMock([], [], { message: "DB error" });
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
 
     const res = await POST(makeRequest({ window_days: 7 }));
@@ -307,7 +364,7 @@ describe("POST /api/discord/digest - error handling", () => {
   });
 
   it("returns 502 when Discord webhook returns non-2xx", async () => {
-    const adminMock = buildAdminMock([]);
+    const adminMock = buildAdminMock([], []);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
     fetchMock.mockResolvedValue(new Response("Bad Request", { status: 400 }));
 
@@ -319,7 +376,7 @@ describe("POST /api/discord/digest - error handling", () => {
   });
 
   it("returns 502 when the Discord fetch throws", async () => {
-    const adminMock = buildAdminMock([]);
+    const adminMock = buildAdminMock([], []);
     mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
     fetchMock.mockRejectedValue(new Error("ECONNREFUSED"));
 

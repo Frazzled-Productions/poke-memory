@@ -19,8 +19,10 @@ import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js
  *   fall back to 7.
  *
  * QUERY CONTRACT
- *   Only SELECT id, category, user_id (for the authenticated bool only,
- *   never forwarded), created_at. NEVER select or send message.
+ *   Two queries: (1) SELECT id, category, created_at for all rows in the
+ *   window; (2) SELECT id, category filtered by user_id IS NOT NULL (filter
+ *   only - user_id never appears in the JS SELECT list). NEVER select or
+ *   send message or user_id.
  *
  * DISCORD WEBHOOK
  *   URL read from DISCORD_DIGEST_WEBHOOK_URL env (server-side only).
@@ -48,11 +50,10 @@ type CategoryStats = {
   guest: number;
 };
 
-/** DB row shape for the digest query. */
+/** DB row shape for the all-rows digest query (user_id is never selected). */
 type FeedbackRow = {
   id: string;
   category: string;
-  user_id: string | null;
   created_at: string;
 };
 
@@ -93,18 +94,37 @@ export async function POST(request: Request) {
   // Compute the window start timestamp.
   const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
 
-  // Query only the fields needed for the digest. NEVER select message.
-  const { data, error } = await admin
-    .from("feedback")
-    .select("id, category, user_id, created_at")
-    .gte("created_at", since);
+  // PII defence-in-depth: user_id is NEVER selected into JavaScript.
+  //
+  // Two queries derive the auth/guest split without touching user_id in the
+  // SELECT list:
+  //   1. All rows in the window (id, category, created_at) for totals.
+  //   2. Authenticated rows only (user_id IS NOT NULL via .not() filter), also
+  //      selecting id + category so we can cross-reference per category.
+  //
+  // The .not("user_id", "is", null) PostgREST filter becomes a WHERE clause;
+  // user_id is never projected into JS memory.
 
-  if (error) {
-    console.error("[discord/digest] query error", error);
+  const [allResult, authResult] = await Promise.all([
+    admin
+      .from("feedback")
+      .select("id, category, created_at")
+      .gte("created_at", since),
+    admin
+      .from("feedback")
+      .select("id, category")
+      .gte("created_at", since)
+      .not("user_id", "is", null),
+  ]);
+
+  if (allResult.error || authResult.error) {
+    const err = allResult.error ?? authResult.error;
+    console.error("[discord/digest] query error", err);
     return NextResponse.json({ ok: false, error: "query_failed" }, { status: 502 });
   }
 
-  const rows = (data ?? []) as FeedbackRow[];
+  const rows = (allResult.data ?? []) as FeedbackRow[];
+  const authIds = new Set((authResult.data ?? []).map((r) => (r as { id: string }).id));
   const total = rows.length;
 
   // Group by category, accumulating authenticated vs guest counts.
@@ -116,7 +136,7 @@ export async function POST(request: Request) {
     }
     const stats = byCategory.get(cat)!;
     stats.total += 1;
-    if (row.user_id !== null) {
+    if (authIds.has(row.id)) {
       stats.authenticated += 1;
     } else {
       stats.guest += 1;

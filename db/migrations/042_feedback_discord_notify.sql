@@ -140,14 +140,40 @@ BEGIN
     'feedback-discord-digest',
     '0 9 * * 1',
     $cronbody$
-    SELECT net.http_post(
-      url     := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'discord_digest_url'),
-      headers := jsonb_build_object(
-        'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'cron_shared_secret'),
-        'Content-Type',  'application/json'
-      ),
-      body    := '{"window_days":7}'::jsonb
-    );
+    DO $$
+    DECLARE
+      v_url    text;
+      v_secret text;
+    BEGIN
+      SELECT decrypted_secret INTO v_url
+        FROM vault.decrypted_secrets
+        WHERE name = 'discord_digest_url'
+        LIMIT 1;
+
+      SELECT decrypted_secret INTO v_secret
+        FROM vault.decrypted_secrets
+        WHERE name = 'cron_shared_secret'
+        LIMIT 1;
+
+      -- Guard: if either secret is unset, skip the post rather than sending
+      -- an empty-bearer request that silently 401s.
+      IF v_url IS NULL OR v_secret IS NULL THEN
+        RAISE NOTICE 'feedback-discord-digest: missing Vault secret(s), skipping HTTP post';
+      ELSE
+        PERFORM net.http_post(
+          url     := v_url,
+          headers := jsonb_build_object(
+            'Authorization', 'Bearer ' || v_secret,
+            'Content-Type',  'application/json'
+          ),
+          body    := '{"window_days":7}'::jsonb
+        );
+      END IF;
+    EXCEPTION
+      WHEN OTHERS THEN
+        RAISE NOTICE 'feedback-discord-digest: http_post failed: %', SQLERRM;
+    END;
+    $$;
     $cronbody$
   );
 EXCEPTION
