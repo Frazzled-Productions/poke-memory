@@ -60,6 +60,7 @@ import { SignInSheet } from "@/components/auth/SignInSheet";
 import { PushOptIn } from "@/components/pwa/PushOptIn";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { SyncStatusLine } from "@/components/stats/SyncStatusLine";
+import { useServiceWorkerVersion } from "@/lib/pwa/useServiceWorkerVersion";
 import { useRetryPush } from "@/lib/sync/useRetryPush";
 import { loadSyncStatus } from "@/lib/sync/persistence";
 import { cn } from "@/lib/utils/cn";
@@ -598,6 +599,10 @@ export default function SettingsPage() {
     anyFlagOn ? null : (user?.id ?? null),
   );
 
+  // Service worker version diagnostic (#1826). Queries the controlling worker
+  // for its baked-in version so stale-SW mismatches are surfaced in About.
+  const swVersionState = useServiceWorkerVersion();
+
   // Derive whether sync is in a failed state for the amber border.
   // Mirrors the isFailed / schemaError logic in SyncStatusLine - uses the
   // same loadSyncStatus() read that SyncStatusLine already performs, so no
@@ -948,6 +953,7 @@ export default function SettingsPage() {
                       retryState={retryState}
                       retryNow={retryNow}
                       superuserPaused={anyFlagOn}
+                      tz={settings?.timezone ?? "UTC"}
                     />
                   </div>
                 </div>
@@ -2067,6 +2073,32 @@ export default function SettingsPage() {
                         ? `v${process.env.NEXT_PUBLIC_APP_VERSION}`
                         : "dev"}
                     </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{t("settings.about.serviceWorker")}</p>
+                    <p className={`mt-1 ${mutedTextXs}`}>
+                      {swVersionState.status === "loading" && t("settings.about.serviceWorkerLoading")}
+                      {swVersionState.status === "no-controller" && t("settings.about.serviceWorkerNone")}
+                      {swVersionState.status === "timeout" && t("settings.about.serviceWorkerTimeout")}
+                      {swVersionState.status === "ready" && `v${swVersionState.version}`}
+                    </p>
+                    {swVersionState.status === "ready" &&
+                      process.env.NEXT_PUBLIC_APP_VERSION &&
+                      swVersionState.version !== process.env.NEXT_PUBLIC_APP_VERSION && (
+                        <p
+                          className="mt-2 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400"
+                          role="alert"
+                        >
+                          <span aria-hidden="true">&#9888;</span>
+                          <span>
+                            {t("settings.about.serviceWorkerMismatch", {
+                              swVersion: `v${swVersionState.version}`,
+                              appVersion: `v${process.env.NEXT_PUBLIC_APP_VERSION}`,
+                            })}
+                          </span>
+                        </p>
+                    )}
                   </div>
 
                   <hr className="border-zinc-200 dark:border-zinc-800" />

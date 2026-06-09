@@ -90,11 +90,21 @@ const SW_REPLAY_MESSAGE = "BACKGROUND_SYNC_REPLAY";
 interface ServiceWorkerScope {
   /** Build-time injection point replaced by scripts/build-sw.mjs. */
   __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
+  /**
+   * Build-time version string injected by scripts/build-sw.mjs via the
+   * esbuild `define` block. Format: `"<appVersion>+<sha8>"`. Frozen into
+   * each deployed bundle so an old controlling worker always reports its
+   * own version, not the new app version (#1826).
+   */
+  __SW_VERSION__: string;
   location: { origin: string };
   skipWaiting(): Promise<void>;
   addEventListener(
     type: "message",
-    listener: (event: { data?: { type?: string } }) => void,
+    listener: (event: {
+      data?: { type?: string };
+      ports: readonly MessagePort[];
+    }) => void,
   ): void;
   addEventListener(
     type: "sync",
@@ -309,8 +319,14 @@ const serwist = new Serwist({
 // window client is open - otherwise a still-foreground sibling tab would be
 // swapped under the user. The client's visibility listener stays armed, so
 // the next quiet moment retries naturally.
+//
+// Also handles GET_SW_VERSION (#1826): the Settings page queries the
+// controlling worker's baked-in version so a stale-worker mismatch is
+// surfaced to the user without requiring Safari Web Inspector.
 self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
+  if (!event.data) return;
+
+  if (event.data.type === "SKIP_WAITING") {
     void (async () => {
       const clients = await self.clients.matchAll({ type: "window" });
       if (clients.length <= 1) {
@@ -318,6 +334,17 @@ self.addEventListener("message", (event) => {
       }
       // Otherwise: decline silently. Another visibility tick will retry.
     })();
+    return;
+  }
+
+  if (event.data.type === "GET_SW_VERSION") {
+    // Reply via the MessageChannel port sent by the client. The port is
+    // the first entry in event.ports; if absent (unexpected), no reply is
+    // sent and the client's timeout fires naturally.
+    const port = event.ports[0];
+    if (port) {
+      port.postMessage({ type: "SW_VERSION", version: self.__SW_VERSION__ });
+    }
   }
 });
 

@@ -131,6 +131,17 @@ async function main() {
     );
   }
 
+  // Bake a version string into the SW bundle so the Settings diagnostic can
+  // detect a stale controlling worker (#1826). Format: "<appVersion>+<sha8>"
+  // where sha8 is computed AFTER writing the bundle (see below). For the
+  // define block we inject the app version only; the sha8 is appended later
+  // via a second pass if needed. Here we use just the package version so the
+  // frozen string is human-readable in the Settings UI.
+  const pkgJson = JSON.parse(
+    await fs.readFile(path.join(projectRoot, "package.json"), "utf-8"),
+  );
+  const appVersion = pkgJson.version ?? "dev";
+
   const result = await esbuild.build({
     sourcemap: true,
     format: "esm",
@@ -145,6 +156,10 @@ async function main() {
     define: {
       ...config.esbuildOptions?.define,
       ...(injectionPoint ? { [injectionPoint]: manifestString } : {}),
+      // Inject the frozen SW version string. esbuild replaces the identifier
+      // `self.__SW_VERSION__` (declared in app/sw.ts) with this literal at
+      // bundle time so the value is frozen into each deployed worker.
+      "self.__SW_VERSION__": JSON.stringify(appVersion),
     },
     outdir: config.cwd,
     write: false,

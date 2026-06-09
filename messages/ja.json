@@ -303,6 +303,11 @@
     "about": {
       "heading": "このアプリについて",
       "version": "バージョン",
+      "serviceWorker": "サービスワーカー",
+      "serviceWorkerLoading": "確認中...",
+      "serviceWorkerNone": "アクティブなサービスワーカーはありません",
+      "serviceWorkerTimeout": "サービスワーカーから応答がありません",
+      "serviceWorkerMismatch": "サービスワーカー（{swVersion}）がアプリ（{appVersion}）より古いです - 更新が保留中です。アプリを閉じて再度開いて適用してください。",
       "whatsNew": "新機能",
       "whatsNewDescription": "最近のリリースで追加された内容を確認できます。",
       "viewChangelog": "変更履歴を見る",

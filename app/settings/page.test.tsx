@@ -226,8 +226,8 @@ vi.mock("@/lib/profile/masteredCountCache", () => ({
 // SyncStatusLine has its own unit tests; stub it here so the account-block
 // tests can assert on its presence without requiring a useFormatter mock.
 vi.mock("@/components/stats/SyncStatusLine", () => ({
-  SyncStatusLine: ({ retryState }: { retryState: string; retryNow: () => void; superuserPaused?: boolean }) => (
-    <div data-testid="sync-status-line" data-retry-state={retryState}>
+  SyncStatusLine: ({ retryState, tz }: { retryState: string; retryNow: () => void; superuserPaused?: boolean; tz?: string }) => (
+    <div data-testid="sync-status-line" data-retry-state={retryState} data-tz={tz ?? ""}>
       {retryState === "error" || retryState === "retrying"
         ? "Sync failed · Retry"
         : "Synced"}
@@ -263,6 +263,16 @@ vi.mock("@/components/auth/LinkIdentitiesSection", () => ({
 
 vi.mock("@/components/settings/OfflineSection", () => ({
   OfflineSection: () => <div data-testid="offline-section" />,
+}));
+
+// ---------------------------------------------------------------------------
+// useServiceWorkerVersion mock (#1826) - controllable per test.
+// ---------------------------------------------------------------------------
+const { mockSwVersionState } = vi.hoisted(() => ({
+  mockSwVersionState: { current: { status: "no-controller" } as import("@/lib/pwa/useServiceWorkerVersion").SwVersionState },
+}));
+vi.mock("@/lib/pwa/useServiceWorkerVersion", () => ({
+  useServiceWorkerVersion: () => mockSwVersionState.current,
 }));
 
 // Stub next-intl - t() resolves keys against the real en.json catalogue so
@@ -447,6 +457,8 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({ user: null, supabase: null, loading: false });
   // Reset retry/sync state to healthy defaults.
   mockUseRetryPush.mockReturnValue({ retryState: "idle", retryNow: vi.fn() });
+  // Reset SW version state to no-controller by default.
+  mockSwVersionState.current = { status: "no-controller" };
   mockLoadSyncStatus.mockReturnValue({
     lastPushAt: null,
     lastPushFailed: false,
@@ -957,6 +969,34 @@ describe("SettingsPage - i18n key resolution (#1369)", () => {
       expect(catalogue.settings.about.moreFromFrazzled).not.toBe("settings.about.moreFromFrazzled");
       expect(catalogue.settings.about.moreFromFrazzledDescription).toBeTruthy();
       expect(catalogue.settings.about.moreFromFrazzledCta).toBeTruthy();
+    }
+  });
+
+  it("settings.about SW-version keys resolve in all locales (#1826)", () => {
+    // Confirm every locale has the five new SW-version diagnostic strings.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const en = require("../../messages/en.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ja = require("../../messages/ja.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const zhHans = require("../../messages/zh-Hans.json") as Record<string, Record<string, Record<string, string>>>;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const zhHant = require("../../messages/zh-Hant.json") as Record<string, Record<string, Record<string, string>>>;
+
+    const keys = [
+      "serviceWorker",
+      "serviceWorkerLoading",
+      "serviceWorkerNone",
+      "serviceWorkerTimeout",
+      "serviceWorkerMismatch",
+    ] as const;
+
+    for (const key of keys) {
+      expect(en.settings.about[key]).toBeTruthy();
+      for (const catalogue of [ja, zhHans, zhHant]) {
+        expect(catalogue.settings.about[key]).toBeTruthy();
+        expect(catalogue.settings.about[key]).not.toBe(`settings.about.${key}`);
+      }
     }
   });
 });
@@ -1805,5 +1845,121 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
     // Must have inline-flex class (not bg-foreground filled style).
     expect(signInBtn.className).toMatch(/inline-flex/);
     expect(signInBtn.className).not.toMatch(/bg-foreground/);
+  });
+
+  it("#1823: SyncStatusLine receives tz from settings.timezone when signed in", async () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: "u1", email: "a@b.com", app_metadata: {}, user_metadata: {} },
+      supabase: {},
+      loading: false,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      timezone: "America/New_York",
+    });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      const el = screen.getByTestId("sync-status-line");
+      expect(el).toHaveAttribute("data-tz", "America/New_York");
+    });
+  });
+
+  it("#1823: SyncStatusLine uses detected timezone when settings.timezone is null", async () => {
+    // When timezone is null, the settings page auto-detects it via detectTimezone().
+    // The mock for detectTimezone returns "Europe/London" (see vi.mock above).
+    mockUseAuth.mockReturnValue({
+      user: { id: "u1", email: "a@b.com", app_metadata: {}, user_metadata: {} },
+      supabase: {},
+      loading: false,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      timezone: null,
+    });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      const el = screen.getByTestId("sync-status-line");
+      // detectTimezone() mock returns "Europe/London", which auto-detection
+      // substitutes for null. The tz must NOT be an empty string or "UTC".
+      expect(el).toHaveAttribute("data-tz", "Europe/London");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1826 - SW version display in the About section
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage - SW version diagnostic (#1826)", () => {
+  it("shows 'no active service worker' when no controller is present", async () => {
+    mockSwVersionState.current = { status: "no-controller" };
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No active service worker")).toBeInTheDocument();
+    });
+  });
+
+  it("shows 'Checking...' while loading", async () => {
+    mockSwVersionState.current = { status: "loading" };
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Checking...")).toBeInTheDocument();
+    });
+  });
+
+  it("shows 'No response from service worker' on timeout", async () => {
+    mockSwVersionState.current = { status: "timeout" };
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No response from service worker")).toBeInTheDocument();
+    });
+  });
+
+  it("shows SW version when matched (no mismatch warning)", async () => {
+    const originalAppVersion = process.env.NEXT_PUBLIC_APP_VERSION;
+    process.env.NEXT_PUBLIC_APP_VERSION = "0.11.2";
+    mockSwVersionState.current = { status: "ready", version: "0.11.2" };
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      // Both the app-version line and the SW-version line show the same text.
+      // getAllByText asserts at least one is present.
+      expect(screen.getAllByText("v0.11.2").length).toBeGreaterThanOrEqual(1);
+    });
+
+    // No mismatch alert when versions match.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    process.env.NEXT_PUBLIC_APP_VERSION = originalAppVersion;
+  });
+
+  it("shows mismatch warning when SW version differs from app version", async () => {
+    // Set a known app version so the mismatch condition is predictable.
+    const originalAppVersion = process.env.NEXT_PUBLIC_APP_VERSION;
+    process.env.NEXT_PUBLIC_APP_VERSION = "0.11.2";
+
+    const oldSwVersion = "0.9.0";
+    mockSwVersionState.current = { status: "ready", version: oldSwVersion };
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(`v${oldSwVersion}`)).toBeInTheDocument();
+    });
+
+    // Mismatch alert must be present when versions differ.
+    const alert = screen.getByRole("alert");
+    expect(alert).toBeInTheDocument();
+    expect(alert.textContent).toContain(`v${oldSwVersion}`);
+    expect(alert.textContent).toContain("v0.11.2");
+
+    process.env.NEXT_PUBLIC_APP_VERSION = originalAppVersion;
   });
 });

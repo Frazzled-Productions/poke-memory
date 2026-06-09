@@ -303,6 +303,11 @@
     "about": {
       "heading": "关于",
       "version": "版本",
+      "serviceWorker": "Service Worker",
+      "serviceWorkerLoading": "检查中...",
+      "serviceWorkerNone": "没有活跃的 Service Worker",
+      "serviceWorkerTimeout": "Service Worker 无响应",
+      "serviceWorkerMismatch": "Service Worker（{swVersion}）比应用（{appVersion}）旧 - 有待应用的更新，请关闭并重新打开应用。",
       "whatsNew": "新功能",
       "whatsNewDescription": "查看最近版本的更新内容。",
       "viewChangelog": "查看更新日志",
