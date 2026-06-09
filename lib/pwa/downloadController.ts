@@ -259,6 +259,24 @@ export function stopDownload(): void {
 }
 
 /**
+ * Immediately reset the singleton to idle and notify all subscribers.
+ *
+ * Used by the "Delete offline cache" flow after the cached bytes have been
+ * removed and the localStorage keys cleared. The reseed guard (`storageSeedDone`)
+ * is also cleared so that `seedFromStorage()` re-runs on the next `getState()`
+ * or `subscribe()` call - but since the localStorage keys were just removed,
+ * it will find nothing and stay idle.
+ *
+ * Safe to call at any phase - a no-op if already idle.
+ */
+export function resetToIdle(): void {
+  if (currentState.phase === "idle") return;
+  // Allow seedFromStorage to re-run (it will find no timestamp and stay idle).
+  storageSeedDone = false;
+  setState({ phase: "idle" });
+}
+
+/**
  * Reset the controller state back to idle.
  * Used in tests to clear singleton state between test cases.
  * Do NOT call from production code.

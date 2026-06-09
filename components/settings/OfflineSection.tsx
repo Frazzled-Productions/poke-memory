@@ -8,6 +8,7 @@ import {
   subscribe,
   startDownload,
   stopDownload,
+  resetToIdle,
   getCurrentManifest,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
@@ -170,23 +171,13 @@ export function OfflineSection() {
         // localStorage unavailable - non-fatal.
       }
 
-      // Reset the singleton to idle and refresh the storage readout.
-      // Calling stopDownload is a no-op when not downloading; the state
-      // change to idle is driven by removing the localStorage keys and then
-      // forcing a re-seed via page-visible actions. We drive it directly here
-      // by dispatching a storage event so the subscribe listeners react.
-      //
-      // The cleanest path: dispatch a synthetic StorageEvent on window so the
-      // controller's subscribe callbacks pick up the cleared localStorage.
-      // In practice the controller's currentState stays "done" until the next
-      // seedFromStorage(); we reset the DOM by just setting the local React
-      // state to idle. The singleton keeps "done" in memory until the next page
-      // load, but that is acceptable - the key invariant is that the UI reflects
-      // idle and the caches are cleared.
-      //
-      // Note: we cannot call _resetForTesting here (production only). Instead
-      // we drive the UI state locally and the page reflects idle immediately.
-      setDownloadState({ phase: "idle" });
+      // Reset the singleton to idle via the public API so all subscribers
+      // (any other mounted OfflineSection instances, future listeners) see
+      // the cleared state immediately without waiting for a page reload.
+      // resetToIdle() also clears the storageSeedDone guard so a subsequent
+      // subscribe/getState call re-checks localStorage (which is now empty)
+      // and stays idle rather than re-seeding "done" from stale memory.
+      resetToIdle();
       refreshStorageEstimate();
     } catch {
       setDeleteError(t("deleteErrorMessage"));
