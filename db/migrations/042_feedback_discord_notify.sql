@@ -122,7 +122,61 @@ EXCEPTION
 END;
 $$;
 
--- 3. WEEKLY DIGEST CRON JOB
+-- 3. DIGEST FUNCTION
+-- Extracted as a top-level SECURITY DEFINER function to avoid nested
+-- dollar-quote tag collision.  The cron body becomes a simple
+-- `SELECT feedback_send_digest();` with no inner $$ quoting required.
+-- Wrapped in DO/EXCEPTION so CI's postgres:15 (no pg_net, no vault schema)
+-- degrades gracefully -- same pattern as notify_discord_on_bug above.
+DO $$
+BEGIN
+  CREATE OR REPLACE FUNCTION feedback_send_digest()
+  RETURNS void
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path = public
+  AS $func$
+  DECLARE
+    v_url    text;
+    v_secret text;
+  BEGIN
+    SELECT decrypted_secret INTO v_url
+      FROM vault.decrypted_secrets
+      WHERE name = 'discord_digest_url'
+      LIMIT 1;
+
+    SELECT decrypted_secret INTO v_secret
+      FROM vault.decrypted_secrets
+      WHERE name = 'cron_shared_secret'
+      LIMIT 1;
+
+    -- Guard: if either secret is unset, skip the post rather than sending
+    -- an empty-bearer request that silently 401s.
+    IF v_url IS NULL OR v_secret IS NULL THEN
+      RAISE NOTICE 'feedback-discord-digest: missing Vault secret(s), skipping HTTP post';
+      RETURN;
+    END IF;
+
+    PERFORM net.http_post(
+      url     := v_url,
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || v_secret,
+        'Content-Type',  'application/json'
+      ),
+      body    := '{"window_days":7}'::jsonb
+    );
+  EXCEPTION
+    WHEN OTHERS THEN
+      RAISE NOTICE 'feedback-discord-digest: http_post failed: %', SQLERRM;
+  END;
+  $func$;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE NOTICE 'Skipping feedback_send_digest function creation (pg_net / vault not available): %', SQLERRM;
+END;
+$$;
+
+-- 4. WEEKLY DIGEST CRON JOB
 -- Unschedule any existing job first (idempotent re-apply guard).
 DO $$
 BEGIN
@@ -134,47 +188,13 @@ END;
 $$;
 
 -- Schedule weekly Mon 09:00 UTC digest.
+-- Cron body is a single SELECT statement -- no nested dollar-quoting.
 DO $$
 BEGIN
   PERFORM cron.schedule(
     'feedback-discord-digest',
     '0 9 * * 1',
-    $cronbody$
-    DO $$
-    DECLARE
-      v_url    text;
-      v_secret text;
-    BEGIN
-      SELECT decrypted_secret INTO v_url
-        FROM vault.decrypted_secrets
-        WHERE name = 'discord_digest_url'
-        LIMIT 1;
-
-      SELECT decrypted_secret INTO v_secret
-        FROM vault.decrypted_secrets
-        WHERE name = 'cron_shared_secret'
-        LIMIT 1;
-
-      -- Guard: if either secret is unset, skip the post rather than sending
-      -- an empty-bearer request that silently 401s.
-      IF v_url IS NULL OR v_secret IS NULL THEN
-        RAISE NOTICE 'feedback-discord-digest: missing Vault secret(s), skipping HTTP post';
-      ELSE
-        PERFORM net.http_post(
-          url     := v_url,
-          headers := jsonb_build_object(
-            'Authorization', 'Bearer ' || v_secret,
-            'Content-Type',  'application/json'
-          ),
-          body    := '{"window_days":7}'::jsonb
-        );
-      END IF;
-    EXCEPTION
-      WHEN OTHERS THEN
-        RAISE NOTICE 'feedback-discord-digest: http_post failed: %', SQLERRM;
-    END;
-    $$;
-    $cronbody$
+    $cronbody$ SELECT feedback_send_digest(); $cronbody$
   );
 EXCEPTION
   WHEN OTHERS THEN
