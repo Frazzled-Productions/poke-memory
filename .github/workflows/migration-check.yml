@@ -19,14 +19,31 @@ jobs:
     timeout-minutes: 3
     permissions:
       contents: read
-    # Fork PRs don't see secrets — skip rather than fail. Same guard as auto-review.yml.
-    if: github.event.pull_request.head.repo.fork == false
+    # Fork PRs don't see secrets - skip rather than fail. Same guard as auto-review.yml.
+    # `push` events have no `pull_request` context, so gate them in explicitly
+    # (a bare `pull_request.head.repo.fork == false` is falsy on push).
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork == false
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-      - name: Check that db/migrations/* is applied to the live project
+      # Env-to-branch parity (#1806): a PR into `qa` rehearses the migration on
+      # the QA project; a push to `main` (promotion) checks prod. The same
+      # env-driven script runs against whichever project the trigger selects.
+      # NB secrets can't be read in `if:` expressions, so routing is purely on
+      # event/base-ref context; missing secrets surface as a loud exit 2.
+      - name: Check that db/migrations/* is applied to the QA project
+        if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'qa'
+        env:
+          # A Supabase Management-API token is account-scoped (not per-project),
+          # so the existing prod token also reads the QA project — only the QA
+          # project ref is a new secret. No separate QA token needed (#1806).
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.QA_SUPABASE_PROJECT_REF }}
+        run: node scripts/check-migrations.mjs
+      - name: Check that db/migrations/* is applied to the prod project
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
