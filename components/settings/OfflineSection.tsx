@@ -9,6 +9,7 @@ import {
   startDownload,
   stopDownload,
   resetToIdle,
+  reconcileWithStorage,
   getCurrentManifest,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
@@ -78,6 +79,18 @@ export function OfflineSection() {
   useEffect(() => {
     return subscribe(setDownloadState);
   }, []);
+
+  // Reconcile the download state against actual IndexedDB contents on mount.
+  // This detects the post-migration state where localStorage says "downloaded"
+  // but the IndexedDB offline-pack store is empty (e.g. after the SW activate
+  // deleted the legacy Cache Storage buckets). When IDB is empty the state
+  // resets to idle so the user sees the Download button, not a false "downloaded"
+  // status. This is intentionally non-blocking: the initial render shows the
+  // localStorage-seeded state and a brief "done" → "idle" flicker on the first
+  // post-migration load is acceptable.
+  useEffect(() => {
+    void reconcileWithStorage();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount only
 
   /** Read navigator.storage.estimate() and update storageInfo state. */
   function refreshStorageEstimate() {

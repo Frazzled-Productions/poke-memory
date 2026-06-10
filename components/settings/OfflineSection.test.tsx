@@ -58,6 +58,12 @@ beforeEach(() => {
     configurable: true,
     writable: true,
   });
+
+  // By default, stub offlineCount to return a positive value so that
+  // reconcileWithStorage() (called on mount) does NOT reset a "done" state in
+  // tests that seed localStorage with a download timestamp. Individual tests
+  // that need to exercise the empty-IDB path override this stub.
+  vi.spyOn(offlineStoreModule, "offlineCount").mockResolvedValue(1);
 });
 
 afterEach(() => {
@@ -550,6 +556,64 @@ describe("OfflineSection", () => {
       expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
     );
     expect(screen.getByText(/could not delete the cache/i)).toBeInTheDocument();
+  });
+
+  // ── Reconciliation wiring (#1845) ────────────────────────────────────────────
+  //
+  // When the component mounts with a "done" localStorage state but IDB is empty
+  // (the post-migration scenario), the reconcileWithStorage() useEffect must
+  // reset the state to idle so the Download button appears.
+
+  it("resets to Download when localStorage says done but IDB is empty (post-migration)", async () => {
+    // Seed localStorage with a timestamp so seedFromStorage() sets phase "done".
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-06-01T10:00:00.000Z",
+    );
+    window.localStorage.setItem(
+      KEY_OFFLINE_MANIFEST,
+      JSON.stringify({ signature: "abc123", count: 100 }),
+    );
+
+    // Override the default stub: IDB is empty (0 entries) - the post-migration scenario.
+    vi.spyOn(offlineStoreModule, "offlineCount").mockResolvedValue(0);
+
+    renderWithIntl(<OfflineSection />);
+
+    // Initial render shows "Update" (seeded from localStorage synchronously).
+    expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
+
+    // After the reconcileWithStorage useEffect resolves, it detects IDB is empty
+    // and resets to idle. The Download button must appear.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^download$/i })).toBeInTheDocument(),
+    );
+
+    // The Delete button must also disappear (no longer in done state).
+    expect(
+      screen.queryByRole("button", { name: /delete offline cache/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("stays in done state when localStorage says done and IDB has entries", async () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-06-01T10:00:00.000Z",
+    );
+
+    // Default beforeEach stub returns 1 (IDB has entries) - no override needed.
+    renderWithIntl(<OfflineSection />);
+
+    // Should stay in "done" - Update button remains.
+    expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
+
+    // Wait briefly to confirm no async reset occurs.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("button", { name: /^download$/i }),
+    ).not.toBeInTheDocument();
   });
 
   // ── Locale: delete button rendering ──────────────────────────────────────────

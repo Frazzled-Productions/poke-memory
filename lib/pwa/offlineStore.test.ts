@@ -164,6 +164,68 @@ describe("offlineStore (put / get / has / clear)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// offlineCount helper
+// ---------------------------------------------------------------------------
+
+describe("offlineCount", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    await deleteIdbDatabase();
+    stubWindow();
+  });
+
+  afterEach(async () => {
+    const { _resetOfflineStoreForTests } = await import("./offlineStore");
+    _resetOfflineStoreForTests();
+    vi.unstubAllGlobals();
+  });
+
+  it("returns 0 for an empty store", async () => {
+    const { offlineCount } = await import("./offlineStore");
+    const count = await offlineCount();
+    expect(count).toBe(0);
+  });
+
+  it("returns the correct count after entries are added", async () => {
+    const { offlinePut, offlineCount } = await import("./offlineStore");
+
+    await offlinePut("/sprites/pokemon/webp/1/320.webp", {
+      blob: new Blob(["a"]),
+      contentType: "image/webp",
+    });
+    await offlinePut("/cries/1.ogg", {
+      blob: new Blob(["b"]),
+      contentType: "audio/ogg",
+    });
+
+    const count = await offlineCount();
+    expect(count).toBe(2);
+  });
+
+  it("returns 0 after offlineClear", async () => {
+    const { offlinePut, offlineClear, offlineCount } = await import("./offlineStore");
+
+    await offlinePut("/sprites/pokemon/webp/2/320.webp", {
+      blob: new Blob(["data"]),
+      contentType: "image/webp",
+    });
+
+    await offlineClear();
+    const count = await offlineCount();
+    expect(count).toBe(0);
+  });
+
+  it("throws when IDB is unavailable (server-side guard)", async () => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+    vi.stubGlobal("window", undefined);
+
+    const { offlineCount } = await import("./offlineStore");
+    await expect(offlineCount()).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Concern A - offlinePut must REJECT on IDB write error
 // ---------------------------------------------------------------------------
 //

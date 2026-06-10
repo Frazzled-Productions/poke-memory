@@ -227,6 +227,42 @@ export async function offlineHas(url: string): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
+// Count entries (used by reconcileWithStorage in downloadController.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the number of entries in the offline-pack store.
+ *
+ * Used by the download-state reconciliation path in `downloadController.ts` to
+ * detect the post-migration state where localStorage says "downloaded" but the
+ * IndexedDB store has been emptied (e.g. by the SW activate deleting the legacy
+ * Cache Storage buckets before the IndexedDB migration filled it in).
+ *
+ * Returns 0 on failure or when IDB is unavailable (treats unavailable as empty
+ * so the reconciliation can offer a re-download), EXCEPT that callers who need
+ * to distinguish "unavailable" from "empty" should use the throwing variant and
+ * handle the rejection themselves.
+ *
+ * Note: callers that want to preserve a "done" state on IDB error should catch
+ * the rejection from `offlineCount` before deciding to reset. See
+ * `reconcileWithStorage` in `downloadController.ts`.
+ */
+export async function offlineCount(): Promise<number> {
+  const db = await openOfflineDb();
+  if (!db) throw new Error("[offline-store] IDB unavailable");
+  return new Promise<number>((resolve, reject) => {
+    try {
+      const tx = db.transaction(OFFLINE_IDB_STORE, "readonly");
+      const req = tx.objectStore(OFFLINE_IDB_STORE).count();
+      req.onsuccess = () => resolve(req.result as number);
+      req.onerror = () => reject(req.error ?? new Error("[offline-store] IDB count failed"));
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Delete the entire offline-pack store contents
 // ---------------------------------------------------------------------------
 
