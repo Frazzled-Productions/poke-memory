@@ -11,12 +11,13 @@
  * What it does:
  * - Precaches the app shell. `self.__SW_MANIFEST` is the injection point that
  *   `scripts/build-sw.mjs` replaces at build time with the list of build-output
- *   files (JS and CSS - see the `globPatterns` in `scripts/build-sw.mjs`).
- *   HTML documents are not precached; they are runtime-cached network-first so
- *   an offline visit still falls back to the last-known shell. With the static
- *   assets precached, an installed PWA opens offline.
- * - Runtime-caches sprites cache-first and navigations/data network-first, per
- *   the policy in `lib/pwa/cacheStrategy.ts`. Cross-origin requests (Supabase
+ *   files (JS/CSS, root public assets, and Pokémon seed JSON - see the
+ *   `globPatterns` in `scripts/build-sw.mjs`). With the static assets and seed
+ *   data precached, an installed PWA opens instantly and the card area renders
+ *   without a cold-start network round-trip. (#1803)
+ * - Runtime-caches sprites cache-first and navigations/seed data
+ *   stale-while-revalidate (was network-first with a 10 s timeout before #1803),
+ *   per the policy in `lib/pwa/cacheStrategy.ts`. Cross-origin requests (Supabase
  *   sync) are never cached, so the best-effort sync model is unchanged.
  * - Versions every cache via `SW_CACHE_VERSION`. Bumping it changes every
  *   cache name, so a deploy that needs a clean slate orphans the old caches;
@@ -34,7 +35,6 @@
 import {
   CacheFirst,
   ExpirationPlugin,
-  NetworkFirst,
   Serwist,
   StaleWhileRevalidate,
   type PrecacheEntry,
@@ -282,13 +282,30 @@ const runtimeCaching: RuntimeCaching[] = [
     }),
   },
   {
-    // Same-origin navigations and data - network-first, cache fallback offline.
+    // Same-origin navigations, seed data, and other data fetches.
+    //
+    // Strategy: StaleWhileRevalidate (was: NetworkFirst with a 10 s timeout).
+    //
+    // Regression note (#1803): the prior NetworkFirst(10 s) strategy caused
+    // every cold launch on the installed iOS PWA to block for up to 10 s
+    // waiting for the network to return the / HTML document. The SW intercepted
+    // the cold-launch navigation and gated paint on the network. Switching to
+    // StaleWhileRevalidate eliminates the wait: the cached shell is returned
+    // instantly from this bucket; the network response is written back in the
+    // background so the next visit gets a fresh shell. Seed data files
+    // (public/pokemon-data/*.json) are now also in the SW precache manifest
+    // (scripts/build-sw.mjs) so they are served cache-first by the precache
+    // handler before this runtime rule even fires.
+    //
+    // A full App Router RSC static shell precache was considered but rejected:
+    // the root page uses searchParams + getTranslations and is server-rendered,
+    // so no static HTML template exists at build time. SWR is the correct
+    // strategy for App Router navigations where freshness can be traded for speed.
     matcher: ({ url, request }) =>
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.pages,
-    handler: new NetworkFirst({
+    handler: new StaleWhileRevalidate({
       cacheName: versionedCacheName(CACHE_NAMES.pages),
-      networkTimeoutSeconds: 10,
       plugins: [
         new ExpirationPlugin({
           maxEntries: 64,
@@ -310,7 +327,11 @@ const serwist = new Serwist({
   // This avoids swapping the app shell mid-session.
   skipWaiting: false,
   clientsClaim: true,
-  navigationPreload: true,
+  // navigationPreload was previously true to reduce the SW startup latency
+  // before the network request fired (a NetworkFirst optimisation). With
+  // StaleWhileRevalidate the cache is read first and the response is immediate,
+  // so navigation preload is unnecessary overhead. (#1803)
+  navigationPreload: false,
   runtimeCaching,
 });
 

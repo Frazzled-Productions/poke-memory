@@ -16,13 +16,16 @@
  *                     never change for a given URL, so a cached copy is always
  *                     correct and an offline practice session can render every
  *                     sprite and play every cry.
- * - `network-first` - try the network, fall back to cache when offline. Used
- *                     for navigations and same-origin data so a connected user
- *                     always sees fresh content but an offline user still gets
- *                     the last-known app shell.
  * - `stale-while-revalidate` - serve the cached copy immediately and refresh
- *                     it in the background. Used for fonts and other static
- *                     assets where instant render matters more than freshness.
+ *                     it in the background. Used for navigations, seed data,
+ *                     fonts, and other assets where instant render matters more
+ *                     than freshness. This is the cold-launch strategy: the
+ *                     first visit fetches from the network; every subsequent
+ *                     cold launch is served instantly from cache while a
+ *                     background fetch updates the cached shell (see #1803).
+ * - `network-first` - try the network, fall back to cache when offline. No
+ *                     longer used for navigations; retained as a strategy type
+ *                     for any future asset class that needs it.
  * - `network-only` - never cache. Used for cross-origin requests (e.g. the
  *                     Supabase sync endpoint) so offline reads never return a
  *                     stale cloud response and sync semantics are unchanged.
@@ -157,6 +160,16 @@ function classifyPath(path: string): { strategy: CacheStrategy; cacheName: Cache
     return { strategy: "stale-while-revalidate", cacheName: CACHE_NAMES.fonts };
   }
 
+  // Pokémon seed data (generated-core.json, generated-chains.json, etc.) -
+  // precached at build time by the SW manifest glob (scripts/build-sw.mjs) and
+  // served stale-while-revalidate so cold launch reads from the precache
+  // instantly. The precache handler intercepts these before the runtime rules
+  // run, so this rule is a fallback for any seed file not yet in the precache
+  // (e.g. the first SW install before the precache is populated).
+  if (path.startsWith("/pokemon-data/")) {
+    return { strategy: "stale-while-revalidate", cacheName: CACHE_NAMES.pages };
+  }
+
   return null;
 }
 
@@ -247,14 +260,30 @@ export function classifyRequest(
     return pathResult;
   }
 
-  // Top-level navigations - network-first so a connected user gets fresh
-  // pages, an offline user falls back to the cached app shell.
+  // Top-level navigations - stale-while-revalidate so the cached app shell is
+  // served instantly on cold launch (no 5-10 s network gate), with a background
+  // fetch updating the cached version for the next visit. (#1803)
+  //
+  // Regression note: the prior strategy was NetworkFirst(networkTimeoutSeconds:
+  // 10). That caused every cold launch on the installed iOS PWA to block for up
+  // to 10 s waiting for the network to return the / HTML document before
+  // anything painted. The root cause is that the SW intercepted the navigation
+  // and refused to serve a cached shell until the network responded. Switching to
+  // stale-while-revalidate eliminates the wait: the cached shell is returned
+  // instantly from the pages cache bucket; the network response is used to
+  // refresh the cache in the background. This does NOT change offline behaviour -
+  // an offline user still gets the last-known cached shell. A full App Router RSC
+  // static shell precache was considered but rejected: the root page uses
+  // searchParams + getTranslations and is server-rendered, so no static HTML
+  // template exists at build time. SWR is the correct strategy for App Router
+  // navigations where freshness can be traded for speed.
   if (requestMode === "navigate") {
-    return { strategy: "network-first", cacheName: CACHE_NAMES.pages };
+    return { strategy: "stale-while-revalidate", cacheName: CACHE_NAMES.pages };
   }
 
-  // Everything else same-origin (data fetches, RSC payloads) - network-first.
-  return { strategy: "network-first", cacheName: CACHE_NAMES.pages };
+  // Everything else same-origin (data fetches, RSC payloads) - stale-while-
+  // revalidate for fast response; the background refresh keeps data current.
+  return { strategy: "stale-while-revalidate", cacheName: CACHE_NAMES.pages };
 }
 
 /**
