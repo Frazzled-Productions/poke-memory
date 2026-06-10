@@ -37,15 +37,28 @@ export async function seedIdb(
 ): Promise<void> {
   await page.addInitScript((data: { entries: Record<string, string> }) => {
     window.__seedIdbReady = new Promise<void>((resolve, reject) => {
-      const req = indexedDB.open("poke-memory");
+      // Open at version 2 to match the app schema (lib/idb/db.ts::DB_VERSION=2).
+      // Opening without a version (or at v1) leaves a v1 connection open that
+      // blocks openAppDb()'s v1→v2 upgrade, permanently hanging all IDB reads
+      // and preventing the session from loading (#1845 follow-up).
+      // Both stores must be created idempotently in onupgradeneeded.
+      const req = indexedDB.open("poke-memory", 2);
       req.onerror = () => reject(req.error);
-      req.onupgradeneeded = () => {
-        if (!req.result.objectStoreNames.contains("kv")) {
-          req.result.createObjectStore("kv");
+      req.onupgradeneeded = (event) => {
+        const db = req.result;
+        const oldVersion = (event as IDBVersionChangeEvent).oldVersion;
+        if (oldVersion < 1 && !db.objectStoreNames.contains("kv")) {
+          db.createObjectStore("kv");
+        }
+        if (!db.objectStoreNames.contains("offline-pack")) {
+          db.createObjectStore("offline-pack");
         }
       };
       req.onsuccess = () => {
         const db = req.result;
+        // Close this connection when a newer version wants to upgrade, so we
+        // do not block future openAppDb() calls during the test.
+        db.onversionchange = () => db.close();
         const tx = db.transaction("kv", "readwrite");
         const store = tx.objectStore("kv");
         // Set the migration flag so IdbMigration.tsx does not overwrite.
