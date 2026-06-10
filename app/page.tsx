@@ -43,9 +43,11 @@ export default function Home({
     /*
       On mobile the page must fill the available height between the top nav and
       the bottom nav without scrolling (#1087). The height chain is:
-        body (flex flex-col min-h-[100svh])       ← anchors page to 100svh (#1086/#1728)
-        → MobileNavPaddingWrapper (flex-1 flex-col min-h-0)
-        → this div (flex-1 flex-col min-h-0) ← fills the gap
+        body (h-[100lvh] overflow-hidden flex flex-col;
+              md:h-auto md:min-h-[100svh] md:overflow-visible)  ← app-shell (#1801)
+        → [data-scroll-region] (flex-1 overflow-hidden)         ← fit container (no scroll)
+        → MobileNavPaddingWrapper
+        → this div (flex-1 flex-col min-h-0)                    ← fills the gap
         → inner container → main → ReviewSession wrapper
       `min-h-0` prevents the flex child from overflowing its parent when the
       session content is taller than the available space (flex's default is

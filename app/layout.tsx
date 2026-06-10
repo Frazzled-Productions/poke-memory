@@ -9,6 +9,7 @@ import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { MobileNavPaddingWrapper } from "@/components/MobileNavPaddingWrapper";
+import { ScrollRegion } from "@/components/ScrollRegion";
 import { Footer } from "@/components/Footer";
 import { SyncOnVisible } from "@/components/sync/SyncOnVisible";
 import { SignInPull } from "@/components/sync/SignInPull";
@@ -122,7 +123,23 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-[100svh] flex flex-col">
+      {/*
+        Mobile app-shell: h-[100lvh] pins the body to the large viewport height
+        (874px on iPhone 17 Pro), which is the only viewport unit that resolves
+        to the true visible bottom on a non-scrolling page like Practice. dvh and
+        svh both resolve to innerHeight (853px when the URL bar is visible),
+        which left a 21px gap above the visible bottom. overflow-hidden confines
+        scrolling to the internal content region so the BottomTabBar is always
+        in-flow at the bottom of the visible screen (#1801).
+
+        On desktop (md+) we revert to normal document scroll: h-auto removes the
+        fixed height, min-h-[100svh] preserves the #1728 cold-paint guarantee
+        (body is at least the expanded-URL-bar height at first paint), and
+        overflow-visible allows the page to grow beyond the viewport. The bottom
+        tab bar is hidden at md+ via md:hidden so no positioning adjustment is
+        needed there.
+      */}
+      <body className="h-[100lvh] overflow-hidden flex flex-col md:h-auto md:min-h-[100svh] md:overflow-visible">
         {/*
           LocaleProvider is wrapped in Suspense so the cookie read it performs
           (resolveLocale → cookies()) is isolated from the static shell.
@@ -194,18 +211,39 @@ export default function RootLayout({
                       */}
                       <FunnelTracker />
                       {/*
-                        MobileNavPaddingWrapper adds bottom padding on mobile only when
-                        the bottom tab bar is active, so the fixed bar never overlaps content.
-                        The padding is removed automatically when the user switches to the
-                        hamburger nav style via Settings.
+                        ScrollRegion: the single flex-1 child between the sticky header
+                        chrome and the in-flow BottomTabBar. On Practice (`/`) the
+                        region is overflow-hidden (a fit container, not a scroller) so
+                        the card layout fills the available height without triggering
+                        scroll (#1087 / #1801). On every other route (Settings, Privacy,
+                        Terms, Stats, Journey, Pasture, Pokédex, etc.) the region is
+                        overflow-y-auto so tall content is scrollable even when those
+                        pages do NOT use PageShell (#1801 / #1839 scroll regression fix).
+                        On desktop (md+) overflow reverts to visible and the document
+                        scrolls normally.
+
+                        The Footer is intentionally placed OUTSIDE this region (as a
+                        sibling after it) rather than inside. Keeping the Footer inside
+                        the overflow container triggered a WebKit actionability bug where
+                        the Footer was reported as intercepting pointer events on
+                        interactive elements inside the region even when they did not
+                        visually overlap (#1838). On mobile the Footer is hidden entirely
+                        for bottom-nav mode anyway; for hamburger mode it renders as an
+                        in-flow element below the fit region. On desktop (md+) the
+                        region is overflow-visible so there is no internal scroll context
+                        and the Footer position relative to it is irrelevant.
                       */}
-                      <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
+                      <ScrollRegion>
+                        <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
+                      </ScrollRegion>
                       <Footer />
                       {/*
                         BottomTabBar is always mounted but returns null internally when
                         mobileNav === 'hamburger'. The single Suspense boundary here is
                         sufficient - the component has its own inner Suspense for the
                         async mastery check.
+                        In-flow (not fixed) as of #1801 - see BottomTabBar.tsx for
+                        the positioning change.
                       */}
                       <BottomTabBar />
                     </FavouriteThemeProvider>

@@ -255,7 +255,15 @@
       "stopButton": "停止",
       "upToDate": "最新の状態",
       "updateAvailable": "アップデートあり",
-      "updateAvailableCount": "アップデートあり（{count} 件追加）"
+      "updateAvailableCount": "アップデートあり（{count} 件追加）",
+      "downloadBytesLabel": "ダウンロード済み",
+      "deleteButton": "オフラインキャッシュを削除",
+      "deleteConfirmTitle": "オフラインキャッシュを削除しますか？",
+      "deleteConfirmBody": "ダウンロードしたすべてのスプライトと鳴き声（{size}）が削除されます。いつでも再ダウンロードできます。",
+      "deleteConfirmBodyNoSize": "オフラインデータをすべて削除します。いつでも再ダウンロードできます。",
+      "deleteConfirmConfirm": "削除",
+      "deleteConfirmCancel": "キャンセル",
+      "deleteErrorMessage": "キャッシュを削除できませんでした。ブラウザの設定からサイトデータを消去してください。"
     },
     "optimizerCooldown": "{count, plural, other {次の最適化まであと # 日}}",
     "optimizerRetryAfter": "{count, plural, other {# 日後に再試行してください。}}",
@@ -303,6 +311,11 @@
     "about": {
       "heading": "このアプリについて",
       "version": "バージョン",
+      "serviceWorker": "サービスワーカー",
+      "serviceWorkerLoading": "確認中...",
+      "serviceWorkerNone": "アクティブなサービスワーカーはありません",
+      "serviceWorkerTimeout": "サービスワーカーから応答がありません",
+      "serviceWorkerMismatch": "サービスワーカー（{swVersion}）がアプリ（{appVersion}）より古いです - 更新が保留中です。アプリを閉じて再度開いて適用してください。",
       "whatsNew": "新機能",
       "whatsNewDescription": "最近のリリースで追加された内容を確認できます。",
       "viewChangelog": "変更履歴を見る",

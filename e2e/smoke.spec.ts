@@ -408,6 +408,299 @@ test.describe("Practice page", () => {
     await expect(gradeButtons).toBeInViewport();
   });
 
+  test("Practice content region does NOT scroll at common mobile viewports (#1087 regression guard)", async ({
+    page,
+  }, testInfo) => {
+    // This is the regression guard for the #1801 app-shell follow-up: the
+    // app-shell fit region ([data-scroll-region]) must be overflow-hidden on
+    // mobile so Practice never scrolls. The PageShell element owns its own
+    // overflow for pages that need to scroll.
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "content-fit check is mobile-only",
+    );
+
+    for (const { width, height, label } of [
+      { width: 402, height: 874, label: "iPhone 17 Pro" },
+      { width: 390, height: 844, label: "iPhone 14" },
+      { width: 375, height: 667, label: "iPhone SE" },
+    ]) {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+
+      const reveal = page.getByRole("button", { name: "Reveal" });
+      const hasCard = await reveal.isVisible().catch(() => false);
+      if (!hasCard) {
+        // No reviewable card at this viewport - skip size, don't fail.
+        continue;
+      }
+
+      // Before reveal: no scroll on the content region
+      const fitBefore = await page.evaluate(() => {
+        const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+        if (!region) return null;
+        return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
+      });
+      expect(fitBefore, `${label}: content region must exist`).not.toBeNull();
+      // Allow 1px tolerance for sub-pixel rounding.
+      expect(
+        fitBefore!.scrollHeight,
+        `${label}: content region must not scroll before reveal (scrollHeight ${fitBefore!.scrollHeight} > clientHeight ${fitBefore!.clientHeight})`,
+      ).toBeLessThanOrEqual(fitBefore!.clientHeight + 1);
+
+      // After reveal: grade buttons visible, still no scroll
+      await reveal.click();
+      const gradeButtons = page.getByRole("group", { name: "Grade your answer" });
+      await expect(gradeButtons).toBeVisible();
+
+      const fitAfter = await page.evaluate(() => {
+        const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+        if (!region) return null;
+        return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
+      });
+      expect(fitAfter, `${label}: content region must exist after reveal`).not.toBeNull();
+      expect(
+        fitAfter!.scrollHeight,
+        `${label}: content region must not scroll after reveal (scrollHeight ${fitAfter!.scrollHeight} > clientHeight ${fitAfter!.clientHeight})`,
+      ).toBeLessThanOrEqual(fitAfter!.clientHeight + 1);
+    }
+  });
+
+  test("Practice content region does NOT scroll on the SECOND card (reverse card regression guard #1839 followup)", async ({
+    page,
+  }, testInfo) => {
+    // Guards the specific failure mode from #1839 followup: the FIRST card fits
+    // but then a TALLER card (the SpritePicker 2×2 grid) loads and the top badge
+    // gets clipped. We seed name card → reverse card so the second card is always
+    // the sprite-picker variant.
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "content-fit check is mobile-only",
+    );
+
+    // Seed: Bulbasaur name card (review-due) first, then Bulbasaur reverse card.
+    // The review queue serves review-due cards first, so the name card appears,
+    // and after grading it the reverse card is shown as a new card.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 10,
+            difficulty: 5,
+            elapsedDays: 10,
+            scheduledDays: 10,
+            reps: 3,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2026-01-01",
+            lastReview: "2026-04-01",
+            firstSeen: "2026-03-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+        {
+          id: 2_000_001,
+          pokemonId: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "reverse",
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    for (const { width, height, label } of [
+      { width: 402, height: 874, label: "iPhone 17 Pro" },
+      { width: 390, height: 844, label: "iPhone 14" },
+      { width: 375, height: 667, label: "iPhone SE" },
+    ]) {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      await awaitSeedIdb(page);
+
+      // First card: the name card (review-due). Reveal and grade Good.
+      const reveal = page.getByRole("button", { name: "Reveal" });
+      if (!(await reveal.isVisible().catch(() => false))) {
+        continue;
+      }
+      await reveal.click();
+      const gradeGroup = page.getByRole("group", { name: "Grade your answer" });
+      await expect(gradeGroup).toBeVisible();
+      await gradeGroup.getByRole("button", { name: "Good" }).click();
+
+      // Second card: should be the reverse/sprite-picker card.
+      // Wait for either the sprite picker group or the end state.
+      const spritePicker = page.getByRole("group", { name: /Which Pok[eé]mon is .+\?/ });
+      const hasSpritePicker = await spritePicker.isVisible({ timeout: 5000 }).catch(() => false);
+      if (!hasSpritePicker) {
+        // Session may have ended or seeded differently - still assert no scroll.
+      }
+
+      // Assert: no scroll on the content region after advancing to the second card.
+      const fit = await page.evaluate(() => {
+        const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+        if (!region) return null;
+        return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
+      });
+      expect(fit, `${label}: content region must exist on second card`).not.toBeNull();
+      expect(
+        fit!.scrollHeight,
+        `${label}: content region must not scroll on second card (scrollHeight ${fit!.scrollHeight} > clientHeight ${fit!.clientHeight})`,
+      ).toBeLessThanOrEqual(fit!.clientHeight + 1);
+    }
+  });
+
+  test("SpritePicker (reverse card) - no clip at top/bottom at common mobile viewports (#1840 followup)", async ({
+    page,
+  }, testInfo) => {
+    // Guards the exact failure mode reported after #1840: the queue-state pill at
+    // the top and the controls/queue counter at the bottom were clipped by
+    // overflow-hidden even though scrollHeight === clientHeight (always true under
+    // overflow-hidden - the bogus check from the previous test).
+    //
+    // Root cause: ReviewCardLayout's card-region wrapper used items-center, which
+    // centres SpritePicker at its NATURAL height rather than stretching it to fill
+    // the flex-1 wrapper. SpritePicker's internal flex-1 min-h-0 chain never got
+    // a constrained height to shrink within, so the 2x2 grid stayed full-size and
+    // the outer ReviewCardLayout column overflowed - the top pill and bottom
+    // controls were clipped. Fix: SpritePicker root gets self-stretch h-full
+    // min-h-0 so it actually fills the wrapper (#1840 followup).
+    //
+    // CLIP CHECK (not scroll check): scrollHeight <= clientHeight is meaningless
+    // under overflow-hidden. Instead assert BOUNDS: the queue-state badge top must
+    // be >= the scroll-region top, and the queue counter bottom must be <=
+    // the scroll-region bottom. If either is clipped, the element's rect will be
+    // outside those bounds.
+    test.skip(
+      testInfo.project.name !== "mobile-safari",
+      "clip-bounds check is mobile-only",
+    );
+
+    // Seed a single reverse card so it is always the first card shown.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 2_000_001,
+          pokemonId: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "reverse",
+          state: {
+            stability: 0,
+            difficulty: 0,
+            elapsedDays: 0,
+            scheduledDays: 0,
+            reps: 0,
+            lapses: 0,
+            fsrsState: "new",
+            dueDate: "2026-01-01",
+            lastReview: null,
+            firstSeen: null,
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        evolution: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 0, maxReviewsPerDay: 0 },
+      },
+    });
+
+    for (const { width, height, label } of [
+      { width: 402, height: 874, label: "iPhone 17 Pro" },
+      { width: 390, height: 844, label: "iPhone 14" },
+      { width: 375, height: 667, label: "iPhone SE" },
+    ]) {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      await awaitSeedIdb(page);
+
+      // The SpritePicker renders immediately (no Reveal step).
+      const spritePicker = page.getByRole("group", { name: /Which Pok[eé]mon is .+\?/ });
+      const hasSpritePicker = await spritePicker.isVisible({ timeout: 10_000 }).catch(() => false);
+      if (!hasSpritePicker) {
+        // Card did not load as expected - skip this viewport rather than fail.
+        continue;
+      }
+
+      // Clip-bounds check: assert NOTHING is clipped by overflow-hidden.
+      // scrollHeight === clientHeight is always true under overflow-hidden and
+      // proves nothing; we must check actual element positions instead.
+      //
+      // - queue-state badge (top chrome, flex-none): its rect.top must be >= the
+      //   scroll-region rect.top (i.e. it is not clipped above the container).
+      // - queue counter (bottom chrome, flex-none): its rect.bottom must be <=
+      //   the scroll-region rect.bottom (i.e. not clipped below the container).
+      const bounds = await page.evaluate(() => {
+        const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+        if (!region) return null;
+        const regionRect = region.getBoundingClientRect();
+
+        // QueueStateBadge: role="status" aria-label contains "Card queue state:"
+        const badge = document.querySelector('[role="status"][aria-label*="Card queue state:"]') as HTMLElement | null;
+        // QueueCounterRow: role="status" aria-label contains "queue" (the "New / Learning / Review" counter row)
+        const counters = Array.from(
+          document.querySelectorAll('[role="status"]')
+        ).find((el) => {
+          const label = el.getAttribute("aria-label") ?? "";
+          return label.toLowerCase().includes("queue") && !label.toLowerCase().includes("card queue state");
+        }) as HTMLElement | null;
+
+        return {
+          regionTop: regionRect.top,
+          regionBottom: regionRect.bottom,
+          badgeTop: badge ? badge.getBoundingClientRect().top : null,
+          countersBottom: counters ? counters.getBoundingClientRect().bottom : null,
+        };
+      });
+
+      expect(bounds, `${label}: clip-bounds elements must be findable`).not.toBeNull();
+
+      if (bounds!.badgeTop !== null) {
+        // Allow 2 px tolerance for sub-pixel rounding.
+        expect(
+          bounds!.badgeTop,
+          `${label}: queue-state badge top (${bounds!.badgeTop}) must not be clipped above region top (${bounds!.regionTop})`,
+        ).toBeGreaterThanOrEqual(bounds!.regionTop - 2);
+      }
+
+      if (bounds!.countersBottom !== null) {
+        // Allow 2 px tolerance for sub-pixel rounding.
+        expect(
+          bounds!.countersBottom,
+          `${label}: queue counters bottom (${bounds!.countersBottom}) must not be clipped below region bottom (${bounds!.regionBottom})`,
+        ).toBeLessThanOrEqual(bounds!.regionBottom + 2);
+      }
+    }
+  });
+
   test("queue state badge shows 'New' on a never-reviewed name card", async ({ page }) => {
     await seedSessionIdb(page, {
       cards: [

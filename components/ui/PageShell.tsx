@@ -5,13 +5,18 @@
  * centred `div` with standard horizontal padding and vertical breathing room.
  * The `width` prop selects the max-width tier:
  *
- *   - `wide`    → max-w-5xl  (Pokédex, Pasture - matches nav chrome)
- *   - `reading` → max-w-3xl  (Stats, Journey, What's-new)
- *   - `narrow`  → max-w-2xl  (Pokémon detail)
+ *   - `wide`    -> max-w-5xl  (Pokédex, Pasture - matches nav chrome)
+ *   - `reading` -> max-w-3xl  (Stats, Journey, What's-new)
+ *   - `narrow`  -> max-w-2xl  (Pokémon detail)
  *
  * Keep the biome landscape page (`app/pasture/[biome]/page.tsx`) out of this
  * shell: it uses a fixed full-bleed rotated layout that is incompatible with
  * a standard centred container.
+ *
+ * Scroll is owned by the `[data-scroll-region]` wrapper in `app/layout.tsx`
+ * (ScrollRegion component), which is `overflow-y-auto` on all non-Practice
+ * routes. PageShell does NOT add its own overflow so there is a single scroller
+ * per page and no nested double-scroll (#1801 / #1839 scroll regression fix).
  */
 
 import type { ReactNode } from "react";

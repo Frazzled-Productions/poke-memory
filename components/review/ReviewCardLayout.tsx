@@ -40,8 +40,9 @@ export interface ReviewCardLayoutProps {
    *                Full-height flex column, gap-2 sm:gap-8, card region uses
    *                `overflow-hidden`.
    * - "reverse" - SpritePicker (multiple-choice). Same full-height flex column
-   *                but gap-2 sm:gap-4 and card region uses `overflow-y-auto` so
-   *                very short viewports (e.g. iPhone SE) can scroll the tiles.
+   *                but gap-2 sm:gap-4. Card region also uses `overflow-hidden`;
+   *                SpritePicker scales its grid to fit the available height
+   *                rather than scrolling (#1839 followup).
    * - "countdown" - No card; just queue counter + undo + countdown content.
    *                  Plain centred column, gap-6, no flex-1.
    */
@@ -158,11 +159,9 @@ export function ReviewCardLayout({
   // Outer gap differs between flip and reverse variants.
   const outerGap = variant === "reverse" ? "gap-2 sm:gap-4" : "gap-2 sm:gap-8";
 
-  // Card region overflow differs: reverse uses overflow-y-auto so very short
-  // viewports (e.g. iPhone SE) can scroll the picker tiles. Flip cards use
-  // overflow-hidden to prevent the card shadow from bleeding.
-  const cardRegionOverflow =
-    variant === "reverse" ? "overflow-y-auto" : "overflow-hidden";
+  // Card region always uses overflow-hidden. The SpritePicker content scales
+  // to fit the available flex-1 height rather than scrolling (#1839 followup).
+  const cardRegionOverflow = "overflow-hidden";
 
   return (
     /* Height-filling flex column - grade buttons stay on screen without

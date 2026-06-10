@@ -59,7 +59,11 @@ test.describe("Mobile nav - bottom tab bar (default)", () => {
     }
   });
 
-  test("tab bar is fixed - does not scroll with the page", async ({ page }) => {
+  test("tab bar stays at viewport bottom when the content region scrolls (#1801)", async ({ page }) => {
+    // Under the app-shell model the document itself does not scroll on mobile.
+    // The [data-scroll-region] wrapper is overflow-y-auto on non-Practice routes
+    // and is the single scroller. Scrolling it must not move the BottomTabBar,
+    // which is the in-flow last child of the shell (#1801 / #1839 regression fix).
     await page.goto("/pokedex");
 
     const tabBar = page.getByRole("navigation", {
@@ -67,19 +71,59 @@ test.describe("Mobile nav - bottom tab bar (default)", () => {
     });
     await expect(tabBar).toBeVisible();
 
-    // Record position before scrolling
+    const viewportSize = page.viewportSize();
+    expect(viewportSize).not.toBeNull();
+
+    // Record bar position before scrolling
     const boxBefore = await tabBar.boundingBox();
     expect(boxBefore).not.toBeNull();
 
-    // Scroll the page down
-    await page.evaluate(() => window.scrollBy(0, 300));
+    // Scroll the scroll region ([data-scroll-region]) down. On non-Practice
+    // routes this element is overflow-y-auto and is the single scroller.
+    await page.evaluate(() => {
+      const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+      if (region) {
+        region.scrollTop = 300;
+      }
+    });
 
-    // Position should be unchanged (fixed positioning)
+    // Bar position must be unchanged - it is in-flow at the shell bottom
     const boxAfter = await tabBar.boundingBox();
     expect(boxAfter).not.toBeNull();
 
     if (boxBefore && boxAfter) {
       expect(Math.abs(boxAfter.y - boxBefore.y)).toBeLessThanOrEqual(2);
+    }
+
+    // Bar's bottom edge must align with the viewport bottom (the core #1801 invariant)
+    if (boxAfter && viewportSize) {
+      const barBottom = boxAfter.y + boxAfter.height;
+      expect(Math.abs(barBottom - viewportSize.height)).toBeLessThanOrEqual(4);
+    }
+  });
+
+  test("bottom tab bar bottom edge is flush with viewport on Practice route (#1801)", async ({ page }) => {
+    // The #1801 bug was Practice-specific: on the non-scrolling flex-1/min-h-0
+    // route the bar detached 21px above the visible bottom. This test is the
+    // regression guard for that exact failure.
+    await page.goto("/");
+
+    const tabBar = page.getByRole("navigation", {
+      name: "Mobile tab navigation",
+    });
+    await expect(tabBar).toBeVisible();
+
+    const viewportSize = page.viewportSize();
+    expect(viewportSize).not.toBeNull();
+
+    const box = await tabBar.boundingBox();
+    expect(box).not.toBeNull();
+
+    // Bar's bottom edge must align with the viewport bottom (within 2px for
+    // sub-pixel rounding across device-pixel ratios).
+    if (box && viewportSize) {
+      const barBottom = box.y + box.height;
+      expect(Math.abs(barBottom - viewportSize.height)).toBeLessThanOrEqual(2);
     }
   });
 

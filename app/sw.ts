@@ -11,12 +11,13 @@
  * What it does:
  * - Precaches the app shell. `self.__SW_MANIFEST` is the injection point that
  *   `scripts/build-sw.mjs` replaces at build time with the list of build-output
- *   files (JS and CSS - see the `globPatterns` in `scripts/build-sw.mjs`).
- *   HTML documents are not precached; they are runtime-cached network-first so
- *   an offline visit still falls back to the last-known shell. With the static
- *   assets precached, an installed PWA opens offline.
- * - Runtime-caches sprites cache-first and navigations/data network-first, per
- *   the policy in `lib/pwa/cacheStrategy.ts`. Cross-origin requests (Supabase
+ *   files (JS/CSS, root public assets, and Pokémon seed JSON - see the
+ *   `globPatterns` in `scripts/build-sw.mjs`). With the static assets and seed
+ *   data precached, an installed PWA opens instantly and the card area renders
+ *   without a cold-start network round-trip. (#1803)
+ * - Runtime-caches sprites cache-first and navigations/seed data
+ *   stale-while-revalidate (was network-first with a 10 s timeout before #1803),
+ *   per the policy in `lib/pwa/cacheStrategy.ts`. Cross-origin requests (Supabase
  *   sync) are never cached, so the best-effort sync model is unchanged.
  * - Versions every cache via `SW_CACHE_VERSION`. Bumping it changes every
  *   cache name, so a deploy that needs a clean slate orphans the old caches;
@@ -34,7 +35,6 @@
 import {
   CacheFirst,
   ExpirationPlugin,
-  NetworkFirst,
   Serwist,
   StaleWhileRevalidate,
   type PrecacheEntry,
@@ -42,22 +42,37 @@ import {
 } from "serwist";
 import {
   CACHE_NAMES,
-  CRY_CACHE_MAX_AGE_SECONDS,
-  CRY_CACHE_MAX_ENTRIES,
-  SPRITE_CACHE_MAX_AGE_SECONDS,
-  SPRITE_CACHE_MAX_ENTRIES,
+  LEGACY_CRY_CACHE_NAME,
+  LEGACY_SPRITE_CACHE_NAME,
   classifyRequest,
   versionedCacheName,
 } from "@/lib/pwa/cacheStrategy";
+import { SW_IDB_OPEN_TIMEOUT_MS, openSwIdb } from "@/lib/pwa/swIdb";
 
 // SW_CACHE_VERSION and versionedCacheName are imported from lib/pwa/cacheStrategy.ts - 
 // the single source of truth for the cache-version suffix. Both this worker and
 // the offline precache orchestrator (lib/pwa/precache.ts) derive their cache
 // names from that one constant so their reads and writes target the same buckets.
 
-/** IndexedDB database/store names - must match lib/idb/db.ts exactly. */
-const IDB_DB_NAME = "poke-memory";
-const IDB_STORE_NAME = "kv";
+/**
+ * IndexedDB database/store names.
+ *
+ * These must stay byte-identical to DB_NAME, STORE_KV, and STORE_OFFLINE_PACK
+ * in lib/idb/db.ts (the single source of truth for the schema). The SW is a
+ * separate esbuild bundle so it cannot import client modules directly; these
+ * duplicated constants are accompanied by a comment pointing back to the
+ * authoritative source.
+ *
+ * DB_VERSION must equal lib/idb/db.ts::DB_VERSION (currently 2).
+ */
+const IDB_DB_NAME = "poke-memory";  // lib/idb/db.ts::DB_NAME
+const IDB_DB_VERSION = 2;           // lib/idb/db.ts::DB_VERSION
+const IDB_STORE_NAME = "kv";        // lib/idb/db.ts::STORE_KV
+/**
+ * Object store name for the offline sprite/cry pack.
+ * Must stay byte-identical to OFFLINE_IDB_STORE in lib/pwa/offlineStore.ts.
+ */
+const OFFLINE_PACK_STORE = "offline-pack";
 /**
  * localStorage / IDB key for the persisted pending-grade queue.
  * Must stay byte-identical to KEY_PENDING_GRADE_QUEUE in lib/storage/keys.ts.
@@ -90,11 +105,22 @@ const SW_REPLAY_MESSAGE = "BACKGROUND_SYNC_REPLAY";
 interface ServiceWorkerScope {
   /** Build-time injection point replaced by scripts/build-sw.mjs. */
   __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
+  /**
+   * Build-time version string injected by scripts/build-sw.mjs via the
+   * esbuild `define` block. Value is the bare semver from package.json
+   * (e.g. `"0.11.2"`). Frozen into each deployed bundle so an old
+   * controlling worker always reports its own version, not the new app
+   * version (#1826).
+   */
+  __SW_VERSION__: string;
   location: { origin: string };
   skipWaiting(): Promise<void>;
   addEventListener(
     type: "message",
-    listener: (event: { data?: { type?: string } }) => void,
+    listener: (event: {
+      data?: { type?: string };
+      ports: readonly MessagePort[];
+    }) => void,
   ): void;
   addEventListener(
     type: "sync",
@@ -107,6 +133,10 @@ interface ServiceWorkerScope {
   addEventListener(
     type: "notificationclick",
     listener: (event: NotificationClickEvent) => void,
+  ): void;
+  addEventListener(
+    type: "activate",
+    listener: (event: { waitUntil(promise: Promise<unknown>): void }) => void,
   ): void;
   clients: {
     matchAll(options?: { type?: string; includeUncontrolled?: boolean }): Promise<Array<{
@@ -200,45 +230,58 @@ const stripDplPlugin = {
  */
 const runtimeCaching: RuntimeCaching[] = [
   {
-    // Sprite art - immutable per URL, cache-first, large cap.
+    // Sprites and cries - IDB-first, fall back to network.
     //
-    // `stripDplPlugin` normalises the cache key for `/_next/image` requests by
-    // removing the `&dpl=<deployment-id>` query parameter that Vercel/Next.js
-    // appends at runtime. Without this, the precache (which writes dpl-free
-    // URLs) and the runtime handler (which reads dpl-decorated URLs) would
-    // target different cache entries - meaning every precached sprite would be
-    // invisible. Raw `/sprites/pokemon/<id>.png` paths carry no `dpl` param, so
-    // the plugin is a no-op for them.
+    // Root cause fix (#1803): the old CacheFirst routes put ~10,000+ sprite/cry
+    // blobs into Cache Storage, making `cache.match` globally slow on WebKit
+    // and hanging cold launch. The offline pack now lives in IndexedDB
+    // (offline-pack store, written by lib/pwa/precache.ts). This handler reads
+    // directly from IDB and falls back to a network fetch on miss, so the
+    // Pack is served offline while Cache Storage stays small (just the app-shell
+    // precache + navigation/data buckets).
     matcher: ({ url, request }) =>
-      classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
-      CACHE_NAMES.sprites,
-    handler: new CacheFirst({
-      cacheName: versionedCacheName(CACHE_NAMES.sprites),
-      plugins: [
-        stripDplPlugin,
-        new ExpirationPlugin({
-          maxEntries: SPRITE_CACHE_MAX_ENTRIES,
-          maxAgeSeconds: SPRITE_CACHE_MAX_AGE_SECONDS,
-          maxAgeFrom: "last-used",
-        }),
-      ],
-    }),
-  },
-  {
-    // Pokémon cry audio - immutable per URL, cache-first, large cap.
-    matcher: ({ url, request }) =>
-      classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
-      CACHE_NAMES.cries,
-    handler: new CacheFirst({
-      cacheName: versionedCacheName(CACHE_NAMES.cries),
-      plugins: [
-        new ExpirationPlugin({
-          maxEntries: CRY_CACHE_MAX_ENTRIES,
-          maxAgeSeconds: CRY_CACHE_MAX_AGE_SECONDS,
-          maxAgeFrom: "last-used",
-        }),
-      ],
-    }),
+      classifyRequest(url.href, self.location.origin, request.mode).strategy === "idb-first",
+    handler: async ({ request }: { request: Request; url: URL }): Promise<Response> => {
+      // Derive the IDB key as the URL pathname (relative path).
+      //
+      // precache.ts writes blobs via offlinePut using RELATIVE paths such as
+      // `/sprites/pokemon/webp/25/320.webp` (produced by spriteVariantUrl).
+      // In the SW handler, request.url is ABSOLUTE (e.g.
+      // `https://pokememory.com/sprites/pokemon/webp/25/320.webp`). Using the
+      // raw request.url would be a different key → every lookup would miss and
+      // the offline pack would never be served. Extracting pathname normalises
+      // both sides to the same relative path so the IDB lookup hits correctly.
+      const key = new URL(request.url).pathname;
+
+      try {
+        // Race the IDB open + lookup against a hard timeout. The singleton
+        // `openIdb()` prevents concurrent opens from blocking each other, but
+        // the first open may still stall if a v1 connection is held by a tab
+        // undergoing a version upgrade. Timing out guarantees sprite Responses
+        // always resolve (from IDB when present, else network) and never hang.
+        // (#1845 - hung promises from concurrent opens caused cards and the
+        // Pokédex grid to never finish rendering in chromium e2e.)
+        const idbResult = await Promise.race([
+          openIdb().then((db) => idbPackGet(db, key)),
+          new Promise<null>((resolveTimeout) =>
+            setTimeout(() => resolveTimeout(null), SW_IDB_OPEN_TIMEOUT_MS),
+          ),
+        ]);
+        if (idbResult) {
+          return new Response(idbResult.blob, {
+            status: 200,
+            headers: { "Content-Type": idbResult.contentType },
+          });
+        }
+      } catch {
+        // IDB unavailable or open failed - fall through to network.
+      }
+
+      // Network fallback: fetch and return without caching. The user can
+      // re-download the pack to populate IDB; runtime sprite fetches are
+      // expected to be warm from the static file server anyway.
+      return fetch(request);
+    },
   },
   {
     // Next.js content-hashed build output - cache-first.
@@ -271,13 +314,30 @@ const runtimeCaching: RuntimeCaching[] = [
     }),
   },
   {
-    // Same-origin navigations and data - network-first, cache fallback offline.
+    // Same-origin navigations, seed data, and other data fetches.
+    //
+    // Strategy: StaleWhileRevalidate (was: NetworkFirst with a 10 s timeout).
+    //
+    // Regression note (#1803): the prior NetworkFirst(10 s) strategy caused
+    // every cold launch on the installed iOS PWA to block for up to 10 s
+    // waiting for the network to return the / HTML document. The SW intercepted
+    // the cold-launch navigation and gated paint on the network. Switching to
+    // StaleWhileRevalidate eliminates the wait: the cached shell is returned
+    // instantly from this bucket; the network response is written back in the
+    // background so the next visit gets a fresh shell. Seed data files
+    // (public/pokemon-data/*.json) are now also in the SW precache manifest
+    // (scripts/build-sw.mjs) so they are served cache-first by the precache
+    // handler before this runtime rule even fires.
+    //
+    // A full App Router RSC static shell precache was considered but rejected:
+    // the root page uses searchParams + getTranslations and is server-rendered,
+    // so no static HTML template exists at build time. SWR is the correct
+    // strategy for App Router navigations where freshness can be traded for speed.
     matcher: ({ url, request }) =>
       classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
       CACHE_NAMES.pages,
-    handler: new NetworkFirst({
+    handler: new StaleWhileRevalidate({
       cacheName: versionedCacheName(CACHE_NAMES.pages),
-      networkTimeoutSeconds: 10,
       plugins: [
         new ExpirationPlugin({
           maxEntries: 64,
@@ -299,7 +359,11 @@ const serwist = new Serwist({
   // This avoids swapping the app shell mid-session.
   skipWaiting: false,
   clientsClaim: true,
-  navigationPreload: true,
+  // navigationPreload was previously true to reduce the SW startup latency
+  // before the network request fired (a NetworkFirst optimisation). With
+  // StaleWhileRevalidate the cache is read first and the response is immediate,
+  // so navigation preload is unnecessary overhead. (#1803)
+  navigationPreload: false,
   runtimeCaching,
 });
 
@@ -309,8 +373,14 @@ const serwist = new Serwist({
 // window client is open - otherwise a still-foreground sibling tab would be
 // swapped under the user. The client's visibility listener stays armed, so
 // the next quiet moment retries naturally.
+//
+// Also handles GET_SW_VERSION (#1826): the Settings page queries the
+// controlling worker's baked-in version so a stale-worker mismatch is
+// surfaced to the user without requiring Safari Web Inspector.
 self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
+  if (!event.data) return;
+
+  if (event.data.type === "SKIP_WAITING") {
     void (async () => {
       const clients = await self.clients.matchAll({ type: "window" });
       if (clients.length <= 1) {
@@ -318,30 +388,89 @@ self.addEventListener("message", (event) => {
       }
       // Otherwise: decline silently. Another visibility tick will retry.
     })();
+    return;
+  }
+
+  if (event.data.type === "GET_SW_VERSION") {
+    // Reply via the MessageChannel port sent by the client. The port is
+    // the first entry in event.ports; if absent (unexpected), no reply is
+    // sent and the client's timeout fires naturally.
+    const port = event.ports[0];
+    if (port) {
+      port.postMessage({ type: "SW_VERSION", version: self.__SW_VERSION__ });
+    }
   }
 });
 
 /**
- * Opens the shared `poke-memory` IDB, creating the `kv` store when the DB is
- * being initialised for the first time. On a fresh install the client-side
- * `lib/idb/db.ts` wrapper may not have run yet (all tabs closed), so the SW
- * must handle `onupgradeneeded` itself. Without this handler the open() call
- * would fail silently and the queue read would return [] (#1072 non-blocker).
+ * Opens the shared `poke-memory` IDB at version 2 (IDB_DB_VERSION).
+ *
+ * Delegates to lib/pwa/swIdb.ts::openSwIdb which provides:
+ *   - A module-level singleton so concurrent sprite/cry requests share one
+ *     connection instead of each opening a new one (the root cause of #1845 -
+ *     multiple concurrent opens blocked each other's v1→v2 upgrade, leaving all
+ *     their promises pending indefinitely and preventing cards from rendering).
+ *   - An `onblocked` timeout (SW_IDB_OPEN_TIMEOUT_MS) that rejects and nulls
+ *     the singleton when a stale connection elsewhere blocks the upgrade, so
+ *     the sprite handler falls through to a network fetch instead of hanging.
+ *   - An `onversionchange` handler that closes the connection and nulls the
+ *     singleton when a future upgrade fires elsewhere.
  */
 function openIdb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  return openSwIdb(
+    self.indexedDB,
+    IDB_DB_NAME,
+    IDB_DB_VERSION,
+    (db, oldVersion) => {
+      // kv store: create on fresh install (oldVersion < 1).
+      if (oldVersion < 1 && !db.objectStoreNames.contains(IDB_STORE_NAME)) {
+        db.createObjectStore(IDB_STORE_NAME);
+      }
+      // offline-pack store: added at v2.
+      if (!db.objectStoreNames.contains(OFFLINE_PACK_STORE)) {
+        db.createObjectStore(OFFLINE_PACK_STORE);
+      }
+    },
+  );
+}
+
+/**
+ * Look up a sprite or cry blob in the IndexedDB offline-pack store.
+ *
+ * Returns null on miss or any IDB error - the caller falls back to network.
+ * The value shape { blob: Blob; contentType: string } mirrors OfflineEntry in
+ * lib/pwa/offlineStore.ts; we cannot import that module directly because
+ * app/sw.ts is bundled separately by esbuild and lib/pwa/offlineStore.ts
+ * contains a browser-global guard (`typeof window`) that would become a dead
+ * branch in the SW scope (SW scope has no `window`). We access IDB directly
+ * to avoid this coupling.
+ */
+async function idbPackGet(
+  db: IDBDatabase,
+  url: string,
+): Promise<{ blob: Blob; contentType: string } | null> {
+  return new Promise((resolve) => {
     try {
-      const request = self.indexedDB.open(IDB_DB_NAME, 1);
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
-          db.createObjectStore(IDB_STORE_NAME);
+      const tx = db.transaction(OFFLINE_PACK_STORE, "readonly");
+      const req = tx.objectStore(OFFLINE_PACK_STORE).get(url);
+      req.onsuccess = () => {
+        const val: unknown = req.result;
+        if (
+          val &&
+          typeof val === "object" &&
+          "blob" in val &&
+          (val as Record<string, unknown>).blob instanceof Blob &&
+          "contentType" in val &&
+          typeof (val as Record<string, unknown>).contentType === "string"
+        ) {
+          resolve(val as { blob: Blob; contentType: string });
+        } else {
+          resolve(null);
         }
       };
-      request.onerror = () => reject(new Error("[sw-sync] IDB open failed"));
-      request.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
-    } catch (err) {
-      reject(err);
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
     }
   });
 }
@@ -363,7 +492,7 @@ async function readPendingQueueFromIdb(): Promise<unknown[]> {
         const store = tx.objectStore(IDB_STORE_NAME);
         const getReq = store.get(PENDING_QUEUE_KEY);
         getReq.onsuccess = () => {
-          db.close();
+          // Do NOT close db here - it is a singleton shared across all callers.
           const raw: unknown = getReq.result;
           if (typeof raw !== "string") {
             resolve([]);
@@ -376,9 +505,8 @@ async function readPendingQueueFromIdb(): Promise<unknown[]> {
             resolve([]);
           }
         };
-        getReq.onerror = () => { db.close(); resolve([]); };
+        getReq.onerror = () => resolve([]);
       } catch {
-        db.close();
         resolve([]);
       }
     });
@@ -399,10 +527,10 @@ async function clearPendingQueueFromIdb(): Promise<void> {
         const tx = db.transaction(IDB_STORE_NAME, "readwrite");
         const store = tx.objectStore(IDB_STORE_NAME);
         const delReq = store.delete(PENDING_QUEUE_KEY);
-        delReq.onsuccess = () => { db.close(); resolve(); };
-        delReq.onerror = () => { db.close(); resolve(); };
+        // Do NOT close db here - it is a singleton shared across all callers.
+        delReq.onsuccess = () => resolve();
+        delReq.onerror = () => resolve();
       } catch {
-        db.close();
         resolve();
       }
     });
@@ -653,6 +781,32 @@ self.addEventListener("notificationclick", (event) => {
       }
 
       await self.clients.openWindow(absoluteTarget);
+    })(),
+  );
+});
+
+/**
+ * Delete the old Cache Storage sprite/cry buckets on SW activate (#1803 migration).
+ *
+ * The offline pack moved from Cache Storage to IndexedDB. Existing users who
+ * downloaded the pack before this SW deployed will have ~10,000+ entries in
+ * `poke-memory-sprites-v2` / `poke-memory-cries-v2`. Those bloated buckets are
+ * the exact cause of the cold-launch hang: WebKit's `cache.match` is globally
+ * slow when Cache Storage has that many entries.
+ *
+ * This handler runs once when the new SW activates (typically on the first page
+ * load after the update is installed). `waitUntil` keeps the activate event alive
+ * until the deletions complete. If `caches` is unavailable (non-PWA context) the
+ * call is a silent no-op.
+ */
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      if (typeof caches === "undefined") return;
+      await Promise.all([
+        caches.delete(LEGACY_SPRITE_CACHE_NAME),
+        caches.delete(LEGACY_CRY_CACHE_NAME),
+      ]);
     })(),
   );
 });

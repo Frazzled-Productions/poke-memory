@@ -130,7 +130,7 @@ export function TypedEntryNameCard({
         width={PRACTICE_SPRITE_SIZE}
         height={PRACTICE_SPRITE_SIZE}
         priority
-        className="h-36 w-36 object-contain sm:h-80 sm:w-80"
+        className="max-h-36 w-auto object-contain sm:max-h-80"
       />
 
       {/*

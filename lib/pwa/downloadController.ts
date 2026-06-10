@@ -27,6 +27,7 @@
 
 import { precacheAll, OFFLINE_DOWNLOADED_AT_KEY, buildPrecacheUrls, type PrecacheProgress, type PrecacheSummary } from "./precache";
 import { computeManifestSignature, parseOfflineManifest, type OfflineManifest } from "./manifestSignature";
+import { offlineCount } from "./offlineStore";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
 import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
@@ -256,6 +257,84 @@ export async function startDownload(ids: number[]): Promise<void> {
  */
 export function stopDownload(): void {
   abortController?.abort();
+}
+
+/**
+ * Immediately reset the singleton to idle and notify all subscribers.
+ *
+ * Used by the "Delete offline cache" flow after the cached bytes have been
+ * removed and the localStorage keys cleared. The reseed guard (`storageSeedDone`)
+ * is also cleared so that `seedFromStorage()` re-runs on the next `getState()`
+ * or `subscribe()` call - but since the localStorage keys were just removed,
+ * it will find nothing and stay idle.
+ *
+ * Safe to call at any phase - a no-op if already idle.
+ */
+export function resetToIdle(): void {
+  if (currentState.phase === "idle") return;
+  // Allow seedFromStorage to re-run (it will find no timestamp and stay idle).
+  storageSeedDone = false;
+  setState({ phase: "idle" });
+}
+
+/**
+ * Reconcile the in-memory download state against the actual IndexedDB contents.
+ *
+ * This guards against the post-migration state where:
+ *   - localStorage (and therefore `seedFromStorage()`) says the pack is "done", but
+ *   - the IndexedDB `offline-pack` store is empty because the SW's activate handler
+ *     deleted the legacy Cache Storage buckets before the user had a chance to
+ *     re-download into IndexedDB.
+ *
+ * Resolution:
+ *   - If phase is "done" AND `offlineCount()` returns 0, reset to idle and clear
+ *     the stale localStorage keys so `OfflineSection` shows the Download button.
+ *   - If IDB is unavailable or `offlineCount()` throws, do NOT reset - never wipe
+ *     a valid "done" state on a transient IDB error.
+ *   - If IDB has entries (count > 0), leave state unchanged.
+ *   - If phase is anything other than "done", this is a no-op.
+ *
+ * This function is async and must be called after `seedFromStorage()` has run
+ * (i.e. after `getState()` or `subscribe()` has been called). The reconciliation
+ * MUST NOT block the initial render - call it in a non-blocking `useEffect`.
+ *
+ * A brief "done" → "idle" transition on the first post-migration page load is
+ * intentional and acceptable.
+ */
+export async function reconcileWithStorage(): Promise<void> {
+  // Only relevant when the manifest claims a completed download.
+  if (currentState.phase !== "done") return;
+
+  let count: number;
+  try {
+    count = await offlineCount();
+  } catch {
+    // IDB unavailable or errored - preserve the existing "done" state.
+    return;
+  }
+
+  // Re-check the phase after the async IDB call. A concurrent startDownload()
+  // or stopDownload() may have changed it while we awaited.
+  if (currentState.phase !== "done") return;
+
+  if (count > 0) {
+    // IDB has entries - state is consistent, nothing to do.
+    return;
+  }
+
+  // IDB is confirmed empty but localStorage claimed "done". This means the
+  // offline pack data is missing (e.g. the SW migration deleted the old Cache
+  // Storage buckets but the user never re-downloaded into IndexedDB). Reset.
+  try {
+    localStorage.removeItem(OFFLINE_DOWNLOADED_AT_KEY);
+    localStorage.removeItem(KEY_OFFLINE_MANIFEST);
+  } catch {
+    // localStorage unavailable - non-fatal.
+  }
+
+  // Allow seedFromStorage to re-run (it will find no timestamp and stay idle).
+  storageSeedDone = false;
+  setState({ phase: "idle" });
 }
 
 /**

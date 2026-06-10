@@ -63,8 +63,28 @@ const ROUTE_OPTIONS = {
   globPatterns: [
     ".next/static/**/*.{js,css}",
     "public/*.{png,svg,ico,webmanifest}",
+    // Pokémon seed data - precached so cold launch reads from cache instantly
+    // rather than waiting for a network round-trip. (#1803)
+    //
+    // Files and approximate uncompressed sizes (as of 2026-06):
+    //   generated-core.json         ~932 KB  (core species data for loadSeed)
+    //   generated-chains.json       ~319 KB  (evolution chains for loadSeed)
+    //   generated-locale-names.json ~219 KB  (locale-aware names for i18n)
+    //   ──────────────────────────────────
+    //   Total seed addition:       ~1.47 MB  uncompressed
+    //   On-wire (gzip/brotli):     ~0.3 MB   typical JSON compression ratio
+    //
+    // generated-flavor.json (~1.3 MB) is excluded via globIgnores: it is
+    // lazy-loaded only when a Pokédex detail view opens, so precaching it
+    // bloats the SW install and slows cache.match on every cold launch - the
+    // opposite of what this fix achieves.
+    //
+    // The glob intentionally stays broad ("*.json") so any future seed files
+    // are auto-included; new large lazy-loaded files must be added to
+    // globIgnores rather than narrowing this pattern.
+    "public/pokemon-data/*.json",
   ],
-  globIgnores: ["**/sprites/**"],
+  globIgnores: ["**/sprites/**", "**/pokemon-data/generated-flavor.json"],
   maximumFileSizeToCacheInBytes: 2 * 1024 * 1024, // 2 MiB
 };
 
@@ -131,6 +151,16 @@ async function main() {
     );
   }
 
+  // Bake the package.json version string into the SW bundle so the Settings
+  // diagnostic can detect a stale controlling worker (#1826). The injected
+  // value is the bare semver from NEXT_PUBLIC_APP_VERSION (e.g. "0.11.2").
+  // No sha8 suffix is appended; the Settings UI compares this value directly
+  // against process.env.NEXT_PUBLIC_APP_VERSION.
+  const pkgJson = JSON.parse(
+    await fs.readFile(path.join(projectRoot, "package.json"), "utf-8"),
+  );
+  const appVersion = pkgJson.version ?? "dev";
+
   const result = await esbuild.build({
     sourcemap: true,
     format: "esm",
@@ -145,6 +175,10 @@ async function main() {
     define: {
       ...config.esbuildOptions?.define,
       ...(injectionPoint ? { [injectionPoint]: manifestString } : {}),
+      // Inject the frozen SW version string. esbuild replaces the identifier
+      // `self.__SW_VERSION__` (declared in app/sw.ts) with this literal at
+      // bundle time so the value is frozen into each deployed worker.
+      "self.__SW_VERSION__": JSON.stringify(appVersion),
     },
     outdir: config.cwd,
     write: false,

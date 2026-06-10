@@ -6,11 +6,26 @@ import { KEY_REVIEW_SESSION, KEY_GRADE_LOG } from "@/lib/storage/keys";
 let idbAvailable = true;
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
-const DB_NAME = "poke-memory";
-const DB_VERSION = 1;
-const STORE_NAME = "kv";
+export const DB_NAME = "poke-memory";
+/**
+ * Current schema version.
+ *
+ * v1: `kv` store (review-session, grade-log, pending-grade-queue, …).
+ * v2: adds `offline-pack` store (sprite/cry blobs for offline practice).
+ *
+ * This constant is the single source of truth. `lib/pwa/offlineStore.ts` and
+ * `app/sw.ts` must both open the DB at this version with an upgrade handler
+ * that creates BOTH stores idempotently so whichever context triggers the
+ * upgrade first yields a consistent schema.
+ */
+export const DB_VERSION = 2;
+export const STORE_KV = "kv";
+export const STORE_OFFLINE_PACK = "offline-pack";
 
-/** Opens the poke-memory database at version 1 with a `kv` object store. */
+// Keep the internal alias for existing code in this file.
+const STORE_NAME = STORE_KV;
+
+/** Opens the poke-memory database at version 2 with `kv` and `offline-pack` stores. */
 export function openAppDb(): Promise<IDBPDatabase> {
   if (typeof window === "undefined") {
     // Server-side: return a promise that never resolves to keep the caller
@@ -19,10 +34,33 @@ export function openAppDb(): Promise<IDBPDatabase> {
   }
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME);
+      upgrade(db, oldVersion) {
+        // Create kv store on fresh install or upgrade from before v1.
+        if (oldVersion < 1) {
+          db.createObjectStore(STORE_KV);
         }
+        // Create offline-pack store when upgrading from v1 to v2, or on
+        // fresh install (oldVersion === 0 falls through both guards).
+        if (oldVersion < 2) {
+          if (!db.objectStoreNames.contains(STORE_OFFLINE_PACK)) {
+            db.createObjectStore(STORE_OFFLINE_PACK);
+          }
+        }
+      },
+      blocking(_currentVersion, _blockedVersion, event) {
+        // This connection is blocking a newer-version upgrade request from
+        // another context (e.g. a SW or another tab that upgraded to v2).
+        // Close immediately so the upgrade can proceed.
+        // event.target is the IDBDatabase that is blocking (per the IDB spec's
+        // versionchange event: it fires on the open connection, not the request).
+        const db = event.target as IDBDatabase | null;
+        if (db) db.close();
+        dbPromise = null;
+      },
+      blocked() {
+        // A v1 connection elsewhere is blocking our v2 upgrade. Log and
+        // continue - the upgrade will complete once the old connection closes.
+        console.warn("[poke-memory] IDB upgrade blocked by another context; waiting for it to close.");
       },
     }).catch((err) => {
       console.warn("[poke-memory] IndexedDB unavailable, falling back to localStorage:", err);

@@ -633,7 +633,7 @@ test.describe("Pokédex detail - bottom nav anchoring (#1086)", () => {
     expect(Math.abs(barBottom - viewportSize!.height)).toBeLessThanOrEqual(2);
   });
 
-  test("page is at least one viewport tall on the detail page", async ({ page }) => {
+  test("bottom tab bar is at viewport bottom and content region is scrollable on detail page (#1801)", async ({ page }) => {
     await page.goto("/pokedex/1");
 
     // Wait for the page to render.
@@ -642,18 +642,34 @@ test.describe("Pokédex detail - bottom nav anchoring (#1086)", () => {
     const viewportSize = page.viewportSize();
     expect(viewportSize).not.toBeNull();
 
-    // The #1086 invariant: the page itself must be at least as tall as the
-    // viewport so iOS Safari keeps its toolbar hidden and `position: fixed;
-    // bottom: 0` on the tab bar stays anchored. As of #1104 the guarantee
-    // lives on <body> (was on [data-page-content]), because pinning the
-    // wrapper to 100svh on top of the Nav + sibling banners pushed the
-    // Practice page past the viewport and re-introduced the scroll #1087
-    // was meant to remove. As of #1728 the body uses `min-h-[100svh]`
-    // (svh = URL-bar-expanded height) rather than `min-h-dvh` so the body
-    // is correct at cold first paint before any scroll. Assert the property
-    // at body so the test follows where the contract now lives.
-    const bodyHeight = await page.evaluate(() => document.body.scrollHeight);
-    expect(bodyHeight).toBeGreaterThanOrEqual(viewportSize!.height - 2);
+    // Under the app-shell model (#1801) the body is fixed at h-[100lvh] on
+    // mobile, so body.scrollHeight equals the viewport height rather than
+    // being taller. The old invariant (bodyHeight >= viewport.height) was
+    // a proxy for "bar stays at the bottom", but it no longer applies.
+    //
+    // The new invariants:
+    // 1. The bar's bottom edge is at the viewport bottom (the bar is in-flow).
+    // 2. The [data-scroll-region] wrapper is scrollable on non-Practice routes
+    //    (scroll ownership moved from PageShell back to the shell region so
+    //    pages that do not use PageShell also scroll - #1839 regression fix).
+    const tabBar = page.getByRole("navigation", { name: "Mobile tab navigation" });
+    await expect(tabBar).toBeVisible();
+
+    const box = await tabBar.boundingBox();
+    expect(box).not.toBeNull();
+
+    const barBottom = box!.y + box!.height;
+    expect(Math.abs(barBottom - viewportSize!.height)).toBeLessThanOrEqual(4);
+
+    // The [data-scroll-region] element must be scrollable on a detail page
+    // (scrollHeight > clientHeight means there is overflow content).
+    const scrollable = await page.evaluate(() => {
+      const region = document.querySelector("[data-scroll-region]") as HTMLElement | null;
+      if (!region) return null;
+      return { scrollHeight: region.scrollHeight, clientHeight: region.clientHeight };
+    });
+    expect(scrollable).not.toBeNull();
+    expect(scrollable!.scrollHeight).toBeGreaterThan(scrollable!.clientHeight);
   });
 });
 

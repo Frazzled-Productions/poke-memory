@@ -19,10 +19,33 @@ export function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Constructing an `Intl.DateTimeFormat` is expensive (it loads ICU locale +
+// timezone data on every `new`). The cold-launch session build calls
+// `todayInTimezone` once per card via the SRS scheduler's `isoDate` /
+// `initialReviewState` / `addDays`, so a returning user re-hydrating a full
+// saved deck triggers thousands of constructions on boot - the ~6s
+// main-thread block behind the PWA black screen (#1803). The format options
+// only depend on the timezone, so cache one formatter per timezone and reuse
+// it; `Intl.DateTimeFormat.prototype.format` is itself cheap (#1803).
+const _isoDateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function isoDateFormatterFor(tz: string): Intl.DateTimeFormat {
+  let fmt = _isoDateFormatters.get(tz);
+  if (fmt === undefined) {
+    // en-CA natively formats as YYYY-MM-DD with dashes (ISO order for free).
+    fmt = new Intl.DateTimeFormat("en-CA", { timeZone: tz });
+    _isoDateFormatters.set(tz, fmt);
+  }
+  return fmt;
+}
+
 /**
  * Returns the current date in the given IANA timezone as a "YYYY-MM-DD" string.
  * en-CA locale natively formats as YYYY-MM-DD with dashes, giving us ISO order
  * for free without any string surgery.
+ *
+ * The per-timezone `Intl.DateTimeFormat` is cached (see `_isoDateFormatters`)
+ * because this is on the per-card cold-launch session-build hot path (#1803).
  *
  * @param tz   IANA timezone name e.g. "America/New_York". Falls back to UTC on
  *             any Intl error.
@@ -30,10 +53,10 @@ export function isoDate(d: Date): string {
  */
 export function todayInTimezone(tz: string, now: Date = new Date()): string {
   try {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(now);
+    return isoDateFormatterFor(tz).format(now);
   } catch {
     // Unknown / invalid timezone - fall back to UTC.
-    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(now);
+    return isoDateFormatterFor("UTC").format(now);
   }
 }
 

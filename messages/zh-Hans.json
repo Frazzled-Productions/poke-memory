@@ -255,7 +255,15 @@
       "stopButton": "停止",
       "upToDate": "已是最新",
       "updateAvailable": "有可用更新",
-      "updateAvailableCount": "有可用更新（新增 {count} 个）"
+      "updateAvailableCount": "有可用更新（新增 {count} 个）",
+      "downloadBytesLabel": "已下载",
+      "deleteButton": "删除离线缓存",
+      "deleteConfirmTitle": "删除离线缓存？",
+      "deleteConfirmBody": "这将删除所有已下载的精灵图和叫声（{size}）。您可以随时重新下载。",
+      "deleteConfirmBodyNoSize": "这将删除您的所有离线数据。您可以随时重新下载。",
+      "deleteConfirmConfirm": "删除",
+      "deleteConfirmCancel": "取消",
+      "deleteErrorMessage": "无法删除缓存。请尝试在浏览器设置中清除网站数据。"
     },
     "optimizerCooldown": "{count, plural, other {下次优化还需 # 天}}",
     "optimizerRetryAfter": "{count, plural, other {请在 # 天后重试。}}",
@@ -303,6 +311,11 @@
     "about": {
       "heading": "关于",
       "version": "版本",
+      "serviceWorker": "Service Worker",
+      "serviceWorkerLoading": "检查中...",
+      "serviceWorkerNone": "没有活跃的 Service Worker",
+      "serviceWorkerTimeout": "Service Worker 无响应",
+      "serviceWorkerMismatch": "Service Worker（{swVersion}）比应用（{appVersion}）旧 - 有待应用的更新，请关闭并重新打开应用。",
       "whatsNew": "新功能",
       "whatsNewDescription": "查看最近版本的更新内容。",
       "viewChangelog": "查看更新日志",

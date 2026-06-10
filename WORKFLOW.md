@@ -196,9 +196,9 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 |---|---|
 | **Trigger** | `pull_request` touching `db/migrations/**`, `scripts/check-migrations.mjs`, or the workflow file itself; push to `main` |
 | **Job** | `check` |
-| **What it does** | Runs `scripts/check-migrations.mjs`, which lists files in `db/migrations/` (excluding the bootstrap `001_initial_sync_schema.sql`), calls the Supabase Management API to list applied migrations, and exits non-zero if any committed file is not in the applied list |
-| **Required secrets** | `SUPABASE_ACCESS_TOKEN` (Supabase PAT with read access), `SUPABASE_PROJECT_REF` (dashboard slug, e.g. `nvxvvtvnthsgdxgksmju`). Both must be set as repo secrets before the workflow can run; without them the script exits 2 with a clear error. |
-| **Fork PRs** | Skipped (`head.repo.fork == false` guard - same pattern as `auto-review.yml`). No secrets exposed. |
+| **What it does** | Runs `scripts/check-migrations.mjs`, which lists files in `db/migrations/` (excluding the bootstrap `001_initial_sync_schema.sql`), calls the Supabase Management API to list applied migrations, and exits non-zero if any committed file is not in the applied list. **Env-to-branch parity (#1806):** a PR whose base is `qa` is checked against the **QA** project (staging rehearsal); a push to `main` (and a PR into `main`) is checked against **prod**. Routing is purely on `github.event_name` + `pull_request.base.ref` (secrets can't be read in `if:`), so the matching secret set is injected per step. |
+| **Required secrets** | `SUPABASE_ACCESS_TOKEN` (Supabase Management-API PAT, account-scoped so it reads BOTH projects) plus the per-project ref: `SUPABASE_PROJECT_REF` (prod, e.g. `nvxvvtvnthsgdxgksmju`) or `QA_SUPABASE_PROJECT_REF` (QA). No separate QA token - the PAT is account-level. The relevant ref must be set before the matching trigger can run; without it the script exits 2 with a clear error (the loud failure mode during the secrets-provisioning window). |
+| **Fork PRs** | Skipped (`github.event_name == 'push' || head.repo.fork == false` guard - same pattern as `auto-review.yml`, with the push path gated in explicitly). No secrets exposed. |
 | **Required check** | No - informational. Failure flags the gap; the recovery action is to run `mcp__supabase__apply_migration` against the named file. |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
 

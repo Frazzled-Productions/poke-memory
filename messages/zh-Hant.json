@@ -255,7 +255,15 @@
       "stopButton": "停止",
       "upToDate": "已是最新",
       "updateAvailable": "有可用更新",
-      "updateAvailableCount": "有可用更新（新增 {count} 個）"
+      "updateAvailableCount": "有可用更新（新增 {count} 個）",
+      "downloadBytesLabel": "已下載",
+      "deleteButton": "刪除離線快取",
+      "deleteConfirmTitle": "刪除離線快取？",
+      "deleteConfirmBody": "這將刪除所有已下載的精靈圖和叫聲（{size}）。您可以隨時重新下載。",
+      "deleteConfirmBodyNoSize": "這將刪除您的所有離線資料。您可以隨時重新下載。",
+      "deleteConfirmConfirm": "刪除",
+      "deleteConfirmCancel": "取消",
+      "deleteErrorMessage": "無法刪除快取。請嘗試在瀏覽器設定中清除網站資料。"
     },
     "optimizerCooldown": "{count, plural, other {下次最佳化還需 # 天}}",
     "optimizerRetryAfter": "{count, plural, other {請在 # 天後重試。}}",
@@ -303,6 +311,11 @@
     "about": {
       "heading": "關於",
       "version": "版本",
+      "serviceWorker": "Service Worker",
+      "serviceWorkerLoading": "檢查中...",
+      "serviceWorkerNone": "沒有活躍的 Service Worker",
+      "serviceWorkerTimeout": "Service Worker 無回應",
+      "serviceWorkerMismatch": "Service Worker（{swVersion}）比應用程式（{appVersion}）舊 - 有待套用的更新，請關閉並重新開啟應用程式。",
       "whatsNew": "新功能",
       "whatsNewDescription": "查看最近版本的更新內容。",
       "viewChangelog": "查看更新記錄",

@@ -1,39 +1,28 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { buildPrecacheUrls, precacheAll, OFFLINE_DOWNLOADED_AT_KEY, OFFLINE_PRECACHE_WIDTHS } from "./precache";
-import { CACHE_NAMES, versionedCacheName } from "./cacheStrategy";
 import { GENERATED_SPRITE_WIDTHS } from "@/lib/sprites/imageLoaderHelpers";
+import * as offlineStore from "./offlineStore";
 
 // ---------------------------------------------------------------------------
-// Helpers to build a minimal CacheStorage stub.
+// IDB stub helpers.
+//
+// precache.ts uses offlineHas + offlinePut from offlineStore.ts to read and
+// write blobs into IndexedDB. We mock these at the module level so tests run
+// without a real IDB environment.
 // ---------------------------------------------------------------------------
 
-function makeCache(existingUrls: Set<string> = new Set()) {
-  const store = new Map<string, Response>();
+function makeIdbStubs(existingUrls: Set<string> = new Set()) {
+  const idbStore = new Map<string, { blob: Blob; contentType: string }>();
   for (const u of existingUrls) {
-    store.set(u, new Response("cached", { status: 200 }));
+    idbStore.set(u, { blob: new Blob(["cached"]), contentType: "application/octet-stream" });
   }
-  return {
-    match: vi.fn(async (url: string) => store.get(url)),
-    put: vi.fn(async (url: string, res: Response) => {
-      store.set(url, res);
-    }),
-  };
-}
 
-function makeCaches(cache: ReturnType<typeof makeCache>) {
-  return {
-    open: vi.fn(async () => cache),
-  };
-}
-
-function makeOkFetch(extraUrls: Set<string> = new Set()) {
-  return vi.fn(async (url: string) => {
-    // Return 404 for /cries/ paths to exercise the not-ok branch.
-    if (url.startsWith("/cries/") && !extraUrls.has(url)) {
-      return new Response("", { status: 404 });
-    }
-    return new Response("data", { status: 200 });
+  const hasSpy = vi.spyOn(offlineStore, "offlineHas").mockImplementation(async (url) => idbStore.has(url));
+  const putSpy = vi.spyOn(offlineStore, "offlinePut").mockImplementation(async (url, entry) => {
+    idbStore.set(url, entry);
   });
+
+  return { idbStore, hasSpy, putSpy };
 }
 
 // ---------------------------------------------------------------------------
@@ -143,22 +132,10 @@ describe("precacheAll", () => {
     vi.restoreAllMocks();
   });
 
-  it("opens the versioned sprites cache bucket - byte-identical to the SW runtime handler", async () => {
-    // This test pins the contract between the precache orchestrator and the
-    // service worker's CacheFirst route: both must open the SAME cache name.
-    // If this assertion fails after a SW_CACHE_VERSION bump, it means the
-    // SW and the precache have diverged and precached assets will be invisible.
-    const openedNames: string[] = [];
-    const fakeCache = {
-      match: vi.fn(async () => undefined),
-      put: vi.fn(async () => undefined),
-    };
-    vi.stubGlobal("caches", {
-      open: vi.fn(async (name: string) => {
-        openedNames.push(name);
-        return fakeCache;
-      }),
-    });
+  it("stores blobs in IndexedDB (not Cache Storage) - uses offlinePut per URL", async () => {
+    // Since #1803 the offline pack lives in IndexedDB. This test pins that
+    // precacheAll calls offlinePut (not caches.open / cache.put) for each URL.
+    const { putSpy } = makeIdbStubs();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("data", { status: 200 })),
@@ -166,21 +143,33 @@ describe("precacheAll", () => {
 
     await precacheAll({ ids: [25] });
 
-    const expectedSpritesName = versionedCacheName(CACHE_NAMES.sprites);
-    const expectedCriesName = versionedCacheName(CACHE_NAMES.cries);
+    // offlinePut must have been called for every URL produced by buildPrecacheUrls.
+    const expectedUrls = buildPrecacheUrls([25]);
+    // Some URLs may be fetched concurrently but all should be stored.
+    expect(putSpy.mock.calls.length).toBeGreaterThan(0);
+    // Every stored key must be one of the expected URLs.
+    for (const [url] of putSpy.mock.calls) {
+      expect(expectedUrls).toContain(url);
+    }
+  });
 
-    // The precache must open only the versioned bucket names.
-    expect(openedNames).toContain(expectedSpritesName);
-    expect(openedNames).toContain(expectedCriesName);
+  it("does NOT open Cache Storage (no caches.open calls)", async () => {
+    // Regression guard: after #1803 the precache must never touch Cache Storage.
+    makeIdbStubs();
+    const cachesOpenSpy = vi.fn();
+    vi.stubGlobal("caches", { open: cachesOpenSpy });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("data", { status: 200 })),
+    );
 
-    // It must NOT open the unversioned names (those are the wrong buckets).
-    expect(openedNames).not.toContain(CACHE_NAMES.sprites);
-    expect(openedNames).not.toContain(CACHE_NAMES.cries);
+    await precacheAll({ ids: [25] });
+
+    expect(cachesOpenSpy).not.toHaveBeenCalled();
   });
 
   it("returns zero counts for an empty ID list", async () => {
-    const cache = makeCache();
-    vi.stubGlobal("caches", makeCaches(cache));
+    makeIdbStubs();
     vi.stubGlobal("fetch", vi.fn());
 
     const result = await precacheAll({ ids: [] });
@@ -188,12 +177,11 @@ describe("precacheAll", () => {
     expect(result.downloaded).toBe(0);
   });
 
-  it("skips already-cached URLs (idempotency)", async () => {
-    // Pre-seed just one URL into the cache.
+  it("skips already-stored URLs (idempotency - offlineHas returns true)", async () => {
+    // Pre-seed just one URL into the IDB store.
     const urls = buildPrecacheUrls([1]);
     const preseeded = new Set([urls[0]!]);
-    const cache = makeCache(preseeded);
-    vi.stubGlobal("caches", makeCaches(cache));
+    makeIdbStubs(preseeded);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("data", { status: 200 })),
@@ -209,8 +197,7 @@ describe("precacheAll", () => {
   });
 
   it("counts failed URLs when fetch returns non-ok", async () => {
-    const cache = makeCache();
-    vi.stubGlobal("caches", makeCaches(cache));
+    makeIdbStubs();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("", { status: 404 })),
@@ -221,28 +208,28 @@ describe("precacheAll", () => {
     expect(result.downloaded).toBe(0);
   });
 
-  it("counts failed URLs when caches.open throws", async () => {
-    vi.stubGlobal("caches", {
-      open: vi.fn(async () => {
-        throw new Error("Cache unavailable");
-      }),
-    });
-    vi.stubGlobal("fetch", vi.fn());
+  it("counts failed URLs when offlinePut throws", async () => {
+    // offlineHas returns false (miss) so a fetch is attempted, but offlinePut throws.
+    vi.spyOn(offlineStore, "offlineHas").mockResolvedValue(false);
+    vi.spyOn(offlineStore, "offlinePut").mockRejectedValue(new Error("IDB write failed"));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("data", { status: 200 })),
+    );
 
     const result = await precacheAll({ ids: [1] });
     expect(result.failed).toBeGreaterThan(0);
   });
 
   it("aborts mid-download when AbortSignal fires", async () => {
-    const cache = makeCache();
-    vi.stubGlobal("caches", makeCaches(cache));
+    makeIdbStubs();
 
     let fetchCount = 0;
     const controller = new AbortController();
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string, opts?: RequestInit) => {
+      vi.fn(async (_url: string, opts?: RequestInit) => {
         fetchCount++;
         // Abort after the first fetch.
         if (fetchCount === 1) controller.abort();
@@ -263,8 +250,7 @@ describe("precacheAll", () => {
   });
 
   it("calls onProgress with monotonically increasing done counts", async () => {
-    const cache = makeCache();
-    vi.stubGlobal("caches", makeCaches(cache));
+    makeIdbStubs();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("data", { status: 200 })),
@@ -285,8 +271,7 @@ describe("precacheAll", () => {
   });
 
   it("accrues real bytes from Content-Length header for downloaded sprites", async () => {
-    const cache = makeCache();
-    vi.stubGlobal("caches", makeCaches(cache));
+    makeIdbStubs();
     // Return a response with a known Content-Length so we can assert the exact accumulation.
     vi.stubGlobal(
       "fetch",
@@ -324,8 +309,7 @@ describe("precacheAll", () => {
   });
 
   it("accrues bytes from blob size when Content-Length header is absent", async () => {
-    const cache = makeCache();
-    vi.stubGlobal("caches", makeCaches(cache));
+    makeIdbStubs();
     // Response without Content-Length; body is 4 bytes ("data").
     vi.stubGlobal(
       "fetch",
@@ -349,8 +333,7 @@ describe("precacheAll", () => {
   });
 
   it("does not add heuristic bytes (25_000/15_000) - old estimate is gone", async () => {
-    const cache = makeCache();
-    vi.stubGlobal("caches", makeCaches(cache));
+    makeIdbStubs();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
