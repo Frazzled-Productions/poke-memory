@@ -17,7 +17,8 @@ import { _resetForTesting } from "@/lib/pwa/downloadController";
 import { computeManifestSignature } from "@/lib/pwa/manifestSignature";
 import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
-import { CACHE_NAMES, versionedCacheName } from "@/lib/pwa/cacheStrategy";
+import { LEGACY_SPRITE_CACHE_NAME, LEGACY_CRY_CACHE_NAME } from "@/lib/pwa/cacheStrategy";
+import * as offlineStoreModule from "@/lib/pwa/offlineStore";
 
 // ------------------------------------------------------------------
 // localStorage stub - jsdom does not always ship localStorage.
@@ -57,6 +58,12 @@ beforeEach(() => {
     configurable: true,
     writable: true,
   });
+
+  // By default, stub offlineCount to return a positive value so that
+  // reconcileWithStorage() (called on mount) does NOT reset a "done" state in
+  // tests that seed localStorage with a download timestamp. Individual tests
+  // that need to exercise the empty-IDB path override this stub.
+  vi.spyOn(offlineStoreModule, "offlineCount").mockResolvedValue(1);
 });
 
 afterEach(() => {
@@ -473,7 +480,7 @@ describe("OfflineSection", () => {
     expect(screen.getByRole("button", { name: /delete offline cache/i })).toBeInTheDocument();
   });
 
-  it("confirming delete resets to idle and removes localStorage keys", async () => {
+  it("confirming delete calls offlineClear, sweeps legacy Cache Storage, and resets to idle", async () => {
     window.localStorage.setItem(
       precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
       new Date().toISOString(),
@@ -485,7 +492,10 @@ describe("OfflineSection", () => {
       JSON.stringify({ signature: "abc123", count: 100 }),
     );
 
-    // Stub caches.delete so it resolves without error.
+    // Stub offlineClear so it resolves without hitting real IDB.
+    const offlineClearSpy = vi.spyOn(offlineStoreModule, "offlineClear").mockResolvedValue();
+
+    // Stub caches.delete so legacy bucket deletion resolves without error.
     const cacheDeleteMock = vi.fn().mockResolvedValue(true);
     Object.defineProperty(window, "caches", {
       value: { delete: cacheDeleteMock },
@@ -517,26 +527,23 @@ describe("OfflineSection", () => {
       window.localStorage.getItem(KEY_OFFLINE_MANIFEST),
     ).toBeNull();
 
-    // caches.delete must have been called with the exact versioned cache names
-    // derived from CACHE_NAMES + versionedCacheName - the single source of truth.
-    const expectedSpritesCacheName = versionedCacheName(CACHE_NAMES.sprites);
-    const expectedCriesCacheName = versionedCacheName(CACHE_NAMES.cries);
-    expect(cacheDeleteMock).toHaveBeenCalledWith(expectedSpritesCacheName);
-    expect(cacheDeleteMock).toHaveBeenCalledWith(expectedCriesCacheName);
+    // offlineClear must have been called to wipe the IndexedDB offline-pack store.
+    expect(offlineClearSpy).toHaveBeenCalledOnce();
+
+    // Legacy Cache Storage buckets must also be deleted (for users who have not
+    // yet received the new SW activate that cleans them automatically).
+    expect(cacheDeleteMock).toHaveBeenCalledWith(LEGACY_SPRITE_CACHE_NAME);
+    expect(cacheDeleteMock).toHaveBeenCalledWith(LEGACY_CRY_CACHE_NAME);
   });
 
-  it("shows an error message when cache deletion fails", async () => {
+  it("shows an error message when offlineClear fails", async () => {
     window.localStorage.setItem(
       precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
       new Date().toISOString(),
     );
 
-    // Stub caches.delete to throw.
-    Object.defineProperty(window, "caches", {
-      value: { delete: vi.fn().mockRejectedValue(new Error("Storage error")) },
-      configurable: true,
-      writable: true,
-    });
+    // Stub offlineClear to throw.
+    vi.spyOn(offlineStoreModule, "offlineClear").mockRejectedValue(new Error("IDB error"));
 
     const user = userEvent.setup();
     renderWithIntl(<OfflineSection />);
@@ -549,6 +556,64 @@ describe("OfflineSection", () => {
       expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
     );
     expect(screen.getByText(/could not delete the cache/i)).toBeInTheDocument();
+  });
+
+  // ── Reconciliation wiring (#1845) ────────────────────────────────────────────
+  //
+  // When the component mounts with a "done" localStorage state but IDB is empty
+  // (the post-migration scenario), the reconcileWithStorage() useEffect must
+  // reset the state to idle so the Download button appears.
+
+  it("resets to Download when localStorage says done but IDB is empty (post-migration)", async () => {
+    // Seed localStorage with a timestamp so seedFromStorage() sets phase "done".
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-06-01T10:00:00.000Z",
+    );
+    window.localStorage.setItem(
+      KEY_OFFLINE_MANIFEST,
+      JSON.stringify({ signature: "abc123", count: 100 }),
+    );
+
+    // Override the default stub: IDB is empty (0 entries) - the post-migration scenario.
+    vi.spyOn(offlineStoreModule, "offlineCount").mockResolvedValue(0);
+
+    renderWithIntl(<OfflineSection />);
+
+    // Initial render shows "Update" (seeded from localStorage synchronously).
+    expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
+
+    // After the reconcileWithStorage useEffect resolves, it detects IDB is empty
+    // and resets to idle. The Download button must appear.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^download$/i })).toBeInTheDocument(),
+    );
+
+    // The Delete button must also disappear (no longer in done state).
+    expect(
+      screen.queryByRole("button", { name: /delete offline cache/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("stays in done state when localStorage says done and IDB has entries", async () => {
+    window.localStorage.setItem(
+      precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
+      "2026-06-01T10:00:00.000Z",
+    );
+
+    // Default beforeEach stub returns 1 (IDB has entries) - no override needed.
+    renderWithIntl(<OfflineSection />);
+
+    // Should stay in "done" - Update button remains.
+    expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
+
+    // Wait briefly to confirm no async reset occurs.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("button", { name: /^download$/i }),
+    ).not.toBeInTheDocument();
   });
 
   // ── Locale: delete button rendering ──────────────────────────────────────────

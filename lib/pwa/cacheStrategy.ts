@@ -10,12 +10,9 @@
  * Strategies (named after their `serwist` handler counterparts):
  *
  * - `cache-first` - serve from cache, only hit the network on a miss. Used
- *                     for immutable, content-addressed assets: sprites under
- *                     `public/sprites/**`, cries under `public/cries/**`, and
- *                     Next.js build output under `/_next/static/**`. These
- *                     never change for a given URL, so a cached copy is always
- *                     correct and an offline practice session can render every
- *                     sprite and play every cry.
+ *                     for immutable, content-addressed assets: Next.js build
+ *                     output under `/_next/static/**`. These never change for
+ *                     a given URL, so a cached copy is always correct.
  * - `stale-while-revalidate` - serve the cached copy immediately and refresh
  *                     it in the background. Used for navigations, seed data,
  *                     fonts, and other assets where instant render matters more
@@ -29,18 +26,21 @@
  * - `network-only` - never cache. Used for cross-origin requests (e.g. the
  *                     Supabase sync endpoint) so offline reads never return a
  *                     stale cloud response and sync semantics are unchanged.
+ * - `idb-first` - serve from IndexedDB, fall back to network. Used for
+ *                     sprites (`/sprites/`) and cries (`/cries/`). The offline
+ *                     pack is stored in IndexedDB rather than Cache Storage
+ *                     (#1803 root cause fix): WebKit's `cache.match` becomes
+ *                     globally slow with ~10,000+ Cache Storage entries,
+ *                     hanging cold launch. IndexedDB handles large blob counts
+ *                     without this penalty.
  *
  * Asset buckets
  * -------------
- * - **Sprites** (`poke-memory-sprites-v2`): self-hosted official-artwork PNGs
- *   under `/sprites/pokemon/<id>.png`, plus pre-generated static WebP variants
- *   at `/sprites/pokemon/webp/<id>/<width>.webp` (10 width variants per sprite,
- *   ~12,914 entries total when the full offline pack is downloaded). Sprites
- *   are served directly as static files - the `/_next/image` endpoint is no
- *   longer used for sprites. The entry cap must exceed the offline pack size - 
- *   see {@link SPRITE_CACHE_MAX_ENTRIES}.
- * - **Cries** (`poke-memory-cries-v2`): self-hosted OGG audio under
- *   `/cries/<id>.ogg`, one file per species (~1,025 entries plus regional forms).
+ * - **Sprites** and **Cries**: offline pack now lives in IndexedDB
+ *   (`poke-memory` DB, `offline-pack` store). The SW intercepts `/sprites/`
+ *   and `/cries/` requests, looks them up in IDB, and falls back to network.
+ *   The old `poke-memory-sprites-v2` / `poke-memory-cries-v2` Cache Storage
+ *   buckets are deleted on SW activate (migration for existing users).
  * - **Static** (`poke-memory-static-v2`): content-hashed Next.js build output
  *   under `/_next/static/`.
  * - **Fonts** (`poke-memory-fonts-v2`): web fonts (woff2/woff/ttf/otf/eot).
@@ -59,14 +59,14 @@
  * THIS CONSTANT IS THE SINGLE SOURCE OF TRUTH.  Both the service worker
  * (`app/sw.ts`) and the offline precache orchestrator (`lib/pwa/precache.ts`)
  * derive their cache names from this value so that writes from `precache.ts`
- * and reads from the SW's `CacheFirst` handler always target the same bucket.
+ * and reads from the SW's handlers always target the same buckets.
  */
 export const SW_CACHE_VERSION = "v2";
 
 /**
  * Append the cache-version suffix to a base cache name.
  *
- * Example: `versionedCacheName("poke-memory-sprites")` → `"poke-memory-sprites-v2"`.
+ * Example: `versionedCacheName("poke-memory-static")` → `"poke-memory-static-v2"`.
  *
  * Callers should always use this helper rather than constructing the versioned
  * name by hand so that a version bump is a single-line change.
@@ -77,12 +77,11 @@ export type CacheStrategy =
   | "cache-first"
   | "network-first"
   | "stale-while-revalidate"
-  | "network-only";
+  | "network-only"
+  | "idb-first";
 
 /** Named cache buckets, one per asset class, so each can expire independently. */
 export const CACHE_NAMES = {
-  sprites: "poke-memory-sprites",
-  cries: "poke-memory-cries",
   static: "poke-memory-static",
   fonts: "poke-memory-fonts",
   pages: "poke-memory-pages",
@@ -91,36 +90,17 @@ export const CACHE_NAMES = {
 export type CacheName = (typeof CACHE_NAMES)[keyof typeof CACHE_NAMES];
 
 /**
- * Maximum entries for the sprite cache bucket.
+ * Legacy Cache Storage bucket names for the sprite and cry packs.
  *
- * The offline-download feature (#1168) writes ~12,914 sprite URLs into this
- * bucket: 10 pre-generated WebP width variants
- * (`/sprites/pokemon/webp/<id>/<width>.webp`) + 1 raw PNG
- * (`/sprites/pokemon/<id>.png`) per species, across ~1,174 species/forms
- * (11 URLs × 1,174 IDs = 12,914 entries).
- * The cap must comfortably exceed that pack size so that `ExpirationPlugin`
- * does not evict offline-downloaded sprites as the user practises - culled
- * entries become permanent cache misses and broken images for the remainder
- * of an offline session.
+ * These buckets were used before #1803's IndexedDB migration. They are kept
+ * here as constants so:
+ *  1. The SW activate handler can delete them for existing users.
+ *  2. The "Delete offline cache" flow in OfflineSection can sweep them.
  *
- * 15,000 gives ~16% headroom above the ~12,914-entry offline pack, leaving
- * room for additional evolution/alt-form art and organic runtime caching
- * without triggering LRU eviction. The opt-in offline download already
- * implies the user accepted the storage cost.
+ * Do NOT use these as write targets. The offline pack now lives in IndexedDB.
  */
-export const SPRITE_CACHE_MAX_ENTRIES = 15_000;
-
-/** Sprite art is immutable per URL; keep it for a long time. */
-export const SPRITE_CACHE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days
-
-/**
- * Up to 1025 species cries plus regional forms - cap generously.
- * Mirrors the sprite cap since the species count is the same.
- */
-export const CRY_CACHE_MAX_ENTRIES = 1300;
-
-/** Cry audio is immutable per URL; keep it as long as sprite art. */
-export const CRY_CACHE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days
+export const LEGACY_SPRITE_CACHE_NAME = "poke-memory-sprites-v2";
+export const LEGACY_CRY_CACHE_NAME = "poke-memory-cries-v2";
 
 const FONT_EXTENSION = /\.(?:woff2?|ttf|otf|eot)$/i;
 
@@ -137,17 +117,17 @@ const FONT_EXTENSION = /\.(?:woff2?|ttf|otf|eot)$/i;
  * @returns     A classification result, or `null` when no specific rule
  *              matches (caller should fall back to the pages bucket).
  */
-function classifyPath(path: string): { strategy: CacheStrategy; cacheName: CacheName } | null {
-  // Self-hosted sprite art - immutable per URL. Cache-first so an offline
-  // practice session renders every card.
+function classifyPath(path: string): { strategy: CacheStrategy; cacheName?: CacheName } | null {
+  // Self-hosted sprite art - served from IndexedDB when present (offline pack),
+  // falling back to network on miss. The SW handles the IDB lookup directly;
+  // Cache Storage is no longer used for sprites.
   if (path.startsWith("/sprites/")) {
-    return { strategy: "cache-first", cacheName: CACHE_NAMES.sprites };
+    return { strategy: "idb-first" };
   }
 
-  // Self-hosted cry audio - immutable per URL. Cache-first so offline practice
-  // can play every cry without a network request.
+  // Self-hosted cry audio - same IndexedDB strategy as sprites.
   if (path.startsWith("/cries/")) {
-    return { strategy: "cache-first", cacheName: CACHE_NAMES.cries };
+    return { strategy: "idb-first" };
   }
 
   // Next.js build output is content-hashed, so a URL never changes meaning.
@@ -155,7 +135,7 @@ function classifyPath(path: string): { strategy: CacheStrategy; cacheName: Cache
     return { strategy: "cache-first", cacheName: CACHE_NAMES.static };
   }
 
-  // Fonts - render instantly from cache, refresh in the background.
+  // Fonts - render instantly from cache, refreshed in the background.
   if (FONT_EXTENSION.test(path)) {
     return { strategy: "stale-while-revalidate", cacheName: CACHE_NAMES.fonts };
   }
@@ -179,8 +159,8 @@ function classifyPath(path: string): { strategy: CacheStrategy; cacheName: Cache
  * Handles the `/_next/image` optimiser path by decoding the `url` query param
  * and re-applying the classification rules to the underlying asset path. This
  * ensures optimised sprite variants (requested as `/_next/image?url=%2Fsprites%2F...`)
- * route to the sprites cache rather than the network-first pages bucket, so
- * offline practice correctly serves cached sprites.
+ * route to the `idb-first` strategy rather than the pages bucket, so
+ * offline practice correctly serves cached sprites from IndexedDB.
  *
  * One level of indirection only - the decoded `url` is classified via
  * {@link classifyPath}, not via a recursive `classifyRequest` call, so there
@@ -218,15 +198,10 @@ export function classifyRequest(
   // requests `/_next/image?url=%2Fsprites%2F...` rather than the raw asset
   // path, so the path-based rules below would not match. Decode the `url`
   // query param and re-classify against the underlying asset path so that
-  // optimised sprite variants still land in the sprites cache.
+  // optimised sprite variants still use the idb-first strategy.
   //
   // Only one level of indirection: we call `classifyPath`, not `classifyRequest`,
-  // so there is no recursion risk. Cross-origin optimiser URLs (e.g. GitHub
-  // avatars) resolve to `null` from `classifyPath` and fall through to the
-  // pages bucket - which is fine, because the outer cross-origin guard above
-  // has already handled the case where the *request itself* is cross-origin;
-  // here the request is same-origin (`/_next/image` is served by our app) but
-  // the underlying image source may be external.
+  // so there is no recursion risk.
   if (path === "/_next/image") {
     const rawParam = parsed.searchParams.get("url");
     if (rawParam !== null) {
@@ -237,12 +212,7 @@ export function classifyRequest(
         // Malformed url param - fall through to pages bucket.
       }
       // Same-origin guard: only route to an immutable-asset bucket when the
-      // decoded source URL belongs to our own origin. A future `remotePatterns`
-      // entry whose path happens to start with `/sprites/` or `/cries/` must
-      // not be mis-classified into our local sprite or cry bucket. Cross-origin
-      // optimiser URLs (e.g. GitHub avatars, external CDNs) fall through to
-      // the pages bucket - they are already handled as network-first there,
-      // which is the correct behaviour for mutable remote assets.
+      // decoded source URL belongs to our own origin.
       if (innerParsed !== null && innerParsed.origin === origin) {
         const innerResult = classifyPath(innerParsed.pathname);
         if (innerResult !== null) {
@@ -250,8 +220,7 @@ export function classifyRequest(
         }
       }
     }
-    // Non-sprite optimiser request (other same-origin assets, cross-origin
-    // image sources) - fall through to the pages bucket below.
+    // Non-sprite optimiser request - fall through to the pages bucket below.
   }
 
   // Apply path-based classification for all other same-origin paths.

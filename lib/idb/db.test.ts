@@ -70,11 +70,93 @@ describe("openAppDb (happy path)", () => {
     expect(db.objectStoreNames.contains("kv")).toBe(true);
   });
 
+  it("resolves to a database with an offline-pack object store (v2 schema)", async () => {
+    const { openAppDb } = await import("./db");
+    const db = await openAppDb();
+    expect(db.objectStoreNames.contains("offline-pack")).toBe(true);
+  });
+
+  it("opens at version 2", async () => {
+    const { openAppDb } = await import("./db");
+    const db = await openAppDb();
+    expect(db.version).toBe(2);
+  });
+
   it("returns the same promise on successive calls (singleton pattern)", async () => {
     const { openAppDb } = await import("./db");
     const p1 = openAppDb();
     const p2 = openAppDb();
     expect(p1).toBe(p2);
+  });
+});
+
+// ─── v1→v2 upgrade: kv data survives, offline-pack is added ──────────────────
+//
+// Blocker 2 regression guard: once the DB was opened at v1 by lib/idb/db.ts,
+// bumping to v2 must create the offline-pack store without destroying the kv
+// store or its data. Uses the raw fake-indexeddb API to simulate the v1 state.
+
+describe("v1→v2 schema upgrade (kv data survives, offline-pack added)", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    await deleteIdbDatabase();
+    stubWindow();
+  });
+
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    await deleteIdbDatabase();
+  });
+
+  it("kv data written at v1 is readable after the v2 upgrade", async () => {
+    // Step 1: seed data at v1 using the raw IDB API.
+    await new Promise<void>((resolve, reject) => {
+      const req = globalThis.indexedDB.open("poke-memory", 1);
+      req.onupgradeneeded = (e) => {
+        const db = (e.target as IDBOpenDBRequest).result;
+        db.createObjectStore("kv");
+      };
+      req.onsuccess = (e) => {
+        const db = (e.target as IDBOpenDBRequest).result;
+        const tx = db.transaction("kv", "readwrite");
+        tx.objectStore("kv").put("session-data", "poke-memory:review-session:v1");
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    // Step 2: open at v2 via openAppDb (triggers the upgrade).
+    const { openAppDb, idbGet } = await import("./db");
+    const db = await openAppDb();
+
+    // Both stores must exist.
+    expect(db.objectStoreNames.contains("kv")).toBe(true);
+    expect(db.objectStoreNames.contains("offline-pack")).toBe(true);
+
+    // kv data written at v1 must be intact.
+    const val = await idbGet("poke-memory:review-session:v1");
+    expect(val).toBe("session-data");
+  });
+
+  it("offline-pack store exists after upgrade even when starting from v1", async () => {
+    // Seed v1 DB without offline-pack.
+    await new Promise<void>((resolve, reject) => {
+      const req = globalThis.indexedDB.open("poke-memory", 1);
+      req.onupgradeneeded = (e) => {
+        const db = (e.target as IDBOpenDBRequest).result;
+        db.createObjectStore("kv");
+      };
+      req.onsuccess = (e) => {
+        (e.target as IDBOpenDBRequest).result.close();
+        resolve();
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    const { openAppDb } = await import("./db");
+    const db = await openAppDb();
+    expect(db.objectStoreNames.contains("offline-pack")).toBe(true);
   });
 });
 

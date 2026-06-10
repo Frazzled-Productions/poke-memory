@@ -9,10 +9,12 @@ import {
   startDownload,
   stopDownload,
   resetToIdle,
+  reconcileWithStorage,
   getCurrentManifest,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
-import { CACHE_NAMES, versionedCacheName } from "@/lib/pwa/cacheStrategy";
+import { LEGACY_CRY_CACHE_NAME, LEGACY_SPRITE_CACHE_NAME } from "@/lib/pwa/cacheStrategy";
+import { offlineClear } from "@/lib/pwa/offlineStore";
 import { OFFLINE_DOWNLOADED_AT_KEY } from "@/lib/pwa/precache";
 import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
 import { cardPanelPadded, colStack, colStackLg, dialogPanel, mutedText, mutedTextXs } from "@/lib/utils/class-names";
@@ -77,6 +79,18 @@ export function OfflineSection() {
   useEffect(() => {
     return subscribe(setDownloadState);
   }, []);
+
+  // Reconcile the download state against actual IndexedDB contents on mount.
+  // This detects the post-migration state where localStorage says "downloaded"
+  // but the IndexedDB offline-pack store is empty (e.g. after the SW activate
+  // deleted the legacy Cache Storage buckets). When IDB is empty the state
+  // resets to idle so the user sees the Download button, not a false "downloaded"
+  // status. This is intentionally non-blocking: the initial render shows the
+  // localStorage-seeded state and a brief "done" → "idle" flicker on the first
+  // post-migration load is acceptable.
+  useEffect(() => {
+    void reconcileWithStorage();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- run once on mount only
 
   /** Read navigator.storage.estimate() and update storageInfo state. */
   function refreshStorageEstimate() {
@@ -157,10 +171,14 @@ export function OfflineSection() {
   /**
    * Delete all offline cache entries written by the precache orchestrator.
    *
-   * Clears the versioned sprites and cries cache buckets (the same buckets
-   * that `lib/pwa/precache.ts::fetchAndCache` writes to, derived from the
-   * same `versionedCacheName` helper and `CACHE_NAMES` constants). This
-   * avoids hardcoding a second copy of the cache-name strings.
+   * Since #1803 the offline pack lives in IndexedDB (`offline-pack` store).
+   * This function clears that store via `offlineClear()`. It also deletes the
+   * legacy Cache Storage buckets (`poke-memory-sprites-v2` /
+   * `poke-memory-cries-v2`) that may still be present on devices that downloaded
+   * the pack before the IndexedDB migration. The SW's activate handler does the
+   * same deletion automatically, but doing it here too ensures the "Delete
+   * offline cache" button always clears everything, even if the user has not
+   * reloaded since the new SW activated.
    *
    * After deletion:
    *   - The download timestamp and manifest are cleared from localStorage so
@@ -173,12 +191,15 @@ export function OfflineSection() {
     setDeleteError(null);
 
     try {
+      // Clear the IndexedDB offline-pack store (primary storage since #1803).
+      await offlineClear();
+
+      // Also delete the legacy Cache Storage buckets for users who have not
+      // yet received the new SW activate (belt-and-braces cleanup).
       if ("caches" in window) {
-        const spritesCacheName = versionedCacheName(CACHE_NAMES.sprites);
-        const criesCacheName = versionedCacheName(CACHE_NAMES.cries);
         await Promise.all([
-          caches.delete(spritesCacheName),
-          caches.delete(criesCacheName),
+          caches.delete(LEGACY_SPRITE_CACHE_NAME),
+          caches.delete(LEGACY_CRY_CACHE_NAME),
         ]);
       }
 
