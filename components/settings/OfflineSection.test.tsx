@@ -17,7 +17,8 @@ import { _resetForTesting } from "@/lib/pwa/downloadController";
 import { computeManifestSignature } from "@/lib/pwa/manifestSignature";
 import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
-import { CACHE_NAMES, versionedCacheName } from "@/lib/pwa/cacheStrategy";
+import { LEGACY_SPRITE_CACHE_NAME, LEGACY_CRY_CACHE_NAME } from "@/lib/pwa/cacheStrategy";
+import * as offlineStoreModule from "@/lib/pwa/offlineStore";
 
 // ------------------------------------------------------------------
 // localStorage stub - jsdom does not always ship localStorage.
@@ -473,7 +474,7 @@ describe("OfflineSection", () => {
     expect(screen.getByRole("button", { name: /delete offline cache/i })).toBeInTheDocument();
   });
 
-  it("confirming delete resets to idle and removes localStorage keys", async () => {
+  it("confirming delete calls offlineClear, sweeps legacy Cache Storage, and resets to idle", async () => {
     window.localStorage.setItem(
       precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
       new Date().toISOString(),
@@ -485,7 +486,10 @@ describe("OfflineSection", () => {
       JSON.stringify({ signature: "abc123", count: 100 }),
     );
 
-    // Stub caches.delete so it resolves without error.
+    // Stub offlineClear so it resolves without hitting real IDB.
+    const offlineClearSpy = vi.spyOn(offlineStoreModule, "offlineClear").mockResolvedValue();
+
+    // Stub caches.delete so legacy bucket deletion resolves without error.
     const cacheDeleteMock = vi.fn().mockResolvedValue(true);
     Object.defineProperty(window, "caches", {
       value: { delete: cacheDeleteMock },
@@ -517,26 +521,23 @@ describe("OfflineSection", () => {
       window.localStorage.getItem(KEY_OFFLINE_MANIFEST),
     ).toBeNull();
 
-    // caches.delete must have been called with the exact versioned cache names
-    // derived from CACHE_NAMES + versionedCacheName - the single source of truth.
-    const expectedSpritesCacheName = versionedCacheName(CACHE_NAMES.sprites);
-    const expectedCriesCacheName = versionedCacheName(CACHE_NAMES.cries);
-    expect(cacheDeleteMock).toHaveBeenCalledWith(expectedSpritesCacheName);
-    expect(cacheDeleteMock).toHaveBeenCalledWith(expectedCriesCacheName);
+    // offlineClear must have been called to wipe the IndexedDB offline-pack store.
+    expect(offlineClearSpy).toHaveBeenCalledOnce();
+
+    // Legacy Cache Storage buckets must also be deleted (for users who have not
+    // yet received the new SW activate that cleans them automatically).
+    expect(cacheDeleteMock).toHaveBeenCalledWith(LEGACY_SPRITE_CACHE_NAME);
+    expect(cacheDeleteMock).toHaveBeenCalledWith(LEGACY_CRY_CACHE_NAME);
   });
 
-  it("shows an error message when cache deletion fails", async () => {
+  it("shows an error message when offlineClear fails", async () => {
     window.localStorage.setItem(
       precacheModule.OFFLINE_DOWNLOADED_AT_KEY,
       new Date().toISOString(),
     );
 
-    // Stub caches.delete to throw.
-    Object.defineProperty(window, "caches", {
-      value: { delete: vi.fn().mockRejectedValue(new Error("Storage error")) },
-      configurable: true,
-      writable: true,
-    });
+    // Stub offlineClear to throw.
+    vi.spyOn(offlineStoreModule, "offlineClear").mockRejectedValue(new Error("IDB error"));
 
     const user = userEvent.setup();
     renderWithIntl(<OfflineSection />);

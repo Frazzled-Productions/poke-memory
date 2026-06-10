@@ -42,10 +42,8 @@ import {
 } from "serwist";
 import {
   CACHE_NAMES,
-  CRY_CACHE_MAX_AGE_SECONDS,
-  CRY_CACHE_MAX_ENTRIES,
-  SPRITE_CACHE_MAX_AGE_SECONDS,
-  SPRITE_CACHE_MAX_ENTRIES,
+  LEGACY_CRY_CACHE_NAME,
+  LEGACY_SPRITE_CACHE_NAME,
   classifyRequest,
   versionedCacheName,
 } from "@/lib/pwa/cacheStrategy";
@@ -58,6 +56,11 @@ import {
 /** IndexedDB database/store names - must match lib/idb/db.ts exactly. */
 const IDB_DB_NAME = "poke-memory";
 const IDB_STORE_NAME = "kv";
+/**
+ * Object store name for the offline sprite/cry pack.
+ * Must stay byte-identical to OFFLINE_IDB_STORE in lib/pwa/offlineStore.ts.
+ */
+const OFFLINE_PACK_STORE = "offline-pack";
 /**
  * localStorage / IDB key for the persisted pending-grade queue.
  * Must stay byte-identical to KEY_PENDING_GRADE_QUEUE in lib/storage/keys.ts.
@@ -118,6 +121,10 @@ interface ServiceWorkerScope {
   addEventListener(
     type: "notificationclick",
     listener: (event: NotificationClickEvent) => void,
+  ): void;
+  addEventListener(
+    type: "activate",
+    listener: (event: { waitUntil(promise: Promise<unknown>): void }) => void,
   ): void;
   clients: {
     matchAll(options?: { type?: string; includeUncontrolled?: boolean }): Promise<Array<{
@@ -211,45 +218,42 @@ const stripDplPlugin = {
  */
 const runtimeCaching: RuntimeCaching[] = [
   {
-    // Sprite art - immutable per URL, cache-first, large cap.
+    // Sprites and cries - IDB-first, fall back to network.
     //
-    // `stripDplPlugin` normalises the cache key for `/_next/image` requests by
-    // removing the `&dpl=<deployment-id>` query parameter that Vercel/Next.js
-    // appends at runtime. Without this, the precache (which writes dpl-free
-    // URLs) and the runtime handler (which reads dpl-decorated URLs) would
-    // target different cache entries - meaning every precached sprite would be
-    // invisible. Raw `/sprites/pokemon/<id>.png` paths carry no `dpl` param, so
-    // the plugin is a no-op for them.
+    // Root cause fix (#1803): the old CacheFirst routes put ~10,000+ sprite/cry
+    // blobs into Cache Storage, making `cache.match` globally slow on WebKit
+    // and hanging cold launch. The offline pack now lives in IndexedDB
+    // (offline-pack store, written by lib/pwa/precache.ts). This handler reads
+    // directly from IDB and falls back to a network fetch on miss, so the
+    // Pack is served offline while Cache Storage stays small (just the app-shell
+    // precache + navigation/data buckets).
     matcher: ({ url, request }) =>
-      classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
-      CACHE_NAMES.sprites,
-    handler: new CacheFirst({
-      cacheName: versionedCacheName(CACHE_NAMES.sprites),
-      plugins: [
-        stripDplPlugin,
-        new ExpirationPlugin({
-          maxEntries: SPRITE_CACHE_MAX_ENTRIES,
-          maxAgeSeconds: SPRITE_CACHE_MAX_AGE_SECONDS,
-          maxAgeFrom: "last-used",
-        }),
-      ],
-    }),
-  },
-  {
-    // Pokémon cry audio - immutable per URL, cache-first, large cap.
-    matcher: ({ url, request }) =>
-      classifyRequest(url.href, self.location.origin, request.mode).cacheName ===
-      CACHE_NAMES.cries,
-    handler: new CacheFirst({
-      cacheName: versionedCacheName(CACHE_NAMES.cries),
-      plugins: [
-        new ExpirationPlugin({
-          maxEntries: CRY_CACHE_MAX_ENTRIES,
-          maxAgeSeconds: CRY_CACHE_MAX_AGE_SECONDS,
-          maxAgeFrom: "last-used",
-        }),
-      ],
-    }),
+      classifyRequest(url.href, self.location.origin, request.mode).strategy === "idb-first",
+    handler: async ({ request }: { request: Request; url: URL }): Promise<Response> => {
+      // Resolve the canonical path. For static WebP sprites served by the
+      // custom Next.js loader the request URL is already `/sprites/pokemon/webp/...`.
+      // We use the raw request URL as the IDB key (the same URL that
+      // precache.ts passes to offlinePut via offlineHas + fetchAndStore).
+      const key = request.url;
+
+      try {
+        const db = await openIdb();
+        const entry = await idbPackGet(db, key);
+        if (entry) {
+          return new Response(entry.blob, {
+            status: 200,
+            headers: { "Content-Type": entry.contentType },
+          });
+        }
+      } catch {
+        // IDB unavailable or open failed - fall through to network.
+      }
+
+      // Network fallback: fetch and return without caching. The user can
+      // re-download the pack to populate IDB; runtime sprite fetches are
+      // expected to be warm from the static file server anyway.
+      return fetch(request);
+    },
   },
   {
     // Next.js content-hashed build output - cache-first.
@@ -371,26 +375,78 @@ self.addEventListener("message", (event) => {
 });
 
 /**
- * Opens the shared `poke-memory` IDB, creating the `kv` store when the DB is
- * being initialised for the first time. On a fresh install the client-side
- * `lib/idb/db.ts` wrapper may not have run yet (all tabs closed), so the SW
- * must handle `onupgradeneeded` itself. Without this handler the open() call
- * would fail silently and the queue read would return [] (#1072 non-blocker).
+ * Opens the shared `poke-memory` IDB at version 2.
+ *
+ * Version 2 adds the `offline-pack` object store (sprite and cry blobs for the
+ * offline download feature - see lib/pwa/offlineStore.ts). The `kv` store from
+ * version 1 is preserved: if the DB has never been opened before (all tabs
+ * closed, first SW install) both stores are created; if the DB exists at v1 the
+ * upgrade handler creates only the new `offline-pack` store.
+ *
+ * The SW must handle `onupgradeneeded` itself because `lib/idb/db.ts`
+ * (client-side) may not have run yet when the SW wakes from a background event.
+ * Without this handler the open() would fail for a fresh install (#1072).
  */
 function openIdb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     try {
-      const request = self.indexedDB.open(IDB_DB_NAME, 1);
+      const request = self.indexedDB.open(IDB_DB_NAME, 2);
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
+        // kv store: present at v1; create only on a fresh install.
         if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
           db.createObjectStore(IDB_STORE_NAME);
+        }
+        // offline-pack store: added at v2.
+        if (!db.objectStoreNames.contains(OFFLINE_PACK_STORE)) {
+          db.createObjectStore(OFFLINE_PACK_STORE);
         }
       };
       request.onerror = () => reject(new Error("[sw-sync] IDB open failed"));
       request.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
     } catch (err) {
       reject(err);
+    }
+  });
+}
+
+/**
+ * Look up a sprite or cry blob in the IndexedDB offline-pack store.
+ *
+ * Returns null on miss or any IDB error - the caller falls back to network.
+ * The value shape { blob: Blob; contentType: string } mirrors OfflineEntry in
+ * lib/pwa/offlineStore.ts; we cannot import that module directly because
+ * app/sw.ts is bundled separately by esbuild and lib/pwa/offlineStore.ts
+ * contains a browser-global guard (`typeof window`) that would become a dead
+ * branch in the SW scope (SW scope has no `window`). We access IDB directly
+ * to avoid this coupling.
+ */
+async function idbPackGet(
+  db: IDBDatabase,
+  url: string,
+): Promise<{ blob: Blob; contentType: string } | null> {
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(OFFLINE_PACK_STORE, "readonly");
+      const req = tx.objectStore(OFFLINE_PACK_STORE).get(url);
+      req.onsuccess = () => {
+        const val: unknown = req.result;
+        if (
+          val &&
+          typeof val === "object" &&
+          "blob" in val &&
+          (val as Record<string, unknown>).blob instanceof Blob &&
+          "contentType" in val &&
+          typeof (val as Record<string, unknown>).contentType === "string"
+        ) {
+          resolve(val as { blob: Blob; contentType: string });
+        } else {
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
     }
   });
 }
@@ -702,6 +758,32 @@ self.addEventListener("notificationclick", (event) => {
       }
 
       await self.clients.openWindow(absoluteTarget);
+    })(),
+  );
+});
+
+/**
+ * Delete the old Cache Storage sprite/cry buckets on SW activate (#1803 migration).
+ *
+ * The offline pack moved from Cache Storage to IndexedDB. Existing users who
+ * downloaded the pack before this SW deployed will have ~10,000+ entries in
+ * `poke-memory-sprites-v2` / `poke-memory-cries-v2`. Those bloated buckets are
+ * the exact cause of the cold-launch hang: WebKit's `cache.match` is globally
+ * slow when Cache Storage has that many entries.
+ *
+ * This handler runs once when the new SW activates (typically on the first page
+ * load after the update is installed). `waitUntil` keeps the activate event alive
+ * until the deletions complete. If `caches` is unavailable (non-PWA context) the
+ * call is a silent no-op.
+ */
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      if (typeof caches === "undefined") return;
+      await Promise.all([
+        caches.delete(LEGACY_SPRITE_CACHE_NAME),
+        caches.delete(LEGACY_CRY_CACHE_NAME),
+      ]);
     })(),
   );
 });
