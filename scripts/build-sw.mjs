@@ -63,8 +63,28 @@ const ROUTE_OPTIONS = {
   globPatterns: [
     ".next/static/**/*.{js,css}",
     "public/*.{png,svg,ico,webmanifest}",
+    // Pokémon seed data - precached so cold launch reads from cache instantly
+    // rather than waiting for a network round-trip. (#1803)
+    //
+    // Files and approximate uncompressed sizes (as of 2026-06):
+    //   generated-core.json         ~932 KB  (core species data for loadSeed)
+    //   generated-chains.json       ~319 KB  (evolution chains for loadSeed)
+    //   generated-locale-names.json ~219 KB  (locale-aware names for i18n)
+    //   ──────────────────────────────────
+    //   Total seed addition:       ~1.47 MB  uncompressed
+    //   On-wire (gzip/brotli):     ~0.3 MB   typical JSON compression ratio
+    //
+    // generated-flavor.json (~1.3 MB) is excluded via globIgnores: it is
+    // lazy-loaded only when a Pokédex detail view opens, so precaching it
+    // bloats the SW install and slows cache.match on every cold launch - the
+    // opposite of what this fix achieves.
+    //
+    // The glob intentionally stays broad ("*.json") so any future seed files
+    // are auto-included; new large lazy-loaded files must be added to
+    // globIgnores rather than narrowing this pattern.
+    "public/pokemon-data/*.json",
   ],
-  globIgnores: ["**/sprites/**"],
+  globIgnores: ["**/sprites/**", "**/pokemon-data/generated-flavor.json"],
   maximumFileSizeToCacheInBytes: 2 * 1024 * 1024, // 2 MiB
 };
 
