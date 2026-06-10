@@ -47,6 +47,7 @@ import {
   classifyRequest,
   versionedCacheName,
 } from "@/lib/pwa/cacheStrategy";
+import { SW_IDB_OPEN_TIMEOUT_MS, openSwIdb } from "@/lib/pwa/swIdb";
 
 // SW_CACHE_VERSION and versionedCacheName are imported from lib/pwa/cacheStrategy.ts - 
 // the single source of truth for the cache-version suffix. Both this worker and
@@ -253,12 +254,23 @@ const runtimeCaching: RuntimeCaching[] = [
       const key = new URL(request.url).pathname;
 
       try {
-        const db = await openIdb();
-        const entry = await idbPackGet(db, key);
-        if (entry) {
-          return new Response(entry.blob, {
+        // Race the IDB open + lookup against a hard timeout. The singleton
+        // `openIdb()` prevents concurrent opens from blocking each other, but
+        // the first open may still stall if a v1 connection is held by a tab
+        // undergoing a version upgrade. Timing out guarantees sprite Responses
+        // always resolve (from IDB when present, else network) and never hang.
+        // (#1845 - hung promises from concurrent opens caused cards and the
+        // Pokédex grid to never finish rendering in chromium e2e.)
+        const idbResult = await Promise.race([
+          openIdb().then((db) => idbPackGet(db, key)),
+          new Promise<null>((resolveTimeout) =>
+            setTimeout(() => resolveTimeout(null), SW_IDB_OPEN_TIMEOUT_MS),
+          ),
+        ]);
+        if (idbResult) {
+          return new Response(idbResult.blob, {
             status: 200,
-            headers: { "Content-Type": entry.contentType },
+            headers: { "Content-Type": idbResult.contentType },
           });
         }
       } catch {
@@ -393,51 +405,33 @@ self.addEventListener("message", (event) => {
 /**
  * Opens the shared `poke-memory` IDB at version 2 (IDB_DB_VERSION).
  *
- * Version 2 adds the `offline-pack` object store (sprite and cry blobs for the
- * offline download feature - see lib/pwa/offlineStore.ts). The `kv` store from
- * version 1 is preserved: if the DB has never been opened before (all tabs
- * closed, first SW install) both stores are created; if the DB exists at v1 the
- * upgrade handler creates only the new `offline-pack` store.
- *
- * The SW must handle `onupgradeneeded` itself because `lib/idb/db.ts`
- * (client-side) may not have run yet when the SW wakes from a background event.
- * Without this handler the open() would fail for a fresh install (#1072).
- *
- * `onblocked`: if a v1 context holds an open connection, the upgrade stalls.
- * We log the blockage but do NOT reject immediately - the open request stays
- * pending and will resolve once the old connection is released. This prevents
- * indefinite hangs in the background-sync / sprite-serving paths from silently
- * failing while a v1 tab is open.
+ * Delegates to lib/pwa/swIdb.ts::openSwIdb which provides:
+ *   - A module-level singleton so concurrent sprite/cry requests share one
+ *     connection instead of each opening a new one (the root cause of #1845 -
+ *     multiple concurrent opens blocked each other's v1→v2 upgrade, leaving all
+ *     their promises pending indefinitely and preventing cards from rendering).
+ *   - An `onblocked` timeout (SW_IDB_OPEN_TIMEOUT_MS) that rejects and nulls
+ *     the singleton when a stale connection elsewhere blocks the upgrade, so
+ *     the sprite handler falls through to a network fetch instead of hanging.
+ *   - An `onversionchange` handler that closes the connection and nulls the
+ *     singleton when a future upgrade fires elsewhere.
  */
 function openIdb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    try {
-      const request = self.indexedDB.open(IDB_DB_NAME, IDB_DB_VERSION);
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        const oldVersion = (event as IDBVersionChangeEvent).oldVersion;
-        // kv store: create on fresh install (oldVersion < 1).
-        if (oldVersion < 1 && !db.objectStoreNames.contains(IDB_STORE_NAME)) {
-          db.createObjectStore(IDB_STORE_NAME);
-        }
-        // offline-pack store: added at v2.
-        if (!db.objectStoreNames.contains(OFFLINE_PACK_STORE)) {
-          db.createObjectStore(OFFLINE_PACK_STORE);
-        }
-      };
-      request.onerror = () => reject(new Error("[sw-sync] IDB open failed"));
-      request.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
-      request.onblocked = () => {
-        // A v1 client context is blocking the v2 upgrade. Log; the open will
-        // resolve once the old connection closes. Do not reject - leaving the
-        // sprite handler pending is preferable to a hard miss while a tab is
-        // transitioning.
-        console.warn("[sw-sync] IDB upgrade blocked; waiting for old connection to close.");
-      };
-    } catch (err) {
-      reject(err);
-    }
-  });
+  return openSwIdb(
+    self.indexedDB,
+    IDB_DB_NAME,
+    IDB_DB_VERSION,
+    (db, oldVersion) => {
+      // kv store: create on fresh install (oldVersion < 1).
+      if (oldVersion < 1 && !db.objectStoreNames.contains(IDB_STORE_NAME)) {
+        db.createObjectStore(IDB_STORE_NAME);
+      }
+      // offline-pack store: added at v2.
+      if (!db.objectStoreNames.contains(OFFLINE_PACK_STORE)) {
+        db.createObjectStore(OFFLINE_PACK_STORE);
+      }
+    },
+  );
 }
 
 /**
@@ -498,7 +492,7 @@ async function readPendingQueueFromIdb(): Promise<unknown[]> {
         const store = tx.objectStore(IDB_STORE_NAME);
         const getReq = store.get(PENDING_QUEUE_KEY);
         getReq.onsuccess = () => {
-          db.close();
+          // Do NOT close db here - it is a singleton shared across all callers.
           const raw: unknown = getReq.result;
           if (typeof raw !== "string") {
             resolve([]);
@@ -511,9 +505,8 @@ async function readPendingQueueFromIdb(): Promise<unknown[]> {
             resolve([]);
           }
         };
-        getReq.onerror = () => { db.close(); resolve([]); };
+        getReq.onerror = () => resolve([]);
       } catch {
-        db.close();
         resolve([]);
       }
     });
@@ -534,10 +527,10 @@ async function clearPendingQueueFromIdb(): Promise<void> {
         const tx = db.transaction(IDB_STORE_NAME, "readwrite");
         const store = tx.objectStore(IDB_STORE_NAME);
         const delReq = store.delete(PENDING_QUEUE_KEY);
-        delReq.onsuccess = () => { db.close(); resolve(); };
-        delReq.onerror = () => { db.close(); resolve(); };
+        // Do NOT close db here - it is a singleton shared across all callers.
+        delReq.onsuccess = () => resolve();
+        delReq.onerror = () => resolve();
       } catch {
-        db.close();
         resolve();
       }
     });
