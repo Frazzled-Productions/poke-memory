@@ -2,8 +2,15 @@
  * Offline precache orchestrator.
  *
  * Iterates every sprite and cry URL for every Pokémon in the seed and
- * populates the service-worker runtime caches so practice sessions work
+ * populates the IndexedDB offline-pack store so practice sessions work
  * without a network connection.
+ *
+ * Storage change (#1803 root cause fix): sprites and cries are now stored in
+ * IndexedDB (via `lib/pwa/offlineStore.ts`) instead of Cache Storage. When the
+ * pack was in Cache Storage, WebKit's `cache.match` became globally slow with
+ * ~10,000+ entries, hanging cold launch even though the app-shell precache is
+ * tiny. Moving the pack to IndexedDB keeps Cache Storage small so cold-launch
+ * serving is always fast.
  *
  * Strategy:
  *  - Sprites are cached as pre-generated static WebP files at a curated
@@ -14,14 +21,14 @@
  *    no longer precached: the Pokédex grid switched to the 64 px WebP variant
  *    in #1740, and nothing else requests the raw PNGs at runtime.
  *  - Cries are cached once at their canonical /cries/<id>.ogg URL.
- *  - Each URL is checked with `cache.match` before fetching - already-cached
+ *  - Each URL is checked with `offlineHas` before fetching - already-cached
  *    assets are skipped, making the operation idempotent and resumable.
  *  - Fetches are bounded to CONCURRENCY at a time to avoid hammering the server.
  *  - An AbortSignal can cancel the loop mid-way; the summary reflects what
  *    was completed before cancellation.
  */
 
-import { CACHE_NAMES, versionedCacheName } from "./cacheStrategy";
+import { offlineHas, offlinePut } from "./offlineStore";
 import { KEY_OFFLINE_DOWNLOADED_AT } from "@/lib/storage/keys";
 import { spriteVariantUrl } from "@/lib/sprites/url";
 
@@ -115,13 +122,10 @@ type PrecacheOptions = {
  * Raw PNG paths (`/sprites/pokemon/<id>.png`) are intentionally excluded:
  * the Pokédex grid switched to the 64 px WebP variant in #1740, so nothing
  * requests the PNGs at runtime. The PNG files remain in `public/` as the
- * build-time source for the WebP seed script. The `/sprites/` CacheFirst
- * route in `cacheStrategy.ts` remains unchanged - PNGs are still cacheable
- * on demand if anything ever requests them.
+ * build-time source for the WebP seed script.
  *
- * All sprite paths start with `/sprites/` so `classifyRequest` in
- * `cacheStrategy.ts` routes them to the sprites cache bucket via the
- * `classifyPath` prefix rule.
+ * All sprite paths start with `/sprites/` so the SW's IDB handler (in
+ * `app/sw.ts`) intercepts them and serves from IndexedDB when present.
  */
 export function buildPrecacheUrls(ids: number[]): string[] {
   const urls: string[] = [];
@@ -142,48 +146,36 @@ export function buildPrecacheUrls(ids: number[]): string[] {
 }
 
 /**
- * Fetch and cache a single URL.
- *
- * Opens the appropriate cache bucket based on the URL path:
- *  - /sprites/... (WebP variants and raw PNGs) → versioned sprites cache
- *  - /cries/...                                → versioned cries cache
- *
- * The versioned names (e.g. "poke-memory-sprites-v2") are derived from
- * `versionedCacheName` - the same helper used by the service worker's
- * `CacheFirst` route handlers - so writes from this function always land in
- * the exact bucket the SW reads from.
- *
- * Returns `'skipped'` when the entry already exists in the cache.
- * Returns `{ result: 'failed' }` when the network request returns a non-ok response.
- * Returns `{ result: 'downloaded', bytes: number }` when the entry was freshly fetched
- * and stored, with the real byte size from the Content-Length header (or the
- * response body size as a fallback when the header is absent).
+ * Determine the content-type for a URL based on its extension.
+ * Used when storing blobs in IndexedDB so the SW can reconstruct a Response.
  */
-async function fetchAndCache(
+function contentTypeForUrl(url: string): string {
+  if (url.endsWith(".webp")) return "image/webp";
+  if (url.endsWith(".png")) return "image/png";
+  if (url.endsWith(".ogg")) return "audio/ogg";
+  return "application/octet-stream";
+}
+
+/**
+ * Fetch a single URL and persist its body to the IndexedDB offline-pack store.
+ *
+ * Returns `'skipped'` when the entry already exists in IndexedDB.
+ * Returns `'failed'` when the network request returns a non-ok response or
+ *   IndexedDB is unavailable.
+ * Returns `{ result: 'downloaded', bytes: number }` when the entry was freshly
+ *   fetched and stored, with the real byte size from the Content-Length header
+ *   (or the blob size as a fallback when the header is absent).
+ */
+async function fetchAndStore(
   url: string,
   signal: AbortSignal,
 ): Promise<"skipped" | "failed" | { result: "downloaded"; bytes: number }> {
-  // Determine which cache bucket this URL belongs to and derive the versioned
-  // name so the precache writes match the SW's CacheFirst reads exactly.
-  const isCry = url.startsWith("/cries/");
-  const cacheName = isCry
-    ? versionedCacheName(CACHE_NAMES.cries)
-    : versionedCacheName(CACHE_NAMES.sprites);
-
-  let cache: Cache;
+  // Idempotency check - skip already-stored entries.
   try {
-    cache = await caches.open(cacheName);
+    const exists = await offlineHas(url);
+    if (exists) return "skipped";
   } catch {
-    // caches API unavailable (non-HTTPS, non-SW context, etc.)
-    return "failed";
-  }
-
-  // Idempotency check - skip already-cached entries.
-  try {
-    const existing = await cache.match(url);
-    if (existing !== undefined) return "skipped";
-  } catch {
-    // Match failure is non-fatal; proceed to fetch.
+    // IDB check failure is non-fatal; proceed to fetch.
   }
 
   // Fetch with the AbortSignal so cancellation propagates.
@@ -197,44 +189,45 @@ async function fetchAndCache(
 
   if (!response.ok) return "failed";
 
-  // Read the real byte size before consuming the body.
-  // Content-Length is present on same-origin static files (sprites, cries, seed JSON).
-  // If absent (e.g. chunked transfer or CORS response without the header), fall
-  // back to cloning the response and reading the blob size. The clone is consumed
-  // for the size check while the original goes into the cache.
+  // Determine the content-type before consuming the body.
+  const contentType =
+    response.headers.get("content-type")?.split(";")[0]?.trim() ??
+    contentTypeForUrl(url);
+
+  // Read the real byte size. Content-Length is present on same-origin static
+  // files (sprites, cries). If absent, derive from the blob after reading.
   const contentLength = response.headers.get("content-length");
   let bytes: number;
+
   if (contentLength !== null && contentLength !== "") {
     bytes = parseInt(contentLength, 10);
     if (!Number.isFinite(bytes) || bytes < 0) bytes = 0;
+
+    // Read the body as a blob and store it.
+    let blob: Blob;
     try {
-      await cache.put(url, response);
+      blob = await response.blob();
+    } catch {
+      return "failed";
+    }
+
+    try {
+      await offlinePut(url, { blob, contentType });
     } catch {
       return "failed";
     }
   } else {
-    // No Content-Length: clone, read blob for the size, cache the clone.
-    let cloned: Response;
+    // No Content-Length - read the blob first to get the size.
+    let blob: Blob;
     try {
-      cloned = response.clone();
-    } catch {
-      // Clone failed (body already consumed) - skip size, just cache.
-      bytes = 0;
-      try {
-        await cache.put(url, response);
-      } catch {
-        return "failed";
-      }
-      return { result: "downloaded", bytes };
-    }
-    try {
-      const blob = await cloned.blob();
+      blob = await response.blob();
       bytes = blob.size;
     } catch {
-      bytes = 0;
+      return "failed";
     }
+
     try {
-      await cache.put(url, response);
+      await offlinePut(url, { blob, contentType });
     } catch {
       return "failed";
     }
@@ -249,7 +242,7 @@ async function fetchAndCache(
  * Progress is reported via `onProgress` after each completed URL.
  * When `signal` is aborted the loop stops and returns a partial summary.
  *
- * Safe to call multiple times - already-cached URLs are skipped.
+ * Safe to call multiple times - already-stored URLs are skipped.
  */
 export async function precacheAll(options: PrecacheOptions): Promise<PrecacheSummary> {
   const { ids, onProgress, signal } = options;
@@ -274,7 +267,7 @@ export async function precacheAll(options: PrecacheOptions): Promise<PrecacheSum
 
       let result: "skipped" | "failed" | { result: "downloaded"; bytes: number };
       try {
-        result = await fetchAndCache(url, signal ?? new AbortController().signal);
+        result = await fetchAndStore(url, signal ?? new AbortController().signal);
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
         result = "failed";
