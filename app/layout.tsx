@@ -9,6 +9,7 @@ import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { MobileNavPaddingWrapper } from "@/components/MobileNavPaddingWrapper";
+import { ScrollRegion } from "@/components/ScrollRegion";
 import { Footer } from "@/components/Footer";
 import { SyncOnVisible } from "@/components/sync/SyncOnVisible";
 import { SignInPull } from "@/components/sync/SignInPull";
@@ -210,15 +211,16 @@ export default function RootLayout({
                       */}
                       <FunnelTracker />
                       {/*
-                        Fit region: the single flex-1 child between the sticky header
-                        chrome and the in-flow BottomTabBar. On mobile this region is
-                        overflow-hidden (a fit container, not a scroller) so Practice
-                        can fill the available height without triggering scroll (#1087).
-                        Pages that need to scroll (Pokédex, Pasture, Stats, etc.) own
-                        their own internal overflow-y-auto via PageShell's <main>
-                        element, so tall content is still reachable. On desktop (md+)
-                        overflow reverts to visible and the document scrolls normally
-                        (#1801).
+                        ScrollRegion: the single flex-1 child between the sticky header
+                        chrome and the in-flow BottomTabBar. On Practice (`/`) the
+                        region is overflow-hidden (a fit container, not a scroller) so
+                        the card layout fills the available height without triggering
+                        scroll (#1087 / #1801). On every other route (Settings, Privacy,
+                        Terms, Stats, Journey, Pasture, Pokédex, etc.) the region is
+                        overflow-y-auto so tall content is scrollable even when those
+                        pages do NOT use PageShell (#1801 / #1839 scroll regression fix).
+                        On desktop (md+) overflow reverts to visible and the document
+                        scrolls normally.
 
                         The Footer is intentionally placed OUTSIDE this region (as a
                         sibling after it) rather than inside. Keeping the Footer inside
@@ -231,12 +233,9 @@ export default function RootLayout({
                         region is overflow-visible so there is no internal scroll context
                         and the Footer position relative to it is irrelevant.
                       */}
-                      <div
-                        className="flex flex-1 flex-col min-h-0 overflow-hidden md:overflow-visible"
-                        data-scroll-region
-                      >
+                      <ScrollRegion>
                         <MobileNavPaddingWrapper>{children}</MobileNavPaddingWrapper>
-                      </div>
+                      </ScrollRegion>
                       <Footer />
                       {/*
                         BottomTabBar is always mounted but returns null internally when
