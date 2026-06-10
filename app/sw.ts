@@ -53,9 +53,20 @@ import {
 // the offline precache orchestrator (lib/pwa/precache.ts) derive their cache
 // names from that one constant so their reads and writes target the same buckets.
 
-/** IndexedDB database/store names - must match lib/idb/db.ts exactly. */
-const IDB_DB_NAME = "poke-memory";
-const IDB_STORE_NAME = "kv";
+/**
+ * IndexedDB database/store names.
+ *
+ * These must stay byte-identical to DB_NAME, STORE_KV, and STORE_OFFLINE_PACK
+ * in lib/idb/db.ts (the single source of truth for the schema). The SW is a
+ * separate esbuild bundle so it cannot import client modules directly; these
+ * duplicated constants are accompanied by a comment pointing back to the
+ * authoritative source.
+ *
+ * DB_VERSION must equal lib/idb/db.ts::DB_VERSION (currently 2).
+ */
+const IDB_DB_NAME = "poke-memory";  // lib/idb/db.ts::DB_NAME
+const IDB_DB_VERSION = 2;           // lib/idb/db.ts::DB_VERSION
+const IDB_STORE_NAME = "kv";        // lib/idb/db.ts::STORE_KV
 /**
  * Object store name for the offline sprite/cry pack.
  * Must stay byte-identical to OFFLINE_IDB_STORE in lib/pwa/offlineStore.ts.
@@ -230,11 +241,16 @@ const runtimeCaching: RuntimeCaching[] = [
     matcher: ({ url, request }) =>
       classifyRequest(url.href, self.location.origin, request.mode).strategy === "idb-first",
     handler: async ({ request }: { request: Request; url: URL }): Promise<Response> => {
-      // Resolve the canonical path. For static WebP sprites served by the
-      // custom Next.js loader the request URL is already `/sprites/pokemon/webp/...`.
-      // We use the raw request URL as the IDB key (the same URL that
-      // precache.ts passes to offlinePut via offlineHas + fetchAndStore).
-      const key = request.url;
+      // Derive the IDB key as the URL pathname (relative path).
+      //
+      // precache.ts writes blobs via offlinePut using RELATIVE paths such as
+      // `/sprites/pokemon/webp/25/320.webp` (produced by spriteVariantUrl).
+      // In the SW handler, request.url is ABSOLUTE (e.g.
+      // `https://pokememory.com/sprites/pokemon/webp/25/320.webp`). Using the
+      // raw request.url would be a different key → every lookup would miss and
+      // the offline pack would never be served. Extracting pathname normalises
+      // both sides to the same relative path so the IDB lookup hits correctly.
+      const key = new URL(request.url).pathname;
 
       try {
         const db = await openIdb();
@@ -375,7 +391,7 @@ self.addEventListener("message", (event) => {
 });
 
 /**
- * Opens the shared `poke-memory` IDB at version 2.
+ * Opens the shared `poke-memory` IDB at version 2 (IDB_DB_VERSION).
  *
  * Version 2 adds the `offline-pack` object store (sprite and cry blobs for the
  * offline download feature - see lib/pwa/offlineStore.ts). The `kv` store from
@@ -386,15 +402,22 @@ self.addEventListener("message", (event) => {
  * The SW must handle `onupgradeneeded` itself because `lib/idb/db.ts`
  * (client-side) may not have run yet when the SW wakes from a background event.
  * Without this handler the open() would fail for a fresh install (#1072).
+ *
+ * `onblocked`: if a v1 context holds an open connection, the upgrade stalls.
+ * We log the blockage but do NOT reject immediately - the open request stays
+ * pending and will resolve once the old connection is released. This prevents
+ * indefinite hangs in the background-sync / sprite-serving paths from silently
+ * failing while a v1 tab is open.
  */
 function openIdb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     try {
-      const request = self.indexedDB.open(IDB_DB_NAME, 2);
+      const request = self.indexedDB.open(IDB_DB_NAME, IDB_DB_VERSION);
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
-        // kv store: present at v1; create only on a fresh install.
-        if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
+        const oldVersion = (event as IDBVersionChangeEvent).oldVersion;
+        // kv store: create on fresh install (oldVersion < 1).
+        if (oldVersion < 1 && !db.objectStoreNames.contains(IDB_STORE_NAME)) {
           db.createObjectStore(IDB_STORE_NAME);
         }
         // offline-pack store: added at v2.
@@ -404,6 +427,13 @@ function openIdb(): Promise<IDBDatabase> {
       };
       request.onerror = () => reject(new Error("[sw-sync] IDB open failed"));
       request.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
+      request.onblocked = () => {
+        // A v1 client context is blocking the v2 upgrade. Log; the open will
+        // resolve once the old connection closes. Do not reject - leaving the
+        // sprite handler pending is preferable to a hard miss while a tab is
+        // transitioning.
+        console.warn("[sw-sync] IDB upgrade blocked; waiting for old connection to close.");
+      };
     } catch (err) {
       reject(err);
     }

@@ -32,25 +32,27 @@
  * `typeof window` / `typeof indexedDB`.
  */
 
+import { DB_NAME, DB_VERSION, STORE_KV, STORE_OFFLINE_PACK } from "@/lib/idb/db";
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Shared DB name - must stay byte-identical to IDB_DB_NAME in app/sw.ts. */
-export const OFFLINE_IDB_DB_NAME = "poke-memory";
+/**
+ * Shared DB name - re-exported from lib/idb/db.ts (the single source of
+ * truth). Must stay byte-identical to IDB_DB_NAME in app/sw.ts.
+ */
+export const OFFLINE_IDB_DB_NAME = DB_NAME;
 
-/** Object store for the offline pack. */
-export const OFFLINE_IDB_STORE = "offline-pack";
+/** Object store for the offline pack. Re-exported from lib/idb/db.ts. */
+export const OFFLINE_IDB_STORE = STORE_OFFLINE_PACK;
 
 /**
- * DB version that introduces the "offline-pack" store.
- *
- * The existing kv store was created at version 1 by lib/idb/db.ts. We bump
- * to version 2 to add the new store without touching the kv store. Both stores
- * coexist; the IDB upgrade handler guards against re-creating the kv store
- * (it already exists at v1).
+ * DB version - re-exported from lib/idb/db.ts (the single source of truth).
+ * Both this module and app/sw.ts must open the DB at this version with an
+ * upgrade that creates BOTH stores idempotently.
  */
-export const OFFLINE_IDB_VERSION = 2;
+export const OFFLINE_IDB_VERSION = DB_VERSION;
 
 // ---------------------------------------------------------------------------
 // Value shape stored per URL
@@ -69,9 +71,9 @@ export interface OfflineEntry {
 let _dbPromise: Promise<IDBDatabase> | null = null;
 
 /**
- * Opens the poke-memory DB at version 2, creating the "offline-pack" store
- * when upgrading from version 1 (or from scratch). Returns null on failure so
- * callers can fall back gracefully.
+ * Opens the poke-memory DB at version 2, creating both the `kv` and
+ * `offline-pack` stores idempotently. Returns null on failure so callers can
+ * fall back gracefully.
  *
  * Server-safe: returns null immediately when `window` or `indexedDB` is absent.
  */
@@ -85,21 +87,35 @@ export function openOfflineDb(): Promise<IDBDatabase | null> {
         const req = indexedDB.open(OFFLINE_IDB_DB_NAME, OFFLINE_IDB_VERSION);
         req.onupgradeneeded = (event) => {
           const db = (event.target as IDBOpenDBRequest).result;
-          // Create the kv store if it does not exist yet (fresh install on v2).
-          if (!db.objectStoreNames.contains("kv")) {
-            db.createObjectStore("kv");
+          const oldVersion = (event as IDBVersionChangeEvent).oldVersion;
+          // Create the kv store on fresh install or upgrade from before v1.
+          // Guarded on oldVersion so we never clobber existing kv data.
+          if (oldVersion < 1 && !db.objectStoreNames.contains(STORE_KV)) {
+            db.createObjectStore(STORE_KV);
           }
-          // Create the offline-pack store (this is the v1→v2 upgrade).
+          // Create the offline-pack store when upgrading from v1 to v2, or on
+          // fresh install (oldVersion === 0 falls through both guards).
           if (!db.objectStoreNames.contains(OFFLINE_IDB_STORE)) {
             db.createObjectStore(OFFLINE_IDB_STORE);
           }
         };
-        req.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
+        req.onsuccess = (event) => {
+          const db = (event.target as IDBOpenDBRequest).result;
+          // If this connection ever blocks a future upgrade from another
+          // context, close immediately so the upgrade can proceed.
+          db.onversionchange = () => {
+            db.close();
+            _dbPromise = null;
+          };
+          resolve(db);
+        };
         req.onerror = () => reject(new Error("[offline-store] IDB open failed"));
         req.onblocked = () => {
-          // Another tab holds the old version open. Reject so the caller falls
-          // back gracefully; the upgrade will complete once the old tab closes.
-          reject(new Error("[offline-store] IDB upgrade blocked"));
+          // A v1 connection elsewhere is blocking our v2 upgrade. Log; once
+          // the old connection closes the upgrade will complete and onsuccess
+          // will fire. Do NOT reject here - the open request stays pending and
+          // will resolve once unblocked.
+          console.warn("[offline-store] IDB upgrade blocked; waiting for old connection to close.");
         };
       } catch (err) {
         reject(err);
@@ -160,19 +176,28 @@ export async function offlineGet(url: string): Promise<OfflineEntry | null> {
 
 /**
  * Persist a blob into the offline-pack store.
- * No-ops on failure - the download continues even if IDB is unavailable.
+ *
+ * Rejects on IDB write failure (e.g. quota exhaustion) so that callers such
+ * as `fetchAndStore` in precache.ts can surface the failure accurately. The
+ * byte-counter and the "Download complete" indicator must not count a URL that
+ * was not actually stored.
+ *
+ * When IDB is unavailable (openOfflineDb returns null), the promise resolves
+ * immediately - this is an expected degraded-mode where offline serving is
+ * simply unavailable, not a write failure.
  */
 export async function offlinePut(url: string, entry: OfflineEntry): Promise<void> {
   const db = await openOfflineDb();
   if (!db) return;
-  return new Promise<void>((resolve) => {
+  return new Promise<void>((resolve, reject) => {
     try {
       const tx = db.transaction(OFFLINE_IDB_STORE, "readwrite");
       const req = tx.objectStore(OFFLINE_IDB_STORE).put(entry, url);
       req.onsuccess = () => resolve();
-      req.onerror = () => resolve();
-    } catch {
-      resolve();
+      req.onerror = () => reject(req.error ?? new Error("[offline-store] IDB put failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("[offline-store] IDB transaction aborted"));
+    } catch (err) {
+      reject(err);
     }
   });
 }

@@ -160,4 +160,107 @@ describe("offlineStore (put / get / has / clear)", () => {
     const db = await openOfflineDb();
     expect(db).toBeNull();
   });
+
+});
+
+// ---------------------------------------------------------------------------
+// Concern A - offlinePut must REJECT on IDB write error
+// ---------------------------------------------------------------------------
+//
+// When the IDB transaction.objectStore() call throws (e.g. no such store, or
+// quota exceeded), offlinePut must reject so fetchAndStore's try/catch
+// surfaces the failure. Previously offlinePut swallowed these errors by
+// calling resolve() unconditionally.
+
+describe("offlinePut rejects on write error (Concern A)", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    await deleteIdbDatabase();
+    stubWindow();
+  });
+
+  afterEach(async () => {
+    const { _resetOfflineStoreForTests } = await import("./offlineStore");
+    _resetOfflineStoreForTests();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    await deleteIdbDatabase();
+  });
+
+  it("offlinePut rejects when transaction().objectStore() throws synchronously", async () => {
+    // Open the DB at v2 normally first so openOfflineDb() resolves to a real DB.
+    const { openOfflineDb, offlinePut, OFFLINE_IDB_STORE } = await import("./offlineStore");
+
+    const db = await openOfflineDb();
+    expect(db).not.toBeNull();
+
+    // Patch the db's `transaction` method to throw, simulating an IDB error
+    // such as a missing store or quota exceeded during the transaction open.
+    const originalTransaction = db!.transaction.bind(db);
+    const thrownError = new DOMException("NotFoundError", "NotFoundError");
+    (db as unknown as Record<string, unknown>).transaction = () => {
+      throw thrownError;
+    };
+
+    const blob = new Blob(["data"], { type: "image/webp" });
+    await expect(
+      offlinePut("/sprites/pokemon/webp/25/320.webp", { blob, contentType: "image/webp" }),
+    ).rejects.toBeTruthy();
+
+    // Restore for cleanup.
+    (db as unknown as Record<string, unknown>).transaction = originalTransaction;
+
+    // Sanity-check: normal put still works after restoring.
+    await expect(
+      offlinePut("/sprites/pokemon/webp/25/320.webp", { blob, contentType: "image/webp" }),
+    ).resolves.toBeUndefined();
+
+    // Verify the value is actually in the store.
+    const { offlineHas } = await import("./offlineStore");
+    expect(await offlineHas("/sprites/pokemon/webp/25/320.webp")).toBe(true);
+    void OFFLINE_IDB_STORE; // used for type reference only
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Concern B - write-key / read-key format contract (Blocker 1 regression guard)
+// ---------------------------------------------------------------------------
+//
+// precache.ts (write side) uses RELATIVE paths (e.g. "/sprites/...") produced
+// by spriteVariantUrl().
+// app/sw.ts (read side) looks up blobs via `new URL(request.url).pathname`,
+// which is also the RELATIVE path.
+// Both sides must use the same key format so IDB lookups hit.
+
+describe("key-format contract: precache write-key matches SW read-key", () => {
+  it("spriteVariantUrl produces a relative path that equals the SW pathname extraction", async () => {
+    // This mirrors the exact transformation the SW now applies:
+    //   key = new URL(request.url).pathname
+    // where request.url is the absolute URL.
+    const { spriteVariantUrl } = await import("@/lib/sprites/url");
+
+    const relativeKey = spriteVariantUrl(25, 320);
+
+    // Verify the write-side produces a relative path.
+    expect(relativeKey).toBe("/sprites/pokemon/webp/25/320.webp");
+    expect(relativeKey.startsWith("/")).toBe(true);
+    expect(relativeKey.startsWith("http")).toBe(false);
+
+    // Simulate the SW read-side transform: new URL(absoluteUrl).pathname
+    const origin = "https://pokememory.com";
+    const absoluteUrl = `${origin}${relativeKey}`;
+    const swKey = new URL(absoluteUrl).pathname;
+
+    // The two keys must be identical - if they differ the IDB lookup misses.
+    expect(swKey).toBe(relativeKey);
+  });
+
+  it("cry URL format also matches on both sides", async () => {
+    // Cries use a simple path: /cries/<id>.ogg
+    const relativeKey = "/cries/25.ogg";
+    const absoluteUrl = `https://pokememory.com${relativeKey}`;
+    const swKey = new URL(absoluteUrl).pathname;
+
+    expect(swKey).toBe(relativeKey);
+  });
 });
