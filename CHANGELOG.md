@@ -6,6 +6,38 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.3] - 2026-06-10
+
+### Added
+
+- The maintainer receives Discord notifications when users submit feedback: immediate ping for bug reports, weekly digest for all categories.
+- Added Sentry error and performance monitoring (`@sentry/nextjs`): client, Node, and Edge runtime initialisation, server-side `onRequestError` hook, and client error-boundary capture. Wired inert until the maintainer provisions the DSN and auth token.
+- Settings > About now shows the active service-worker version alongside the app version, with a clear warning when they differ (indicating a pending update). (#1826)
+- Settings "Last synced" time now correctly honours the user's configured timezone, matching the fix previously applied to Stats. (#1823)
+- Added `app/global-error.tsx`: a root-layout error boundary that reports uncaught errors to Sentry. `app/error.tsx` does not catch errors thrown in the root layout or template; this boundary fills that gap (follow-up #1822).
+
+### Changed
+
+- Offline download progress now shows MB-scale bytes (e.g. "60.0 MB downloaded") rather than coarse GB-with-one-decimal ("0.1 GB"), making progress meaningful from the start of the run.
+- Added a "Delete offline cache" button to the Offline settings section so users can reclaim the storage used by the downloaded sprite and cry pack without clearing all site data.
+
+### Fixed
+
+- Fixed the Practice-page bottom tab bar floating ~21px above the bottom of the screen on iOS (it now sits flush). The bottom nav is an in-flow app-shell child anchored to the large viewport (`lvh`) instead of `position:fixed`, so it reaches the true visible bottom on non-scrolling pages.
+- On desktop (md+) the layout reverts to normal document scroll so existing scrollable pages are unaffected.
+- Fixed the ~6-second blank (black) screen on PWA cold launch. The cause was the Practice cold-boot session build calling `new Intl.DateTimeFormat(...)` once per card (via the SRS scheduler's date helpers), thousands of constructions that blocked the main thread before first paint. The per-timezone formatter is now cached, collapsing the per-card date cost from ~147ms to ~4ms per session-build pass over the full deck and removing the main-thread block.
+- Offline sprite/cry pack now stored in IndexedDB instead of Cache Storage, eliminating the root cause of the iOS PWA cold-launch hang (#1803). A Cache Storage with ~10,000+ entries makes WebKit's `cache.match` globally slow, stalling render-critical precache lookups on every cold launch. Moving the offline pack to IndexedDB keeps Cache Storage small so cold launch is fast regardless of whether the pack is downloaded.
+- On SW activate, the old `poke-memory-sprites-v2` / `poke-memory-cries-v2` Cache Storage buckets are deleted automatically, unblocking existing affected users without any manual action.
+- The "Delete offline cache" button now clears the IndexedDB offline-pack store and also sweeps the legacy Cache Storage buckets for users who have not yet received the new SW activate.
+- Fixed the remaining PWA cold-launch hang by switching the service-worker navigation strategy from `NetworkFirst` (10 s timeout) to `StaleWhileRevalidate`. The SW now serves the cached app shell instantly on cold launch rather than blocking paint until the network returns the HTML document.
+- Precached the Pokémon seed data (`public/pokemon-data/*.json`) so cards render immediately on cold launch without a separate network round-trip.
+- Fix scroll regression on Settings, /privacy and /terms: the #1801/#1839 app-shell change made `[data-scroll-region]` always `overflow-hidden`, leaving pages that do not use PageShell unable to scroll on mobile.
+- Extract `ScrollRegion` client component that reads `usePathname()` and applies `overflow-hidden` only on the Practice route (`/`), `overflow-y-auto` on every other route, and `md:overflow-visible` on desktop.
+- Revert PageShell's internal `overflow-y-auto min-h-0` so there is a single scroller per page and no nested double-scroll on PageShell pages (#1801, #1839).
+- Practice: all card variants now shrink to fit the viewport with no scroll and no clipping on any supported device (iPhone SE to iPhone 17 Pro). The SpritePicker 2x2 grid fills the flex-1 card region and scales sprites via `max-h-full / w-auto / object-contain`, so it no longer overflows or clips the queue-state badge on short viewports. The reverse-card variant no longer uses `overflow-y-auto` on the card region. Name, evolution, reverse-evolution, multiple-choice, and typed-entry card sprites use `max-h` instead of fixed `h-` so they can shrink on very short viewports. Builds on #1801 and #1839.
+- Fixed Practice content being clipped and scrollable on mobile after the #1801 app-shell change. Scroll ownership is now per-page: the app-shell fit region is `overflow-hidden` (no scroll, Practice fits); pages that need to scroll (Pokédex, Pasture, Stats, etc.) own their own `overflow-y-auto` inside the PageShell `<main>` element.
+- Fixed the pick-the-sprite practice card clipping its top pill and bottom controls on mobile: the 2x2 sprite grid now shrinks to fit the available height so nothing is cut off (follow-up to the bottom-bar app-shell fix).
+
 ## [0.11.2] - 2026-06-08
 
 ### Changed
@@ -1702,7 +1734,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.2...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.3...HEAD
+[0.11.3]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.3
 [0.11.2]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.2
 [0.11.1]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.1
 [0.11.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.0
