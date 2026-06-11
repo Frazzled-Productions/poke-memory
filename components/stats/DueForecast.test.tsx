@@ -249,6 +249,8 @@ describe("DueForecast axis labels", () => {
     expect(screen.getByText("Today")).toBeInTheDocument();
     expect(screen.getByText("21")).toBeInTheDocument();
     expect(screen.getByText("31")).toBeInTheDocument();
-    expect(screen.getByText("1")).toBeInTheDocument();
+    // "1" is the June 1st axis label; verify exactly one to pin it to this
+    // label rather than any badge or count that might render as "1" elsewhere.
+    expect(screen.getAllByText("1")).toHaveLength(1);
   });
 });

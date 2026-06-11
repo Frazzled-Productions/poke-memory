@@ -8,6 +8,7 @@ import {
   cardTypeIsEnabled,
   groupNewCandidatesBySpecies,
   stableShuffleForDay,
+  todayString,
   type DailyLimits,
   type EvolutionReviewCard,
   type NameReviewCard,
@@ -2591,5 +2592,31 @@ describe('buildSessionQueues - convergence-priority (#1764)', () => {
     // All cards in the set have lastReview null (except name 10 which is due in the future)
     // so the review queue should be empty (name 10 is due 2026-05-20, not on or before today).
     expect(queues.reviewQueue).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// todayString timezone-aware day stamping (#1853)
+//
+// The streak writer and grade-log stamper call `todayString(now, timezone)`.
+// These tests are host-timezone-independent: `now` and `timezone` are
+// passed explicitly so the result is fixed regardless of where CI runs.
+// ---------------------------------------------------------------------------
+
+describe("todayString timezone-aware day boundary (#1853)", () => {
+  it("returns the local date west of UTC when UTC has already rolled past midnight", () => {
+    // 2026-05-15T02:30:00Z = 22:30 EDT (America/New_York, UTC-4 in May).
+    // UTC says May 15; local still says May 14.
+    // recordReview and appendGradeEntry must receive "2026-05-14", not "2026-05-15".
+    const now = new Date("2026-05-15T02:30:00Z");
+    expect(todayString(now, "America/New_York")).toBe("2026-05-14");
+  });
+
+  it("returns the local date ahead of UTC for a UTC+13 zone (morning grade)", () => {
+    // 2026-01-14T14:00:00Z = 03:00 NZDT (Pacific/Auckland, UTC+13 in January).
+    // UTC says Jan 14; Auckland is already in Jan 15.
+    // recordReview and appendGradeEntry must receive "2026-01-15", not "2026-01-14".
+    const now = new Date("2026-01-14T14:00:00Z");
+    expect(todayString(now, "Pacific/Auckland")).toBe("2026-01-15");
   });
 });

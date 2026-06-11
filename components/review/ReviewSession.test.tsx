@@ -14,6 +14,7 @@ import type { UserSettings } from "@/lib/settings/persistence";
 import { saveSettings } from "@/lib/settings/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { loadGradeLog, appendGradeEntry } from "@/lib/gradelog/persistence";
+import { recordReview } from "@/lib/streak";
 import { STORAGE_KEY as DAILY_SUMMARY_KEY } from "@/lib/review/dailySummaryPersistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { CRY_ID_OFFSET } from "@/lib/pokemon/seed";
@@ -4806,5 +4807,65 @@ describe("ReviewSession higher-or-lower nudge seenPokemon gate (#1573)", () => {
         screen.getByText(/finish your session for a bonus mini-game/i),
       ).toBeInTheDocument();
     }, { timeout: 5000 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleGrade timezone-aware date stamping (#1853)
+//
+// The streak writer (recordReview) and the grade-log writer (appendGradeEntry)
+// must stamp the user's timezone-local calendar date, not the UTC date.
+// These tests fix the clock at a moment when UTC has rolled past midnight but
+// the user's local clock has not, and verify the local date propagates to both
+// writers. Host-timezone-independent: now and timezone are passed explicitly.
+// ---------------------------------------------------------------------------
+
+describe("handleGrade timezone-aware date stamping (#1853)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("stamps recordReview and appendGradeEntry with the local date, not UTC, west of UTC", async () => {
+    // 2026-05-15T02:30:00Z = 22:30 EDT (America/New_York, UTC-4 in May).
+    // UTC date is "2026-05-15"; local date is still "2026-05-14".
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-15T02:30:00Z"));
+    vi.mocked(saveSession).mockResolvedValue({ ok: true });
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 0,
+      maxReviewsEvolutionPerDay: 0,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 0,
+      cryCardsEnabled: false,
+      maxNewCryPerDay: 0,
+      maxReviewsCryPerDay: 0,
+      evolutionCardsEnabled: false,
+      playCryOnReveal: false,
+      timezone: "America/New_York",
+      practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+      earnedBadges: [] as { id: string; earnedAt: string }[],
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    const revealBtn = screen.getByRole("button", { name: /reveal/i });
+    act(() => { fireEvent.click(revealBtn); });
+    act(() => { fireEvent.click(screen.getByRole("button", { name: /easy/i })); });
+
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(vi.mocked(appendGradeEntry)).toHaveBeenCalledWith(
+        expect.objectContaining({ date: "2026-05-14" }),
+      );
+    });
+    expect(vi.mocked(recordReview)).toHaveBeenCalledWith(
+      "2026-05-14",
+      expect.any(Number),
+      expect.any(Boolean),
+    );
   });
 });

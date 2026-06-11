@@ -74,12 +74,11 @@ export function todayInTimezone(tz: string, now: Date = new Date()): string {
  * date between timezones is meaningless without a time of day, so no
  * projection belongs here.
  *
- * @deprecated-param `tz` is retained for call-site compatibility but is
- * intentionally ignored - whichever zone produced the ISO string, the string
- * itself is the day to display.
+ * @param _tz Retained for call-site compatibility but intentionally ignored -
+ *           whichever zone produced the ISO string, the string itself is the
+ *           day to display.
  */
-export function formatDate(iso: string, fmt: DateFormat, tz?: string): string {
-  void tz;
+export function formatDate(iso: string, fmt: DateFormat, _tz?: string): string {
   try {
     const d = new Date(iso + "T12:00:00Z");
     if (fmt === "iso") {
