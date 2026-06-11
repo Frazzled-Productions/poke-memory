@@ -15,6 +15,8 @@ import { decodeSpriteUrls } from "@/lib/sprites/decode";
 import type { SeedPokemon } from "@/lib/pokemon/seed";
 import { mutedTextXs } from "@/lib/utils/class-names";
 import { POKEDEX_FORM_SPRITE_SIZE } from "@/lib/sprites/sizes";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 
 type Phase = "picking" | "revealed";
 type LastResult = "correct" | "wrong" | "tie" | null;
@@ -39,6 +41,9 @@ type PokemonTileProps = {
 
 function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTileProps) {
   const statVal = pokemon.stats[stat];
+  const { locale } = usePokemonLocaleContext();
+  // eslint-disable-next-line no-restricted-syntax -- English fallback arg, not a direct render
+  const { name: localeName } = useLocalePokemonName(pokemon.speciesId, pokemon.displayName);
 
   let ringClass = "";
   if (highlight === "winner")
@@ -62,20 +67,25 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
       ]
         .filter(Boolean)
         .join(" ")}
-      aria-label={pokemon.name}
+      aria-label={localeName}
     >
       {/* unoptimized: sprites are self-hosted static PNGs; keeping the URL
           identical to what decodeSpriteUrls warms means the decode pre-warm
           prevents names swapping before the sprite has loaded (#879). */}
       <Image
         src={pokemon.spriteUrl}
-        alt={pokemon.name}
+        alt={localeName}
         width={POKEDEX_FORM_SPRITE_SIZE}
         height={POKEDEX_FORM_SPRITE_SIZE}
         className="h-24 w-24 object-contain sm:h-32 sm:w-32"
         unoptimized
       />
-      <p className="text-sm font-semibold capitalize text-foreground">{pokemon.name}</p>
+      <p
+        className="text-sm font-semibold capitalize text-foreground"
+        lang={locale !== "en" ? locale : undefined}
+      >
+        {localeName}
+      </p>
       {phase === "revealed" ? (
         <p className="text-lg font-bold tabular-nums text-foreground">{statVal}</p>
       ) : (

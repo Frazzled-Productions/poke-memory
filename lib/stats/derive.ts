@@ -138,6 +138,8 @@ export type GenerationStats = {
 
 export type StrugglingCard = {
   id: number;
+  /** PokéAPI species ID - used by the UI to resolve locale names via useLocalePokemonName. */
+  speciesId: number;
   name: string;
   spriteUrl: string;
   easeFactor: number;
@@ -389,6 +391,9 @@ export function computeStats(
       const ease = 2.5 - ((card.state.difficulty - 1) * 1.2) / 9;
       return {
         id:          card.id,
+        // speciesId is the PokéAPI species ID; for name cards id === speciesId,
+        // but alternate-form cards (id >= 10001) carry a distinct speciesId.
+        speciesId:   card.speciesId ?? card.id,
         name:        card.name,
         spriteUrl:   card.spriteUrl,
         easeFactor:  Math.min(2.5, Math.max(1.3, ease)),

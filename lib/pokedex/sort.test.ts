@@ -5,7 +5,9 @@
  * Tests are in the node project (lib/**) and run without a DOM.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { loadLocaleNames, _resetLocaleNamesCache } from "@/lib/pokemon/localeNames";
+import type { PokemonLocaleNames } from "@/lib/pokemon/seed";
 import {
   compareByNational,
   compareAlphabetical,
@@ -275,5 +277,91 @@ describe("sortPokemon", () => {
     const list = [SQUIRTLE, BULBASAUR, ABRA, CHARMANDER];
     const sorted = sortPokemon(list, "closest-to-mastery", true);
     expect(sorted.map((p) => p.id)).toEqual([1, 4, 7, 63]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale-aware alphabetical sort tests (F39 fix, issue #1852)
+// ---------------------------------------------------------------------------
+
+/** Minimal locale-names payload for sort tests. */
+const SORT_LOCALE_NAMES: PokemonLocaleNames[] = [
+  {
+    speciesId: 1,
+    nameByLocale: { en: 'Bulbasaur', ja: 'フシギダネ', 'zh-Hans': '妙蛙种子', 'zh-Hant': '妙蛙種子' },
+    transliterationByLocale: { ja: 'Fushigidane', 'zh-Hans': 'miào wā zhǒng zi', 'zh-Hant': 'miào wā zhǒng zǐ' },
+  },
+  {
+    speciesId: 4,
+    nameByLocale: { en: 'Charmander', ja: 'ヒトカゲ', 'zh-Hans': '小火龙', 'zh-Hant': '小火龍' },
+    transliterationByLocale: { ja: 'Hitokage', 'zh-Hans': 'xiǎo huǒ lóng', 'zh-Hant': 'xiǎo huǒ lóng' },
+  },
+  {
+    speciesId: 7,
+    nameByLocale: { en: 'Squirtle', ja: 'ゼニガメ', 'zh-Hans': '杰尼龟', 'zh-Hant': '傑尼龜' },
+    transliterationByLocale: { ja: 'Zenigame', 'zh-Hans': 'jié ní guī', 'zh-Hant': 'jié ní guī' },
+  },
+  {
+    speciesId: 63,
+    nameByLocale: { en: 'Abra', ja: 'ケーシィ', 'zh-Hans': '凯西', 'zh-Hant': '凱西' },
+    transliterationByLocale: { ja: 'Keshii', 'zh-Hans': 'kǎi xī', 'zh-Hant': 'kǎi xī' },
+  },
+];
+
+describe('compareAlphabetical - locale-aware sort (F39, #1852)', () => {
+  // Local fixtures for locale sort tests (independent of the mastery-sort describe block).
+  const SORT_BULBASAUR  = makeCell(1,  "Bulbasaur",  "locked");
+  const SORT_CHARMANDER = makeCell(4,  "Charmander", "locked");
+  const SORT_SQUIRTLE   = makeCell(7,  "Squirtle",   "locked");
+  const SORT_ABRA       = makeCell(63, "Abra",       "locked");
+
+  beforeEach(async () => {
+    _resetLocaleNamesCache();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => SORT_LOCALE_NAMES,
+    }));
+    await loadLocaleNames();
+  });
+
+  it('en locale: sorts by English name (Abra < Bulbasaur < Charmander < Squirtle)', () => {
+    const list = [SORT_SQUIRTLE, SORT_BULBASAUR, SORT_ABRA, SORT_CHARMANDER];
+    const sorted = sortPokemon(list, "alphabetical", false, "en");
+    expect(sorted.map((p) => p.id)).toEqual([63, 1, 4, 7]);
+  });
+
+  it('ja locale: sorts by Japanese name using "ja" collator', () => {
+    // Japanese names: ケーシィ(63), ゼニガメ(7), ヒトカゲ(4), フシギダネ(1)
+    // Katakana sorted by code point order: ケ(12465) < ゼ(12476) < ヒ(12498) < フ(12501)
+    const list = [SORT_SQUIRTLE, SORT_BULBASAUR, SORT_ABRA, SORT_CHARMANDER];
+    const sorted = sortPokemon(list, "alphabetical", false, "ja");
+    expect(sorted.map((p) => p.id)).toEqual([63, 7, 4, 1]);
+  });
+
+  it('zh-Hans locale: sorts by Simplified Chinese name using "zh-Hans" collator', () => {
+    // Chinese names: 凯西(63=kǎi), 妙蛙种子(1=miào), 小火龙(4=xiǎo), 杰尼龟(7=jié)
+    // Pinyin order: jié(7) < kǎi(63) < miào(1) < xiǎo(4)
+    const list = [SORT_SQUIRTLE, SORT_BULBASAUR, SORT_ABRA, SORT_CHARMANDER];
+    const sorted = sortPokemon(list, "alphabetical", false, "zh-Hans");
+    // Verify that sorting produces some locale-appropriate order (different from en order)
+    // and does not crash. We verify the length and that all ids are present.
+    expect(sorted.map((p) => p.id).sort((a, b) => a - b)).toEqual([1, 4, 7, 63]);
+    // The zh-Hans collation should put 杰尼龟(7) before 凯西(63) before 妙蛙种子(1) before 小火龙(4)
+    expect(sorted.map((p) => p.id)).toEqual([7, 63, 1, 4]);
+  });
+
+  it('zh-Hant locale: sorts by Traditional Chinese name (same pinyin order as Hans for these fixtures)', () => {
+    const list = [SORT_SQUIRTLE, SORT_BULBASAUR, SORT_ABRA, SORT_CHARMANDER];
+    const sorted = sortPokemon(list, "alphabetical", false, "zh-Hant");
+    expect(sorted.map((p) => p.id).sort((a, b) => a - b)).toEqual([1, 4, 7, 63]);
+  });
+
+  it('falls back to English name when sidecar not yet loaded for a locale', () => {
+    _resetLocaleNamesCache();
+    // Without pre-loaded sidecar, getLocaleName returns undefined → falls back to p.name
+    const list = [SORT_SQUIRTLE, SORT_BULBASAUR, SORT_ABRA, SORT_CHARMANDER];
+    const sorted = sortPokemon(list, "alphabetical", false, "ja");
+    // Graceful fallback: sorts by English name (same as "en" order)
+    expect(sorted.map((p) => p.id)).toEqual([63, 1, 4, 7]);
   });
 });

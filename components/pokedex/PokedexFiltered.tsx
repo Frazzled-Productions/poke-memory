@@ -207,15 +207,15 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
     masteryStatus: effectiveMasteryStatus,
   };
 
-  const filtered = filterPokemon(enrichedPokemon, effectiveFilters);
+  const filtered = filterPokemon(enrichedPokemon, effectiveFilters, locale);
 
   // Apply sort. Memoised to avoid re-sorting 1025 items on every render when
   // only unrelated state changes. WebKit note: sort of 1025 items is O(n log n)
   // and runs in <1 ms on modern devices - no measurable per-render cost.
   const sorted = useMemo(
-    () => sortPokemon(filtered, sort, flags.pretendAllMastered),
+    () => sortPokemon(filtered, sort, flags.pretendAllMastered, locale),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filtered, sort, flags.pretendAllMastered],
+    [filtered, sort, flags.pretendAllMastered, locale],
   );
 
   const activeCount = countActiveFilters(effectiveFilters);
