@@ -155,7 +155,7 @@ function isFiltered(filters: PastureFilters): boolean {
 export default function PasturePage() {
   const t = useTranslations("pasture");
   const { user, supabase } = useAuth();
-  const { flags } = useSuperuser();
+  const { flags, anyFlagOn } = useSuperuser();
   const { seed } = useSeed();
   const [session, setSession] = useState<SavedSession | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -275,19 +275,23 @@ export default function PasturePage() {
       await saveSession(updated);
       setSession(updated);
 
-      // Fire-and-forget cloud sync for authenticated users
-      if (supabase && user?.id) {
+      // F12: honour the sync write-guard - if any superuser flag is on (or
+      // cleanup is pending), skip the cloud write. seen_in_pasture is one-way
+      // at the DB layer (regression trigger raises 23514 on any attempt to
+      // unset it), so a wrongly-pushed value cannot be undone.
+      const syncClient = anyFlagOn ? null : supabase;
+      if (syncClient && user?.id) {
         const updatedCard = updated.cards.find((c) => c.id === cardId);
         if (updatedCard) {
           try {
-            await pushSingleCard(supabase, user.id, updatedCard);
+            await pushSingleCard(syncClient, user.id, updatedCard);
           } catch (err) {
             console.warn("[pasture] pushSingleCard failed:", err);
           }
         }
       }
     },
-    [session, supabase, user?.id],
+    [session, supabase, user?.id, anyFlagOn],
   );
 
   if (!loaded) {

@@ -709,6 +709,8 @@ export default function SettingsPage() {
   // Best-effort push of auto-detected regional prefs once auth is available.
   useEffect(() => {
     if (!user || !supabase || !autoDetectedPrefsRef.current) return;
+    // Guard: skip if any superuser flag is on (write-guard parity, #1854 F-settings).
+    if (anyFlagOn) return;
     const prefs = autoDetectedPrefsRef.current;
     autoDetectedPrefsRef.current = null;
     void pushRegionalPrefs(supabase, user.id, {
@@ -716,7 +718,7 @@ export default function SettingsPage() {
       dateFormat: prefs.dateFormat,
       pushNotificationHour: loadSettings().pushNotificationHour,
     }).catch(() => {});
-  }, [user, supabase]);
+  }, [user, supabase, anyFlagOn]);
 
   function handleChange(key: keyof UserSettings, raw: string) {
     setDraftValues((prev) => ({ ...prev, [key]: raw }));
@@ -1818,7 +1820,7 @@ export default function SettingsPage() {
                         const next = { ...settings, timezone: e.target.value };
                         setSettings(next);
                         saveSettings(next);
-                        if (user && supabase) {
+                        if (user && supabase && !anyFlagOn) {
                           void pushRegionalPrefs(supabase, user.id, {
                             timezone: e.target.value,
                             dateFormat: next.dateFormat,
@@ -1866,7 +1868,7 @@ export default function SettingsPage() {
                                 const next = { ...settings, dateFormat: value };
                                 setSettings(next);
                                 saveSettings(next);
-                                if (user && supabase) {
+                                if (user && supabase && !anyFlagOn) {
                                   void pushRegionalPrefs(supabase, user.id, {
                                     timezone: next.timezone,
                                     dateFormat: value,
@@ -1909,7 +1911,7 @@ export default function SettingsPage() {
                         const next = { ...settings, pushNotificationHour: hour };
                         setSettings(next);
                         saveSettings(next);
-                        if (user && supabase) {
+                        if (user && supabase && !anyFlagOn) {
                           void pushRegionalPrefs(supabase, user.id, {
                             timezone: next.timezone,
                             dateFormat: next.dateFormat,

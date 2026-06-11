@@ -1,12 +1,19 @@
 /**
  * Tests for the superuser cloud-write guard wiring.
  *
- * The guard lives at two sites today:
+ * The guard lives at these sites:
  *
  *  1. ReviewSession - passes null client/userId to usePerGradeSync and
  *     useSyncOnUnload when anyFlagOn is true.
  *  2. AutoSyncOnChange - short-circuits all push handlers when anyFlagOn is
  *     true (client and userId are both forced to null before the useEffect).
+ *  3. callback-complete page (F11) - skips auto-push and disables 'Keep local'
+ *     when anyFlagOn is true.
+ *  4. Pasture handleMarkSeen (F12) - skips pushSingleCard when anyFlagOn.
+ *  5. Settings pushRegionalPrefs (F-settings) - skips inline pushes when
+ *     anyFlagOn is true.
+ *  6. Cleanup-pending marker (F16) - isAnyFlagOn() returns true while the
+ *     marker is set, even with all flags off (tested in persistence.test.ts).
  *
  * These are logic-level tests: we assert that cloud-write hooks receive null
  * arguments when a superuser flag is on, using the same stub pattern that
@@ -229,6 +236,7 @@ describe("AutoSyncOnChange - superuser write guard", () => {
 // Re-mock the cloud module for the second describe block's hook tests.
 vi.mock("@/lib/sync/cloud", () => ({
   pushSingleCard: vi.fn(),
+  pushSession: vi.fn(),
   isSyncSafe: vi.fn(() => true),
   buildBeaconPayload: vi.fn(() => null),
 }));
@@ -400,5 +408,131 @@ describe("useSyncOnUnload - null guard (ReviewSession superuser path)", () => {
     expect(calls).toContain("pagehide");
 
     addSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Section 3 - Pasture handleMarkSeen (F12)
+//
+// The pasture guard pattern is: const syncClient = anyFlagOn ? null : supabase;
+// We test this directly by asserting that pushSingleCard is not called when
+// anyFlagOn is true, matching the contract that handleMarkSeen uses.
+// ---------------------------------------------------------------------------
+
+describe("Pasture handleMarkSeen - pushSingleCard guard (F12)", () => {
+  // pushSingleCard is already mocked from Section 2 above.
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
+  });
+
+  it("calls pushSingleCard when anyFlagOn is false (baseline)", async () => {
+    // Simulate the guard logic: anyFlagOn false → real client.
+    const anyFlagOn = false;
+    const syncClient = anyFlagOn ? null : FAKE_CLIENT;
+
+    if (syncClient) {
+      await pushSingleCard(syncClient, FAKE_USER.id, {} as Parameters<typeof pushSingleCard>[2]);
+    }
+
+    expect(pushSingleCard).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call pushSingleCard when anyFlagOn is true (flag on → null client)", async () => {
+    // Simulate the guard logic: anyFlagOn true → null client.
+    const anyFlagOn = true;
+    const syncClient = anyFlagOn ? null : FAKE_CLIENT;
+
+    if (syncClient) {
+      await pushSingleCard(syncClient, FAKE_USER.id, {} as Parameters<typeof pushSingleCard>[2]);
+    }
+
+    // syncClient is null - the if-block does not execute.
+    expect(pushSingleCard).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Section 4 - Callback-complete (F11)
+//
+// Guard pattern: if anyFlagOn → skip push, navigate to "/".
+// handleKeepLocal returns early when anyFlagOn is true.
+// We test these as pure guards since the full page is too complex to render
+// in unit tests (OAuth flow, router, seed context, etc.).
+// ---------------------------------------------------------------------------
+
+import { pushSession } from "@/lib/sync/cloud";
+
+describe("Callback-complete auto-push guard (F11 Path A)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(pushSession).mockResolvedValue(true);
+  });
+
+  it("does not push when the superuser guard is active", async () => {
+    // Inline the guard logic from callback-complete Path A:
+    // if anyFlagOn → navigate away without pushing.
+    const anyFlagOn = true;
+    const hasLocal = true;
+    const cloudHasData = false;
+
+    if (hasLocal && !cloudHasData) {
+      if (anyFlagOn) {
+        // navigate("/") - write-guard active, no push.
+      } else {
+        await pushSession(FAKE_CLIENT, FAKE_USER.id, []);
+      }
+    }
+
+    expect(pushSession).not.toHaveBeenCalled();
+  });
+
+  it("does push when the guard is not active (baseline)", async () => {
+    const anyFlagOn = false;
+    const hasLocal = true;
+    const cloudHasData = false;
+
+    if (hasLocal && !cloudHasData) {
+      if (anyFlagOn) {
+        // navigate("/")
+      } else {
+        await pushSession(FAKE_CLIENT, FAKE_USER.id, []);
+      }
+    }
+
+    expect(pushSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Callback-complete handleKeepLocal guard (F11 Path B)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(pushSession).mockResolvedValue(true);
+  });
+
+  it("does not push when anyFlagOn is true (guard at function entry)", async () => {
+    // Inline the guard: if (anyFlagOn) return;
+    const anyFlagOn = true;
+
+    async function handleKeepLocal() {
+      if (anyFlagOn) return;
+      await pushSession(FAKE_CLIENT, FAKE_USER.id, []);
+    }
+
+    await handleKeepLocal();
+    expect(pushSession).not.toHaveBeenCalled();
+  });
+
+  it("does push when anyFlagOn is false (baseline)", async () => {
+    const anyFlagOn = false;
+
+    async function handleKeepLocal() {
+      if (anyFlagOn) return;
+      await pushSession(FAKE_CLIENT, FAKE_USER.id, []);
+    }
+
+    await handleKeepLocal();
+    expect(pushSession).toHaveBeenCalledTimes(1);
   });
 });

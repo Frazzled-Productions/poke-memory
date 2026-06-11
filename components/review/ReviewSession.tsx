@@ -1541,8 +1541,12 @@ export function ReviewSession() {
     // undoSnapshotRef is a stable ref object - its identity never changes, so
     // it is intentionally omitted from deps. The closure reads .current at
     // call time, which is always the latest snapshot.
+    // superuserGuarded is included so the undo handler always reads the
+    // current guard value: the superuser chord fires on the Practice page,
+    // and flags also sync cross-tab via the storage listener, so the guard
+    // can change while ReviewSession stays mounted (#1854 F54).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grading, limits, timezone]);
+  }, [grading, limits, timezone, superuserGuarded]);
 
   // Update stable callback refs every render so the keyboard handler below
   // always dispatches to the latest handleReveal / handleGrade without needing
