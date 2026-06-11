@@ -51,10 +51,28 @@ describe("classifyRequest", () => {
     expect(result.cacheName).toBe(CACHE_NAMES.pages);
   });
 
-  it("uses stale-while-revalidate for same-origin data requests", () => {
-    const result = classifyRequest(`${ORIGIN}/api/something`, ORIGIN);
-    expect(result.strategy).toBe("stale-while-revalidate");
-    expect(result.cacheName).toBe(CACHE_NAMES.pages);
+  it("classifies /api/** as network-only so authenticated responses are never cached (#1858 F9)", () => {
+    // The GDPR review-history CSV (/api/export) sets Cache-Control: no-store
+    // but the SW's StaleWhileRevalidate handler ignored HTTP cache headers and
+    // wrote any 200 into Cache Storage. The explicit network-only rule here
+    // prevents any /api/** response from being written to Cache Storage.
+    const exportResult = classifyRequest(`${ORIGIN}/api/export`, ORIGIN);
+    expect(exportResult.strategy).toBe("network-only");
+    expect(exportResult.cacheName).toBeUndefined();
+
+    const syncResult = classifyRequest(`${ORIGIN}/api/sync`, ORIGIN);
+    expect(syncResult.strategy).toBe("network-only");
+    expect(syncResult.cacheName).toBeUndefined();
+
+    const genericResult = classifyRequest(`${ORIGIN}/api/something`, ORIGIN);
+    expect(genericResult.strategy).toBe("network-only");
+    expect(genericResult.cacheName).toBeUndefined();
+  });
+
+  it("classifies /api/** as network-only even with navigate mode", () => {
+    const result = classifyRequest(`${ORIGIN}/api/export`, ORIGIN, "navigate");
+    expect(result.strategy).toBe("network-only");
+    expect(result.cacheName).toBeUndefined();
   });
 
   it("uses stale-while-revalidate for seed data (pokemon-data/*.json)", () => {
@@ -190,6 +208,11 @@ describe("shouldCache", () => {
 
   it("returns false for cross-origin requests", () => {
     expect(shouldCache("https://abc.supabase.co/rest/v1/x", ORIGIN)).toBe(false);
+  });
+
+  it("returns false for /api/** requests (authenticated responses must not be cached)", () => {
+    expect(shouldCache(`${ORIGIN}/api/export`, ORIGIN)).toBe(false);
+    expect(shouldCache(`${ORIGIN}/api/sync`, ORIGIN)).toBe(false);
   });
 });
 

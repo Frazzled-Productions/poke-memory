@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Serwist } from "@serwist/window";
+import { Serwist, messageSW } from "@serwist/window";
 import { isSessionActive } from "@/lib/review/sessionActive";
 
 /**
@@ -102,11 +102,17 @@ export function ServiceWorkerProvider() {
     navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
 
     // Safe-moment activator. On `visibilitychange → hidden`, if a SW is
-    // waiting and no review session is active, post SKIP_WAITING. The SW
-    // double-checks `clients.matchAll().length <= 1` before honouring the
-    // request so a co-open tab is not yanked while it is still in the
-    // foreground (#1162 multi-tab gate). If the SW declines, this listener
-    // stays armed for the next visibility tick.
+    // waiting and no review session is active, post REQUEST_SKIP_WAITING. The
+    // SW double-checks `clients.matchAll({ includeUncontrolled: true }).length
+    // <= 1` before honouring the request so a co-open tab is not yanked while
+    // it is still in the foreground (#1162 multi-tab gate). If the SW declines,
+    // this listener stays armed for the next visibility tick.
+    //
+    // We use REQUEST_SKIP_WAITING (not the Serwist-standard "SKIP_WAITING")
+    // because Serwist's constructor registers its own message listener that
+    // calls self.skipWaiting() unconditionally on {type:"SKIP_WAITING"} when
+    // skipWaiting:false, bypassing our client-count gate entirely (#1858 F34).
+    // Using the custom type means only our SW handler runs for these activations.
     //
     // Periodic update check (#1164). On `visibilitychange → visible`, if the
     // tab was hidden for at least HIDDEN_FOR_UPDATE_CHECK_MS and we haven't
@@ -120,7 +126,15 @@ export function ServiceWorkerProvider() {
         if (isSessionActive()) return;
 
         updateAcceptedRef.current = true;
-        serwistRef.current?.messageSkipWaiting();
+        // Post REQUEST_SKIP_WAITING directly to the waiting SW rather than
+        // calling serwistRef.current?.messageSkipWaiting(), which would send
+        // the built-in "SKIP_WAITING" type that Serwist intercepts and handles
+        // unconditionally (bypassing the SW's client-count gate).
+        void navigator.serviceWorker.getRegistration().then((registration) => {
+          if (registration?.waiting) {
+            void messageSW(registration.waiting, { type: "REQUEST_SKIP_WAITING" });
+          }
+        });
         return;
       }
 

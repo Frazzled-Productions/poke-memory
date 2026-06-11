@@ -7,6 +7,7 @@ import {
   hasLocalSubscription,
   isPushSupported,
   isStandalone,
+  reconcileSubscription,
   subscribeToPush,
   unsubscribeFromPush,
 } from "@/lib/push/subscribe";
@@ -65,6 +66,14 @@ export function PushOptIn({
   // Gate detection runs on mount. The three checks are all sync (or fast
   // async) so the loading window is essentially the first paint after
   // hydration; the parent renders a placeholder via `visible === false`.
+  //
+  // After confirming a local subscription exists, we reconcile against the
+  // server to detect orphaned subscriptions (#1858 F35). When the push
+  // service rotates an endpoint the daily route deletes the server row on 410,
+  // but the PushManager still reports a local subscription - so the toggle
+  // would show ON while reminders are silently stopped. Reconciliation
+  // re-inserts the row when the subscription is valid but the row is missing,
+  // or flips the toggle off when re-insert fails (so the user can opt back in).
   useEffect(() => {
     let cancelled = false;
     async function detect() {
@@ -80,8 +89,18 @@ export function PushOptIn({
         setPermission(Notification.permission);
       }
       const local = await hasLocalSubscription();
+      if (cancelled) return;
+      if (!local) {
+        setSubscribed(false);
+        setStatus("ready");
+        return;
+      }
+      // Local subscription exists - reconcile against the server row.
+      const reconcileResult = await reconcileSubscription(supabase, user.id);
       if (!cancelled) {
-        setSubscribed(local);
+        // "disabled" means the local subscription has no server row and we
+        // could not re-insert it - flip the toggle off so the user is aware.
+        setSubscribed(reconcileResult !== "disabled");
         setStatus("ready");
       }
     }
@@ -89,6 +108,8 @@ export function PushOptIn({
     return () => {
       cancelled = true;
     };
+  // supabase and user.id are stable for the lifetime of the component.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onSubscribe = useCallback(async () => {

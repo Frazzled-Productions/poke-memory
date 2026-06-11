@@ -24,14 +24,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // factories can close over them safely.
 // ---------------------------------------------------------------------------
 
-const { mockRegister, mockUpdate, mockMessageSkipWaiting, serwistListeners } =
+const { mockRegister, mockUpdate, mockMessageSW, serwistListeners } =
   vi.hoisted(() => {
     type SerwistListener = (event?: unknown) => void;
     const serwistListeners: Record<string, SerwistListener[]> = {};
     return {
       mockRegister: vi.fn<() => Promise<void>>(async () => {}),
       mockUpdate: vi.fn<() => Promise<void>>(async () => {}),
-      mockMessageSkipWaiting: vi.fn<() => void>(),
+      // messageSW is now called directly (not via Serwist.messageSkipWaiting)
+      // so we can assert the REQUEST_SKIP_WAITING type is sent (#1858 F34).
+      mockMessageSW: vi.fn<() => Promise<void>>(async () => {}),
       serwistListeners,
     };
   });
@@ -51,8 +53,8 @@ vi.mock("@serwist/window", () => {
       removeEventListener() {}
       register = mockRegister;
       update = mockUpdate;
-      messageSkipWaiting = mockMessageSkipWaiting;
     },
+    messageSW: mockMessageSW,
   };
 });
 
@@ -122,7 +124,7 @@ beforeEach(() => {
   resetListeners();
   mockRegister.mockClear();
   mockUpdate.mockClear();
-  mockMessageSkipWaiting.mockClear();
+  mockMessageSW.mockClear();
   mockIsSessionActive.mockReturnValue(false);
   mockGetRegistration.mockResolvedValue(undefined);
 
@@ -292,8 +294,14 @@ describe("ServiceWorkerProvider - 1-hour background interval", () => {
 // Tests: silent-activation / multi-tab gate is unchanged.
 // ---------------------------------------------------------------------------
 
-describe("ServiceWorkerProvider - silent activation and multi-tab gate unchanged", () => {
-  it("posts messageSkipWaiting when the tab hides and a SW is waiting", async () => {
+describe("ServiceWorkerProvider - silent activation and multi-tab gate", () => {
+  it("sends REQUEST_SKIP_WAITING (not SKIP_WAITING) when the tab hides and a SW is waiting (#1858 F34)", async () => {
+    // Provide a waiting SW registration so the component can message it.
+    const waitingWorker = {} as ServiceWorker;
+    mockGetRegistration.mockResolvedValue({ waiting: waitingWorker } as unknown as {
+      waiting: null;
+    });
+
     render(<ServiceWorkerProvider />);
     await act(async () => {
       await Promise.resolve();
@@ -302,25 +310,41 @@ describe("ServiceWorkerProvider - silent activation and multi-tab gate unchanged
     // Simulate the SW firing the 'waiting' event to arm the activator.
     serwistListeners["waiting"]?.forEach((l) => l());
 
-    fireVisibilityChange("hidden");
+    await act(async () => {
+      fireVisibilityChange("hidden");
+      // Flush the getRegistration() promise inside the handler.
+      await Promise.resolve();
+    });
 
-    expect(mockMessageSkipWaiting).toHaveBeenCalledTimes(1);
+    // Must use REQUEST_SKIP_WAITING, not the built-in SKIP_WAITING, so
+    // Serwist's unconditional listener does not fire before our client-count
+    // gate runs in the SW.
+    expect(mockMessageSW).toHaveBeenCalledWith(waitingWorker, {
+      type: "REQUEST_SKIP_WAITING",
+    });
   });
 
-  it("does NOT post messageSkipWaiting when no SW is waiting", async () => {
+  it("does NOT send REQUEST_SKIP_WAITING when no SW is waiting", async () => {
     render(<ServiceWorkerProvider />);
     await act(async () => {
       await Promise.resolve();
     });
 
     // No 'waiting' event fired.
-    fireVisibilityChange("hidden");
+    await act(async () => {
+      fireVisibilityChange("hidden");
+      await Promise.resolve();
+    });
 
-    expect(mockMessageSkipWaiting).not.toHaveBeenCalled();
+    expect(mockMessageSW).not.toHaveBeenCalled();
   });
 
-  it("does NOT post messageSkipWaiting when a review session is active", async () => {
+  it("does NOT send REQUEST_SKIP_WAITING when a review session is active", async () => {
     mockIsSessionActive.mockReturnValue(true);
+    const waitingWorker = {} as ServiceWorker;
+    mockGetRegistration.mockResolvedValue({ waiting: waitingWorker } as unknown as {
+      waiting: null;
+    });
 
     render(<ServiceWorkerProvider />);
     await act(async () => {
@@ -328,31 +352,32 @@ describe("ServiceWorkerProvider - silent activation and multi-tab gate unchanged
     });
 
     serwistListeners["waiting"]?.forEach((l) => l());
-    fireVisibilityChange("hidden");
+    await act(async () => {
+      fireVisibilityChange("hidden");
+      await Promise.resolve();
+    });
 
-    expect(mockMessageSkipWaiting).not.toHaveBeenCalled();
+    expect(mockMessageSW).not.toHaveBeenCalled();
   });
 
-  it("does NOT post messageSkipWaiting from the timing changes alone (no waiting SW)", async () => {
+  it("does NOT send REQUEST_SKIP_WAITING from the timing changes alone (no waiting SW)", async () => {
     render(<ServiceWorkerProvider />);
     await act(async () => {
       await Promise.resolve();
     });
 
     // Advance through both timing thresholds without a waiting SW.
-    fireVisibilityChange("hidden");
-    vi.advanceTimersByTime(90_000);
-    fireVisibilityChange("visible");
-    vi.advanceTimersByTime(60 * 60 * 1000);
     await act(async () => {
+      fireVisibilityChange("hidden");
+      vi.advanceTimersByTime(90_000);
+      fireVisibilityChange("visible");
+      vi.advanceTimersByTime(60 * 60 * 1000);
       await Promise.resolve();
     });
 
-    // update() fired on the interval and visibility check, but no SKIP_WAITING
-    // was posted because no SW is in the waiting state. A reload is only
-    // triggered via controllerchange after messageSkipWaiting - which requires
-    // a waiting worker first.
-    expect(mockMessageSkipWaiting).not.toHaveBeenCalled();
+    // update() fired on the interval and visibility check, but no REQUEST_SKIP_WAITING
+    // was posted because no SW is in the waiting state.
+    expect(mockMessageSW).not.toHaveBeenCalled();
     expect(mockUpdate).toHaveBeenCalled(); // both thresholds fired update()
   });
 });
