@@ -524,7 +524,7 @@ describe("validateShardParity - lib and public copies match", () => {
   const shards = ["generated-core.json", "generated-chains.json", "generated-flavor.json", "generated-locale-names.json"];
 
   it("passes when all four shards are byte-identical", () => {
-    const readFn = (path) => `{"content":"same"}`;
+    const readFn = () => `{"content":"same"}`;
     const results = validateShardParity("/lib/pokemon", "/public/pokemon-data", readFn);
     expect(results).toHaveLength(4);
     for (const r of results) {

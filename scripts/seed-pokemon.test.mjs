@@ -5,7 +5,7 @@
 // Run with: npx vitest run --project node scripts/seed-pokemon.test.mjs
 
 import { describe, it, expect } from "vitest";
-import { flattenChain, buildVarietiesLookup, addFormEdges, trimDetail } from "./seed-pokemon.mjs";
+import { flattenChain, buildVarietiesLookup, addFormEdges } from "./seed-pokemon.mjs";
 
 // ---------------------------------------------------------------------------
 // Fixtures

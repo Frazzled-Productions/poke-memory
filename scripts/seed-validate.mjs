@@ -17,11 +17,14 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   validateSpeciesCount,
-  validateSpeciesIds,
   validateShards,
   validateShardParity,
   validateSprites,
   validateLocaleNames,
+  // validateSpeciesIds is also exported from ./lib/seed-validate.mjs for use in
+  // pipeline orchestrators that have access to both the prior and current
+  // generated.json id sets. The standalone runner cannot use it because it
+  // does not have access to a prior snapshot.
 } from "./lib/seed-validate.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
