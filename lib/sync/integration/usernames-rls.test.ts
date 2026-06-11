@@ -1,8 +1,8 @@
 /**
- * Integration test: Row Level Security on public.usernames (#1671).
+ * Integration test: Row Level Security on public.usernames (#1671, #1815).
  *
  * Verifies the RLS invariants for the username/password auth table:
- *   SELECT (public)  - any session (including unauthenticated) can read all rows.
+ *   SELECT           - no SELECT policy (dropped in #1815); all reads return 0 rows.
  *   INSERT (owner)   - user may only insert a row where user_id = auth.uid().
  *   INSERT (other)   - inserting with another user's user_id is rejected.
  *   UPDATE           - no UPDATE policy; all attempts are silently filtered.
@@ -42,6 +42,8 @@ const USER_B = randomUUID();
 const USER_B_ANON_SELECT = randomUUID();
 const USER_B_UPDATE = randomUUID();
 const USER_B_DELETE = randomUUID();
+// Separate user for the self-select test (adminInsertUsername persists without rollback).
+const USER_A_SELF_SELECT = randomUUID();
 
 let rlsPool: pg.Pool;
 
@@ -77,6 +79,7 @@ beforeAll(async () => {
   await insertAuthUser(adminPool, USER_B_ANON_SELECT);
   await insertAuthUser(adminPool, USER_B_UPDATE);
   await insertAuthUser(adminPool, USER_B_DELETE);
+  await insertAuthUser(adminPool, USER_A_SELF_SELECT);
 
   // Create an unprivileged role for RLS testing (cluster-level).
   await adminPool.query(`
@@ -154,10 +157,10 @@ async function asAnon<T>(
 
 describe("usernames RLS policies (integration)", () => {
   // ---------------------------------------------------------------------------
-  // SELECT - public
+  // SELECT - no policy (dropped in #1815; RLS silently filters all reads)
   // ---------------------------------------------------------------------------
 
-  it("authenticated user A can SELECT all rows (intentionally public)", async () => {
+  it("authenticated user A SELECT of another user's row returns 0 rows (no SELECT policy)", async () => {
     await adminInsertUsername(adminPool, "trainerb", USER_B);
 
     const rows = await asUser(USER_A, async (c) => {
@@ -168,12 +171,11 @@ describe("usernames RLS policies (integration)", () => {
       return res.rows;
     });
 
-    // SELECT is open - user A can see user B's row.
-    expect(rows).toHaveLength(1);
-    expect(rows[0].username).toBe("trainerb");
+    // No SELECT policy - RLS filters the row silently; no error is thrown.
+    expect(rows).toHaveLength(0);
   });
 
-  it("unauthenticated (anon) session can SELECT all rows", async () => {
+  it("unauthenticated (anon) SELECT returns 0 rows (no SELECT policy)", async () => {
     await adminInsertUsername(adminPool, "trainerb2", USER_B_ANON_SELECT);
 
     const rows = await asAnon(async (c) => {
@@ -184,8 +186,25 @@ describe("usernames RLS policies (integration)", () => {
       return res.rows;
     });
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].username).toBe("trainerb2");
+    // No SELECT policy - anon session sees nothing.
+    expect(rows).toHaveLength(0);
+  });
+
+  it("authenticated user SELECT of their own row also returns 0 rows (no self-select policy)", async () => {
+    // Uses a dedicated user so adminInsertUsername (no transaction) does not
+    // leave a row that conflicts with USER_A's INSERT test via one_username_per_user.
+    await adminInsertUsername(adminPool, "trainera-self", USER_A_SELF_SELECT);
+
+    const rows = await asUser(USER_A_SELF_SELECT, async (c) => {
+      const res = await c.query(
+        `SELECT username FROM public.usernames WHERE user_id = $1`,
+        [USER_A_SELF_SELECT],
+      );
+      return res.rows;
+    });
+
+    // No self-select policy exists, so even the row owner sees nothing.
+    expect(rows).toHaveLength(0);
   });
 
   // ---------------------------------------------------------------------------
