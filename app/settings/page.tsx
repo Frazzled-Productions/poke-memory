@@ -1013,6 +1013,32 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* ── Feedback row (above accordions, always visible or matches search) ── */}
+            {(!isFiltering || visibleSectionIds.has("feedback-row")) && (
+              <div
+                id="feedback-row"
+                className={`${cardPanelPadded} mb-3`}
+              >
+                <div className="flex min-h-[44px] items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {t("settings.feedback.rowLabel")}
+                    </p>
+                    <p className={`mt-0.5 ${mutedTextXs}`}>
+                      {t("settings.feedback.rowDescription")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackOpen(true)}
+                    className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  >
+                    {t("settings.feedback.rowLabel")}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-3">
 
               {/* ── 1. Practice schedule ────────────────────────────────── */}
@@ -2357,17 +2383,6 @@ export default function SettingsPage() {
               </CollapsibleSection>
               )}
 
-            </div>
-
-            {/* ── Persistent feedback link (below all accordions) ──────── */}
-            <div className="mt-6 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setFeedbackOpen(true)}
-                className="inline-flex min-h-[44px] items-center text-sm font-medium text-foreground underline underline-offset-2 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-              >
-                {t("settings.feedback.rowLabel")}
-              </button>
             </div>
 
             <ResetProgressDialog
