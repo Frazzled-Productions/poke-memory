@@ -39,6 +39,12 @@ jobs:
     # has access to secrets, so fork PRs would otherwise be able to trigger a
     # secret-bearing job. auto-review.yml already excludes forks (so the LGTM
     # gate stays closed for them anyway), but belt-and-braces here.
+    #
+    # `issue_comment` author gates (#1859): the auto-review branch only accepts
+    # comments authored by the bot itself, and `/preview` only from
+    # OWNER/MEMBER/COLLABORATOR (the same check the override step applies) -
+    # otherwise any commenter could start this secret-bearing job by posting
+    # the marker substring.
     if: |
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
@@ -47,8 +53,11 @@ jobs:
       ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request != null &&
-       (contains(github.event.comment.body, '<!-- auto-review:') ||
-        startsWith(github.event.comment.body, '/preview')))
+       ((contains(github.event.comment.body, '<!-- auto-review:') &&
+         github.event.comment.user.login == 'poke-memory-bot[bot]') ||
+        (startsWith(github.event.comment.body, '/preview') &&
+         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+                  github.event.comment.author_association))))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -113,9 +122,12 @@ jobs:
           SHA: ${{ steps.pr.outputs.sha }}
         run: |
           set -euo pipefail
-          # SHA is a hex commit id — safe to interpolate directly.
+          # SHA is a hex commit id — safe to interpolate directly. Only count
+          # markers the bot itself posted (#1859), so a third party cannot
+          # suppress legitimate fires with a forged marker comment.
           MATCH=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq "[.[] | select(.body | contains(\"<!-- vercel-preview-fired:$SHA -->\"))] | length")
+            --jq "[.[] | select(.user.login == \"poke-memory-bot[bot]\")
+                       | select(.body | contains(\"<!-- vercel-preview-fired:$SHA -->\"))] | length")
           if [[ "$MATCH" -gt 0 ]]; then
             echo "Already fired at SHA $SHA — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -181,9 +193,13 @@ jobs:
           set -euo pipefail
           # Scope to the current HEAD SHA via the `<!-- auto-review-sha:SHA -->`
           # marker auto-review.yml writes on row 2 of every review comment, so
-          # a stale LGTM on an earlier SHA does not satisfy the gate.
+          # a stale LGTM on an earlier SHA does not satisfy the gate. Only
+          # bot-authored comments count (#1859): without the author filter,
+          # any commenter could paste the marker plus a "Verdict: Looks good
+          # to me" line and open the deploy gate themselves.
           BODY=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq "[.[] | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
+            --jq "[.[] | select(.user.login == \"poke-memory-bot[bot]\")
+                       | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
                   | sort_by(.created_at) | last | .body // \"\"")
           VERDICT=$(printf '%s\n' "$BODY" | grep -E '^Verdict:' | head -1 || true)
           echo "Latest verdict at $SHA: ${VERDICT:-<none>}"

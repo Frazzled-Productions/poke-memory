@@ -411,7 +411,8 @@ jobs:
           fi
           PR="${{ github.event.issue.number }}"
           VERDICT=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate \
-            --jq '[.[] | select(.body | startswith("<!-- auto-review:"))]
+            --jq '[.[] | select(.user.login == "poke-memory-bot[bot]")
+                       | select(.body | startswith("<!-- auto-review:"))]
                   | sort_by(.created_at) | last | .body // ""' \
             | grep -E '^Verdict:' | head -1 || true)
           if [[ "$VERDICT" == *"Looks good to me"* ]]; then
