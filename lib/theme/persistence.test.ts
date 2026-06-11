@@ -179,3 +179,35 @@ describe("isFavouriteEarned", () => {
     expect(isFavouriteEarned(SAMPLE_FAV, learningCards)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Any-locale earned check (#1851)
+// ---------------------------------------------------------------------------
+
+describe("isFavouriteEarned any-locale arbitration (#1851)", () => {
+  it("is earned when a later duplicate-id card is mastered (ja after en)", () => {
+    // Multi-locale sessions hold several name cards with the same numeric id.
+    // The old first-match cards.find arbitrated by array order, so a species
+    // mastered only in ja (appended after en) read as un-earned and the
+    // favourite was silently wiped on load.
+    const masteredJa = {
+      ...initialReviewState(new Date("2026-05-13")),
+      reps: 5,
+      stability: 21,
+      scheduledDays: MASTERY_INTERVAL_DAYS + 1,
+      lastReview: "2026-05-12",
+    };
+    const learningEn = {
+      ...initialReviewState(new Date("2026-05-13")),
+      reps: 2,
+      stability: 5,
+      scheduledDays: 3,
+      lastReview: "2026-05-12",
+    };
+    const cards = [
+      { id: SAMPLE.id, state: learningEn },
+      { id: SAMPLE.id, state: masteredJa },
+    ];
+    expect(isFavouriteEarned(SAMPLE_FAV, cards)).toBe(true);
+  });
+});

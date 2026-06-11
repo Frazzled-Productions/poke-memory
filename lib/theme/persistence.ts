@@ -124,18 +124,23 @@ export function loadFavourite(): StoredFavourite | null {
   }
 }
 
-// Pure. Returns true if there is no favourite, or its underlying name card
-// meets the mastery bar. Used by the superuser exit-cleanup and by the
-// FavouriteThemeProvider as a load-time invariant - a cheat-selected theme
-// must not survive a flag-off transition or a subsequent page load.
+// Pure. Returns true if there is no favourite, or ANY card with the
+// favourite's species id meets the mastery bar. Any-locale on purpose
+// (#1851): a multi-locale session legitimately holds several name cards with
+// the same numeric id (en id=1 and ja id=1), and the old first-match
+// `cards.find` arbitrated by array order while the FavouritePicker's unlock
+// Map arbitrated last-wins - a species mastered only in ja could be selected
+// in the picker and then silently wiped here on the next load. Mastery in any
+// enrolled locale earns the theme; the picker uses the same predicate.
+// Used by the superuser exit-cleanup and by the FavouriteThemeProvider as a
+// load-time invariant - a cheat-selected theme must not survive a flag-off
+// transition or a subsequent page load.
 export function isFavouriteEarned(
   favourite: StoredFavourite | null,
   cards: ReadonlyArray<{ id: number; state: ReviewState }>,
 ): boolean {
   if (favourite === null) return true;
-  const card = cards.find((c) => c.id === favourite.id);
-  if (card === undefined) return false;
-  return isMastered(card.state);
+  return cards.some((c) => c.id === favourite.id && isMastered(c.state));
 }
 
 export function saveFavourite(

@@ -292,9 +292,13 @@ export default function StatsPage() {
       // This check is idempotent: `checkBadges` only returns badges not already
       // in `earnedIdSet`, so running it on both Stats and Journey is safe.
       if (!anyFlagOn) {
+        // Scoped to the active pokemonNameLocale (#1851) so ja/zh learners'
+        // mastery counts toward badges; previously the implicit "en" default
+        // evaluated English-only mastery.
         const masteredIds = masteredSpeciesIds(
           sessionCards,
           false,
+          settings.pokemonNameLocale,
         );
         const earnedIdSet = new Set(settings.earnedBadges.map((b) => b.id));
         const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIdSet);
@@ -331,15 +335,17 @@ export default function StatsPage() {
   }, [storageVersion, anyFlagOn, supabase, user, seed]);
 
   // Per-game mastery breakdown (#1313). Recomputed whenever cards change or
-  // the superuser flag toggles.
+  // the superuser flag toggles. Locale-scoped (#1851) so the panel reflects
+  // the active learning language like the rest of the page.
   const perGame = useMemo<GameStats[]>(() => {
     if (cards === null || seed === null) return [];
     return computePerGameStats(
       cards,
       seed.seedPokemon,
       flags.pretendAllMastered,
+      pokemonNameLocale,
     );
-  }, [cards, flags.pretendAllMastered, seed]);
+  }, [cards, flags.pretendAllMastered, seed, pokemonNameLocale]);
 
   // Provide the full snapshot input to the shared DashboardSnapshotContext.
   // Stats reads all axes from the returned snapshot (#1139, simplified in #1151).

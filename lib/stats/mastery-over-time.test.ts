@@ -120,18 +120,18 @@ function makeMasteredSpecies(
 
 describe("computeMasteryOverTime - species-level (both legs)", () => {
   it("returns empty array when no cards are present", () => {
-    expect(computeMasteryOverTime([], TODAY)).toEqual([]);
+    expect(computeMasteryOverTime([], TODAY, false, "en")).toEqual([]);
   });
 
   it("returns empty array when only name cards are mastered (no reverse leg)", () => {
     // The reverse leg is absent - species is NOT species-mastered.
     const cards: ReviewableCard[] = [makeNameCard(1, "2026-05-01", true)];
-    expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
+    expect(computeMasteryOverTime(cards, TODAY, false, "en")).toEqual([]);
   });
 
   it("returns empty array when only reverse cards are mastered (no name leg)", () => {
     const cards: ReviewableCard[] = [makeReverseCard(1, "2026-05-01", true)];
-    expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
+    expect(computeMasteryOverTime(cards, TODAY, false, "en")).toEqual([]);
   });
 
   it("returns empty array when name is mastered but reverse is not", () => {
@@ -139,7 +139,7 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
       makeNameCard(1, "2026-05-01", true),
       makeReverseCard(1, "2026-05-01", false), // reverse not mastered
     ];
-    expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
+    expect(computeMasteryOverTime(cards, TODAY, false, "en")).toEqual([]);
   });
 
   it("returns empty array when reverse is mastered but name is not", () => {
@@ -147,26 +147,26 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
       makeNameCard(1, "2026-05-01", false), // name not mastered
       makeReverseCard(1, "2026-05-01", true),
     ];
-    expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
+    expect(computeMasteryOverTime(cards, TODAY, false, "en")).toEqual([]);
   });
 
   it("returns a single point when one species has both legs mastered on the same date", () => {
     const cards = makeMasteredSpecies(1, "2026-05-01", "2026-05-01");
-    const series = computeMasteryOverTime(cards, TODAY);
+    const series = computeMasteryOverTime(cards, TODAY, false, "en");
     expect(series).toEqual([{ date: "2026-05-01", count: 1 }]);
   });
 
   it("uses the LATER of the two leg dates as the species masteredDate", () => {
     // Name mastered on May 1, reverse mastered on May 5 - species mastered on May 5.
     const cards = makeMasteredSpecies(1, "2026-05-01", "2026-05-05");
-    const series = computeMasteryOverTime(cards, TODAY);
+    const series = computeMasteryOverTime(cards, TODAY, false, "en");
     expect(series).toEqual([{ date: "2026-05-05", count: 1 }]);
   });
 
   it("uses the later date regardless of which leg comes last", () => {
     // Reverse mastered on May 3, name mastered on May 10 - species mastered on May 10.
     const cards = makeMasteredSpecies(1, "2026-05-10", "2026-05-03");
-    const series = computeMasteryOverTime(cards, TODAY);
+    const series = computeMasteryOverTime(cards, TODAY, false, "en");
     expect(series).toEqual([{ date: "2026-05-10", count: 1 }]);
   });
 
@@ -177,7 +177,7 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
       ...makeMasteredSpecies(3, "2026-04-10", "2026-04-10"),
       ...makeMasteredSpecies(4, "2026-05-01", "2026-05-01"),
     ];
-    const series = computeMasteryOverTime(cards, TODAY);
+    const series = computeMasteryOverTime(cards, TODAY, false, "en");
     expect(series).toEqual([
       { date: "2026-04-01", count: 1 },
       { date: "2026-04-10", count: 3 },
@@ -190,7 +190,7 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
       ...makeMasteredSpecies(1, "2026-04-01", "2026-04-01"),
       makeNameCard(2, "2026-04-10", true),   // name mastered, no paired reverse
     ];
-    const series = computeMasteryOverTime(cards, TODAY);
+    const series = computeMasteryOverTime(cards, TODAY, false, "en");
     expect(series).toHaveLength(1);
     expect(series[0].count).toBe(1);
   });
@@ -200,7 +200,7 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
       makeNameCard(1, null, false),
       makeReverseCard(1, null, false),
     ];
-    expect(computeMasteryOverTime(cards, TODAY)).toEqual([]);
+    expect(computeMasteryOverTime(cards, TODAY, false, "en")).toEqual([]);
   });
 
   it("collapses multiple species mastered on the same date into one point", () => {
@@ -209,7 +209,7 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
       ...makeMasteredSpecies(2, "2026-05-01", "2026-05-01"),
       ...makeMasteredSpecies(3, "2026-05-01", "2026-05-01"),
     ];
-    const series = computeMasteryOverTime(cards, TODAY);
+    const series = computeMasteryOverTime(cards, TODAY, false, "en");
     expect(series).toHaveLength(1);
     expect(series[0]).toEqual({ date: "2026-05-01", count: 3 });
   });
@@ -241,10 +241,10 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
     ];
 
     // stability=21 meets the gate → 1 species mastered.
-    expect(computeMasteryOverTime(masteredCards, TODAY)).toHaveLength(1);
+    expect(computeMasteryOverTime(masteredCards, TODAY, false, "en")).toHaveLength(1);
 
     // stability=20 does not meet the gate → 0 species mastered.
-    expect(computeMasteryOverTime(learningCards, TODAY)).toHaveLength(0);
+    expect(computeMasteryOverTime(learningCards, TODAY, false, "en")).toHaveLength(0);
   });
 
   // ---------------------------------------------------------------------------
@@ -261,19 +261,19 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
       makeReverseCard(2, null, false),
       makeReverseCard(3, "2026-04-01", true),
     ];
-    const series = computeMasteryOverTime(cards, TODAY, true);
+    const series = computeMasteryOverTime(cards, TODAY, true, "en");
     // 3 name cards → count should be 3 (not 6).
     expect(series).toEqual([{ date: TODAY, count: 3 }]);
   });
 
   it("forceAllMastered: returns the full name-card count even when nothing is mastered", () => {
     const cards: ReviewableCard[] = [makeNameCard(1, null, false), makeNameCard(2, null, false)];
-    const series = computeMasteryOverTime(cards, TODAY, true);
+    const series = computeMasteryOverTime(cards, TODAY, true, "en");
     expect(series).toEqual([{ date: TODAY, count: 2 }]);
   });
 
   it("forceAllMastered: empty card list returns a single point at 0", () => {
-    const series = computeMasteryOverTime([], TODAY, true);
+    const series = computeMasteryOverTime([], TODAY, true, "en");
     expect(series).toEqual([{ date: TODAY, count: 0 }]);
   });
 
@@ -283,7 +283,7 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
       ...makeMasteredSpecies(1, "2026-04-01", "2026-04-01"),
       ...makeMasteredSpecies(2, "2026-04-20", "2026-04-20"),
     ];
-    const series = computeMasteryOverTime(cards, TODAY);
+    const series = computeMasteryOverTime(cards, TODAY, false, "en");
     for (let i = 1; i < series.length; i++) {
       expect(series[i].date > series[i - 1].date).toBe(true);
     }
@@ -295,9 +295,32 @@ describe("computeMasteryOverTime - species-level (both legs)", () => {
       ...makeMasteredSpecies(2, "2026-04-10", "2026-04-10"),
       ...makeMasteredSpecies(3, "2026-05-01", "2026-05-01"),
     ];
-    const series = computeMasteryOverTime(cards, TODAY);
+    const series = computeMasteryOverTime(cards, TODAY, false, "en");
     for (let i = 1; i < series.length; i++) {
       expect(series[i].count).toBeGreaterThanOrEqual(series[i - 1].count);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// forceAllMastered overlay locale scoping (#1851)
+// ---------------------------------------------------------------------------
+
+describe("computeMasteryOverTime forceAllMastered locale scoping (#1851)", () => {
+  it("counts only the active locale's name cards in the overlay", () => {
+    const cards = [
+      makeNameCard(1, null),
+      makeNameCard(2, null),
+      { ...makeNameCard(3, null), locale: "ja" as const },
+    ];
+    // Two en cards + one ja card: the en overlay must report 2, not 3
+    // (previously the overlay had no locale filter and a two-locale QA
+    // session showed roughly double the species count).
+    const enOverlay = computeMasteryOverTime(cards, TODAY, true, "en");
+    expect(enOverlay).toHaveLength(1);
+    expect(enOverlay[0]?.count).toBe(2);
+
+    const jaOverlay = computeMasteryOverTime(cards, TODAY, true, "ja");
+    expect(jaOverlay[0]?.count).toBe(1);
   });
 });

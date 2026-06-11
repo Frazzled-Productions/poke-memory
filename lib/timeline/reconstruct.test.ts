@@ -51,6 +51,7 @@ function baseOpts(
     currentNameCards: new Map(),
     totalSpecies: 10,
     nowMs: NOW_MS,
+    locale: "en",
     ...extra,
   };
 }
@@ -568,5 +569,31 @@ describe("snapshotAtPosition", () => {
     const tl = makeFakeTl();
     expect(() => snapshotAtPosition(tl, -999)).not.toThrow();
     expect(() => snapshotAtPosition(tl, 999)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-locale replay isolation (#1851)
+// ---------------------------------------------------------------------------
+
+describe("buildCollectionTimeline locale isolation (#1851)", () => {
+  it("excludes other locales' grade-log entries from the replay", () => {
+    // Four Easy grades on species 1, all stamped ja. Same subjectKey as a
+    // would-be en card - before #1851 the replay merged both locales' grades
+    // into one FSRS stream.
+    const jaLog = [0, 7, 16, 30].map((offset) => ({
+      ...makeEntry("1", 5, offset),
+      locale: "ja" as const,
+    }));
+
+    const underEn = buildCollectionTimeline(baseOpts({ log: jaLog }));
+    const emptyLog = buildCollectionTimeline(baseOpts({}));
+    // Under the en locale the ja entries are invisible: identical past
+    // timeline to an empty log.
+    expect(underEn.past).toEqual(emptyLog.past);
+
+    // Under ja the same entries drive the replay.
+    const underJa = buildCollectionTimeline(baseOpts({ log: jaLog, locale: "ja" }));
+    expect(underJa.past).not.toEqual(emptyLog.past);
   });
 });

@@ -16,6 +16,7 @@
  */
 
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
+import type { AppLocale } from "@/i18n/locales";
 // Import the numeric constant from seed-builder (no JSON dependency) so
 // per-game.ts does NOT force the seed JSON into any shared chunk (#1677).
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-builder";
@@ -44,6 +45,12 @@ export type GameStats = {
  * @param cards              Full mixed card array (name + reverse + others).
  * @param seed               `SEED_POKEMON` (provides versionGroups per species).
  * @param forceAllMastered   Superuser flag: treats every species as mastered.
+ * @param locale             Active pokemonNameLocale. REQUIRED (#1851
+ *                           type-system forcing): both the name-card lookup
+ *                           and the reverse-mastery set are scoped to this
+ *                           locale, matching computeStats, so a ja-active
+ *                           user's per-game panel reflects ja progress and a
+ *                           mastered ja reverse leg cannot count for en.
  * @returns                  One entry per version-group slug that appears in
  *                           at least one seed entry, in seed-insertion order
  *                           (i.e. no guaranteed sort - callers should sort via
@@ -52,23 +59,26 @@ export type GameStats = {
 export function computePerGameStats(
   cards: readonly ReviewableCard[],
   seed: readonly SeedPokemon[],
-  forceAllMastered = false,
+  forceAllMastered: boolean,
+  locale: AppLocale,
 ): GameStats[] {
-  // Build a lookup from pokemon ID → name card for fast per-species access.
-  // Filter to the "en" locale to match the same default as computeStats, so
-  // multi-locale sessions don't double-count a species.
+  // Build a lookup from pokemon ID → name card for fast per-species access,
+  // scoped to the active locale so multi-locale sessions don't collide.
   const nameCardById = new Map<number, NameReviewCard>();
   for (const card of cards) {
-    if (card.cardType === "name" && ((card as NameReviewCard).locale ?? "en") === "en") {
+    if (card.cardType === "name" && ((card as NameReviewCard).locale ?? "en") === locale) {
       nameCardById.set(card.id, card as NameReviewCard);
     }
   }
 
   // Build the set of species IDs whose reverse card has cleared the mastery
-  // gate. Mirrors the identical logic in computeStats.
+  // gate IN THIS LOCALE. Mirrors the identical logic in computeStats - the
+  // locale guard is part of that logic (#1851): without it a mastered ja
+  // reverse leg marked an en species as mastered.
   const masteredReverseSpecies = new Set<number>();
   for (const card of cards) {
     if (card.cardType !== "reverse") continue;
+    if ((card.locale ?? "en") !== locale) continue;
     const speciesId = card.id - REVERSE_ID_OFFSET;
     if (speciesId > 0 && (forceAllMastered || isMastered(card.state))) {
       masteredReverseSpecies.add(speciesId);

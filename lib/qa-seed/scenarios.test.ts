@@ -250,7 +250,7 @@ describe("scenario payload builders", () => {
 
     it("produces name-mastered/reverse-pending pairs that satisfy deriveCloseToMastery", () => {
       const cards = buildCards();
-      const closeToMastery = deriveCloseToMastery(cards);
+      const closeToMastery = deriveCloseToMastery(cards, false, "en");
       // Must have all 10 intended entries: 5 nearMissPartialIds (partially-reviewed
       // reverse) + 5 nearMissUnseenIds (unseen reverse). Setting the floor to 10
       // is a real forcing function: the pre-fix code produced 8 because ids 41 and
