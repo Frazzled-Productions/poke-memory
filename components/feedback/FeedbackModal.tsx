@@ -7,6 +7,17 @@ import { colStackLg, dialogPanel, mutedTextXs } from "@/lib/utils/class-names";
 /** Valid feedback categories as accepted by POST /api/feedback (#1621). */
 type FeedbackCategory = "bug" | "feature" | "other";
 
+/** User-selectable page paths. Empty string means "not specified" (stored as null). */
+type FeedbackPage =
+  | ""
+  | "/"
+  | "/pokedex"
+  | "/pasture"
+  | "/stats"
+  | "/journey"
+  | "/settings"
+  | "other";
+
 const MESSAGE_MAX_LENGTH = 2000;
 
 interface Props {
@@ -34,6 +45,7 @@ export function FeedbackModal({ open, onClose }: Props) {
   const t = useTranslations("settings.feedback");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [category, setCategory] = useState<FeedbackCategory | "">("");
+  const [selectedPage, setSelectedPage] = useState<FeedbackPage>("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -53,6 +65,7 @@ export function FeedbackModal({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) {
       setCategory("");
+      setSelectedPage("");
       setMessage("");
       setSubmitting(false);
       setSubmitted(false);
@@ -76,6 +89,8 @@ export function FeedbackModal({ open, onClose }: Props) {
     if (category === "" || message.trim().length === 0 || submitting) return;
     setSubmitting(true);
     setError(null);
+    // Use the user-stated page if provided; omit otherwise (null in DB, absent in Discord embed).
+    const pageValue = selectedPage !== "" ? selectedPage : null;
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
@@ -83,7 +98,7 @@ export function FeedbackModal({ open, onClose }: Props) {
         body: JSON.stringify({
           category,
           message: message.slice(0, MESSAGE_MAX_LENGTH),
-          page: window.location.pathname,
+          page: pageValue,
           appVersion: process.env.NEXT_PUBLIC_APP_VERSION,
         }),
       });
@@ -97,7 +112,7 @@ export function FeedbackModal({ open, onClose }: Props) {
       setError(t("errorMessage"));
       setSubmitting(false);
     }
-  }, [category, message, submitting, t]);
+  }, [category, message, selectedPage, submitting, t]);
 
   // Cmd/Ctrl+Enter submits from within the textarea.
   function handleTextareaKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -170,6 +185,32 @@ export function FeedbackModal({ open, onClose }: Props) {
               <option value="bug">{t("categoryBug")}</option>
               <option value="feature">{t("categoryFeature")}</option>
               <option value="other">{t("categoryOther")}</option>
+            </select>
+          </div>
+
+          {/* Page selector (optional, #1847) */}
+          <div>
+            <label
+              htmlFor="feedback-page"
+              className="block text-sm font-medium text-foreground"
+            >
+              {t("pageLabel")}
+            </label>
+            <select
+              id="feedback-page"
+              value={selectedPage}
+              onChange={(e) => setSelectedPage(e.target.value as FeedbackPage)}
+              disabled={submitting}
+              className="mt-2 w-full rounded-lg border border-zinc-300 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50 dark:border-zinc-700"
+            >
+              <option value="">{t("pageOptionDefault")}</option>
+              <option value="/">{t("pageOptionPractice")}</option>
+              <option value="/pokedex">{t("pageOptionPokedex")}</option>
+              <option value="/pasture">{t("pageOptionPasture")}</option>
+              <option value="/stats">{t("pageOptionStats")}</option>
+              <option value="/journey">{t("pageOptionJourney")}</option>
+              <option value="/settings">{t("pageOptionSettings")}</option>
+              <option value="other">{t("pageOptionOther")}</option>
             </select>
           </div>
 

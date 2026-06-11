@@ -1972,3 +1972,48 @@ describe("SettingsPage - SW version diagnostic (#1826)", () => {
     process.env.NEXT_PUBLIC_APP_VERSION = originalAppVersion;
   });
 });
+
+// ---------------------------------------------------------------------------
+// Feedback row - lifted above accordions (#1849)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage - lifted feedback row (#1847 / #1849)", () => {
+  it("renders a 'Send feedback' button above the accordions (id=feedback-row present)", async () => {
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      // The feedback row element with its stable id must be present in the DOM.
+      expect(document.getElementById("feedback-row")).toBeInTheDocument();
+    });
+
+    // The button inside the row must be visible and labelled.
+    const feedbackBtn = screen.getByRole("button", { name: /send feedback/i });
+    expect(feedbackBtn).toBeInTheDocument();
+  });
+
+  it("clicking 'Send feedback' opens the FeedbackModal (feedback-category select becomes visible)", async () => {
+    // Stub the dialog open/close so jsdom treats it as open.
+    HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+      this.open = false;
+    };
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /send feedback/i })).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /send feedback/i }));
+    });
+
+    // The category select is rendered inside the modal - its presence confirms the
+    // modal opened and the FeedbackModal form is mounted.
+    await waitFor(() => {
+      expect(document.getElementById("feedback-category")).toBeInTheDocument();
+    });
+  });
+});

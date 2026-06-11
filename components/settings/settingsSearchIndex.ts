@@ -24,6 +24,25 @@ export type SectionSearchEntry = {
 
 export const SETTINGS_SEARCH_INDEX: SectionSearchEntry[] = [
   {
+    // Not a CollapsibleSection - maps to the id="feedback-row" element at the
+    // top of Settings so searches for feedback terms reveal and scroll to it.
+    sectionId: "feedback-row",
+    terms: [
+      "feedback",
+      "send feedback",
+      "bug",
+      "bug report",
+      "report a bug",
+      "report",
+      "report a problem",
+      "contact",
+      "support",
+      "suggestion",
+      "feature request",
+      "improve",
+    ],
+  },
+  {
     sectionId: "practice-schedule-heading",
     terms: [
       "practice",

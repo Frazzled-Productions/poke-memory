@@ -202,6 +202,19 @@ describe("POST /api/discord/notify - success", () => {
     expect(authField.value).toBe("Yes");
   });
 
+  it("shows '(not provided)' in the Page field when page is null (#1847 - user left selector blank)", async () => {
+    await POST(makeRequest({ ...VALID_BODY, page: null }));
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(init.body as string) as {
+      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
+    };
+    const pageField = payload.embeds[0].fields.find((f) => f.name === "Page")!;
+    // Null page (user didn't state a page) must NOT show "/settings" - any
+    // previous submission that captured the pathname would always be "/settings".
+    expect(pageField.value).not.toBe("/settings");
+    expect(pageField.value).toBe("(not provided)");
+  });
+
   it("shows 'No (guest)' in the Authenticated field for guest submissions", async () => {
     await POST(makeRequest({ ...VALID_BODY, authenticated: false }));
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
