@@ -22,6 +22,9 @@ import type {
 import { computeEvolutionWallStats } from "@/lib/evolution/chains";
 import { mutedText, mutedTextXs } from "@/lib/utils/class-names";
 import { POKEDEX_NODE_SPRITE_SIZE } from "@/lib/sprites/sizes";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
+import { getLocaleNamesSnapshot, getLocaleName } from "@/lib/pokemon/localeNames";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -119,13 +122,16 @@ function CompactEdgeArrow({ edge, fromName, toName }: {
 // ---------------------------------------------------------------------------
 
 function SpeciesNode({ node }: { node: FamilyNode }) {
+  // eslint-disable-next-line no-restricted-syntax -- English fallback arg, not a direct render
+  const { name: localeName } = useLocalePokemonName(node.speciesId, node.name);
+  const { locale } = usePokemonLocaleContext();
   return (
     <div className="flex flex-col items-center gap-0.5" style={{ minWidth: 48 }}>
       <div className="relative h-10 w-10 shrink-0">
         {node.spriteUrl ? (
           <Image
             src={node.spriteUrl}
-            alt={node.name}
+            alt={localeName}
             width={POKEDEX_NODE_SPRITE_SIZE}
             height={POKEDEX_NODE_SPRITE_SIZE}
             className="object-contain"
@@ -135,11 +141,24 @@ function SpeciesNode({ node }: { node: FamilyNode }) {
           <div className="h-10 w-10 rounded-full bg-zinc-200 dark:bg-zinc-700" aria-hidden="true" />
         )}
       </div>
-      <span className="max-w-[52px] truncate text-center text-[10px] leading-tight text-zinc-500 dark:text-zinc-400">
-        {node.name}
+      <span
+        className="max-w-[52px] truncate text-center text-[10px] leading-tight text-zinc-500 dark:text-zinc-400"
+        lang={locale !== "en" ? locale : undefined}
+      >
+        {localeName}
       </span>
     </div>
   );
+}
+
+/**
+ * Resolve a locale name for a node synchronously from the sidecar snapshot.
+ * Falls back to node.name (English) before the sidecar has loaded.
+ */
+function resolveNodeName(node: Pick<FamilyNode, "speciesId" | "name">, locale: string): string {
+  if (locale === "en") return node.name;
+  // eslint-disable-next-line no-restricted-syntax -- English fallback arg, not a direct render
+  return getLocaleName(node.speciesId, locale as Parameters<typeof getLocaleName>[1]) ?? node.name;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +217,12 @@ function LinearChain({
   nodeById: Map<number, FamilyNode>;
   outEdges: Map<number, FamilyEdge[]>;
 }) {
+  const { locale } = usePokemonLocaleContext();
+  // Pre-load the sidecar snapshot so edge aria-labels use the locale name.
+  // getLocaleNamesSnapshot() is synchronous; SpeciesNode triggers the async
+  // load and re-renders once it resolves.
+  void getLocaleNamesSnapshot();
+
   // Walk the chain from the root.
   const ordered: Array<{ node: FamilyNode; edge: FamilyEdge | null }> = [];
   let currentId: number | null = family.rootId;
@@ -217,8 +242,8 @@ function LinearChain({
           {edge !== null && (
             <CompactEdgeArrow
               edge={edge}
-              fromName={node.name}
-              toName={nodeById.get(edge.toId)?.name ?? "?"}
+              fromName={resolveNodeName(node, locale)}
+              toName={resolveNodeName(nodeById.get(edge.toId) ?? { speciesId: 0, name: "?" }, locale)}
             />
           )}
         </span>
@@ -241,6 +266,9 @@ function BranchingTree({
   nodeById: Map<number, FamilyNode>;
   outEdges: Map<number, FamilyEdge[]>;
 }) {
+  const { locale } = usePokemonLocaleContext();
+  void getLocaleNamesSnapshot();
+
   const rootNode = nodeById.get(family.rootId);
   if (!rootNode) return null;
 
@@ -264,8 +292,8 @@ function BranchingTree({
               <div key={edge.toId} className="flex items-center gap-1">
                 <CompactEdgeArrow
                   edge={edge}
-                  fromName={node.name}
-                  toName={childNode?.name ?? "?"}
+                  fromName={resolveNodeName(node, locale)}
+                  toName={resolveNodeName(childNode ?? { speciesId: 0, name: "?" }, locale)}
                 />
                 {renderSubtree(edge.toId)}
               </div>

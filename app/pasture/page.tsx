@@ -28,6 +28,8 @@ import { useSeed } from "@/lib/pokemon/SeedContext";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { generationOf } from "@/lib/stats/derive";
+import { getLocaleName, getTransliteration } from "@/lib/pokemon/localeNames";
+import type { PokemonNameLocale, TransliterationLocale } from "@/lib/pokemon/seed";
 import { OnboardingHint } from "@/components/onboarding/OnboardingHint";
 import { PageShell } from "@/components/ui/PageShell";
 import { pageTitle } from "@/lib/utils/class-names";
@@ -98,15 +100,34 @@ function buildZoneData(
 /**
  * Applies name search, type, and generation filters to the mastered card set.
  * Stats remain computed from the full mastered set, independent of this filter.
+ *
+ * When `locale` is non-"en", the name search also matches the locale name and
+ * its transliteration so users can search by the name they see in the Pasture.
  */
 function applyFilters(
   cards: NameReviewCard[],
   filters: PastureFilters,
+  locale: PokemonNameLocale = "en",
 ): NameReviewCard[] {
   return cards.filter((card) => {
     if (filters.query !== "") {
       const q = filters.query.trim().toLowerCase();
-      if (!card.name.toLowerCase().includes(q)) return false;
+      const englishMatches = card.name.toLowerCase().includes(q);
+      let matches = englishMatches;
+      if (!matches && locale !== "en") {
+        const sid = card.speciesId ?? card.id;
+        const localeName = getLocaleName(sid, locale);
+        if (localeName && localeName.toLowerCase().includes(q)) {
+          matches = true;
+        }
+        if (!matches) {
+          const translit = getTransliteration(sid, locale as TransliterationLocale);
+          if (translit && translit.toLowerCase().includes(q)) {
+            matches = true;
+          }
+        }
+      }
+      if (!matches) return false;
     }
 
     if (filters.types.length > 0) {
@@ -325,7 +346,7 @@ export default function PasturePage() {
     );
   }
 
-  const visibleCards = applyFilters(masteredCards, filters);
+  const visibleCards = applyFilters(masteredCards, filters, pokemonNameLocale);
 
   const zones = buildZoneData(
     visibleCards,

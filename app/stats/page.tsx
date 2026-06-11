@@ -58,6 +58,8 @@ import { GameBreakdown } from "@/components/stats/GameBreakdown";
 import { LanguageBreakdown } from "@/components/stats/LanguageBreakdown";
 import type { AppLocale } from "@/i18n/locales";
 import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 
 // ---------------------------------------------------------------------------
 // Lazily-loaded Recharts chart components.
@@ -136,9 +138,47 @@ function LoadingSkeleton({ ariaLabel }: { ariaLabel: string }) {
 }
 
 
+/**
+ * One row in the Struggling cards list. Extracted as a named sub-component so
+ * the hook can be called once per card (hooks cannot be called in .map callbacks).
+ */
+function StrugglingCardRow({ card }: { card: StrugglingCard }) {
+  const tCommon = useTranslations("common");
+  const { locale } = usePokemonLocaleContext();
+  // eslint-disable-next-line no-restricted-syntax -- English fallback arg, not a direct render
+  const { name: localeName } = useLocalePokemonName(card.speciesId, card.name);
+  return (
+    <Link
+      href={`/pokedex/${card.id}`}
+      aria-label={tCommon("viewInPokedex", { name: localeName })}
+      className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-background px-4 py-2 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-zinc-800 dark:hover:bg-zinc-900"
+    >
+      <Image
+        src={card.spriteUrl}
+        alt={localeName}
+        width={STATS_SPRITE_SIZE}
+        height={STATS_SPRITE_SIZE}
+        className="shrink-0 object-contain"
+      />
+      <div className="min-w-0 flex-1">
+        <p
+          className="truncate font-medium text-foreground"
+          lang={locale !== "en" ? locale : undefined}
+        >
+          {localeName}
+        </p>
+        <p className={`${mutedTextXs} tabular-nums`}>
+          Ease factor: {card.easeFactor.toFixed(2)} · Reps:{" "}
+          {card.repetitions}
+        </p>
+      </div>
+      <DirectionBadge direction="name" />
+    </Link>
+  );
+}
+
 function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[] }) {
   const t = useTranslations("stats");
-  const tCommon = useTranslations("common");
   return (
     <section aria-labelledby="struggling-heading">
       {/* h3 because StrugglingCards is nested inside the Scheduling h2 section */}
@@ -154,27 +194,7 @@ function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[]
         <ul className={colStack} role="list">
           {struggling.map((card) => (
             <li key={card.id}>
-              <Link
-                href={`/pokedex/${card.id}`}
-                aria-label={tCommon("viewInPokedex", { name: card.name })}
-                className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-background px-4 py-2 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-zinc-800 dark:hover:bg-zinc-900"
-              >
-                <Image
-                  src={card.spriteUrl}
-                  alt={card.name}
-                  width={STATS_SPRITE_SIZE}
-                  height={STATS_SPRITE_SIZE}
-                  className="shrink-0 object-contain"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-foreground">{card.name}</p>
-                  <p className={`${mutedTextXs} tabular-nums`}>
-                    Ease factor: {card.easeFactor.toFixed(2)} · Reps:{" "}
-                    {card.repetitions}
-                  </p>
-                </div>
-                <DirectionBadge direction="name" />
-              </Link>
+              <StrugglingCardRow card={card} />
             </li>
           ))}
         </ul>
