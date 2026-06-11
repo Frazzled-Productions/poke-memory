@@ -54,14 +54,17 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
     ringClass = "ring-2 ring-yellow-400";
 
   return (
-    /* flex-1 min-h-0 min-w-0: the tile fills half the available width and
-       all the available height in the shrinkable tiles row (#1837). */
+    /* flex-1 h-full: the tile fills half the available width (flex-1 in the
+       row direction) and the full height of the tiles row (h-full avoids the
+       Webkit bug where flex-1 + min-h-0 on the cross-axis resolves to
+       zero-height, making the button's click-center land on a sibling element
+       instead of the button itself, #1837). */
     <button
       type="button"
       onClick={onPick}
       disabled={phase === "revealed"}
       className={[
-        "flex flex-1 min-h-0 min-w-0 flex-col items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 transition-colors",
+        "flex flex-1 h-full flex-col items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 transition-colors",
         "hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2",
         "disabled:cursor-default disabled:hover:bg-zinc-50",
         "dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:disabled:hover:bg-zinc-900",
@@ -71,10 +74,10 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
         .join(" ")}
       aria-label={localeName}
     >
-      {/* Sprite fills the available flex-1 region of the tile and shrinks on
-          short viewports (e.g. iPhone SE) via min-h-0. The fixed h-24/sm:h-32
-          is the maximum size; the tile clips to its available height via
-          overflow-hidden on the parent row. */}
+      {/* Sprite is capped at max-h-24 / sm:max-h-32 so it does not overflow
+          the tile on short viewports (e.g. iPhone SE). The sprite grows to fill
+          available space via flex-1 min-h-0 but never exceeds the cap.
+          object-contain preserves aspect ratio. */}
       {/* unoptimized: sprites are self-hosted static PNGs; keeping the URL
           identical to what decodeSpriteUrls warms means the decode pre-warm
           prevents names swapping before the sprite has loaded (#879). */}
@@ -83,7 +86,7 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
         alt={localeName}
         width={POKEDEX_FORM_SPRITE_SIZE}
         height={POKEDEX_FORM_SPRITE_SIZE}
-        className="flex-1 min-h-0 w-auto max-h-full object-contain sm:max-h-32"
+        className="flex-1 min-h-0 w-auto max-h-24 object-contain sm:max-h-32"
         unoptimized
       />
       <p
@@ -236,11 +239,13 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
         <span className="font-bold">{statLabel(pair.stat)}</span>?
       </p>
 
-      {/* flex-1 min-h-0: sprite tiles region absorbs available height and
-          shrinks on short viewports so the pinned footer stays on-screen.
-          overflow-hidden prevents tiles from punching through on very short
-          viewports like iPhone SE. */}
-      <div className="flex flex-1 min-h-0 gap-3 w-full justify-center overflow-hidden">
+      {/* flex-1 min-h-0: sprite tiles region absorbs the remaining height
+          inside the section and can shrink on short viewports (e.g. iPhone SE)
+          so the pinned footer stays on-screen. overflow-hidden is intentionally
+          omitted: it caused Webkit to lose the height context for the tile
+          buttons, collapsing their computed height to zero (#1837). The sprite
+          max-h cap prevents overflow instead. */}
+      <div className="flex flex-1 min-h-0 gap-3 w-full justify-center">
         <PokemonTile
           pokemon={pair.left}
           stat={pair.stat}
@@ -259,11 +264,13 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
 
       {/* flex-none: result message and action button are always pinned at the
           bottom of the game section so the user never needs to scroll to reach
-          them (#1837). The min-h ensures the footer reserves space even when
-          the result is not yet shown, preventing layout shift on reveal. */}
+          them (#1837). min-h-[72px] reserves space so there is no layout shift
+          on reveal. pointer-events-none in the picking phase prevents Webkit
+          from routing clicks intended for the tile buttons to this placeholder
+          div (empty but hit-testable on Webkit, #1837). */}
       <div
         ref={resultBlockRef}
-        className="flex-none flex flex-col items-center gap-3 w-full pt-3 pb-2 min-h-[72px] justify-center"
+        className={`flex-none flex flex-col items-center gap-3 w-full pt-3 pb-2 min-h-[72px] justify-center${phase !== "revealed" ? " pointer-events-none" : ""}`}
       >
         {phase === "revealed" && lastResult !== null && (
           <>
