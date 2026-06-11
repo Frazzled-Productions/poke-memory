@@ -24,6 +24,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 // ---------------------------------------------------------------------------
 
 import type {
+  ReconcileResult,
   SubscribeResult,
   UnsubscribeResult,
 } from "@/lib/push/subscribe";
@@ -31,6 +32,9 @@ import type {
 const mockIsPushSupported = vi.fn<() => boolean>(() => true);
 const mockIsStandalone = vi.fn<() => boolean>(() => true);
 const mockHasLocalSubscription = vi.fn<() => Promise<boolean>>(async () => false);
+const mockReconcileSubscription = vi.fn<
+  (client: SupabaseClient, userId: string) => Promise<ReconcileResult>
+>(async () => "in-sync");
 const mockSubscribeToPush = vi.fn<
   (client: SupabaseClient, userId: string) => Promise<SubscribeResult>
 >(async () => ({ ok: true }));
@@ -42,6 +46,8 @@ vi.mock("@/lib/push/subscribe", () => ({
   isPushSupported: () => mockIsPushSupported(),
   isStandalone: () => mockIsStandalone(),
   hasLocalSubscription: () => mockHasLocalSubscription(),
+  reconcileSubscription: (client: SupabaseClient, userId: string) =>
+    mockReconcileSubscription(client, userId),
   subscribeToPush: (client: SupabaseClient, userId: string) =>
     mockSubscribeToPush(client, userId),
   unsubscribeFromPush: (client: SupabaseClient, userId: string) =>
@@ -75,6 +81,8 @@ beforeEach(() => {
   mockIsPushSupported.mockReturnValue(true);
   mockIsStandalone.mockReturnValue(true);
   mockHasLocalSubscription.mockResolvedValue(false);
+  // Default: reconcile confirms the local subscription is in sync.
+  mockReconcileSubscription.mockResolvedValue("in-sync");
   mockSubscribeToPush.mockResolvedValue({ ok: true });
   mockUnsubscribeFromPush.mockResolvedValue({ ok: true });
   mockUseSuperuser.mockReturnValue({ anyFlagOn: false });
@@ -208,6 +216,45 @@ describe("PushOptIn - interaction", () => {
     expect(alert.textContent).toMatch(/could not unsubscribe/i);
     // State stays subscribed because the call did not succeed.
     expect(toggle.getAttribute("aria-checked")).toBe("true");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reconciliation (#1858 F35).
+// ---------------------------------------------------------------------------
+
+describe("PushOptIn - subscription reconciliation", () => {
+  it("shows the toggle ON when hasLocalSubscription=true and reconcile returns 'in-sync'", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    mockReconcileSubscription.mockResolvedValue("in-sync");
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const toggle = await screen.findByTestId("push-optin-button");
+    await waitFor(() => {
+      expect(toggle.getAttribute("aria-checked")).toBe("true");
+    });
+  });
+
+  it("shows the toggle ON when reconcile returns 're-inserted' (row was missing but re-persisted)", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    mockReconcileSubscription.mockResolvedValue("re-inserted");
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const toggle = await screen.findByTestId("push-optin-button");
+    await waitFor(() => {
+      expect(toggle.getAttribute("aria-checked")).toBe("true");
+    });
+  });
+
+  it("shows the toggle OFF when reconcile returns 'disabled' (orphaned subscription, re-insert failed)", async () => {
+    // The local PushManager has a subscription but there is no server row and
+    // re-insert failed (orphaned endpoint). PushOptIn should flip the toggle
+    // off so the user sees that reminders have stopped (#1858 F35).
+    mockHasLocalSubscription.mockResolvedValue(true);
+    mockReconcileSubscription.mockResolvedValue("disabled");
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const toggle = await screen.findByTestId("push-optin-button");
+    await waitFor(() => {
+      expect(toggle.getAttribute("aria-checked")).toBe("false");
+    });
   });
 });
 

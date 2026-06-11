@@ -113,6 +113,13 @@ interface ServiceWorkerScope {
    * version (#1826).
    */
   __SW_VERSION__: string;
+  /**
+   * VAPID public key injected at build time by scripts/build-sw.mjs.
+   * Used by the pushsubscriptionchange handler to re-subscribe when the
+   * push service rotates the endpoint (#1858 F35). Empty string when
+   * NEXT_PUBLIC_VAPID_PUBLIC_KEY is unset (push unsupported in that build).
+   */
+  __SW_VAPID_PUBLIC_KEY__: string;
   location: { origin: string };
   skipWaiting(): Promise<void>;
   addEventListener(
@@ -138,6 +145,10 @@ interface ServiceWorkerScope {
     type: "activate",
     listener: (event: { waitUntil(promise: Promise<unknown>): void }) => void,
   ): void;
+  addEventListener(
+    type: "pushsubscriptionchange",
+    listener: (event: PushSubscriptionChangeEvent) => void,
+  ): void;
   clients: {
     matchAll(options?: { type?: string; includeUncontrolled?: boolean }): Promise<Array<{
       postMessage(data: unknown, transfer?: Transferable[]): void;
@@ -160,6 +171,29 @@ interface ServiceWorkerScope {
 interface SyncEvent extends Event {
   tag: string;
   waitUntil(promise: Promise<unknown>): void;
+}
+
+/**
+ * Minimal shape of a pushsubscriptionchange event (#1858 F35).
+ *
+ * Fired when the push service rotates or expires the current subscription.
+ * `newSubscription` is non-null when the UA has already re-subscribed;
+ * `oldSubscription` carries the expired endpoint.
+ */
+interface PushSubscriptionChangeEvent extends Event {
+  newSubscription?: PushSubscriptionLite | null;
+  oldSubscription?: PushSubscriptionLite | null;
+  waitUntil(promise: Promise<unknown>): void;
+}
+
+/** Minimal shape of the subscription object available in pushsubscriptionchange. */
+interface PushSubscriptionLite {
+  endpoint: string;
+  getKey(name: "p256dh" | "auth"): ArrayBuffer | null;
+  toJSON(): {
+    endpoint: string;
+    keys?: { p256dh?: string; auth?: string };
+  };
 }
 
 /** Minimal shape of a Push event. */
@@ -369,10 +403,18 @@ const serwist = new Serwist({
 
 // Honour the client's silent activator (#1162): when a SW is waiting and the
 // active tab transitions to hidden, `ServiceWorkerProvider` posts a
-// SKIP_WAITING message. We activate the new worker only if at most one
-// window client is open - otherwise a still-foreground sibling tab would be
-// swapped under the user. The client's visibility listener stays armed, so
-// the next quiet moment retries naturally.
+// REQUEST_SKIP_WAITING message. We activate the new worker only if at most
+// one window client is open - otherwise a still-foreground sibling tab would
+// be swapped under the user. The client's visibility listener stays armed,
+// so the next quiet moment retries naturally.
+//
+// The custom message type REQUEST_SKIP_WAITING intentionally differs from
+// Serwist's built-in "SKIP_WAITING". When `skipWaiting: false` is passed to
+// the Serwist constructor it registers its own message listener that calls
+// self.skipWaiting() unconditionally on {type:"SKIP_WAITING"}, bypassing the
+// client-count gate below. Using REQUEST_SKIP_WAITING means Serwist's listener
+// never fires for our activations, so the gate is the sole decision point
+// (#1858 F34).
 //
 // Also handles GET_SW_VERSION (#1826): the Settings page queries the
 // controlling worker's baked-in version so a stale-worker mismatch is
@@ -380,9 +422,13 @@ const serwist = new Serwist({
 self.addEventListener("message", (event) => {
   if (!event.data) return;
 
-  if (event.data.type === "SKIP_WAITING") {
+  if (event.data.type === "REQUEST_SKIP_WAITING") {
     void (async () => {
-      const clients = await self.clients.matchAll({ type: "window" });
+      // includeUncontrolled: true is required here. A waiting worker controls
+      // no clients yet (it has not called skipWaiting/clientsClaim), so without
+      // this flag matchAll returns an empty array and the <=1 check always
+      // passes - the gate was always open (#1858 F34).
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       if (clients.length <= 1) {
         await self.skipWaiting();
       }
@@ -807,6 +853,83 @@ self.addEventListener("activate", (event) => {
         caches.delete(LEGACY_SPRITE_CACHE_NAME),
         caches.delete(LEGACY_CRY_CACHE_NAME),
       ]);
+    })(),
+  );
+});
+
+/**
+ * pushsubscriptionchange handler (#1858 F35).
+ *
+ * Fires when the push service rotates or expires the current subscription
+ * (e.g. after a browser update or push-service key rotation). Without this
+ * handler the old endpoint silently receives no more pushes, but the local
+ * PushManager still reports a subscription and `hasLocalSubscription()`
+ * returns true - the toggle shows ON while reminders have stopped.
+ *
+ * This handler:
+ *   1. Takes the `newSubscription` if the UA has already re-subscribed, or
+ *      calls `pushManager.subscribe()` to create a fresh one.
+ *   2. POSTs the new subscription to `/api/push/resubscribe` (authenticated
+ *      via session cookie) so the server row is updated.
+ *
+ * On any failure the handler resolves (does not throw), so the browser does
+ * not retry. The PushOptIn reconciliation on next Settings visit will detect
+ * the missing row and re-insert or flip the toggle off.
+ */
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      const vapidKey = self.__SW_VAPID_PUBLIC_KEY__;
+      if (!vapidKey) return;
+
+      let newSub: PushSubscriptionLite | null = event.newSubscription ?? null;
+
+      if (!newSub) {
+        // UA did not provide a new subscription - re-subscribe ourselves.
+        try {
+          const reg = (self as unknown as { registration: ServiceWorkerRegistration }).registration;
+          // Convert the base64url VAPID key to a Uint8Array. Inline the
+          // urlBase64ToUint8Array logic here - we cannot import from lib/push/
+          // subscribe.ts because the SW is a separate esbuild bundle.
+          const padding = "=".repeat((4 - (vapidKey.length % 4)) % 4);
+          const base64 = (vapidKey + padding).replace(/-/g, "+").replace(/_/g, "/");
+          const rawData = atob(base64);
+          const keyBytes = new Uint8Array(rawData.length);
+          for (let i = 0; i < rawData.length; i++) {
+            keyBytes[i] = rawData.charCodeAt(i);
+          }
+          const keyBuffer = new ArrayBuffer(keyBytes.byteLength);
+          new Uint8Array(keyBuffer).set(keyBytes);
+
+          newSub = (await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: keyBuffer,
+          })) as unknown as PushSubscriptionLite;
+        } catch {
+          // PushManager.subscribe failed - give up. The next PushOptIn mount
+          // reconciliation will detect the orphan and flip the toggle off.
+          return;
+        }
+      }
+
+      // Persist the new subscription via the server so the daily route
+      // picks up the updated endpoint. The route authenticates via session
+      // cookie (same-origin SW fetch includes credentials by default).
+      try {
+        const subJson = newSub.toJSON();
+        await fetch("/api/push/resubscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            endpoint: newSub.endpoint,
+            p256dh: subJson.keys?.p256dh ?? "",
+            auth: subJson.keys?.auth ?? "",
+          }),
+        });
+      } catch {
+        // Network error - best effort. reconcileSubscription will catch it.
+      }
     })(),
   );
 });
