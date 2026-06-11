@@ -54,12 +54,14 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
     ringClass = "ring-2 ring-yellow-400";
 
   return (
+    /* flex-1 min-h-0 min-w-0: the tile fills half the available width and
+       all the available height in the shrinkable tiles row (#1837). */
     <button
       type="button"
       onClick={onPick}
       disabled={phase === "revealed"}
       className={[
-        "flex flex-col items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 transition-colors",
+        "flex flex-1 min-h-0 min-w-0 flex-col items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 transition-colors",
         "hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2",
         "disabled:cursor-default disabled:hover:bg-zinc-50",
         "dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:disabled:hover:bg-zinc-900",
@@ -69,6 +71,10 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
         .join(" ")}
       aria-label={localeName}
     >
+      {/* Sprite fills the available flex-1 region of the tile and shrinks on
+          short viewports (e.g. iPhone SE) via min-h-0. The fixed h-24/sm:h-32
+          is the maximum size; the tile clips to its available height via
+          overflow-hidden on the parent row. */}
       {/* unoptimized: sprites are self-hosted static PNGs; keeping the URL
           identical to what decodeSpriteUrls warms means the decode pre-warm
           prevents names swapping before the sprite has loaded (#879). */}
@@ -77,19 +83,19 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
         alt={localeName}
         width={POKEDEX_FORM_SPRITE_SIZE}
         height={POKEDEX_FORM_SPRITE_SIZE}
-        className="h-24 w-24 object-contain sm:h-32 sm:w-32"
+        className="flex-1 min-h-0 w-auto max-h-full object-contain sm:max-h-32"
         unoptimized
       />
       <p
-        className="text-sm font-semibold capitalize text-foreground"
+        className="flex-none text-sm font-semibold capitalize text-foreground"
         lang={locale !== "en" ? locale : undefined}
       >
         {localeName}
       </p>
       {phase === "revealed" ? (
-        <p className="text-lg font-bold tabular-nums text-foreground">{statVal}</p>
+        <p className="flex-none text-lg font-bold tabular-nums text-foreground">{statVal}</p>
       ) : (
-        <p className="text-lg font-bold text-zinc-300 dark:text-zinc-600 select-none">—</p>
+        <p className="flex-none text-lg font-bold text-zinc-300 dark:text-zinc-600 select-none">—</p>
       )}
     </button>
   );
@@ -109,25 +115,10 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   // True while sprite decode is in-flight; prevents a second click from racing.
   const [transitioning, setTransitioning] = useState(false);
 
-  // Ref attached to the result block (result message + action button) that
-  // appears below the tiles when phase === "revealed". On reveal, we scroll
-  // this element into view so the action button is reachable without manual
-  // scrolling on tall mobile viewports (e.g. iPhone 17 Pro) where the reveal
-  // block lands below the fold (#1447).
-  // `block: "nearest"` is intentional: it only scrolls when the element is
-  // already out of view, so on desktop / short viewports where everything fits
-  // the tiles are never scrolled off-screen.
+  // resultBlockRef retained as a no-op fallback - the layout now pins the
+  // action button as flex-none so it is always visible without scrolling
+  // (#1837). The scrollIntoView workaround from #1447 has been removed.
   const resultBlockRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (phase !== "revealed" || resultBlockRef.current === null) return;
-    const prefersReducedMotion =
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    resultBlockRef.current.scrollIntoView({
-      behavior: prefersReducedMotion ? "instant" : "smooth",
-      block: "nearest",
-    });
-  }, [phase]);
 
   const canPlay = seenPokemon.length >= 2;
 
@@ -221,11 +212,16 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   }
 
   return (
+    /* flex-1 min-h-0: fills the height passed from the end-of-session
+       container so the layout can pin the action button without scrolling
+       (#1837). The border-t divides the game from the EndOfSessionScreen
+       content above. */
     <section
       aria-label={t("higherOrLower.sectionAriaLabel")}
-      className="flex flex-col items-center gap-4 w-full max-w-sm mx-auto pt-6 border-t border-zinc-200 dark:border-zinc-800"
+      className="flex flex-col flex-1 min-h-0 w-full max-w-sm mx-auto pt-4 border-t border-zinc-200 dark:border-zinc-800"
     >
-      <div className={`flex justify-between w-full ${mutedTextXs} tabular-nums`}>
+      {/* flex-none: streak/best counters always visible, do not shrink. */}
+      <div className={`flex-none flex justify-between w-full ${mutedTextXs} tabular-nums mb-3`}>
         <span>
           Streak: <span className="font-semibold text-foreground">{streak}</span>
         </span>
@@ -234,12 +230,17 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
         </span>
       </div>
 
-      <p className="text-base font-medium text-foreground text-center">
+      {/* flex-none: stat prompt always visible. */}
+      <p className="flex-none text-base font-medium text-foreground text-center mb-3">
         Which has higher{" "}
         <span className="font-bold">{statLabel(pair.stat)}</span>?
       </p>
 
-      <div className="flex gap-3 w-full justify-center">
+      {/* flex-1 min-h-0: sprite tiles region absorbs available height and
+          shrinks on short viewports so the pinned footer stays on-screen.
+          overflow-hidden prevents tiles from punching through on very short
+          viewports like iPhone SE. */}
+      <div className="flex flex-1 min-h-0 gap-3 w-full justify-center overflow-hidden">
         <PokemonTile
           pokemon={pair.left}
           stat={pair.stat}
@@ -256,49 +257,56 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
         />
       </div>
 
-      {phase === "revealed" && lastResult !== null && (
-        <div
-          ref={resultBlockRef}
-          aria-live="polite"
-          className="flex flex-col items-center gap-3 w-full"
-        >
-          {lastResult === "correct" && (
-            <p className="text-sm font-medium text-green-600 dark:text-green-400">
-              Correct!
-            </p>
-          )}
-          {lastResult === "tie" && (
-            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-              Equal, both count.
-            </p>
-          )}
-          {lastResult === "wrong" && (
-            <p className="text-sm font-medium text-red-500 dark:text-red-400">
-              Game over! Streak of {streak}.
-            </p>
-          )}
+      {/* flex-none: result message and action button are always pinned at the
+          bottom of the game section so the user never needs to scroll to reach
+          them (#1837). The min-h ensures the footer reserves space even when
+          the result is not yet shown, preventing layout shift on reveal. */}
+      <div
+        ref={resultBlockRef}
+        className="flex-none flex flex-col items-center gap-3 w-full pt-3 pb-2 min-h-[72px] justify-center"
+      >
+        {phase === "revealed" && lastResult !== null && (
+          <>
+            <div aria-live="polite">
+              {lastResult === "correct" && (
+                <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                  Correct!
+                </p>
+              )}
+              {lastResult === "tie" && (
+                <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                  Equal, both count.
+                </p>
+              )}
+              {lastResult === "wrong" && (
+                <p className="text-sm font-medium text-red-500 dark:text-red-400">
+                  Game over! Streak of {streak}.
+                </p>
+              )}
+            </div>
 
-          {lastResult === "wrong" ? (
-            <button
-              type="button"
-              onClick={handlePlayAgain}
-              disabled={transitioning}
-              className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50"
-            >
-              Play again
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={transitioning}
-              className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50"
-            >
-              Next pair
-            </button>
-          )}
-        </div>
-      )}
+            {lastResult === "wrong" ? (
+              <button
+                type="button"
+                onClick={handlePlayAgain}
+                disabled={transitioning}
+                className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50"
+              >
+                Play again
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={transitioning}
+                className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-50"
+              >
+                Next pair
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </section>
   );
 }
