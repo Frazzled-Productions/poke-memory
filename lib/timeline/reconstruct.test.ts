@@ -403,14 +403,18 @@ describe("buildCollectionTimeline - future direction", () => {
 
   it("a card with low stability drops out within the horizon", () => {
     // stability=1 → power-law inversion gives ~1 day to forget at r=0.9.
+    // lastReview=2026-02-28, so forgetMs ≈ 2026-03-01T00:00:00Z which is
+    // already past NOW_MS=2026-03-01T12:00:00Z - the card is already forgotten
+    // at day 0 and all future snapshots should show mastered=0 (F19).
     const state = makeState({
       stability: 1,
       lastReview: "2026-02-28",
-      dueDate: "2026-02-28", // overdue, forgetMs anchored from nowMs
+      dueDate: "2026-02-28",
     });
     const cards = new Map([["1", state]]);
     const tl = buildCollectionTimeline(baseOpts({ currentNameCards: cards }));
-    // The card should be forgotten within a couple of days of the future.
+    // The card should be forgotten from day 0 onwards.
+    expect(tl.future[0].mastered).toBe(0);
     const dayThree = tl.future.find((s) => s.atMs > NOW_MS + 2 * DAY_MS);
     if (dayThree) {
       expect(dayThree.mastered).toBe(0);

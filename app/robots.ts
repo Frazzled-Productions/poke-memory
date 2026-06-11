@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/api/", "/audit-themes/", "/auth/"],
+      disallow: ["/api/", "/audit-themes", "/auth/"],
     },
     sitemap: "https://pokememory.com/sitemap.xml",
   };

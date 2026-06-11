@@ -11,7 +11,7 @@ import {
 import { useFormatter } from "next-intl";
 import type { ActivityPoint } from "@/lib/stats/activity-history";
 import { isActivityHistoryEmpty } from "@/lib/stats/activity-history";
-import type { DateFormat } from "@/lib/utils/format-date";
+import { formatChartDate, type DateFormat } from "@/lib/utils/format-date";
 import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
@@ -23,23 +23,6 @@ const REVIEWS_COLOUR = "#f43f5e";
 
 /** Emerald-500: new-card introductions, matching the mastery colour. */
 const INTRODUCED_COLOUR = "#10b981";
-
-// ---------------------------------------------------------------------------
-// X-axis tick formatter
-// ---------------------------------------------------------------------------
-
-/**
- * Produce a short date label for the x-axis tick, honouring the user's
- * preferred date format. Mirrors the `formatXTick` pattern in
- * `MasteryOverTimeChart`.
- */
-function formatXTick(date: string, fmt: DateFormat): string {
-  const [, m, d] = date.split("-");
-  if (fmt === "mdy") return `${parseInt(m)}/${parseInt(d)}`;
-  if (fmt === "iso") return `${m}-${d}`;
-  // dmy (default, en-GB)
-  return `${parseInt(d)}/${parseInt(m)}`;
-}
 
 // ---------------------------------------------------------------------------
 // Tooltip
@@ -59,7 +42,7 @@ function ChartTooltip({
   const format = useFormatter();
   if (!active || !payload || payload.length === 0) return null;
   const d = (payload[0] as { payload: TooltipPayload }).payload;
-  const label = formatXTick(d.date, dateFormat);
+  const label = formatChartDate(d.date, dateFormat);
   return (
     <div className={chartTooltipCard}>
       <p className="mb-1 font-semibold text-foreground">{label}</p>
@@ -169,7 +152,7 @@ export function ActivityHistoryChart({
     ? null
     : [...series].sort((a, b) => b.reviews - a.reviews)[0];
   const ariaLabel = peakDay
-    ? `Daily review and introduction history over the past year. Peak activity: ${peakDay.reviews} reviews on ${formatXTick(peakDay.date, dateFormat)}.`
+    ? `Daily review and introduction history over the past year. Peak activity: ${peakDay.reviews} reviews on ${formatChartDate(peakDay.date, dateFormat)}.`
     : "Daily review and introduction history: no activity recorded yet.";
 
   return (
@@ -204,7 +187,7 @@ export function ActivityHistoryChart({
                   <XAxis
                     dataKey="date"
                     tickFormatter={(date: string) =>
-                      formatXTick(date, dateFormat)
+                      formatChartDate(date, dateFormat)
                     }
                     tick={{ fontSize: 10, fill: "currentColor" }}
                     className={chartTickText}

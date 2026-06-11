@@ -22,13 +22,21 @@ import type { Grade } from "@/lib/review/session";
  *    are preserved.
  */
 export function normaliseInput(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    // Strip ASCII punctuation characters (., -, ', !, ?, : etc.) AND spaces so
-    // separator variants ("Porygon-Z" / "porygon z" / "porygonz") all match.
-    // eslint-disable-next-line no-useless-escape
-    .replace(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~\s]/g, "");
+  return (
+    input
+      .trim()
+      .toLowerCase()
+      // Fold typographic apostrophes (U+2018 LEFT / U+2019 RIGHT SINGLE QUOTATION
+      // MARK) to ASCII apostrophe so "Farfetch’d" matches a typed "farfetch'd"
+      // or "farfetchd" after the strip below (F10).
+      .replace(/[‘’]/g, "'")
+      // Strip gender symbols used in Nidoran♀/♂ names (F10).
+      .replace(/[♀♂]/g, "")
+      // Strip ASCII punctuation characters (., -, ', !, ?, : etc.) AND spaces so
+      // separator variants ("Porygon-Z" / "porygon z" / "porygonz") all match.
+      // eslint-disable-next-line no-useless-escape
+      .replace(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~\s]/g, "")
+  );
 }
 
 /**

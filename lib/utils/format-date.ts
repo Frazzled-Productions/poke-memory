@@ -145,6 +145,28 @@ export function formatShortDate(iso: string, fmt: DateFormat): string {
 }
 
 /**
+ * Format a YYYY-MM-DD date as a compact month/day label for chart axes and
+ * tooltips - no year, strips leading zeros, respects the user's date format.
+ *
+ * Examples (date = "2026-09-03"):
+ *   dmy  → "3/9"
+ *   mdy  → "9/3"
+ *   iso  → "09-03"
+ *
+ * This is the single-source replacement for the local `formatXTick` helper
+ * that was duplicated across `MasteryOverTimeChart` and `ActivityHistoryChart`
+ * (F40 / #1860).
+ */
+export function formatChartDate(iso: string, fmt: DateFormat): string {
+  const [, m, d] = iso.split("-");
+  if (!m || !d) return iso;
+  if (fmt === "mdy") return `${parseInt(m)}/${parseInt(d)}`;
+  if (fmt === "iso") return `${m}-${d}`;
+  // dmy (default, en-GB)
+  return `${parseInt(d)}/${parseInt(m)}`;
+}
+
+/**
  * Inspect the user's locale to infer a sensible default DateFormat.
  * Heuristic:
  *   - If the locale formats a known date with year first → 'iso'
