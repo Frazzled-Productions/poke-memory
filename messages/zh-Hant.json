@@ -624,7 +624,16 @@
       "incorrectSuffix": "（錯誤）"
     },
     "higherOrLower": {
-      "sectionAriaLabel": "高還是低小遊戲"
+      "sectionAriaLabel": "高還是低小遊戲",
+      "playButton": "高還是低",
+      "playButtonAriaLabel": "高還是低",
+      "playButtonDisabledAriaLabel": "沒有足夠的寶可夢來進行猜高低遊戲",
+      "playButtonHelperText": "繼續練習以解鎖屬性猜測遊戲。",
+      "backToSummary": "← 總結",
+      "backToSummaryAriaLabel": "返回本局總結",
+      "barStreakAriaLabel": "連續{count}天",
+      "barDueTomorrow": "明天{count}張",
+      "barDueTomorrowAriaLabel": "明天有{count}張卡片到期"
     },
     "typedEntry": {
       "inputAriaLabel": "輸入寶可夢的名字"
