@@ -270,4 +270,57 @@ describe("rate_limit_buckets + check_rate_limit RPC (integration)", () => {
       await rlsPool.end();
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // 'feedback' action (migration 045, #1883)
+  // ---------------------------------------------------------------------------
+
+  it("returns true for the first feedback attempt (under cap)", async () => {
+    const hash = testHash("ip-feedback-first");
+    const allowed = await callRpc(adminPool, hash, "feedback");
+    expect(allowed).toBe(true);
+  });
+
+  it("returns true at the 5th feedback attempt (exactly at the 10-min cap)", async () => {
+    const hash = testHash("ip-feedback-at-5th-cap");
+
+    // Seed 4 rows within the last 10 minutes.
+    await seedRows(adminPool, hash, "feedback", 4, 2);
+
+    // 5th call: still within cap -> must return true.
+    const allowed = await callRpc(adminPool, hash, "feedback");
+    expect(allowed).toBe(true);
+  });
+
+  it("returns false on the 6th feedback attempt (over the 10-min cap)", async () => {
+    const hash = testHash("ip-feedback-over-10m-cap");
+
+    // Seed 5 rows within the last 10 minutes (already at cap).
+    await seedRows(adminPool, hash, "feedback", 5, 2);
+
+    const allowed = await callRpc(adminPool, hash, "feedback");
+    expect(allowed).toBe(false);
+  });
+
+  it("feedback and signup caps are tracked independently (same IP hash)", async () => {
+    const hash = testHash("ip-feedback-signup-isolation");
+
+    // Exhaust the feedback 10-min cap for this IP.
+    await seedRows(adminPool, hash, "feedback", 5, 2);
+
+    // A signup call on the same IP must still be allowed (10-min cap is 5, but different action).
+    const signupAllowed = await callRpc(adminPool, hash, "signup");
+    expect(signupAllowed).toBe(true);
+  });
+
+  it("'feedback' is now accepted by the rate_limit_buckets CHECK constraint", async () => {
+    // A direct INSERT with action='feedback' must succeed (constraint allows it post-045).
+    const hash = testHash("ip-feedback-constraint-check");
+    await expect(
+      adminPool.query(
+        `INSERT INTO public.rate_limit_buckets (ip_hash, action) VALUES ($1, 'feedback')`,
+        [hash],
+      ),
+    ).resolves.not.toThrow();
+  });
 });

@@ -105,12 +105,17 @@ export async function POST(request: Request) {
         "check_rate_limit",
         { p_ip_hash: ipHash, p_action: "feedback" },
       );
-      if (rlError || rlAllowed === false) {
+      if (rlAllowed === false) {
         return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
       }
+      if (rlError) {
+        // Rate-limit check failure is non-fatal: log and continue so the endpoint
+        // stays available when the RPC is transiently unavailable (e.g. unknown
+        // action branch not yet deployed). Only an explicit false blocks the request.
+        console.warn("[feedback] rate-limit check error, proceeding", rlError);
+      }
     } catch {
-      // Rate-limit check failure is non-fatal: log and continue so the endpoint
-      // stays available when the RPC is transiently unavailable.
+      // Unexpected throw (e.g. network error) - also non-fatal.
       console.warn("[feedback] rate-limit check failed, proceeding");
     }
   }
