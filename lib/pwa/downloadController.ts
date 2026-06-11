@@ -25,7 +25,7 @@
  *                         very first render.
  */
 
-import { precacheAll, OFFLINE_DOWNLOADED_AT_KEY, buildPrecacheUrls, type PrecacheProgress, type PrecacheSummary } from "./precache";
+import { precacheAll, OFFLINE_DOWNLOADED_AT_KEY, buildPrecacheUrls, OFFLINE_PACK_EXPECTED_BYTES, OFFLINE_SAVE_BUFFER_BYTES, type PrecacheProgress, type PrecacheSummary } from "./precache";
 import { computeManifestSignature, parseOfflineManifest, type OfflineManifest } from "./manifestSignature";
 import { offlineCount } from "./offlineStore";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
@@ -133,6 +133,58 @@ export const CURRENT_MANIFEST: OfflineManifest = new Proxy({} as OfflineManifest
     return getCurrentManifest()[prop as keyof OfflineManifest];
   },
 });
+
+// ---------------------------------------------------------------------------
+// Storage headroom check
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of a pre-flight storage headroom check.
+ *
+ * `hasHeadroom` - true when enough free space is available to start the
+ *   download without risking QuotaExceededError on concurrent saves.
+ * `freeBytes` - the available quota minus current usage, in bytes.
+ * `requiredBytes` - the expected pack size + save buffer in bytes.
+ *
+ * Returns `null` when `navigator.storage.estimate()` is unavailable (e.g.
+ * some older browsers). The caller must treat `null` as "proceed" - we should
+ * never block a download solely because the API is absent.
+ */
+export type StorageHeadroomResult = {
+  hasHeadroom: boolean;
+  freeBytes: number;
+  requiredBytes: number;
+} | null;
+
+/**
+ * Read `navigator.storage.estimate()` and compare the remaining headroom
+ * against the expected offline pack size plus a safety buffer for concurrent
+ * saves.
+ *
+ * Returns `null` if the Storage API is unavailable (fall back to proceed).
+ * Rejects only on unexpected thrown errors; quota-API absence is handled
+ * gracefully with a `null` return.
+ */
+export async function checkStorageHeadroom(): Promise<StorageHeadroomResult> {
+  if (typeof navigator === "undefined") return null;
+  if (!("storage" in navigator) || !("estimate" in navigator.storage)) return null;
+
+  let estimate: StorageEstimate;
+  try {
+    estimate = await navigator.storage.estimate();
+  } catch {
+    // API threw unexpectedly - treat as "no data, proceed".
+    return null;
+  }
+
+  const { usage, quota } = estimate;
+  if (usage === undefined || quota === undefined) return null;
+
+  const freeBytes = quota - usage;
+  const requiredBytes = OFFLINE_PACK_EXPECTED_BYTES + OFFLINE_SAVE_BUFFER_BYTES;
+
+  return { hasHeadroom: freeBytes >= requiredBytes, freeBytes, requiredBytes };
+}
 
 // ---------------------------------------------------------------------------
 // Public API

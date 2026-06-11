@@ -263,7 +263,11 @@
       "deleteConfirmBodyNoSize": "[This will remove all your offline data. You can re-download at any time.]",
       "deleteConfirmConfirm": "[Delete]",
       "deleteConfirmCancel": "[Cancel]",
-      "deleteErrorMessage": "[Could not delete the cache. Try clearing site data in your browser settings.]"
+      "deleteErrorMessage": "[Could not delete the cache. Try clearing site data in your browser settings.]",
+      "lowStorageTitle": "[Low storage]",
+      "lowStorageBody": "[Your device may not have enough free space for the offline pack (about 166 MB). Starting the download could disrupt progress saves. Free up some space first, or download anyway at your own risk.]",
+      "lowStorageCancel": "[Cancel]",
+      "lowStorageProceed": "[Download anyway]"
     },
     "optimizerCooldown": "[{count, plural, one {Next optimisation in # day} other {Next optimisation in # days}}]",
     "optimizerRetryAfter": "[{count, plural, one {Try again in # day.} other {Try again in # days.}}]",
