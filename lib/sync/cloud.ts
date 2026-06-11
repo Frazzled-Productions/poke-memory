@@ -222,9 +222,11 @@ export async function pushSession(
 
   let allOk = true;
   const BATCH = 200;
-  const updatedAt = new Date().toISOString();
   for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH).map((r) => ({ ...r, user_id: userId, updated_at: updatedAt }));
+    // updated_at is omitted: INSERT uses DEFAULT now(); UPDATE uses the
+    // card_reviews_set_updated_at_trigger (migration 043). Sending a client
+    // clock value defeats the lastPullAt anchor (docs/sync.md F22).
+    const batch = rows.slice(i, i + BATCH).map((r) => ({ ...r, user_id: userId }));
     try {
       const { error } = await client
         .from("card_reviews")
@@ -259,22 +261,44 @@ export async function pushSession(
 }
 
 /**
- * Upserts a single card into card_reviews. Best-effort - returns false on any
- * error without throwing. Returns false without a network call when the card
- * violates the firstSeen/lastReview invariant (in-step, not yet graduated).
+ * Outcome of a single-card push attempt.
+ *
+ * - "ok"       - upserted successfully.
+ * - "failed"   - transient failure; should stay in queue for retry.
+ * - "rejected" - DB regression trigger (SQLSTATE 23514) rejected the row
+ *                because the cloud row is already newer. The card should be
+ *                EVICTED from the local queue (not retried) per docs/sync.md.
+ */
+export type PushSingleCardResult = "ok" | "failed" | "rejected";
+
+/**
+ * Upserts a single card into card_reviews.
+ *
+ * Returns:
+ *   "ok"       - success.
+ *   "rejected" - SQLSTATE 23514 (regression trigger); the cloud row is newer.
+ *                Callers must evict this card from the retry queue.
+ *   "failed"   - any other error; card should be kept in the queue.
+ *
+ * Never throws.
  */
 export async function pushSingleCard(
   client: SupabaseClient,
   userId: string,
   card: ReviewableCard,
-): Promise<boolean> {
+): Promise<PushSingleCardResult> {
   if (!isSyncSafe(card)) {
     console.warn(
       `[sync] skipping card ${card.cardType}:${card.subjectKey}: firstSeen set but lastReview null (in-step, not graduated)`
     );
-    return false;
+    return "failed";
   }
   try {
+    // updated_at is intentionally omitted from the upsert payload.
+    // For INSERTs the column DEFAULT now() applies; for UPDATEs the
+    // card_reviews_set_updated_at_trigger (migration 043) stamps now()
+    // server-side. Sending a client-clock value would override the DEFAULT
+    // and defeat the lastPullAt clock-skew anchor documented in docs/sync.md.
     const { error } = await client.from("card_reviews").upsert(
       {
         user_id: userId,
@@ -293,7 +317,6 @@ export async function pushSingleCard(
         first_seen: card.state.firstSeen,
         hidden_since: card.state.hiddenSince,
         seen_in_pasture: card.state.seenInPasture,
-        updated_at: new Date().toISOString(),
       },
       { onConflict: CARD_REVIEWS_CONFLICT_COLS },
     );
@@ -302,7 +325,17 @@ export async function pushSingleCard(
       // This is the ONLY path that clears structuralSyncError; auxiliary-leg
       // success (pushSettings, pushStreak, etc.) must not clear it (#1358 FIX 2).
       clearStructuralSyncError();
-      return true;
+      return "ok";
+    }
+    // 23514 = check_violation from the regression trigger (migration 002 / 015
+    // / 016 / 017). The DB has a newer row - this card state is stale. Evict
+    // it from the queue rather than retrying forever (F23, docs/sync.md).
+    // Do NOT mark as structural; do NOT set structuralSyncError.
+    if (error.code === "23514") {
+      console.warn(
+        `[sync] card ${card.cardType}:${card.subjectKey}:${card.locale ?? "en"} rejected by regression trigger (23514) - cloud row is newer; evicting from queue`
+      );
+      return "rejected";
     }
     if (isStructuralError(error)) {
       // Structural errors are never transient - fail loud immediately (#1358).
@@ -313,9 +346,9 @@ export async function pushSingleCard(
       );
       markStructuralSyncError(error.code);
     }
-    return false;
+    return "failed";
   } catch {
-    return false;
+    return "failed";
   }
 }
 

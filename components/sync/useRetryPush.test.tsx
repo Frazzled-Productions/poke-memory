@@ -178,7 +178,7 @@ describe("useRetryPush", () => {
     const oldCard = makeCard(2, "2026-05-10");    // older date → excluded
     const newCard = makeCard(3, null);             // never reviewed → excluded
     vi.mocked(loadSession).mockResolvedValue({ cards: [todayCard, oldCard, newCard], limits: LIMITS });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 
@@ -214,8 +214,8 @@ describe("useRetryPush", () => {
     vi.mocked(loadSession).mockResolvedValue({ cards: [card1, card2], limits: LIMITS });
     // First card succeeds, second fails.
     vi.mocked(pushSingleCard)
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+      .mockResolvedValueOnce("ok")
+      .mockResolvedValueOnce("failed");
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 
@@ -251,7 +251,7 @@ describe("useRetryPush", () => {
       cards: [yesterday, older, fresh],
       limits: LIMITS,
     });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 
@@ -282,7 +282,7 @@ describe("useRetryPush", () => {
       .mockReturnValue(updatedStatus);
     const card = makeCard(1, "2026-05-13");
     vi.mocked(loadSession).mockResolvedValue({ cards: [card], limits: LIMITS });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 
@@ -312,7 +312,7 @@ describe("useRetryPush", () => {
       cards: [reviewedOld, reviewedToday, notReviewed],
       limits: LIMITS,
     });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 

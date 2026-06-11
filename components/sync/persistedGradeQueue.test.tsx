@@ -175,7 +175,7 @@ describe("usePerGradeSync - persisted queue (#893)", () => {
   });
 
   it("calls savePendingQueue after the persist debounce fires", async () => {
-    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue("failed");
 
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
@@ -194,7 +194,7 @@ describe("usePerGradeSync - persisted queue (#893)", () => {
   });
 
   it("calls savePendingQueue with the current queue snapshot on each burst", async () => {
-    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue("failed");
 
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
@@ -218,7 +218,7 @@ describe("usePerGradeSync - persisted queue (#893)", () => {
   });
 
   it("calls clearPendingQueue after a fully successful drain", async () => {
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
@@ -237,7 +237,7 @@ describe("usePerGradeSync - persisted queue (#893)", () => {
   });
 
   it("does not call clearPendingQueue when all pushes fail", async () => {
-    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue("failed");
 
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
@@ -303,7 +303,7 @@ describe("usePerGradeSync - persisted queue (#893)", () => {
   // unmount loses the last snapshot.
 
   it("flushes the persist debounce synchronously on unmount (#893 timer cleanup)", async () => {
-    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue("failed");
 
     const { result, unmount } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
@@ -324,7 +324,7 @@ describe("usePerGradeSync - persisted queue (#893)", () => {
   });
 
   it("does not call savePendingQueue on unmount when no persist timer is pending", async () => {
-    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue("failed");
 
     const { unmount } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
@@ -357,7 +357,7 @@ describe("useRetryPush - prefers persisted queue when non-empty (#893)", () => {
     vi.mocked(loadPendingQueue).mockReturnValue([persistedCard]);
     vi.mocked(loadSyncStatus).mockReturnValue(FAILED_STATUS);
     vi.mocked(loadSession).mockResolvedValue({ cards: [sessionCard], limits: LIMITS });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 
@@ -378,7 +378,7 @@ describe("useRetryPush - prefers persisted queue when non-empty (#893)", () => {
     const persistedCard = makeCard(1);
     vi.mocked(loadPendingQueue).mockReturnValue([persistedCard]);
     vi.mocked(loadSyncStatus).mockReturnValue(FAILED_STATUS);
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 
@@ -402,8 +402,8 @@ describe("useRetryPush - prefers persisted queue when non-empty (#893)", () => {
     vi.mocked(loadPendingQueue).mockReturnValue([persistedCard1, persistedCard2]);
     vi.mocked(loadSyncStatus).mockReturnValue(FAILED_STATUS);
     vi.mocked(pushSingleCard)
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+      .mockResolvedValueOnce("ok")
+      .mockResolvedValueOnce("failed");
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 
@@ -425,8 +425,8 @@ describe("useRetryPush - prefers persisted queue when non-empty (#893)", () => {
     vi.mocked(loadPendingQueue).mockReturnValue([persistedCard1, persistedCard2]);
     vi.mocked(loadSyncStatus).mockReturnValue(FAILED_STATUS);
     vi.mocked(pushSingleCard)
-      .mockResolvedValueOnce(true)   // card 1 succeeds
-      .mockResolvedValueOnce(false); // card 2 fails
+      .mockResolvedValueOnce("ok")      // card 1 succeeds
+      .mockResolvedValueOnce("failed"); // card 2 fails
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 
@@ -453,7 +453,7 @@ describe("useRetryPush - prefers persisted queue when non-empty (#893)", () => {
     const persistedCard = makeCard(5);
     vi.mocked(loadPendingQueue).mockReturnValue([persistedCard]);
     vi.mocked(loadSyncStatus).mockReturnValue({ ...FAILED_STATUS, failedCardCount: 0 });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 
@@ -474,7 +474,7 @@ describe("useRetryPush - prefers persisted queue when non-empty (#893)", () => {
     vi.mocked(loadSyncStatus).mockReturnValue({ ...FAILED_STATUS, failedCardCount: 1 });
     const todayCard = makeCard(7, "2026-05-17");
     vi.mocked(loadSession).mockResolvedValue({ cards: [todayCard], limits: LIMITS });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     const { result } = renderHook(() => useRetryPush(FAKE_CLIENT, FAKE_USER));
 
@@ -511,7 +511,7 @@ describe("useOnlineReconnectSync - prefers persisted queue when non-empty (#893)
     const sessionCard = makeCard(99, "2026-05-17");
     vi.mocked(loadPendingQueue).mockReturnValue([persistedCard]);
     vi.mocked(loadSession).mockResolvedValue({ cards: [sessionCard], limits: LIMITS });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 
@@ -531,7 +531,7 @@ describe("useOnlineReconnectSync - prefers persisted queue when non-empty (#893)
 
     const persistedCard = makeCard(1);
     vi.mocked(loadPendingQueue).mockReturnValue([persistedCard]);
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 
@@ -552,8 +552,8 @@ describe("useOnlineReconnectSync - prefers persisted queue when non-empty (#893)
     const persistedCard2 = makeCard(2);
     vi.mocked(loadPendingQueue).mockReturnValue([persistedCard1, persistedCard2]);
     vi.mocked(pushSingleCard)
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+      .mockResolvedValueOnce("ok")
+      .mockResolvedValueOnce("failed");
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 
@@ -576,8 +576,8 @@ describe("useOnlineReconnectSync - prefers persisted queue when non-empty (#893)
     const persistedCard2 = makeCard(2);
     vi.mocked(loadPendingQueue).mockReturnValue([persistedCard1, persistedCard2]);
     vi.mocked(pushSingleCard)
-      .mockResolvedValueOnce(true)   // card 1 succeeds
-      .mockResolvedValueOnce(false); // card 2 fails
+      .mockResolvedValueOnce("ok")      // card 1 succeeds
+      .mockResolvedValueOnce("failed"); // card 2 fails
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 
@@ -606,7 +606,7 @@ describe("useOnlineReconnectSync - prefers persisted queue when non-empty (#893)
 
     const todayCard = makeCard(7, "2026-05-17");
     vi.mocked(loadSession).mockResolvedValue({ cards: [todayCard], limits: LIMITS });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 
@@ -633,5 +633,85 @@ describe("useOnlineReconnectSync - prefers persisted queue when non-empty (#893)
 
     expect(pullAndMerge).not.toHaveBeenCalled();
     expect(pushSingleCard).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Part 4: usePerGradeSync - mount rehydration (F2 / #1856) ─────────────────
+//
+// A force-killed tab leaves a non-empty persisted queue with lastPushFailed=false.
+// Without rehydration the first successful drain in the new session calls
+// clearPendingQueue() and silently discards those grades.
+
+describe("usePerGradeSync - mount rehydration from persisted queue (F2 / #1856)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.mocked(isSyncSafe).mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("seeds the in-memory queue from the persisted queue on mount when signed in", async () => {
+    // Persisted queue has one card from a previous (force-killed) session.
+    const orphanCard = makeCard(77);
+    vi.mocked(loadPendingQueue).mockReturnValue([orphanCard]);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
+
+    const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
+
+    // Trigger the push debounce to drain the seeded queue.
+    await act(async () => {
+      // Enqueue a fresh card to arm the push timer.
+      result.current.enqueueGrade(makeCard(88));
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Both the orphan (77) and the new card (88) should have been pushed.
+    const pushed = vi.mocked(pushSingleCard).mock.calls.map(([, , c]) => (c as ReviewableCard).id);
+    expect(pushed).toContain(77);
+    expect(pushed).toContain(88);
+  });
+
+  it("does not seed from the persisted queue when client is null (guest / superuser)", () => {
+    const orphanCard = makeCard(77);
+    vi.mocked(loadPendingQueue).mockReturnValue([orphanCard]);
+
+    // Mount with null client - rehydration must be skipped entirely.
+    renderHook(() => usePerGradeSync(null, FAKE_USER));
+
+    // loadPendingQueue may be called during the seed effect; but since client
+    // is null the effect should exit before doing anything with the result.
+    // We verify this by checking pushSingleCard was never called.
+    act(() => { vi.advanceTimersByTime(500); });
+
+    expect(vi.mocked(pushSingleCard)).not.toHaveBeenCalled();
+  });
+
+  it("evicts a 23514-rejected card from the queue (does not retry forever) (F23 / #1856)", async () => {
+    vi.mocked(loadPendingQueue).mockReturnValue([]);
+    // First push returns rejected; second (re-enqueue) would return ok.
+    vi.mocked(pushSingleCard).mockResolvedValue("rejected");
+
+    const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
+
+    act(() => {
+      result.current.enqueueGrade(makeCard(1));
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // After a rejected drain, the card should be evicted: the queue is empty
+    // so clearPendingQueue (not savePendingQueue) should have been called.
+    expect(vi.mocked(clearPendingQueue)).toHaveBeenCalled();
+    // The banner (markPushFailed) must NOT have been set for a rejection.
+    expect(vi.mocked(markPushFailed)).not.toHaveBeenCalled();
   });
 });

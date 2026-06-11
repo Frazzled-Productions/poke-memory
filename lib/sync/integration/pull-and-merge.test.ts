@@ -272,7 +272,12 @@ describe("upsert conflict resolution (integration)", () => {
     expect(pgDateToISO(row!.last_review as Date)).toBe("2026-05-20");
   });
 
-  it("ON CONFLICT correctly updates updated_at to the EXCLUDED value", async () => {
+  it("ON CONFLICT updated_at is server-stamped by trigger (not the client-sent value)", async () => {
+    // Migration 043 adds a BEFORE UPDATE trigger that unconditionally sets
+    // updated_at = now(), so even if the test (or a client) sends an explicit
+    // updated_at value in the DO UPDATE SET clause, the trigger overrides it
+    // with the server clock. This verifies the F22 / #1856 fix.
+    const beforeUpsert = new Date();
     await upsertAndCommit(pool, USER_A, {
       subjectKey: "1003",
       updatedAt: T1,
@@ -284,26 +289,36 @@ describe("upsert conflict resolution (integration)", () => {
       lastReview: "2026-05-21",
       scheduledDays: 10,
     });
+    const afterUpsert = new Date();
 
     const row = await readCard(USER_A, "name", "1003");
     expect(row).not.toBeNull();
-    // updated_at must reflect T2, not T1. This is the value the merge conflict
-    // rule compares against lastPullAt to determine whether the cloud row is newer.
-    const storedAt = (row!.updated_at as Date).toISOString();
-    expect(storedAt).toBe(T2);
+    // The trigger stamps now() server-side; the stored value must be a
+    // server timestamp in the test-run window, NOT the old client-sent T2.
+    const storedAt = row!.updated_at as Date;
+    expect(storedAt.getTime()).toBeGreaterThanOrEqual(beforeUpsert.getTime() - 1000);
+    expect(storedAt.getTime()).toBeLessThanOrEqual(afterUpsert.getTime() + 1000);
+    expect(storedAt.toISOString()).not.toBe(T2);
   });
 
-  it("repeated upsert of unchanged state still writes updated_at", async () => {
+  it("repeated upsert of unchanged state still advances updated_at (trigger stamps server time)", async () => {
     // PostgreSQL unconditionally executes the DO UPDATE SET clause even when the
     // incoming row is identical to the stored row. The merge rule relies on
     // updated_at advancing so a re-push after a pull does not look stale.
+    // Migration 043's trigger ensures the advanced value is server-authoritative.
     await upsertAndCommit(pool, USER_A, { subjectKey: "1004", updatedAt: T1 });
-    // Identical FSRS state, newer updated_at timestamp only.
+    const beforeSecondUpsert = new Date();
+    // Identical FSRS state, different client-sent updated_at. The trigger
+    // stamps now(), not T2, so we verify the row has a recent server timestamp.
     await upsertAndCommit(pool, USER_A, { subjectKey: "1004", updatedAt: T2 });
+    const afterSecondUpsert = new Date();
 
     const row = await readCard(USER_A, "name", "1004");
     expect(row).not.toBeNull();
-    expect((row!.updated_at as Date).toISOString()).toBe(T2);
+    const storedAt = row!.updated_at as Date;
+    // Server-stamped; must be in the test-run window.
+    expect(storedAt.getTime()).toBeGreaterThanOrEqual(beforeSecondUpsert.getTime() - 1000);
+    expect(storedAt.getTime()).toBeLessThanOrEqual(afterSecondUpsert.getTime() + 1000);
   });
 });
 

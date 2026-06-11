@@ -23,7 +23,18 @@ export async function clearLocalProgress(): Promise<void> {
   try {
     if (typeof window !== "undefined") {
       Object.keys(localStorage)
-        .filter((k) => k.startsWith("poke-memory:") && !k.startsWith("poke-memory:settings:"))
+        .filter(
+          (k) =>
+            k.startsWith("poke-memory:") &&
+            !k.startsWith("poke-memory:settings:") &&
+            // Preserve other users' archived state on shared devices. The archive
+            // prefix (poke-memory:user-archive:<userId>) stores un-pushed local
+            // progress for accounts other than the current user. clearLocalProgress
+            // is a progress reset, NOT an account deletion; wiping other users'
+            // archives here would silently discard their offline grades
+            // (F56 / #1856). deleteAccountEverywhere removes archives explicitly.
+            !k.startsWith("poke-memory:user-archive:"),
+        )
         .forEach((k) => localStorage.removeItem(k));
     }
   } catch {
