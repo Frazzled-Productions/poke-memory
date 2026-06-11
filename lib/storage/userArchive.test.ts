@@ -42,6 +42,7 @@ import {
   archiveUserData,
   restoreUserData,
   clearIdbPendingQueue,
+  clearIdbUserData,
 } from "./userArchive";
 import {
   KEY_STREAK,
@@ -252,5 +253,27 @@ describe("clearIdbPendingQueue", () => {
   it("calls idbDelete on the pending-grade-queue key", async () => {
     await clearIdbPendingQueue();
     expect(mockIdbDelete).toHaveBeenCalledWith(KEY_PENDING_GRADE_QUEUE);
+  });
+});
+
+// ─── clearIdbUserData (#1850) ─────────────────────────────────────────────────
+
+describe("clearIdbUserData", () => {
+  it("deletes exactly the IDB review-session and grade-log keys", async () => {
+    await clearIdbUserData();
+
+    expect(mockIdbDelete).toHaveBeenCalledWith(KEY_REVIEW_SESSION);
+    expect(mockIdbDelete).toHaveBeenCalledWith(KEY_GRADE_LOG);
+    expect(mockIdbDelete).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not touch the pending-grade queue or the migration flag", async () => {
+    await clearIdbUserData();
+
+    const deletedKeys = mockIdbDelete.mock.calls.map((c) => c[0]);
+    expect(deletedKeys).not.toContain(KEY_PENDING_GRADE_QUEUE);
+    // The migration flag is device-level and must survive a user switch
+    // (see the clearIdbUserData doc comment).
+    expect(deletedKeys).not.toContain("migration_done_v1");
   });
 });
