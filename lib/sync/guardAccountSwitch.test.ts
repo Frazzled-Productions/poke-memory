@@ -13,11 +13,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockArchive = vi.fn((_userId: string): Promise<void> => Promise.resolve());
 const mockRestore = vi.fn((_userId: string): Promise<void> => Promise.resolve());
 const mockClearIdb = vi.fn((): Promise<void> => Promise.resolve());
+const mockClearIdbUserData = vi.fn((): Promise<void> => Promise.resolve());
 
 vi.mock("@/lib/storage/userArchive", () => ({
   archiveUserData: (...args: [string]) => mockArchive(...args),
   restoreUserData: (...args: [string]) => mockRestore(...args),
   clearIdbPendingQueue: () => mockClearIdb(),
+  clearIdbUserData: () => mockClearIdbUserData(),
 }));
 
 // ─── Mock localStorage (set up before the module imports so the guard can
@@ -71,6 +73,7 @@ beforeEach(() => {
   mockArchive.mockClear();
   mockRestore.mockClear();
   mockClearIdb.mockClear();
+  mockClearIdbUserData.mockClear();
 });
 
 // ─── Guest (null owner) path ──────────────────────────────────────────────────
@@ -85,6 +88,7 @@ describe("guest path (ownerUserId === null)", () => {
     expect(mockArchive).not.toHaveBeenCalled();
     expect(mockRestore).not.toHaveBeenCalled();
     expect(mockClearIdb).not.toHaveBeenCalled();
+    expect(mockClearIdbUserData).not.toHaveBeenCalled();
   });
 
   it("leaves local storage untouched", async () => {
@@ -111,6 +115,7 @@ describe("same-user path (ownerUserId === incomingUserId)", () => {
     expect(mockArchive).not.toHaveBeenCalled();
     expect(mockRestore).not.toHaveBeenCalled();
     expect(mockClearIdb).not.toHaveBeenCalled();
+    expect(mockClearIdbUserData).not.toHaveBeenCalled();
   });
 
   it("leaves SyncStatus.ownerUserId unchanged", async () => {
@@ -127,17 +132,28 @@ describe("same-user path (ownerUserId === incomingUserId)", () => {
 // ─── Different user (switch) path ────────────────────────────────────────────
 
 describe("switch path (ownerUserId !== incomingUserId)", () => {
-  it("calls archive(outgoing), clearIdb, restore(incoming) in order", async () => {
+  it("calls archive(outgoing), clearIdb, clearIdbUserData, restore(incoming) in order", async () => {
     const callOrder: string[] = [];
     mockArchive.mockImplementation(async () => { callOrder.push("archive"); });
     mockClearIdb.mockImplementation(async () => { callOrder.push("clearIdb"); });
+    mockClearIdbUserData.mockImplementation(async () => { callOrder.push("clearIdbUserData"); });
     mockRestore.mockImplementation(async () => { callOrder.push("restore"); });
 
     saveSyncStatus({ ...ZERO_STATUS, ownerUserId: "user-A" });
 
     await guardAccountSwitch("user-B");
 
-    expect(callOrder).toEqual(["archive", "clearIdb", "restore"]);
+    // clearIdbUserData must run AFTER archive (snapshot already taken) and
+    // BEFORE restore (a restored archive must not be wiped) - #1850.
+    expect(callOrder).toEqual(["archive", "clearIdb", "clearIdbUserData", "restore"]);
+  });
+
+  it("deletes the IDB review session and grade log on a switch (#1850)", async () => {
+    saveSyncStatus({ ...ZERO_STATUS, ownerUserId: "user-A" });
+
+    await guardAccountSwitch("user-B");
+
+    expect(mockClearIdbUserData).toHaveBeenCalledTimes(1);
   });
 
   it("archives the outgoing user (user-A) and restores the incoming user (user-B)", async () => {
@@ -219,6 +235,7 @@ describe("switch path (ownerUserId !== incomingUserId)", () => {
     // Clear and restore still ran.
     expect(mockRestore).toHaveBeenCalledWith("user-B");
     expect(mockClearIdb).toHaveBeenCalled();
+    expect(mockClearIdbUserData).toHaveBeenCalled();
   });
 
   it("writes SyncStatus.ownerUserId = incomingUserId even after archive failure", async () => {
