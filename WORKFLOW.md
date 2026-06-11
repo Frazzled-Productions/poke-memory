@@ -151,6 +151,8 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 
 ## GitHub Actions catalog
 
+**Trust rule for comment/edit-triggered jobs (#1859).** Any job triggered by a user-authorable event (`issue_comment`, `issues: edited`, and similar) must gate on the event author before any secret-bearing or write-token step runs: bot-produced artefacts (review verdicts, digests, idempotency markers) are only trusted when the comment/issue author is `poke-memory-bot[bot]`, and human commands (`/preview`, `/resolve`) require `author_association` OWNER / MEMBER / COLLABORATOR. Body-content markers alone are attacker-postable and never sufficient.
+
 ### `ci.yml` - CI
 
 | | |
@@ -607,7 +609,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | | |
 |---|---|
 | **Trigger** | `issues: [edited]` |
-| **Guard** | Issue body contains `<!-- auto-codequality-suggest -->` or `<!-- auto-app-suggest -->` |
+| **Guard** | Issue authored by `poke-memory-bot[bot]` AND body contains `<!-- auto-codequality-suggest -->` or `<!-- auto-app-suggest -->` (#1859 - digest bodies are user-editable, so the marker alone is spoofable) |
 | **Permissions** | `issues: write` only - never touches the git tree |
 | **Concurrency** | `digest-fanout-{issue}`, `cancel-in-progress: false` - queues runs, never cancels, so each re-trigger after a body PATCH does a fast no-op |
 | **What it does** | For each proposal whose `- [ ] File this as an issue <!-- proposal:N -->` checkbox is newly checked: extracts the title and `**Priority:**` label, creates a child issue (with `area:app` and the extracted priority, never `auto`), writes ` → filed as #N` onto the proposal heading as an idempotency marker, then posts a single summary comment on the parent |
@@ -692,9 +694,9 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 |---|---|
 | **Status** | **Disabled** (`disabled_manually`). Under the qa staging flow, QA happens on the bundled `qa` branch via `qa-preview-deploy.yml`, so per-PR previews are redundant and were retired to stay within Vercel's deploy rate limit (#814). Re-enable with `gh workflow enable "Vercel Preview on Ready"` if per-PR previews are wanted again. |
 | **Trigger** | `workflow_run` on `CI` (`completed`); `issue_comment: created` |
-| **Gate** | Fires the Vercel Deploy Hook only when both conditions hold on the same HEAD SHA: the `test` check is `success` AND the latest `<!-- auto-review:N -->` comment scoped to that SHA carries `Verdict: Looks good to me`. The auto-review SHA scope comes from the `<!-- auto-review-sha:<sha> -->` row that `auto-review.yml` writes on every comment. |
-| **Manual override** | A `/preview` PR comment from OWNER / MEMBER / COLLABORATOR bypasses both gates and fires the hook unconditionally - for mid-iteration peeks before LGTM. |
-| **Fork guard** | `workflow_run` arm requires `head_repository.fork == false`; the `issue_comment` arm relies on `auto-review.yml` already excluding forks (so no LGTM verdict is ever posted for a fork PR). |
+| **Gate** | Fires the Vercel Deploy Hook only when both conditions hold on the same HEAD SHA: the `test` check is `success` AND the latest **bot-authored** `<!-- auto-review:N -->` comment scoped to that SHA carries `Verdict: Looks good to me`. The auto-review SHA scope comes from the `<!-- auto-review-sha:<sha> -->` row that `auto-review.yml` writes on every comment. Only comments authored by `poke-memory-bot[bot]` count for the verdict, the idempotency marker, and the `issue_comment` trigger itself (#1859). |
+| **Manual override** | A `/preview` PR comment from OWNER / MEMBER / COLLABORATOR bypasses both gates and fires the hook unconditionally - for mid-iteration peeks before LGTM. The association is checked at the job trigger as well as in the override step (#1859). |
+| **Fork guard** | `workflow_run` arm requires `head_repository.fork == false`; the `issue_comment` arm requires bot authorship for review-marker comments and OWNER / MEMBER / COLLABORATOR for `/preview` (#1859). |
 | **Idempotency** | Posts `<!-- vercel-preview-fired:<sha> -->` on the PR after a successful fire; subsequent re-evaluations at the same SHA are no-ops. |
 | **Why two triggers** | CI and auto-review run independently; whichever finishes second flips the gate. Both events re-evaluate against the current HEAD SHA, so order doesn't matter. |
 | **qa promotion PRs** | Skipped - a `qa -> main` PR's head branch is `qa`, and its preview is handled by `qa-preview-deploy.yml`. Firing here too would double-deploy `qa`. |

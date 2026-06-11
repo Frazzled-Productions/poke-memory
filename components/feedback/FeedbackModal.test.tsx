@@ -82,10 +82,28 @@ function renderOpen() {
 describe("FeedbackModal - renders correctly", () => {
   it("renders the category selector with all three options", () => {
     renderOpen();
-    expect(screen.getByLabelText(/category/i)).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /bug report/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /feature request/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /other/i })).toBeInTheDocument();
+    const categorySelect = screen.getByLabelText(/category/i);
+    expect(categorySelect).toBeInTheDocument();
+    // Scope to the category select to avoid matching the page selector's "Other" option.
+    expect(categorySelect.querySelector('option[value="bug"]')).toBeInTheDocument();
+    expect(categorySelect.querySelector('option[value="feature"]')).toBeInTheDocument();
+    expect(categorySelect.querySelector('option[value="other"]')).toBeInTheDocument();
+  });
+
+  it("renders the page selector with blank default and all route options (#1847)", () => {
+    renderOpen();
+    const pageSelect = screen.getByLabelText(/which page/i);
+    expect(pageSelect).toBeInTheDocument();
+    // Blank default means no page is pre-selected.
+    expect((pageSelect as HTMLSelectElement).value).toBe("");
+    expect(pageSelect.querySelector('option[value=""]')).toBeInTheDocument();
+    expect(pageSelect.querySelector('option[value="/"]')).toBeInTheDocument();
+    expect(pageSelect.querySelector('option[value="/pokedex"]')).toBeInTheDocument();
+    expect(pageSelect.querySelector('option[value="/pasture"]')).toBeInTheDocument();
+    expect(pageSelect.querySelector('option[value="/stats"]')).toBeInTheDocument();
+    expect(pageSelect.querySelector('option[value="/journey"]')).toBeInTheDocument();
+    expect(pageSelect.querySelector('option[value="/settings"]')).toBeInTheDocument();
+    expect(pageSelect.querySelector('option[value="other"]')).toBeInTheDocument();
   });
 
   it("renders the message textarea with a visible label", () => {
@@ -168,7 +186,7 @@ describe("FeedbackModal - character counter", () => {
 // --- Submit calls API with correct payload -----------------------------------
 
 describe("FeedbackModal - submit payload", () => {
-  it("POSTs the correct payload on submit", async () => {
+  it("POSTs null for page when the page selector is left blank (#1847)", async () => {
     mockFetchOk();
     renderOpen();
 
@@ -178,6 +196,7 @@ describe("FeedbackModal - submit payload", () => {
     fireEvent.change(screen.getByLabelText(/message/i), {
       target: { value: "Add dark mode" },
     });
+    // Leave the page selector at the blank default.
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
@@ -190,12 +209,38 @@ describe("FeedbackModal - submit payload", () => {
     const body = JSON.parse(options.body as string) as {
       category: string;
       message: string;
-      page: string;
+      page: string | null;
       appVersion?: string;
     };
     expect(body.category).toBe("feature");
     expect(body.message).toBe("Add dark mode");
-    expect(typeof body.page).toBe("string");
+    // No page selected: must be null (not "/settings"), so the Discord embed
+    // does not show a constant meaningless pathname (#1847).
+    expect(body.page).toBeNull();
+  });
+
+  it("POSTs the user-stated page when selected (#1847)", async () => {
+    mockFetchOk();
+    renderOpen();
+
+    fireEvent.change(screen.getByLabelText(/category/i), {
+      target: { value: "bug" },
+    });
+    fireEvent.change(screen.getByLabelText(/message/i), {
+      target: { value: "Bug on Pokédex" },
+    });
+    fireEvent.change(screen.getByLabelText(/which page/i), {
+      target: { value: "/pokedex" },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    });
+
+    expect(fetch).toHaveBeenCalledOnce();
+    const [, options] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(options.body as string) as { page: string | null };
+    expect(body.page).toBe("/pokedex");
   });
 
   it("includes appVersion in POST payload when env var is set", async () => {

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
+import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 
 // Grade-log sync is best-effort. Failures are surfaced as `false` / `null`
 // and the caller is expected to keep going - analytics history is auxiliary
@@ -68,13 +69,20 @@ export async function pullGradeLog(
   userId: string,
 ): Promise<GradeLogEntry[] | null> {
   try {
-    const { data, error } = await client
-      .from("grade_log")
-      .select("occurred_at,entry_date,card_type,grade,subject_key,locale,learning_step,step_started_at")
-      .eq("user_id", userId)
-      .order("occurred_at", { ascending: true });
-    if (error || !data) return null;
-    return (data as GradeLogCloudRow[]).map((r) => {
+    // Paginate to avoid the PostgREST 1000-row default cap, which would
+    // silently truncate the grade log for any user past ~10 active days.
+    // Rows are ordered by occurred_at ascending so offset pagination is
+    // safe: grade_log is append-only and new rows only appear at the tail.
+    const data = await fetchAllPages<GradeLogCloudRow>((from, to) =>
+      client
+        .from("grade_log")
+        .select("occurred_at,entry_date,card_type,grade,subject_key,locale,learning_step,step_started_at")
+        .eq("user_id", userId)
+        .order("occurred_at", { ascending: true })
+        .range(from, to),
+    );
+    if (!data) return null;
+    return data.map((r) => {
       const entry: GradeLogEntry = {
         occurredAt: Number(r.occurred_at),
         date: r.entry_date,

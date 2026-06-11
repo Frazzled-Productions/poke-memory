@@ -15,8 +15,10 @@
  *
  *   ownerUserId !== incomingUserId    → different user.  Archive outgoing user's
  *                                       full local state, wipe all per-user LS
- *                                       keys (incl. settings:*), restore incoming
- *                                       user's archive if present (else fresh),
+ *                                       keys (incl. settings:*) AND the
+ *                                       IDB-primary review session + grade log,
+ *                                       restore incoming user's archive if
+ *                                       present (else fresh),
  *                                       then write a fresh SyncStatus stamped with
  *                                       incomingUserId and null cursors so
  *                                       pullAndMerge starts from a clean slate.
@@ -35,6 +37,7 @@ import {
   archiveUserData,
   restoreUserData,
   clearIdbPendingQueue,
+  clearIdbUserData,
 } from "@/lib/storage/userArchive";
 import {
   KEY_SETTINGS,
@@ -125,6 +128,15 @@ export async function guardAccountSwitch(incomingUserId: string): Promise<void> 
   // the LS queue) and clearIdbPendingQueue could read the IDB copy and POST A's
   // grades under B's session cookie. Clearing IDB first closes that window. (#1712)
   await clearIdbPendingQueue();
+
+  // Delete the IDB-primary review session and grade log. Without this the
+  // incoming user inherits the outgoing user's session (loadSession is
+  // IDB-first; the LS wipe below cannot reach IDB), and callback-complete
+  // pushes it into their cloud account on an empty-cloud first sign-in -
+  // the #1712 cross-account blending class. Runs after archiveUserData (the
+  // snapshot is already taken) and before restoreUserData (so a restored
+  // archive is not wiped). (#1850)
+  await clearIdbUserData();
 
   // Wipe per-user LS keys including settings:* (clearLocalProgress spares them).
   wipeUserLocalStorage();

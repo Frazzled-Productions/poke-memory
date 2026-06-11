@@ -1077,9 +1077,11 @@ export function saveSettings(settings: UserSettings): void {
   // Mirror the deprecated `pokemonNameLocale` scalar from the active learning
   // locale (#1484), so any reader that only knows the old field - including the
   // cloud settings JSONB before the union-merge RPC ships - stays correct.
+  // Fall back to the existing `pokemonNameLocale` field for pre-#1484 backups
+  // where `activePokemonNameLocale` may be absent (F44 / #1860).
   const toWrite: UserSettings = {
     ...settings,
-    pokemonNameLocale: settings.activePokemonNameLocale,
+    pokemonNameLocale: settings.activePokemonNameLocale ?? settings.pokemonNameLocale,
   };
   // writeLocalStorage handles the guard + try/catch. The CustomEvent dispatch
   // is kept explicit here because it carries a typed detail payload that is

@@ -125,13 +125,13 @@ function makeSeedPokemon(id: number, versionGroups: string[], isDefaultForm = tr
 
 describe("computePerGameStats", () => {
   it("returns an empty array when the seed is empty", () => {
-    const result = computePerGameStats([], []);
+    const result = computePerGameStats([], [], false, "en");
     expect(result).toEqual([]);
   });
 
   it("counts all species as total=1 when no cards have been introduced", () => {
     const seed = [makeSeedPokemon(1, ["red-blue"]), makeSeedPokemon(2, ["red-blue"])];
-    const result = computePerGameStats([], seed);
+    const result = computePerGameStats([], seed, false, "en");
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ slug: "red-blue", total: 2, introduced: 0, mastered: 0 });
   });
@@ -139,7 +139,7 @@ describe("computePerGameStats", () => {
   it("counts an introduced species (lastReview !== null)", () => {
     const seed = [makeSeedPokemon(1, ["red-blue"])];
     const cards: ReviewableCard[] = [makeNameCard(1, { lastReview: "2025-01-01", firstSeen: "2025-01-01" })];
-    const result = computePerGameStats(cards, seed);
+    const result = computePerGameStats(cards, seed, false, "en");
     expect(result[0]).toMatchObject({ slug: "red-blue", total: 1, introduced: 1, mastered: 0 });
   });
 
@@ -147,7 +147,7 @@ describe("computePerGameStats", () => {
     const seed = [makeSeedPokemon(1, ["red-blue"])];
     // Name card mastered but no reverse card.
     const cards: ReviewableCard[] = [makeNameCard(1, MASTERED_STATE)];
-    const result = computePerGameStats(cards, seed);
+    const result = computePerGameStats(cards, seed, false, "en");
     expect(result[0]).toMatchObject({ mastered: 0 });
   });
 
@@ -157,7 +157,7 @@ describe("computePerGameStats", () => {
       makeNameCard(1, MASTERED_STATE),
       makeReverseCard(1, MASTERED_STATE),
     ];
-    const result = computePerGameStats(cards, seed);
+    const result = computePerGameStats(cards, seed, false, "en");
     expect(result[0]).toMatchObject({ slug: "red-blue", total: 1, introduced: 1, mastered: 1 });
   });
 
@@ -167,7 +167,7 @@ describe("computePerGameStats", () => {
       makeNameCard(1, MASTERED_STATE),
       makeReverseCard(1, MASTERED_STATE),
     ];
-    const result = computePerGameStats(cards, seed);
+    const result = computePerGameStats(cards, seed, false, "en");
     const slugs = result.map((r) => r.slug);
     expect(slugs).toContain("red-blue");
     expect(slugs).toContain("gold-silver");
@@ -182,7 +182,7 @@ describe("computePerGameStats", () => {
       makeSeedPokemon(26, ["red-blue"], true),        // default Raichu
       makeSeedPokemon(10100, ["sun-moon"], false),     // Alolan Raichu (alternate form)
     ];
-    const result = computePerGameStats([], seed);
+    const result = computePerGameStats([], seed, false, "en");
     const slugs = result.map((r) => r.slug);
     expect(slugs).toContain("red-blue");
     // Alolan Raichu (alternate form) must NOT contribute to any game count.
@@ -191,14 +191,14 @@ describe("computePerGameStats", () => {
 
   it("skips seed entries with no versionGroups", () => {
     const seed = [makeSeedPokemon(1, [])];
-    const result = computePerGameStats([], seed);
+    const result = computePerGameStats([], seed, false, "en");
     expect(result).toHaveLength(0);
   });
 
   it("forceAllMastered overrides everything - all species are mastered", () => {
     const seed = [makeSeedPokemon(1, ["red-blue"]), makeSeedPokemon(2, ["red-blue"])];
     // No cards at all - yet with forceAllMastered every species counts.
-    const result = computePerGameStats([], seed, /* forceAllMastered = */ true);
+    const result = computePerGameStats([], seed, /* forceAllMastered = */ true, "en");
     expect(result[0]).toMatchObject({ slug: "red-blue", total: 2, introduced: 0, mastered: 2 });
   });
 
@@ -209,7 +209,7 @@ describe("computePerGameStats", () => {
       makeNameCard(1, MASTERED_STATE),
       makeReverseCard(1, MASTERED_STATE),
     ];
-    const masteredResult = computePerGameStats(masteredCards, seed);
+    const masteredResult = computePerGameStats(masteredCards, seed, false, "en");
     expect(masteredResult[0]?.mastered).toBe(1);
 
     // stability < 21 → not mastered.
@@ -218,7 +218,7 @@ describe("computePerGameStats", () => {
       makeNameCard(1, lowStabilityState),
       makeReverseCard(1, lowStabilityState),
     ];
-    const learningResult = computePerGameStats(learningCards, seed);
+    const learningResult = computePerGameStats(learningCards, seed, false, "en");
     expect(learningResult[0]?.mastered).toBe(0);
   });
 
@@ -230,7 +230,7 @@ describe("computePerGameStats", () => {
       ...makeNameCard(1, { lastReview: "2025-01-01", firstSeen: "2025-01-01" }),
       locale: "ja" as const,
     } as ReviewableCard;
-    const result = computePerGameStats([jaCard], seed);
+    const result = computePerGameStats([jaCard], seed, false, "en");
     // The "ja" name card must not count as introduced.
     expect(result[0]).toMatchObject({ total: 1, introduced: 0, mastered: 0 });
   });
@@ -249,11 +249,52 @@ describe("computePerGameStats", () => {
       makeReverseCard(1, MASTERED_STATE),
       makeNameCard(2, { lastReview: "2025-01-01", firstSeen: "2025-01-01", reps: 1, scheduledDays: 1 }),
     ];
-    const result = computePerGameStats(cards, seed);
+    const result = computePerGameStats(cards, seed, false, "en");
     const bySlug = Object.fromEntries(result.map((r) => [r.slug, r]));
 
     expect(bySlug["red-blue"]).toMatchObject({ total: 1, introduced: 1, mastered: 1 });
     expect(bySlug["gold-silver"]).toMatchObject({ total: 2, introduced: 2, mastered: 1 });
     expect(bySlug["x-y"]).toMatchObject({ total: 1, introduced: 0, mastered: 0 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale scoping (#1851)
+// ---------------------------------------------------------------------------
+
+describe("computePerGameStats locale scoping (#1851)", () => {
+  it("counts ja progress under the ja locale", () => {
+    const seed = [makeSeedPokemon(1, ["red-blue"])];
+    const cards: ReviewableCard[] = [
+      { ...makeNameCard(1, MASTERED_STATE), locale: "ja" as const } as ReviewableCard,
+      { ...makeReverseCard(1, MASTERED_STATE), locale: "ja" as const } as ReviewableCard,
+    ];
+    expect(computePerGameStats(cards, seed, false, "ja")[0]).toMatchObject({
+      total: 1,
+      introduced: 1,
+      mastered: 1,
+    });
+    // The same cards contribute nothing to the en panel.
+    expect(computePerGameStats(cards, seed, false, "en")[0]).toMatchObject({
+      total: 1,
+      introduced: 0,
+      mastered: 0,
+    });
+  });
+
+  it("a mastered reverse leg in another locale does not complete an en species", () => {
+    const seed = [makeSeedPokemon(1, ["red-blue"])];
+    const cards: ReviewableCard[] = [
+      makeNameCard(1, MASTERED_STATE),
+      { ...makeReverseCard(1, MASTERED_STATE), locale: "ja" as const } as ReviewableCard,
+    ];
+    // en name is mastered but the only mastered reverse leg is ja - the en
+    // species must stay unmastered (previously the reverse set had no locale
+    // guard and the ja leg completed it).
+    expect(computePerGameStats(cards, seed, false, "en")[0]).toMatchObject({
+      total: 1,
+      introduced: 1,
+      mastered: 0,
+    });
   });
 });

@@ -21,6 +21,7 @@ import {
 } from "@/lib/gradelog/persistence";
 import { KEY_GRADE_LOG } from "@/lib/storage/keys";
 import { todayString } from "@/lib/review/session";
+import { loadSettings } from "@/lib/settings/persistence";
 import { cardPanel, colStack, mutedText, colStackLg } from "@/lib/utils/class-names";
 
 // Grade colour mapping - colours only; labels are resolved via t() at render.
@@ -102,7 +103,9 @@ export const PracticeSidebar = memo(function PracticeSidebar() {
   useEffect(() => {
     async function refresh() {
       const log: GradeLog = await loadGradeLog();
-      const today = todayString(new Date());
+      // Grade-log entries are stamped with the user's-timezone day (#1853),
+      // so the sidebar's "today" must use the same boundary.
+      const today = todayString(new Date(), loadSettings().timezone ?? "UTC");
       const grades = todayGradeSequence(log, today);
       setTodayGrades(grades);
       setLoading(false);

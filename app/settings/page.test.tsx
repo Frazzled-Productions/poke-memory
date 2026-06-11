@@ -127,10 +127,14 @@ vi.mock("@/components/theme/FavouriteThemeProvider", () => ({
   useFavourite: () => ({ updateFavourite: vi.fn() }),
 }));
 
-vi.mock("@/lib/theme/persistence", () => ({
-  loadFavourite: vi.fn(() => null),
-  saveFavourite: vi.fn(),
-}));
+vi.mock("@/lib/theme/persistence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/theme/persistence")>();
+  return {
+    ...actual,
+    loadFavourite: vi.fn(() => null),
+    saveFavourite: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/gradelog/persistence", () => ({
   loadGradeLog: vi.fn().mockResolvedValue([]),
@@ -431,6 +435,7 @@ function defaultSettings() {
     typedEntryOnboardingShown: false,
     mcCardOnboardingShown: false,
     labsFlags: {},
+    learningLocales: ["en"] as AppLocale[],
     removedLocales: [] as AppLocale[],
     pokemonNameLocale: "en" as const,
     pushNotificationHour: null,
@@ -1153,7 +1158,7 @@ describe("SettingsPage - theme picker locked state (#1440)", () => {
   }
 
   it("shows locked-state message when no Pokémon are mastered", async () => {
-    // loadSession returns null → cardStateById is empty → unlockedEntries is empty
+    // loadSession returns null → sessionCards is empty → masteredSpeciesUnion returns empty set → unlockedEntries empty
     mockLoadSession.mockResolvedValue(null);
 
     await renderAndWait();
@@ -1182,8 +1187,8 @@ describe("SettingsPage - theme picker locked state (#1440)", () => {
   it("pretendAllMastered on: picker grid renders, locked message absent", async () => {
     // The superuser flag forces unlockedEntries to include every CURATED_POKEMON
     // entry (the real, non-empty curated list), so the locked branch is skipped.
-    // This exercises the actual `flags.pretendAllMastered || isMastered(...)`
-    // guard in the component, not just catalogue-key presence.
+    // This exercises the actual `flags.pretendAllMastered` short-circuit in the
+    // component's masteredSpeciesUnion call, not just catalogue-key presence.
     mockLoadSession.mockResolvedValue(null);
     mockSuperuserFlags.pretendAllMastered = true;
     try {
@@ -1965,5 +1970,50 @@ describe("SettingsPage - SW version diagnostic (#1826)", () => {
     expect(mismatchEl!.textContent).toContain("v0.11.2");
 
     process.env.NEXT_PUBLIC_APP_VERSION = originalAppVersion;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Feedback row - lifted above accordions (#1849)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage - lifted feedback row (#1847 / #1849)", () => {
+  it("renders a 'Send feedback' button above the accordions (id=feedback-row present)", async () => {
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      // The feedback row element with its stable id must be present in the DOM.
+      expect(document.getElementById("feedback-row")).toBeInTheDocument();
+    });
+
+    // The button inside the row must be visible and labelled.
+    const feedbackBtn = screen.getByRole("button", { name: /send feedback/i });
+    expect(feedbackBtn).toBeInTheDocument();
+  });
+
+  it("clicking 'Send feedback' opens the FeedbackModal (feedback-category select becomes visible)", async () => {
+    // Stub the dialog open/close so jsdom treats it as open.
+    HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+      this.open = false;
+    };
+
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /send feedback/i })).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /send feedback/i }));
+    });
+
+    // The category select is rendered inside the modal - its presence confirms the
+    // modal opened and the FeedbackModal form is mounted.
+    await waitFor(() => {
+      expect(document.getElementById("feedback-category")).toBeInTheDocument();
+    });
   });
 });

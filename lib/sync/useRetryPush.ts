@@ -154,7 +154,12 @@ export function useRetryPush(
         // is idempotent but wasteful (#893 partial-success slimming).
         const failedCards = persistedQueue.filter((_, i) => {
           const r = results[i];
-          return r.status === "rejected" || (r.status === "fulfilled" && !r.value);
+          // "rejected" (Promise rejected) or "failed" (tri-state from pushSingleCard)
+          // both count as failure for the retry queue. "rejected" (23514 regression
+          // trigger) is evicted - the cloud row is newer, no point retrying.
+          if (r.status === "rejected") return true;
+          if (r.status !== "fulfilled") return false;
+          return r.value === "failed";
         });
 
         const attemptAt = new Date().toISOString();
@@ -216,7 +221,7 @@ export function useRetryPush(
       if (cancelledRef.current) return;
 
       const anyFailed = results.some(
-        (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value),
+        (r) => r.status === "rejected" || (r.status === "fulfilled" && r.value === "failed"),
       );
 
       const attemptAt = new Date().toISOString();

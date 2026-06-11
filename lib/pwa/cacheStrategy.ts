@@ -118,6 +118,17 @@ const FONT_EXTENSION = /\.(?:woff2?|ttf|otf|eot)$/i;
  *              matches (caller should fall back to the pages bucket).
  */
 function classifyPath(path: string): { strategy: CacheStrategy; cacheName?: CacheName } | null {
+  // API routes - never cache. Responses are authenticated and often carry
+  // sensitive data (e.g. the GDPR review-history CSV from /api/export).
+  // Caching them would persist personal data in Cache Storage after sign-out
+  // and risk serving a stale or wrong-user response on a shared profile.
+  // This rule must precede all other same-origin rules so that /api/**
+  // is never routed into the pages bucket by the fallthrough at the bottom
+  // of classifyRequest (#1858 F9).
+  if (path.startsWith("/api/")) {
+    return { strategy: "network-only" };
+  }
+
   // Self-hosted sprite art - served from IndexedDB when present (offline pack),
   // falling back to network on miss. The SW handles the IDB lookup directly;
   // Cache Storage is no longer used for sprites.

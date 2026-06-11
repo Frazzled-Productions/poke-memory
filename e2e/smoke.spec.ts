@@ -1040,7 +1040,18 @@ test.describe("Settings page", () => {
   test("App Theme section visible and theme applies after mastering a Pokémon", async ({
     page,
   }) => {
-    // Seed a mastered Charizard (id=6: repetitions >= 3 AND interval >= 21)
+    // Seed a mastered Charizard at species-level: both name (id=6) and reverse
+    // (id=2000006, REVERSE_ID_OFFSET+6) legs must meet the mastery gate so the
+    // theme picker unlocks (#1865: species-level mastery requires BOTH legs).
+    // repetitions >= 3 AND interval >= 21 migrates to stability=21 (mastered).
+    const charizardMastered = {
+      repetitions: 3,
+      interval: 21,
+      easeFactor: 2.5,
+      dueDate: "2026-05-20",
+      lastReview: "2026-04-29",
+      firstSeen: "2026-03-01",
+    };
     await seedSessionIdb(page, {
       cards: [
         {
@@ -1048,14 +1059,15 @@ test.describe("Settings page", () => {
           name: "Charizard",
           spriteUrl: "/sprites/pokemon/6.png",
           cardType: "name",
-          state: {
-            repetitions: 3,
-            interval: 21,
-            easeFactor: 2.5,
-            dueDate: "2026-05-20",
-            lastReview: "2026-04-29",
-            firstSeen: "2026-03-01",
-          },
+          state: charizardMastered,
+        },
+        {
+          id: 2000006,
+          pokemonId: 6,
+          name: "Charizard",
+          spriteUrl: "/sprites/pokemon/6.png",
+          cardType: "reverse",
+          state: charizardMastered,
         },
       ],
       limits: {

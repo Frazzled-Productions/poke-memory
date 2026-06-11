@@ -269,11 +269,16 @@ export function computeDashboardSnapshot(
 
   let statsResult: StatsResult | null = null;
   if (needsStats) {
+    // Pass the active locale (#1851): without it computeStats fell back to
+    // its "en" default, so the mastery and struggling axes were hard-wired
+    // to English cards while the queue/forecast/projection axes on the same
+    // page were locale-scoped.
     statsResult = computeStats(
       cards,
       today,
       strugglingLimit,
       forceAllMastered,
+      locale,
     );
   }
 
@@ -388,6 +393,11 @@ export function computeDashboardSnapshot(
   // The helper itself returns null for forceAllMastered.
   let firstMasteryDays: number | null = null;
   if (wants("firstMastery")) {
+    // Locale-scoped name cards (#1851): the gate counts and the projection
+    // must reflect the same locale as the statsResult they sit beside.
+    const localeNameCards = nameCards.filter(
+      (c) => (c.locale ?? "en") === locale,
+    );
     // We need to know introduced/mastered counts to gate this axis.
     // If statsResult is already computed, reuse it. Otherwise do a minimal check.
     let introduced = 0;
@@ -397,7 +407,7 @@ export function computeDashboardSnapshot(
       mastered = statsResult.mastered;
     } else {
       // Compute a minimal pass for the gate check (stability-based, #1765).
-      for (const card of nameCards) {
+      for (const card of localeNameCards) {
         if (card.state.lastReview !== null) {
           introduced++;
           if (card.state.stability >= MASTERY_STABILITY_DAYS) {
@@ -409,7 +419,7 @@ export function computeDashboardSnapshot(
     if (!forceAllMastered && introduced > 0 && mastered === 0) {
       firstMasteryDays =
         projectTimeToFirstMastery(
-          nameCards,
+          localeNameCards,
           now,
           forceAllMastered,
           { retentionTarget },

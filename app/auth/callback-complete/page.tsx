@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import {
   hasCloudData,
   applyCloudAuthoritative,
@@ -48,7 +49,7 @@ import {
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import type { CloudRow } from "@/lib/sync/cloud";
 import type { ReviewableCard } from "@/lib/review/session";
-import { mutedText } from "@/lib/utils/class-names";
+import { mutedText, pageTitle } from "@/lib/utils/class-names";
 type ConflictData = {
   localCards: ReviewableCard[];
   cloudCards: CloudRow[];
@@ -86,6 +87,7 @@ function summariseCloudCards(rows: CloudRow[]) {
 export default function CallbackCompletePage() {
   const router = useRouter();
   const { user, loading, supabase } = useAuth();
+  const { anyFlagOn } = useSuperuser();
   const { seed } = useSeed();
   const tAuth = useTranslations("auth");
   const [status, setStatus] = useState<Status>({ kind: "loading" });
@@ -138,7 +140,17 @@ export default function CallbackCompletePage() {
       // AutoSyncOnChange listeners will catch them up on the next user
       // interaction. Keeping this branch narrow avoids a stalled sign-in if
       // any auxiliary push hangs.
+      //
+      // F11: if any superuser flag is on (or cleanup is pending), skip the push
+      // entirely. A guest who applied a QA seed then signs in must not upload
+      // fabricated cards to the cloud. The sync write-guard documented in
+      // AGENTS.md applies here just as it does for every other write path.
       if (hasLocal && !cloudHasData) {
+        if (anyFlagOn) {
+          // Write-guard active: navigate away without uploading local state.
+          if (!cancelled) router.replace("/");
+          return;
+        }
         const ok = await pushSession(supabase, user.id, localSession!.cards);
         const prev = loadSyncStatus();
         // Stamp ownerUserId to mark this device's data as belonging to this user
@@ -288,6 +300,11 @@ export default function CallbackCompletePage() {
   }
 
   async function handleKeepLocal() {
+    // F11: write-guard - never push local data while any superuser flag is on.
+    // The 'Keep local' button is rendered disabled (see SideCard below) when
+    // anyFlagOn is true, but guard here too so the function is safe even if
+    // called programmatically.
+    if (anyFlagOn) return;
     if (status.kind !== "conflict" || !user || !supabase || pending) return;
     setPending(true);
     try {
@@ -416,8 +433,8 @@ export default function CallbackCompletePage() {
   return (
     <div className="flex flex-1 items-center justify-center px-4 py-8">
       <div className="w-full max-w-3xl">
-        <h1 className="text-2xl font-bold text-foreground text-center">Sync conflict</h1>
-        <p className="mt-2 text-center text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
+        <h1 className={`${pageTitle} text-center`}>Sync conflict</h1>
+        <p className={`mt-2 text-center max-w-md mx-auto ${mutedText}`}>
           You have progress on this device and in the cloud. Picking a side replaces
           the other for all synced data: cards, settings, streak, and grade history.
         </p>
@@ -431,6 +448,7 @@ export default function CallbackCompletePage() {
             buttonLabel="Keep local"
             buttonClass="bg-foreground text-background hover:opacity-80 focus-visible:ring-foreground"
             disabled={pending}
+            superuserPaused={anyFlagOn}
             onClick={handleKeepLocal}
           />
           <SideCard
@@ -459,6 +477,7 @@ function SideCard({
   buttonLabel,
   buttonClass,
   disabled,
+  superuserPaused,
   onClick,
 }: {
   heading: string;
@@ -469,13 +488,14 @@ function SideCard({
   buttonLabel: string;
   buttonClass: string;
   disabled: boolean;
+  superuserPaused?: boolean;
   onClick: () => void;
 }) {
   const t = useTranslations("auth");
   return (
     <div className="rounded-xl border border-zinc-200 bg-background p-6 dark:border-zinc-800">
       <h2 className="text-base font-semibold text-foreground">{heading}</h2>
-      <ul className="mt-2 space-y-1 text-sm text-zinc-500 dark:text-zinc-400">
+      <ul className={`mt-2 space-y-1 ${mutedText}`}>
         <li>
           {t("cardsReviewed", { count: cardCount })}
         </li>
@@ -491,14 +511,27 @@ function SideCard({
           Last reviewed: {latestReviewed}
         </p>
       )}
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className={`mt-4 w-full min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 ${buttonClass}`}
-      >
-        {buttonLabel}
-      </button>
+      {/* F11: while any superuser flag is on, replace the push button with
+          the standard 'Sync paused (superuser)' treatment so QA-seeded data
+          cannot be uploaded to the cloud via the conflict picker. */}
+      {superuserPaused ? (
+        <button
+          type="button"
+          disabled
+          className="mt-4 w-full min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 bg-foreground text-background"
+        >
+          Sync paused (superuser)
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className={`mt-4 w-full min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 ${buttonClass}`}
+        >
+          {buttonLabel}
+        </button>
+      )}
     </div>
   );
 }

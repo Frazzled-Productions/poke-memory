@@ -14,6 +14,7 @@ import {
   type SuperuserFlags,
   type SuperuserFlagKey,
 } from "./persistence";
+import { KEY_SUPERUSER_CLEANUP_PENDING } from "@/lib/storage/keys";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/sync/cloud";
 import { pullSettingsWithTimestamp, pullRegionalPrefs } from "@/lib/sync/settings";
@@ -34,6 +35,7 @@ import { saveGradeLog } from "@/lib/gradelog/persistence";
 import { loadSeed } from "@/lib/pokemon/seed-async";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { KEY_QA_SEED_ACTIVE } from "@/lib/storage/keys";
+import { clearSeedScenario } from "@/lib/qa-seed/apply";
 
 // Typing "super" anywhere (when not focused on an input) toggles unlocked state.
 const CHORD_SEQUENCE = ["s", "u", "p", "e", "r"];
@@ -71,6 +73,9 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
   const { user, supabase } = useAuth();
   const [unlocked, setUnlockedState] = useState(false);
   const [flags, setFlags] = useState<SuperuserFlags>(DEFAULT_FLAGS);
+  // F16: tracks whether the cleanup-pending marker is set so the React
+  // anyFlagOn value matches isAnyFlagOn() throughout the cleanup window.
+  const [cleanupPending, setCleanupPending] = useState(false);
 
   // Refs let chord/tap handlers see latest values without rebinding listeners
   // on every auth change or flag flip.
@@ -94,13 +99,9 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
   // so a mastery check would spuriously return earned; `FavouriteThemeProvider`'s
   // mount-time belt-and-braces handles those cases on the next page load.
   const exitCleanup = useCallback(async () => {
-    // Remove the QA seed indicator so it never outlives the IDB data that
-    // exitCleanup is about to overwrite or wipe.
-    try {
-      window.localStorage.removeItem(KEY_QA_SEED_ACTIVE);
-    } catch {
-      // Non-fatal for a QA tool.
-    }
+    // F55: do NOT remove KEY_QA_SEED_ACTIVE here unconditionally. It is removed
+    // only in the cardsTrusted=true branches below so the indicator survives a
+    // cancelled or degraded cleanup - QA can still see the seed is active.
     const u = userRef.current;
     const sb = supabaseRef.current;
     let cardsTrusted = false;
@@ -142,7 +143,7 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
             // DEFAULT_SETTINGS ensures the stored blob is always complete.
             saveSettings({ ...DEFAULT_SETTINGS, ...pulledSettings.settings });
           }
-          // Regional prefs overlay runs ONLY if the JSONB pull succeeded - 
+          // Regional prefs overlay runs ONLY if the JSONB pull succeeded -
           // otherwise the loadSettings() base is the QA-dirty local snapshot,
           // and overlaying timezone/dateFormat onto it would persist all the
           // other QA-drifted fields. Degrade-together with the JSONB pull is
@@ -194,6 +195,10 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
           window.dispatchEvent(
             new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
           );
+          // F55: cloud pull succeeded - seed is gone; clear the indicator now.
+          try { window.localStorage.removeItem(KEY_QA_SEED_ACTIVE); } catch { /* non-fatal */ }
+          // F16: cleanup succeeded - clear the write-guard marker.
+          try { window.localStorage.removeItem(KEY_SUPERUSER_CLEANUP_PENDING); } catch { /* non-fatal */ }
           cardsTrusted = true;
         } else {
           // pullSession returned null: the pull failed (network error / Supabase
@@ -201,9 +206,12 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
           // data would be worse - and warn so QA can see the cleanup degraded.
           // cardsTrusted stays false so the favourite-theme re-validation below
           // skips, matching the catch branch's conservative posture.
+          // F16: marker is deliberately left set so writes remain suppressed.
           console.warn("[superuser] pullSession returned null during exit cleanup; local state preserved (cleanup degraded)");
         }
       } catch (err) {
+        // F16: marker is deliberately left set on failure so writes remain
+        // suppressed. The user can re-toggle superuser to retry cleanup.
         console.warn("[superuser] cloud→local overwrite failed:", err);
       }
     } else {
@@ -211,21 +219,44 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
         "Reset local progress?\n\nSuperuser mode may have altered your local card state. Press OK to clear it (you'll start fresh), or Cancel to keep what you have now.",
       );
       if (confirmed) {
+        // F42: call clearSeedScenario to reset ALL seeded state (streak,
+        // protection tokens, grade log, mastered-count cache), not just the
+        // review session. This ensures the phantom streak/token balance and
+        // mastered count are zeroed alongside the card data.
+        try {
+          await clearSeedScenario();
+        } catch (err) {
+          console.warn("[superuser] clearSeedScenario failed during guest exit cleanup:", err);
+          // Fall through: still delete the session below so the user gets
+          // a fresh start even if the streak/cache cleanup partially failed.
+        }
         // Data now lives in IndexedDB; delete it there. The localStorage key
         // is left alone (it was already removed during the initial migration).
         await idbDelete(SESSION_STORAGE_KEY);
         window.dispatchEvent(
           new StorageEvent("storage", { key: SESSION_STORAGE_KEY }),
         );
+        // F55: guest confirmed wipe - seed is gone; clear the indicator now.
+        // (clearSeedScenario already removes it, but removeItem is idempotent.)
+        try { window.localStorage.removeItem(KEY_QA_SEED_ACTIVE); } catch { /* non-fatal */ }
+        // F16: cleanup succeeded - clear the write-guard marker.
+        try { window.localStorage.removeItem(KEY_SUPERUSER_CLEANUP_PENDING); } catch { /* non-fatal */ }
         cardsTrusted = true;
       }
+      // Guest Cancel: marker is left set so writes stay suppressed on the
+      // (still-seeded) local state.
     }
 
     if (!cardsTrusted) return;
     const favourite = loadFavourite();
     if (favourite === null) return;
     const cards = (await loadSession())?.cards ?? [];
-    if (!isFavouriteEarned(favourite, cards)) {
+    // Use species-level mastery (both legs, any enrolled locale) for the
+    // exit-cleanup check (#1865). forceAllMastered is false here by design:
+    // this runs after the flag-off transition, so cheat-selected themes that
+    // are not genuinely earned are wiped. learningLocales always includes "en".
+    const { learningLocales } = loadSettings();
+    if (!isFavouriteEarned(favourite, cards, false, learningLocales)) {
       // `saveFavourite` → `saveSettings` already fires `SETTINGS_SAVED_EVENT`,
       // which `FavouriteThemeProvider` listens for - no synthetic StorageEvent
       // is needed for same-tab refresh.
@@ -239,11 +270,25 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
       const next: SuperuserFlags = { ...prev, [key]: value };
       const prevAnyOn = anyFlagTrue(prev);
       const nextAnyOn = anyFlagTrue(next);
+      if (prevAnyOn && !nextAnyOn) {
+        // F16: set the cleanup-pending marker BEFORE persisting the all-off
+        // flag state and before any React re-render. This keeps isAnyFlagOn()
+        // returning true (writes suppressed) until exitCleanup finishes. Only
+        // the cardsTrusted=true branches inside exitCleanup remove it.
+        try { window.localStorage.setItem(KEY_SUPERUSER_CLEANUP_PENDING, "true"); } catch { /* non-fatal */ }
+        setCleanupPending(true);
+      }
       saveFlags(next);
       flagsRef.current = next;
       setFlags(next);
       if (prevAnyOn && !nextAnyOn) {
         await exitCleanup();
+        // Sync React state with the marker: if exitCleanup succeeded it
+        // removed the marker; if it failed the marker stays set and we leave
+        // cleanupPending true (writes stay suppressed).
+        const stillPending = typeof window !== "undefined" &&
+          window.localStorage.getItem(KEY_SUPERUSER_CLEANUP_PENDING) === "true";
+        setCleanupPending(stillPending);
       }
     },
     [exitCleanup],
@@ -280,10 +325,18 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
         const prev = flagsRef.current;
         const anyWasOn = anyFlagTrue(prev);
         if (anyWasOn) {
+          // F16: set cleanup-pending marker BEFORE clearFlags() so writes
+          // stay suppressed throughout the cleanup. Only exitCleanup's
+          // cardsTrusted=true branches remove it.
+          try { window.localStorage.setItem(KEY_SUPERUSER_CLEANUP_PENDING, "true"); } catch { /* non-fatal */ }
+          setCleanupPending(true);
           clearFlags();
           flagsRef.current = DEFAULT_FLAGS;
           setFlags(DEFAULT_FLAGS);
           await exitCleanup();
+          const stillPending = typeof window !== "undefined" &&
+            window.localStorage.getItem(KEY_SUPERUSER_CLEANUP_PENDING) === "true";
+          setCleanupPending(stillPending);
         }
       }
     }
@@ -357,9 +410,14 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
     };
   }, [exitCleanup]);
 
+  // F16: anyFlagOn is true while any flag is set OR while cleanup is pending,
+  // so AutoSyncOnChange / usePerGradeSync / useSyncOnUnload all suppress writes
+  // during the cleanup window, not just while flags are set.
+  const anyFlagOn = anyFlagTrue(flags) || cleanupPending;
+
   return (
     <SuperuserContext.Provider
-      value={{ unlocked, flags, anyFlagOn: anyFlagTrue(flags), setFlag }}
+      value={{ unlocked, flags, anyFlagOn, setFlag }}
     >
       {children}
     </SuperuserContext.Provider>

@@ -75,7 +75,7 @@ function LegStatusRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-2 py-0.5">
-      <span className="text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
+      <span className={mutedTextXs}>{label}</span>
       <LegStatusText status={legStatus} className="text-xs font-medium" />
     </div>
   );

@@ -1,5 +1,14 @@
 import { pronunciationFor } from "./pronunciations";
 import { loadSettings } from "@/lib/settings/persistence";
+import type { AppLocale } from "@/i18n/locales";
+
+/** Map a pokemonNameLocale to the BCP-47 language tag used for utterance.lang and voice selection. */
+const LOCALE_TO_BCP47: Record<AppLocale, string> = {
+  en: "en-GB",
+  ja: "ja",
+  "zh-Hans": "zh-Hans",
+  "zh-Hant": "zh-Hant",
+};
 
 export type VoiceTier = "premium" | "enhanced" | "compact";
 
@@ -188,27 +197,39 @@ export function awaitTtsEnd(): Promise<void> {
 export function speakName(
   name: string,
   id?: number | null,
-  overrides?: { ttsVoice?: string | null; ttsRate?: number; ttsVolume?: number },
+  overrides?: { ttsVoice?: string | null; ttsRate?: number; ttsVolume?: number; locale?: AppLocale },
 ): void {
   // Resolve settings synchronously - captures state at call time, avoids stale closure.
-  let resolvedSettings: { ttsVoice: string | null; ttsRate: number; ttsVolume: number };
+  let resolvedSettings: { ttsVoice: string | null; ttsRate: number; ttsVolume: number; locale: AppLocale };
   if (overrides !== undefined) {
-    resolvedSettings = { ttsVoice: overrides.ttsVoice ?? null, ttsRate: overrides.ttsRate ?? 1, ttsVolume: overrides.ttsVolume ?? 1 };
+    resolvedSettings = {
+      ttsVoice: overrides.ttsVoice ?? null,
+      ttsRate: overrides.ttsRate ?? 1,
+      ttsVolume: overrides.ttsVolume ?? 1,
+      locale: overrides.locale ?? "en",
+    };
   } else {
     try {
       const s = loadSettings();
-      resolvedSettings = { ttsVoice: s.ttsVoice, ttsRate: s.ttsRate, ttsVolume: s.ttsVolume };
+      resolvedSettings = {
+        ttsVoice: s.ttsVoice,
+        ttsRate: s.ttsRate,
+        ttsVolume: s.ttsVolume,
+        locale: s.activePokemonNameLocale ?? "en",
+      };
     } catch {
       // localStorage may throw in storage-blocked contexts (private browsing, etc.); fall back to defaults.
-      resolvedSettings = { ttsVoice: null, ttsRate: 1, ttsVolume: 1 };
+      resolvedSettings = { ttsVoice: null, ttsRate: 1, ttsVolume: 1, locale: "en" };
     }
   }
-  const { ttsVoice, ttsRate, ttsVolume } = resolvedSettings;
+  const { ttsVoice, ttsRate, ttsVolume, locale } = resolvedSettings;
 
   // ---------------------------------------------------------------------------
-  // Audio element path - used when a numeric id is supplied and Audio exists.
+  // Audio element path - English only (the static MP3s are English pronunciations).
+  // For non-English locales, fall through directly to Web Speech so the browser
+  // uses a voice for the displayed locale script (F36).
   // ---------------------------------------------------------------------------
-  if (typeof id === "number" && typeof Audio !== "undefined") {
+  if (typeof id === "number" && typeof Audio !== "undefined" && locale === "en") {
     stopCurrentAudio();
     // Also cancel any in-flight Web Speech utterance.
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -230,7 +251,7 @@ export function speakName(
       if (hasCalledFallback) return;
       hasCalledFallback = true;
       if (_currentAudio === audio) _currentAudio = null;
-      speakNameViaSpeech(name, ttsVoice, ttsRate, ttsVolume);
+      speakNameViaSpeech(name, ttsVoice, ttsRate, ttsVolume, locale);
     };
 
     audio.addEventListener("error", fallbackToSpeech, { once: true });
@@ -254,9 +275,9 @@ export function speakName(
   }
 
   // ---------------------------------------------------------------------------
-  // Web Speech API path - no id supplied, or Audio unavailable.
+  // Web Speech API path - no id supplied, Audio unavailable, or non-English locale.
   // ---------------------------------------------------------------------------
-  speakNameViaSpeech(name, ttsVoice, ttsRate, ttsVolume);
+  speakNameViaSpeech(name, ttsVoice, ttsRate, ttsVolume, locale);
 }
 
 function speakNameViaSpeech(
@@ -264,28 +285,41 @@ function speakNameViaSpeech(
   ttsVoice: string | null,
   ttsRate: number,
   ttsVolume: number,
+  locale: AppLocale = "en",
 ): void {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
   initVoices();
 
+  const bcpTag = LOCALE_TO_BCP47[locale] ?? "en-GB";
+
   // Chrome bug (crbug.com/335907): cancel() + speak() in the same tick silently no-ops.
   if (window.speechSynthesis.speaking || window.speechSynthesis.pending) window.speechSynthesis.cancel();
 
   setTimeout(() => {
-    const utterance = new SpeechSynthesisUtterance(pronunciationFor(name));
-    utterance.lang = "en-GB";
+    // For non-English locales pass the name directly (locale-script pronunciation),
+    // not pronunciationFor() which is English-specific phonetics.
+    const text = locale === "en" ? pronunciationFor(name) : name;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = bcpTag;
     utterance.rate = ttsRate;
     utterance.volume = ttsVolume;
 
-    // Resolve voice: pinned URI → auto-picked preferred → language-hint fallback.
-    const voiceURI = ttsVoice ?? null;
-    if (voiceURI !== null) {
+    // Resolve voice: pinned URI → auto-picked preferred voice for this locale.
+    // A pinned voice (ttsVoice) is an en-specific setting - only honour it for
+    // English to avoid asking the wrong voice to speak a foreign script.
+    if (locale === "en" && ttsVoice !== null) {
       const voices = window.speechSynthesis.getVoices();
-      const pinned = voices.find((v) => v.voiceURI === voiceURI) ?? null;
+      const pinned = voices.find((v) => v.voiceURI === ttsVoice) ?? null;
       utterance.voice = pinned ?? preferredVoice;
-    } else if (preferredVoice !== null) {
+    } else if (locale === "en" && preferredVoice !== null) {
       utterance.voice = preferredVoice;
+    } else {
+      // For non-English locales, let the browser pick the best available voice
+      // for the BCP-47 lang tag we set on the utterance.
+      const voices = window.speechSynthesis.getVoices();
+      const localeVoice = pickBest(voices.filter((v) => v.lang.startsWith(bcpTag.split("-")[0])));
+      if (localeVoice !== null) utterance.voice = localeVoice;
     }
     window.speechSynthesis.speak(utterance);
   }, 0);

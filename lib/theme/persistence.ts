@@ -5,10 +5,11 @@ import {
   saveSettings,
   type StoredFavouriteTheme,
 } from "@/lib/settings/persistence";
-import type { ReviewState } from "@/lib/srs/scheduler";
-import { isMastered } from "@/lib/stats/derive";
 import { KEY_LEGACY_FAVOURITE_THEME } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { masteredSpeciesIds } from "@/lib/badges/derive";
+import type { ReviewableCard } from "@/lib/review/session";
+import type { AppLocale } from "@/i18n/locales";
 
 // Legacy localStorage key. The favourite theme used to live here standalone;
 // since #307 the canonical store is `user_settings.settings.favouriteTheme`
@@ -124,18 +125,44 @@ export function loadFavourite(): StoredFavourite | null {
   }
 }
 
-// Pure. Returns true if there is no favourite, or its underlying name card
-// meets the mastery bar. Used by the superuser exit-cleanup and by the
-// FavouriteThemeProvider as a load-time invariant - a cheat-selected theme
-// must not survive a flag-off transition or a subsequent page load.
+/**
+ * Build the union of mastered species IDs across all enrolled locales.
+ * A species is mastered (BOTH name + reverse legs) in any enrolled locale.
+ * This is the shared predicate for the theme picker and isFavouriteEarned (#1865).
+ */
+export function masteredSpeciesUnion(
+  cards: readonly ReviewableCard[],
+  forceAllMastered: boolean,
+  enrolledLocales: readonly AppLocale[],
+): Set<number> {
+  const result = new Set<number>();
+  for (const locale of enrolledLocales) {
+    for (const id of masteredSpeciesIds(cards, forceAllMastered, locale)) {
+      result.add(id);
+    }
+  }
+  return result;
+}
+
+// Pure. Returns true if there is no favourite, or the favourite's species is
+// mastered at species-level (BOTH name + reverse legs) in ANY enrolled locale
+// (#1865). Uses masteredSpeciesIds which already encodes the two-leg rule.
+// When `forceAllMastered` is true (superuser `pretendAllMastered`), returns
+// true immediately without checking cards so the picker always opens.
+// Used by the superuser exit-cleanup - a cheat-selected theme is wiped on
+// flag-off via this predicate. NOT used for load-time auto-wipe in
+// FavouriteThemeProvider (grandfathering decision, #1865): the provider keeps
+// an already-applied favourite as-is; only the picker gate tightens.
 export function isFavouriteEarned(
   favourite: StoredFavourite | null,
-  cards: ReadonlyArray<{ id: number; state: ReviewState }>,
+  cards: readonly ReviewableCard[],
+  forceAllMastered: boolean,
+  enrolledLocales: readonly AppLocale[],
 ): boolean {
   if (favourite === null) return true;
-  const card = cards.find((c) => c.id === favourite.id);
-  if (card === undefined) return false;
-  return isMastered(card.state);
+  if (forceAllMastered) return true;
+  const mastered = masteredSpeciesUnion(cards, false, enrolledLocales);
+  return mastered.has(favourite.id);
 }
 
 export function saveFavourite(

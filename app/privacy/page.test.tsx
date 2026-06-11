@@ -159,9 +159,9 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 7 June 2026 (#698)", async () => {
+    it("shows the last updated date as 11 June 2026 (#1848)", async () => {
       await renderPage();
-      expect(screen.getByText(/7 june 2026/i)).toBeTruthy();
+      expect(screen.getByText(/11 june 2026/i)).toBeTruthy();
     });
 
     it("states the ICO registration number in section 1 (#698)", async () => {

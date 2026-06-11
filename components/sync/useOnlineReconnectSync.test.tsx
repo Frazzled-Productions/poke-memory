@@ -224,7 +224,7 @@ describe("useOnlineReconnectSync", () => {
     const oldCard = makeCard(2, "2026-05-10");    // old -> excluded
     const newCard = makeCard(3, null);             // never reviewed -> excluded
     vi.mocked(loadSession).mockResolvedValue({ cards: [todayCard, oldCard, newCard], limits: LIMITS });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 
@@ -242,7 +242,7 @@ describe("useOnlineReconnectSync", () => {
     const yesterdayCard = makeCard(1, "2026-05-16");
     const olderCard = makeCard(2, "2026-04-01");
     vi.mocked(loadSession).mockResolvedValue({ cards: [yesterdayCard, olderCard], limits: LIMITS });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 
@@ -264,7 +264,7 @@ describe("useOnlineReconnectSync", () => {
       cards: [reviewed1, reviewed2, notReviewed],
       limits: LIMITS,
     });
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 
@@ -283,7 +283,7 @@ describe("useOnlineReconnectSync", () => {
     vi.mocked(loadSyncStatus).mockReturnValue(FAILED_STATUS);
     const todayCard = makeCard(1, "2026-05-17");
     vi.mocked(loadSession).mockResolvedValue({ cards: [todayCard], limits: LIMITS });
-    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue("failed");
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 
@@ -306,8 +306,8 @@ describe("useOnlineReconnectSync", () => {
     });
     // First card succeeds, second fails - partial success.
     vi.mocked(pushSingleCard)
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+      .mockResolvedValueOnce("ok")
+      .mockResolvedValueOnce("failed");
 
     renderHook(() => useOnlineReconnectSync(FAKE_CLIENT, FAKE_USER));
 

@@ -26,13 +26,12 @@ import { deleteAccountEverywhere } from "@/lib/sync/deleteAccount";
 import { signOut } from "@/lib/auth/actions";
 import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
 import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
-import { loadFavourite, saveFavourite } from "@/lib/theme/persistence";
+import { loadFavourite, saveFavourite, masteredSpeciesUnion } from "@/lib/theme/persistence";
 import { useFavourite } from "@/components/theme/FavouriteThemeProvider";
-import { isMastered } from "@/lib/stats/derive";
+import type { ReviewableCard } from "@/lib/review/session";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
-import type { ReviewState } from "@/lib/srs/scheduler";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { countOptimizableReviews } from "@/lib/srs/optimizer";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
@@ -64,7 +63,7 @@ import { useServiceWorkerVersion } from "@/lib/pwa/useServiceWorkerVersion";
 import { useRetryPush } from "@/lib/sync/useRetryPush";
 import { loadSyncStatus } from "@/lib/sync/persistence";
 import { cn } from "@/lib/utils/cn";
-import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, pageTitle, sectionLabel } from "@/lib/utils/class-names";
 import { CompanyDisclosure } from "@/components/CompanyDisclosure";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
@@ -193,23 +192,28 @@ function FavouritePicker({
   const { flags } = useSuperuser();
   const { seed } = useSeed();
   // Loaded once at mount. Nothing on this page writes to the session so a
-  // snapshot is safe and avoids re-reading on every render.
-  const [cardStateById, setCardStateById] = useState<Map<number, ReviewState>>(new Map());
+  // snapshot is safe and avoids re-reading on every render. Stored as the
+  // set of mastered species ids rather than a Map keyed by id: a multi-locale
+  // session holds several name cards per numeric id, and the Map's
+  // Load the full ReviewableCard[] so both name AND reverse legs are available
+  // for species-level mastery (#1865). masteredSpeciesUnion unions across all
+  // enrolled locales so a species mastered in any locale earns the theme.
+  const [sessionCards, setSessionCards] = useState<readonly ReviewableCard[]>([]);
   useEffect(() => {
     async function load() {
       const session = await loadSession();
-      setCardStateById(new Map((session?.cards ?? []).map((c) => [c.id, c.state])));
+      setSessionCards(session?.cards ?? []);
     }
     void load();
   }, []);
 
-  const unlockedEntries = CURATED_POKEMON.filter((entry) => {
-    const state = cardStateById.get(entry.id);
-    return (
-      flags.pretendAllMastered ||
-      (state !== undefined && isMastered(state))
-    );
-  });
+  // Compute the mastered set once (not per-iteration) then filter.
+  const masteredIds = flags.pretendAllMastered
+    ? null
+    : masteredSpeciesUnion(sessionCards, false, settings.learningLocales);
+  const unlockedEntries = CURATED_POKEMON.filter((entry) =>
+    masteredIds === null || masteredIds.has(entry.id),
+  );
 
   if (unlockedEntries.length === 0) {
     return (
@@ -703,6 +707,8 @@ export default function SettingsPage() {
   // Best-effort push of auto-detected regional prefs once auth is available.
   useEffect(() => {
     if (!user || !supabase || !autoDetectedPrefsRef.current) return;
+    // Guard: skip if any superuser flag is on (write-guard parity, #1854 F-settings).
+    if (anyFlagOn) return;
     const prefs = autoDetectedPrefsRef.current;
     autoDetectedPrefsRef.current = null;
     void pushRegionalPrefs(supabase, user.id, {
@@ -710,7 +716,7 @@ export default function SettingsPage() {
       dateFormat: prefs.dateFormat,
       pushNotificationHour: loadSettings().pushNotificationHour,
     }).catch(() => {});
-  }, [user, supabase]);
+  }, [user, supabase, anyFlagOn]);
 
   function handleChange(key: keyof UserSettings, raw: string) {
     setDraftValues((prev) => ({ ...prev, [key]: raw }));
@@ -904,7 +910,7 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
       <div className="w-full max-w-3xl">
-        <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
+        <h1 className={`mb-8 ${pageTitle}`}>
           {t("settings.heading")}
         </h1>
 
@@ -1004,6 +1010,32 @@ export default function SettingsPage() {
                 >
                   <p>{t("settings.practice.markWhatIKnowNudge.body")}</p>
                 </OnboardingHint>
+              </div>
+            )}
+
+            {/* ── Feedback row (above accordions, always visible or matches search) ── */}
+            {(!isFiltering || visibleSectionIds.has("feedback-row")) && (
+              <div
+                id="feedback-row"
+                className={`${cardPanelPadded} mb-3`}
+              >
+                <div className="flex min-h-[44px] items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {t("settings.feedback.rowLabel")}
+                    </p>
+                    <p className={`mt-0.5 ${mutedTextXs}`}>
+                      {t("settings.feedback.rowDescription")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackOpen(true)}
+                    className="min-h-[44px] shrink-0 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  >
+                    {t("settings.feedback.rowLabel")}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1812,7 +1844,7 @@ export default function SettingsPage() {
                         const next = { ...settings, timezone: e.target.value };
                         setSettings(next);
                         saveSettings(next);
-                        if (user && supabase) {
+                        if (user && supabase && !anyFlagOn) {
                           void pushRegionalPrefs(supabase, user.id, {
                             timezone: e.target.value,
                             dateFormat: next.dateFormat,
@@ -1860,7 +1892,7 @@ export default function SettingsPage() {
                                 const next = { ...settings, dateFormat: value };
                                 setSettings(next);
                                 saveSettings(next);
-                                if (user && supabase) {
+                                if (user && supabase && !anyFlagOn) {
                                   void pushRegionalPrefs(supabase, user.id, {
                                     timezone: next.timezone,
                                     dateFormat: value,
@@ -1903,7 +1935,7 @@ export default function SettingsPage() {
                         const next = { ...settings, pushNotificationHour: hour };
                         setSettings(next);
                         saveSettings(next);
-                        if (user && supabase) {
+                        if (user && supabase && !anyFlagOn) {
                           void pushRegionalPrefs(supabase, user.id, {
                             timezone: next.timezone,
                             dateFormat: next.dateFormat,
@@ -2351,17 +2383,6 @@ export default function SettingsPage() {
               </CollapsibleSection>
               )}
 
-            </div>
-
-            {/* ── Persistent feedback link (below all accordions) ──────── */}
-            <div className="mt-6 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setFeedbackOpen(true)}
-                className="inline-flex min-h-[44px] items-center text-sm font-medium text-foreground underline underline-offset-2 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-              >
-                {t("settings.feedback.rowLabel")}
-              </button>
             </div>
 
             <ResetProgressDialog

@@ -120,7 +120,7 @@ describe("sectionMatchesQuery", () => {
 describe("SETTINGS_SEARCH_INDEX", () => {
   const sectionIds = SETTINGS_SEARCH_INDEX.map((e) => e.sectionId);
 
-  it("contains all ten top-level section ids", () => {
+  it("contains all ten accordion section ids plus the feedback-row entry (#1849)", () => {
     expect(sectionIds).toContain("practice-schedule-heading");
     expect(sectionIds).toContain("card-types-heading");
     expect(sectionIds).toContain("audio-heading");
@@ -131,6 +131,33 @@ describe("SETTINGS_SEARCH_INDEX", () => {
     expect(sectionIds).toContain("data-backup-heading");
     expect(sectionIds).toContain("about-heading");
     expect(sectionIds).toContain("advanced-heading");
+    // feedback-row is not a CollapsibleSection; it maps to the lifted feedback button row.
+    expect(sectionIds).toContain("feedback-row");
+  });
+
+  it("'feedback' matches the feedback-row entry (#1849)", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "feedback-row")!;
+    expect(sectionMatchesQuery(entry, "feedback")).toBe(true);
+  });
+
+  it("'bug' matches the feedback-row entry (#1849)", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "feedback-row")!;
+    expect(sectionMatchesQuery(entry, "bug")).toBe(true);
+  });
+
+  it("'report' matches the feedback-row entry (#1849)", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "feedback-row")!;
+    expect(sectionMatchesQuery(entry, "report")).toBe(true);
+  });
+
+  it("'contact' matches the feedback-row entry (#1849)", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "feedback-row")!;
+    expect(sectionMatchesQuery(entry, "contact")).toBe(true);
+  });
+
+  it("'support' matches the feedback-row entry (#1849)", () => {
+    const entry = SETTINGS_SEARCH_INDEX.find((e) => e.sectionId === "feedback-row")!;
+    expect(sectionMatchesQuery(entry, "support")).toBe(true);
   });
 
   it("'dark mode' matches Appearance section", () => {
@@ -202,10 +229,11 @@ function getVisibleSectionIds(query: string): Set<string> {
 }
 
 describe("Settings page filter logic", () => {
-  it("returns all 10 sections when query is empty", () => {
+  it("returns all 11 entries when query is empty (10 accordions + feedback-row)", () => {
     const visible = getVisibleSectionIds("");
-    expect(visible.size).toBe(10);
+    expect(visible.size).toBe(11);
     for (const id of [
+      "feedback-row",
       "practice-schedule-heading",
       "card-types-heading",
       "audio-heading",
@@ -221,8 +249,8 @@ describe("Settings page filter logic", () => {
     }
   });
 
-  it("returns all 10 sections when query is whitespace-only", () => {
-    expect(getVisibleSectionIds("   ").size).toBe(10);
+  it("returns all 11 entries when query is whitespace-only", () => {
+    expect(getVisibleSectionIds("   ").size).toBe(11);
   });
 
   it("filters to Audio and Card types when query is 'cry'", () => {
@@ -259,13 +287,28 @@ describe("Settings page filter logic", () => {
     expect(getVisibleSectionIds("xyzzynosuchthing").size).toBe(0);
   });
 
+  it("'feedback' includes the feedback-row (#1849)", () => {
+    const visible = getVisibleSectionIds("feedback");
+    expect(visible.has("feedback-row")).toBe(true);
+  });
+
+  it("'bug' includes the feedback-row (#1849)", () => {
+    const visible = getVisibleSectionIds("bug");
+    expect(visible.has("feedback-row")).toBe(true);
+  });
+
+  it("'report' includes the feedback-row (#1849)", () => {
+    const visible = getVisibleSectionIds("report");
+    expect(visible.has("feedback-row")).toBe(true);
+  });
+
   it("is case-insensitive - 'BACKUP' matches Data & backup", () => {
     expect(getVisibleSectionIds("BACKUP").has("data-backup-heading")).toBe(true);
   });
 
-  it("clearing the query restores all 10 sections", () => {
+  it("clearing the query restores all 11 entries", () => {
     expect(getVisibleSectionIds("voice").size).toBe(1);
-    expect(getVisibleSectionIds("").size).toBe(10);
+    expect(getVisibleSectionIds("").size).toBe(11);
   });
 
   it("'voice' matches only Audio", () => {

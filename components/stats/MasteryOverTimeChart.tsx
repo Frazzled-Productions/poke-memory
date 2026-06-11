@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { useFormatter, useTranslations } from "next-intl";
 import type { MasteryPoint } from "@/lib/stats/mastery-over-time";
-import type { DateFormat } from "@/lib/utils/format-date";
+import { formatChartDate, type DateFormat } from "@/lib/utils/format-date";
 import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
@@ -32,9 +32,11 @@ type TooltipPayload = {
 function ChartTooltip({
   active,
   payload,
+  dateFormat,
 }: {
   active?: boolean;
   payload?: readonly unknown[];
+  dateFormat: DateFormat;
 }) {
   const t = useTranslations("stats.masteryOverTime");
   const format = useFormatter();
@@ -42,7 +44,7 @@ function ChartTooltip({
   const d = (payload[0] as { payload: TooltipPayload }).payload;
   return (
     <div className={chartTooltipCard}>
-      <p className="font-semibold text-foreground">{d.date}</p>
+      <p className="font-semibold text-foreground">{formatChartDate(d.date, dateFormat)}</p>
       <p className={`mt-0.5 ${statValue}`}>
         <span
           className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle"
@@ -52,18 +54,6 @@ function ChartTooltip({
       </p>
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// X-axis tick formatter - show date labels sparsely, respecting user format
-// ---------------------------------------------------------------------------
-
-function formatXTick(date: string, fmt: DateFormat): string {
-  const [, m, d] = date.split("-");
-  if (fmt === "mdy") return `${parseInt(m)}/${parseInt(d)}`;
-  if (fmt === "iso") return `${m}-${d}`;
-  // dmy (default, en-GB)
-  return `${parseInt(d)}/${parseInt(m)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +180,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
                     </defs>
                     <XAxis
                       dataKey="date"
-                      tickFormatter={(date: string) => formatXTick(date, dateFormat)}
+                      tickFormatter={(date: string) => formatChartDate(date, dateFormat)}
                       tick={{ fontSize: 10, fill: "currentColor" }}
                       className={chartTickText}
                       axisLine={false}
@@ -210,7 +200,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
                     <Tooltip
                       cursor={{ stroke: AREA_COLOUR, strokeOpacity: 0.3, strokeWidth: 1 }}
                       content={({ active, payload }) => (
-                        <ChartTooltip active={active} payload={payload} />
+                        <ChartTooltip active={active} payload={payload} dateFormat={dateFormat} />
                       )}
                     />
                     <Area

@@ -10,11 +10,16 @@ function makeClientWithUpsert(error: null | object = null) {
 }
 
 function makeClientWithOrderedSelect(data: unknown, error: null | object = null) {
-  const order = vi.fn().mockResolvedValue({ data, error });
+  // The chain is: select → eq → order → range(from, to)
+  // fetchAllPages calls .range(from, to) as the terminal method.
+  // Return data with length < pageSize (1000) so fetchAllPages stops after one call.
+  const range = vi.fn().mockResolvedValue({ data, error });
+  const orderBuilder = { range };
+  const order = vi.fn().mockReturnValue(orderBuilder);
   const eq = vi.fn().mockReturnValue({ order });
   const select = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ select });
-  return { client: { from } as unknown as SupabaseClient, order };
+  return { client: { from } as unknown as SupabaseClient, order, range };
 }
 
 function makeEntry(occurredAt: number, overrides: Partial<GradeLogEntry> = {}): GradeLogEntry {

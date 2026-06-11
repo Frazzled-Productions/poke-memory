@@ -1,8 +1,9 @@
 import { generationOf } from "@/lib/stats/derive";
-import type { SeedPokemon } from "@/lib/pokemon/seed";
+import type { SeedPokemon, PokemonNameLocale, TransliterationLocale } from "@/lib/pokemon/seed";
 import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
 import type { CardClass } from "@/lib/stats/derive";
 import type { MasteryProgress } from "@/lib/pokedex/sort";
+import { getLocaleName, getTransliteration } from "@/lib/pokemon/localeNames";
 
 export type PokemonCellData = SeedPokemon & {
   cardClass: CardClass;
@@ -54,17 +55,48 @@ function getSpeciesWithAlternateForms(): ReadonlySet<number> {
   return _speciesWithFormsCache;
 }
 
+/**
+ * Filter a list of Pokémon by the active filters.
+ *
+ * @param pokemon   Pre-enriched list to filter.
+ * @param filters   Active filter state.
+ * @param locale    The active `pokemonNameLocale`. When non-"en", the name search
+ *                  also matches against the locale name and its transliteration
+ *                  (rōmaji for ja, pinyin for zh-Hans/zh-Hant) so users can search
+ *                  by the names they see on screen.
+ */
 export function filterPokemon(
   pokemon: PokemonCellData[],
   filters: PokedexFilters,
+  locale: PokemonNameLocale = "en",
 ): PokemonCellData[] {
   return pokemon.filter((p) => {
     if (filters.query !== "") {
       const q = filters.query.toLowerCase().trim();
+      // Always match the English seed name.
       const nameMatches = p.name.toLowerCase().includes(q);
       const formNames = getFormDisplayNames().get(p.speciesId ?? p.id) ?? [];
       const formMatches = formNames.some((fn) => fn.toLowerCase().includes(q));
-      if (!nameMatches && !formMatches) {
+
+      // When a non-English locale is active, also match the displayed locale
+      // name and its transliteration (rōmaji/pinyin) so users can search by
+      // the name visible in the grid.
+      let localeNameMatches = false;
+      if (!nameMatches && !formMatches && locale !== "en") {
+        const sid = p.speciesId ?? p.id;
+        const localeName = getLocaleName(sid, locale);
+        if (localeName && localeName.toLowerCase().includes(q)) {
+          localeNameMatches = true;
+        }
+        if (!localeNameMatches) {
+          const translit = getTransliteration(sid, locale as TransliterationLocale);
+          if (translit && translit.toLowerCase().includes(q)) {
+            localeNameMatches = true;
+          }
+        }
+      }
+
+      if (!nameMatches && !formMatches && !localeNameMatches) {
         return false;
       }
     }

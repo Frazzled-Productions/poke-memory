@@ -61,8 +61,10 @@ function makeSupabaseMock(overrides: {
   gradeLogError?: unknown;
   user?: { id: string } | null;
 } = {}) {
-  // The grade_log query chains: .select().eq().order().order()
-  const innerOrderMock = vi.fn().mockResolvedValue({
+  // The grade_log query chains: .select().eq().order().order().range(from, to)
+  // fetchAllPages calls .range(from, to) as the terminal method.
+  // Return data with length < pageSize (1000) so fetchAllPages stops after one call.
+  const rangeMock = vi.fn().mockResolvedValue({
     data: overrides.gradeLogData !== undefined ? overrides.gradeLogData : makeGradeLogRows(),
     error: overrides.gradeLogError ?? null,
   });
@@ -70,9 +72,8 @@ function makeSupabaseMock(overrides: {
   const gradeLogChain = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnValue({
-      order: innerOrderMock,
-    }),
+    order: vi.fn().mockReturnThis(),
+    range: rangeMock,
   };
 
   const fromMock = vi.fn((table: string) => {
@@ -91,7 +92,7 @@ function makeSupabaseMock(overrides: {
   };
 
   (createClient as ReturnType<typeof vi.fn>).mockResolvedValue(client);
-  return { client, fromMock, innerOrderMock };
+  return { client, fromMock, rangeMock };
 }
 
 /** Reads the response body text and splits into lines, stripping empty lines. */

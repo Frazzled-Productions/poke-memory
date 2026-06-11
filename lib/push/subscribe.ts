@@ -273,6 +273,119 @@ export async function hasLocalSubscription(): Promise<boolean> {
 }
 
 /**
+ * Outcome of a subscription reconciliation check.
+ *
+ * - `"in-sync"` - local subscription matches a server row; no action needed.
+ * - `"re-inserted"` - local subscription existed but had no server row;
+ *   the row was re-inserted successfully.
+ * - `"disabled"` - local subscription existed but re-insert failed; the
+ *   caller should flip the toggle off so the user knows reminders have stopped.
+ * - `"no-local"` - no local subscription; nothing to reconcile.
+ */
+export type ReconcileResult =
+  | "in-sync"
+  | "re-inserted"
+  | "disabled"
+  | "no-local";
+
+/**
+ * Reconciles the local PushManager subscription against the server-side
+ * `push_subscriptions` table (#1858 F35).
+ *
+ * When the push service rotates or expires a subscription the daily route
+ * gets a 410 and deletes the server row, but the browser's PushManager still
+ * reports `getSubscription() !== null`. `hasLocalSubscription()` therefore
+ * returns true even though the server has no row - reminders silently stop
+ * while Settings shows the toggle ON.
+ *
+ * This helper runs the full check:
+ *   1. Get the local PushManager subscription. If absent, return `"no-local"`.
+ *   2. Query `push_subscriptions` for the `(user_id, endpoint)` pair.
+ *   3. If a row exists, return `"in-sync"`.
+ *   4. If no row exists, re-insert the subscription keys (same delete-then-insert
+ *      pattern as `subscribeToPush`) and return `"re-inserted"` on success or
+ *      `"disabled"` on failure.
+ *
+ * The caller (PushOptIn) should flip the toggle off when `"disabled"` is
+ * returned so the user can see that reminders have stopped and opt back in.
+ *
+ * RLS note: the SELECT and INSERT policies on `push_subscriptions` are keyed
+ * on `auth.uid()`, so a user only sees and inserts their own rows.
+ */
+export async function reconcileSubscription(
+  client: SupabaseClient,
+  userId: string,
+): Promise<ReconcileResult> {
+  if (!isPushSupported()) return "no-local";
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (!vapidPublicKey) return "no-local";
+
+  let subscription: PushSubscription | null = null;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    subscription = await registration.pushManager.getSubscription();
+  } catch {
+    return "no-local";
+  }
+  if (!subscription) return "no-local";
+
+  // Check for a matching server row.
+  try {
+    const { data, error } = await client
+      .from("push_subscriptions")
+      .select("endpoint")
+      .eq("user_id", userId)
+      .eq("endpoint", subscription.endpoint)
+      .maybeSingle();
+
+    if (error) {
+      // Query failed - treat as in-sync to avoid falsely disabling the toggle.
+      return "in-sync";
+    }
+    if (data !== null) {
+      // Row exists - all good.
+      return "in-sync";
+    }
+  } catch {
+    return "in-sync";
+  }
+
+  // No server row for the local subscription. Re-insert it.
+  const p256dhBuf = subscription.getKey("p256dh");
+  const authBuf = subscription.getKey("auth");
+  if (!p256dhBuf || !authBuf) return "disabled";
+
+  const p256dh = arrayBufferToBase64Url(p256dhBuf);
+  const auth = arrayBufferToBase64Url(authBuf);
+
+  try {
+    // Delete-then-insert matches the pattern in subscribeToPush: there is no
+    // UPDATE policy on push_subscriptions, so ON CONFLICT DO UPDATE would be
+    // denied by RLS on re-insert.
+    await client
+      .from("push_subscriptions")
+      .delete()
+      .eq("user_id", userId)
+      .eq("endpoint", subscription.endpoint);
+
+    const { error: insertError } = await client
+      .from("push_subscriptions")
+      .insert({
+        user_id: userId,
+        endpoint: subscription.endpoint,
+        p256dh,
+        auth_secret: auth,
+        last_seen_at: new Date().toISOString(),
+      });
+
+    if (insertError) return "disabled";
+    return "re-inserted";
+  } catch {
+    return "disabled";
+  }
+}
+
+/**
  * Encodes an ArrayBuffer as base64url (no padding) - the canonical
  * encoding for VAPID keys both on the wire and in storage. The web-push
  * library accepts this shape directly when sending.

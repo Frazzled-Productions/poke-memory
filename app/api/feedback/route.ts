@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
+import { hashIp } from "@/lib/auth/rateLimitIp";
+import type { RateLimitAction } from "@/lib/auth/rateLimitIp";
 
 /**
  * POST /api/feedback (#1621)
@@ -18,11 +20,13 @@ import { createClient as createServerSupabaseClient } from "@/lib/supabase/serve
  * Responses:
  *   200 { ok: true } - inserted successfully
  *   400 { ok: false, error } - invalid input
+ *   429 { ok: false, error: 'rate_limited' } - too many requests from this IP
  *   500 { ok: false } - unexpected server error
  */
 
 const VALID_CATEGORIES = new Set(["bug", "feature", "other"]);
 const MESSAGE_MAX_LENGTH = 2000;
+const FIELD_MAX_LENGTH = 300;
 
 type FeedbackBody = {
   category: unknown;
@@ -66,23 +70,55 @@ export async function POST(request: Request) {
   // Truncate server-side to guard against oversized payloads.
   const message = body.message.slice(0, MESSAGE_MAX_LENGTH);
 
-  // --- Optional fields ---
+  // --- Optional fields - cap length to prevent oversized-payload spam (F28/F32) ---
   const page =
-    typeof body.page === "string" && body.page.length > 0 ? body.page : null;
+    typeof body.page === "string" && body.page.length > 0
+      ? body.page.slice(0, FIELD_MAX_LENGTH)
+      : null;
   const appVersion =
     typeof body.appVersion === "string" && body.appVersion.length > 0
-      ? body.appVersion
+      ? body.appVersion.slice(0, FIELD_MAX_LENGTH)
       : null;
 
   // --- Resolve user_id from server-validated session (never from request body) ---
   let userId: string | null = null;
+  // Also obtain the anonymous Supabase client for rate-limit checks.
+  let rateLimitSupabase: Awaited<ReturnType<typeof createServerSupabaseClient>> | null = null;
   try {
     const supabase = await createServerSupabaseClient();
+    rateLimitSupabase = supabase;
     const { data } = await supabase.auth.getUser();
     userId = data.user?.id ?? null;
   } catch {
     // Guest or session error - proceed with null user_id.
     userId = null;
+  }
+
+  // --- Per-IP rate limit: mirrors the check in lib/auth/actions.ts (F28/F32) ---
+  if (rateLimitSupabase !== null) {
+    try {
+      const rawIp = (request.headers.get("x-forwarded-for") ?? "unknown")
+        .split(",")[0]
+        .trim();
+      const ipHash = hashIp(rawIp);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: rlAllowed, error: rlError } = await (rateLimitSupabase as any).rpc(
+        "check_rate_limit",
+        { p_ip_hash: ipHash, p_action: "feedback" as RateLimitAction },
+      );
+      if (rlAllowed === false) {
+        return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
+      }
+      if (rlError) {
+        // Rate-limit check failure is non-fatal: log and continue so the endpoint
+        // stays available when the RPC is transiently unavailable (e.g. unknown
+        // action branch not yet deployed). Only an explicit false blocks the request.
+        console.warn("[feedback] rate-limit check error, proceeding", rlError);
+      }
+    } catch {
+      // Unexpected throw (e.g. network error) - also non-fatal.
+      console.warn("[feedback] rate-limit check failed, proceeding");
+    }
   }
 
   // --- Insert via admin client (service-role, bypasses RLS) ---

@@ -25,6 +25,10 @@ vi.mock("@/lib/sync/persistence", () => ({
     structuralSyncError: null,
     ownerUserId: null,
   })),
+  // Returns empty by default so the mount-rehydration effect is a no-op in
+  // tests that do not explicitly override this. Tests covering F2 / #1856 set
+  // a non-empty return value.
+  loadPendingQueue: vi.fn(() => []),
   savePendingQueue: vi.fn(),
   clearPendingQueue: vi.fn(),
 }));
@@ -39,7 +43,7 @@ vi.mock("@/lib/sync/structuralError", () => ({
 }));
 
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
-import { markPushSucceeded, markPushFailed, loadSyncStatus } from "@/lib/sync/persistence";
+import { markPushSucceeded, markPushFailed, loadSyncStatus, loadPendingQueue } from "@/lib/sync/persistence";
 import { hasStructuralProbeBeenAttempted, markStructuralProbeAttempted } from "@/lib/sync/structuralError";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import type { ReviewableCard } from "@/lib/review/session";
@@ -112,7 +116,7 @@ describe("usePerGradeSync - markPushSucceeded wiring", () => {
   });
 
   it("calls markPushSucceeded once per debounce flush when all cards succeed", async () => {
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
 
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
@@ -136,8 +140,8 @@ describe("usePerGradeSync - markPushSucceeded wiring", () => {
 
   it("calls markPushSucceeded when only some cards succeed (partial success)", async () => {
     vi.mocked(pushSingleCard)
-      .mockResolvedValueOnce(true)  // card 1 succeeds
-      .mockResolvedValueOnce(false); // card 2 fails
+      .mockResolvedValueOnce("ok")      // card 1 succeeds
+      .mockResolvedValueOnce("failed"); // card 2 fails
 
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
@@ -157,7 +161,7 @@ describe("usePerGradeSync - markPushSucceeded wiring", () => {
   });
 
   it("does not call markPushSucceeded when all cards fail", async () => {
-    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue("failed");
 
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 
@@ -234,7 +238,7 @@ describe("usePerGradeSync - consecutive-failure banner (#606)", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.mocked(isSyncSafe).mockReturnValue(true);
-    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue("failed");
   });
 
   afterEach(() => {
@@ -266,7 +270,7 @@ describe("usePerGradeSync - consecutive-failure banner (#606)", () => {
     await drainNTimes(result.current.enqueueGrade, 2);
 
     // One success - resets counter.
-    vi.mocked(pushSingleCard).mockResolvedValueOnce(true);
+    vi.mocked(pushSingleCard).mockResolvedValueOnce("ok");
     act(() => { result.current.enqueueGrade(makeCard(2)); });
     await act(async () => {
       vi.advanceTimersByTime(200);
@@ -275,7 +279,7 @@ describe("usePerGradeSync - consecutive-failure banner (#606)", () => {
     });
 
     // 2 more failures - still below threshold since counter was reset.
-    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue("failed");
     await drainNTimes(result.current.enqueueGrade, 2);
 
     expect(vi.mocked(markPushFailed)).not.toHaveBeenCalled();
@@ -297,7 +301,7 @@ describe("usePerGradeSync - consecutive-failure banner (#606)", () => {
     // 2 failures, then a success in the same hook instance.
     await drainNTimes(result.current.enqueueGrade, 2);
 
-    vi.mocked(pushSingleCard).mockResolvedValueOnce(true);
+    vi.mocked(pushSingleCard).mockResolvedValueOnce("ok");
     act(() => { result.current.enqueueGrade(makeCard(1)); });
     await act(async () => {
       vi.advanceTimersByTime(200);
@@ -413,10 +417,10 @@ describe("usePerGradeSync - structural error: drain marks structural immediately
   });
 
   it("when a push causes a structural error, drain persists the queue and does NOT call markPushSucceeded", async () => {
-    // pushSingleCard returns false (structural error side-effect already recorded
+    // pushSingleCard returns "failed" (structural error side-effect already recorded
     // in cloud.ts; here we simulate loadSyncStatus returning the structural error
     // after the push, which is what the hook checks).
-    vi.mocked(pushSingleCard).mockResolvedValue(false);
+    vi.mocked(pushSingleCard).mockResolvedValue("failed");
     // After the push, structuralSyncError is now set (simulating markStructuralSyncError
     // having been called by cloud.ts during the push).
     vi.mocked(loadSyncStatus)
@@ -454,7 +458,7 @@ describe("usePerGradeSync - structural error: drain marks structural immediately
       ownerUserId: null,
     });
     vi.mocked(hasStructuralProbeBeenAttempted).mockReturnValue(false);
-    vi.mocked(pushSingleCard).mockResolvedValue(true); // probe succeeds!
+    vi.mocked(pushSingleCard).mockResolvedValue("ok"); // probe succeeds!
 
     const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
 

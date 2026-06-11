@@ -46,6 +46,7 @@ import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { appendGradeEntry } from "@/lib/gradelog/persistence";
+import { todayInTimezone } from "@/lib/utils/format-date";
 import { generationOf, GEN_RANGES } from "@/lib/stats/derive";
 import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
@@ -177,8 +178,16 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         new Date(),
         opts,
       );
-      // Quiz operates on name cards only - keep the grid scannable.
-      const names = cards.filter((c): c is NameReviewCard => c.cardType === "name");
+      // Quiz operates on name cards only - keep the grid scannable. Filtered
+      // to the active pokemonNameLocale (#1851): a multi-locale session holds
+      // one card per (id, locale), and the unfiltered list rendered duplicate
+      // tiles with duplicate React keys, one tap selected every locale's
+      // variant, and the push loop's by-id Map dropped all but the last.
+      const names = cards.filter(
+        (c): c is NameReviewCard =>
+          c.cardType === "name" &&
+          (c.locale ?? "en") === settings.pokemonNameLocale,
+      );
       // Pass alternateFormsEnabled so alternate-form cards (Alolan, Galarian,
       // Mega, etc.) are excluded from the grid when the user has not enabled
       // them - matching the gate buildSessionQueues applies via isCardEligible
@@ -284,6 +293,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         currentCards,
         selectedIds,
         now,
+        settings.pokemonNameLocale,
         { retentionTarget: settings.retentionTarget, weights: settings.fsrsWeights },
       );
 
@@ -306,8 +316,18 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
       // appendGradeEntry fires GRADE_LOG_APPENDED_EVENT, which
       // AutoSyncOnChange picks up to push to grade_log. enqueueGrade short
       // circuits when client/userId are null (guest or superuser pause).
-      const todayUtc = formatTodayUtc(now);
-      const gradedCardsById = new Map(nextCards.map((c) => [c.id, c]));
+      // Stamp with the user's-timezone day (#1853), matching ReviewSession's
+      // handleGrade and the todayGradeSequence readers.
+      const todayLocal = todayInTimezone(settings.timezone ?? "UTC", now);
+      // Scoped to the active locale before keying by bare id (#1851): the
+      // session still holds other locales' variants with the same numeric id,
+      // and an unfiltered Map collapsed to whichever appeared last - pushing
+      // the wrong locale's card_reviews row and dropping the graded one.
+      const gradedCardsById = new Map(
+        nextCards
+          .filter((c) => (c.locale ?? "en") === settings.pokemonNameLocale)
+          .map((c) => [c.id, c]),
+      );
       for (const id of gradedIds) {
         const card = gradedCardsById.get(id);
         if (!card) continue;
@@ -317,12 +337,15 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         // Onboarding bulk-grades at Easy which graduates immediately;
         // learningStep and stepStartedAt are null for graduated cards (#1416).
         await appendGradeEntry({
-          date: todayUtc,
+          date: todayLocal,
           grade: 5,
           cardType: card.cardType,
           subjectKey: card.subjectKey,
           learningStep: null,
           stepStartedAt: null,
+          // Carry the graded card's locale (#1851) so non-en grades no longer
+          // sync to grade_log as "en" and pollute per-locale FSRS optimisation.
+          locale: card.locale ?? "en",
         });
         enqueueGrade(card);
       }
@@ -507,18 +530,6 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
       </dialog>
     </div>
   );
-}
-
-/**
- * Format a Date as "YYYY-MM-DD" in UTC. Matches `appendGradeEntry`'s default
- * (UTC) mode so `todayGradeSequence` can recover the entry. Local helper to
- * avoid pulling in the timezone-aware format-date stack.
- */
-function formatTodayUtc(date: Date): string {
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(date.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 // Helper export for use in callers - keeps the `ReviewableCard` import surface

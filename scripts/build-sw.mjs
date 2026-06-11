@@ -179,6 +179,13 @@ async function main() {
       // `self.__SW_VERSION__` (declared in app/sw.ts) with this literal at
       // bundle time so the value is frozen into each deployed worker.
       "self.__SW_VERSION__": JSON.stringify(appVersion),
+      // Inject the VAPID public key so the pushsubscriptionchange handler can
+      // re-subscribe without a client round-trip (#1858 F35). The value is
+      // public (it is also available via NEXT_PUBLIC_VAPID_PUBLIC_KEY on the
+      // client side) so baking it into the SW bundle is safe.
+      "self.__SW_VAPID_PUBLIC_KEY__": JSON.stringify(
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "",
+      ),
     },
     outdir: config.cwd,
     write: false,

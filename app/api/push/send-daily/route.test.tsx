@@ -149,13 +149,18 @@ function buildAdminMock(opts: {
         })),
       };
     }
-    // card_reviews - chained lte().in().is() returning the due rows array.
+    // card_reviews - chained lte().in().is().order().order().range()
+    // The route paginates via fetchAllPages which calls .range(from, to).
+    // The mock returns all dueRows on the first page (length < pageSize
+    // so fetchAllPages stops after one trip).
     return {
       select: vi.fn(() => {
         const builder = {
           lte: vi.fn(() => builder),
           in: vi.fn(() => builder),
-          is: vi.fn(() => Promise.resolve({ data: dueRows, error: null })),
+          is: vi.fn(() => builder),
+          order: vi.fn(() => builder),
+          range: vi.fn(() => Promise.resolve({ data: dueRows, error: null })),
         };
         return builder;
       }),

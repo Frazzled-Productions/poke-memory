@@ -154,7 +154,7 @@ describe("species-level mastery contract (#1448)", () => {
   const cards = buildFixture();
 
   // Ground truth: masteredSpeciesIds is the canonical set.
-  const masteredIds = masteredSpeciesIds(cards, false);
+  const masteredIds = masteredSpeciesIds(cards, false, "en");
   // With the fixture above, only species 3 is fully mastered.
   const expectedMasteredCount = 1;
 
@@ -177,7 +177,7 @@ describe("species-level mastery contract (#1448)", () => {
   });
 
   it("computeMasteryOverTime final count equals masteredSpeciesIds.size", () => {
-    const series = computeMasteryOverTime(cards, TODAY);
+    const series = computeMasteryOverTime(cards, TODAY, false, "en");
     const finalCount = series.length > 0 ? series[series.length - 1].count : 0;
     expect(finalCount).toBe(masteredIds.size);
   });
@@ -222,13 +222,13 @@ describe("species-level mastery contract (#1448)", () => {
       makeNameCard(3, masteredState()),
     ];
 
-    const idsZero = masteredSpeciesIds(nameOnlyCards, false);
+    const idsZero = masteredSpeciesIds(nameOnlyCards, false, "en");
     expect(idsZero.size).toBe(0);
 
     const statsZero = computeStats(nameOnlyCards, TODAY);
     expect(statsZero.mastered).toBe(0);
 
-    const seriesZero = computeMasteryOverTime(nameOnlyCards, TODAY);
+    const seriesZero = computeMasteryOverTime(nameOnlyCards, TODAY, false, "en");
     expect(seriesZero).toHaveLength(0);
 
     const recordsZero = computeRecords(nameOnlyCards, [], []);
@@ -246,13 +246,13 @@ describe("species-level mastery contract (#1448)", () => {
   it("forceAllMastered: all helpers reflect 'everything mastered'", () => {
     const nameCount = cards.filter((c) => c.cardType === "name").length;
 
-    const idsForce = masteredSpeciesIds(cards, true);
+    const idsForce = masteredSpeciesIds(cards, true, "en");
     expect(idsForce.size).toBe(nameCount);
 
     const statsForce = computeStats(cards, TODAY, 10, true);
     expect(statsForce.mastered).toBe(nameCount);
 
-    const seriesForce = computeMasteryOverTime(cards, TODAY, true);
+    const seriesForce = computeMasteryOverTime(cards, TODAY, true, "en");
     expect(seriesForce).toHaveLength(1);
     expect(seriesForce[0].count).toBe(nameCount);
 

@@ -58,6 +58,23 @@ function buildServerMock(user: { id: string } | null) {
   };
 }
 
+/**
+ * Build a mock server client with both getUser and rpc (for rate-limit tests).
+ * rpcResult controls what the mocked check_rate_limit RPC returns.
+ */
+function buildServerMockWithRpc(
+  user: { id: string } | null,
+  rpcResult: { data: boolean | null; error: unknown },
+) {
+  const getUserFn = vi.fn(() => Promise.resolve({ data: { user }, error: null }));
+  const rpcFn = vi.fn(() => Promise.resolve(rpcResult));
+  const client = {
+    auth: { getUser: getUserFn },
+    rpc: rpcFn,
+  } as unknown as Awaited<ReturnType<typeof createServerClient>>;
+  return { client, getUserFn, rpcFn };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
@@ -369,5 +386,61 @@ describe("POST /api/feedback - error handling", () => {
     expect(res.status).toBe(500);
     const b = (await res.json()) as { ok: boolean };
     expect(b.ok).toBe(false);
+  });
+});
+
+// ─── Rate-limit behaviour ─────────────────────────────────────────────────────
+
+describe("POST /api/feedback - rate-limit behaviour (#1883)", () => {
+  it("returns 429 when the RPC explicitly returns false (over cap)", async () => {
+    const adminMock = buildAdminMock();
+    const serverMock = buildServerMockWithRpc(null, { data: false, error: null });
+    mockCreateAdminClient.mockReturnValue(
+      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
+    );
+    mockCreateServerClient.mockResolvedValue(serverMock.client);
+
+    const res = await POST(makeRequest({ category: "bug", message: "Too many requests" }));
+    expect(res.status).toBe(429);
+    const b = (await res.json()) as { ok: boolean; error: string };
+    expect(b.ok).toBe(false);
+    expect(b.error).toBe("rate_limited");
+    // Insert must NOT have been called when rate-limited.
+    expect(adminMock.insertFn).not.toHaveBeenCalled();
+  });
+
+  it("proceeds with the insert (200) when the RPC returns an error (fail-open)", async () => {
+    // This is the regression case from #1883: check_rate_limit raised EXCEPTION
+    // for the 'feedback' action, returning { data: null, error: <error> }.
+    // The old code treated rlError as a block; the fix makes it non-fatal.
+    const adminMock = buildAdminMock();
+    const rpcError = { message: "check_rate_limit: unknown action feedback", code: "P0001" };
+    const serverMock = buildServerMockWithRpc(null, { data: null, error: rpcError });
+    mockCreateAdminClient.mockReturnValue(
+      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
+    );
+    mockCreateServerClient.mockResolvedValue(serverMock.client);
+
+    const res = await POST(makeRequest({ category: "bug", message: "Feedback that was broken" }));
+    expect(res.status).toBe(200);
+    const b = (await res.json()) as { ok: boolean };
+    expect(b.ok).toBe(true);
+    // The insert MUST still have been called despite the RPC error.
+    expect(adminMock.insertFn).toHaveBeenCalledOnce();
+  });
+
+  it("proceeds with the insert (200) when the RPC returns true (under cap)", async () => {
+    const adminMock = buildAdminMock();
+    const serverMock = buildServerMockWithRpc(null, { data: true, error: null });
+    mockCreateAdminClient.mockReturnValue(
+      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
+    );
+    mockCreateServerClient.mockResolvedValue(serverMock.client);
+
+    const res = await POST(makeRequest({ category: "feature", message: "Under cap" }));
+    expect(res.status).toBe(200);
+    const b = (await res.json()) as { ok: boolean };
+    expect(b.ok).toBe(true);
+    expect(adminMock.insertFn).toHaveBeenCalledOnce();
   });
 });

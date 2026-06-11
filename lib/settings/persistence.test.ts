@@ -1236,3 +1236,30 @@ describe("validateOnboarding - offline nudge flags", () => {
     expect(loaded.onboarding.slowSpriteLoadCount).toBe(3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// F44: saveSettings preserves pokemonNameLocale from pre-#1484 backups
+// ---------------------------------------------------------------------------
+
+describe('saveSettings / F44: pre-#1484 backup pokemonNameLocale preservation', () => {
+  it('saves pokemonNameLocale from activePokemonNameLocale when both are present', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, activePokemonNameLocale: 'ja', pokemonNameLocale: 'en' });
+    const loaded = loadSettings();
+    // The mirror should use activePokemonNameLocale.
+    expect(loaded.pokemonNameLocale).toBe('ja');
+  });
+
+  it('preserves pokemonNameLocale when activePokemonNameLocale is absent (pre-#1484 backup shape)', () => {
+    // Simulate a pre-#1484 backup: pokemonNameLocale is set but activePokemonNameLocale
+    // is absent (undefined on the settings object).
+    const pre1484Settings = {
+      ...DEFAULT_SETTINGS,
+      pokemonNameLocale: 'ja' as const,
+      activePokemonNameLocale: undefined as unknown as typeof DEFAULT_SETTINGS.activePokemonNameLocale,
+    };
+    saveSettings(pre1484Settings);
+    const loaded = loadSettings();
+    // Should fall back to pokemonNameLocale rather than writing undefined.
+    expect(loaded.pokemonNameLocale).toBe('ja');
+  });
+});

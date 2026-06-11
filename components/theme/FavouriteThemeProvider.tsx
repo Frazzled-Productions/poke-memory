@@ -3,40 +3,27 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   loadFavourite,
-  saveFavourite,
-  isFavouriteEarned,
 } from "@/lib/theme/persistence";
 import { applyTheme } from "@/lib/theme/apply";
 import { applyIntensity } from "@/lib/theme/intensity";
 import { loadSettings, SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
-import { loadSession } from "@/lib/review/persistence";
-import { loadFlags } from "@/lib/superuser/persistence";
 import type { StoredFavourite } from "@/lib/theme/persistence";
 import { KEY_SETTINGS, KEY_LEGACY_FAVOURITE_THEME } from "@/lib/storage/keys";
 
-// Belt-and-braces invariant for #428: a stored favourite is only applied if
-// its underlying card is actually mastered, OR the `pretendAllMastered`
-// superuser flag is currently on. A non-earned favourite that somehow
-// survives the exit-cleanup (e.g. cleanup pull failed, then a later
-// SignInPull restored real cards) is self-healed on the next load and
-// cleared from localStorage. `loadFlags` is read directly so we do not
-// depend on `SuperuserProvider`'s async mount.
+// Grandfathering decision (#1865): an already-applied favourite is kept as-is
+// on load. The picker gate (FavouritePicker in app/settings/page.tsx) tightens
+// to species-level mastery (BOTH name + reverse legs) for NEW picks only.
+// The superuser exit-cleanup path (SuperuserContext) still validates mastery
+// strictly via isFavouriteEarned and wipes a cheat-selected favourite on
+// flag-off. That path is intentionally separate.
 //
 // Conservative on `session === null`: a new sign-in pull may restore
-// settings before cards, so abstain rather than wipe a legitimate
-// favourite. The next mount re-checks once cards are present.
+// settings before cards, so abstain rather than wipe a legitimate favourite.
 async function resolveFavourite(): Promise<StoredFavourite | null> {
   const stored = loadFavourite();
   if (stored === null) return null;
-  if (loadFlags().pretendAllMastered) return stored;
-  const session = await loadSession();
-  if (session === null) return stored;
-  const settings = loadSettings();
-  if (isFavouriteEarned(stored, session.cards)) {
-    return stored;
-  }
-  saveFavourite(null);
-  return null;
+  // Return the stored favourite as-is (grandfather: no auto-wipe on load).
+  return stored;
 }
 
 type FavouriteContextValue = {

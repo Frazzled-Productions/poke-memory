@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { filterPokemon, parseFilters } from './filter';
 import type { PokemonCellData, PokedexFilters } from './filter';
 import { generationOf } from '@/lib/stats/derive';
+import { loadLocaleNames, _resetLocaleNamesCache } from '@/lib/pokemon/localeNames';
+import type { PokemonLocaleNames } from '@/lib/pokemon/seed';
 
 function basePokemon(overrides: Partial<PokemonCellData> = {}): PokemonCellData {
   return {
@@ -364,5 +366,85 @@ describe('parseFilters', () => {
   it('maps invalid mastery param to "all"', () => {
     const result = parseFilters(params({ mastery: 'unknown' }));
     expect(result.masteryStatus).toBe('all');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale-aware search tests (F39 fix, issue #1852)
+// ---------------------------------------------------------------------------
+
+const LOCALE_FIXTURES: PokemonCellData[] = [
+  basePokemon({ id: 1,  speciesId: 1,  name: 'bulbasaur',  displayName: 'Bulbasaur', types: ['grass', 'poison'] }),
+  basePokemon({ id: 25, speciesId: 25, name: 'pikachu',    displayName: 'Pikachu',   types: ['electric'] }),
+  basePokemon({ id: 4,  speciesId: 4,  name: 'charmander', displayName: 'Charmander', types: ['fire'] }),
+];
+
+const LOCALE_NAMES_PAYLOAD: PokemonLocaleNames[] = [
+  {
+    speciesId: 1,
+    nameByLocale: { en: 'Bulbasaur', ja: 'フシギダネ', 'zh-Hans': '妙蛙种子', 'zh-Hant': '妙蛙種子' },
+    transliterationByLocale: { ja: 'Fushigidane', 'zh-Hans': 'miào wā zhǒng zi', 'zh-Hant': 'miào wā zhǒng zǐ' },
+  },
+  {
+    speciesId: 25,
+    nameByLocale: { en: 'Pikachu', ja: 'ピカチュウ', 'zh-Hans': '皮卡丘', 'zh-Hant': '皮卡丘' },
+    transliterationByLocale: { ja: 'Pikachuu', 'zh-Hans': 'pí kǎ qiū', 'zh-Hant': 'pí kǎ qiū' },
+  },
+  {
+    speciesId: 4,
+    nameByLocale: { en: 'Charmander', ja: 'ヒトカゲ', 'zh-Hans': '小火龙', 'zh-Hant': '小火龍' },
+    transliterationByLocale: { ja: 'Hitokage', 'zh-Hans': 'xiǎo huǒ lóng', 'zh-Hant': 'xiǎo huǒ lóng' },
+  },
+];
+
+describe('filterPokemon - locale-aware search (F39, #1852)', () => {
+  beforeEach(async () => {
+    _resetLocaleNamesCache();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => LOCALE_NAMES_PAYLOAD,
+    }));
+    await loadLocaleNames();
+  });
+
+  it('en locale: English query matches the English seed name', () => {
+    const result = filterPokemon(LOCALE_FIXTURES, { ...noFilters, query: 'pikachu' }, 'en');
+    expect(result).toHaveLength(1);
+    expect(result[0].speciesId).toBe(25);
+  });
+
+  it('ja locale: Japanese name query matches the locale name (ピカチュウ)', () => {
+    const result = filterPokemon(LOCALE_FIXTURES, { ...noFilters, query: 'ピカチュウ' }, 'ja');
+    expect(result).toHaveLength(1);
+    expect(result[0].speciesId).toBe(25);
+  });
+
+  it('ja locale: rōmaji transliteration query matches Bulbasaur (Fushigidane)', () => {
+    const result = filterPokemon(LOCALE_FIXTURES, { ...noFilters, query: 'fushigidane' }, 'ja');
+    expect(result).toHaveLength(1);
+    expect(result[0].speciesId).toBe(1);
+  });
+
+  it('zh-Hans locale: Chinese name query matches (皮卡丘)', () => {
+    const result = filterPokemon(LOCALE_FIXTURES, { ...noFilters, query: '皮卡丘' }, 'zh-Hans');
+    expect(result).toHaveLength(1);
+    expect(result[0].speciesId).toBe(25);
+  });
+
+  it('zh-Hant locale: Traditional Chinese name query matches (妙蛙種子)', () => {
+    const result = filterPokemon(LOCALE_FIXTURES, { ...noFilters, query: '妙蛙種子' }, 'zh-Hant');
+    expect(result).toHaveLength(1);
+    expect(result[0].speciesId).toBe(1);
+  });
+
+  it('ja locale: English name still matches when locale is ja (three-way fallback)', () => {
+    const result = filterPokemon(LOCALE_FIXTURES, { ...noFilters, query: 'pikachu' }, 'ja');
+    expect(result).toHaveLength(1);
+    expect(result[0].speciesId).toBe(25);
+  });
+
+  it('en locale: Japanese name query does NOT match (only English searched in en mode)', () => {
+    const result = filterPokemon(LOCALE_FIXTURES, { ...noFilters, query: 'ピカチュウ' }, 'en');
+    expect(result).toHaveLength(0);
   });
 });

@@ -773,6 +773,9 @@ export function ReviewSession() {
   // call must write the full array - never the filtered `cards`. See the invariant
   // comment at each saveSession call site in this file.
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
+  // Ref so the cry auto-play effect can read the current card without
+  // listing `cards` as a dep (which would re-fire on every grade).
+  const cardsRef = useRef<ReviewableCard[] | null>(null);
   // MULTI-LOCALE: holds the complete multi-locale card array from the last load
   // or grade. `cards` state is always a subset: full.filter(c => locale matches).
   // Initialised to [] before the load effect fires; never null (avoids conditional
@@ -1368,12 +1371,15 @@ export function ReviewSession() {
         setNewCardsThisSession(storedSummary.newCards);
         setMasteredThisSession(storedSummary.mastered);
       } else if (!superuserGuarded) {
-        // Grade-log entries are stamped with a UTC date (see handleGrade), so
-        // reconstruct against the same UTC day boundary the entries use.
+        // Grade-log entries are stamped with the user's-timezone day (see
+        // handleGrade, #1853), so reconstruct against the same boundary.
         // Skipped while a superuser flag is on, mirroring the saveDailySummary
         // write-guard: a QA session must not drive the Share affordance.
         const gradeLog = await loadGradeLog();
-        const todaysGrades = todayGradeSequence(gradeLog, today);
+        const todaysGrades = todayGradeSequence(
+          gradeLog,
+          todayString(now, settings.timezone ?? "UTC"),
+        );
         if (todaysGrades.length > 0) {
           setSessionGradeSeq(todaysGrades);
         }
@@ -1442,35 +1448,23 @@ export function ReviewSession() {
     useCallback(() => setLearningQueue((q) => [...q]), []),
   );
 
+  // Keep the ref in sync with state so the cry effect can read it without
+  // listing `cards` as a dependency (which would re-fire on every grade).
+  useEffect(() => { cardsRef.current = cards; }, [cards]);
+
   // Auto-play the cry when a cry card first becomes the current card.
   // Drives the "audio as prompt" loop without requiring a tap. Skipped
   // on already-revealed cards (the cry plays separately via handleReveal).
+  // Drive off displayedCardId so we play the DISPLAYED card's cry, not the
+  // first array-order cry card (F7). Only re-fires when the displayed card
+  // id changes - not on every grade (which changes `cards` but not the id).
   useEffect(() => {
-    // Resolve the would-be current card by re-running the queue logic in
-    // the effect; doing it here (above the early returns) keeps the hook
-    // unconditional. If anything is null or the card isn't a cry, exit.
-    if (cards === null) return;
     if (revealed) return;
-    if (!cards.length) return;
-    // Mirror the priority used downstream: locked > learning > review > new.
-    let cardId: number | null = revealedCardId.current;
-    if (cardId === null) {
-      // Re-evaluate cheaply: just look for an in-step or due card.
-      const found = cards.find(
-        (c) =>
-          c.cardType === "cry" &&
-          (c.state.learningStep !== null ||
-            (c.state.lastReview !== null && c.state.dueDate <= todayString(new Date()) && c.state.lastReview !== todayString(new Date())) ||
-            c.state.lastReview === null),
-      );
-      cardId = found?.id ?? null;
-    }
-    if (cardId === null) return;
-    const card = cards.find((c) => c.id === cardId);
+    if (displayedCardId === null) return;
+    const card = cardsRef.current?.find((c) => c.id === displayedCardId);
     if (!card || card.cardType !== "cry") return;
     playCry(card.cryUrl ?? null);
-    // Re-fire only when the underlying card id changes (next cry card up).
-  }, [cards, revealed]);
+  }, [displayedCardId, revealed]);
 
   // Cmd/Ctrl+Z triggers undo while an undo snapshot is live. Listener is
   // attached unconditionally so the hook order stays stable across early
@@ -1538,8 +1532,12 @@ export function ReviewSession() {
     // undoSnapshotRef is a stable ref object - its identity never changes, so
     // it is intentionally omitted from deps. The closure reads .current at
     // call time, which is always the latest snapshot.
+    // superuserGuarded is included so the undo handler always reads the
+    // current guard value: the superuser chord fires on the Practice page,
+    // and flags also sync cross-tab via the storage listener, so the guard
+    // can change while ReviewSession stays mounted (#1854 F54).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grading, limits, timezone]);
+  }, [grading, limits, timezone, superuserGuarded]);
 
   // Update stable callback refs every render so the keyboard handler below
   // always dispatches to the latest handleReveal / handleGrade without needing
@@ -2126,42 +2124,56 @@ export function ReviewSession() {
       saveSettings({ ...current, activePokemonNameLocale: next });
     }
 
+    const hasGame = seenPokemon.length >= 2;
     return (
-      <div className="flex flex-col flex-1 min-h-0 w-full items-center overflow-y-auto">
-        {/* When a scope filter is active, show ScopeControl so the user can
-            see what filter is set and modify or clear it. This mirrors the
-            card-practice path where ScopeControl is always visible (#1797). */}
-        {!isScopeEmpty(scope) && (
-          <div className="w-full max-w-xl px-4 pt-4">
-            <ScopeControl
-              scope={scope}
-              onChange={handleScopeChange}
-              alternateFormsEnabled={alternateFormsEnabled}
-              incompleteChainSpeciesIds={incompleteChains}
-              masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
-            />
-          </div>
-        )}
-        <EndOfSessionScreen
-          variant={variant}
-          perType={perType}
-          nameEnabled={true}
-          evolutionEnabled={evolutionCardsEnabled}
-          reverseEnabled={reverseEnabled}
-          reverseEvolutionEnabled={reverseEvolutionEnabled}
-          cryEnabled={cryCardsEnabled}
-          shareText={shareText}
-          shareParts={shareParts}
-          dueTomorrow={dueTomorrow}
-          showCardTypesHint={!cardTypesAllOn}
-          directionGrades={sessionDirectionGrades}
-          activeLocale={activeLocale}
-          learningLocales={learningLocales}
-          dueCountByLocale={readDueCountCache()}
-          onSwitchLocale={handleSwitchLocale}
-          onClearScope={!isScopeEmpty(scope) ? () => handleScopeChange(EMPTY_SCOPE) : undefined}
-        />
-        {seenPokemon.length >= 2 && (
+      /* When the Higher-or-Lower game is present the outer container switches
+         from overflow-y-auto (scrollable) to overflow-hidden so the game
+         receives a bounded flex-1 min-h-0 height context. The game pins its
+         action button as flex-none so the user never needs to scroll to reach
+         it (#1837). Without the game the container stays scrollable so the
+         EndOfSessionScreen content can overflow on very small viewports. */
+      <div
+        className={`flex flex-col flex-1 min-h-0 w-full items-center ${hasGame ? "overflow-hidden" : "overflow-y-auto"}`}
+      >
+        {/* EndOfSessionScreen: flex-none when the game is present so it does
+            not compete with the game for the available height. Without a game
+            it grows naturally inside the scrollable container. */}
+        <div className={`w-full ${hasGame ? "flex-none overflow-y-auto" : ""}`}>
+          {/* When a scope filter is active, show ScopeControl so the user can
+              see what filter is set and modify or clear it. This mirrors the
+              card-practice path where ScopeControl is always visible (#1797). */}
+          {!isScopeEmpty(scope) && (
+            <div className="w-full max-w-xl px-4 pt-4">
+              <ScopeControl
+                scope={scope}
+                onChange={handleScopeChange}
+                alternateFormsEnabled={alternateFormsEnabled}
+                incompleteChainSpeciesIds={incompleteChains}
+                masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+              />
+            </div>
+          )}
+          <EndOfSessionScreen
+            variant={variant}
+            perType={perType}
+            nameEnabled={true}
+            evolutionEnabled={evolutionCardsEnabled}
+            reverseEnabled={reverseEnabled}
+            reverseEvolutionEnabled={reverseEvolutionEnabled}
+            cryEnabled={cryCardsEnabled}
+            shareText={shareText}
+            shareParts={shareParts}
+            dueTomorrow={dueTomorrow}
+            showCardTypesHint={!cardTypesAllOn}
+            directionGrades={sessionDirectionGrades}
+            activeLocale={activeLocale}
+            learningLocales={learningLocales}
+            dueCountByLocale={readDueCountCache()}
+            onSwitchLocale={handleSwitchLocale}
+            onClearScope={!isScopeEmpty(scope) ? () => handleScopeChange(EMPTY_SCOPE) : undefined}
+          />
+        </div>
+        {hasGame && (
           <HigherOrLowerGame seenPokemon={seenPokemon} />
         )}
         {badgeToastSlot}
@@ -2396,6 +2408,12 @@ export function ReviewSession() {
     fullSessionRef.current = newFullCards;
 
     const today = todayString(now);
+    // User-facing day stamp for the streak and the grade log (#1853). `today`
+    // stays UTC for scheduling comparisons (dueDate / lastReview); the streak
+    // and grade-log day must instead match the readers, which all anchor on
+    // the user's timezone (StreakBadge, useStreakNavState, the Stats history
+    // charts) - the same domain saveDailySummary below already uses.
+    const localToday = todayString(now, timezone);
 
     // Derive new/mastered transitions now (while effectiveCard / nextState are
     // in scope) so the values are available for the visible swap below and for
@@ -2694,7 +2712,10 @@ export function ReviewSession() {
       undoSnapshotRef.current = snapshot;
       setHasUndoSnap(true);
       const gradeLog = await loadGradeLog();
-      const gradedToday = gradeLog.filter((e) => e.date === today).length + 1;
+      // Count and stamp in the user's-timezone day domain (#1853): the streak
+      // readers and Stats charts anchor on the tz-local day, so the writer
+      // must too. dueDate/lastReview comparisons stay UTC (scheduling dates).
+      const gradedToday = gradeLog.filter((e) => e.date === localToday).length + 1;
       const dueQueueEmpty = !newCards.some(
         (c) =>
           c.state.learningStep === null &&
@@ -2702,12 +2723,12 @@ export function ReviewSession() {
           c.state.dueDate <= today &&
           c.state.lastReview !== today,
       );
-      recordReview(today, gradedToday, dueQueueEmpty);
+      recordReview(localToday, gradedToday, dueQueueEmpty);
       // Pass POST-grade learningStep/stepStartedAt from nextState so the
       // grade_log row captures the scheduler's exact in-learning position
       // at the time of grading (#1416). These are in closure scope.
       const appended = await appendGradeEntry({
-        date: today,
+        date: localToday,
         grade,
         cardType: effectiveCard.cardType,
         subjectKey: effectiveCard.subjectKey,
@@ -2753,14 +2774,20 @@ export function ReviewSession() {
     // rationale in the comment below.
     if (!wasMastered && nowMastered && effectiveCard.cardType === "name" && !superuserGuarded) {
       // Capture values needed inside the timeout closure now, before they
-      // go stale.
+      // go stale. The badge check is scoped to the graded card's locale
+      // (#1851): masteredSpeciesIds counts only cards in the given locale,
+      // so passing the locale the user just mastered in lets ja/zh learners
+      // earn badges - previously the implicit "en" default made badges
+      // permanently unearnable outside English.
       const masteredCheckCards = newCards;
       const masteredCheckSettings = settings;
+      const masteredCheckLocale = effectiveCard.locale ?? "en";
       setTimeout(() => {
         if (!isMountedRef.current) return;
         const masteredIds = masteredSpeciesIds(
           masteredCheckCards,
           false,
+          masteredCheckLocale,
         );
         const earnedIds = new Set(masteredCheckSettings.earnedBadges.map((b) => b.id));
         const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIds);

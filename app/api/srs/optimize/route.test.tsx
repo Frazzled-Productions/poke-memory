@@ -75,10 +75,14 @@ function makeSupabaseMock(overrides: {
     }),
   };
 
+  // The grade_log query chains: select → eq → order → range(from, to)
+  // fetchAllPages calls .range(from, to) as the terminal method.
+  // Return data with length < pageSize (1000) so fetchAllPages stops after one call.
   const gradeLogChain = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockResolvedValue({
+    order: vi.fn().mockReturnThis(),
+    range: vi.fn().mockResolvedValue({
       data: overrides.gradeLogData ?? makeLargeGradeLog(),
       error: overrides.gradeLogError ?? null,
     }),
@@ -127,11 +131,19 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
     expect(body.weights).toEqual(FAKE_WEIGHTS);
     expect(body.optimizedAt).toBeTruthy();
 
-    expect(rpcMock).toHaveBeenCalledOnce();
-    const [fnName, args] = rpcMock.mock.calls[0];
-    expect(fnName).toBe("merge_user_settings");
-    expect(args.p_user_id).toBe(USER_ID);
-    expect(args.p_patch).toMatchObject({
+    // F29: rpc is called twice - once to pre-stamp fsrsOptimizingAt (before the
+    // CPU-heavy fit, to close the concurrent-request window) and once to persist
+    // the final weights. The final call carries fsrsWeights + fsrsWeightsOptimizedAt.
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+    const [fnName1, args1] = rpcMock.mock.calls[0];
+    expect(fnName1).toBe("merge_user_settings");
+    expect(args1.p_user_id).toBe(USER_ID);
+    expect(args1.p_patch).toHaveProperty("fsrsOptimizingAt");
+
+    const [fnName2, args2] = rpcMock.mock.calls[1];
+    expect(fnName2).toBe("merge_user_settings");
+    expect(args2.p_user_id).toBe(USER_ID);
+    expect(args2.p_patch).toMatchObject({
       fsrsWeights: FAKE_WEIGHTS,
       fsrsWeightsOptimizedAt: body.optimizedAt,
     });
@@ -248,7 +260,11 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
 
     expect(response.status).toBe(422);
     expect(body.error).toBe("not_enough_reviews");
-    expect(rpcMock).not.toHaveBeenCalled();
+    // F29: the pre-stamp fires before grade log validation, so rpc is called
+    // once (to claim the slot). It is NOT called a second time (no final persist).
+    expect(rpcMock).toHaveBeenCalledOnce();
+    const [, args] = rpcMock.mock.calls[0];
+    expect(args.p_patch).toHaveProperty("fsrsOptimizingAt");
   });
 
   it("does not call the old update/insert write path on user_settings table", async () => {
@@ -256,10 +272,12 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
 
     await POST();
 
-    // Confirm the only user_settings access is the cooldown SELECT.
+    // Confirm the only user_settings read is the cooldown SELECT.
     const userSettingsCalls = fromMock.mock.calls.filter(([t]: [string]) => t === "user_settings");
     expect(userSettingsCalls).toHaveLength(1);
-    // The write is exclusively via rpc.
-    expect(rpcMock).toHaveBeenCalledOnce();
+    // The write path is exclusively via rpc (pre-stamp + final persist = 2 calls).
+    // F29: rpc is called twice - once to pre-stamp the in-progress marker and
+    // once to persist the final weights.
+    expect(rpcMock).toHaveBeenCalledTimes(2);
   });
 });

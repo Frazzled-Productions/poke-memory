@@ -11,6 +11,7 @@ import {
   UNLOCKED_KEY,
   FLAGS_KEY,
 } from "./persistence";
+import { KEY_SUPERUSER_CLEANUP_PENDING } from "@/lib/storage/keys";
 
 beforeEach(() => {
   // node project lacks a DOM, but it has a localStorage polyfill via happy-dom
@@ -187,6 +188,62 @@ describe("anyFlagTrue / isAnyFlagOn", () => {
     // The sync write-guard suppresses cloud writes while any flag is on, so
     // forceTokenToast must register through isAnyFlagOn like every other flag.
     saveFlags({ pretendAllMastered: false, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: true, qaSeedMode: false });
+    expect(isAnyFlagOn()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cleanup-pending marker (#1854 F16)
+//
+// isAnyFlagOn() must return true while the cleanup-pending marker is set, even
+// when all flags are off. This keeps cloud writes suppressed from the moment
+// flags are persisted as all-off until exitCleanup finishes successfully.
+// ---------------------------------------------------------------------------
+
+describe("isAnyFlagOn - cleanup-pending marker (#1854 F16)", () => {
+  it("returns true when the cleanup-pending marker is set, even with all flags off", () => {
+    // All flags off.
+    clearFlags();
+    expect(isAnyFlagOn()).toBe(false);
+    // Set the marker (simulates setFlag setting it before saveFlags).
+    globalThis.localStorage.setItem(KEY_SUPERUSER_CLEANUP_PENDING, "true");
+    expect(isAnyFlagOn()).toBe(true);
+  });
+
+  it("returns false after the cleanup-pending marker is removed", () => {
+    globalThis.localStorage.setItem(KEY_SUPERUSER_CLEANUP_PENDING, "true");
+    expect(isAnyFlagOn()).toBe(true);
+    globalThis.localStorage.removeItem(KEY_SUPERUSER_CLEANUP_PENDING);
+    expect(isAnyFlagOn()).toBe(false);
+  });
+
+  it("returns true when both a flag AND the marker are set", () => {
+    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: false });
+    globalThis.localStorage.setItem(KEY_SUPERUSER_CLEANUP_PENDING, "true");
+    expect(isAnyFlagOn()).toBe(true);
+  });
+
+  it("returns true with marker set even after flags are cleared (the F16 window)", () => {
+    // Simulate the exact window that F16 was about: flags were cleared by
+    // saveFlags/clearFlags but exitCleanup has not yet finished.
+    saveFlags({ pretendAllMastered: true, forceNextStreakMilestone: false, forceCardsGraduated: false, forceTokenToast: false, qaSeedMode: false });
+    // Step 1: set marker (before saveFlags).
+    globalThis.localStorage.setItem(KEY_SUPERUSER_CLEANUP_PENDING, "true");
+    // Step 2: persist all-off flags (simulates saveFlags(DEFAULT_FLAGS)).
+    clearFlags();
+    // At this point flags are all off, but the marker keeps the guard active.
+    expect(isAnyFlagOn()).toBe(true);
+    // Step 3: cleanup succeeds - marker removed.
+    globalThis.localStorage.removeItem(KEY_SUPERUSER_CLEANUP_PENDING);
+    // Now writes are unblocked.
+    expect(isAnyFlagOn()).toBe(false);
+  });
+
+  it("stays true when cleanup fails (marker not removed)", () => {
+    globalThis.localStorage.setItem(KEY_SUPERUSER_CLEANUP_PENDING, "true");
+    clearFlags();
+    // Simulate a failed cleanup: marker is left set (the catch branch logs but
+    // does NOT removeItem). Writes must remain suppressed.
     expect(isAnyFlagOn()).toBe(true);
   });
 });

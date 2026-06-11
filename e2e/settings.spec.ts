@@ -815,13 +815,14 @@ test.describe("Settings - Language section (#1720 / #1726)", () => {
 
 // ─── #1622: Feedback modal ───────────────────────────────────────────────────
 
-test.describe("Settings - Send feedback modal (#1622)", () => {
-  test("'Send feedback' button is visible below all sections (persistent, not inside an accordion)", async ({
+test.describe("Settings - Send feedback modal (#1622 / #1849)", () => {
+  test("'Send feedback' button is visible at the top of Settings (lifted above accordions, #1849)", async ({
     page,
   }) => {
     await page.goto("/settings");
 
-    // The Send feedback button sits below all accordions - always visible.
+    // The Send feedback row sits ABOVE all accordions (lifted in #1849) - visible
+    // without scrolling.
     const sendFeedbackBtn = page.getByRole("button", { name: /send feedback/i });
     await expect(sendFeedbackBtn).toBeVisible();
   });

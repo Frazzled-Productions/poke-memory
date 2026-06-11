@@ -25,6 +25,8 @@
  */
 
 import type { PokemonCellData } from "@/lib/pokemon/filter";
+import type { PokemonNameLocale } from "@/lib/pokemon/seed";
+import { getLocaleName } from "@/lib/pokemon/localeNames";
 
 // ---------------------------------------------------------------------------
 // Sort key type - carried by PokemonCellData for the "closest to mastery" path
@@ -74,16 +76,28 @@ export function compareByNational(
 }
 
 /**
- * Alphabetical order by the English display name shown in the grid (`p.name`).
- * Uses `localeCompare` with `"en"` locale and case-insensitive collation so
- * accented variants (e.g. Flabébé) sort predictably.
+ * Alphabetical order by the displayed name in the active Pokémon-name locale.
+ *
+ * When `locale` is `"en"` (default), compares using the English seed name
+ * (`p.name`) with an `"en"` collator so accented variants (e.g. Flabébé)
+ * sort predictably.
+ *
+ * When a non-English locale is active and the sidecar has loaded, compares by
+ * the locale name with a BCP-47 collator matching the locale tag so the sort
+ * order matches what users see in the grid.  Falls back to `p.name + "en"`
+ * when the sidecar has not loaded yet (graceful degradation).
+ *
  * Tie-break: national number ascending.
  */
 export function compareAlphabetical(
   a: PokemonCellData,
   b: PokemonCellData,
+  locale: PokemonNameLocale = "en",
 ): number {
-  const cmp = a.name.localeCompare(b.name, "en", { sensitivity: "base" });
+  const collatorTag = locale === "en" ? "en" : locale;
+  const nameA = (locale !== "en" ? getLocaleName(a.speciesId ?? a.id, locale) : undefined) ?? a.name;
+  const nameB = (locale !== "en" ? getLocaleName(b.speciesId ?? b.id, locale) : undefined) ?? b.name;
+  const cmp = nameA.localeCompare(nameB, collatorTag, { sensitivity: "base" });
   if (cmp !== 0) return cmp;
   return a.id - b.id;
 }
@@ -139,14 +153,19 @@ export function compareClosestToMastery(
  * @param pokemon          Already-filtered list.
  * @param sort             The requested sort order.
  * @param forceAllMastered Pass `useSuperuser().flags.pretendAllMastered`.
+ * @param locale           The active `pokemonNameLocale`. Passed to
+ *                         `compareAlphabetical` so the sort operates on the
+ *                         names visible in the grid rather than invisible
+ *                         English seed names.
  */
 export function sortPokemon(
   pokemon: PokemonCellData[],
   sort: PokedexSortOrder,
   forceAllMastered: boolean,
+  locale: PokemonNameLocale = "en",
 ): PokemonCellData[] {
   if (sort === "national") return [...pokemon].sort(compareByNational);
-  if (sort === "alphabetical") return [...pokemon].sort(compareAlphabetical);
+  if (sort === "alphabetical") return [...pokemon].sort((a, b) => compareAlphabetical(a, b, locale));
   // closest-to-mastery
   return [...pokemon].sort((a, b) =>
     compareClosestToMastery(a, b, forceAllMastered),

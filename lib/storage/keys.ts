@@ -59,6 +59,18 @@ export const KEY_SUPERUSER_UNLOCKED = "poke-memory:superuser";
 /** Per-behaviour developer-mode toggle flags. */
 export const KEY_SUPERUSER_FLAGS = "poke-memory:superuser:flags:v1";
 
+/**
+ * Persisted cleanup-pending marker. Set to `"true"` immediately before
+ * `exitCleanup` begins (before any React re-render / React-state write), and
+ * cleared only on the cardsTrusted=true branches (successful pull for
+ * signed-in; confirmed wipe for guest). While the marker is `"true"`,
+ * `isAnyFlagOn()` returns true so AutoSyncOnChange, usePerGradeSync, and
+ * useSyncOnUnload all suppress cloud writes. On failure the marker is left set
+ * so writes stay suppressed until the user re-toggles to retry. (#1854 F16)
+ */
+export const KEY_SUPERUSER_CLEANUP_PENDING =
+  "poke-memory:superuser:cleanup-pending";
+
 // ─── Version tracking ─────────────────────────────────────────────────────────
 
 /** Last app version the user was shown a "what's new" notice for. */

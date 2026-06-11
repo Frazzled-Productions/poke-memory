@@ -193,3 +193,24 @@ export async function restoreUserData(userId: string): Promise<void> {
 export async function clearIdbPendingQueue(): Promise<void> {
   await idbDelete(KEY_PENDING_GRADE_QUEUE);
 }
+
+/**
+ * Deletes the outgoing user's IDB-primary stores (review session + grade log)
+ * on a confirmed user switch. Without this, the incoming user inherits the
+ * outgoing user's session: loadSession reads IDB first, so callback-complete
+ * treats the leftover data as the incoming user's "local" state and pushes it
+ * into their cloud account on an empty-cloud first sign-in (#1850 - the #1712
+ * cross-account blending class). The LS fallback copies are wiped by
+ * wipeUserLocalStorage in guardAccountSwitch.
+ *
+ * Deliberately does NOT delete MIGRATION_FLAG_KEY: the migration flag is
+ * device-level (see the header above). Keeping it set also prevents a
+ * re-triggered LS-to-IDB migration from racing restoreUserData and
+ * overwriting a restored IDB value with a stale LS fallback.
+ */
+export async function clearIdbUserData(): Promise<void> {
+  await Promise.all([
+    idbDelete(KEY_REVIEW_SESSION),
+    idbDelete(KEY_GRADE_LOG),
+  ]);
+}

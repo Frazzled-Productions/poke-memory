@@ -215,3 +215,30 @@ describe("detectTimezone", () => {
     expect(tz.length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// formatDate renders the calendar day named by the ISO string (#1853 / F37)
+//
+// The tz parameter is deliberately ignored: re-projecting a noon-UTC anchor
+// into a UTC+13/+14 zone (Auckland in DST, Tonga, Kiritimati) rendered every
+// date one day late. 2026-06-11 is a Thursday.
+// ---------------------------------------------------------------------------
+
+describe("formatDate at UTC+13/+14 (#1853)", () => {
+  it("renders the named day, not the next one, for Pacific/Kiritimati (+14)", () => {
+    expect(formatDate("2026-06-11", "dmy", "Pacific/Kiritimati")).toBe("Thu 11 Jun");
+  });
+
+  it("keeps the iso-branch weekday on the named day at +14", () => {
+    expect(formatDate("2026-06-11", "iso", "Pacific/Kiritimati")).toBe("Thu, 2026-06-11");
+  });
+
+  it("renders identically for any tz argument", () => {
+    const formats: DateFormat[] = ["iso", "dmy", "mdy", "dmy-year", "mdy-year"];
+    for (const fmt of formats) {
+      expect(formatDate("2026-06-11", fmt, "Pacific/Auckland")).toBe(
+        formatDate("2026-06-11", fmt, "UTC"),
+      );
+    }
+  });
+});

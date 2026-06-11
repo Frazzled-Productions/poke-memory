@@ -219,14 +219,17 @@ describe("POST /api/sync", () => {
     expect(upsertRows[0].hidden_since).toBeNull();
   });
 
-  it("injects user_id and updated_at into each upserted row", async () => {
+  it("injects user_id into each upserted row and omits updated_at (server trigger handles it)", async () => {
     const { upsertMock } = makeSupabaseMock({ user: { id: "user-xyz-789" } });
 
     await POST(makeRequest({ cards: [makeCard()] }));
 
     const [upsertRows] = upsertMock.mock.calls[0];
     expect(upsertRows[0].user_id).toBe("user-xyz-789");
-    expect(typeof upsertRows[0].updated_at).toBe("string");
+    // updated_at must NOT be sent from the client - the card_reviews_set_updated_at_trigger
+    // (migration 043) stamps it server-side to preserve the lastPullAt clock-skew anchor
+    // documented in docs/sync.md (F22 / #1856).
+    expect(upsertRows[0]).not.toHaveProperty("updated_at");
   });
 
   it("upserts into card_reviews with the correct onConflict columns", async () => {

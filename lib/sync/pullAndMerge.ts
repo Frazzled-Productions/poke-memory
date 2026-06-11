@@ -583,19 +583,28 @@ export async function pullAndMerge(
       console.warn("[pullAndMerge] push-subscription pull failed (non-fatal)", e);
     }
 
-    // Use `userId` (the incoming authenticated user) as the ownerUserId anchor
-    // rather than relying on whatever syncStatus currently holds. On the reset
-    // path, clearLocalProgress wipes KEY_SYNC_STATUS and syncStatus is reloaded
-    // as ZERO (ownerUserId=null). Without the explicit userId here, the spread
-    // would re-null ownerUserId - clobbering the value guardAccountSwitch just
-    // stamped - and every subsequent sign-in from a third user would find null,
-    // skip the guard, and blend data. (#1712)
+    // Re-read the latest SyncStatus immediately before writing so concurrent
+    // writes from markPushSucceeded/markPushFailed/markStructuralSyncError or
+    // the unload handler are not clobbered by the stale `syncStatus` snapshot
+    // taken at the top of this function (F24 / #1856). Only the pull-specific
+    // fields (lastPullAt, lastSettingsPullAt, lastSeenResetAt, ownerUserId) are
+    // overridden; all other fields (lastPushFailed, structuralSyncError, etc.)
+    // are preserved from the freshly-loaded state.
+    //
+    // Note: `userId` (the incoming authenticated user) is still used as the
+    // ownerUserId anchor. On the reset path, clearLocalProgress wipes
+    // KEY_SYNC_STATUS and syncStatus is reloaded as ZERO (ownerUserId=null).
+    // Without the explicit userId here, the spread would re-null ownerUserId -
+    // clobbering the value guardAccountSwitch just stamped - and every
+    // subsequent sign-in from a third user would find null, skip the guard,
+    // and blend data. (#1712)
+    const latestSyncStatus = loadSyncStatus();
     saveSyncStatus({
-      ...syncStatus,
+      ...latestSyncStatus,
       lastPullAt: maxCloudUpdatedAt(cloudRows),
       lastSettingsPullAt: nextLastSettingsPullAt,
-      lastSeenResetAt: pulledRow?.lastResetAt ?? syncStatus.lastSeenResetAt,
-      ownerUserId: userId ?? syncStatus.ownerUserId,
+      lastSeenResetAt: pulledRow?.lastResetAt ?? latestSyncStatus.lastSeenResetAt,
+      ownerUserId: userId ?? latestSyncStatus.ownerUserId,
     });
 
     return "ok";

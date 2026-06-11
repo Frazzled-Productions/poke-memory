@@ -117,14 +117,14 @@ function reverseCard(pokemonId: number, stateOverrides: Partial<ReviewState> = {
 
 describe("deriveCloseToMastery - no results", () => {
   it("returns empty array when there are no cards", () => {
-    expect(deriveCloseToMastery([])).toHaveLength(0);
+    expect(deriveCloseToMastery([], false, "en")).toHaveLength(0);
   });
 
   it("returns empty array when name card is not yet mastered", () => {
     const cards = [
       nameCard(1, { reps: 2, scheduledDays: 10, lastReview: "2026-01-01" }),
     ];
-    expect(deriveCloseToMastery(cards)).toHaveLength(0);
+    expect(deriveCloseToMastery(cards, false, "en")).toHaveLength(0);
   });
 
   it("returns empty array when both name and reverse cards are mastered", () => {
@@ -132,7 +132,7 @@ describe("deriveCloseToMastery - no results", () => {
       nameCard(1, masteredState()),
       reverseCard(1, masteredState()),
     ];
-    expect(deriveCloseToMastery(cards)).toHaveLength(0);
+    expect(deriveCloseToMastery(cards, false, "en")).toHaveLength(0);
   });
 
   it("returns empty array when forceAllMastered is true, even with qualifying species", () => {
@@ -140,14 +140,14 @@ describe("deriveCloseToMastery - no results", () => {
       nameCard(1, masteredState()),
       reverseCard(1, { reps: 1, scheduledDays: 5, lastReview: "2026-01-01" }),
     ];
-    expect(deriveCloseToMastery(cards, true)).toHaveLength(0);
+    expect(deriveCloseToMastery(cards, true, "en")).toHaveLength(0);
   });
 });
 
 describe("deriveCloseToMastery - results present", () => {
   it("includes a species whose name card is mastered but has no reverse card", () => {
     const cards = [nameCard(1, masteredState())];
-    const result = deriveCloseToMastery(cards);
+    const result = deriveCloseToMastery(cards, false, "en");
     expect(result).toHaveLength(1);
     expect(result[0]!.speciesId).toBe(1);
   });
@@ -157,14 +157,14 @@ describe("deriveCloseToMastery - results present", () => {
       nameCard(1, masteredState()),
       reverseCard(1, { reps: 1, scheduledDays: 10, lastReview: "2026-01-01" }),
     ];
-    const result = deriveCloseToMastery(cards);
+    const result = deriveCloseToMastery(cards, false, "en");
     expect(result).toHaveLength(1);
     expect(result[0]!.speciesId).toBe(1);
   });
 
   it("populates entry fields from the card data", () => {
     const cards = [nameCard(25, masteredState())];
-    const [entry] = deriveCloseToMastery(cards);
+    const [entry] = deriveCloseToMastery(cards, false, "en");
     expect(entry!.speciesId).toBe(25);
     expect(entry!.englishName).toBe("Pokemon 25");
     expect(entry!.spriteUrl).toBe("/sprites/pokemon/25.png");
@@ -179,7 +179,7 @@ describe("deriveCloseToMastery - results present", () => {
       nameCard(7, masteredState()),
       reverseCard(7, { reps: 2, stability: 15, scheduledDays: 15, lastReview: "2026-01-01" }),
     ];
-    const [entry] = deriveCloseToMastery(cards);
+    const [entry] = deriveCloseToMastery(cards, false, "en");
     expect(entry!.reverseStability).toBe(15);
     expect(entry!.reverseScheduledDays).toBe(15);
     expect(entry!.reverseReps).toBe(2);
@@ -191,7 +191,7 @@ describe("deriveCloseToMastery - results present", () => {
       nameCard(4, masteredState()),
       reverseCard(4, { reps: 0, scheduledDays: 0, lastReview: null }),
     ];
-    const [entry] = deriveCloseToMastery(cards);
+    const [entry] = deriveCloseToMastery(cards, false, "en");
     expect(entry!.reverseIntroduced).toBe(false);
   });
 });
@@ -210,7 +210,7 @@ describe("deriveCloseToMastery - sort order", () => {
       reverseCard(2, { reps: 2, stability: 18, scheduledDays: 18, lastReview: "2026-01-01" }),
       reverseCard(3, { reps: 1, stability: 10, scheduledDays: 10, lastReview: "2026-01-01" }),
     ];
-    const result = deriveCloseToMastery(cards);
+    const result = deriveCloseToMastery(cards, false, "en");
     expect(result.map((e) => e.speciesId)).toEqual([2, 3, 1]);
   });
 
@@ -222,7 +222,7 @@ describe("deriveCloseToMastery - sort order", () => {
       reverseCard(5, { reps: 3, stability: 10, scheduledDays: 10, lastReview: "2026-01-01" }),
       reverseCard(6, { reps: 1, stability: 10, scheduledDays: 10, lastReview: "2026-01-01" }),
     ];
-    const result = deriveCloseToMastery(cards);
+    const result = deriveCloseToMastery(cards, false, "en");
     // Species 5 wins the tie (more reps); stability=10 does not pass the mastery gate
     // (stability must be >= MASTERY_STABILITY_DAYS=21), so both appear in the list.
     expect(result[0]!.speciesId).toBe(5);
@@ -236,7 +236,7 @@ describe("deriveCloseToMastery - sort order", () => {
       reverseCard(10, { reps: 1, stability: 8, scheduledDays: 8, lastReview: "2026-01-01" }),
       reverseCard(7, { reps: 1, stability: 8, scheduledDays: 8, lastReview: "2026-01-01" }),
     ];
-    const result = deriveCloseToMastery(cards);
+    const result = deriveCloseToMastery(cards, false, "en");
     expect(result[0]!.speciesId).toBe(7);
     expect(result[1]!.speciesId).toBe(10);
   });
@@ -249,7 +249,7 @@ describe("deriveCloseToMastery - sort order", () => {
       nameCard(2, masteredState()),
       reverseCard(1, { reps: 2, stability: 18, scheduledDays: 18, lastReview: "2026-01-01" }),
     ];
-    const result = deriveCloseToMastery(cards);
+    const result = deriveCloseToMastery(cards, false, "en");
     expect(result[0]!.speciesId).toBe(1);
     expect(result[1]!.speciesId).toBe(2);
   });
@@ -265,7 +265,7 @@ describe("deriveCloseToMastery - stability gate", () => {
     const cards = [
       nameCard(1, masteredState({ stability: MASTERY_STABILITY_DAYS })),
     ];
-    expect(deriveCloseToMastery(cards)).toHaveLength(1);
+    expect(deriveCloseToMastery(cards, false, "en")).toHaveLength(1);
   });
 
   it("name card with stability below threshold is NOT treated as mastered", () => {
@@ -273,7 +273,7 @@ describe("deriveCloseToMastery - stability gate", () => {
     const cards = [
       nameCard(1, { stability: MASTERY_STABILITY_DAYS - 1, scheduledDays: 28, reps: 4, lastReview: "2026-01-01" }),
     ];
-    expect(deriveCloseToMastery(cards)).toHaveLength(0);
+    expect(deriveCloseToMastery(cards, false, "en")).toHaveLength(0);
   });
 
   it("high reps + scheduledDays but low stability does NOT qualify name card as mastered", () => {
@@ -281,6 +281,30 @@ describe("deriveCloseToMastery - stability gate", () => {
     const cards = [
       nameCard(1, { stability: 5, scheduledDays: 60, reps: 10, lastReview: "2026-01-01" }),
     ];
-    expect(deriveCloseToMastery(cards)).toHaveLength(0);
+    expect(deriveCloseToMastery(cards, false, "en")).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale-scoped metadata (#1851)
+// ---------------------------------------------------------------------------
+
+describe("deriveCloseToMastery locale-scoped metadata (#1851)", () => {
+  it("reads reverse metadata from the active locale's card, not another locale's", () => {
+    // ja: name mastered, reverse fresh (stability 0) - blocked by reverse.
+    // en: a mastered reverse card for the same species. Before #1851 the
+    // metadata maps had no locale guard, so the en reverse (later in the
+    // array) drove the rendered stability/reps for the ja entry.
+    const cards = [
+      { ...nameCard(1, masteredState()), locale: "ja" as const },
+      { ...reverseCard(1), locale: "ja" as const },
+      { ...reverseCard(1, masteredState()), locale: "en" as const },
+    ];
+    const result = deriveCloseToMastery(cards, false, "ja");
+    expect(result).toHaveLength(1);
+    expect(result[0]!.speciesId).toBe(1);
+    // Metadata must reflect the ja reverse card (fresh), not the mastered en one.
+    expect(result[0]!.reverseStability).toBe(0);
+    expect(result[0]!.reverseReps).toBe(0);
   });
 });

@@ -71,23 +71,29 @@ export type CloseToMasteryEntry = {
  */
 export function deriveCloseToMastery(
   cards: readonly ReviewableCard[],
-  forceAllMastered = false,
-  locale: AppLocale = "en",
+  forceAllMastered: boolean,
+  locale: AppLocale,
 ): readonly CloseToMasteryEntry[] {
   if (forceAllMastered) return [];
 
   // Build a lookup of reverse cards by pokemonId for metadata extraction.
+  // Locale-scoped (#1851): computeSpeciesLegStatuses below is locale-filtered,
+  // so without the same guard here the rendered progress bar / "-Nd" badge /
+  // closest-first sort could come from a DIFFERENT locale's reverse card than
+  // the one actually blocking mastery (last card in the array won).
   const reverseBySpeciesId = new Map<number, ReverseReviewCard>();
   for (const card of cards) {
     if (card.cardType !== "reverse") continue;
+    if ((card.locale ?? "en") !== locale) continue;
     const rc = card as ReverseReviewCard;
     reverseBySpeciesId.set(rc.pokemonId, rc);
   }
 
-  // Build name card lookup for metadata extraction.
+  // Build name card lookup for metadata extraction. Same locale guard.
   const nameCardBySpeciesId = new Map<number, ReviewableCard>();
   for (const card of cards) {
     if (card.cardType !== "name") continue;
+    if ((card.locale ?? "en") !== locale) continue;
     nameCardBySpeciesId.set(card.id, card);
   }
 

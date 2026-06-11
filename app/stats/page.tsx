@@ -58,6 +58,8 @@ import { GameBreakdown } from "@/components/stats/GameBreakdown";
 import { LanguageBreakdown } from "@/components/stats/LanguageBreakdown";
 import type { AppLocale } from "@/i18n/locales";
 import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 
 // ---------------------------------------------------------------------------
 // Lazily-loaded Recharts chart components.
@@ -136,9 +138,48 @@ function LoadingSkeleton({ ariaLabel }: { ariaLabel: string }) {
 }
 
 
+/**
+ * One row in the Struggling cards list. Extracted as a named export so
+ * the hook can be called once per card (hooks cannot be called in .map callbacks)
+ * and so the component can be unit-tested directly for locale-rendering coverage.
+ */
+export function StrugglingCardRow({ card }: { card: StrugglingCard }) {
+  const tCommon = useTranslations("common");
+  const { locale } = usePokemonLocaleContext();
+  // eslint-disable-next-line no-restricted-syntax -- English fallback arg, not a direct render
+  const { name: localeName } = useLocalePokemonName(card.speciesId, card.name);
+  return (
+    <Link
+      href={`/pokedex/${card.id}`}
+      aria-label={tCommon("viewInPokedex", { name: localeName })}
+      className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-background px-4 py-2 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-zinc-800 dark:hover:bg-zinc-900"
+    >
+      <Image
+        src={card.spriteUrl}
+        alt={localeName}
+        width={STATS_SPRITE_SIZE}
+        height={STATS_SPRITE_SIZE}
+        className="shrink-0 object-contain"
+      />
+      <div className="min-w-0 flex-1">
+        <p
+          className="truncate font-medium text-foreground"
+          lang={locale !== "en" ? locale : undefined}
+        >
+          {localeName}
+        </p>
+        <p className={`${mutedTextXs} tabular-nums`}>
+          Ease factor: {card.easeFactor.toFixed(2)} · Reps:{" "}
+          {card.repetitions}
+        </p>
+      </div>
+      <DirectionBadge direction="name" />
+    </Link>
+  );
+}
+
 function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[] }) {
   const t = useTranslations("stats");
-  const tCommon = useTranslations("common");
   return (
     <section aria-labelledby="struggling-heading">
       {/* h3 because StrugglingCards is nested inside the Scheduling h2 section */}
@@ -154,27 +195,7 @@ function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[]
         <ul className={colStack} role="list">
           {struggling.map((card) => (
             <li key={card.id}>
-              <Link
-                href={`/pokedex/${card.id}`}
-                aria-label={tCommon("viewInPokedex", { name: card.name })}
-                className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-background px-4 py-2 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-zinc-800 dark:hover:bg-zinc-900"
-              >
-                <Image
-                  src={card.spriteUrl}
-                  alt={card.name}
-                  width={STATS_SPRITE_SIZE}
-                  height={STATS_SPRITE_SIZE}
-                  className="shrink-0 object-contain"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-foreground">{card.name}</p>
-                  <p className={`${mutedTextXs} tabular-nums`}>
-                    Ease factor: {card.easeFactor.toFixed(2)} · Reps:{" "}
-                    {card.repetitions}
-                  </p>
-                </div>
-                <DirectionBadge direction="name" />
-              </Link>
+              <StrugglingCardRow card={card} />
             </li>
           ))}
         </ul>
@@ -292,9 +313,13 @@ export default function StatsPage() {
       // This check is idempotent: `checkBadges` only returns badges not already
       // in `earnedIdSet`, so running it on both Stats and Journey is safe.
       if (!anyFlagOn) {
+        // Scoped to the active pokemonNameLocale (#1851) so ja/zh learners'
+        // mastery counts toward badges; previously the implicit "en" default
+        // evaluated English-only mastery.
         const masteredIds = masteredSpeciesIds(
           sessionCards,
           false,
+          settings.pokemonNameLocale,
         );
         const earnedIdSet = new Set(settings.earnedBadges.map((b) => b.id));
         const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIdSet);
@@ -331,15 +356,17 @@ export default function StatsPage() {
   }, [storageVersion, anyFlagOn, supabase, user, seed]);
 
   // Per-game mastery breakdown (#1313). Recomputed whenever cards change or
-  // the superuser flag toggles.
+  // the superuser flag toggles. Locale-scoped (#1851) so the panel reflects
+  // the active learning language like the rest of the page.
   const perGame = useMemo<GameStats[]>(() => {
     if (cards === null || seed === null) return [];
     return computePerGameStats(
       cards,
       seed.seedPokemon,
       flags.pretendAllMastered,
+      pokemonNameLocale,
     );
-  }, [cards, flags.pretendAllMastered, seed]);
+  }, [cards, flags.pretendAllMastered, seed, pokemonNameLocale]);
 
   // Provide the full snapshot input to the shared DashboardSnapshotContext.
   // Stats reads all axes from the returned snapshot (#1139, simplified in #1151).
@@ -425,7 +452,7 @@ export default function StatsPage() {
           former ForcePullSection gate.
         */}
         {user !== null && supabase !== null && !anyFlagOn && (
-          <p className="mb-8 text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={`mb-8 ${mutedText}`}>
             {t("restoreFromCloudDescription")}{" "}
             <Link
               href="/settings"

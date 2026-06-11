@@ -9,7 +9,11 @@
 // Flags are kept separate from "unlocked" so a user can have superuser
 // unlocked but no flags active - equivalent to a closed inspector window.
 
-import { KEY_SUPERUSER_UNLOCKED, KEY_SUPERUSER_FLAGS } from "@/lib/storage/keys";
+import {
+  KEY_SUPERUSER_UNLOCKED,
+  KEY_SUPERUSER_FLAGS,
+  KEY_SUPERUSER_CLEANUP_PENDING,
+} from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { writeLocalStorageRaw, writeLocalStorage } from "@/lib/storage/writeLocalStorage";
 
@@ -100,7 +104,13 @@ export function anyFlagTrue(flags: SuperuserFlags): boolean {
 
 // Synchronous read for non-React contexts (e.g. unload-time beacon handlers
 // where the React tree may already be tearing down).
+//
+// Also returns true while the cleanup-pending marker is set (#1854 F16): this
+// keeps cloud writes suppressed from the moment flags are persisted as all-off
+// until exitCleanup completes successfully, preventing QA-seeded data from
+// reaching Supabase during a degraded or in-progress cleanup.
 export function isAnyFlagOn(): boolean {
   if (typeof window === "undefined") return false;
+  if (localStorage.getItem(KEY_SUPERUSER_CLEANUP_PENDING) === "true") return true;
   return anyFlagTrue(loadFlags());
 }

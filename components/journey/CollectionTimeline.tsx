@@ -129,6 +129,12 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
   );
 
   const { totalSpecies } = timeline;
+  // The projectable population for the future direction: species that have
+  // been introduced and have non-zero stability. This is the count at the
+  // start of the future range (day 0), before any forgetting occurs.
+  // Using totalSpecies (~1025) instead inflates the forgotten count to include
+  // never-reviewed species (F48 / #1860).
+  const trackedCount = timeline.future.length > 0 ? timeline.future[0].mastered : 0;
   const isFuture = position > 0.01;
   const isPast = position < -0.01;
 
@@ -226,7 +232,7 @@ export function CollectionTimeline({ timeline }: CollectionTimelineProps) {
                 colour="text-amber-500 dark:text-amber-400"
               />
               <CountPill
-                count={totalSpecies - snapshot.mastered}
+                count={trackedCount - snapshot.mastered}
                 label={tWidget("forgotten")}
                 colour={chartTickText}
               />

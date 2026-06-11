@@ -1169,3 +1169,35 @@ describe("computeQueueCountFromEligible", () => {
     expect(partial.totalCount).toBe(full.totalCount - 1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Mastery axis locale threading (#1851)
+// ---------------------------------------------------------------------------
+
+describe("mastery axis follows options.locale (#1851)", () => {
+  it("counts ja mastery under locale ja and not under the en default", () => {
+    // Before #1851 the snapshot dropped options.locale when calling
+    // computeStats, hard-wiring the mastery axis to "en" while the
+    // queue/forecast axes on the same page were locale-scoped.
+    const cards = [
+      makeCard(
+        1,
+        { lastReview: "2026-05-01", firstSeen: "2026-04-01", reps: 5, stability: 30, scheduledDays: 30, fsrsState: "review" },
+        { locale: "ja" },
+      ),
+    ];
+    const settings = makeSettings();
+
+    const jaSnap = computeDashboardSnapshot(cards, settings, DEFAULT_LIMITS, TODAY, {
+      include: ["mastery"],
+      locale: "ja",
+    });
+    expect(jaSnap.mastery?.introduced).toBe(1);
+
+    const enSnap = computeDashboardSnapshot(cards, settings, DEFAULT_LIMITS, TODAY, {
+      include: ["mastery"],
+      locale: "en",
+    });
+    expect(enSnap.mastery?.introduced).toBe(0);
+  });
+});
