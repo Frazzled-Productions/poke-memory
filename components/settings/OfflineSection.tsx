@@ -11,6 +11,7 @@ import {
   resetToIdle,
   reconcileWithStorage,
   getCurrentManifest,
+  checkStorageHeadroom,
   type DownloadState,
 } from "@/lib/pwa/downloadController";
 import { LEGACY_CRY_CACHE_NAME, LEGACY_SPRITE_CACHE_NAME } from "@/lib/pwa/cacheStrategy";
@@ -48,6 +49,16 @@ export function OfflineSection() {
 
   /** Error message from a failed delete attempt, or null. */
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  /**
+   * When set, a pre-flight quota check found insufficient headroom and we are
+   * showing the low-storage warning dialog. Holds the IDs to pass to
+   * startDownload if the user proceeds anyway.
+   */
+  const [lowStoragePendingIds, setLowStoragePendingIds] = useState<number[] | null>(null);
+
+  /** Ref to the low-storage warning dialog element. */
+  const lowStorageDialogRef = useRef<HTMLDialogElement>(null);
 
   /**
    * Derive the update-available state from the persisted manifest vs. the
@@ -154,6 +165,19 @@ export function OfflineSection() {
     return () => dialog.removeEventListener("cancel", handleCancel);
   }, []);
 
+  // Wire the low-storage dialog's "cancel" event (fired on Escape) to close cleanly.
+  useEffect(() => {
+    const dialog = lowStorageDialogRef.current;
+    if (!dialog) return;
+    function handleCancel(e: Event) {
+      e.preventDefault();
+      dialog!.close();
+      setLowStoragePendingIds(null);
+    }
+    dialog.addEventListener("cancel", handleCancel);
+    return () => dialog.removeEventListener("cancel", handleCancel);
+  }, []);
+
   function openDeleteDialog() {
     deleteDialogRef.current?.showModal();
   }
@@ -162,10 +186,33 @@ export function OfflineSection() {
     deleteDialogRef.current?.close();
   }
 
-  function handleDownload() {
+  async function handleDownload() {
     // Derive species IDs from the context-provided seed rather than a static import.
     const ids = seed ? seed.seedPokemon.filter((p) => p.isDefaultForm).map((p) => p.id) : [];
+
+    // Pre-flight storage headroom check. If navigator.storage.estimate() is
+    // unavailable (null result), fall through and start the download as before.
+    const headroom = await checkStorageHeadroom();
+    if (headroom !== null && !headroom.hasHeadroom) {
+      // Not enough free space - show the warning dialog instead of starting.
+      setLowStoragePendingIds(ids);
+      lowStorageDialogRef.current?.showModal();
+      return;
+    }
+
     void startDownload(ids);
+  }
+
+  function handleLowStorageCancel() {
+    lowStorageDialogRef.current?.close();
+    setLowStoragePendingIds(null);
+  }
+
+  function handleLowStorageProceed() {
+    lowStorageDialogRef.current?.close();
+    const ids = lowStoragePendingIds;
+    setLowStoragePendingIds(null);
+    if (ids !== null) void startDownload(ids);
   }
 
   /**
@@ -283,7 +330,7 @@ export function OfflineSection() {
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={handleDownload}
+                onClick={() => { void handleDownload(); }}
                 disabled={manifestStatus !== null && !manifestStatus.isStale}
                 aria-disabled={manifestStatus !== null && !manifestStatus.isStale}
                 className="self-start min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700"
@@ -387,6 +434,40 @@ export function OfflineSection() {
             className="min-h-[44px] rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
           >
             {t("deleteConfirmConfirm")}
+          </button>
+        </div>
+      </dialog>
+
+      {/* Low-storage warning dialog - shown when pre-flight quota check fails.
+          Allows the user to cancel or proceed anyway with an explicit acknowledgement. */}
+      <dialog
+        ref={lowStorageDialogRef}
+        aria-labelledby="low-storage-dialog-title"
+        className={dialogPanel}
+      >
+        <h2
+          id="low-storage-dialog-title"
+          className="text-base font-semibold text-foreground"
+        >
+          {t("lowStorageTitle")}
+        </h2>
+        <p className={`mt-2 ${mutedText}`}>
+          {t("lowStorageBody")}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={handleLowStorageCancel}
+            className="min-h-[44px] rounded-lg border border-zinc-300 bg-background px-5 py-2 text-sm font-semibold text-foreground transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700"
+          >
+            {t("lowStorageCancel")}
+          </button>
+          <button
+            type="button"
+            onClick={handleLowStorageProceed}
+            className="min-h-[44px] rounded-lg border border-amber-500 bg-background px-5 py-2 text-sm font-semibold text-amber-700 transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 dark:border-amber-500 dark:text-amber-400"
+          >
+            {t("lowStorageProceed")}
           </button>
         </div>
       </dialog>

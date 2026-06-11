@@ -36,6 +36,33 @@ import { spriteVariantUrl } from "@/lib/sprites/url";
 const CONCURRENCY = 6;
 
 /**
+ * Expected total size of the offline pack (sprites + cries) in bytes.
+ *
+ * Derived from the `downloadDescription` copy ("About 166 MB") and the
+ * post-trim accounting in OFFLINE_PRECACHE_WIDTHS JSDoc (~59.7 MB sprites +
+ * ~6 MB cries = ~66 MB raw file bytes on disk, but IndexedDB storage overhead
+ * and browser padding mean the on-device quota cost is higher). The 166 MB
+ * figure is the observed Quota cost on a typical iOS device (WebKit inflates
+ * the quota accounting relative to actual file bytes).
+ *
+ * Used by the pre-flight quota check in `downloadController.ts` to compare
+ * against the remaining storage headroom before starting a download.
+ */
+export const OFFLINE_PACK_EXPECTED_BYTES = 166 * 1024 * 1024; // 166 MB
+
+/**
+ * Safety buffer added on top of `OFFLINE_PACK_EXPECTED_BYTES` when checking
+ * available storage headroom. This reserves room for concurrent card-progress
+ * saves (`saveSession`) so they do not hit QuotaExceededError while the pack
+ * is being written.
+ *
+ * 20 MB is generous: a full `saveSession` snapshot is a few KB. The buffer
+ * exists to absorb rounding errors in the estimate, pack size growth, and any
+ * other origin storage (FSRS state, settings) that is already present.
+ */
+export const OFFLINE_SAVE_BUFFER_BYTES = 20 * 1024 * 1024; // 20 MB
+
+/**
  * The subset of pre-generated WebP widths actually needed for offline use.
  *
  * All 10 widths are generated on disk by `npm run seed:sprites` (see

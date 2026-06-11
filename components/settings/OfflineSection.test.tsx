@@ -14,6 +14,7 @@ import { renderWithIntl } from "@/components/test-utils/renderWithIntl";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import * as precacheModule from "@/lib/pwa/precache";
 import { _resetForTesting } from "@/lib/pwa/downloadController";
+import * as downloadControllerModule from "@/lib/pwa/downloadController";
 import { computeManifestSignature } from "@/lib/pwa/manifestSignature";
 import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
@@ -691,6 +692,233 @@ describe("OfflineSection", () => {
 
     // Chinese Simplified locale: button should be enabled (update available).
     expect(screen.getByRole("button", { name: /更新/i })).toBeEnabled();
+  });
+
+  // ── Pre-flight storage quota check (#1846) ────────────────────────────────
+
+  it("starts download directly when storage headroom is sufficient", async () => {
+    // checkStorageHeadroom returns hasHeadroom: true → no warning dialog, download starts.
+    vi.spyOn(downloadControllerModule, "checkStorageHeadroom").mockResolvedValue({
+      hasHeadroom: true,
+      freeBytes: 2000 * 1024 * 1024,
+      requiredBytes: 186 * 1024 * 1024,
+    });
+
+    let resolvePrecache!: (value: precacheModule.PrecacheSummary) => void;
+    vi.spyOn(precacheModule, "precacheAll").mockImplementation(
+      ({ onProgress }) => {
+        onProgress?.({ done: 1, total: 100, bytesSoFar: 10_000 });
+        return new Promise<precacheModule.PrecacheSummary>((resolve) => {
+          resolvePrecache = resolve;
+        });
+      },
+    );
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    // Download must start immediately, no warning dialog.
+    await waitFor(() =>
+      expect(screen.getByRole("progressbar")).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("heading", { name: /low storage/i })).not.toBeInTheDocument();
+
+    resolvePrecache({ totalRequested: 100, downloaded: 100, skipped: 0, failed: 0 });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
+    );
+  });
+
+  it("shows low-storage warning dialog and does not start download when headroom is insufficient", async () => {
+    // checkStorageHeadroom returns hasHeadroom: false → warning dialog appears.
+    vi.spyOn(downloadControllerModule, "checkStorageHeadroom").mockResolvedValue({
+      hasHeadroom: false,
+      freeBytes: 50 * 1024 * 1024,
+      requiredBytes: 186 * 1024 * 1024,
+    });
+    const precacheSpy = vi.spyOn(precacheModule, "precacheAll");
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    // Low-storage warning dialog must appear.
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /low storage/i })).toBeInTheDocument(),
+    );
+
+    // Download must NOT have started yet.
+    expect(precacheSpy).not.toHaveBeenCalled();
+
+    // Dialog must have Cancel and "Download anyway" buttons.
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /download anyway/i })).toBeInTheDocument();
+  });
+
+  it("cancelling the low-storage warning leaves the component in idle and does not start download", async () => {
+    vi.spyOn(downloadControllerModule, "checkStorageHeadroom").mockResolvedValue({
+      hasHeadroom: false,
+      freeBytes: 50 * 1024 * 1024,
+      requiredBytes: 186 * 1024 * 1024,
+    });
+    const precacheSpy = vi.spyOn(precacheModule, "precacheAll");
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /low storage/i })).toBeInTheDocument(),
+    );
+
+    // Cancel: dialog closes, download does NOT start.
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: /low storage/i })).not.toBeInTheDocument(),
+    );
+
+    // Download button must still be present (still in idle).
+    expect(screen.getByRole("button", { name: /^download$/i })).toBeInTheDocument();
+    expect(precacheSpy).not.toHaveBeenCalled();
+  });
+
+  it("clicking 'Download anyway' on the low-storage warning starts the download", async () => {
+    vi.spyOn(downloadControllerModule, "checkStorageHeadroom").mockResolvedValue({
+      hasHeadroom: false,
+      freeBytes: 50 * 1024 * 1024,
+      requiredBytes: 186 * 1024 * 1024,
+    });
+
+    let resolvePrecache!: (value: precacheModule.PrecacheSummary) => void;
+    vi.spyOn(precacheModule, "precacheAll").mockImplementation(
+      ({ onProgress }) => {
+        onProgress?.({ done: 1, total: 100, bytesSoFar: 10_000 });
+        return new Promise<precacheModule.PrecacheSummary>((resolve) => {
+          resolvePrecache = resolve;
+        });
+      },
+    );
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /low storage/i })).toBeInTheDocument(),
+    );
+
+    // Proceed anyway: dialog closes, download starts.
+    await user.click(screen.getByRole("button", { name: /download anyway/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("progressbar")).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("heading", { name: /low storage/i })).not.toBeInTheDocument();
+
+    resolvePrecache({ totalRequested: 100, downloaded: 100, skipped: 0, failed: 0 });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
+    );
+  });
+
+  it("proceeds with download when checkStorageHeadroom returns null (API unavailable)", async () => {
+    // null = API absent → fall through to download as before.
+    vi.spyOn(downloadControllerModule, "checkStorageHeadroom").mockResolvedValue(null);
+
+    let resolvePrecache!: (value: precacheModule.PrecacheSummary) => void;
+    vi.spyOn(precacheModule, "precacheAll").mockImplementation(
+      ({ onProgress }) => {
+        onProgress?.({ done: 1, total: 100, bytesSoFar: 10_000 });
+        return new Promise<precacheModule.PrecacheSummary>((resolve) => {
+          resolvePrecache = resolve;
+        });
+      },
+    );
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />);
+
+    await user.click(screen.getByRole("button", { name: /download/i }));
+
+    // Download must start without any warning dialog.
+    await waitFor(() =>
+      expect(screen.getByRole("progressbar")).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("heading", { name: /low storage/i })).not.toBeInTheDocument();
+
+    resolvePrecache({ totalRequested: 100, downloaded: 100, skipped: 0, failed: 0 });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument(),
+    );
+  });
+
+  it("renders low-storage warning dialog title in ja locale", async () => {
+    vi.spyOn(downloadControllerModule, "checkStorageHeadroom").mockResolvedValue({
+      hasHeadroom: false,
+      freeBytes: 50 * 1024 * 1024,
+      requiredBytes: 186 * 1024 * 1024,
+    });
+    vi.spyOn(precacheModule, "precacheAll").mockResolvedValue({
+      totalRequested: 0, downloaded: 0, skipped: 0, failed: 0,
+    });
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />, { locale: "ja" });
+
+    await user.click(screen.getByRole("button", { name: /ダウンロード/i }));
+
+    await waitFor(() =>
+      // Japanese: ストレージ容量不足
+      expect(screen.getByRole("heading", { name: /ストレージ容量不足/i })).toBeInTheDocument(),
+    );
+  });
+
+  it("renders low-storage 'Download anyway' button in zh-Hans locale", async () => {
+    vi.spyOn(downloadControllerModule, "checkStorageHeadroom").mockResolvedValue({
+      hasHeadroom: false,
+      freeBytes: 50 * 1024 * 1024,
+      requiredBytes: 186 * 1024 * 1024,
+    });
+    vi.spyOn(precacheModule, "precacheAll").mockResolvedValue({
+      totalRequested: 0, downloaded: 0, skipped: 0, failed: 0,
+    });
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />, { locale: "zh-Hans" });
+
+    await user.click(screen.getByRole("button", { name: /下载/i }));
+
+    await waitFor(() =>
+      // Simplified Chinese proceed button: 仍然下载
+      expect(screen.getByRole("button", { name: /仍然下载/i })).toBeInTheDocument(),
+    );
+  });
+
+  it("renders low-storage 'Download anyway' button in zh-Hant locale", async () => {
+    vi.spyOn(downloadControllerModule, "checkStorageHeadroom").mockResolvedValue({
+      hasHeadroom: false,
+      freeBytes: 50 * 1024 * 1024,
+      requiredBytes: 186 * 1024 * 1024,
+    });
+    vi.spyOn(precacheModule, "precacheAll").mockResolvedValue({
+      totalRequested: 0, downloaded: 0, skipped: 0, failed: 0,
+    });
+
+    const user = userEvent.setup();
+    renderWithIntl(<OfflineSection />, { locale: "zh-Hant" });
+
+    await user.click(screen.getByRole("button", { name: /下載/i }));
+
+    await waitFor(() =>
+      // Traditional Chinese proceed button: 仍然下載
+      expect(screen.getByRole("button", { name: /仍然下載/i })).toBeInTheDocument(),
+    );
   });
 
   // ── Storage estimate formatting (AC2) ─────────────────────────────────────
