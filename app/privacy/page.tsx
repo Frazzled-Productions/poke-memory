@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 7 June 2026
+          Last updated: 11 June 2026
         </p>
       </header>
 
@@ -261,8 +261,13 @@ export default async function PrivacyPage() {
           </ul>
           <p className="mt-2">
             Feedback is used only to improve the service and to investigate
-            reported issues. It is not shared with third parties, and it is not
-            used for profiling or marketing.
+            reported issues. It is not used for profiling or marketing. Bug
+            reports trigger an automated notification to a private,
+            maintainer-only Discord channel used for triage: this notification
+            includes a capped preview (up to 500 characters) of the message,
+            plus the non-identifying metadata above (page, app version,
+            timestamp). No user identifier is included. Discord is a
+            sub-processor under a data processing agreement (see §6).
           </p>
         </section>
 
@@ -445,6 +450,18 @@ export default async function PrivacyPage() {
                     log, settings, and auth session (authenticated users only)
                   </td>
                 </tr>
+                <tr>
+                  <td className="py-2 pr-4 font-medium">Discord</td>
+                  <td className="py-2 pr-4">
+                    Maintainer notification channel for bug-report triage
+                  </td>
+                  <td className="py-2">
+                    A capped preview (up to 500 characters) of the free-text
+                    message, plus non-identifying metadata (page, app version,
+                    timestamp). No user identifier is included. Sent to a
+                    private, maintainer-only channel.
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -547,14 +564,15 @@ export default async function PrivacyPage() {
           </h2>
           <p>
             The third-party services listed in §6 (Vercel; Supabase if you
-            sign in by any method, including username and password; and, if
-            you sign in via GitHub or Google, those providers) may process
-            data outside the UK / EEA. Vercel and Supabase (our
-            sub-processors) operate under the EU Standard Contractual Clauses
-            (SCCs), providing equivalent safeguards via the UK International
-            Data Transfer Agreement (IDTA) addendum. GitHub and Google act as
-            independent controllers under their own applicable transfer
-            mechanisms, including their own published SCCs with end-users.
+            sign in by any method, including username and password; Discord for
+            bug-report triage notifications; and, if you sign in via GitHub or
+            Google, those providers) may process data outside the UK / EEA.
+            Vercel, Supabase, and Discord (our sub-processors) operate under
+            the EU Standard Contractual Clauses (SCCs), providing equivalent
+            safeguards via the UK International Data Transfer Agreement (IDTA)
+            addendum. GitHub and Google act as independent controllers under
+            their own applicable transfer mechanisms, including their own
+            published SCCs with end-users.
           </p>
         </section>
 

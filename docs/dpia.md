@@ -90,6 +90,7 @@ As of #1369, the app UI renders in the user's chosen locale (`en` / `ja` / `zh-H
 |---|---|---|
 | Supabase | Postgres database (authenticated-path review data, auth sessions) | DPA in place; SCCs / IDTA addendum |
 | Vercel | Hosting, static asset delivery, aggregate analytics | DPA in place; SCCs / IDTA addendum |
+| Discord | Bug-report triage notifications (processor / sub-processor) | DPA in place; SCCs / IDTA addendum |
 
 GitHub and Google act as **independent controllers** for the OAuth authentication interaction only. They are not processors for our review data. The app itself never sees the OAuth token - the exchange is handled server-side by Supabase Auth.
 
@@ -275,9 +276,10 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 - A server-side 2,000-character limit prevents large volumes of personal data being submitted inadvertently.
 - Feedback rows are automatically deleted after 12 months by a scheduled database function.
 - For authenticated users, feedback rows are deleted by cascade on account deletion.
-- Feedback data is not shared with any third party and is not used for profiling or marketing.
+- Feedback data is not used for profiling or marketing.
+- Bug-report notifications to Discord: the message preview forwarded is capped at 500 characters, fetched by the Vercel route via the service-role client (keeping it out of pg_net request logs), sent to a private maintainer-only Discord channel, and processed under a DPA. No user identifier is included. The full message remains in Supabase within the existing RLS perimeter.
 
-**Residual risk:** Low. Users may still include personal data despite the inline notice; the server-side truncation and automatic deletion schedule bound both the quantity and retention of any such data.
+**Residual risk:** Low. Users may still include personal data despite the inline notice; the server-side truncation and automatic deletion schedule bound both the quantity and retention of any such data. The Discord preview is additionally capped at 500 characters and sent to a maintainer-only channel.
 
 **Acceptable:** Yes.
 
