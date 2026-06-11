@@ -1046,7 +1046,7 @@ export function ReviewSession() {
     return () => clearTimeout(id);
     // showGame is the only dep: we only want to move focus on toggle, not on
     // every render. The refs are stable objects (never reassigned).
-    // On initial mount showGame=false, so the else branch fires — but
+    // On initial mount showGame=false, so the else branch fires, but
     // showGameButtonRef.current is null at that point (the summary hasn't
     // rendered yet), making the optional-chain a safe no-op.
     // eslint-disable-next-line react-hooks/exhaustive-deps
