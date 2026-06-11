@@ -927,6 +927,39 @@ test.describe("Settings - Send feedback modal (#1622 / #1849)", () => {
   });
 });
 
+test.describe("Settings - Play cry on reveal is independent of Cry cards (#1885)", () => {
+  test("Play-cry-on-reveal toggle is fully enabled and operable when Cry cards are off", async ({
+    page,
+  }) => {
+    // Cry cards default to off. The previous behaviour greyed the Play-cry-on-reveal
+    // row with opacity-50 and showed a disabled note whenever cryCardsEnabled was
+    // false - even though the reveal path never gated on cryCardsEnabled. This test
+    // guards against that regression being re-introduced.
+    await page.goto("/settings");
+
+    // Cry cards default to off, so no setup is needed to reach the
+    // "cry cards disabled" condition that previously greyed this row. (Driving
+    // the Card types section here is avoided on purpose: it can be open by
+    // default, so a navigation click would collapse it and is collapse-state
+    // dependent. The independence we actually guard lives on the Audio toggle.)
+
+    // Expand the Audio section.
+    await page.getByRole("button", { name: /^audio$/i }).click();
+
+    // The Play-cry-on-reveal switch must be visible inside the Audio section.
+    const playCrySwitch = page.getByRole("switch", { name: /play cry on reveal/i });
+    await expect(playCrySwitch).toBeVisible();
+
+    // The switch must not be disabled - it is independent of cryCardsEnabled.
+    await expect(playCrySwitch).not.toBeDisabled();
+
+    // Core interaction: clicking the switch must toggle it on, proving it is
+    // independently operable without cry cards being enabled.
+    await playCrySwitch.click();
+    await expect(playCrySwitch).toHaveAttribute("aria-checked", "true");
+  });
+});
+
 test.describe("Settings - push notification hour picker (#1315)", () => {
   test("hour picker renders in Regional & reminders section and can be set", async ({
     page,

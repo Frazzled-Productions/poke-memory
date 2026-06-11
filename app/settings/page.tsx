@@ -1424,31 +1424,27 @@ export default function SettingsPage() {
                 forceOpen={targetCategoryId === "audio-heading"}
                 transientOpen={isFiltering}
               >
-                {/* Cry playback options - greyed when cry cards disabled (#1722) */}
-                <div className={settings.cryCardsEnabled ? undefined : "opacity-50"}>
-                  <div className={cardPanelPadded}>
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {t("settings.audio.playCryOnReveal.label")}
-                        </p>
-                        <p className={`mt-1 ${mutedTextXs}`}>
-                          {t("settings.audio.playCryOnReveal.description")}
-                        </p>
-                      </div>
-                      <ToggleSwitch
-                        checked={settings.playCryOnReveal}
-                        onChange={() => handleToggle("playCryOnReveal")}
-                        ariaLabel={t("settings.audio.playCryOnReveal.label")}
-                      />
+                {/* Cry on reveal - independent of cry cards (#1885). Plays the
+                    Pokémon cry when a name/evolution/reverse card is revealed;
+                    cry cards are a separate card type, so this is not gated on
+                    cryCardsEnabled. */}
+                <div className={cardPanelPadded}>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {t("settings.audio.playCryOnReveal.label")}
+                      </p>
+                      <p className={`mt-1 ${mutedTextXs}`}>
+                        {t("settings.audio.playCryOnReveal.description")}
+                      </p>
                     </div>
+                    <ToggleSwitch
+                      checked={settings.playCryOnReveal}
+                      onChange={() => handleToggle("playCryOnReveal")}
+                      ariaLabel={t("settings.audio.playCryOnReveal.label")}
+                    />
                   </div>
                 </div>
-                {!settings.cryCardsEnabled && (
-                  <p className={mutedTextXs}>
-                    {t("settings.audio.cryDisabledNote")}
-                  </p>
-                )}
 
                 {/* Speak name on reveal (TTS) */}
                 <div className={cardPanelPadded}>

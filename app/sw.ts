@@ -48,6 +48,7 @@ import {
   versionedCacheName,
 } from "@/lib/pwa/cacheStrategy";
 import { SW_IDB_OPEN_TIMEOUT_MS, openSwIdb } from "@/lib/pwa/swIdb";
+import { buildOfflineAssetResponse } from "@/lib/pwa/rangeResponse";
 
 // SW_CACHE_VERSION and versionedCacheName are imported from lib/pwa/cacheStrategy.ts - 
 // the single source of truth for the cache-version suffix. Both this worker and
@@ -302,10 +303,10 @@ const runtimeCaching: RuntimeCaching[] = [
           ),
         ]);
         if (idbResult) {
-          return new Response(idbResult.blob, {
-            status: 200,
-            headers: { "Content-Type": idbResult.contentType },
-          });
+          // Honour a `Range` request when present (#1886). WebKit media
+          // (`/cries/<id>.ogg` via <audio>) needs a 206 to start playback;
+          // sprites send no Range header and keep the 200 path.
+          return buildOfflineAssetResponse(request, idbResult.blob, idbResult.contentType);
         }
       } catch {
         // IDB unavailable or open failed - fall through to network.
