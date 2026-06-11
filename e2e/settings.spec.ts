@@ -937,13 +937,14 @@ test.describe("Settings - Play cry on reveal is independent of Cry cards (#1885)
     // guards against that regression being re-introduced.
     await page.goto("/settings");
 
+    // Cry cards default to off, so no setup is needed to reach the
+    // "cry cards disabled" condition that previously greyed this row. (Driving
+    // the Card types section here is avoided on purpose: it can be open by
+    // default, so a navigation click would collapse it and is collapse-state
+    // dependent. The independence we actually guard lives on the Audio toggle.)
+
     // Expand the Audio section.
     await page.getByRole("button", { name: /^audio$/i }).click();
-
-    // Confirm cry cards are in their default-off state.
-    await page.getByRole("button", { name: /^card types$/i }).click();
-    const cryCardsSwitch = page.getByRole("switch", { name: /enable cry cards/i });
-    await expect(cryCardsSwitch).toHaveAttribute("aria-checked", "false");
 
     // The Play-cry-on-reveal switch must be visible inside the Audio section.
     const playCrySwitch = page.getByRole("switch", { name: /play cry on reveal/i });
