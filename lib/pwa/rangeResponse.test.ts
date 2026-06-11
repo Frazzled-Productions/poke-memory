@@ -49,8 +49,11 @@ describe("parseRangeHeader", () => {
     expect(parseRangeHeader("items=0-99", TOTAL)).toBeNull();
   });
 
-  it("returns null for an empty/garbage range", () => {
+  it("returns null for an empty range (bytes=-)", () => {
     expect(parseRangeHeader("bytes=-", TOTAL)).toBeNull();
+  });
+
+  it("returns null for a garbage range value (bytes=abc)", () => {
     expect(parseRangeHeader("bytes=abc", TOTAL)).toBeNull();
   });
 });
