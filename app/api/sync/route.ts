@@ -67,14 +67,15 @@ export async function POST(request: Request) {
   // and suppress the retry UI.
   const BATCH_RETRIES = 3;
   const RETRY_DELAY_MS = 100;
-  const updatedAt = new Date().toISOString();
   let allOk = true;
   let structuralErrorCode: string | null = null;
 
-  outerLoop:
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH).map((r) => ({
-      user_id: user.id,
+  const userId = user.id;
+
+  /** Build a single DB row from a CloudRow, ready for upsert. */
+  function toDbRow(r: CloudRow) {
+    return {
+      user_id: userId,
       card_type: r.card_type,
       subject_key: r.subject_key,
       // Migration 029 field - coalesce absent key to "en" for pre-migration clients
@@ -96,8 +97,17 @@ export async function POST(request: Request) {
       // over an existing true would trip the one-way trigger (migration 017), and
       // omitting lets the DB column retain its current value on conflict.
       ...(r.seen_in_pasture != null ? { seen_in_pasture: r.seen_in_pasture } : {}),
-      updated_at: updatedAt,
-    }));
+      // updated_at is intentionally omitted: INSERT uses DEFAULT now(); UPDATE
+      // uses the card_reviews_set_updated_at_trigger (migration 043). Sending a
+      // server-clock value here (or worse, the client-clock value from the
+      // beacon payload) would override the trigger and defeat the lastPullAt
+      // clock-skew anchor documented in docs/sync.md (F22 / #1856).
+    };
+  }
+
+  outerLoop:
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH).map(toDbRow);
     let batchOk = false;
     for (let attempt = 0; attempt < BATCH_RETRIES; attempt++) {
       try {
@@ -117,6 +127,35 @@ export async function POST(request: Request) {
           structuralErrorCode = error.code;
           allOk = false;
           break outerLoop;
+        }
+        // 23514 = check_violation from the regression trigger. One stale row
+        // in the batch aborts the entire Postgres statement, preventing 199
+        // valid rows from landing. Fall back to per-row upserts so a single
+        // rejected row cannot poison the batch (F23 / #1856).
+        if (error.code === "23514") {
+          let batchHadGoodRow = false;
+          for (const row of batch) {
+            try {
+              const { error: rowError } = await supabase
+                .from("card_reviews")
+                .upsert(row, { onConflict: CARD_REVIEWS_CONFLICT_COLS });
+              if (!rowError) {
+                batchHadGoodRow = true;
+              } else if (rowError.code !== "23514") {
+                // Unexpected error on an individual row - log but continue.
+                console.warn(
+                  `[sync/route] per-row upsert error (SQLSTATE ${rowError.code}): ${rowError.message}`
+                );
+              }
+              // 23514 on an individual row: silently skip (the cloud row is newer).
+            } catch {
+              // Best-effort: per-row network error, skip and continue.
+            }
+          }
+          // Count the batch as ok when at least one row landed; individual
+          // rejections are intentional evictions, not failures.
+          if (batchHadGoodRow) batchOk = true;
+          break; // per-row fallback is its own retry; exit the attempt loop.
         }
       } catch {
         // Network-level error - fall through to retry.

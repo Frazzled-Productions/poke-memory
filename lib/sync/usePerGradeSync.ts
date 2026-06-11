@@ -2,11 +2,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
-import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
+import { pushSingleCard, isSyncSafe, type PushSingleCardResult } from "@/lib/sync/cloud";
 import {
   markPushSucceeded,
   markPushFailed,
   loadSyncStatus,
+  loadPendingQueue,
   savePendingQueue,
   clearPendingQueue,
 } from "@/lib/sync/persistence";
@@ -68,6 +69,49 @@ export function usePerGradeSync(
   // localStorage write.
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // On mount, seed the in-memory queue from any persisted queue left by a
+  // previous session that was force-killed before draining (F2 / #1856).
+  //
+  // Without this, the first fully-successful drain in the new session calls
+  // clearPendingQueue() and silently discards grades that were persisted but
+  // never pushed.
+  //
+  // The reconnect/retry paths (useOnlineReconnectSync, useRetryPush) gate on
+  // lastPushFailed, but a force-killed tab leaves lastPushFailed=false even
+  // when the persisted queue is non-empty, so those paths never fire.
+  //
+  // By seeding pendingQueueRef here, the ordinary enqueueGrade/drainQueue path
+  // picks up and delivers the orphaned grades. The first drain after sign-in
+  // sends them to the cloud and then clears the persisted key.
+  //
+  // Deduplication: the persisted queue was written by the previous session's
+  // usePerGradeSync; it should not overlap with the current (fresh) in-memory
+  // queue (which starts empty on every mount). Replace the in-memory queue
+  // directly rather than merging. If a grade arrives via enqueueGrade before
+  // the effect fires (possible in strict-mode double-invocation), deduplicate
+  // by locale-aware key so the current grade wins.
+  useEffect(() => {
+    if (!client || !userId) return;
+
+    const persisted = loadPendingQueue();
+    if (persisted.length === 0) return;
+
+    const cardLocaleKey = (card: ReviewableCard) => `${card.id}:${card.locale ?? "en"}`;
+    const queue = pendingQueueRef.current;
+
+    if (queue.length === 0) {
+      // Common case: empty in-memory queue - seed directly.
+      pendingQueueRef.current = [...persisted];
+    } else {
+      // Rare: a grade arrived before this effect ran. Merge persisted entries
+      // that are not already in the in-memory queue (in-memory/current wins).
+      const existingKeys = new Set(queue.map(cardLocaleKey));
+      const toAdd = persisted.filter((c) => !existingKeys.has(cardLocaleKey(c)));
+      pendingQueueRef.current = [...queue, ...toAdd];
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, userId]);
+
   // Flush the persist debounce on unmount so the last snapshot is written even
   // if the component tears down before the 500 ms window elapses. Flushing
   // (synchronous write) is preferable to dropping because the queue represents
@@ -126,8 +170,8 @@ export function usePerGradeSync(
     // complexity without a meaningful correctness benefit.
     const results = await Promise.all(
       toSend.map(async (card) => {
-        const ok = await pushSingleCard(c, uid, card);
-        return { card, ok };
+        const result = await pushSingleCard(c, uid, card);
+        return { card, result };
       }),
     );
 
@@ -135,22 +179,39 @@ export function usePerGradeSync(
     // markStructuralSyncError was already called inside pushSingleCard - persist
     // the queue so grades survive and return early. Further drains short-circuit
     // on the structuralSyncError guard above (or attempt a single probe next session).
-    if (loadSyncStatus().structuralSyncError !== null && !results.some((r) => r.ok)) {
+    if (loadSyncStatus().structuralSyncError !== null && !results.some((r) => r.result === "ok")) {
       // At least one card returned a structural error and nothing succeeded.
       savePendingQueue(pendingQueueRef.current);
       return;
     }
 
-    const failedKeys = new Set(results.filter((r) => !r.ok).map((r) => cardLocaleKey(r.card)));
-
-    // Keep a card in the queue if it wasn't part of this drain (a newer grade
-    // arrived during the await window) or if it was sent but failed. If two
-    // concurrent drains both attempted the same card, the queue entry at
-    // filter-time reflects the latest enqueued state - the newest version
-    // survives either way.
-    pendingQueueRef.current = pendingQueueRef.current.filter(
-      (card) => !sentKeys.has(cardLocaleKey(card)) || failedKeys.has(cardLocaleKey(card)),
+    // Cards that the regression trigger rejected (SQLSTATE 23514): the cloud row
+    // is newer by definition; evict them from the queue rather than retrying
+    // forever. Evicted cards are NOT counted as failures for the banner threshold
+    // (F23 / #1856). They are silently dropped - the next pull will bring the
+    // correct cloud state.
+    const rejectedKeys = new Set(
+      results.filter((r) => r.result === "rejected").map((r) => cardLocaleKey(r.card)),
     );
+    // Cards that failed transiently: keep in the queue for the next drain.
+    const failedKeys = new Set(
+      results.filter((r) => r.result === "failed").map((r) => cardLocaleKey(r.card)),
+    );
+
+    // Keep a card in the queue when:
+    //   - its key was NOT in this drain's snapshot (a newer re-grade arrived while
+    //     the await was in flight - F51 fix: compare by locale-aware key, NOT by
+    //     object identity with toSend.includes(), so a replaced entry survives), OR
+    //   - it was sent but failed transiently.
+    // Rejected cards (23514) are evicted: they share a sentKey but are in neither
+    // failedKeys nor the "not sent" set.
+    pendingQueueRef.current = pendingQueueRef.current.filter((card) => {
+      const key = cardLocaleKey(card);
+      if (!sentKeys.has(key)) return true;   // newer re-grade arrived mid-flight
+      if (rejectedKeys.has(key)) return false; // 23514 - evict
+      if (failedKeys.has(key)) return true;    // transient failure - keep
+      return false;                            // succeeded - remove
+    });
 
     // Update lastPushAt once per debounce flush if at least one card succeeded.
     // Called here (not per-card) so concurrent drains produce at most one write
@@ -161,10 +222,17 @@ export function usePerGradeSync(
     // indicator should advance. This differs from the unload path, which
     // flags failure whenever any card failed. See lib/sync/persistence.ts
     // `markPushSucceeded` JSDoc for the full semantics rationale.
-    const anySucceeded = results.some((r) => r.ok);
-    if (anySucceeded) {
+    const anySucceeded = results.some((r) => r.result === "ok");
+    // True when every result was either ok or rejected (no transient failures).
+    // Rejected cards are evicted (the cloud row is newer) so they never re-poison
+    // the queue or count against the failure threshold.
+    const anyTransientlyFailed = results.some((r) => r.result === "failed");
+    if (anySucceeded || (!anyTransientlyFailed && pendingQueueRef.current.length === 0)) {
+      // At least one card reached the cloud, OR every card was either ok or
+      // rejected (evicted) and the queue is now empty. Either way the cloud
+      // made forward progress - clear the failure signal and persist state.
       consecutiveFailuresRef.current = 0;
-      markPushSucceeded();
+      if (anySucceeded) markPushSucceeded();
       // If the queue is now empty every card made it to the cloud - clear the
       // persisted queue so stale data does not accumulate (#893).
       if (pendingQueueRef.current.length === 0) {
@@ -175,9 +243,9 @@ export function usePerGradeSync(
         savePendingQueue(pendingQueueRef.current);
       }
     } else {
-      // All cards failed this drain. Increment the consecutive-failure counter
-      // and surface the banner after FAILURE_THRESHOLD attempts (#606). A single
-      // network blip should not show the banner; three consecutive all-failure
+      // All cards failed this drain transiently. Increment the consecutive-failure
+      // counter and surface the banner after FAILURE_THRESHOLD attempts (#606). A
+      // single network blip should not show the banner; three consecutive all-failure
       // drains strongly suggests the push channel is broken.
       //
       // Use === (not >=) so markPushFailed fires exactly once per failure

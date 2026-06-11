@@ -152,6 +152,19 @@ describe("clearLocalProgress", () => {
     expect(await idbGet("migration_done_v1")).toBeNull();
   });
 
+  it("preserves poke-memory:user-archive:* keys belonging to other accounts (F56 / #1856)", async () => {
+    // Simulate a shared device: user-A has an archived blob, user-B resets their own progress.
+    stubLocalStorage.setItem("poke-memory:user-archive:user-a", '{"cards":[]}');
+    stubLocalStorage.setItem("poke-memory:streak", "5");
+
+    await clearLocalProgress();
+
+    // The archive key for another user must survive - it is not a progress reset.
+    expect(stubLocalStorage.getItem("poke-memory:user-archive:user-a")).toBe('{"cards":[]}');
+    // Non-archive progress is still removed.
+    expect(stubLocalStorage.getItem("poke-memory:streak")).toBeNull();
+  });
+
   it("dispatches synthetic StorageEvents for both the session and grade-log keys", async () => {
     await clearLocalProgress();
     const keys = events.map((e) => e.key);

@@ -190,29 +190,46 @@ describe("pushSingleCard", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
-  it("returns false without calling upsert for an unsafe card", async () => {
+  it("returns 'failed' without calling upsert for an unsafe card", async () => {
     const client = makeSupabaseClient();
     const unsafeCard = makeCard(7, "2026-05-10", null);
 
     const result = await pushSingleCard(client, "user-1", unsafeCard);
-    expect(result).toBe(false);
+    expect(result).toBe("failed");
     expect(client._upsertSpy).not.toHaveBeenCalled();
   });
 
-  it("warns when an unsafe card is rejected", async () => {
+  it("warns when an unsafe card is skipped", async () => {
     const client = makeSupabaseClient();
     await pushSingleCard(client, "user-1", makeCard(7, "2026-05-10", null));
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("7"));
   });
 
-  it("calls upsert and returns true for a safe card", async () => {
+  it("calls upsert and returns 'ok' for a safe card", async () => {
     const client = makeSupabaseClient();
     const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
 
     const result = await pushSingleCard(client, "user-1", safeCard);
 
-    expect(result).toBe(true);
+    expect(result).toBe("ok");
     expect(client._upsertSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 'rejected' and does not set structural error when upsert returns 23514", async () => {
+    const client = makeSupabaseClient({ code: "23514", message: "check constraint violation", details: "", hint: "" });
+    const safeCard = makeCard(11, "2026-05-10", "2026-05-10");
+
+    const result = await pushSingleCard(client, "user-1", safeCard);
+
+    expect(result).toBe("rejected");
+  });
+
+  it("does not include updated_at in the upsert payload (server trigger handles it)", async () => {
+    const client = makeSupabaseClient();
+    const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
+    await pushSingleCard(client, "user-1", safeCard);
+    const [rowArg] = client._upsertSpy.mock.calls[0] as [Record<string, unknown>, unknown];
+    expect(rowArg).not.toHaveProperty("updated_at");
   });
 
   it("upsert uses (user_id, card_type, subject_key, locale) as the conflict target (#1259)", async () => {
@@ -396,7 +413,7 @@ describe("hidden_since (#333) round-trip", () => {
     const client = makeSupabaseClient();
     const card = makeCard(13, "2026-05-01", "2026-05-08", "2026-05-09");
     const ok = await pushSingleCard(client, "user-1", card);
-    expect(ok).toBe(true);
+    expect(ok).toBe("ok");
     const [row] = client._upsertSpy.mock.calls[0] as [
       { card_type: string; subject_key: string; hidden_since: string | null },
       unknown,
@@ -457,7 +474,7 @@ describe("seen_in_pasture (#350) round-trip", () => {
     const client = makeSupabaseClient();
     const card = makeCard(33, "2026-05-01", "2026-05-08", null, true);
     const ok = await pushSingleCard(client, "user-1", card);
-    expect(ok).toBe(true);
+    expect(ok).toBe("ok");
     const [row] = client._upsertSpy.mock.calls[0] as [
       { seen_in_pasture: boolean },
       unknown,
@@ -1115,7 +1132,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
 
     const result = await pushSingleCard(client, "user-1", card);
 
-    expect(result).toBe(false);
+    expect(result).toBe("failed");
     expect(markStructuralSyncError).toHaveBeenCalledWith("42P10");
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining("42P10")
@@ -1150,7 +1167,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
 
     const result = await pushSingleCard(client, "user-1", card);
 
-    expect(result).toBe(false);
+    expect(result).toBe("failed");
     expect(markStructuralSyncError).not.toHaveBeenCalled();
   });
 
@@ -1169,7 +1186,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
 
     const result = await pushSingleCard(client, "user-1", card);
 
-    expect(result).toBe(true);
+    expect(result).toBe("ok");
     expect(clearStructuralSyncError).toHaveBeenCalledTimes(1);
     expect(markStructuralSyncError).not.toHaveBeenCalled();
   });

@@ -114,7 +114,11 @@ export function useOnlineReconnectSync(
 
           const failedCards = persistedQueue.filter((_, i) => {
             const r = queueResults[i];
-            return r.status === "rejected" || (r.status === "fulfilled" && !r.value);
+            // "rejected" (Promise rejected) or "failed" (tri-state from pushSingleCard)
+            // both warrant a retry. "rejected" (23514) is evicted - cloud row is newer.
+            if (r.status === "rejected") return true;
+            if (r.status !== "fulfilled") return false;
+            return r.value === "failed";
           });
 
           if (failedCards.length > 0) {
@@ -163,7 +167,7 @@ export function useOnlineReconnectSync(
         );
 
         const anyFailed = results.some(
-          (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value),
+          (r) => r.status === "rejected" || (r.status === "fulfilled" && r.value === "failed"),
         );
 
         if (anyFailed) {

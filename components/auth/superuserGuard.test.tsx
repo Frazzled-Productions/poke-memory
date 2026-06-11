@@ -241,7 +241,7 @@ import { pushSingleCard } from "@/lib/sync/cloud";
 describe("usePerGradeSync - null guard (ReviewSession superuser path)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(pushSingleCard).mockResolvedValue(true);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
   });
 
   it("does not push when client is null (flag on → syncClient = null)", async () => {

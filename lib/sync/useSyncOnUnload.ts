@@ -171,8 +171,13 @@ export function useSyncOnUnload(
         } catch {
           // Network blip, abort, or page torn down before fetch resolved.
           // Treat as failure so the next page mount retries.
+          //
+          // Re-read rather than spreading stale `prev` so concurrent writes
+          // (e.g. pullAndMerge updating lastPullAt, or a push drain updating
+          // structuralSyncError) are not clobbered (F33 / #1856). Mirror the
+          // success path above which already uses loadSyncStatus().
           saveSyncStatus({
-            ...prev,
+            ...loadSyncStatus(),
             lastPushAttemptAt: now,
             lastPushFailed: true,
             failedCardCount: unsynced.length,

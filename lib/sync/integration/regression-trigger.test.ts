@@ -718,4 +718,52 @@ describe("regression trigger (integration)", () => {
       client.release();
     }
   });
+
+  it("card_reviews_set_updated_at_trigger (migration 043) stamps updated_at server-side regardless of client value", async () => {
+    // F22 / #1856: client-sent updated_at values must be overridden by the
+    // server trigger so the lastPullAt clock-skew anchor is always authoritative.
+    //
+    // The test sends a deliberately stale past timestamp in the UPDATE clause.
+    // The trigger (BEFORE UPDATE) overwrites it with now(), so the stored value
+    // must be within the test-run window, not equal to the client-sent constant.
+    const CLIENT_SENT_TS = "2020-01-01T00:00:00.000Z";
+
+    await pool.query(
+      `INSERT INTO card_reviews
+         (user_id, card_type, subject_key,
+          stability, difficulty, elapsed_days, scheduled_days,
+          reps, lapses, fsrs_state,
+          due_date, last_review, first_seen,
+          seen_in_pasture, updated_at)
+       VALUES ($1, 'name', '600',
+               2.0, 5.0, 1, 3,
+               2, 0, 'review',
+               current_date + 3, current_date, current_date,
+               false, now())`,
+      [USER_ID],
+    );
+
+    const beforeUpdate = new Date();
+    // Attempt to SET updated_at to a past value - the trigger must override it.
+    await pool.query(
+      `UPDATE card_reviews
+       SET reps = 3, updated_at = $1
+       WHERE user_id = $2 AND card_type = 'name' AND subject_key = '600'`,
+      [CLIENT_SENT_TS, USER_ID],
+    );
+    const afterUpdate = new Date();
+
+    const { rows } = await pool.query(
+      `SELECT updated_at FROM card_reviews
+       WHERE user_id = $1 AND card_type = 'name' AND subject_key = '600'`,
+      [USER_ID],
+    );
+    expect(rows).toHaveLength(1);
+    const storedAt = (rows[0].updated_at as Date).getTime();
+
+    // Must be in the test-run window, NOT the stale past value.
+    expect(storedAt).toBeGreaterThanOrEqual(beforeUpdate.getTime() - 1000);
+    expect(storedAt).toBeLessThanOrEqual(afterUpdate.getTime() + 1000);
+    expect((rows[0].updated_at as Date).toISOString()).not.toBe(CLIENT_SENT_TS);
+  });
 });
