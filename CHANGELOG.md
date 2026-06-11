@@ -6,6 +6,68 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.4] - 2026-06-11
+
+### Changed
+
+- Discord bug-report notifications now include a capped preview (up to 500 characters) of the feedback message, fetched route-side by id rather than via the pg_net trigger payload. The trigger payload and forbidden-fields guard are unchanged. Privacy notice, DPIA, and Children's Code assessment updated to record the Discord data flow.
+
+### Fixed
+
+- Fix Higher-or-Lower Next/Play-again button pushed below the fold on mobile: adopt the flex-1 min-h-0 shrinkable sprite row plus flex-none pinned footer layout so the action button is always visible without scrolling, and remove the scrollIntoView workaround from #1447.
+- Offline pack download now checks available storage headroom (via `navigator.storage.estimate()`) before starting, comparing it against the pack's expected size plus a buffer for concurrent progress saves. When space is tight a low-storage warning appears with "Cancel" and "Download anyway" options, instead of silently filling the origin quota and disrupting card-progress saves. If the Storage API is unavailable the download proceeds as before.
+- Lifted the "Send feedback" entry to the top of Settings (above all accordions) so it is reachable without scrolling (#1849). The buried bottom link has been removed.
+- Added feedback/bug/report/contact/support synonyms to the Settings search index so searching "feedback", "bug", or "report" surfaces the entry (#1849).
+- Added an optional "Which page is this about?" selector to the feedback form; the stored page now reflects the user-stated route (or null), so the Discord bug notification no longer shows a constant "Page: /settings" (#1847).
+- Account switch now clears the previous user's IndexedDB review session and grade log, so their progress can no longer blend into the next signed-in account on a shared device.
+- Mastery badges can now be earned in every learning language: badge checks, the Stats mastery and struggling panels, the per-game breakdown, the Journey timeline and close-to-mastery list, and the favourite-theme unlock all follow your active Pokémon-name language instead of silently evaluating English-only progress.
+- The "I already know these" onboarding quiz no longer double-grades species when more than one learning language is enrolled, and its grades now sync with the correct language.
+- Journey evolution wall now shows Pokémon names in your chosen Pokémon-name language (Japanese, Simplified Chinese, Traditional Chinese) instead of always showing English names. Image alt text and edge aria-labels are updated to match.
+- Stats "Struggling cards" list now resolves locale names via the locale-aware hook; the speciesId field was missing from StrugglingCard, preventing the hook from being called at all.
+- Higher-or-Lower minigame tiles now display localised Pokémon names instead of raw English seed names.
+- Pokédex and Pasture search now matches the locale name and transliteration (rōmaji for Japanese, pinyin for Chinese) as well as the English name, so searching by the name visible on screen works for all supported locales.
+- Pokédex alphabetical sort now uses the displayed locale name with an appropriate collator instead of sorting by invisible English strings.
+- Streak days and grade-log entries are now recorded in your timezone, so evening reviews no longer land on the wrong day, phantom gaps no longer break streaks or auto-spend protection tokens, and the Stats charts count today's reviews immediately.
+- Date displays no longer shift one day late for UTC+13/+14 timezones, the due-forecast axis labels now match their tooltips everywhere west of UTC, and the Stats history windows no longer skip a date across DST changes.
+- Closed six superuser write-guard gaps: sign-in callback no longer uploads QA-seeded cards; Pasture mark-seen respects the guard; Settings regional-prefs pushes are suppressed while any flag is on; a persisted cleanup-pending marker keeps writes suppressed throughout `exitCleanup` so a degraded pull cannot allow seeded data to reach Supabase; the guest destructive reset now clears all seeded state (streak, protection tokens, grade log, mastered-count cache) via `clearSeedScenario`; the QA-seed active indicator now survives a cancelled or failed cleanup; and the Cmd/Ctrl+Z undo handler captures the current guard value rather than a stale closure.
+- GDPR data export now paginates the grade_log fetch, ensuring users with more than 1000 reviews receive a complete export (previously silently truncated at the PostgREST 1000-row cap).
+- `pullGradeLog` and `pullStreak` paginate to completion so a fresh device always receives the full review history and streak history rather than only the oldest 1000 rows.
+- The daily push notification route paginates the due-card query and adds an ORDER BY for deterministic offset pagination, preventing large backlogs from being miscounted or skipped.
+- The FSRS optimiser fetches the full grade log rather than only the oldest 1000 rows, so personalised weights reflect the user's complete review history.
+- A shared `fetchAllPages` helper (`lib/sync/paginatedFetch.ts`) provides a tested, client-agnostic pagination loop so future queries do not silently re-introduce the cap.
+- Offline grades from a force-killed tab are no longer silently discarded: the persisted queue is rehydrated on the next session and pushed to the cloud.
+- A card rejected by the regression trigger (SQLSTATE 23514) is now evicted from the retry queue instead of being retried forever and poisoning the unload beacon batch.
+- `updated_at` on `card_reviews` is now stamped server-side by a `BEFORE UPDATE` trigger (migration 043) so the `lastPullAt` clock-skew anchor is always authoritative regardless of the pushing device's clock.
+- `pullAndMerge` and the `useSyncOnUnload` catch path re-read the current sync status immediately before writing, preventing concurrent legs from clobbering each other's fields.
+- Re-grading the same card while a push is in flight no longer causes the newer re-grade to be silently dropped from the queue.
+- `clearLocalProgress` no longer sweeps other users' archived state on a shared device.
+- Seed pipeline: `flattenChain` now picks the region-tagged evolution detail (fixing silent omission of Alolan, Galarian, Hisuian, and Paldean form-aware evolution edges); `buildVarietiesLookup` keys by regional prefix so multi-segment slugs (e.g. "galar-standard") resolve correctly.
+- Seed pipeline: a failed evolution-chain fetch now exits the seed run immediately rather than persisting an empty chain; `validateShards` asserts at least one form-aware edge (id > 10000) and, when prior chain data is supplied, that no previously non-empty chain has become empty.
+- Seed pipeline: 429 rate-limit responses are now retried with backoff (previously immediately fatal, causing silent species drops); `validateSpeciesIds` checks set membership so a dropped species is detected even when new species arrive in the same run.
+- Seed pipeline: `writeSplitSeedFiles` now writes `generated-core.json` and `generated-chains.json` to `public/pokemon-data/` as well as `lib/pokemon/` (mirroring the existing flavor/locale-names dual-write); `validateShardParity` asserts byte-equality of all four shards between both directories.
+- Seed validator: flavour-shard check now only requires records with non-empty `flavorTexts` in `generated.json` to appear in the shard, preventing a false-positive failure on freshly-backfilled flavourless species.
+- Service worker no longer caches authenticated `/api/**` responses: the GDPR export CSV can no longer persist in Cache Storage after sign-out or be served to a different account.
+- SKIP_WAITING multi-tab gate now uses `REQUEST_SKIP_WAITING` so Serwist's unconditional built-in listener cannot bypass it, and queries `includeUncontrolled:true` so the client count is accurate for a waiting worker.
+- Push toggle now reconciles against the server on mount: an orphaned subscription (server row deleted after a 410) is re-inserted automatically or the toggle is flipped off so the user knows reminders have stopped.
+- F7: cry auto-play effect now fires only when the displayed card's id changes, not on every grade that updates the cards array
+- F10: typed-entry normaliser folds U+2018/U+2019 typographic apostrophes to ASCII and strips ♀/♂, so Farfetch'd, Sirfetch'd, Nidoran♀ and Nidoran♂ can now be graded Good
+- F19: forgetting-horizon projection now anchors on lastReview instead of dueDate, fixing the double-interval overestimate
+- F28+F32: /api/feedback now rate-limits via check_rate_limit RPC and caps page/appVersion fields to 300 chars
+- F29: /api/srs/optimize pre-stamps an in-progress marker before the CPU-heavy fit, closing the concurrent-request window (migration-free)
+- F36: TTS speakName now threads the active pokemonNameLocale into the utterance lang and voice selection, and skips English MP3s for non-English locales
+- F40: MasteryOverTimeChart tooltip now formats dates via the user's date format preference; formatXTick helper hoisted to formatChartDate in lib/utils/format-date.ts (shared with ActivityHistoryChart)
+- F41: five inlined Tailwind literals replaced with class-name constants (mutedTextXs, mutedText, pageTitle)
+- F44: saveSettings now falls back to pokemonNameLocale when activePokemonNameLocale is absent, preserving locale enrolment from pre-#1484 backups
+- F48: future-direction forgotten pill now counts relative to the projectable population (trackedCount) rather than totalSpecies (~1025)
+- F53: robots.txt Disallow rule for /audit-themes no longer has a trailing slash, correctly matching the route
+- F59: pretendAllMastered past overlay now synthesises events before the earliest checkpoint so all past snapshots show the full mastered count
+- Theme unlock and the applied-favourite check now use the same species-level mastery rule as the Pasture and Stats (both the name and reverse legs, mastered in any enrolled locale), instead of unlocking on the name card alone. Already-applied favourites are grandfathered and kept.
+- Feedback submission no longer fails with 429/500 for all users: added 'feedback' action to check_rate_limit (migration 045) and made the route fail-open on RPC errors rather than treating them as rate-limit blocks (#1883)
+
+### Security
+
+- Drop the dead `usernames_select_public` RLS policy; all username rows are no longer publicly readable via PostgREST now that the sign-up/sign-in path runs entirely through Server Actions.
+
 ## [0.11.3] - 2026-06-10
 
 ### Added
@@ -1734,7 +1796,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.3...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.4...HEAD
+[0.11.4]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.4
 [0.11.3]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.3
 [0.11.2]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.2
 [0.11.1]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.1
