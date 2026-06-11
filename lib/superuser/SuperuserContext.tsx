@@ -225,7 +225,12 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
     const favourite = loadFavourite();
     if (favourite === null) return;
     const cards = (await loadSession())?.cards ?? [];
-    if (!isFavouriteEarned(favourite, cards)) {
+    // Use species-level mastery (both legs, any enrolled locale) for the
+    // exit-cleanup check (#1865). forceAllMastered is false here by design:
+    // this runs after the flag-off transition, so cheat-selected themes that
+    // are not genuinely earned are wiped. learningLocales always includes "en".
+    const { learningLocales } = loadSettings();
+    if (!isFavouriteEarned(favourite, cards, false, learningLocales)) {
       // `saveFavourite` → `saveSettings` already fires `SETTINGS_SAVED_EVENT`,
       // which `FavouriteThemeProvider` listens for - no synthetic StorageEvent
       // is needed for same-tab refresh.

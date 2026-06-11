@@ -127,10 +127,14 @@ vi.mock("@/components/theme/FavouriteThemeProvider", () => ({
   useFavourite: () => ({ updateFavourite: vi.fn() }),
 }));
 
-vi.mock("@/lib/theme/persistence", () => ({
-  loadFavourite: vi.fn(() => null),
-  saveFavourite: vi.fn(),
-}));
+vi.mock("@/lib/theme/persistence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/theme/persistence")>();
+  return {
+    ...actual,
+    loadFavourite: vi.fn(() => null),
+    saveFavourite: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/gradelog/persistence", () => ({
   loadGradeLog: vi.fn().mockResolvedValue([]),
@@ -431,6 +435,7 @@ function defaultSettings() {
     typedEntryOnboardingShown: false,
     mcCardOnboardingShown: false,
     labsFlags: {},
+    learningLocales: ["en"] as AppLocale[],
     removedLocales: [] as AppLocale[],
     pokemonNameLocale: "en" as const,
     pushNotificationHour: null,
@@ -1153,7 +1158,7 @@ describe("SettingsPage - theme picker locked state (#1440)", () => {
   }
 
   it("shows locked-state message when no Pokémon are mastered", async () => {
-    // loadSession returns null → cardStateById is empty → unlockedEntries is empty
+    // loadSession returns null → sessionCards is empty → masteredSpeciesUnion returns empty set → unlockedEntries empty
     mockLoadSession.mockResolvedValue(null);
 
     await renderAndWait();
@@ -1182,8 +1187,8 @@ describe("SettingsPage - theme picker locked state (#1440)", () => {
   it("pretendAllMastered on: picker grid renders, locked message absent", async () => {
     // The superuser flag forces unlockedEntries to include every CURATED_POKEMON
     // entry (the real, non-empty curated list), so the locked branch is skipped.
-    // This exercises the actual `flags.pretendAllMastered || isMastered(...)`
-    // guard in the component, not just catalogue-key presence.
+    // This exercises the actual `flags.pretendAllMastered` short-circuit in the
+    // component's masteredSpeciesUnion call, not just catalogue-key presence.
     mockLoadSession.mockResolvedValue(null);
     mockSuperuserFlags.pretendAllMastered = true;
     try {
