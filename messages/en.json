@@ -633,7 +633,7 @@
       "backToSummary": "← Summary",
       "backToSummaryAriaLabel": "Back to session summary",
       "barStreakAriaLabel": "{count, plural, one {# day streak} other {# days streak}}",
-      "barDueTomorrow": "{count, plural, one {# tomorrow} other {# tomorrow}}",
+      "barDueTomorrow": "{count} tomorrow",
       "barDueTomorrowAriaLabel": "{count, plural, one {# card due tomorrow} other {# cards due tomorrow}}"
     },
     "typedEntry": {

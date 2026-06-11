@@ -5000,6 +5000,68 @@ describe("Higher-or-Lower launch-from-summary redesign (#1882)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("game-entry / back flow works when a Scope filter is applied (non-empty practiceScope)", async () => {
+    // Regression coverage for the scoped end-state: #1837 identified filtered
+    // sessions as the worst-case layout scenario, and the issue body lists
+    // "tested in the filtered end state (Scope applied)" as an AC.
+    // Both Bulbasaur (speciesId 1) and Ivysaur (speciesId 2) are Gen I, so
+    // gens:[1] keeps them in scope and produces an enabled entry button.
+    const ivysaur = FIXTURE_CARDS_4[1];
+    mockSeedPokemon.mockReturnValue([FIXTURE_CARD, ivysaur]);
+    mockLoadSettings.mockReturnValue({
+      ...baseSettings,
+      practiceScope: { gens: [1], types: [], presets: [] },
+    });
+
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [
+        { ...FIXTURE_CARD, state: { ...seenGraduatedState } },
+        { ...ivysaur, state: { ...seenGraduatedState } },
+        GRADUATED_REVERSE_CARD,
+        graduatedReverseIvysaur,
+      ],
+      limits: DEFAULT_LIMITS,
+    });
+
+    const user = userEvent.setup();
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
+    );
+
+    // Entry button is enabled despite the scope filter.
+    const entryBtn = screen.getByRole("button", { name: /play higher or lower/i });
+    expect(entryBtn).not.toBeDisabled();
+
+    // Game region is not yet shown.
+    expect(
+      screen.queryByRole("region", { name: /higher or lower mini-game/i }),
+    ).not.toBeInTheDocument();
+
+    // Enter the game.
+    await user.click(entryBtn);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("region", { name: /higher or lower mini-game/i }),
+      ).toBeInTheDocument(),
+    );
+
+    // Back returns to the full summary.
+    await user.click(screen.getByRole("button", { name: /back to session summary/i }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("region", { name: /higher or lower mini-game/i }),
+      ).not.toBeInTheDocument(),
+    );
+
+    expect(
+      screen.getByRole("button", { name: /play higher or lower/i }),
+    ).toBeInTheDocument();
+  });
+
   it("renders the entry button in Japanese when the app locale is Japanese", async () => {
     // Locale check: the Japanese play-button label ("ハイ・ロー勝負") must render.
     // Uses two seen species so the button is enabled (same fixture as test 1).

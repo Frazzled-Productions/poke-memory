@@ -112,20 +112,13 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight, buttonRef }: Pok
 type Props = {
   seenPokemon: SeedPokemon[];
   /**
-   * When true, the game renders without the top border-separator and outer
-   * top padding that were used in the old stacked-below-summary layout (#1837).
-   * Set to true when the game occupies its own view in the card position (#1882).
-   * Defaults false to preserve backward compatibility.
-   */
-  standalone?: boolean;
-  /**
    * Optional ref forwarded to the first (left) tile button so the parent can
    * move focus to it when entering the game view (#1882).
    */
   firstTileRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
-export function HigherOrLowerGame({ seenPokemon, standalone = false, firstTileRef }: Props) {
+export function HigherOrLowerGame({ seenPokemon, firstTileRef }: Props) {
   const t = useTranslations("review");
   const [pair, setPair] = useState<Pair | null>(null);
   const [phase, setPhase] = useState<Phase>("picking");
@@ -232,14 +225,9 @@ export function HigherOrLowerGame({ seenPokemon, standalone = false, firstTileRe
   }
 
   return (
-    /* When standalone=true (game in its own card-position view, #1882): no
-       border-t or top padding - the highlights bar above provides visual
-       separation.
-       When standalone=false (legacy stacked layout, #1837): border-t and pt-4
-       separate the game from the EndOfSessionScreen content above it. */
     <section
       aria-label={t("higherOrLower.sectionAriaLabel")}
-      className={`flex flex-col flex-1 min-h-0 w-full max-w-sm mx-auto${standalone ? "" : " pt-4 border-t border-zinc-200 dark:border-zinc-800"}`}
+      className="flex flex-col flex-1 min-h-0 w-full max-w-sm mx-auto"
     >
       {/* flex-none: streak/best counters always visible, do not shrink. */}
       <div className={`flex-none flex justify-between w-full ${mutedTextXs} tabular-nums mb-3`}>

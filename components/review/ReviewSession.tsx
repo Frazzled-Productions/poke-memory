@@ -1046,6 +1046,9 @@ export function ReviewSession() {
     return () => clearTimeout(id);
     // showGame is the only dep: we only want to move focus on toggle, not on
     // every render. The refs are stable objects (never reassigned).
+    // On initial mount showGame=false, so the else branch fires — but
+    // showGameButtonRef.current is null at that point (the summary hasn't
+    // rendered yet), making the optional-chain a safe no-op.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showGame]);
 
@@ -2220,15 +2223,13 @@ export function ReviewSession() {
           </div>
 
           {/* Game in card position: flex-1 min-h-0 mirrors ReviewCardLayout's
-              shrinkable card region. standalone=true removes the border-t/pt-4
-              separator that was used in the old stacked layout (#1837/#1882).
-              The highlights bar above provides visual separation.
+              shrinkable card region. The highlights bar above provides visual
+              separation (no border-t/pt-4 needed).
               USER-DECISION: bar is flex-none at the top (not sticky), consistent
               with the #1837 overflow model - the game content scrolls within
               its flex-1 region without the bar floating over it. */}
           <HigherOrLowerGame
             seenPokemon={seenPokemon}
-            standalone={true}
             firstTileRef={firstTileRef}
           />
           {badgeToastSlot}
@@ -2291,7 +2292,6 @@ export function ReviewSession() {
                     ? tReview("higherOrLower.playButtonDisabledAriaLabel")
                     : tReview("higherOrLower.playButtonAriaLabel")
                 }
-                aria-disabled={gameEntryState === "disabled" ? true : undefined}
                 onClick={gameEntryState === "enabled" ? () => setShowGame(true) : undefined}
                 className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >

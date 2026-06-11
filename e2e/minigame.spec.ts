@@ -322,9 +322,8 @@ test.describe("Higher-or-Lower mini-game", () => {
     // Regression test: the bottom tab bar and header nav links were
     // unresponsive on the all-caught-up screen, because the end-of-session
     // container lacked flex-1/overflow-y-auto and caused the body to scroll.
-    // After #1882 the game no longer auto-renders - the summary shows the
-    // "Play Higher or Lower" entry button instead, so this test asserts nav
-    // works on the summary view (before entering the game).
+    // Exercises both the summary view and the game view, since the game uses
+    // overflow-hidden (the same container model that caused the original bug).
     await seedSessionIdb(page, buildCompletedSession({
       pokemonIds: SEED_POKEMON_IDS,
       evolutionCardIds: EVOLUTION_CARD_IDS,
@@ -334,15 +333,24 @@ test.describe("Higher-or-Lower mini-game", () => {
 
     await expect(page.getByText("All caught up!")).toBeVisible();
 
-    // The "Play Higher or Lower" button being visible confirms the end-of-session
-    // layout rendered correctly (the game is behind the entry button after #1882).
+    // --- Summary view: nav must be accessible before entering the game ---
     await expect(
       page.getByRole("button", { name: /play higher or lower/i }),
     ).toBeVisible();
 
-    // The Stats nav link must be clickable - not blocked by any overlay or scroll state.
     const statsLink = page.getByRole("navigation").getByRole("link", { name: "Stats" }).first();
     await statsLink.click();
+    await expect(page).toHaveURL("/stats");
+
+    // --- Game view: nav must also be accessible after entering the game ---
+    // Navigate back and enter the game view to verify the overflow-hidden
+    // container does not block the nav links.
+    await page.goBack();
+    await expect(page.getByText("All caught up!")).toBeVisible();
+    await enterGame(page);
+
+    const statsLinkInGame = page.getByRole("navigation").getByRole("link", { name: "Stats" }).first();
+    await statsLinkInGame.click();
     await expect(page).toHaveURL("/stats");
   });
 });
