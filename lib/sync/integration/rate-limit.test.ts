@@ -25,6 +25,7 @@ import {
 import { applyMigrations } from "./applyMigrations";
 import pg from "pg";
 import { createHash } from "node:crypto";
+import { RATE_LIMIT_ACTIONS } from "../../auth/rateLimitIp";
 
 const { Pool } = pg;
 
@@ -323,4 +324,40 @@ describe("rate_limit_buckets + check_rate_limit RPC (integration)", () => {
       ),
     ).resolves.not.toThrow();
   });
+});
+
+// ---------------------------------------------------------------------------
+// Code↔DB contract fitness test (#1883)
+//
+// This block iterates RATE_LIMIT_ACTIONS (the single source of truth in
+// lib/auth/rateLimitIp.ts) and asserts that EACH action is known to both:
+//   1. The check_rate_limit RPC (the function returns true, not an exception).
+//   2. The rate_limit_buckets_action_check constraint (a direct INSERT succeeds).
+//
+// Adding a new action to RATE_LIMIT_ACTIONS without a migration that teaches
+// the function and constraint will make this test fail in CI's integration job,
+// preventing the broken code from reaching production. This is the same
+// contract-fitness pattern as the #1356 onConflict↔PK parity test.
+// ---------------------------------------------------------------------------
+
+describe("RATE_LIMIT_ACTIONS code↔DB contract (fitness test)", () => {
+  for (const action of RATE_LIMIT_ACTIONS) {
+    it(`check_rate_limit accepts action="${action}" and returns true (under cap)`, async () => {
+      const hash = testHash(`ip-contract-rpc-${action}`);
+      // Must not throw (unknown action raises an exception) and must return true.
+      const allowed = await callRpc(adminPool, hash, action);
+      expect(allowed).toBe(true);
+    });
+
+    it(`rate_limit_buckets CHECK constraint permits action="${action}"`, async () => {
+      const hash = testHash(`ip-contract-constraint-${action}`);
+      // A direct INSERT must succeed: proves the constraint knows this action.
+      await expect(
+        adminPool.query(
+          `INSERT INTO public.rate_limit_buckets (ip_hash, action) VALUES ($1, $2)`,
+          [hash, action],
+        ),
+      ).resolves.not.toThrow();
+    });
+  }
 });

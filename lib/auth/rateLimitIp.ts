@@ -13,6 +13,21 @@
 import { createHash } from "node:crypto";
 
 /**
+ * Canonical list of action strings accepted by the check_rate_limit RPC and
+ * the rate_limit_buckets_action_check constraint in the DB.
+ *
+ * SINGLE SOURCE OF TRUTH - keeping this in sync with the DB is enforced by
+ * lib/sync/integration/rate-limit.test.ts, which iterates this list and calls
+ * the real RPC against a local Postgres container for each action. Adding a
+ * value here without a companion migration (that teaches the function + CHECK
+ * constraint) will make the integration test fail. (#1883)
+ */
+export const RATE_LIMIT_ACTIONS = ["signup", "signin", "feedback"] as const;
+
+/** A value accepted by the check_rate_limit RPC. */
+export type RateLimitAction = (typeof RATE_LIMIT_ACTIONS)[number];
+
+/**
  * Returns a 64-character lowercase hex sha256 digest of (salt + rawIp).
  * The digest format matches the CHECK constraint on rate_limit_buckets.ip_hash.
  *

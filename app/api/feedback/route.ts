@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { hashIp } from "@/lib/auth/rateLimitIp";
+import type { RateLimitAction } from "@/lib/auth/rateLimitIp";
 
 /**
  * POST /api/feedback (#1621)
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: rlAllowed, error: rlError } = await (rateLimitSupabase as any).rpc(
         "check_rate_limit",
-        { p_ip_hash: ipHash, p_action: "feedback" },
+        { p_ip_hash: ipHash, p_action: "feedback" as RateLimitAction },
       );
       if (rlAllowed === false) {
         return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
