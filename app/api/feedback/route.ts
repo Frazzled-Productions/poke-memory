@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { hashIp } from "@/lib/auth/rateLimitIp";
+import type { RateLimitAction } from "@/lib/auth/rateLimitIp";
 
 /**
  * POST /api/feedback (#1621)
@@ -103,14 +104,19 @@ export async function POST(request: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: rlAllowed, error: rlError } = await (rateLimitSupabase as any).rpc(
         "check_rate_limit",
-        { p_ip_hash: ipHash, p_action: "feedback" },
+        { p_ip_hash: ipHash, p_action: "feedback" as RateLimitAction },
       );
-      if (rlError || rlAllowed === false) {
+      if (rlAllowed === false) {
         return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
       }
+      if (rlError) {
+        // Rate-limit check failure is non-fatal: log and continue so the endpoint
+        // stays available when the RPC is transiently unavailable (e.g. unknown
+        // action branch not yet deployed). Only an explicit false blocks the request.
+        console.warn("[feedback] rate-limit check error, proceeding", rlError);
+      }
     } catch {
-      // Rate-limit check failure is non-fatal: log and continue so the endpoint
-      // stays available when the RPC is transiently unavailable.
+      // Unexpected throw (e.g. network error) - also non-fatal.
       console.warn("[feedback] rate-limit check failed, proceeding");
     }
   }

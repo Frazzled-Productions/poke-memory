@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { AuthProvider } from "./types";
 import { normaliseUsername, validateUsername, syntheticEmail, MIN_PASSWORD_LENGTH } from "./username";
 import { hashIp } from "./rateLimitIp";
+import type { RateLimitAction } from "./rateLimitIp";
 
 export async function signIn(provider: AuthProvider) {
   if (provider !== "github" && provider !== "google") redirect("/");
@@ -75,7 +76,7 @@ export async function signUpWithUsername(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: rlAllowed, error: rlError } = await (supabase as any).rpc(
     "check_rate_limit",
-    { p_ip_hash: ipHash, p_action: "signup" },
+    { p_ip_hash: ipHash, p_action: "signup" as RateLimitAction },
   );
   if (rlError || rlAllowed === false) {
     return { ok: false, error: "rate_limited" };
@@ -198,7 +199,7 @@ export async function signInWithUsername(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: rlAllowed, error: rlError } = await (supabase as any).rpc(
     "check_rate_limit",
-    { p_ip_hash: ipHash, p_action: "signin" },
+    { p_ip_hash: ipHash, p_action: "signin" as RateLimitAction },
   );
   if (rlError || rlAllowed === false) {
     return { ok: false, error: "rate_limited" };

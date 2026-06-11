@@ -25,6 +25,7 @@ import {
 import { applyMigrations } from "./applyMigrations";
 import pg from "pg";
 import { createHash } from "node:crypto";
+import { RATE_LIMIT_ACTIONS } from "../../auth/rateLimitIp";
 
 const { Pool } = pg;
 
@@ -270,4 +271,93 @@ describe("rate_limit_buckets + check_rate_limit RPC (integration)", () => {
       await rlsPool.end();
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // 'feedback' action (migration 045, #1883)
+  // ---------------------------------------------------------------------------
+
+  it("returns true for the first feedback attempt (under cap)", async () => {
+    const hash = testHash("ip-feedback-first");
+    const allowed = await callRpc(adminPool, hash, "feedback");
+    expect(allowed).toBe(true);
+  });
+
+  it("returns true at the 5th feedback attempt (exactly at the 10-min cap)", async () => {
+    const hash = testHash("ip-feedback-at-5th-cap");
+
+    // Seed 4 rows within the last 10 minutes.
+    await seedRows(adminPool, hash, "feedback", 4, 2);
+
+    // 5th call: still within cap -> must return true.
+    const allowed = await callRpc(adminPool, hash, "feedback");
+    expect(allowed).toBe(true);
+  });
+
+  it("returns false on the 6th feedback attempt (over the 10-min cap)", async () => {
+    const hash = testHash("ip-feedback-over-10m-cap");
+
+    // Seed 5 rows within the last 10 minutes (already at cap).
+    await seedRows(adminPool, hash, "feedback", 5, 2);
+
+    const allowed = await callRpc(adminPool, hash, "feedback");
+    expect(allowed).toBe(false);
+  });
+
+  it("feedback and signup caps are tracked independently (same IP hash)", async () => {
+    const hash = testHash("ip-feedback-signup-isolation");
+
+    // Exhaust the feedback 10-min cap for this IP.
+    await seedRows(adminPool, hash, "feedback", 5, 2);
+
+    // A signup call on the same IP must still be allowed (10-min cap is 5, but different action).
+    const signupAllowed = await callRpc(adminPool, hash, "signup");
+    expect(signupAllowed).toBe(true);
+  });
+
+  it("'feedback' is now accepted by the rate_limit_buckets CHECK constraint", async () => {
+    // A direct INSERT with action='feedback' must succeed (constraint allows it post-045).
+    const hash = testHash("ip-feedback-constraint-check");
+    await expect(
+      adminPool.query(
+        `INSERT INTO public.rate_limit_buckets (ip_hash, action) VALUES ($1, 'feedback')`,
+        [hash],
+      ),
+    ).resolves.not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Code↔DB contract fitness test (#1883)
+//
+// This block iterates RATE_LIMIT_ACTIONS (the single source of truth in
+// lib/auth/rateLimitIp.ts) and asserts that EACH action is known to both:
+//   1. The check_rate_limit RPC (the function returns true, not an exception).
+//   2. The rate_limit_buckets_action_check constraint (a direct INSERT succeeds).
+//
+// Adding a new action to RATE_LIMIT_ACTIONS without a migration that teaches
+// the function and constraint will make this test fail in CI's integration job,
+// preventing the broken code from reaching production. This is the same
+// contract-fitness pattern as the #1356 onConflict↔PK parity test.
+// ---------------------------------------------------------------------------
+
+describe("RATE_LIMIT_ACTIONS code↔DB contract (fitness test)", () => {
+  for (const action of RATE_LIMIT_ACTIONS) {
+    it(`check_rate_limit accepts action="${action}" and returns true (under cap)`, async () => {
+      const hash = testHash(`ip-contract-rpc-${action}`);
+      // Must not throw (unknown action raises an exception) and must return true.
+      const allowed = await callRpc(adminPool, hash, action);
+      expect(allowed).toBe(true);
+    });
+
+    it(`rate_limit_buckets CHECK constraint permits action="${action}"`, async () => {
+      const hash = testHash(`ip-contract-constraint-${action}`);
+      // A direct INSERT must succeed: proves the constraint knows this action.
+      await expect(
+        adminPool.query(
+          `INSERT INTO public.rate_limit_buckets (ip_hash, action) VALUES ($1, $2)`,
+          [hash, action],
+        ),
+      ).resolves.not.toThrow();
+    });
+  }
 });
