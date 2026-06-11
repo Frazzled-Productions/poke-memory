@@ -17,7 +17,9 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   validateSpeciesCount,
+  validateSpeciesIds,
   validateShards,
+  validateShardParity,
   validateSprites,
   validateLocaleNames,
 } from "./lib/seed-validate.mjs";
@@ -25,6 +27,7 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
 const libDir = resolve(repoRoot, "lib/pokemon");
+const publicDir = resolve(repoRoot, "public/pokemon-data");
 const webpRoot = resolve(repoRoot, "public/sprites/pokemon/webp");
 
 // ---------------------------------------------------------------------------
@@ -65,7 +68,7 @@ function report(result) {
 
 const args = process.argv.slice(2);
 const stepArg = args.find((a) => a.startsWith("--step="))?.replace("--step=", "") ?? "all";
-const validSteps = ["species-count", "shards", "sprites", "locale-names", "all"];
+const validSteps = ["species-count", "shards", "sprites", "locale-names", "shard-parity", "all"];
 
 if (!validSteps.includes(stepArg)) {
   console.error(
@@ -89,6 +92,16 @@ if (runAll || stepArg === "species-count" || stepArg === "shards" || stepArg ===
   defaultSpeciesIds = defaultForms.map((p) => p.speciesId);
 }
 
+/** Minimal readFileFn for validateShardParity: returns content string or null. */
+function readFileOrNull(filePath) {
+  if (!existsSync(filePath)) return null;
+  try {
+    return readFileSync(filePath, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Run validation steps
 // ---------------------------------------------------------------------------
@@ -108,7 +121,7 @@ if (runAll || stepArg === "species-count") {
 
 // --- shards -----------------------------------------------------------------
 if (runAll || stepArg === "shards") {
-  console.log("\n-- Shard completeness (orphan-chain check) --");
+  console.log("\n-- Shard completeness (orphan-chain / form-edge / empty-chain check) --");
   anyStepRan = true;
 
   const core = readJson(resolve(libDir, "generated-core.json"), "generated-core.json");
@@ -117,6 +130,17 @@ if (runAll || stepArg === "shards") {
   const localeNames = readJson(resolve(libDir, "generated-locale-names.json"), "generated-locale-names.json");
 
   const results = validateShards(generated, core, flavor, chains, localeNames);
+  for (const r of results) {
+    if (!report(r)) allPassed = false;
+  }
+}
+
+// --- shard-parity -----------------------------------------------------------
+if (runAll || stepArg === "shard-parity") {
+  console.log("\n-- Shard lib/public parity --");
+  anyStepRan = true;
+
+  const results = validateShardParity(libDir, publicDir, readFileOrNull);
   for (const r of results) {
     if (!report(r)) allPassed = false;
   }

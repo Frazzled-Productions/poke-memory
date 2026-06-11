@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   validateSpeciesCount,
+  validateSpeciesIds,
   validateShards,
+  validateShardParity,
   validateSprites,
   validateLocaleNames,
   formatIdList,
@@ -13,17 +15,33 @@ import {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-/** Minimal generated.json records: 3 total (2 default-form species + 1 alt form). */
+/**
+ * Minimal generated.json records: 3 total (2 default-form species + 1 alt form).
+ * Records include flavorTexts so the flavor-shard check works correctly.
+ */
 const GENERATED = [
-  { id: 1, speciesId: 1, isDefaultForm: true },
-  { id: 2, speciesId: 2, isDefaultForm: true },
-  { id: 10001, speciesId: 1, isDefaultForm: false }, // alternate form of species 1
+  { id: 1, speciesId: 1, isDefaultForm: true, flavorTexts: [{ text: "A strange seed.", versions: ["red"] }] },
+  { id: 2, speciesId: 2, isDefaultForm: true, flavorTexts: [{ text: "A plant.", versions: ["red"] }] },
+  { id: 10001, speciesId: 1, isDefaultForm: false, flavorTexts: [{ text: "An alt form.", versions: ["sword"] }] },
+];
+
+/** Generated records where one entry has no flavorTexts (should be excluded from flavor check). */
+const GENERATED_WITH_FLAVOURLESS = [
+  { id: 1, speciesId: 1, isDefaultForm: true, flavorTexts: [{ text: "A strange seed.", versions: ["red"] }] },
+  { id: 2, speciesId: 2, isDefaultForm: true, flavorTexts: [] }, // intentionally no flavor
+  { id: 10001, speciesId: 1, isDefaultForm: false, flavorTexts: [{ text: "An alt form.", versions: ["sword"] }] },
 ];
 
 const CORE_OK = [{ id: 1 }, { id: 2 }, { id: 10001 }];
 const FLAVOR_OK = [{ id: 1 }, { id: 2 }, { id: 10001 }];
+// CHAINS_OK must have at least one chain node with speciesId > 10000 to pass the form-edge check.
 const CHAINS_OK = {
-  chains: { abc12345: [] },
+  chains: {
+    abc12345: [
+      { speciesId: 1, evolvesFromId: null },
+      { speciesId: 10001, evolvesFromId: 1 }, // form-aware edge (id > 10000)
+    ],
+  },
   pokemonChain: { "1": "abc12345", "2": "abc12345", "10001": "abc12345" },
 };
 const LOCALE_OK = [
@@ -87,8 +105,8 @@ describe("validateSpeciesCount", () => {
 describe("validateShards - happy path (all shards complete)", () => {
   const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, CHAINS_OK, LOCALE_OK);
 
-  it("returns four results", () => {
-    expect(results).toHaveLength(4);
+  it("returns five results (core / chains-coverage / chains-form-edge / flavor / locale)", () => {
+    expect(results).toHaveLength(5);
   });
 
   it("all results are ok", () => {
@@ -101,17 +119,23 @@ describe("validateShards - happy path (all shards complete)", () => {
     expect(results[0].message).toContain("3");
   });
 
-  it("chains result mentions pokemonChain", () => {
+  it("chains-coverage result mentions pokemonChain", () => {
     expect(results[1].message).toContain("pokemonChain");
   });
 
-  it("flavor result mentions the record count", () => {
-    expect(results[2].message).toContain("3");
+  it("chains-form-edge result confirms form-aware edge", () => {
+    expect(results[2].ok).toBe(true);
+    expect(results[2].message).toContain("form-aware edge");
+  });
+
+  it("flavor result mentions the records-with-flavor count", () => {
+    // All 3 records in GENERATED have flavorTexts, so the count is 3.
+    expect(results[3].message).toContain("3");
   });
 
   it("locale result mentions the default-form species count", () => {
     // 2 default-form species in GENERATED
-    expect(results[3].message).toContain("2");
+    expect(results[4].message).toContain("2");
   });
 });
 
@@ -132,20 +156,22 @@ describe("validateShards - core shard missing an entry", () => {
   });
 
   it("other shard results remain ok", () => {
-    expect(results[1].ok).toBe(true);
-    expect(results[2].ok).toBe(true);
-    expect(results[3].ok).toBe(true);
+    expect(results[1].ok).toBe(true); // chains-coverage
+    expect(results[2].ok).toBe(true); // chains-form-edge
+    expect(results[3].ok).toBe(true); // flavor
+    expect(results[4].ok).toBe(true); // locale
   });
 });
 
 describe("validateShards - chains shard missing an entry", () => {
+  // chains.chains is empty so no form-aware edge, and pokemonChain missing id 10001.
   const chainsMissing = {
-    chains: {},
+    chains: { abc: [{ speciesId: 10002, evolvesFromId: 1 }] }, // has form edge but missing pokemonChain id
     pokemonChain: { "1": "abc", "2": "abc" }, // missing 10001
   };
   const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, chainsMissing, LOCALE_OK);
 
-  it("chains result is not ok", () => {
+  it("chains-coverage result is not ok", () => {
     expect(results[1].ok).toBe(false);
   });
 
@@ -158,12 +184,26 @@ describe("validateShards - flavor shard missing an entry", () => {
   const flavorMissing = [{ id: 1 }, { id: 10001 }]; // missing id 2
   const results = validateShards(GENERATED, CORE_OK, flavorMissing, CHAINS_OK, LOCALE_OK);
 
-  it("flavor result is not ok", () => {
-    expect(results[2].ok).toBe(false);
+  it("flavor result is not ok (id=2 has flavorTexts and is absent from shard)", () => {
+    expect(results[3].ok).toBe(false);
   });
 
   it("failure message mentions the missing ID", () => {
-    expect(results[2].message).toContain("2");
+    expect(results[3].message).toContain("2");
+  });
+});
+
+describe("validateShards - flavor shard: flavourless record absent is OK (F58)", () => {
+  // id=2 has empty flavorTexts; it should NOT be required in the flavor shard.
+  const flavorWithoutId2 = [{ id: 1 }, { id: 10001 }]; // id=2 intentionally absent
+  const results = validateShards(GENERATED_WITH_FLAVOURLESS, CORE_OK, flavorWithoutId2, CHAINS_OK, LOCALE_OK);
+
+  it("flavor result is ok when the absent id has no flavorTexts", () => {
+    expect(results[3].ok).toBe(true);
+  });
+
+  it("flavor message mentions the 2 records with flavor (not all 3)", () => {
+    expect(results[3].message).toContain("2 records");
   });
 });
 
@@ -174,16 +214,16 @@ describe("validateShards - locale-names shard missing an entry", () => {
   ];
   const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, CHAINS_OK, localeMissing);
 
-  it("locale result is not ok", () => {
-    expect(results[3].ok).toBe(false);
+  it("locale result is not ok (result index 4)", () => {
+    expect(results[4].ok).toBe(false);
   });
 
   it("failure message mentions the missing species ID", () => {
-    expect(results[3].message).toContain("2");
+    expect(results[4].message).toContain("2");
   });
 
   it("failure message mentions seed:split or seed:locale-names", () => {
-    expect(results[3].message).toMatch(/seed:split|seed:locale-names/);
+    expect(results[4].message).toMatch(/seed:split|seed:locale-names/);
   });
 });
 
@@ -193,7 +233,7 @@ describe("validateShards - alternate-form record absent from locale-names (corre
   // entry should pass the locale-names check.
   it("locale check passes when only default-form species are present", () => {
     const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, CHAINS_OK, LOCALE_OK);
-    expect(results[3].ok).toBe(true);
+    expect(results[4].ok).toBe(true);
   });
 });
 
@@ -355,6 +395,177 @@ describe("validateLocaleNames - custom locale list", () => {
     const results = validateLocaleNames(LOCALE_OK, ["ja"]);
     expect(results).toHaveLength(1);
     expect(results[0].ok).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateShards - form-aware edge check (F17)
+// ---------------------------------------------------------------------------
+
+describe("validateShards - form-aware edge check (F17)", () => {
+  // Chains with NO id > 10000 in any chain node - form-edge check must fail.
+  const chainsNoFormEdge = {
+    chains: {
+      abc: [{ speciesId: 1, evolvesFromId: null }, { speciesId: 2, evolvesFromId: 1 }],
+    },
+    pokemonChain: { "1": "abc", "2": "abc", "10001": "abc" },
+  };
+
+  it("form-edge check fails when no chain node has id > 10000", () => {
+    const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, chainsNoFormEdge, LOCALE_OK);
+    expect(results[2].ok).toBe(false);
+  });
+
+  it("failure message explains form-aware edge generation", () => {
+    const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, chainsNoFormEdge, LOCALE_OK);
+    expect(results[2].message).toContain("form-aware");
+  });
+
+  it("form-edge check passes when a chain node has speciesId > 10000", () => {
+    const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, CHAINS_OK, LOCALE_OK);
+    expect(results[2].ok).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateShards - empty-chain regression check (F18)
+// ---------------------------------------------------------------------------
+
+describe("validateShards - empty-chain regression check (F18)", () => {
+  // Prior chains has a non-empty chain for id 1; current has an empty chain.
+  const priorChainsNonEmpty = {
+    chains: { hash1: [{ speciesId: 1, evolvesFromId: null }, { speciesId: 2, evolvesFromId: 1 }] },
+    pokemonChain: { "1": "hash1", "2": "hash1", "10001": "hash1" },
+  };
+  const currentChainsEmpty = {
+    chains: { emptyHash: [], "form-ok": [{ speciesId: 10001, evolvesFromId: 1 }] },
+    pokemonChain: { "1": "emptyHash", "2": "emptyHash", "10001": "form-ok" },
+  };
+
+  it("empty-chain regression check fails when a previously non-empty chain is now empty", () => {
+    const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, currentChainsEmpty, LOCALE_OK, priorChainsNonEmpty);
+    const regressionResult = results.find((r) => r.message.includes("non-empty chain"));
+    expect(regressionResult).toBeDefined();
+    expect(regressionResult.ok).toBe(false);
+  });
+
+  it("failure message names the regressed IDs", () => {
+    const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, currentChainsEmpty, LOCALE_OK, priorChainsNonEmpty);
+    const regressionResult = results.find((r) => r.message.includes("non-empty chain"));
+    // IDs 1 and 2 previously mapped to the non-empty chain.
+    expect(regressionResult.message).toContain("1");
+  });
+
+  it("empty-chain regression check passes when priorChainsData is null (skipped)", () => {
+    const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, CHAINS_OK, LOCALE_OK, null);
+    // Should not have a regression-check result at all.
+    const regressionResult = results.find((r) => r.message.includes("non-empty chain"));
+    expect(regressionResult).toBeUndefined();
+  });
+
+  it("passes when all previously non-empty chains are still non-empty", () => {
+    const results = validateShards(GENERATED, CORE_OK, FLAVOR_OK, CHAINS_OK, LOCALE_OK, CHAINS_OK);
+    const regressionResult = results.find((r) => r.message.includes("non-empty chain"));
+    expect(regressionResult).toBeDefined();
+    expect(regressionResult.ok).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateSpeciesIds (F46)
+// ---------------------------------------------------------------------------
+
+describe("validateSpeciesIds - set-membership check", () => {
+  it("passes when no prior ids (fresh checkout)", () => {
+    const result = validateSpeciesIds([1, 2, 3], []);
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain("skipped");
+  });
+
+  it("passes when all prior ids are still present", () => {
+    const result = validateSpeciesIds([1, 2, 3], [1, 2, 3]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("passes when new ids are added (additive run)", () => {
+    const result = validateSpeciesIds([1, 2, 3, 4], [1, 2, 3]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("fails when a prior id has disappeared", () => {
+    const result = validateSpeciesIds([1, 3], [1, 2, 3]);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("2");
+  });
+
+  it("failure message names all dropped ids", () => {
+    const result = validateSpeciesIds([3], [1, 2, 3]);
+    expect(result.message).toContain("1");
+    expect(result.message).toContain("2");
+  });
+
+  it("passes when a dropped id is in the removal allowlist", () => {
+    const result = validateSpeciesIds([1, 3], [1, 2, 3], [2]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("fails when a dropped id is NOT in the removal allowlist", () => {
+    const result = validateSpeciesIds([1, 3], [1, 2, 3], [99]);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("2");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateShardParity (F47)
+// ---------------------------------------------------------------------------
+
+describe("validateShardParity - lib and public copies match", () => {
+  const shards = ["generated-core.json", "generated-chains.json", "generated-flavor.json", "generated-locale-names.json"];
+
+  it("passes when all four shards are byte-identical", () => {
+    const readFn = (path) => `{"content":"same"}`;
+    const results = validateShardParity("/lib/pokemon", "/public/pokemon-data", readFn);
+    expect(results).toHaveLength(4);
+    for (const r of results) {
+      expect(r.ok).toBe(true);
+    }
+  });
+
+  it("fails when lib copy is missing", () => {
+    const readFn = (path) => path.includes("/lib/") ? null : `{"x":1}`;
+    const results = validateShardParity("/lib/pokemon", "/public/pokemon-data", readFn);
+    for (const r of results) {
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("lib/pokemon");
+    }
+  });
+
+  it("fails when public copy is missing", () => {
+    const readFn = (path) => path.includes("/public/") ? null : `{"x":1}`;
+    const results = validateShardParity("/lib/pokemon", "/public/pokemon-data", readFn);
+    for (const r of results) {
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("public/pokemon-data");
+    }
+  });
+
+  it("fails when lib and public copies differ", () => {
+    let call = 0;
+    const readFn = () => call++ % 2 === 0 ? `{"a":1}` : `{"b":2}`;
+    const results = validateShardParity("/lib/pokemon", "/public/pokemon-data", readFn);
+    for (const r of results) {
+      expect(r.ok).toBe(false);
+      expect(r.message).toContain("differs");
+    }
+  });
+
+  it("reports the shard filename in every result message", () => {
+    const readFn = () => `{}`;
+    const results = validateShardParity("/lib/pokemon", "/public/pokemon-data", readFn);
+    for (let i = 0; i < results.length; i++) {
+      expect(results[i].message).toContain(shards[i]);
+    }
   });
 });
 
