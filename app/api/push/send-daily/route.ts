@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
+import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 import webpush from "web-push";
 import { createTranslator as _createTranslatorRaw } from "use-intl/core";
 import { todayInTimezone } from "@/lib/utils/format-date";
@@ -734,19 +735,28 @@ export async function POST(request: Request) {
   // startedTodayByUser: user_id → { card_type → count }
   const startedTodayByUser = new Map<string, Record<string, number>>();
   for (const [today, userIds] of usersByDueDate) {
-    const { data: dueData, error: dueError } = await admin
-      .from("card_reviews")
-      .select("user_id, card_type, subject_key, first_seen, locale")
-      .lte("due_date", today)
-      .in("user_id", userIds)
-      .is("hidden_since", null);
-    if (dueError) {
+    // Paginate to avoid the PostgREST 1000-row default cap. A single lapsed
+    // user can exceed 1000 due rows, and the bucket covers multiple users.
+    // ORDER BY user_id, due_date gives a stable total order for offset
+    // pagination so rows don't shift/skip between pages.
+    const dueData = await fetchAllPages<DueRow>((from, to) =>
+      admin
+        .from("card_reviews")
+        .select("user_id, card_type, subject_key, first_seen, locale")
+        .lte("due_date", today)
+        .in("user_id", userIds)
+        .is("hidden_since", null)
+        .order("user_id", { ascending: true })
+        .order("due_date", { ascending: true })
+        .range(from, to),
+    );
+    if (!dueData) {
       return NextResponse.json(
         { ok: false, error: "due_query_failed" },
         { status: 502 },
       );
     }
-    for (const row of (dueData ?? []) as DueRow[]) {
+    for (const row of dueData as DueRow[]) {
       const eligibility = eligibilityByUser.get(row.user_id) ?? DEFAULT_ELIGIBILITY;
 
       // Locale membership filter (#1504, supersedes #1480's single-locale drop):

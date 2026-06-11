@@ -9,10 +9,14 @@ function makeClientWithUpsert(error: null | object = null) {
 }
 
 function makeClientWithSelect(data: unknown, error: null | object = null) {
-  const eq = vi.fn().mockResolvedValue({ data, error });
+  // The chain is: select → eq → range(from, to)
+  // fetchAllPages calls .range(from, to) as the terminal method.
+  // Return data with length < pageSize (1000) so fetchAllPages stops after one call.
+  const range = vi.fn().mockResolvedValue({ data, error });
+  const eq = vi.fn().mockReturnValue({ range });
   const select = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ select });
-  return { client: { from } as unknown as SupabaseClient, eq, select, from };
+  return { client: { from } as unknown as SupabaseClient, eq, select, from, range };
 }
 
 describe("mergeStreak", () => {

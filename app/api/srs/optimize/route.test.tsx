@@ -75,10 +75,14 @@ function makeSupabaseMock(overrides: {
     }),
   };
 
+  // The grade_log query chains: select → eq → order → range(from, to)
+  // fetchAllPages calls .range(from, to) as the terminal method.
+  // Return data with length < pageSize (1000) so fetchAllPages stops after one call.
   const gradeLogChain = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockResolvedValue({
+    order: vi.fn().mockReturnThis(),
+    range: vi.fn().mockResolvedValue({
       data: overrides.gradeLogData ?? makeLargeGradeLog(),
       error: overrides.gradeLogError ?? null,
     }),
