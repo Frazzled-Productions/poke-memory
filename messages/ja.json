@@ -239,8 +239,7 @@
         "volumeLabel": "読み上げ音量（{pct}%）",
         "volumeMute": "0%（ミュート）",
         "volumeFull": "100%（最大）"
-      },
-      "cryDisabledNote": "鳴き声カードは無効です。上のカードの種類で有効にしてください。"
+      }
     },
     "offline": {
       "downloadHeading": "ダウンロード",

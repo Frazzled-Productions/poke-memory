@@ -239,8 +239,7 @@
         "volumeLabel": "朗讀音量（{pct}%）",
         "volumeMute": "0%（靜音）",
         "volumeFull": "100%（最大）"
-      },
-      "cryDisabledNote": "叫聲卡片已停用。請在上方卡片類型中啟用。"
+      }
     },
     "offline": {
       "downloadHeading": "下載",

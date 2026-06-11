@@ -239,8 +239,7 @@
         "volumeLabel": "[Speech volume ({pct}%)]",
         "volumeMute": "[0% mute]",
         "volumeFull": "[100% full]"
-      },
-      "cryDisabledNote": "[Cry cards are disabled. Enable them in Card types above.]"
+      }
     },
     "offline": {
       "downloadHeading": "[Download]",
