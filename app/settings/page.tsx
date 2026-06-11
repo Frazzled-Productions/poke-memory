@@ -26,9 +26,9 @@ import { deleteAccountEverywhere } from "@/lib/sync/deleteAccount";
 import { signOut } from "@/lib/auth/actions";
 import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
 import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
-import { loadFavourite, saveFavourite } from "@/lib/theme/persistence";
+import { loadFavourite, saveFavourite, masteredSpeciesUnion } from "@/lib/theme/persistence";
 import { useFavourite } from "@/components/theme/FavouriteThemeProvider";
-import { isMastered } from "@/lib/stats/derive";
+import type { ReviewableCard } from "@/lib/review/session";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
@@ -195,26 +195,24 @@ function FavouritePicker({
   // snapshot is safe and avoids re-reading on every render. Stored as the
   // set of mastered species ids rather than a Map keyed by id: a multi-locale
   // session holds several name cards per numeric id, and the Map's
-  // last-entry-wins collapse disagreed with isFavouriteEarned's arbitration,
-  // letting a picker-unlocked theme be wiped on the next load (#1851). The
-  // unlock rule matches isFavouriteEarned: mastered in ANY enrolled locale.
-  const [masteredCardIds, setMasteredCardIds] = useState<ReadonlySet<number>>(new Set());
+  // Load the full ReviewableCard[] so both name AND reverse legs are available
+  // for species-level mastery (#1865). masteredSpeciesUnion unions across all
+  // enrolled locales so a species mastered in any locale earns the theme.
+  const [sessionCards, setSessionCards] = useState<readonly ReviewableCard[]>([]);
   useEffect(() => {
     async function load() {
       const session = await loadSession();
-      setMasteredCardIds(
-        new Set(
-          (session?.cards ?? [])
-            .filter((c) => isMastered(c.state))
-            .map((c) => c.id),
-        ),
-      );
+      setSessionCards(session?.cards ?? []);
     }
     void load();
   }, []);
 
-  const unlockedEntries = CURATED_POKEMON.filter(
-    (entry) => flags.pretendAllMastered || masteredCardIds.has(entry.id),
+  // Compute the mastered set once (not per-iteration) then filter.
+  const masteredIds = flags.pretendAllMastered
+    ? null
+    : masteredSpeciesUnion(sessionCards, false, settings.learningLocales);
+  const unlockedEntries = CURATED_POKEMON.filter((entry) =>
+    masteredIds === null || masteredIds.has(entry.id),
   );
 
   if (unlockedEntries.length === 0) {
