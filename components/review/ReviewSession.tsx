@@ -2133,42 +2133,56 @@ export function ReviewSession() {
       saveSettings({ ...current, activePokemonNameLocale: next });
     }
 
+    const hasGame = seenPokemon.length >= 2;
     return (
-      <div className="flex flex-col flex-1 min-h-0 w-full items-center overflow-y-auto">
-        {/* When a scope filter is active, show ScopeControl so the user can
-            see what filter is set and modify or clear it. This mirrors the
-            card-practice path where ScopeControl is always visible (#1797). */}
-        {!isScopeEmpty(scope) && (
-          <div className="w-full max-w-xl px-4 pt-4">
-            <ScopeControl
-              scope={scope}
-              onChange={handleScopeChange}
-              alternateFormsEnabled={alternateFormsEnabled}
-              incompleteChainSpeciesIds={incompleteChains}
-              masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
-            />
-          </div>
-        )}
-        <EndOfSessionScreen
-          variant={variant}
-          perType={perType}
-          nameEnabled={true}
-          evolutionEnabled={evolutionCardsEnabled}
-          reverseEnabled={reverseEnabled}
-          reverseEvolutionEnabled={reverseEvolutionEnabled}
-          cryEnabled={cryCardsEnabled}
-          shareText={shareText}
-          shareParts={shareParts}
-          dueTomorrow={dueTomorrow}
-          showCardTypesHint={!cardTypesAllOn}
-          directionGrades={sessionDirectionGrades}
-          activeLocale={activeLocale}
-          learningLocales={learningLocales}
-          dueCountByLocale={readDueCountCache()}
-          onSwitchLocale={handleSwitchLocale}
-          onClearScope={!isScopeEmpty(scope) ? () => handleScopeChange(EMPTY_SCOPE) : undefined}
-        />
-        {seenPokemon.length >= 2 && (
+      /* When the Higher-or-Lower game is present the outer container switches
+         from overflow-y-auto (scrollable) to overflow-hidden so the game
+         receives a bounded flex-1 min-h-0 height context. The game pins its
+         action button as flex-none so the user never needs to scroll to reach
+         it (#1837). Without the game the container stays scrollable so the
+         EndOfSessionScreen content can overflow on very small viewports. */
+      <div
+        className={`flex flex-col flex-1 min-h-0 w-full items-center ${hasGame ? "overflow-hidden" : "overflow-y-auto"}`}
+      >
+        {/* EndOfSessionScreen: flex-none when the game is present so it does
+            not compete with the game for the available height. Without a game
+            it grows naturally inside the scrollable container. */}
+        <div className={`w-full ${hasGame ? "flex-none overflow-y-auto" : ""}`}>
+          {/* When a scope filter is active, show ScopeControl so the user can
+              see what filter is set and modify or clear it. This mirrors the
+              card-practice path where ScopeControl is always visible (#1797). */}
+          {!isScopeEmpty(scope) && (
+            <div className="w-full max-w-xl px-4 pt-4">
+              <ScopeControl
+                scope={scope}
+                onChange={handleScopeChange}
+                alternateFormsEnabled={alternateFormsEnabled}
+                incompleteChainSpeciesIds={incompleteChains}
+                masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+              />
+            </div>
+          )}
+          <EndOfSessionScreen
+            variant={variant}
+            perType={perType}
+            nameEnabled={true}
+            evolutionEnabled={evolutionCardsEnabled}
+            reverseEnabled={reverseEnabled}
+            reverseEvolutionEnabled={reverseEvolutionEnabled}
+            cryEnabled={cryCardsEnabled}
+            shareText={shareText}
+            shareParts={shareParts}
+            dueTomorrow={dueTomorrow}
+            showCardTypesHint={!cardTypesAllOn}
+            directionGrades={sessionDirectionGrades}
+            activeLocale={activeLocale}
+            learningLocales={learningLocales}
+            dueCountByLocale={readDueCountCache()}
+            onSwitchLocale={handleSwitchLocale}
+            onClearScope={!isScopeEmpty(scope) ? () => handleScopeChange(EMPTY_SCOPE) : undefined}
+          />
+        </div>
+        {hasGame && (
           <HigherOrLowerGame seenPokemon={seenPokemon} />
         )}
         {badgeToastSlot}

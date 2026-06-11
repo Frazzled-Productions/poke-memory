@@ -430,133 +430,66 @@ describe("HigherOrLowerGame", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Scroll-into-view on reveal (#1447)
+  // Layout structure: pinned footer (#1837)
   // ---------------------------------------------------------------------------
   //
-  // When the user makes a guess, the result block (result message + action
-  // button) should scroll into view so it is reachable without manual scrolling
-  // on tall mobile viewports. We verify this by spying on scrollIntoView called
-  // on the result block element.
+  // The action button (Next pair / Play again) lives in a flex-none footer so
+  // it is always visible without scrolling on mobile viewports. We verify that
+  // the footer container is present in both phases (picking and revealed) and
+  // that the action button is rendered inside it after a guess.
 
-  describe("scroll-into-view on reveal (#1447)", () => {
-    let scrollIntoViewCalls: ScrollIntoViewOptions[];
-    let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
-    let originalMatchMedia: typeof window.matchMedia;
-
-    beforeEach(() => {
-      scrollIntoViewCalls = [];
-      originalScrollIntoView = Element.prototype.scrollIntoView;
-      Element.prototype.scrollIntoView = function (options?: ScrollIntoViewOptions | boolean) {
-        scrollIntoViewCalls.push(options as ScrollIntoViewOptions);
-      };
-
-      originalMatchMedia = window.matchMedia;
-      // Default: user has not requested reduced motion.
-      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      }));
+  describe("pinned footer layout (#1837)", () => {
+    it("renders a flex-none footer container before any guess is made", () => {
+      const { container } = renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
+      // The section should be present.
+      const section = container.querySelector("section");
+      expect(section).toBeInTheDocument();
+      // The footer div (last child of section) is always rendered, even in
+      // picking phase, to avoid layout shift on reveal.
+      const footerDiv = section?.lastElementChild as HTMLElement | null;
+      expect(footerDiv).not.toBeNull();
+      // In picking phase the footer is empty - no button yet.
+      expect(footerDiv?.querySelector("button")).toBeNull();
     });
 
-    afterEach(() => {
-      Element.prototype.scrollIntoView = originalScrollIntoView;
-      window.matchMedia = originalMatchMedia;
-    });
-
-    it("calls scrollIntoView on the result block after a correct guess", async () => {
+    it("renders the Next pair button inside the pinned footer after a correct guess", async () => {
       const user = userEvent.setup();
-      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
+      const { container } = renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
-      // No scroll before the user picks - still in picking phase.
-      expect(scrollIntoViewCalls).toHaveLength(0);
-
-      // Correct pick: Ivysaur has the higher attack.
+      // Correct pick: Ivysaur has higher attack.
       await user.click(screen.getByRole("button", { name: "Ivysaur" }));
 
-      // Result block is shown; scrollIntoView must have fired once.
-      expect(screen.getByRole("button", { name: /next pair/i })).toBeInTheDocument();
-      expect(scrollIntoViewCalls).toHaveLength(1);
-      // block: "nearest" means no scrolling when already in view - correct for
-      // desktop where everything fits; necessary scroll on tall mobile viewports.
-      expect(scrollIntoViewCalls[0]).toMatchObject({
-        block: "nearest",
-        behavior: "smooth",
-      });
+      const section = container.querySelector("section");
+      const footerDiv = section?.lastElementChild as HTMLElement | null;
+      // The footer must contain the action button after reveal.
+      const actionButton = footerDiv?.querySelector("button");
+      expect(actionButton).not.toBeNull();
+      expect(actionButton?.textContent).toMatch(/next pair/i);
     });
 
-    it("calls scrollIntoView after a wrong guess (Play again state)", async () => {
+    it("renders the Play again button inside the pinned footer after a wrong guess", async () => {
       const user = userEvent.setup();
-      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
+      const { container } = renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
 
-      // Wrong pick: Bulbasaur has the lower attack.
+      // Wrong pick: Bulbasaur has lower attack.
       await user.click(screen.getByRole("button", { name: "Bulbasaur" }));
 
-      expect(screen.getByRole("button", { name: /play again/i })).toBeInTheDocument();
-      expect(scrollIntoViewCalls).toHaveLength(1);
-      expect(scrollIntoViewCalls[0]).toMatchObject({
-        block: "nearest",
-        behavior: "smooth",
-      });
+      const section = container.querySelector("section");
+      const footerDiv = section?.lastElementChild as HTMLElement | null;
+      const actionButton = footerDiv?.querySelector("button");
+      expect(actionButton).not.toBeNull();
+      expect(actionButton?.textContent).toMatch(/play again/i);
     });
 
-    it("calls scrollIntoView after a tie", async () => {
-      const tied = makePokemon({
-        id: 99,
-        name: "Tieface",
-        stats: { hp: 49, attack: 49, defense: 49, specialAttack: 49, specialDefense: 49, speed: 49 },
-      });
-      mockPickPair.mockReturnValue({ left: BULBASAUR, right: tied, stat: "attack" as const });
-
-      const user = userEvent.setup();
-      renderWithIntl(<HigherOrLowerGame seenPokemon={[BULBASAUR, tied]} />);
-
-      await user.click(screen.getByRole("button", { name: "Tieface" }));
-
-      expect(screen.getByText(/equal, both count/i)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /next pair/i })).toBeInTheDocument();
-      expect(scrollIntoViewCalls).toHaveLength(1);
-      expect(scrollIntoViewCalls[0]).toMatchObject({ behavior: "smooth", block: "nearest" });
-    });
-
-    it("does NOT call scrollIntoView before a guess is made (picking phase)", () => {
-      renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
-      // Still in picking phase - no scroll should have fired.
-      expect(scrollIntoViewCalls).toHaveLength(0);
-      // Both tile buttons are present and the result block is absent.
-      expect(screen.getByRole("button", { name: "Bulbasaur" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Ivysaur" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /next pair/i })).toBeNull();
-      expect(screen.queryByRole("button", { name: /play again/i })).toBeNull();
-    });
-
-    it("uses instant scroll when prefers-reduced-motion is set", async () => {
-      // Override matchMedia to report reduced-motion preference.
-      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-        matches: query === "(prefers-reduced-motion: reduce)",
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      }));
-
+    it("does not call scrollIntoView on reveal (workaround removed in #1837)", async () => {
+      // The #1447 scrollIntoView workaround has been removed. Spy to confirm it
+      // is no longer called.
+      const scrollIntoViewSpy = vi.spyOn(Element.prototype, "scrollIntoView");
       const user = userEvent.setup();
       renderWithIntl(<HigherOrLowerGame seenPokemon={SEEN} />);
       await user.click(screen.getByRole("button", { name: "Ivysaur" }));
-
-      expect(scrollIntoViewCalls).toHaveLength(1);
-      expect(scrollIntoViewCalls[0]).toMatchObject({
-        behavior: "instant",
-        block: "nearest",
-      });
+      expect(scrollIntoViewSpy).not.toHaveBeenCalled();
+      scrollIntoViewSpy.mockRestore();
     });
   });
 });
