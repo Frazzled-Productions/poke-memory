@@ -139,10 +139,11 @@ function LoadingSkeleton({ ariaLabel }: { ariaLabel: string }) {
 
 
 /**
- * One row in the Struggling cards list. Extracted as a named sub-component so
- * the hook can be called once per card (hooks cannot be called in .map callbacks).
+ * One row in the Struggling cards list. Extracted as a named export so
+ * the hook can be called once per card (hooks cannot be called in .map callbacks)
+ * and so the component can be unit-tested directly for locale-rendering coverage.
  */
-function StrugglingCardRow({ card }: { card: StrugglingCard }) {
+export function StrugglingCardRow({ card }: { card: StrugglingCard }) {
   const tCommon = useTranslations("common");
   const { locale } = usePokemonLocaleContext();
   // eslint-disable-next-line no-restricted-syntax -- English fallback arg, not a direct render
