@@ -67,18 +67,25 @@ export function todayInTimezone(tz: string, now: Date = new Date()): string {
  *   mdy → "Tue, May 14"   (month-first)
  *   iso → "Tue, 2026-05-14" (ISO order - year included for clarity)
  *
- * `tz` is accepted so the rendered date can be aligned to the user's timezone
- * when the ISO string was produced by todayInTimezone / other UTC-safe paths.
- * For already-stored YYYY-MM-DD values (card dueDates, etc.) callers typically
- * pass "UTC" to avoid any DST shift on parsing.
+ * The `iso` argument already names the calendar day to render, so it is
+ * always formatted at UTC. Re-projecting a noon-UTC anchor into a real
+ * timezone shifted every rendered date one day late for UTC+13/+14 users
+ * (Auckland in DST, Tonga, Kiritimati - #1853 / F37): converting a calendar
+ * date between timezones is meaningless without a time of day, so no
+ * projection belongs here.
+ *
+ * @deprecated-param `tz` is retained for call-site compatibility but is
+ * intentionally ignored - whichever zone produced the ISO string, the string
+ * itself is the day to display.
  */
-export function formatDate(iso: string, fmt: DateFormat, tz: string): string {
+export function formatDate(iso: string, fmt: DateFormat, tz?: string): string {
+  void tz;
   try {
     const d = new Date(iso + "T12:00:00Z");
     if (fmt === "iso") {
       // Weekday + ISO string is the clearest representation for this format.
       const weekday = new Intl.DateTimeFormat("en-GB", {
-        timeZone: tz,
+        timeZone: "UTC",
         weekday: "short",
       }).format(d);
       return `${weekday}, ${iso}`;
@@ -89,7 +96,7 @@ export function formatDate(iso: string, fmt: DateFormat, tz: string): string {
     // from components (#1456).
     if (fmt === "dmy-year") {
       return new Intl.DateTimeFormat("en-GB", {
-        timeZone: tz,
+        timeZone: "UTC",
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -97,14 +104,14 @@ export function formatDate(iso: string, fmt: DateFormat, tz: string): string {
     }
     if (fmt === "mdy-year") {
       return new Intl.DateTimeFormat("en-US", {
-        timeZone: tz,
+        timeZone: "UTC",
         day: "numeric",
         month: "short",
         year: "numeric",
       }).format(d);
     }
     const opts: Intl.DateTimeFormatOptions = {
-      timeZone: tz,
+      timeZone: "UTC",
       weekday: "short",
       day: "numeric",
       month: "short",
