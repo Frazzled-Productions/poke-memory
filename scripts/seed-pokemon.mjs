@@ -104,10 +104,21 @@ async function fetchWithRetry(url, label) {
     }
 
     if (res.status === 429) {
+      // Retry 429s with backoff (previously treated as immediately fatal,
+      // causing silent species drops when the rate limit was hit transiently).
+      if (attempt < MAX_RETRIES) {
+        const delay = BACKOFF_MS[attempt];
+        process.stderr.write(
+          `[seed] WARN: rate-limited at ${label} (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${delay}ms\n`
+        );
+        await sleep(delay);
+        attempt++;
+        continue;
+      }
       process.stderr.write(
-        `[seed] WARN: rate-limited at ${label}, skipping\n`
+        `[seed] WARN: rate-limited at ${label} after ${MAX_RETRIES + 1} attempts, skipping\n`
       );
-      return { ok: false, reason: "rate-limited", fatal: true };
+      return { ok: false, reason: "rate-limited", fatal: false };
     }
 
     if (res.status >= 500) {
@@ -385,7 +396,12 @@ function buildVarietiesLookup(records) {
     if (!lookup.has(rec.speciesId)) {
       lookup.set(rec.speciesId, new Map());
     }
-    lookup.get(rec.speciesId).set(rec.formSlug, {
+    // Key by the REGIONAL PREFIX (first segment), not the full formSlug.
+    // PokéAPI's evolution_details.region.name is "alola", "galar", etc., but
+    // formSlug can be multi-segment (e.g. "galar-standard", "hisui-apex").
+    // "alola".split("-")[0] === "alola" is a safe no-op for single-segment slugs.
+    const regionKey = rec.formSlug.split("-")[0];
+    lookup.get(rec.speciesId).set(regionKey, {
       pokemonId: rec.id,
       displayName: rec.displayName,
     });
@@ -466,10 +482,13 @@ function addFormEdges(nodes, lookup) {
 }
 
 // One node per (parent, child) in evolves_to[]. Multiple evolution_details[]
-// entries on a single child (e.g. Urshifu has tower-of-darkness AND
-// use-item:scroll-of-darkness on Single-Strike Urshifu) collapse to the first
-// detail - picking deduplicates the "alternative paths to the same child" case
-// without losing branching, which is encoded as separate evolves_to[] entries.
+// entries on a single child collapse to the region-tagged entry when one exists
+// (e.g. Raichu: [{thunder-stone, region:null}, {thunder-stone, region:"alola"}]
+// - we must pick the region-tagged entry so addFormEdges can fire for Alolan
+// Raichu). When no region-tagged entry exists, fall back to the first entry,
+// which deduplicates "alternative paths to the same child" (e.g. Urshifu has
+// two scroll variants) without losing branching (encoded as separate evolves_to[]
+// entries).
 function flattenChain(node, evolvesFromId, idToName) {
   const url = node.species?.url ?? "";
   const parts = url.split("/").filter(Boolean);
@@ -477,7 +496,14 @@ function flattenChain(node, evolvesFromId, idToName) {
   if (!speciesId || isNaN(speciesId)) return [];
   const name = idToName.get(speciesId) ?? node.species.name;
   const details = node.evolution_details ?? [];
-  const detail = details.length > 0 ? trimDetail(details[0]) : null;
+  // Prefer the region-tagged detail so addFormEdges can generate form-aware
+  // edges. Fall back to details[0] for the non-regional node.
+  const regionTagged = details.find((d) => d.region != null);
+  const detail = regionTagged != null
+    ? trimDetail(regionTagged)
+    : details.length > 0
+      ? trimDetail(details[0])
+      : null;
   const nodes = [{ speciesId, name, evolvesFromId, detail }];
   for (const child of (node.evolves_to ?? [])) {
     nodes.push(...flattenChain(child, speciesId, idToName));
@@ -965,16 +991,14 @@ async function writeSplitSeedFiles(records, outputPath) {
   // Ensure public/pokemon-data exists.
   await mkdir(publicDir, { recursive: true });
 
-  // --- generated-core.json ---
+  // --- generated-core.json (written to lib/ AND public/) ---
   // Strip flavorTexts, evolutionChain, and the seed-time _localeNamesEntry field.
   const coreRecords = records.map(({ flavorTexts: _ft, evolutionChain: _ec, _localeNamesEntry: _ln, ...rest }) => rest);
-  await writeFile(
-    resolvePath(libDir, "generated-core.json"),
-    JSON.stringify(coreRecords),
-    "utf-8",
-  );
+  const coreJson = JSON.stringify(coreRecords);
+  await writeFileAtomic(resolvePath(libDir, "generated-core.json"), coreJson);
+  await writeFileAtomic(resolvePath(publicDir, "generated-core.json"), coreJson);
 
-  // --- generated-chains.json ---
+  // --- generated-chains.json (written to lib/ AND public/) ---
   const chainsByHash = {};
   const pokemonChain = {};
   for (const p of records) {
@@ -984,19 +1008,17 @@ async function writeSplitSeedFiles(records, outputPath) {
     if (!chainsByHash[hash]) chainsByHash[hash] = ec;
     pokemonChain[String(p.id)] = hash;
   }
-  await writeFile(
-    resolvePath(libDir, "generated-chains.json"),
-    JSON.stringify({ chains: chainsByHash, pokemonChain }),
-    "utf-8",
-  );
+  const chainsJson = JSON.stringify({ chains: chainsByHash, pokemonChain });
+  await writeFileAtomic(resolvePath(libDir, "generated-chains.json"), chainsJson);
+  await writeFileAtomic(resolvePath(publicDir, "generated-chains.json"), chainsJson);
 
   // --- generated-flavor.json (also copied to public/) ---
   const flavorRecords = records
     .filter((p) => p.flavorTexts && p.flavorTexts.length > 0)
     .map((p) => ({ id: p.id, flavorTexts: p.flavorTexts }));
   const flavorJson = JSON.stringify(flavorRecords);
-  await writeFile(resolvePath(libDir, "generated-flavor.json"), flavorJson, "utf-8");
-  await writeFile(resolvePath(publicDir, "generated-flavor.json"), flavorJson, "utf-8");
+  await writeFileAtomic(resolvePath(libDir, "generated-flavor.json"), flavorJson);
+  await writeFileAtomic(resolvePath(publicDir, "generated-flavor.json"), flavorJson);
 
   // --- generated-locale-names.json (#1259) ---
   // Collect one entry per default-form species (alternate forms share the
@@ -1010,8 +1032,8 @@ async function writeSplitSeedFiles(records, outputPath) {
   localeNamesRecords.sort((a, b) => a.speciesId - b.speciesId);
 
   const localeNamesJson = JSON.stringify(localeNamesRecords);
-  await writeFile(resolvePath(libDir, "generated-locale-names.json"), localeNamesJson, "utf-8");
-  await writeFile(resolvePath(publicDir, "generated-locale-names.json"), localeNamesJson, "utf-8");
+  await writeFileAtomic(resolvePath(libDir, "generated-locale-names.json"), localeNamesJson);
+  await writeFileAtomic(resolvePath(publicDir, "generated-locale-names.json"), localeNamesJson);
 
   process.stderr.write(
     `[seed] Locale names: ${localeNamesRecords.length} species entries written to generated-locale-names.json\n`,
@@ -1141,7 +1163,14 @@ async function main() {
       if (result.ok) {
         chainDataMap.set(url, flattenChain(result.data.chain, null, idToName));
       } else {
-        chainDataMap.set(url, []);
+        // A failed chain fetch is a hard error: storing an empty chain silently
+        // corrupts all species in that chain (orphaned evolution-edge cards,
+        // broken EvolutionWall, missing journey milestones) with no validator
+        // able to detect it. Fail fast so the operator can retry.
+        process.stderr.write(
+          `[seed] ERROR: failed to fetch evolution chain ${url}: ${result.reason}\n`
+        );
+        process.exit(1);
       }
       if (chainsDone % 100 === 0) {
         process.stderr.write(
@@ -1304,7 +1333,17 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(`[seed] FATAL: ${err.message}\n`);
-  process.exit(1);
-});
+// Run main only when invoked directly (not when imported for unit tests).
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
+  main().catch((err) => {
+    process.stderr.write(`[seed] FATAL: ${err.message}\n`);
+    process.exit(1);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Exports for unit testing only - not part of the public API.
+// These pure helpers are tested in scripts/seed-pokemon.test.mjs.
+// ---------------------------------------------------------------------------
+export { flattenChain, buildVarietiesLookup, addFormEdges, trimDetail };
