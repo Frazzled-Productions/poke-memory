@@ -32,10 +32,16 @@ jobs:
     # causing this guard to miss the marker and silently skip (false-negative).
     # The fanout step re-fetches the full body, so truncation never causes
     # duplicates — it only means the job doesn't start for that event.
+    #
+    # Author gate (#1859): legitimate digests are always created by the bot,
+    # so only bot-authored issues qualify. Without this, any user could write
+    # a digest-shaped issue body and drive the write-scoped bot token to file
+    # arbitrary labelled issues on their behalf.
     if: |
-      contains(github.event.issue.body, '<!-- auto-codequality-suggest -->') ||
-      contains(github.event.issue.body, '<!-- auto-app-suggest -->') ||
-      contains(github.event.issue.body, '<!-- auto-workflow-suggest -->')
+      github.event.issue.user.login == 'poke-memory-bot[bot]' &&
+      (contains(github.event.issue.body, '<!-- auto-codequality-suggest -->') ||
+       contains(github.event.issue.body, '<!-- auto-app-suggest -->') ||
+       contains(github.event.issue.body, '<!-- auto-workflow-suggest -->'))
 
     steps:
       - name: Mint App installation token
