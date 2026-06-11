@@ -2765,14 +2765,20 @@ export function ReviewSession() {
     // rationale in the comment below.
     if (!wasMastered && nowMastered && effectiveCard.cardType === "name" && !superuserGuarded) {
       // Capture values needed inside the timeout closure now, before they
-      // go stale.
+      // go stale. The badge check is scoped to the graded card's locale
+      // (#1851): masteredSpeciesIds counts only cards in the given locale,
+      // so passing the locale the user just mastered in lets ja/zh learners
+      // earn badges - previously the implicit "en" default made badges
+      // permanently unearnable outside English.
       const masteredCheckCards = newCards;
       const masteredCheckSettings = settings;
+      const masteredCheckLocale = effectiveCard.locale ?? "en";
       setTimeout(() => {
         if (!isMountedRef.current) return;
         const masteredIds = masteredSpeciesIds(
           masteredCheckCards,
           false,
+          masteredCheckLocale,
         );
         const earnedIds = new Set(masteredCheckSettings.earnedBadges.map((b) => b.id));
         const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIds);

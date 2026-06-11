@@ -32,7 +32,6 @@ import { isMastered } from "@/lib/stats/derive";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
-import type { ReviewState } from "@/lib/srs/scheduler";
 import { initialReviewState } from "@/lib/srs/scheduler";
 import { countOptimizableReviews } from "@/lib/srs/optimizer";
 import { FsrsOptimizerSection } from "@/components/settings/FsrsOptimizerSection";
@@ -193,23 +192,30 @@ function FavouritePicker({
   const { flags } = useSuperuser();
   const { seed } = useSeed();
   // Loaded once at mount. Nothing on this page writes to the session so a
-  // snapshot is safe and avoids re-reading on every render.
-  const [cardStateById, setCardStateById] = useState<Map<number, ReviewState>>(new Map());
+  // snapshot is safe and avoids re-reading on every render. Stored as the
+  // set of mastered species ids rather than a Map keyed by id: a multi-locale
+  // session holds several name cards per numeric id, and the Map's
+  // last-entry-wins collapse disagreed with isFavouriteEarned's arbitration,
+  // letting a picker-unlocked theme be wiped on the next load (#1851). The
+  // unlock rule matches isFavouriteEarned: mastered in ANY enrolled locale.
+  const [masteredCardIds, setMasteredCardIds] = useState<ReadonlySet<number>>(new Set());
   useEffect(() => {
     async function load() {
       const session = await loadSession();
-      setCardStateById(new Map((session?.cards ?? []).map((c) => [c.id, c.state])));
+      setMasteredCardIds(
+        new Set(
+          (session?.cards ?? [])
+            .filter((c) => isMastered(c.state))
+            .map((c) => c.id),
+        ),
+      );
     }
     void load();
   }, []);
 
-  const unlockedEntries = CURATED_POKEMON.filter((entry) => {
-    const state = cardStateById.get(entry.id);
-    return (
-      flags.pretendAllMastered ||
-      (state !== undefined && isMastered(state))
-    );
-  });
+  const unlockedEntries = CURATED_POKEMON.filter(
+    (entry) => flags.pretendAllMastered || masteredCardIds.has(entry.id),
+  );
 
   if (unlockedEntries.length === 0) {
     return (

@@ -45,14 +45,17 @@ export type MasteryPoint = {
 export function computeMasteryOverTime(
   cards: readonly ReviewableCard[],
   today: string,
-  forceAllMastered = false,
-  locale: AppLocale = "en",
+  forceAllMastered: boolean,
+  locale: AppLocale,
 ): MasteryPoint[] {
   if (forceAllMastered) {
     // Superuser overlay: treat every species as mastered at today's date.
-    // Count name cards as the species count (consistent with computeStats).
+    // Count name cards IN THE ACTIVE LOCALE as the species count - the
+    // real-data path below is locale-scoped via masteredSpeciesEvents, and
+    // without the same guard a two-locale QA session showed roughly double
+    // the species count (#1851).
     const nameCardCount = cards.filter(
-      (c) => c.cardType === "name",
+      (c) => c.cardType === "name" && (c.locale ?? "en") === locale,
     ).length;
     return [{ date: today, count: nameCardCount }];
   }

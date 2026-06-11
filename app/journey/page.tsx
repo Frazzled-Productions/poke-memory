@@ -467,9 +467,12 @@ export default function JourneyPage() {
       // Retroactive badge award - mirrors the same logic in stats/page.tsx.
       // Never award retroactively while a superuser flag is on.
       if (!anyFlagOn) {
+        // Scoped to the active pokemonNameLocale (#1851) - see the matching
+        // comment in stats/page.tsx.
         const masteredIds = masteredSpeciesIds(
           sessionCards,
           false,
+          settings.pokemonNameLocale,
         );
         const earnedIdSet = new Set(settings.earnedBadges.map((b) => b.id));
         const newlyEarned = checkBadges(masteredIds, BADGE_CATALOG, earnedIdSet);
@@ -512,9 +515,17 @@ export default function JourneyPage() {
       }
 
       // Build the collection timeline with the final card set (local or cloud).
+      // Locale-filtered (#1851): name cards for different pokemonNameLocales
+      // share the same subjectKey, and the Map's last-entry-wins collapse let
+      // whichever locale appeared last drive each species' forgetting
+      // projection while non-overlapping species unioned across locales.
       const nameCardMap = new Map(
         finalCards
-          .filter((c) => c.cardType === "name")
+          .filter(
+            (c) =>
+              c.cardType === "name" &&
+              (c.locale ?? "en") === settings.pokemonNameLocale,
+          )
           .map((c) => [c.subjectKey, c.state]),
       );
       const tl = buildCollectionTimeline({
@@ -523,6 +534,7 @@ export default function JourneyPage() {
         totalSpecies: currentSeed.seedPokemon.filter((p) => p.isDefaultForm).length,
         retentionTarget: settings.retentionTarget,
         forceAllMastered: flags.pretendAllMastered,
+        locale: settings.pokemonNameLocale,
       });
       setTimeline(tl);
 
@@ -582,12 +594,13 @@ export default function JourneyPage() {
         return out;
       })();
 
-  // Mastered species IDs for the proximity hint in BadgeGallery.
+  // Mastered species IDs for the proximity hint in BadgeGallery, scoped to
+  // the active pokemonNameLocale (#1851).
   // When forceAllMastered is on, every badge is earned and no hint is needed
   // (BadgeGallery skips the hint when forceAllMastered is true).
   const masteredIds: ReadonlySet<number> | undefined =
     cards !== null
-      ? masteredSpeciesIds(cards, flags.pretendAllMastered)
+      ? masteredSpeciesIds(cards, flags.pretendAllMastered, pokemonNameLocale)
       : undefined;
 
   // Pass the full card array so computeRecords can apply species-level

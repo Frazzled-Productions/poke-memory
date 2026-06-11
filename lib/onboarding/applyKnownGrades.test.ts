@@ -151,7 +151,7 @@ describe("eligibleCardsForKnownQuiz", () => {
 describe("applyKnownGrades", () => {
   it("graduates a selected new card via the Easy path", () => {
     const cards = [makeNameCard(1), makeNameCard(2)];
-    const { cards: next, gradedIds } = applyKnownGrades(cards, new Set([1]), NOW);
+    const { cards: next, gradedIds } = applyKnownGrades(cards, new Set([1]), NOW, "en");
 
     expect(gradedIds).toEqual([1]);
     const graded = next.find((c) => c.id === 1)!;
@@ -177,7 +177,7 @@ describe("applyKnownGrades", () => {
     // state - mastery requires reps >= masteryRepetitions and
     // scheduledDays >= 21, which one tap can't legitimately establish.
     const cards = [makeNameCard(1)];
-    const { cards: next } = applyKnownGrades(cards, new Set([1]), NOW);
+    const { cards: next } = applyKnownGrades(cards, new Set([1]), NOW, "en");
     const graded = next[0];
     expect(graded.state.reps).toBe(1);
     expect(graded.state.scheduledDays).toBeLessThan(MASTERY_INTERVAL_DAYS);
@@ -191,7 +191,7 @@ describe("applyKnownGrades", () => {
       reps: 1,
       scheduledDays: 5,
     });
-    const { cards: next, gradedIds } = applyKnownGrades([reviewed], new Set([1]), NOW);
+    const { cards: next, gradedIds } = applyKnownGrades([reviewed], new Set([1]), NOW, "en");
     expect(gradedIds).toEqual([]);
     // State must be identical to input - no regression of in-progress cards.
     expect(next[0].state).toEqual(reviewed.state);
@@ -199,7 +199,7 @@ describe("applyKnownGrades", () => {
 
   it("returns input cards verbatim when nothing is selected", () => {
     const cards = [makeNameCard(1), makeNameCard(2)];
-    const { cards: next, gradedIds } = applyKnownGrades(cards, new Set(), NOW);
+    const { cards: next, gradedIds } = applyKnownGrades(cards, new Set(), NOW, "en");
     expect(gradedIds).toEqual([]);
     expect(next).toEqual(cards);
   });
@@ -209,10 +209,10 @@ describe("applyKnownGrades", () => {
     // numbers depend on the FSRS library; we only need to confirm the option
     // is plumbed through.
     const cards = [makeNameCard(1), makeNameCard(2)];
-    const { cards: highRetention } = applyKnownGrades(cards, new Set([1]), NOW, {
+    const { cards: highRetention } = applyKnownGrades(cards, new Set([1]), NOW, "en", {
       retentionTarget: 0.97,
     });
-    const { cards: lowRetention } = applyKnownGrades(cards, new Set([1]), NOW, {
+    const { cards: lowRetention } = applyKnownGrades(cards, new Set([1]), NOW, "en", {
       retentionTarget: 0.8,
     });
     const high = highRetention.find((c) => c.id === 1)!.state.scheduledDays;
@@ -225,9 +225,29 @@ describe("applyKnownGrades", () => {
     const cards = [makeNameCard(1), makeNameCard(2)];
     const originalState1 = { ...cards[0].state };
     const originalState2 = { ...cards[1].state };
-    const { cards: next } = applyKnownGrades(cards, new Set([1, 2]), NOW);
+    const { cards: next } = applyKnownGrades(cards, new Set([1, 2]), NOW, "en");
     expect(cards[0].state).toEqual(originalState1);
     expect(cards[1].state).toEqual(originalState2);
     expect(next).not.toBe(cards);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale guard (#1851)
+// ---------------------------------------------------------------------------
+
+describe("applyKnownGrades locale guard (#1851)", () => {
+  it("grades only the requested locale's variant of a selected id", () => {
+    // A multi-locale session holds one card per (id, locale) with the same
+    // numeric id. Before #1851 one selection graded every locale's variant
+    // and gradedIds double-counted.
+    const en = makeNameCard(1);
+    const ja = { ...makeNameCard(1), locale: "ja" as const };
+    const { cards, gradedIds } = applyKnownGrades([en, ja], new Set([1]), NOW, "en");
+
+    expect(gradedIds).toEqual([1]);
+    expect(cards[0]!.state.lastReview).not.toBeNull();
+    // The ja variant is untouched.
+    expect(cards[1]!.state.lastReview).toBeNull();
   });
 });

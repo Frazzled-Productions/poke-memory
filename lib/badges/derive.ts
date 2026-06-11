@@ -12,8 +12,11 @@ const REVERSE_ID_OFFSET = 2_000_000;
  * Since #1234, reverse is a required practice direction, so species-level
  * mastery requires both legs.
  *
- * Since #1259, mastery is scoped to `locale` (defaults to `"en"` for
- * backward-compatibility). Only cards whose `locale` matches are counted.
+ * Since #1259, mastery is scoped to `locale`; since #1851 the parameter is
+ * REQUIRED (type-system forcing). The old `= "en"` default let every award
+ * path silently evaluate English-only mastery, making badges permanently
+ * unearnable for ja/zh learners. Only cards whose `locale` matches are
+ * counted.
  *
  * Since #1765, mastery uses FSRS stability (>= 21) rather than `reps >= 3`.
  *
@@ -30,7 +33,7 @@ const REVERSE_ID_OFFSET = 2_000_000;
 export function masteredSpeciesIds(
   cards: readonly ReviewableCard[],
   forceAllMastered: boolean,
-  locale: AppLocale = "en",
+  locale: AppLocale,
 ): Set<number> {
   // Build a quick lookup of mastered reverse-card species IDs for this locale.
   // Reverse card ID = REVERSE_ID_OFFSET + pokemonId.

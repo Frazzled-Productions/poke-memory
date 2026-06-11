@@ -75,7 +75,7 @@ function reverseCard(id: number, state: ReviewState): ReviewableCard {
 
 describe("masteredSpeciesIds", () => {
   it("returns an empty set when the cards array is empty", () => {
-    expect([...masteredSpeciesIds([], false)]).toEqual([]);
+    expect([...masteredSpeciesIds([], false, "en")]).toEqual([]);
   });
 
   it("returns an empty set when all cards are non-name directions", () => {
@@ -85,7 +85,7 @@ describe("masteredSpeciesIds", () => {
       reverseCard(2_000_001, mkMasteredState()),
       reverseCard(2_000_004, mkMasteredState()),
     ];
-    expect([...masteredSpeciesIds(cards, false)]).toEqual([]);
+    expect([...masteredSpeciesIds(cards, false, "en")]).toEqual([]);
   });
 
   it("returns only species whose name AND reverse cards satisfy the stability gate (#1765)", () => {
@@ -99,7 +99,7 @@ describe("masteredSpeciesIds", () => {
       nameCard(25, mkMasteredState()),         // name mastered
       reverseCard(2_000_025, mkMasteredState()), // reverse mastered → species 25 mastered
     ];
-    expect([...masteredSpeciesIds(cards, false)].sort((a, b) => a - b)).toEqual([1, 25]);
+    expect([...masteredSpeciesIds(cards, false, "en")].sort((a, b) => a - b)).toEqual([1, 25]);
   });
 
   it("ignores non-name card directions when computing the result set", () => {
@@ -111,7 +111,7 @@ describe("masteredSpeciesIds", () => {
       // No name card for species 4 - reverse alone is not enough.
       reverseCard(2_000_004, mkMasteredState()),
     ];
-    expect([...masteredSpeciesIds(cards, false)]).toEqual([1]);
+    expect([...masteredSpeciesIds(cards, false, "en")]).toEqual([1]);
   });
 
   it("includes every name-card species when forceAllMastered is true", () => {
@@ -120,11 +120,11 @@ describe("masteredSpeciesIds", () => {
       nameCard(4, mkNewState()),
       reverseCard(2_000_001, mkNewState()),
     ];
-    expect([...masteredSpeciesIds(cards, true)].sort((a, b) => a - b)).toEqual([1, 4]);
+    expect([...masteredSpeciesIds(cards, true, "en")].sort((a, b) => a - b)).toEqual([1, 4]);
   });
 
   it("returns an empty set when forceAllMastered is true but cards is empty", () => {
-    expect([...masteredSpeciesIds([], true)]).toEqual([]);
+    expect([...masteredSpeciesIds([], true, "en")]).toEqual([]);
   });
 
   it("does NOT count a species whose name stability is below MASTERY_STABILITY_DAYS (#1765)", () => {
@@ -134,7 +134,7 @@ describe("masteredSpeciesIds", () => {
       nameCard(7, lowStability),
       reverseCard(2_000_007, mkMasteredState()),
     ];
-    expect([...masteredSpeciesIds(cards, false)]).toEqual([]);
+    expect([...masteredSpeciesIds(cards, false, "en")]).toEqual([]);
   });
 
   it("locale scoping: only counts name+reverse pairs with matching locale (#1259)", () => {

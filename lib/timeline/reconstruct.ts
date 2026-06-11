@@ -26,6 +26,7 @@
 import { nextReview, initialReviewState, type ReviewState, type Grade } from "@/lib/srs/scheduler";
 import { isMastered, MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
+import type { AppLocale } from "@/i18n/locales";
 import { computeDecayFactor, generatorParameters } from "ts-fsrs";
 
 // Compute FSRS power-law decay/factor once from the default parameters.
@@ -465,6 +466,16 @@ export type BuildTimelineOptions = {
    * high synthetic stability for all cards.
    */
   forceAllMastered?: boolean;
+  /**
+   * Active pokemonNameLocale. REQUIRED (#1851 type-system forcing): the
+   * replay filters grade-log entries to this locale before grouping. A
+   * species enrolled in two locales has two independent cards with the SAME
+   * subjectKey, so an unfiltered replay interleaved both locales' grades
+   * into one FSRS stream - stability accrued double, mastery crossings fired
+   * early, and the scrubber's Now snapshot disagreed with the locale-scoped
+   * live counters on the same page.
+   */
+  locale: AppLocale;
 };
 
 /**
@@ -492,7 +503,13 @@ export function buildCollectionTimeline(
     nowMs = Date.now(),
     horizonDays = 180,
     forceAllMastered = false,
+    locale,
   } = opts;
+
+  // Per-locale isolation (#1851 / #1562): entries from other locales belong
+  // to different cards that merely share a subjectKey. Legacy entries without
+  // a locale field read as "en", matching every other consumer.
+  const localeLog = log.filter((entry) => (entry.locale ?? "en") === locale);
 
   let speciesEvents: Map<string, SpeciesEvent>;
 
@@ -506,7 +523,7 @@ export function buildCollectionTimeline(
       speciesEvents.set(key, { firstSeenMs: syntheticMs, masteredAtMs: syntheticMs });
     }
   } else {
-    speciesEvents = replayLog(log);
+    speciesEvents = replayLog(localeLog);
   }
 
   const past = buildPastTimeline(speciesEvents, nowMs);

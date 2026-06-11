@@ -23,6 +23,7 @@
  */
 
 import type { ReviewableCard } from "@/lib/review/session";
+import type { AppLocale } from "@/i18n/locales";
 import { nextReview, type NextReviewOptions } from "@/lib/srs/scheduler";
 import { isCardEligible } from "@/lib/eligibility/index";
 
@@ -75,11 +76,16 @@ export function eligibleCardsForKnownQuiz(
 }
 
 /**
- * Apply a simulated Easy grade to every card whose id is in `selectedIds`.
- * Returns a new array; the input is not mutated.
+ * Apply a simulated Easy grade to every card whose id is in `selectedIds`
+ * AND whose locale matches `locale`. Returns a new array; the input is not
+ * mutated.
  *
  * - Skips cards that are not eligible (no regression of an in-progress card).
  * - Cards not in `selectedIds` are returned unchanged.
+ * - Cards in another locale are returned unchanged (#1851): selection ids
+ *   are bare numeric ids, and a multi-locale session holds one card per
+ *   (id, locale), so without the locale guard one tap silently graded every
+ *   enrolled locale's variant and gradedIds double-counted.
  * - The graded state comes from `nextReview(state, 5, now, options)` - the
  *   same chokepoint the live review flow uses, so retention target and FSRS
  *   weights are honoured.
@@ -88,11 +94,13 @@ export function applyKnownGrades(
   cards: readonly ReviewableCard[],
   selectedIds: ReadonlySet<number>,
   now: Date,
+  locale: AppLocale,
   options: ApplyKnownGradesOptions = {},
 ): { cards: ReviewableCard[]; gradedIds: number[] } {
   const gradedIds: number[] = [];
   const next = cards.map((card) => {
     if (!selectedIds.has(card.id)) return card;
+    if ((card.locale ?? "en") !== locale) return card;
     if (!isEligibleForKnownQuiz(card)) return card;
     const graded = nextReview(card.state, 5, now, options);
     gradedIds.push(card.id);
