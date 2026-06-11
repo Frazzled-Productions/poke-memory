@@ -24,7 +24,7 @@ import { mutedText, mutedTextXs } from "@/lib/utils/class-names";
 import { POKEDEX_NODE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
-import { getLocaleNamesSnapshot, getLocaleName } from "@/lib/pokemon/localeNames";
+import { getLocaleName } from "@/lib/pokemon/localeNames";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -218,10 +218,6 @@ function LinearChain({
   outEdges: Map<number, FamilyEdge[]>;
 }) {
   const { locale } = usePokemonLocaleContext();
-  // Pre-load the sidecar snapshot so edge aria-labels use the locale name.
-  // getLocaleNamesSnapshot() is synchronous; SpeciesNode triggers the async
-  // load and re-renders once it resolves.
-  void getLocaleNamesSnapshot();
 
   // Walk the chain from the root.
   const ordered: Array<{ node: FamilyNode; edge: FamilyEdge | null }> = [];
@@ -267,7 +263,6 @@ function BranchingTree({
   outEdges: Map<number, FamilyEdge[]>;
 }) {
   const { locale } = usePokemonLocaleContext();
-  void getLocaleNamesSnapshot();
 
   const rootNode = nodeById.get(family.rootId);
   if (!rootNode) return null;
