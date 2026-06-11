@@ -179,7 +179,21 @@ async function postHandler(): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  // Enforce 7-day cooldown before running the CPU-bound optimizer.
+  // Enforce 7-day cooldown and guard against concurrent fits (F29).
+  //
+  // Strategy (migration-free): pre-stamp `fsrsOptimizingAt` via
+  // merge_user_settings BEFORE calling computeParameters so that concurrent
+  // requests reading the DB after this write see the in-progress marker and
+  // are rejected. The race window is now ~1 DB round-trip rather than the
+  // full 60 s fit duration. The full single-statement atomic claim would
+  // require a DB RPC migration (claim_optimizer_slot); this approach closes
+  // the practical window without one.
+  //
+  // Flow:
+  //   1. Read current settings (check cooldown + in-progress marker).
+  //   2. Stamp fsrsOptimizingAt now (write-before-fit).
+  //   3. Run computeParameters.
+  //   4. Persist final weights (clears fsrsOptimizingAt, sets fsrsWeightsOptimizedAt).
   let currentSettings: UserSettingsRow | null;
   try {
     currentSettings = await fetchUserSettings(supabase, user.id);
@@ -187,6 +201,9 @@ async function postHandler(): Promise<NextResponse> {
     return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
   }
   const last = currentSettings?.settings.fsrsWeightsOptimizedAt;
+  const inProgress = (currentSettings?.settings as Partial<UserSettings> & { fsrsOptimizingAt?: string } | undefined)?.fsrsOptimizingAt;
+
+  // Reject if the 7-day cooldown is still active.
   if (last) {
     const sinceMs = Date.now() - new Date(last).getTime();
     if (sinceMs < OPTIMIZER_COOLDOWN_MS) {
@@ -200,6 +217,30 @@ async function postHandler(): Promise<NextResponse> {
       );
     }
   }
+
+  // Reject if another request is currently running the fit (stamp younger
+  // than 5 minutes - the Vercel maxDuration upper bound).
+  if (inProgress) {
+    const inProgressMs = Date.now() - new Date(inProgress).getTime();
+    if (inProgressMs < 5 * 60 * 1000) {
+      return NextResponse.json(
+        { error: "cooldown", retryAfterMs: 5 * 60 * 1000 - inProgressMs },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil((5 * 60 * 1000 - inProgressMs) / 1000)) },
+        },
+      );
+    }
+  }
+
+  // Pre-stamp the in-progress marker. After this write, any concurrent
+  // request that also passed the read above will see fsrsOptimizingAt set
+  // on its own read and be rejected before starting the expensive fit.
+  const optimizingAt = new Date().toISOString();
+  await (supabase.rpc as unknown as MergeUserSettingsRpc)("merge_user_settings", {
+    p_user_id: user.id,
+    p_patch: { fsrsOptimizingAt: optimizingAt } as unknown as Partial<UserSettings>,
+  });
 
   // Fetch grade log from Supabase.
   const entries = await fetchGradeLog(supabase, user.id);

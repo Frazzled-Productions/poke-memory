@@ -709,4 +709,73 @@ describe("speakName - Audio element path (id provided)", () => {
     expect(firstAudio.pause).toHaveBeenCalledOnce();
     expect(secondAudio.play).toHaveBeenCalledOnce();
   });
+
+  // F36: non-English locale should bypass the MP3 path and use Web Speech directly.
+  it("skips MP3 path and uses Web Speech when locale is 'ja' (F36)", async () => {
+    const AudioCtor = vi.fn(function (this: object) {});
+    vi.stubGlobal("Audio", AudioCtor);
+    const synth = makeSynthesis([voice("ja", true, "Kyoko")]);
+    vi.stubGlobal("window", { speechSynthesis: synth });
+    vi.stubGlobal("SpeechSynthesisUtterance", MockUtterance);
+
+    const { speakName } = await import("./tts");
+    speakName("フシギダネ", 1, { locale: "ja" });
+    vi.runAllTimers();
+
+    // MP3 constructor must NOT be called
+    expect(AudioCtor).not.toHaveBeenCalled();
+    // Web Speech must be used
+    expect(synth.speak).toHaveBeenCalledOnce();
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance;
+    expect(utterance.lang).toBe("ja");
+    expect(utterance.text).toBe("フシギダネ");
+  });
+
+  it("skips MP3 path and uses Web Speech when locale is 'zh-Hans' (F36)", async () => {
+    const AudioCtor = vi.fn(function (this: object) {});
+    vi.stubGlobal("Audio", AudioCtor);
+    const synth = makeSynthesis([voice("zh-Hans", true, "Ting-Ting")]);
+    vi.stubGlobal("window", { speechSynthesis: synth });
+    vi.stubGlobal("SpeechSynthesisUtterance", MockUtterance);
+
+    const { speakName } = await import("./tts");
+    speakName("妙蛙种子", 1, { locale: "zh-Hans" });
+    vi.runAllTimers();
+
+    expect(AudioCtor).not.toHaveBeenCalled();
+    expect(synth.speak).toHaveBeenCalledOnce();
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance;
+    expect(utterance.lang).toBe("zh-Hans");
+  });
+
+  it("skips MP3 path and uses Web Speech when locale is 'zh-Hant' (F36)", async () => {
+    const AudioCtor = vi.fn(function (this: object) {});
+    vi.stubGlobal("Audio", AudioCtor);
+    const synth = makeSynthesis([voice("zh-Hant", true, "Mei-Jia")]);
+    vi.stubGlobal("window", { speechSynthesis: synth });
+    vi.stubGlobal("SpeechSynthesisUtterance", MockUtterance);
+
+    const { speakName } = await import("./tts");
+    speakName("妙蛙種子", 1, { locale: "zh-Hant" });
+    vi.runAllTimers();
+
+    expect(AudioCtor).not.toHaveBeenCalled();
+    expect(synth.speak).toHaveBeenCalledOnce();
+    const utterance = synth.speak.mock.calls[0][0] as MockUtterance;
+    expect(utterance.lang).toBe("zh-Hant");
+  });
+
+  it("still uses MP3 path for English locale (F36 - no regression)", async () => {
+    const mockAudio = makeMockAudio();
+    vi.stubGlobal("Audio", makeAudioCtor(mockAudio));
+    const synth = makeSynthesis([voice("en-GB", true, "Daniel")]);
+    vi.stubGlobal("window", { speechSynthesis: synth });
+    vi.stubGlobal("SpeechSynthesisUtterance", MockUtterance);
+
+    const { speakName } = await import("./tts");
+    speakName("Bulbasaur", 1, { locale: "en" });
+
+    expect(mockAudio.play).toHaveBeenCalledOnce();
+    expect(synth.speak).not.toHaveBeenCalled();
+  });
 });

@@ -63,7 +63,7 @@ import { useServiceWorkerVersion } from "@/lib/pwa/useServiceWorkerVersion";
 import { useRetryPush } from "@/lib/sync/useRetryPush";
 import { loadSyncStatus } from "@/lib/sync/persistence";
 import { cn } from "@/lib/utils/cn";
-import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, pageTitle, sectionLabel } from "@/lib/utils/class-names";
 import { CompanyDisclosure } from "@/components/CompanyDisclosure";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
@@ -910,7 +910,7 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-1 flex-col items-center bg-background px-4 py-10 sm:py-14">
       <div className="w-full max-w-3xl">
-        <h1 className="mb-8 text-2xl font-bold tracking-tight text-foreground">
+        <h1 className={`mb-8 ${pageTitle}`}>
           {t("settings.heading")}
         </h1>
 

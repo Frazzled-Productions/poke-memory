@@ -397,16 +397,28 @@ function buildFutureTimeline(
     const daysToForget = daysUntilForgetting(stability, retentionTarget);
     if (!isFinite(daysToForget)) continue;
 
-    // Base the forgetting anchor on dueDate (when FSRS next schedules this card).
-    // If the card is already overdue (dueDate < today), the forgetting starts
-    // from now, not from the past.
-    const dueDateMs = state.lastReview
-      ? Math.max(nowMs, new Date(state.dueDate + "T00:00:00Z").getTime())
-      : nowMs;
-    const forgetMs = dueDateMs + daysToForget * 86_400_000;
+    // Anchor on the last-review date, because FSRS retrievability is a function
+    // of elapsed time since lastReview (not since dueDate). dueDate is already
+    // lastReview + daysToForget, so anchoring on dueDate would double-count the
+    // interval and overstate retention by a full scheduling cycle (F19).
+    // If lastReview is available, derive its epoch directly; otherwise fall back
+    // to deriving it from dueDate - scheduledDays.
+    const dueDateMs = new Date(state.dueDate + "T00:00:00Z").getTime();
+    const lastReviewMs = state.lastReview
+      ? new Date(state.lastReview + "T00:00:00Z").getTime()
+      : dueDateMs - (state.scheduledDays ?? 0) * 86_400_000;
+    const forgetMs = lastReviewMs + daysToForget * 86_400_000;
 
-    if (forgetMs > nowMs && forgetMs <= nowMs + horizonDays * 86_400_000) {
-      events.push({ speciesKey, forgetMs });
+    // Include cards that will be forgotten within the horizon AND cards that
+    // are already forgotten (forgetMs <= nowMs): clamp those to nowMs so they
+    // contribute as "forgotten at day 0" (F19 - "already overdue → forgotten at
+    // day 0"). Exclude cards whose forgetting horizon is beyond the display
+    // window (they stay retained throughout).
+    if (forgetMs <= nowMs + horizonDays * 86_400_000) {
+      // Clamp already-forgotten cards to nowMs so they count as forgotten from
+      // day 0 in the future projection. Cards with forgetMs > nowMs are stored
+      // as-is (they will be forgotten at their actual projected time).
+      events.push({ speciesKey, forgetMs: forgetMs <= nowMs ? nowMs : forgetMs });
     }
   }
 
@@ -516,8 +528,11 @@ export function buildCollectionTimeline(
   if (forceAllMastered) {
     // Under the superuser flag, synthesise events so all species appear
     // introduced and mastered at the earliest point of the past timeline.
-    // Use nowMs as firstSeen so the past graph shows a flat 100% line.
-    const syntheticMs = nowMs - 1;
+    // Place syntheticMs BEFORE the first checkpoint (nowMs - DAILY_RESOLUTION_DAYS)
+    // so every snapshot in the daily range counts all species, giving a flat
+    // 100% line across the full slider (F59 - nowMs-1 landed after midnight,
+    // causing the midnight checkpoint to see 0/0).
+    const syntheticMs = nowMs - DAILY_RESOLUTION_DAYS * 86_400_000 - 1;
     speciesEvents = new Map();
     for (const key of currentNameCards.keys()) {
       speciesEvents.set(key, { firstSeenMs: syntheticMs, masteredAtMs: syntheticMs });

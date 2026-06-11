@@ -26,6 +26,21 @@ describe("normaliseInput", () => {
     expect(normaliseInput("flabébé")).toBe("flabébé");
   });
 
+  it("folds typographic apostrophes (U+2019) to ASCII - real seed strings (F10)", () => {
+    // generated-core.json uses U+2019 RIGHT SINGLE QUOTATION MARK.
+    expect(normaliseInput("Farfetch’d")).toBe("farfetchd");
+    expect(normaliseInput("Sirfetch’d")).toBe("sirfetchd");
+    // Also U+2018 LEFT SINGLE QUOTATION MARK.
+    expect(normaliseInput("Farfetch‘d")).toBe("farfetchd");
+  });
+
+  it("strips gender symbols ♀/♂ - real Nidoran seed strings (F10)", () => {
+    expect(normaliseInput("Nidoran♀")).toBe("nidoran");  // ♀
+    expect(normaliseInput("Nidoran♂")).toBe("nidoran");  // ♂
+    expect(normaliseInput("nidoran♀")).toBe("nidoran");
+    expect(normaliseInput("nidoran♂")).toBe("nidoran");
+  });
+
   it("collapses separator variants to the same form", () => {
     // "Porygon-Z" typed as "porygon-z", "porygon z", or "porygonz" all normalise
     // identically, so the user is not penalised for using a space vs a hyphen.
@@ -159,6 +174,32 @@ describe("gradeTypedAnswer", () => {
 
   it("strips punctuation before comparing - farfetchd matches Farfetch'd", () => {
     const { grade } = gradeTypedAnswer("farfetchd", "Farfetch'd");
+    expect(grade).toBe(4);
+  });
+
+  // F10: real seed strings use U+2019 / ♀ / ♂; typed input (ASCII) must still grade Good.
+  it("grades 'farfetchd' as Good against the real seed canonical 'Farfetch’d' (U+2019)", () => {
+    const { grade } = gradeTypedAnswer("farfetchd", "Farfetch’d");
+    expect(grade).toBe(4);
+  });
+
+  it("grades 'farfetch'd' (ASCII apostrophe) as Good against seed 'Farfetch’d'", () => {
+    const { grade } = gradeTypedAnswer("farfetch'd", "Farfetch’d");
+    expect(grade).toBe(4);
+  });
+
+  it("grades 'sirfetchd' as Good against the real seed canonical 'Sirfetch’d' (U+2019)", () => {
+    const { grade } = gradeTypedAnswer("sirfetchd", "Sirfetch’d");
+    expect(grade).toBe(4);
+  });
+
+  it("grades 'nidoran' as Good against the real seed canonical 'Nidoran♀' (♀)", () => {
+    const { grade } = gradeTypedAnswer("nidoran", "Nidoran♀");
+    expect(grade).toBe(4);
+  });
+
+  it("grades 'nidoran' as Good against the real seed canonical 'Nidoran♂' (♂)", () => {
+    const { grade } = gradeTypedAnswer("nidoran", "Nidoran♂");
     expect(grade).toBe(4);
   });
 

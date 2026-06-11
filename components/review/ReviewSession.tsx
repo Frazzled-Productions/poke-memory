@@ -773,6 +773,9 @@ export function ReviewSession() {
   // call must write the full array - never the filtered `cards`. See the invariant
   // comment at each saveSession call site in this file.
   const [cards, setCards] = useState<ReviewableCard[] | null>(null);
+  // Ref so the cry auto-play effect can read the current card without
+  // listing `cards` as a dep (which would re-fire on every grade).
+  const cardsRef = useRef<ReviewableCard[] | null>(null);
   // MULTI-LOCALE: holds the complete multi-locale card array from the last load
   // or grade. `cards` state is always a subset: full.filter(c => locale matches).
   // Initialised to [] before the load effect fires; never null (avoids conditional
@@ -1445,35 +1448,23 @@ export function ReviewSession() {
     useCallback(() => setLearningQueue((q) => [...q]), []),
   );
 
+  // Keep the ref in sync with state so the cry effect can read it without
+  // listing `cards` as a dependency (which would re-fire on every grade).
+  useEffect(() => { cardsRef.current = cards; }, [cards]);
+
   // Auto-play the cry when a cry card first becomes the current card.
   // Drives the "audio as prompt" loop without requiring a tap. Skipped
   // on already-revealed cards (the cry plays separately via handleReveal).
+  // Drive off displayedCardId so we play the DISPLAYED card's cry, not the
+  // first array-order cry card (F7). Only re-fires when the displayed card
+  // id changes - not on every grade (which changes `cards` but not the id).
   useEffect(() => {
-    // Resolve the would-be current card by re-running the queue logic in
-    // the effect; doing it here (above the early returns) keeps the hook
-    // unconditional. If anything is null or the card isn't a cry, exit.
-    if (cards === null) return;
     if (revealed) return;
-    if (!cards.length) return;
-    // Mirror the priority used downstream: locked > learning > review > new.
-    let cardId: number | null = revealedCardId.current;
-    if (cardId === null) {
-      // Re-evaluate cheaply: just look for an in-step or due card.
-      const found = cards.find(
-        (c) =>
-          c.cardType === "cry" &&
-          (c.state.learningStep !== null ||
-            (c.state.lastReview !== null && c.state.dueDate <= todayString(new Date()) && c.state.lastReview !== todayString(new Date())) ||
-            c.state.lastReview === null),
-      );
-      cardId = found?.id ?? null;
-    }
-    if (cardId === null) return;
-    const card = cards.find((c) => c.id === cardId);
+    if (displayedCardId === null) return;
+    const card = cardsRef.current?.find((c) => c.id === displayedCardId);
     if (!card || card.cardType !== "cry") return;
     playCry(card.cryUrl ?? null);
-    // Re-fire only when the underlying card id changes (next cry card up).
-  }, [cards, revealed]);
+  }, [displayedCardId, revealed]);
 
   // Cmd/Ctrl+Z triggers undo while an undo snapshot is live. Listener is
   // attached unconditionally so the hook order stays stable across early

@@ -452,7 +452,7 @@ export default function StatsPage() {
           former ForcePullSection gate.
         */}
         {user !== null && supabase !== null && !anyFlagOn && (
-          <p className="mb-8 text-sm text-zinc-500 dark:text-zinc-400">
+          <p className={`mb-8 ${mutedText}`}>
             {t("restoreFromCloudDescription")}{" "}
             <Link
               href="/settings"
