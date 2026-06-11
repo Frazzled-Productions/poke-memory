@@ -625,7 +625,16 @@
       "incorrectSuffix": " (incorrect)"
     },
     "higherOrLower": {
-      "sectionAriaLabel": "Higher or Lower mini-game"
+      "sectionAriaLabel": "Higher or Lower mini-game",
+      "playButton": "Play Higher or Lower",
+      "playButtonAriaLabel": "Play Higher or Lower",
+      "playButtonDisabledAriaLabel": "Not enough Pokémon to play Higher or Lower",
+      "playButtonHelperText": "Keep practising to unlock the stat guessing game.",
+      "backToSummary": "← Summary",
+      "backToSummaryAriaLabel": "Back to session summary",
+      "barStreakAriaLabel": "{count, plural, one {# day streak} other {# days streak}}",
+      "barDueTomorrow": "{count, plural, one {# tomorrow} other {# tomorrow}}",
+      "barDueTomorrowAriaLabel": "{count, plural, one {# card due tomorrow} other {# cards due tomorrow}}"
     },
     "typedEntry": {
       "inputAriaLabel": "Type the Pokémon name"

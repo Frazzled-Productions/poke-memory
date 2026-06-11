@@ -763,6 +763,7 @@ function CountdownScreen({
 
 export function ReviewSession() {
   const t = useTranslations("practice");
+  const tReview = useTranslations("review");
   const { seed: seedData, error: seedError, retry: seedRetry } = useSeed();
   const seedPokemon: readonly SeedPokemon[] = seedData?.seedPokemon ?? [];
   const seedEvolutionCards: readonly SeedEvolutionCard[] = seedData?.seedEvolutionCards ?? [];
@@ -839,6 +840,16 @@ export function ReviewSession() {
   // Transient flag: user chose "Keep reviewing" at the soft wall.
   // Not persisted - resets on every page load by design.
   const [extendedReview, setExtendedReview] = useState(false);
+
+  // View-state toggle for the end-of-session Higher-or-Lower game (#1882).
+  // false = full summary with entry button; true = highlights bar + game in card position.
+  const [showGame, setShowGame] = useState(false);
+  // Ref for the "Play Higher or Lower" entry button so focus can be returned
+  // to it when the user presses "Back to summary".
+  const showGameButtonRef = useRef<HTMLButtonElement | null>(null);
+  // Ref for the first tile button in the game so focus moves to it when the
+  // game view is entered.
+  const firstTileRef = useRef<HTMLButtonElement | null>(null);
 
   // Keyboard shortcuts overlay - opened by the `?` key or the `?` hint button
   // on the GradeButtons panel. Controlled here so the keydown handler can open
@@ -1019,6 +1030,24 @@ export function ReviewSession() {
     isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
+
+  // Move focus when the game view is entered or exited (#1882).
+  // useEffect runs after the DOM update so the target element is mounted when
+  // .focus() fires. The timeout (0 ms) yields to React's render flush before
+  // calling focus, necessary on slower devices and in the test env.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (showGame) {
+        firstTileRef.current?.focus();
+      } else {
+        showGameButtonRef.current?.focus();
+      }
+    }, 0);
+    return () => clearTimeout(id);
+    // showGame is the only dep: we only want to move focus on toggle, not on
+    // every render. The refs are stable objects (never reassigned).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showGame]);
 
   // Kick off flavor-text fetch in the background so it is warm by the time
   // the user reveals their first card. Non-blocking: the critical render path
@@ -2124,21 +2153,95 @@ export function ReviewSession() {
       saveSettings({ ...current, activePokemonNameLocale: next });
     }
 
-    const hasGame = seenPokemon.length >= 2;
+    // seenPokemon.length drives the entry-button state (#1882):
+    //   >=2  -> enabled button (game can be played)
+    //   ==1  -> disabled button + helper text (not enough Pokémon yet)
+    //   ==0  -> button hidden entirely
+    const gameEntryState: "hidden" | "disabled" | "enabled" =
+      seenPokemon.length >= 2 ? "enabled"
+      : seenPokemon.length === 1 ? "disabled"
+      : "hidden";
+
+    // --- Game view (showGame=true): highlights bar + game in card position ---
+    if (showGame) {
+      return (
+        /* overflow-hidden so the game receives a bounded flex-1 min-h-0 height
+           context. The game pins its action button as flex-none so the user
+           never needs to scroll to reach it, including with a Scope filter
+           applied (#1837/#1882). */
+        <div className="flex flex-col flex-1 min-h-0 w-full items-center overflow-hidden">
+          {/* Highlights bar: flex-none at the top - not sticky per the #1837
+              overflow model. Contains the back button, SRS daily streak (not
+              the in-game consecutive streak - USER-DECISION: the bar is a
+              session summary affordance so it shows the same streak as the
+              share summary / shareParts, i.e. the SRS calendar streak),
+              due-tomorrow count, and Share button. "All caught up" label
+              omitted to keep the bar compact (#1882 ux-advisor). */}
+          <div className="flex-none w-full flex items-center gap-2 px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
+            {/* Back to summary button - secondary style matching the end-of-session
+                secondary buttons. min-h-[44px] for touch target (#1882). */}
+            <button
+              type="button"
+              aria-label={tReview("higherOrLower.backToSummaryAriaLabel")}
+              onClick={() => setShowGame(false)}
+              className="min-h-[44px] flex-none rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+            >
+              {tReview("higherOrLower.backToSummary")}
+            </button>
+
+            {/* Streak chip: uses shareParts.streak (SRS daily streak). Shows 0
+                until the first grade is committed. aria-label is the full
+                readable form; visible text is the compact emoji+number form. */}
+            <span
+              aria-label={tReview("higherOrLower.barStreakAriaLabel", { count: shareParts?.streak ?? 0 })}
+              className="flex-none flex items-center gap-1 text-sm font-semibold tabular-nums"
+            >
+              🔥{shareParts?.streak ?? 0}
+            </span>
+
+            {/* Due-tomorrow count. Hidden when 0. min-h-[44px] for touch sizing
+                even though this is a <span> (for visual alignment). */}
+            {dueTomorrow > 0 && (
+              <span
+                aria-label={tReview("higherOrLower.barDueTomorrowAriaLabel", { count: dueTomorrow })}
+                className="flex-none text-sm text-zinc-500 dark:text-zinc-400 tabular-nums"
+              >
+                {tReview("higherOrLower.barDueTomorrow", { count: dueTomorrow })}
+              </span>
+            )}
+
+            {/* Share button pushed to the right. Only shown when there is
+                something to share (same gate as the full-summary share button). */}
+            {shareText !== null && shareParts !== null && (
+              <div className="ml-auto flex-none min-h-[44px] flex items-center">
+                <ShareTodayButton parts={shareParts} text={shareText} />
+              </div>
+            )}
+          </div>
+
+          {/* Game in card position: flex-1 min-h-0 mirrors ReviewCardLayout's
+              shrinkable card region. standalone=true removes the border-t/pt-4
+              separator that was used in the old stacked layout (#1837/#1882).
+              The highlights bar above provides visual separation.
+              USER-DECISION: bar is flex-none at the top (not sticky), consistent
+              with the #1837 overflow model - the game content scrolls within
+              its flex-1 region without the bar floating over it. */}
+          <HigherOrLowerGame
+            seenPokemon={seenPokemon}
+            standalone={true}
+            firstTileRef={firstTileRef}
+          />
+          {badgeToastSlot}
+        </div>
+      );
+    }
+
+    // --- Summary view (showGame=false): full summary + entry button ---
     return (
-      /* When the Higher-or-Lower game is present the outer container switches
-         from overflow-y-auto (scrollable) to overflow-hidden so the game
-         receives a bounded flex-1 min-h-0 height context. The game pins its
-         action button as flex-none so the user never needs to scroll to reach
-         it (#1837). Without the game the container stays scrollable so the
-         EndOfSessionScreen content can overflow on very small viewports. */
-      <div
-        className={`flex flex-col flex-1 min-h-0 w-full items-center ${hasGame ? "overflow-hidden" : "overflow-y-auto"}`}
-      >
-        {/* EndOfSessionScreen: flex-none when the game is present so it does
-            not compete with the game for the available height. Without a game
-            it grows naturally inside the scrollable container. */}
-        <div className={`w-full ${hasGame ? "flex-none overflow-y-auto" : ""}`}>
+      /* No game is mounted in this view, so the container is scrollable to
+         accommodate the full EndOfSessionScreen on very small viewports. */
+      <div className="flex flex-col flex-1 min-h-0 w-full items-center overflow-y-auto">
+        <div className="w-full">
           {/* When a scope filter is active, show ScopeControl so the user can
               see what filter is set and modify or clear it. This mirrors the
               card-practice path where ScopeControl is always visible (#1797). */}
@@ -2172,10 +2275,36 @@ export function ReviewSession() {
             onSwitchLocale={handleSwitchLocale}
             onClearScope={!isScopeEmpty(scope) ? () => handleScopeChange(EMPTY_SCOPE) : undefined}
           />
+
+          {/* Play Higher or Lower entry area.
+              - gameEntryState "enabled": primary entry button.
+              - gameEntryState "disabled": disabled button + helper text.
+              - gameEntryState "hidden": renders nothing (0 seen Pokémon). */}
+          {gameEntryState !== "hidden" && (
+            <div className="flex flex-col items-center gap-2 pb-6 pt-2">
+              <button
+                ref={showGameButtonRef}
+                type="button"
+                disabled={gameEntryState === "disabled"}
+                aria-label={
+                  gameEntryState === "disabled"
+                    ? tReview("higherOrLower.playButtonDisabledAriaLabel")
+                    : tReview("higherOrLower.playButtonAriaLabel")
+                }
+                aria-disabled={gameEntryState === "disabled" ? true : undefined}
+                onClick={gameEntryState === "enabled" ? () => setShowGame(true) : undefined}
+                className="min-h-[44px] rounded-lg bg-foreground px-6 py-2 text-sm font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {tReview("higherOrLower.playButton")}
+              </button>
+              {gameEntryState === "disabled" && (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center max-w-xs px-4">
+                  {tReview("higherOrLower.playButtonHelperText")}
+                </p>
+              )}
+            </div>
+          )}
         </div>
-        {hasGame && (
-          <HigherOrLowerGame seenPokemon={seenPokemon} />
-        )}
         {badgeToastSlot}
       </div>
     );

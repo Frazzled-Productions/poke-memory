@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
@@ -37,9 +38,12 @@ type PokemonTileProps = {
   phase: Phase;
   onPick: () => void;
   highlight: "winner" | "loser" | "tie" | null;
+  /** Optional ref forwarded to the tile root button element. Used to move
+   *  focus to the first tile when the game view is entered (#1882). */
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
-function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTileProps) {
+function PokemonTile({ pokemon, stat, phase, onPick, highlight, buttonRef }: PokemonTileProps) {
   const statVal = pokemon.stats[stat];
   const { locale } = usePokemonLocaleContext();
   // eslint-disable-next-line no-restricted-syntax -- English fallback arg, not a direct render
@@ -57,9 +61,10 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
     /* flex-1 h-full: the tile fills half the available width (flex-1 in the
        row direction) and the full height of the tiles row (h-full avoids the
        Webkit bug where flex-1 + min-h-0 on the cross-axis resolves to
-       zero-height, making the button's click-center land on a sibling element
+       zero-height, making the button click-center landing on a sibling element
        instead of the button itself, #1837). */
     <button
+      ref={buttonRef}
       type="button"
       onClick={onPick}
       disabled={phase === "revealed"}
@@ -106,9 +111,21 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
 
 type Props = {
   seenPokemon: SeedPokemon[];
+  /**
+   * When true, the game renders without the top border-separator and outer
+   * top padding that were used in the old stacked-below-summary layout (#1837).
+   * Set to true when the game occupies its own view in the card position (#1882).
+   * Defaults false to preserve backward compatibility.
+   */
+  standalone?: boolean;
+  /**
+   * Optional ref forwarded to the first (left) tile button so the parent can
+   * move focus to it when entering the game view (#1882).
+   */
+  firstTileRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
-export function HigherOrLowerGame({ seenPokemon }: Props) {
+export function HigherOrLowerGame({ seenPokemon, standalone = false, firstTileRef }: Props) {
   const t = useTranslations("review");
   const [pair, setPair] = useState<Pair | null>(null);
   const [phase, setPhase] = useState<Phase>("picking");
@@ -215,13 +232,14 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   }
 
   return (
-    /* flex-1 min-h-0: fills the height passed from the end-of-session
-       container so the layout can pin the action button without scrolling
-       (#1837). The border-t divides the game from the EndOfSessionScreen
-       content above. */
+    /* When standalone=true (game in its own card-position view, #1882): no
+       border-t or top padding - the highlights bar above provides visual
+       separation.
+       When standalone=false (legacy stacked layout, #1837): border-t and pt-4
+       separate the game from the EndOfSessionScreen content above it. */
     <section
       aria-label={t("higherOrLower.sectionAriaLabel")}
-      className="flex flex-col flex-1 min-h-0 w-full max-w-sm mx-auto pt-4 border-t border-zinc-200 dark:border-zinc-800"
+      className={`flex flex-col flex-1 min-h-0 w-full max-w-sm mx-auto${standalone ? "" : " pt-4 border-t border-zinc-200 dark:border-zinc-800"}`}
     >
       {/* flex-none: streak/best counters always visible, do not shrink. */}
       <div className={`flex-none flex justify-between w-full ${mutedTextXs} tabular-nums mb-3`}>
@@ -252,6 +270,7 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
           phase={phase}
           onPick={() => handlePick("left")}
           highlight={tileHighlight("left")}
+          buttonRef={firstTileRef}
         />
         <PokemonTile
           pokemon={pair.right}
