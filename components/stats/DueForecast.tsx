@@ -250,7 +250,11 @@ export default function DueForecast({
           <div className="mt-2 grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1 text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">
             {forecast.map((day, idx) => (
               <span key={day.date} className="text-center">
-                {idx === 0 ? "Today" : new Date(day.date).getDate()}
+                {/* Day-of-month straight from the YYYY-MM-DD string - parsing
+                    via `new Date(...).getDate()` read UTC midnight in the
+                    browser's local zone, labelling every bar one day early
+                    west of UTC and disagreeing with the tooltip (#1853). */}
+                {idx === 0 ? "Today" : Number(day.date.slice(8, 10))}
               </span>
             ))}
           </div>

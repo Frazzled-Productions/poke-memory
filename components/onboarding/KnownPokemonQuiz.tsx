@@ -46,6 +46,7 @@ import { buildSession, DEFAULT_LIMITS } from "@/lib/review/session";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import { appendGradeEntry } from "@/lib/gradelog/persistence";
+import { todayInTimezone } from "@/lib/utils/format-date";
 import { generationOf, GEN_RANGES } from "@/lib/stats/derive";
 import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
@@ -306,7 +307,9 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
       // appendGradeEntry fires GRADE_LOG_APPENDED_EVENT, which
       // AutoSyncOnChange picks up to push to grade_log. enqueueGrade short
       // circuits when client/userId are null (guest or superuser pause).
-      const todayUtc = formatTodayUtc(now);
+      // Stamp with the user's-timezone day (#1853), matching ReviewSession's
+      // handleGrade and the todayGradeSequence readers.
+      const todayLocal = todayInTimezone(settings.timezone ?? "UTC", now);
       const gradedCardsById = new Map(nextCards.map((c) => [c.id, c]));
       for (const id of gradedIds) {
         const card = gradedCardsById.get(id);
@@ -317,7 +320,7 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
         // Onboarding bulk-grades at Easy which graduates immediately;
         // learningStep and stepStartedAt are null for graduated cards (#1416).
         await appendGradeEntry({
-          date: todayUtc,
+          date: todayLocal,
           grade: 5,
           cardType: card.cardType,
           subjectKey: card.subjectKey,
@@ -507,18 +510,6 @@ export function KnownPokemonQuiz({ client, userId, superuserPaused, onApplied }:
       </dialog>
     </div>
   );
-}
-
-/**
- * Format a Date as "YYYY-MM-DD" in UTC. Matches `appendGradeEntry`'s default
- * (UTC) mode so `todayGradeSequence` can recover the entry. Local helper to
- * avoid pulling in the timezone-aware format-date stack.
- */
-function formatTodayUtc(date: Date): string {
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(date.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 // Helper export for use in callers - keeps the `ReviewableCard` import surface

@@ -306,10 +306,11 @@ export function computeGradeTotals(log: GradeLog): GradeTotals {
  *
  * Entries are sorted by `occurredAt` so the sequence reflects grade order
  * regardless of how the log array happens to be laid out after a sync merge.
- * `today` must be a UTC "YYYY-MM-DD" date string, because `appendGradeEntry`
- * stamps each entry's `date` with `todayString(now)` in its default (UTC)
- * mode. Passing a timezone-aware `today` here would fail to match the UTC
- * entry dates and return an empty sequence.
+ * `today` must be the user's-timezone "YYYY-MM-DD" calendar day
+ * (`todayString(now, timezone)`), because every writer stamps `date` in that
+ * domain (#1853): ReviewSession's handleGrade and KnownPokemonQuiz both stamp
+ * the tz-local day, matching the streak and Stats-chart readers. Passing the
+ * UTC day here would mismatch entries for any non-UTC user.
  */
 export function todayGradeSequence(log: GradeLog, today: string): Grade[] {
   return log

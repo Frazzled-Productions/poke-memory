@@ -1368,12 +1368,15 @@ export function ReviewSession() {
         setNewCardsThisSession(storedSummary.newCards);
         setMasteredThisSession(storedSummary.mastered);
       } else if (!superuserGuarded) {
-        // Grade-log entries are stamped with a UTC date (see handleGrade), so
-        // reconstruct against the same UTC day boundary the entries use.
+        // Grade-log entries are stamped with the user's-timezone day (see
+        // handleGrade, #1853), so reconstruct against the same boundary.
         // Skipped while a superuser flag is on, mirroring the saveDailySummary
         // write-guard: a QA session must not drive the Share affordance.
         const gradeLog = await loadGradeLog();
-        const todaysGrades = todayGradeSequence(gradeLog, today);
+        const todaysGrades = todayGradeSequence(
+          gradeLog,
+          todayString(now, settings.timezone ?? "UTC"),
+        );
         if (todaysGrades.length > 0) {
           setSessionGradeSeq(todaysGrades);
         }
@@ -2396,6 +2399,12 @@ export function ReviewSession() {
     fullSessionRef.current = newFullCards;
 
     const today = todayString(now);
+    // User-facing day stamp for the streak and the grade log (#1853). `today`
+    // stays UTC for scheduling comparisons (dueDate / lastReview); the streak
+    // and grade-log day must instead match the readers, which all anchor on
+    // the user's timezone (StreakBadge, useStreakNavState, the Stats history
+    // charts) - the same domain saveDailySummary below already uses.
+    const localToday = todayString(now, timezone);
 
     // Derive new/mastered transitions now (while effectiveCard / nextState are
     // in scope) so the values are available for the visible swap below and for
@@ -2694,7 +2703,10 @@ export function ReviewSession() {
       undoSnapshotRef.current = snapshot;
       setHasUndoSnap(true);
       const gradeLog = await loadGradeLog();
-      const gradedToday = gradeLog.filter((e) => e.date === today).length + 1;
+      // Count and stamp in the user's-timezone day domain (#1853): the streak
+      // readers and Stats charts anchor on the tz-local day, so the writer
+      // must too. dueDate/lastReview comparisons stay UTC (scheduling dates).
+      const gradedToday = gradeLog.filter((e) => e.date === localToday).length + 1;
       const dueQueueEmpty = !newCards.some(
         (c) =>
           c.state.learningStep === null &&
@@ -2702,12 +2714,12 @@ export function ReviewSession() {
           c.state.dueDate <= today &&
           c.state.lastReview !== today,
       );
-      recordReview(today, gradedToday, dueQueueEmpty);
+      recordReview(localToday, gradedToday, dueQueueEmpty);
       // Pass POST-grade learningStep/stepStartedAt from nextState so the
       // grade_log row captures the scheduler's exact in-learning position
       // at the time of grading (#1416). These are in closure scope.
       const appended = await appendGradeEntry({
-        date: today,
+        date: localToday,
         grade,
         cardType: effectiveCard.cardType,
         subjectKey: effectiveCard.subjectKey,

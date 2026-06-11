@@ -231,3 +231,24 @@ describe("DueForecast", () => {
     ).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Axis labels (#1853 / F38)
+//
+// Day-of-month labels come straight from the YYYY-MM-DD string. The previous
+// `new Date(day.date).getDate()` parsed UTC midnight in the browser's local
+// zone, labelling every bar one day early west of UTC and disagreeing with
+// the formatDate-driven tooltip.
+// ---------------------------------------------------------------------------
+
+describe("DueForecast axis labels", () => {
+  it("labels the first bar 'Today' and the rest with the string's day-of-month", () => {
+    renderWithIntl(<DueForecast forecast={makeForecast()} />);
+    // Fixture starts 2026-05-20: bar 0 is "Today", bar 1 is the 21st, the
+    // last May bar is the 31st, and the first June bar is the 1st.
+    expect(screen.getByText("Today")).toBeInTheDocument();
+    expect(screen.getByText("21")).toBeInTheDocument();
+    expect(screen.getByText("31")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+  });
+});
