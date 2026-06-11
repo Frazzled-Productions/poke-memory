@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 
 // Streak sync is best-effort: failures are surfaced as `false` (push) or `null`
 // (pull) and the caller is expected to keep going. A streak miss is not a
@@ -39,12 +40,18 @@ export async function pullStreak(
   userId: string,
 ): Promise<string[] | null> {
   try {
-    const { data, error } = await client
-      .from("streak_days")
-      .select("review_date")
-      .eq("user_id", userId);
-    if (error || !data) return null;
-    return (data as { review_date: string }[]).map((r) => r.review_date);
+    // Paginate to avoid the PostgREST 1000-row cap. streak_days grows one
+    // row per review day (fuse is ~2.7 years at daily use), so truncation
+    // is a long-horizon risk worth guarding now.
+    const data = await fetchAllPages<{ review_date: string }>((from, to) =>
+      client
+        .from("streak_days")
+        .select("review_date")
+        .eq("user_id", userId)
+        .range(from, to),
+    );
+    if (!data) return null;
+    return data.map((r) => r.review_date);
   } catch {
     return null;
   }

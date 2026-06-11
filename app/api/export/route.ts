@@ -22,6 +22,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { Subject } from "@/lib/cards/subjectKey";
+import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 
 // Build a lookup map once at module load - derived from static seed data so
 // the cost is paid once per cold start, not per request.
@@ -115,22 +116,29 @@ export async function GET(): Promise<NextResponse> {
   }
 
   // Fetch all grade_log rows for this user, ordered chronologically so the
-  // CSV reads in review order.
+  // CSV reads in review order. Paginated to avoid the PostgREST 1000-row
+  // default cap, which would silently truncate the export for any active
+  // user and violate GDPR right-to-portability completeness.
+  // entry_date + occurred_at together form a total order tiebreaker so rows
+  // do not shift across page boundaries as the user continues reviewing.
   let rows: GradeLogCloudRow[];
   try {
-    const { data, error } = await supabase
-      .from("grade_log")
-      .select("occurred_at,entry_date,card_type,grade,subject_key")
-      .eq("user_id", user.id)
-      .order("entry_date", { ascending: true })
-      .order("occurred_at", { ascending: true });
+    const data = await fetchAllPages<GradeLogCloudRow>((from, to) =>
+      supabase
+        .from("grade_log")
+        .select("occurred_at,entry_date,card_type,grade,subject_key")
+        .eq("user_id", user.id)
+        .order("entry_date", { ascending: true })
+        .order("occurred_at", { ascending: true })
+        .range(from, to),
+    );
 
-    if (error || !data) {
-      console.error("[/api/export] grade_log fetch failed", error);
+    if (!data) {
+      console.error("[/api/export] grade_log fetch failed");
       return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
     }
 
-    rows = data as GradeLogCloudRow[];
+    rows = data;
   } catch (err) {
     console.error("[/api/export] unexpected error", err);
     return NextResponse.json({ error: "service_unavailable" }, { status: 503 });

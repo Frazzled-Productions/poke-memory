@@ -18,6 +18,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 
 // Native optimizer can take tens of seconds on large datasets. Default
 // (300s on current Vercel plans) is plenty; setting the cap explicitly so
@@ -74,13 +75,21 @@ async function fetchGradeLog(
   userId: string,
 ): Promise<GradeLogEntry[] | null> {
   try {
-    const { data, error } = await client
-      .from("grade_log")
-      .select("occurred_at,entry_date,card_type,grade,subject_key")
-      .eq("user_id", userId)
-      .order("occurred_at", { ascending: true });
-    if (error || !data) return null;
-    return (data as GradeLogCloudRow[]).map((r) => {
+    // Paginate to avoid the PostgREST 1000-row default cap. Without
+    // pagination the optimiser fits permanently on only the oldest 1000
+    // grades, ignoring all recent review behaviour.
+    // Rows are ordered by occurred_at ascending so offset pagination is
+    // safe: grade_log is append-only and new rows only appear at the tail.
+    const data = await fetchAllPages<GradeLogCloudRow>((from, to) =>
+      client
+        .from("grade_log")
+        .select("occurred_at,entry_date,card_type,grade,subject_key")
+        .eq("user_id", userId)
+        .order("occurred_at", { ascending: true })
+        .range(from, to),
+    );
+    if (!data) return null;
+    return data.map((r) => {
       const entry: GradeLogEntry = {
         occurredAt: Number(r.occurred_at),
         date: r.entry_date,
