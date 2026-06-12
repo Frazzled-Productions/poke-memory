@@ -6,6 +6,19 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.5] - 2026-06-12
+
+### Changed
+
+- The Higher or Lower mini-game now launches from a "Play Higher or Lower" button on the end-of-session summary into the practice-card position, instead of being stacked at the bottom of the page. The summary collapses to a compact highlights bar while playing, and a "Back to summary" control returns to it.
+
+### Fixed
+
+- Play cry on reveal is now independent of the Cry cards setting: the toggle is no longer greyed out or labelled as disabled when cry cards are off.
+- Cry audio served from the offline pack now plays on WebKit (Safari): the service worker honours range requests with a 206 response, fixing a silent stall that played no cry and added a delay when grading (#1886).
+- The Higher or Lower tiles now render as content-sized cards (no longer stretched to the full height with empty space) and their highlight borders are no longer clipped at the screen edges.
+- Settings toggles now save immediately when switched, so Play cry on reveal (and other toggles) no longer revert on navigation.
+
 ## [0.11.4] - 2026-06-11
 
 ### Changed
@@ -1796,7 +1809,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.4...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.5...HEAD
+[0.11.5]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.5
 [0.11.4]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.4
 [0.11.3]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.3
 [0.11.2]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.2
