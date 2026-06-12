@@ -532,6 +532,40 @@ describe("SettingsPage - card-type toggle: disable (non-destructive, #835)", () 
   });
 });
 
+describe("SettingsPage - toggle persistence (#1889)", () => {
+  it("toggling Play cry on reveal persists immediately via saveSettings", async () => {
+    // Regression: the generic boolean-toggle path only updated React state and
+    // relied on the page-level Save button (in another section), so turning on
+    // Play cry on reveal reverted on navigation and the cry never played. Cry
+    // cards default off here - the toggle must still be independently operable
+    // and persist (#1885 + #1889).
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      playCryOnReveal: false,
+      cryCardsEnabled: false,
+    });
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    const sw = await screen.findByRole("switch", { name: /play cry on reveal/i });
+    expect(sw).toHaveAttribute("aria-checked", "false");
+    expect(sw).not.toBeDisabled();
+
+    await user.click(sw);
+
+    // The toggle must write through to storage on toggle, not only on a later
+    // Save click.
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ playCryOnReveal: true }),
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: /play cry on reveal/i }),
+      ).toHaveAttribute("aria-checked", "true");
+    });
+  });
+});
+
 describe("SettingsPage - card-type toggle: re-enable dialog (#835)", () => {
   it("opening a disabled card type shows the ReenableCardTypeDialog", async () => {
     const user = userEvent.setup();
@@ -589,6 +623,11 @@ describe("SettingsPage - card-type toggle: re-enable dialog (#835)", () => {
     await waitFor(() => {
       expect(getEvolutionCardsSwitch()).toHaveAttribute("aria-checked", "true");
     });
+
+    // saveSettings must be called immediately with the type enabled (#1889).
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ evolutionCardsEnabled: true }),
+    );
 
     // IDB session must NOT be touched when re-using progress.
     expect(mockSaveSession).not.toHaveBeenCalled();
@@ -676,6 +715,11 @@ describe("SettingsPage - card-type toggle: re-enable dialog (#835)", () => {
         screen.queryByRole("heading", { name: /re-enable evolution cards/i }),
       ).not.toBeInTheDocument();
     });
+
+    // saveSettings must be called immediately with the type enabled (#1889).
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ evolutionCardsEnabled: true }),
+    );
 
     // saveSession must be called with the evolution card reset to initial state.
     await waitFor(() => {

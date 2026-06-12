@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
@@ -37,9 +38,12 @@ type PokemonTileProps = {
   phase: Phase;
   onPick: () => void;
   highlight: "winner" | "loser" | "tie" | null;
+  /** Optional ref forwarded to the tile root button element. Used to move
+   *  focus to the first tile when the game view is entered (#1882). */
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
-function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTileProps) {
+function PokemonTile({ pokemon, stat, phase, onPick, highlight, buttonRef }: PokemonTileProps) {
   const statVal = pokemon.stats[stat];
   const { locale } = usePokemonLocaleContext();
   // eslint-disable-next-line no-restricted-syntax -- English fallback arg, not a direct render
@@ -54,17 +58,20 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
     ringClass = "ring-2 ring-yellow-400";
 
   return (
-    /* flex-1 h-full: the tile fills half the available width (flex-1 in the
-       row direction) and the full height of the tiles row (h-full avoids the
-       Webkit bug where flex-1 + min-h-0 on the cross-axis resolves to
-       zero-height, making the button's click-center land on a sibling element
-       instead of the button itself, #1837). */
+    /* flex-1: the tile fills half the available width (flex-1 in the row
+       direction). It is content-height (no h-full) and the parent row uses
+       items-center, so the tile sizes to its sprite + name + stat rather than
+       stretching to the full tall card-position height (#1889). Content height
+       is deterministic and non-zero, so the Webkit zero-height stretch bug that
+       #1837's h-full guarded against does not apply here. justify-center keeps
+       the content centred within the tile. */
     <button
+      ref={buttonRef}
       type="button"
       onClick={onPick}
       disabled={phase === "revealed"}
       className={[
-        "flex flex-1 h-full flex-col items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 transition-colors",
+        "flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 transition-colors",
         "hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2",
         "disabled:cursor-default disabled:hover:bg-zinc-50",
         "dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:disabled:hover:bg-zinc-900",
@@ -74,10 +81,10 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
         .join(" ")}
       aria-label={localeName}
     >
-      {/* Sprite is capped at max-h-24 / sm:max-h-32 so it does not overflow
-          the tile on short viewports (e.g. iPhone SE). The sprite grows to fill
-          available space via flex-1 min-h-0 but never exceeds the cap.
-          object-contain preserves aspect ratio. */}
+      {/* Sprite fixed at h-24 / sm:h-32 so the content-height tile has a
+          consistent, sensible size (no longer stretched to the full card-position
+          height). max-w-full keeps it inside the tile; object-contain preserves
+          aspect ratio (#1889). */}
       {/* unoptimized: sprites are self-hosted static PNGs; keeping the URL
           identical to what decodeSpriteUrls warms means the decode pre-warm
           prevents names swapping before the sprite has loaded (#879). */}
@@ -86,7 +93,7 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
         alt={localeName}
         width={POKEDEX_FORM_SPRITE_SIZE}
         height={POKEDEX_FORM_SPRITE_SIZE}
-        className="flex-1 min-h-0 w-auto max-h-24 object-contain sm:max-h-32"
+        className="h-24 w-auto max-w-full object-contain sm:h-32"
         unoptimized
       />
       <p
@@ -106,9 +113,14 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight }: PokemonTilePro
 
 type Props = {
   seenPokemon: SeedPokemon[];
+  /**
+   * Optional ref forwarded to the first (left) tile button so the parent can
+   * move focus to it when entering the game view (#1882).
+   */
+  firstTileRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
-export function HigherOrLowerGame({ seenPokemon }: Props) {
+export function HigherOrLowerGame({ seenPokemon, firstTileRef }: Props) {
   const t = useTranslations("review");
   const [pair, setPair] = useState<Pair | null>(null);
   const [phase, setPhase] = useState<Phase>("picking");
@@ -215,13 +227,9 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
   }
 
   return (
-    /* flex-1 min-h-0: fills the height passed from the end-of-session
-       container so the layout can pin the action button without scrolling
-       (#1837). The border-t divides the game from the EndOfSessionScreen
-       content above. */
     <section
       aria-label={t("higherOrLower.sectionAriaLabel")}
-      className="flex flex-col flex-1 min-h-0 w-full max-w-sm mx-auto pt-4 border-t border-zinc-200 dark:border-zinc-800"
+      className="flex flex-col flex-1 min-h-0 w-full max-w-sm mx-auto"
     >
       {/* flex-none: streak/best counters always visible, do not shrink. */}
       <div className={`flex-none flex justify-between w-full ${mutedTextXs} tabular-nums mb-3`}>
@@ -239,19 +247,22 @@ export function HigherOrLowerGame({ seenPokemon }: Props) {
         <span className="font-bold">{statLabel(pair.stat)}</span>?
       </p>
 
-      {/* flex-1 min-h-0: sprite tiles region absorbs the remaining height
-          inside the section and can shrink on short viewports (e.g. iPhone SE)
-          so the pinned footer stays on-screen. overflow-hidden is intentionally
-          omitted: it caused Webkit to lose the height context for the tile
-          buttons, collapsing their computed height to zero (#1837). The sprite
-          max-h cap prevents overflow instead. */}
-      <div className="flex flex-1 min-h-0 gap-3 w-full justify-center">
+      {/* flex-1 min-h-0: the tiles region absorbs the remaining height and can
+          shrink on short viewports (e.g. iPhone SE) so the pinned footer stays
+          on-screen. items-center sizes the tiles to their content and centres
+          them vertically instead of stretching them to the full (tall)
+          card-position height, which left a large empty band below the sprites
+          (#1889). overflow-hidden is intentionally omitted: it caused Webkit to
+          lose the height context for the tile buttons (#1837); the sprite size
+          cap prevents overflow instead. */}
+      <div className="flex flex-1 min-h-0 items-center gap-3">
         <PokemonTile
           pokemon={pair.left}
           stat={pair.stat}
           phase={phase}
           onPick={() => handlePick("left")}
           highlight={tileHighlight("left")}
+          buttonRef={firstTileRef}
         />
         <PokemonTile
           pokemon={pair.right}

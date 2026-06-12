@@ -239,8 +239,7 @@
         "volumeLabel": "読み上げ音量（{pct}%）",
         "volumeMute": "0%（ミュート）",
         "volumeFull": "100%（最大）"
-      },
-      "cryDisabledNote": "鳴き声カードは無効です。上のカードの種類で有効にしてください。"
+      }
     },
     "offline": {
       "downloadHeading": "ダウンロード",
@@ -625,7 +624,16 @@
       "incorrectSuffix": "（不正解）"
     },
     "higherOrLower": {
-      "sectionAriaLabel": "高い or 低いミニゲーム"
+      "sectionAriaLabel": "高い or 低いミニゲーム",
+      "playButton": "ハイ・ロー勝負",
+      "playButtonAriaLabel": "ハイ・ロー勝負",
+      "playButtonDisabledAriaLabel": "ハイ・ロー勝負をプレイするポケモンが足りません",
+      "playButtonHelperText": "ステータス推測ゲームを解放するには、練習を続けましょう。",
+      "backToSummary": "← まとめ",
+      "backToSummaryAriaLabel": "セッションサマリーに戻る",
+      "barStreakAriaLabel": "{count}日連続",
+      "barDueTomorrow": "明日{count}枚",
+      "barDueTomorrowAriaLabel": "明日{count}枚のカードが期限切れ"
     },
     "typedEntry": {
       "inputAriaLabel": "ポケモンの名前を入力"

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { seedSessionIdb, awaitSeedIdb } from "./helpers/seedIdb";
 import {
   SEED_POKEMON_IDS,
@@ -14,7 +14,7 @@ import { REVERSE_ID_OFFSET } from "./helpers/mastery";
 //     today, lastReview === today, dueDate far future) so
 //     name.newIntroducedToday === maxNewPerDay (10).
 //   - The last ID in pokemonIds is a fresh new card (lastReview === null) so
-//     hasMoreNewCardsOf(name) is true → the new-cards wall fires.
+//     hasMoreNewCardsOf(name) is true -> the new-cards wall fires.
 //   - All other IDs are already-reviewed, not-due-today (no contribution to
 //     either counter) so they don't accidentally trigger the review soft-wall.
 //   - Evolution cards are seeded as reviewed, not-due - no evo queues populate.
@@ -127,6 +127,20 @@ function buildNewCardsLockedSession(args: {
 
 const SETTINGS_KEY = "poke-memory:settings:v1";
 
+// ---------------------------------------------------------------------------
+// Local helper: click the "Play Higher or Lower" entry button and wait for the
+// game region to become visible. Every test that needs the game open calls
+// this after reaching the summary screen.
+// ---------------------------------------------------------------------------
+async function enterGame(page: Page): Promise<void> {
+  const entryButton = page.getByRole("button", { name: /play higher or lower/i });
+  await expect(entryButton).toBeVisible();
+  await entryButton.click();
+  await expect(
+    page.getByRole("region", { name: /higher or lower mini-game/i }),
+  ).toBeVisible();
+}
+
 test.describe("Higher-or-Lower mini-game", () => {
   // Pre-dismiss the first-visit modal so it does not block the end-of-session screen.
   test.beforeEach(async ({ page }) => {
@@ -144,11 +158,17 @@ test.describe("Higher-or-Lower mini-game", () => {
     // Confirm the session-complete end-state is reached
     await expect(page.getByText("All caught up!")).toBeVisible();
 
-    // The mini-game section is rendered as <section aria-label="Higher or Lower mini-game">
+    // The entry button is visible on the summary before entering the game
+    await expect(
+      page.getByRole("button", { name: /play higher or lower/i }),
+    ).toBeVisible();
+
+    // Enter the game
+    await enterGame(page);
+
     const gameRegion = page.getByRole("region", {
       name: /higher or lower mini-game/i,
     });
-    await expect(gameRegion).toBeVisible();
 
     // Prompt is present ("Which has higher <Stat>?")
     await expect(page.getByText(/which has higher/i)).toBeVisible();
@@ -168,10 +188,12 @@ test.describe("Higher-or-Lower mini-game", () => {
 
     await expect(page.getByText("All caught up!")).toBeVisible();
 
+    // Enter the game before interacting with tiles
+    await enterGame(page);
+
     const gameRegion = page.getByRole("region", {
       name: /higher or lower mini-game/i,
     });
-    await expect(gameRegion).toBeVisible();
 
     // Click the first tile - any outcome (correct / tie / game over) is valid
     await gameRegion.getByRole("button").first().click();
@@ -195,10 +217,17 @@ test.describe("Higher-or-Lower mini-game", () => {
       page.getByText("New cards locked for today"),
     ).toBeVisible();
 
+    // The entry button is visible on the locked summary before entering the game
+    await expect(
+      page.getByRole("button", { name: /play higher or lower/i }),
+    ).toBeVisible();
+
+    // Enter the game
+    await enterGame(page);
+
     const gameRegion = page.getByRole("region", {
       name: /higher or lower mini-game/i,
     });
-    await expect(gameRegion).toBeVisible();
     await expect(page.getByText(/which has higher/i)).toBeVisible();
     await expect(gameRegion.getByRole("button")).toHaveCount(2);
   });
@@ -211,7 +240,7 @@ test.describe("Higher-or-Lower mini-game", () => {
     // iPhone SE CSS viewport (375x667) - the shortest supported mobile
     // viewport. We also run at the standard iPhone 17 Pro (402x874) used in
     // the original #1447 report. The layout pins the action button as
-    // flex-none so it is always visible without scrolling (#1837).
+    // flex-none so it is always visible without scrolling (#1837/#1882).
     for (const { width, height } of [
       { width: 375, height: 667 }, // iPhone SE (shortest supported)
       { width: 402, height: 874 }, // iPhone 17 Pro (original report)
@@ -226,10 +255,12 @@ test.describe("Higher-or-Lower mini-game", () => {
 
       await expect(page.getByText("All caught up!")).toBeVisible();
 
+      // Enter the game before checking in-viewport behaviour
+      await enterGame(page);
+
       const gameRegion = page.getByRole("region", {
         name: /higher or lower mini-game/i,
       });
-      await expect(gameRegion).toBeVisible();
 
       // Click the first Pokémon tile - the outcome (correct, tie, or wrong) does
       // not matter; all three result states show an action button.
@@ -237,12 +268,12 @@ test.describe("Higher-or-Lower mini-game", () => {
 
       // The action button ("Next pair" or "Play again") must be visible in the
       // viewport - not merely present in the DOM - so the user can reach it
-      // without manual scrolling on a mobile viewport (#1837).
+      // without manual scrolling on a mobile viewport (#1837/#1882).
       const actionButton = page.getByRole("button", { name: /next pair|play again/i });
       await expect(actionButton).toBeInViewport();
 
       // The button must also be clickable (enabled, not obstructed). Clicking it
-      // transitions back to the picking phase (sprite decode pending → button
+      // transitions back to the picking phase (sprite decode pending -> button
       // shows "Next pair" or re-renders the game).
       await expect(actionButton).toBeEnabled();
       await actionButton.click();
@@ -254,11 +285,9 @@ test.describe("Higher-or-Lower mini-game", () => {
     }
   });
 
-  test("nav links remain interactive on the all-caught-up screen (#1275)", async ({ page }) => {
-    // Regression test: the bottom tab bar and header nav links were
-    // unresponsive on the all-caught-up screen when the Higher-or-Lower
-    // mini-game was visible, because the end-of-session container lacked
-    // flex-1/overflow-y-auto and caused the body to scroll.
+  test("returns to the summary from the game (reversible)", async ({ page }) => {
+    // Acceptance criterion: the collapse is reversible - there is a way back
+    // to the full summary from the game (#1882).
     await seedSessionIdb(page, buildCompletedSession({
       pokemonIds: SEED_POKEMON_IDS,
       evolutionCardIds: EVOLUTION_CARD_IDS,
@@ -268,15 +297,60 @@ test.describe("Higher-or-Lower mini-game", () => {
 
     await expect(page.getByText("All caught up!")).toBeVisible();
 
-    // Confirm the mini-game is present so this test exercises the problematic layout.
-    const gameRegion = page.getByRole("region", {
-      name: /higher or lower mini-game/i,
-    });
-    await expect(gameRegion).toBeVisible();
+    // Enter the game - summary collapses to the highlights bar
+    await enterGame(page);
+    await expect(
+      page.getByRole("region", { name: /higher or lower mini-game/i }),
+    ).toBeVisible();
 
-    // The Stats nav link must be clickable - not blocked by any overlay or scroll state.
+    // Use the back control to return to the full summary
+    await page.getByRole("button", { name: /back to session summary/i }).click();
+
+    // Full summary is restored: "All caught up!" and the entry button reappear
+    await expect(page.getByText("All caught up!")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /play higher or lower/i }),
+    ).toBeVisible();
+
+    // The game region is no longer visible
+    await expect(
+      page.getByRole("region", { name: /higher or lower mini-game/i }),
+    ).not.toBeVisible();
+  });
+
+  test("nav links remain interactive on the all-caught-up screen (#1275)", async ({ page }) => {
+    // Regression test: the bottom tab bar and header nav links were
+    // unresponsive on the all-caught-up screen, because the end-of-session
+    // container lacked flex-1/overflow-y-auto and caused the body to scroll.
+    // Exercises both the summary view and the game view, since the game uses
+    // overflow-hidden (the same container model that caused the original bug).
+    await seedSessionIdb(page, buildCompletedSession({
+      pokemonIds: SEED_POKEMON_IDS,
+      evolutionCardIds: EVOLUTION_CARD_IDS,
+    }));
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    await expect(page.getByText("All caught up!")).toBeVisible();
+
+    // --- Summary view: nav must be accessible before entering the game ---
+    await expect(
+      page.getByRole("button", { name: /play higher or lower/i }),
+    ).toBeVisible();
+
     const statsLink = page.getByRole("navigation").getByRole("link", { name: "Stats" }).first();
     await statsLink.click();
+    await expect(page).toHaveURL("/stats");
+
+    // --- Game view: nav must also be accessible after entering the game ---
+    // Navigate back and enter the game view to verify the overflow-hidden
+    // container does not block the nav links.
+    await page.goBack();
+    await expect(page.getByText("All caught up!")).toBeVisible();
+    await enterGame(page);
+
+    const statsLinkInGame = page.getByRole("navigation").getByRole("link", { name: "Stats" }).first();
+    await statsLinkInGame.click();
     await expect(page).toHaveURL("/stats");
   });
 });

@@ -239,8 +239,7 @@
         "volumeLabel": "朗读音量（{pct}%）",
         "volumeMute": "0%（静音）",
         "volumeFull": "100%（最大）"
-      },
-      "cryDisabledNote": "叫声卡片已禁用。请在上方卡片类型中启用。"
+      }
     },
     "offline": {
       "downloadHeading": "下载",
@@ -625,7 +624,16 @@
       "incorrectSuffix": "（错误）"
     },
     "higherOrLower": {
-      "sectionAriaLabel": "高还是低小游戏"
+      "sectionAriaLabel": "高还是低小游戏",
+      "playButton": "高还是低",
+      "playButtonAriaLabel": "高还是低",
+      "playButtonDisabledAriaLabel": "没有足够的宝可梦来进行猜高低游戏",
+      "playButtonHelperText": "继续练习以解锁属性猜测游戏。",
+      "backToSummary": "← 总结",
+      "backToSummaryAriaLabel": "返回本局总结",
+      "barStreakAriaLabel": "连续{count}天",
+      "barDueTomorrow": "明天{count}张",
+      "barDueTomorrowAriaLabel": "明天有{count}张卡片到期"
     },
     "typedEntry": {
       "inputAriaLabel": "输入宝可梦的名字"
