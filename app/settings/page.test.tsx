@@ -624,6 +624,11 @@ describe("SettingsPage - card-type toggle: re-enable dialog (#835)", () => {
       expect(getEvolutionCardsSwitch()).toHaveAttribute("aria-checked", "true");
     });
 
+    // saveSettings must be called immediately with the type enabled (#1889).
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ evolutionCardsEnabled: true }),
+    );
+
     // IDB session must NOT be touched when re-using progress.
     expect(mockSaveSession).not.toHaveBeenCalled();
   });
@@ -710,6 +715,11 @@ describe("SettingsPage - card-type toggle: re-enable dialog (#835)", () => {
         screen.queryByRole("heading", { name: /re-enable evolution cards/i }),
       ).not.toBeInTheDocument();
     });
+
+    // saveSettings must be called immediately with the type enabled (#1889).
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ evolutionCardsEnabled: true }),
+    );
 
     // saveSession must be called with the evolution card reset to initial state.
     await waitFor(() => {

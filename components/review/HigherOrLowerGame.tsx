@@ -255,7 +255,7 @@ export function HigherOrLowerGame({ seenPokemon, firstTileRef }: Props) {
           (#1889). overflow-hidden is intentionally omitted: it caused Webkit to
           lose the height context for the tile buttons (#1837); the sprite size
           cap prevents overflow instead. */}
-      <div className="flex flex-1 min-h-0 items-center gap-3 w-full justify-center">
+      <div className="flex flex-1 min-h-0 items-center gap-3">
         <PokemonTile
           pokemon={pair.left}
           stat={pair.stat}
