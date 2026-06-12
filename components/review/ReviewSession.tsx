@@ -2171,8 +2171,10 @@ export function ReviewSession() {
         /* overflow-hidden so the game receives a bounded flex-1 min-h-0 height
            context. The game pins its action button as flex-none so the user
            never needs to scroll to reach it, including with a Scope filter
-           applied (#1837/#1882). */
-        <div className="flex flex-col flex-1 min-h-0 w-full items-center overflow-hidden">
+           applied (#1837/#1882). The bar is full-bleed; the game sits in a
+           padded inner wrapper so the tile focus rings are not clipped at the
+           viewport edges (#1889). */
+        <div className="flex flex-col flex-1 min-h-0 w-full overflow-hidden">
           {/* Highlights bar: flex-none at the top - not sticky per the #1837
               overflow model. Contains the back button, SRS daily streak (not
               the in-game consecutive streak - USER-DECISION: the bar is a
@@ -2228,10 +2230,12 @@ export function ReviewSession() {
               USER-DECISION: bar is flex-none at the top (not sticky), consistent
               with the #1837 overflow model - the game content scrolls within
               its flex-1 region without the bar floating over it. */}
-          <HigherOrLowerGame
-            seenPokemon={seenPokemon}
-            firstTileRef={firstTileRef}
-          />
+          <div className="flex flex-1 min-h-0 w-full justify-center px-4 pt-3">
+            <HigherOrLowerGame
+              seenPokemon={seenPokemon}
+              firstTileRef={firstTileRef}
+            />
+          </div>
           {badgeToastSlot}
         </div>
       );

@@ -58,18 +58,20 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight, buttonRef }: Pok
     ringClass = "ring-2 ring-yellow-400";
 
   return (
-    /* flex-1 h-full: the tile fills half the available width (flex-1 in the
-       row direction) and the full height of the tiles row (h-full avoids the
-       Webkit bug where flex-1 + min-h-0 on the cross-axis resolves to
-       zero-height, making the button click-center landing on a sibling element
-       instead of the button itself, #1837). */
+    /* flex-1: the tile fills half the available width (flex-1 in the row
+       direction). It is content-height (no h-full) and the parent row uses
+       items-center, so the tile sizes to its sprite + name + stat rather than
+       stretching to the full tall card-position height (#1889). Content height
+       is deterministic and non-zero, so the Webkit zero-height stretch bug that
+       #1837's h-full guarded against does not apply here. justify-center keeps
+       the content centred within the tile. */
     <button
       ref={buttonRef}
       type="button"
       onClick={onPick}
       disabled={phase === "revealed"}
       className={[
-        "flex flex-1 h-full flex-col items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 transition-colors",
+        "flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 transition-colors",
         "hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2",
         "disabled:cursor-default disabled:hover:bg-zinc-50",
         "dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:disabled:hover:bg-zinc-900",
@@ -79,10 +81,10 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight, buttonRef }: Pok
         .join(" ")}
       aria-label={localeName}
     >
-      {/* Sprite is capped at max-h-24 / sm:max-h-32 so it does not overflow
-          the tile on short viewports (e.g. iPhone SE). The sprite grows to fill
-          available space via flex-1 min-h-0 but never exceeds the cap.
-          object-contain preserves aspect ratio. */}
+      {/* Sprite fixed at h-24 / sm:h-32 so the content-height tile has a
+          consistent, sensible size (no longer stretched to the full card-position
+          height). max-w-full keeps it inside the tile; object-contain preserves
+          aspect ratio (#1889). */}
       {/* unoptimized: sprites are self-hosted static PNGs; keeping the URL
           identical to what decodeSpriteUrls warms means the decode pre-warm
           prevents names swapping before the sprite has loaded (#879). */}
@@ -91,7 +93,7 @@ function PokemonTile({ pokemon, stat, phase, onPick, highlight, buttonRef }: Pok
         alt={localeName}
         width={POKEDEX_FORM_SPRITE_SIZE}
         height={POKEDEX_FORM_SPRITE_SIZE}
-        className="flex-1 min-h-0 w-auto max-h-24 object-contain sm:max-h-32"
+        className="h-24 w-auto max-w-full object-contain sm:h-32"
         unoptimized
       />
       <p
@@ -245,13 +247,15 @@ export function HigherOrLowerGame({ seenPokemon, firstTileRef }: Props) {
         <span className="font-bold">{statLabel(pair.stat)}</span>?
       </p>
 
-      {/* flex-1 min-h-0: sprite tiles region absorbs the remaining height
-          inside the section and can shrink on short viewports (e.g. iPhone SE)
-          so the pinned footer stays on-screen. overflow-hidden is intentionally
-          omitted: it caused Webkit to lose the height context for the tile
-          buttons, collapsing their computed height to zero (#1837). The sprite
-          max-h cap prevents overflow instead. */}
-      <div className="flex flex-1 min-h-0 gap-3 w-full justify-center">
+      {/* flex-1 min-h-0: the tiles region absorbs the remaining height and can
+          shrink on short viewports (e.g. iPhone SE) so the pinned footer stays
+          on-screen. items-center sizes the tiles to their content and centres
+          them vertically instead of stretching them to the full (tall)
+          card-position height, which left a large empty band below the sprites
+          (#1889). overflow-hidden is intentionally omitted: it caused Webkit to
+          lose the height context for the tile buttons (#1837); the sprite size
+          cap prevents overflow instead. */}
+      <div className="flex flex-1 min-h-0 items-center gap-3">
         <PokemonTile
           pokemon={pair.left}
           stat={pair.stat}

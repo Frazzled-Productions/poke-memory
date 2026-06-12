@@ -766,7 +766,15 @@ export default function SettingsPage() {
       return;
     }
 
-    setSettings({ ...settings, [key]: !settings[key] });
+    // Persist immediately (#1889). Boolean toggles read as committed on the
+    // next page load, so they must write through to storage on toggle rather
+    // than only staging into React state for the page-level Save button (which
+    // lives in another section). Without this, turning on e.g. Play cry on
+    // reveal reverted on navigation and the cry never played. The Save button
+    // still handles the numeric-draft fields.
+    const updated = { ...settings, [key]: !settings[key] };
+    setSettings(updated);
+    saveSettings(updated);
   }
 
   async function handleReenableChoice(choice: ReenableChoice) {
@@ -775,7 +783,9 @@ export default function SettingsPage() {
     setToggleError(null);
     setToggleErrorKey(null);
 
-    setSettings({ ...settings, [reenableKey]: true });
+    const reenabled = { ...settings, [reenableKey]: true };
+    setSettings(reenabled);
+    saveSettings(reenabled);
 
     if (choice === "fresh") {
       const cardTypeForKey: Record<string, string> = {
