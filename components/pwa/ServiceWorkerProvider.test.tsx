@@ -381,3 +381,178 @@ describe("ServiceWorkerProvider - silent activation and multi-tab gate", () => {
     expect(mockUpdate).toHaveBeenCalled(); // both thresholds fired update()
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: rejection handling (#1913).
+//
+// Every promise the component starts is fire-and-forget. Before #1913 they were
+// floated with a bare `void`, which discards the resolved value but leaves a
+// rejection unhandled - it reached `window.onunhandledrejection` and Sentry
+// captured it as an unhandled `error`-level exception in production.
+//
+// Each test below drives one rejecting branch and asserts the `.catch()` ran,
+// which is what proves the rejection was handled rather than escaping.
+// ---------------------------------------------------------------------------
+
+describe("ServiceWorkerProvider - rejection handling", () => {
+  let debugSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    debugSpy.mockRestore();
+  });
+
+  /** Assert console.debug logged the given context, with the causing error. */
+  function expectSwFailureLogged(context: string, error: Error) {
+    expect(debugSpy).toHaveBeenCalledWith(
+      `[sw] ${context} failed; continuing without a service worker`,
+      error,
+    );
+  }
+
+  it("handles a rejecting register() and still renders", async () => {
+    // The GoogleOther crawler stubs navigator.serviceWorker.register to reject
+    // outright; WebKit rejects natively with `TypeError: Internal error`.
+    const error = new Error("Rejected");
+    mockRegister.mockRejectedValueOnce(error);
+
+    const { container } = render(<ServiceWorkerProvider />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expectSwFailureLogged("registration", error);
+    // The component renders nothing, but the tree must not have thrown.
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("handles a rejecting getRegistration() on mount", async () => {
+    const error = new Error("Internal error");
+    mockGetRegistration.mockRejectedValueOnce(error);
+
+    render(<ServiceWorkerProvider />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expectSwFailureLogged("getRegistration on mount", error);
+  });
+
+  it("handles a rejecting update() on the visibility check", async () => {
+    const error = new Error("script fetch failed");
+    mockUpdate.mockRejectedValueOnce(error);
+
+    render(<ServiceWorkerProvider />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Hide for long enough to arm the update check, then return.
+    await act(async () => {
+      fireVisibilityChange("hidden");
+      vi.advanceTimersByTime(90_000);
+      fireVisibilityChange("visible");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockUpdate).toHaveBeenCalled();
+    expectSwFailureLogged("visibility update check", error);
+  });
+
+  it("handles a rejecting update() on the background interval", async () => {
+    const error = new Error("script fetch failed");
+
+    render(<ServiceWorkerProvider />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    mockUpdate.mockRejectedValueOnce(error);
+
+    await act(async () => {
+      vi.advanceTimersByTime(60 * 60 * 1000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expectSwFailureLogged("background update check", error);
+  });
+
+  it("handles a rejecting getRegistration() in the REQUEST_SKIP_WAITING path", async () => {
+    render(<ServiceWorkerProvider />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Arm the activator, then make the second getRegistration() reject.
+    serwistListeners["waiting"]?.forEach((l) => l());
+    const error = new Error("Internal error");
+    mockGetRegistration.mockRejectedValueOnce(error);
+
+    await act(async () => {
+      fireVisibilityChange("hidden");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockMessageSW).not.toHaveBeenCalled();
+    expectSwFailureLogged("REQUEST_SKIP_WAITING dispatch", error);
+  });
+
+  it("handles a rejecting messageSW() in the REQUEST_SKIP_WAITING path", async () => {
+    const waitingWorker = {} as ServiceWorker;
+    mockGetRegistration.mockResolvedValue({ waiting: waitingWorker } as unknown as {
+      waiting: null;
+    });
+
+    render(<ServiceWorkerProvider />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    serwistListeners["waiting"]?.forEach((l) => l());
+    const error = new Error("postMessage failed");
+    mockMessageSW.mockRejectedValueOnce(error);
+
+    await act(async () => {
+      fireVisibilityChange("hidden");
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockMessageSW).toHaveBeenCalled();
+    expectSwFailureLogged("REQUEST_SKIP_WAITING dispatch", error);
+  });
+
+  it("lets no rejection escape to the process as an unhandled rejection", async () => {
+    // The regression test for the two Sentry issues in #1913. Runs on real
+    // timers so the rejection can settle across a genuine macrotask, which is
+    // when Node decides a rejection went unhandled.
+    vi.useRealTimers();
+
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+
+    try {
+      mockRegister.mockRejectedValueOnce(new Error("Rejected"));
+      mockGetRegistration.mockRejectedValueOnce(new Error("Internal error"));
+
+      render(<ServiceWorkerProvider />);
+      await act(async () => {
+        await new Promise((resolve) => setImmediate(resolve));
+      });
+
+      expect(unhandled).not.toHaveBeenCalled();
+      // Both rejections were routed through the catch handler, not dropped.
+      expect(debugSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
+  });
+});
