@@ -39,7 +39,7 @@ Standard flow for non-trivial work:
 
 1. **Plan** - invoke `planner`. It surfaces unknowns tagged as `[EXPERT-RESEARCH]`, `[USER-DECISION + RESEARCH]`, or `[USER-DECISION]`.
 2. **Research in parallel** - dispatch specialists (`next16-expert`, `pokeapi-expert`, `srs-expert`, `researcher`) in a single message when their questions are independent. Fold answers into the plan.
-3. **Implement** - invoke `ui-coder` and/or `data-coder` with full context (research findings + spec). Run in parallel when their work is independent.
+3. **Implement** - invoke `ui-coder` and/or `data-coder` with full context (research findings + spec). Run in parallel when their work is independent. **Multi-surface decomposition gate:** a `ui-coder` brief covering 3+ distinct UI surfaces, a locale-by-state matrix on more than one surface, or a new e2e spec alongside surface work must be split into sequential per-surface agents - the hard pre-dispatch check lives in `.claude/agents/ui-coder.md` (#1766/#1767).
 4. **E2E** - if the change is user-facing, invoke `playwright` to add or update E2E smoke tests. Pass the diff summary and affected pages.
 5. **Review** - invoke `code-reviewer` at the end. Iterate on its punch list.
 
@@ -61,15 +61,20 @@ When every box is ticked the issue *is* the plan and a planner round-trip would 
 
 If any of the three is missing, run the planner. If all three are present, go straight to implement.
 
+**Record the skip.** When skipping the planner, the orchestrator posts a one-line comment on the issue - `<!-- planner-skipped: <reason> -->` - so the decision is auditable at retro time without a planner round-trip (#1856). Full criteria and the template live in `.claude/agents/planner.md` under "Skip criteria and recording".
+
 When *not* to use a sub-agent: small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value.
 
-**Hard rule - `workflow-expert` before writing GitHub Actions.** For any change to `.github/workflows/**` that involves marker-based dedup (HTML-comment idempotency markers) or GitHub search-index lookups, invoke `workflow-expert` **before** writing the change, not only as a reviewer afterwards. GitHub's search index strips HTML comments, so a `<!-- marker -->` dedup that relies on search to find prior comments silently fails - exactly the platform quirk a `workflow-expert` design-time pass surfaces before it costs a fix commit at auto-review time.
+**Hard rule - `workflow-expert` reviews EVERY `.github/workflows/**` change.** No exception for mechanical-looking edits: complexity is not the gate, YAML's silent-failure mode is. Three separate incidents (#1859, #1815, #1806) came from bypassing the review because a change "looked mechanical". Additionally, for any change that involves marker-based dedup (HTML-comment idempotency markers) or GitHub search-index lookups, invoke `workflow-expert` **before** writing the change, not only as a reviewer afterwards. GitHub's search index strips HTML comments, so a `<!-- marker -->` dedup that relies on search to find prior comments silently fails - exactly the platform quirk a `workflow-expert` design-time pass surfaces before it costs a fix commit at auto-review time.
 
 **`ux-advisor` before writing onboarding/discoverability code.** On the same design-time pattern as `workflow-expert` before GitHub Actions, invoke `ux-advisor` on the brief **before** dispatching the implementer for any change that adds a user-facing feature, changes how something is displayed, or changes how something is accessed/discovered. The planner's testability + first-contact UX pre-flight (#1276) names this hook; any discoverability gap `ux-advisor` cannot resolve from the existing code becomes a `[USER-DECISION]` open question or a dedicated acceptance criterion. At review time, `code-reviewer` raises a new surface with no declared discovery path as a Concern (the "Discoverability" check in its step-3 list) - auto-review.yml is unchanged, the check lives in the agent definition.
 
 **Orchestration entrypoints - `/batch-issues` and `/ship`.** Two local slash-commands run the playbook end-to-end so the gate, the in-session `code-reviewer` pass, the issue-first cross-check, and branch-off-`qa` are not re-derived by hand each time:
 
-- **`/batch-issues`** (`.claude/commands/batch-issues.md`) - drains the open backlog in conflict-minimizing batches, parallel where safe, draining into `qa` and opening a draft `qa -> main` promotion PR. Use for a backlog pass.
+- **`/batch-issues`** (`.claude/commands/batch-issues.md`) - drains the open backlog in conflict-minimizing batches, parallel where safe, draining into `qa` and opening a draft `qa -> main` promotion PR. Use for a backlog pass. Drain protocol (the command file is canonical; these are the load-bearing steps):
+  1. Pre-flight: list the backlog, then **suspend Auto Review before dispatching the first implementer** - run `gh workflow disable "Auto Review"` (allow-listed in `.claude/settings.json`). During the drain the in-session `code-reviewer` is the sole review gate; each PR `auto-review.yml` touches before the disable incurs a concrete reconciliation round (#1764/#1765: #1777 needed one purely from this collision). Do not dispatch any implementer until the disable succeeds.
+  2. Implement per batch: worktree off `origin/qa`, coder agents, in-session `code-reviewer`, `npm run pre-pr`, PR into `qa`.
+  3. Close-out: fire the QA preview deploy, then **re-enable Auto Review** - `gh workflow enable "Auto Review"` - as the last action (the graceful-exit guardrail also runs the enable, so a halted run never leaves it disabled).
 - **`/ship`** (`.claude/commands/ship.md`, #1718) - the single-change projection of `/batch-issues`: one issue (or one freshly-created issue) → branch off `qa` → implement → `npm run pre-pr` gate → PR into `qa` with `Closes #N` → `code-reviewer` → auto-merge. It **defers** to `/batch-issues` for the gate, review, and branching rules rather than restating them, so the two paths never diverge. Use for one linear change where the batch machinery is overkill.
 
 Both run the same `npm run pre-pr` gate (AGENTS.md "Pre-PR build gate") and the same `code-reviewer` pass; the only difference is batch fan-out vs single change.
