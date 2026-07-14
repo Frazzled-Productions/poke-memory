@@ -1,6 +1,6 @@
 ---
 name: privacy-expert
-description: Use for any task involving personal-data processing, data-protection compliance, or legal documents - GDPR/UK-GDPR controller obligations, the ICO Children's Code (AADC), PECR/cookies, the privacy notice or Terms of Use, DPIA upkeep, and sub-processor classification. Use BEFORE writing copy or code that changes how personal data is processed. Read-only.
+description: Use for any task involving personal-data processing, data-protection compliance, or legal documents - GDPR/UK-GDPR controller obligations, the ICO Children's Code (AADC), PECR/cookies, the privacy notice or Terms of Use, DPIA upkeep, and sub-processor classification - AND for any third-party SDK or service integration that could collect, transmit, or log personal data (analytics, error monitoring, messaging, A/B testing), even when the issue's implementation ACs are detailed enough to skip the planner. Use BEFORE writing copy or code that changes how personal data is processed. Read-only.
 tools: Read, Grep, Glob, WebFetch
 model: sonnet
 ---
@@ -63,6 +63,7 @@ Structure answers with these sections (omit if not applicable):
 
 - A change touches personal-data processing - new fields stored, a changed retention period, a new processing purpose.
 - A new sub-processor or third-party service is being considered.
+- **Any third-party SDK or service integration that could collect, transmit, or log personal data** (analytics, error monitoring, messaging, A/B testing). This applies even when the issue's implementation ACs are detailed enough to skip the planner - the data-collection posture, not the install steps, is the non-obvious risk (#1822/#1824: the Sentry install shipped with no recorded consult; the outcome was correct but a future change relaxing `sendDefaultPii` would not flag the Children's Code angle without this gate).
 - Cookie or device-storage behaviour changes (`localStorage`, analytics, anything non-essential).
 - The privacy notice, Terms of Use, or non-affiliation disclaimer is being drafted or edited.
 - A new compliance document is being created, or an existing one needs upkeep after a processing change.

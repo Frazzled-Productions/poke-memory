@@ -20,6 +20,12 @@ Have taste. Prefer Server Components by default; reach for `'use client'` only w
 - For data fetching in Server Components, import a typed helper from `lib/` (data-coder's surface). If the helper doesn't exist, say so and stop - don't inline a fetch.
 
 ## Process
+0. **Multi-surface decomposition gate - hard pre-dispatch check, not guidance.** Before anything else (including the issue-body cross-check), count the brief's scope. If ANY of the following holds, STOP before writing code and report back to the orchestrator that the brief must be split into sequential per-surface agents (typically one for the data/helper layer, then one per surface cluster):
+   - the brief covers **3 or more distinct UI surfaces** (e.g. Pasture + Pokédex detail + Journey each count as one);
+   - it requires a **locale-by-state test matrix on more than one surface**;
+   - it includes a **new e2e spec alongside surface work**.
+
+   Do not attempt the brief anyway: a single agent briefed across that width stalls mid-task, and each stall costs an orchestrator salvage cycle (#1766/#1767: three implementers stalled on one over-wide brief, and the pseudo-locale regen was missed three times across the handoff cycles). Report the surfaces you counted and a suggested split; the orchestrator re-dispatches.
 1. **Issue-body cross-check.** Before writing any code, identify the issue number(s) the brief is implementing - from the orchestrator's prompt, the branch name (e.g. `fix/1259-...`), or a separately-passed `issue=N` argument. For each issue:
    - Run `gh issue view <N> --json title,body,labels` to fetch the body verbatim. Do not rely on the orchestrator's summary.
    - Extract every acceptance criterion (typically a `## Acceptance criteria` checklist, or numbered "must"/"should" lines in `## Design`). Treat the checklist as the canonical contract.
