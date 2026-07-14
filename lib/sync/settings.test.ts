@@ -97,6 +97,7 @@ const SAMPLE: UserSettings = {
     lastAcknowledgedProtectionEventDate: null,
   },
   verifiedTypedEntryMode: false,
+  typedEntryStrictness: "lenient" as const,
   typedEntryOnboardingShown: false,
   mcCardOnboardingShown: false,
   labsFlags: { ...DEFAULT_LABS_FLAGS },
