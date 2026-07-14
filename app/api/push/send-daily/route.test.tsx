@@ -96,15 +96,19 @@ const ALL_ENABLED_SETTINGS: Record<string, unknown> = {
 };
 
 /**
- * Build a thenable-style Supabase mock that returns the given fixtures
- * for each `.from(table)` call. The route's query shape is:
+ * Build a thenable-style Supabase mock that returns the given fixtures.
+ * Since #1100 the route reads through two SECURITY DEFINER RPCs (migration
+ * 046) and only the dead-endpoint DELETE still goes through `.from()`:
  *
- *   from("push_subscriptions").select(...)                     → subs
- *   from("user_settings").select(...).in(...)                  → settings
- *   from("card_reviews").select(...).lte().in().is()           → due rows
- *   from("push_subscriptions").delete().in()                   → delete
+ *   rpc("get_push_targets")                        → subs LEFT JOIN settings
+ *   rpc("get_push_due_cards", {...}).order().range() → due rows
+ *   from("push_subscriptions").delete().in()       → delete
  *
- * Per-user counts come from counting eligible rows in the `.select()` result.
+ * The mock synthesises the `get_push_targets` join from the same
+ * `subscriptions` and `settings` fixtures the tests always passed, so test
+ * cases stay expressed in terms of the two underlying tables.
+ *
+ * Per-user counts come from counting eligible rows in the RPC result.
  * To configure a test where user-a has 3 due `name` cards, pass three
  * `{ user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "en" }`
  * rows in `due`. The helper `dueRowsFor` builds them (always locale="en").
@@ -114,6 +118,7 @@ function buildAdminMock(opts: {
   subsError?: unknown;
   settings?: SettingsMockRow[];
   due?: DueRow[];
+  dueError?: unknown;
   deleteError?: unknown;
   deleteCount?: number;
 }) {
@@ -124,50 +129,58 @@ function buildAdminMock(opts: {
 
   const deleteCalls: Array<{ ids: unknown[] }> = [];
 
-  const from = vi.fn((table: string) => {
-    if (table === "push_subscriptions") {
-      const builder = {
-        select: vi.fn(() =>
-          Promise.resolve({ data: subsRows, error: opts.subsError ?? null }),
-        ),
-        delete: vi.fn((_opts?: unknown) => ({
-          in: vi.fn((_col: string, ids: unknown[]) => {
-            deleteCalls.push({ ids });
-            return Promise.resolve({
-              error: opts.deleteError ?? null,
-              count: deleteCount,
-            });
-          }),
-        })),
-      };
-      return builder;
-    }
-    if (table === "user_settings") {
-      return {
-        select: vi.fn(() => ({
-          in: vi.fn(() => Promise.resolve({ data: settingsRows, error: null })),
-        })),
-      };
-    }
-    // card_reviews - chained lte().in().is().order().order().range()
-    // The route paginates via fetchAllPages which calls .range(from, to).
-    // The mock returns all dueRows on the first page (length < pageSize
-    // so fetchAllPages stops after one trip).
+  // Synthesise the LEFT JOIN the get_push_targets RPC performs: one row per
+  // subscription, with the owner's settings fields (null when absent).
+  const targetRows = subsRows.map((sub) => {
+    const settings = settingsRows.find((s) => s.user_id === sub.user_id) ?? null;
     return {
-      select: vi.fn(() => {
-        const builder = {
-          lte: vi.fn(() => builder),
-          in: vi.fn(() => builder),
-          is: vi.fn(() => builder),
-          order: vi.fn(() => builder),
-          range: vi.fn(() => Promise.resolve({ data: dueRows, error: null })),
-        };
-        return builder;
-      }),
+      subscription_id: sub.id,
+      user_id: sub.user_id,
+      endpoint: sub.endpoint,
+      p256dh: sub.p256dh,
+      auth_secret: sub.auth_secret,
+      timezone: settings?.timezone ?? null,
+      settings: settings?.settings ?? null,
+      push_notification_hour: settings?.push_notification_hour ?? null,
     };
   });
 
-  return { client: { from }, deleteCalls };
+  const rpc = vi.fn((fn: string, _args?: Record<string, unknown>) => {
+    if (fn === "get_push_targets") {
+      return Promise.resolve({
+        data: opts.subsError ? null : targetRows,
+        error: opts.subsError ?? null,
+      });
+    }
+    // get_push_due_cards - chained .order().order().range(from, to).
+    // The route paginates via fetchAllPages which calls .range(from, to).
+    // The mock returns all dueRows on the first page (length < pageSize
+    // so fetchAllPages stops after one trip).
+    const builder = {
+      order: vi.fn(() => builder),
+      range: vi.fn(() =>
+        Promise.resolve({
+          data: opts.dueError ? null : dueRows,
+          error: opts.dueError ?? null,
+        }),
+      ),
+    };
+    return builder;
+  });
+
+  const from = vi.fn((_table: string) => ({
+    delete: vi.fn((_opts?: unknown) => ({
+      in: vi.fn((_col: string, ids: unknown[]) => {
+        deleteCalls.push({ ids });
+        return Promise.resolve({
+          error: opts.deleteError ?? null,
+          count: deleteCount,
+        });
+      }),
+    })),
+  }));
+
+  return { client: { rpc, from }, deleteCalls };
 }
 
 /**
@@ -445,6 +458,68 @@ describe("POST /api/push/send-daily - happy path", () => {
       "vapid-pub",
       "vapid-priv",
     );
+  });
+
+  it("reads via the get_push_targets / get_push_due_cards RPCs, not raw table SELECTs (#1100)", async () => {
+    const admin = buildAdminMock({
+      subscriptions: [
+        {
+          id: "sub-1",
+          user_id: "user-a",
+          endpoint: "https://push.example/a",
+          p256dh: "p256-a",
+          auth_secret: "auth-a",
+        },
+      ],
+      settings: [{ user_id: "user-a", timezone: "UTC", settings: ALL_ENABLED_SETTINGS }],
+      due: dueRowsFor({ "user-a": 2 }),
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(admin.client.rpc).toHaveBeenCalledWith("get_push_targets");
+    expect(admin.client.rpc).toHaveBeenCalledWith("get_push_due_cards", {
+      user_ids: ["user-a"],
+      today_input: "2026-05-20",
+    });
+    // The only .from() access left is the dead-endpoint DELETE, which this
+    // happy path never reaches.
+    expect(admin.client.from).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 when the get_push_due_cards RPC errors", async () => {
+    const admin = buildAdminMock({
+      subscriptions: [
+        {
+          id: "sub-1",
+          user_id: "user-a",
+          endpoint: "https://push.example/a",
+          p256dh: "p256-a",
+          auth_secret: "auth-a",
+        },
+      ],
+      settings: [{ user_id: "user-a", timezone: "UTC", settings: ALL_ENABLED_SETTINGS }],
+      dueError: { message: "boom" },
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toBe("due_query_failed");
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 when the get_push_targets RPC errors", async () => {
+    const admin = buildAdminMock({ subsError: { message: "boom" } });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toBe("targets_query_failed");
   });
 
   it("sends a notification to a subscriber with due cards", async () => {

@@ -17,7 +17,8 @@
  * `applyPreMigrationFixture()`, which installs:
  *   - the `auth` schema + minimal `auth.users` table (FK target for migrations)
  *   - the `auth.uid()` polyfill (reads from `request.jwt.claims` session var)
- *   - the `anon` and `authenticated` roles (required by GRANT/REVOKE in migrations)
+ *   - the `anon`, `authenticated`, and `service_role` roles (required by
+ *     GRANT/REVOKE in migrations)
  *   - a stub `public.rls_auto_enable()` function (required by migration 025)
  */
 
@@ -105,6 +106,7 @@ export async function dropTestDatabase(
  *     returns the `sub` claim as a uuid. Matches what Supabase's GoTrue sets.
  *   - `anon` role (for REVOKE statements in migrations 018 / 025)
  *   - `authenticated` role (for GRANT/REVOKE in migrations 018 / 025)
+ *   - `service_role` role (for GRANT statements in migration 046)
  *   - `public.rls_auto_enable()` stub (REVOKE target in migration 025)
  *
  * Roles are shared across all databases in the cluster; the DO block guards
@@ -124,6 +126,9 @@ export async function applyPreMigrationFixture(pool: pg.Pool): Promise<void> {
         END IF;
         IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
           CREATE ROLE authenticated NOLOGIN;
+        END IF;
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
         END IF;
       END;
       $$;
