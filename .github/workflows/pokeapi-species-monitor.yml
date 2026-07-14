@@ -42,7 +42,7 @@ jobs:
       issues: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Compare live species count to seeded default-form count
         env:

@@ -78,7 +78,7 @@ jobs:
       # other input still comes from the event payload or the `gh` API (all
       # `gh` calls pass `--repo`).
       - name: Checkout (for the parser script)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           sparse-checkout: .github/scripts
           sparse-checkout-cone-mode: false
