@@ -43,7 +43,7 @@ jobs:
       # commit that first added each workflow file (Fix 1, #971). The
       # default shallow checkout would not contain that commit.
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

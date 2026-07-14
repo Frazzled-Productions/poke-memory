@@ -24,7 +24,7 @@ jobs:
       code: ${{ steps.decide.outputs.code }}
       e2e_relevant: ${{ steps.decide.outputs.e2e_relevant }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Detect changed paths
         id: filter
         if: github.event_name == 'pull_request'
@@ -74,7 +74,7 @@ jobs:
       - name: Skip notice (docs-only change)
         if: needs.changes.outputs.code != 'true'
         run: echo "No code changes detected — skipping typecheck/build/vitest."
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: needs.changes.outputs.code == 'true'
         with:
           # vitest --changed needs history to diff against the base ref.
@@ -149,7 +149,7 @@ jobs:
       - name: Skip notice (no app/lib/components/public/e2e change)
         if: needs.changes.outputs.e2e_relevant != 'true'
         run: echo "No e2e-relevant changes detected — skipping Playwright suite."
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: needs.changes.outputs.e2e_relevant == 'true'
       - name: Cache npm
         if: needs.changes.outputs.e2e_relevant == 'true'
@@ -240,7 +240,7 @@ jobs:
       - name: Skip notice (no e2e-relevant change)
         if: needs.changes.outputs.e2e_relevant != 'true'
         run: echo "No e2e-relevant changes detected — skipping real-auth Playwright suite."
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: needs.changes.outputs.e2e_relevant == 'true'
       - name: Cache npm
         if: needs.changes.outputs.e2e_relevant == 'true'

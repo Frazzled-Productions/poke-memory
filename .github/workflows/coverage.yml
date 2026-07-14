@@ -34,7 +34,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Need the PR base commit so `git diff` can compute changed lines for
           # the diff-coverage gate. fetch-depth: 0 fetches full history.

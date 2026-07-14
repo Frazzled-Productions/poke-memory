@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 6
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Cache npm
         uses: actions/cache@v6
