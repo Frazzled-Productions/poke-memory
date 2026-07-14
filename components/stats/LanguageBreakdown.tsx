@@ -23,7 +23,7 @@ import { formatDate, type DateFormat } from "@/lib/utils/format-date";
 import { LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import type { ReviewableCard } from "@/lib/review/session";
 import { cn } from "@/lib/utils/cn";
-import { mutedText, mutedTextXs } from "@/lib/utils/class-names";
+import { mutedText, mutedTextXs, sectionHeadingSm } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -131,7 +131,7 @@ function LanguageBreakdownInner({
     <section aria-labelledby="stats-lang-breakdown-heading">
       <h2
         id="stats-lang-breakdown-heading"
-        className="mb-3 text-base font-semibold text-foreground"
+        className={`mb-3 ${sectionHeadingSm}`}
       >
         {t("heading")}
       </h2>

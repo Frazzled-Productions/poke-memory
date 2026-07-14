@@ -18,6 +18,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth/requireAuth";
 import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 
 // Native optimizer can take tens of seconds on large datasets. Default
@@ -170,14 +171,9 @@ export async function POST(): Promise<NextResponse> {
 
 async function postHandler(): Promise<NextResponse> {
   const supabase = (await createClient()) as unknown as SupabaseClient;
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAuth(supabase);
+  if (auth instanceof NextResponse) return auth;
+  const { user } = auth;
 
   // Enforce 7-day cooldown and guard against concurrent fits (F29).
   //

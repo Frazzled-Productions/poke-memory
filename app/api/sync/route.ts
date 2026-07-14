@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { parseJsonBody } from "@/lib/api/parseJsonBody";
+import { requireAuth } from "@/lib/auth/requireAuth";
 import type { CloudRow } from "@/lib/sync/cloud";
 import { CARD_REVIEWS_CONFLICT_COLS, isStructuralError } from "@/lib/sync/cloud";
 
@@ -22,12 +24,9 @@ type BeaconPayload = {
 // into a user-visible "Sync failed" banner. Structural errors (42xxx, 23505,
 // 23503) break out of the retry loop immediately and return HTTP 409 (#1358).
 export async function POST(request: Request) {
-  let payload: BeaconPayload;
-  try {
-    payload = (await request.json()) as BeaconPayload;
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<BeaconPayload>(request);
+  if (parsed instanceof NextResponse) return parsed;
+  const payload = parsed.data;
 
   if (!Array.isArray(payload.cards)) {
     return NextResponse.json({ ok: false, error: "invalid_payload" }, { status: 400 });
@@ -37,14 +36,9 @@ export async function POST(request: Request) {
   // repo, which causes the typed upsert to expect never[]. The untyped client
   // matches the pattern used throughout lib/sync/cloud.ts.
   const supabase = (await createClient()) as unknown as SupabaseClient;
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAuth(supabase, { withOkField: true });
+  if (auth instanceof NextResponse) return auth;
+  const { user } = auth;
 
   const rows = payload.cards;
   if (rows.length === 0) {

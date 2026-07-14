@@ -18,7 +18,7 @@ import { LEGACY_CRY_CACHE_NAME, LEGACY_SPRITE_CACHE_NAME } from "@/lib/pwa/cache
 import { offlineClear } from "@/lib/pwa/offlineStore";
 import { OFFLINE_DOWNLOADED_AT_KEY } from "@/lib/pwa/precache";
 import { KEY_OFFLINE_MANIFEST } from "@/lib/storage/keys";
-import { cardPanelPadded, colStack, colStackLg, dialogPanel, mutedText, mutedTextXs } from "@/lib/utils/class-names";
+import { cardPanelPadded, colStack, colStackLg, dialogPanel, mutedText, mutedTextXs, sectionHeadingSm } from "@/lib/utils/class-names";
 import { formatGb, formatDownloadBytes } from "@/lib/utils/format-bytes";
 
 /**
@@ -411,7 +411,7 @@ export function OfflineSection() {
       >
         <h2
           id="delete-cache-dialog-title"
-          className="text-base font-semibold text-foreground"
+          className={sectionHeadingSm}
         >
           {t("deleteConfirmTitle")}
         </h2>
@@ -447,7 +447,7 @@ export function OfflineSection() {
       >
         <h2
           id="low-storage-dialog-title"
-          className="text-base font-semibold text-foreground"
+          className={sectionHeadingSm}
         >
           {t("lowStorageTitle")}
         </h2>

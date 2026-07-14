@@ -29,7 +29,7 @@ import {
 } from "@/lib/settings/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { cn } from "@/lib/utils/cn";
-import { mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { mutedTextXs, sectionLabel, sectionHeadingSm } from "@/lib/utils/class-names";
 import { MachineTranslationBanner } from "@/components/i18n/MachineTranslationBanner";
 
 type Props = {
@@ -189,7 +189,7 @@ export function FirstVisitOnboardingModal({ onDismiss }: Props) {
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
           <h2
             id="onboarding-modal-title"
-            className="text-base font-semibold text-foreground"
+            className={sectionHeadingSm}
           >
             {t("welcomeHeading")}
           </h2>

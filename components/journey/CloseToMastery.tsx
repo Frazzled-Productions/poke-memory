@@ -25,7 +25,7 @@ import { MASTERY_STABILITY_DAYS } from "@/lib/stats/derive";
 import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { cn } from "@/lib/utils/cn";
-import { mutedText } from "@/lib/utils/class-names";
+import { mutedText, sectionHeadingSm } from "@/lib/utils/class-names";
 import { MeterBar } from "@/components/ui/MeterBar";
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ export function CloseToMastery({
     <section aria-labelledby="close-to-mastery-heading">
       <h3
         id="close-to-mastery-heading"
-        className="mb-1 text-base font-semibold text-foreground"
+        className={`mb-1 ${sectionHeadingSm}`}
       >
         {tWidget("heading")}
       </h3>

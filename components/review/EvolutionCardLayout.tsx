@@ -7,7 +7,7 @@ import { DirectionBadge } from "@/components/review/DirectionBadge";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import type { CardDirection } from "@/components/review/DirectionBadge";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
-import { sectionLabelSubtle } from "@/lib/utils/class-names";
+import { sectionLabelSubtle, sectionHeadingSm } from "@/lib/utils/class-names";
 import { PRACTICE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 // Intrinsic size is PRACTICE_SPRITE_SIZE so the loader serves the right WebP
@@ -132,7 +132,7 @@ export function EvolutionCardLayout({
   return (
     <div className="flex flex-col items-center gap-2 sm:gap-4">
       <DirectionBadge direction={direction} />
-      <p className="text-base font-semibold text-foreground sm:text-lg">
+      <p className={`${sectionHeadingSm} sm:text-lg`}>
         {prompt}
       </p>
       <div

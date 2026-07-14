@@ -4,7 +4,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import type { CompletionProjection } from "@/lib/stats/completion-projection";
 import type { DateFormat } from "@/lib/utils/format-date";
 import { formatDate } from "@/lib/utils/format-date";
-import { cardPanel, mutedText, mutedTextXs } from "@/lib/utils/class-names";
+import { cardPanel, mutedText, mutedTextXs, sectionHeadingSm } from "@/lib/utils/class-names";
 
 type Props = {
   projection: CompletionProjection;
@@ -19,7 +19,7 @@ export function CompletionProjection({ projection, fmt = "dmy", tz = "UTC" }: Pr
     <section aria-labelledby="completion-projection-heading">
       <h2
         id="completion-projection-heading"
-        className="mb-3 text-base font-semibold text-foreground"
+        className={`mb-3 ${sectionHeadingSm}`}
       >
         {t("heading")}
       </h2>

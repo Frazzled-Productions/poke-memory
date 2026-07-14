@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { AccuracyPoint } from "@/lib/stats/accuracy";
 import { cn } from "@/lib/utils/cn";
-import { cardPanel, mutedText, mutedTextXs } from "@/lib/utils/class-names";
+import { cardPanel, mutedText, mutedTextXs, sectionHeadingSm } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Window options
@@ -121,7 +121,7 @@ export function AccuracySparkline({ points, rolling7d, rolling30d, rolling365d, 
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2
           id="accuracy-heading"
-          className="text-base font-semibold text-foreground"
+          className={sectionHeadingSm}
         >
           {t("heading")}
         </h2>

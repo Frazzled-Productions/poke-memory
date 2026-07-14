@@ -31,7 +31,7 @@ import { useTranslations } from "next-intl";
 import { signIn, signUpWithUsername, signInWithUsername } from "@/lib/auth/actions";
 import type { AuthProvider } from "@/lib/auth/types";
 import { normaliseUsername, validateUsername, MIN_PASSWORD_LENGTH } from "@/lib/auth/username";
-import { colStack } from "@/lib/utils/class-names";
+import { colStack, sectionHeadingSm } from "@/lib/utils/class-names";
 
 type Props = {
   open: boolean;
@@ -250,7 +250,7 @@ export function SignInSheet({ open, onClose }: Props) {
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
           <h2
             id="sign-in-sheet-heading"
-            className="text-base font-semibold text-foreground"
+            className={sectionHeadingSm}
           >
             {t("signInSheet.heading")}
           </h2>

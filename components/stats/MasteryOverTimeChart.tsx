@@ -11,7 +11,7 @@ import {
 import { useFormatter, useTranslations } from "next-intl";
 import type { MasteryPoint } from "@/lib/stats/mastery-over-time";
 import { formatChartDate, type DateFormat } from "@/lib/utils/format-date";
-import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue, sectionHeadingSm } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Palette - consistent with other Stats components (zinc/emerald/rose)
@@ -110,7 +110,7 @@ export function MasteryOverTimeChart({ series, totalCards, dateFormat = "dmy", f
     <section aria-labelledby="mastery-over-time-heading">
       <h2
         id="mastery-over-time-heading"
-        className="mb-1 text-base font-semibold text-foreground"
+        className={`mb-1 ${sectionHeadingSm}`}
       >
         {t("heading")}
       </h2>

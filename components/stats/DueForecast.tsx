@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
-import { cardPanel, mutedTextXs } from "@/lib/utils/class-names";
+import { cardPanel, mutedTextXs, sectionHeadingSm } from "@/lib/utils/class-names";
 import type { DueForecastDay } from "@/lib/stats/derive";
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ export default function DueForecast({
     <section aria-labelledby="due-heading">
       <h2
         id="due-heading"
-        className="mb-3 text-base font-semibold text-foreground"
+        className={`mb-3 ${sectionHeadingSm}`}
       >
         Due forecast
       </h2>

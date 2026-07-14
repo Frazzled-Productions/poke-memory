@@ -8,7 +8,7 @@ import {
 } from "recharts";
 import { useTranslations, useFormatter } from "next-intl";
 import type { RetentionComparison } from "@/lib/stats/retention";
-import { cardPanel, mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { cardPanel, mutedText, mutedTextXs, sectionLabel, sectionHeadingSm } from "@/lib/utils/class-names";
 
 type Props = {
   /** Actual-vs-target comparison from `computeRetentionComparison`. */
@@ -51,7 +51,7 @@ export function RetentionIndicator({ comparison }: Props) {
     <section aria-labelledby="retention-heading">
       <h2
         id="retention-heading"
-        className="mb-1 text-base font-semibold text-foreground"
+        className={`mb-1 ${sectionHeadingSm}`}
       >
         {tR("heading")}
       </h2>

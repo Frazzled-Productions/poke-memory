@@ -21,7 +21,7 @@ import { LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { GradeLog } from "@/lib/gradelog/persistence";
 import { cn } from "@/lib/utils/cn";
-import { mutedText } from "@/lib/utils/class-names";
+import { mutedText, sectionHeadingSm } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -108,7 +108,7 @@ function LanguageBreakdownInner({
     <section aria-labelledby="lang-breakdown-heading">
       <h3
         id="lang-breakdown-heading"
-        className="mb-3 text-base font-semibold text-foreground"
+        className={`mb-3 ${sectionHeadingSm}`}
       >
         {t("heading")}
       </h3>

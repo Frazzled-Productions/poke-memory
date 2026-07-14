@@ -13,7 +13,7 @@ import {
   type StreakProtection,
 } from "@/lib/streak";
 import { cn } from "@/lib/utils/cn";
-import { cardPanel, colStack, mutedText } from "@/lib/utils/class-names";
+import { cardPanel, colStack, mutedText, sectionHeadingSm } from "@/lib/utils/class-names";
 import { formatDate, type DateFormat } from "@/lib/utils/format-date";
 
 type Props = {
@@ -95,7 +95,7 @@ export function StreakProtectionCard({ dateFormat, timezone }: Props) {
     >
       <h2
         id="streak-protection-heading"
-        className="mb-3 text-base font-semibold text-foreground"
+        className={`mb-3 ${sectionHeadingSm}`}
       >
         {t("heading")}
       </h2>

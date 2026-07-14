@@ -105,7 +105,7 @@ import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
 import { computeSpeciesLegStatuses } from "@/lib/stats/legStatus";
-import { mutedText, mutedTextXs, sectionLabel, colStack } from "@/lib/utils/class-names";
+import { mutedText, mutedTextXs, sectionLabel, colStack, sectionHeadingSm } from "@/lib/utils/class-names";
 import { getOrCreateClientSalt } from "@/lib/identity/clientSalt";
 import { addDaysToIsoDate } from "@/lib/utils/dates";
 import { useShareSheet } from "@/components/review/useShareSheet";
@@ -3058,7 +3058,7 @@ export function ReviewSession() {
                 >
                   🔊
                 </button>
-                <p className="text-base font-semibold text-foreground">
+                <p className={sectionHeadingSm}>
                   {t("cryPrompt")}
                 </p>
               </div>
