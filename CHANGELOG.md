@@ -6,6 +6,21 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.6] - 2026-07-14
+
+### Added
+
+- E2E layout-regression check for the Higher-or-Lower minigame: bounding-box assertions on tile proportions and viewport-edge clearance (highlight-ring clipping), covering the two v0.11.5 visual regressions.
+
+### Changed
+
+- Extracted the bearer-token authorisation check duplicated across three API routes into a single shared helper (`lib/auth/bearerAuth.ts`); no behaviour change.
+
+### Fixed
+
+- Service-worker registration and update failures no longer surface as unhandled promise rejections. A browser that declines to register a service worker (private browsing, enterprise policy, a search-engine crawler) now degrades silently to an online-only page instead of reporting an error.
+- The cron-health monitor now finds its own open tracking issues again: repeat failures update the existing issue in place instead of filing duplicates, and a recovered workflow's issue closes automatically on the next healthy run. The broken `gh issue list --search` marker lookup (the marker's colon parsed as a search qualifier and matched nothing) is replaced with the repo-standard local jq marker match.
+
 ## [0.11.5] - 2026-06-12
 
 ### Changed
@@ -1809,7 +1824,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.5...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.6...HEAD
+[0.11.6]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.6
 [0.11.5]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.5
 [0.11.4]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.4
 [0.11.3]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.3
