@@ -809,6 +809,18 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 Two separate gates catch type/build/test errors at different points:
 
+### Local pre-PR gate (`npm run pre-pr`)
+
+After pushing, before opening the PR, run **`npm run pre-pr`** (`scripts/pre-pr.mjs`, #1716) - it runs the full gate in order, fail-fast: lint -> typecheck -> build -> test -> coverage -> diff-coverage, and exits non-zero on the first failure. This is THE local gate; it mirrors the CI required checks (CI remains the enforcement layer) and removes the per-step skip risk of re-deriving the chain by hand.
+
+- `npm run lint` (em-dash + i18n + pseudo-locale + agents-size) catches errors that do **not** surface in typecheck/build/test, so a hand-run that omits it ships a red PR (#1541).
+- The diff-coverage leg is the one that has bitten most (green-locally-then-red on CI's per-diff bar, #1642 / #1646 / #1649): `test:coverage` enforces only the global floor; the 90% per-diff patch bar runs after it against the fresh `coverage/coverage-final.json`. Override the diff base for a main-targeting PR with `DIFF_COVERAGE_BASE=origin/main npm run pre-pr`.
+- An opt-in `pre-push` git hook running the same command is documented but not installed by default.
+
+**Pre-PR e2e smoke** for high-surface-area diffs (touching `app/layout.tsx`, `app/page.tsx`, `components/onboarding/**`, `components/Nav.tsx` / `BottomTabBar.tsx` / `MobileNavPaddingWrapper.tsx`, `lib/settings/persistence.ts`, or `playwright.config.ts`): run `scripts/pre-pr-smoke.sh` (chromium-only subset in the pinned Docker image). Same two-attempt budget.
+
+**Push discipline.** Push with an explicit `git push origin <branch>` - never a bare `git push`. A worktree created via `git worktree add -b <branch> origin/qa` sets the branch's upstream to `origin/qa`, so a bare `git push` does NOT update `origin/<branch>`: at best it fast-fails (rejected, harmless), and at worst it silently pushes to `origin/qa` or no-ops, leaving the PR branch stale and CI red on the old commit. Always name the remote and branch (mirrors the `gh pr create --head <branch>` rule). Worked example: a pseudo-locale regen "pushed" but never landed on the PR branch (#1474).
+
 ### Pre-PR gate (`auto-issue.yml` only)
 
 Runs before opening a PR: `npm run typecheck && npm run build && npm test`

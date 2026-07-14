@@ -55,7 +55,9 @@ If a column has a "this value only moves forward" semantic (review dates, counte
 
 ## Apply the migration
 
-Apply the migration to the live Supabase project **before merging** the PR that adds it - typically right after opening the PR. Call `mcp__supabase__apply_migration(name, query)` with `name` matching the filename's `<NNN>_<name>` part (drop the number and the `.sql` extension). The `migration-check.yml` workflow fails the PR's required CI check until file-vs-applied parity holds, so applying *after* merge is not an option: the PR can't merge without the migration already in place.
+Apply the migration to the live Supabase projects **before merging** the PR that adds it - typically right after opening the PR. Apply it to **both** projects: prod via `mcp__supabase__apply_migration(name, query)` **and** QA via `mcp__supabase-qa__apply_migration(name, query)`, with `name` matching the filename's `<NNN>_<name>` part (drop the number and the `.sql` extension). The `migration-check.yml` workflow fails the PR's required CI check until file-vs-applied parity holds, so applying *after* merge is not an option: the PR can't merge without the migration already in place.
+
+**Env-to-branch parity (#1806).** `migration-check.yml` asserts **QA** parity on PRs whose base is `qa` (the staging DB is the migration rehearsal) and **prod** parity on push to `main` (promotion proves it against prod). Practically: apply to QA before the qa-targeted PR can go green, and have prod applied before the `qa -> main` promotion. The same env-driven `scripts/check-migrations.mjs` runs against whichever project the trigger selects; the check reads `SUPABASE_ACCESS_TOKEN` (account-scoped, reused for both projects) plus `QA_SUPABASE_PROJECT_REF` (QA) or `SUPABASE_PROJECT_REF` (prod). A Supabase Management-API token is account-level, so no separate QA token exists - only the QA ref is a distinct secret. A migration missing from the target project fails the check loudly (it does not silently pass), which is the drift that bit QA on 2026-06-08 (#1798/#1806). QA's ledger was reconciled (001-041) on 2026-06-08 so the check starts from parity.
 
 ## Wire cross-device sync
 
