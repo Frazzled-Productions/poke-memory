@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
+import { isAuthorized } from "@/lib/auth/bearerAuth";
 
 /**
  * POST /api/discord/digest (#1653)
@@ -27,18 +27,6 @@ import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js
  * DISCORD WEBHOOK
  *   URL read from DISCORD_DIGEST_WEBHOOK_URL env (server-side only).
  */
-
-/** Constant-time bearer comparison (mirrors push/send-daily/route.ts). */
-function isAuthorized(headerValue: string | null, secret: string): boolean {
-  if (!headerValue || !secret) return false;
-  const expected = `Bearer ${secret}`;
-  if (headerValue.length !== expected.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(headerValue), Buffer.from(expected));
-  } catch {
-    return false;
-  }
-}
 
 /** Discord embed colour for digest (blue). */
 const EMBED_COLOUR_DIGEST = 0x3498db;
