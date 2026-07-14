@@ -66,11 +66,15 @@ const _createTranslator = _createTranslatorRaw as unknown as (
  *      Any other value (or missing header) returns 401. The shared secret
  *      lives in both Vercel env (`CRON_SHARED_SECRET`) and Supabase Vault
  *      (`cron_shared_secret`); they must match exactly.
- *   2. Inside the route, we use the SUPABASE_SERVICE_ROLE_KEY to read
- *      across every user's `push_subscriptions` row. Row-level security is
- *      bypassed by design - the cron has no `auth.uid()` to authorise as,
- *      and the route's only privileged operation is reading subscriptions
- *      + computing due counts + sending pushes.
+ *   2. Inside the route, the SUPABASE_SERVICE_ROLE_KEY client calls two
+ *      SECURITY DEFINER RPCs (migration 046, #1100) instead of raw table
+ *      SELECTs: `get_push_targets` (subscriptions joined to settings) and
+ *      `get_push_due_cards` (due card_reviews rows per timezone bucket).
+ *      EXECUTE on both is revoked from PUBLIC/anon/authenticated and
+ *      granted only to service_role, so the cross-user read surface is the
+ *      functions' explicit return contracts rather than the whole schema.
+ *      The only remaining direct table access is the dead-endpoint DELETE
+ *      on `push_subscriptions` (410/404 cleanup).
  */
 
 // Note: this route must run on Node.js (not Edge) because the `web-push`
@@ -195,24 +199,24 @@ export async function buildDailyMessage(
   return { title, body, url };
 }
 
-type SubscriptionRow = {
-  id: string;
-  user_id: string;
-  endpoint: string;
-  p256dh: string;
-  auth_secret: string;
-};
-
 /**
- * Subset of the `user_settings` row shape. `settings` is the JSONB blob
- * carrying per-user card-type enabled flags and daily new-card caps.
- * `timezone` is a scalar column (migration 019).
+ * Row shape returned by the `get_push_targets` RPC (migration 046, #1100):
+ * one row per push subscription, LEFT JOINed to the owner's `user_settings`
+ * row, so the settings-derived fields are null for users without a settings
+ * record.
+ *
+ * `settings` is the JSONB blob carrying per-user card-type enabled flags and
+ * daily new-card caps. `timezone` is a scalar column (migration 019).
  * `push_notification_hour` is a scalar column (migration 030, #1315) storing
  * the user's preferred LOCAL hour (0-23) for the daily reminder. NULL means
  * "no preference" - falls back to PUSH_DEFAULT_HOUR_UTC (8).
  */
-type SettingsRow = {
+type PushTargetRow = {
+  subscription_id: string;
   user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth_secret: string;
   timezone: string | null;
   settings: Record<string, unknown> | null;
   push_notification_hour: number | null;
@@ -588,46 +592,46 @@ export async function POST(request: Request) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Step 1: fetch every push subscription. The result fits comfortably in
-  // memory at our scale (one row per device per signed-in user).
-  const { data: subsData, error: subsError } = await admin
-    .from("push_subscriptions")
-    .select("id, user_id, endpoint, p256dh, auth_secret");
-  if (subsError || !subsData) {
+  // Steps 1+2 (merged via the `get_push_targets` RPC, migration 046 / #1100):
+  // one call returns every push subscription LEFT JOINed to the owner's
+  // settings row, covering what the two previous table reads fetched:
+  //   - the subscription tuple (id, endpoint, p256dh, auth_secret);
+  //   - `settings` JSONB: card-type enabled flags, alt-forms toggle, and
+  //     `learningLocales` (#1504 - the user's full learning-locale set);
+  //   - `timezone`: scalar column (migration 019) - used for "today" bucketing
+  //     and for converting the local preferred hour to UTC (#1315);
+  //   - `push_notification_hour`: scalar column (migration 030, #1315) - the
+  //     user's preferred local hour for the daily reminder (0-23 or NULL).
+  // The result fits comfortably in memory at our scale (one row per device
+  // per signed-in user). Users without a stored settings record have null
+  // settings fields and fall back to DEFAULT_ELIGIBILITY, as before.
+  const { data: targetsData, error: targetsError } =
+    await admin.rpc("get_push_targets");
+  if (targetsError || !targetsData) {
     return NextResponse.json(
-      { ok: false, error: "subscriptions_query_failed" },
+      { ok: false, error: "targets_query_failed" },
       { status: 502 },
     );
   }
-  const subscriptions = subsData as SubscriptionRow[];
-  if (subscriptions.length === 0) {
+  const targets = targetsData as PushTargetRow[];
+  if (targets.length === 0) {
     return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
   }
 
-  // Step 2: resolve timezones, notification-hour preference, and per-user
-  // eligibility settings. We widen the SELECT to include:
-  //   - `settings` JSONB: card-type enabled flags, alt-forms toggle, and
-  //     `learningLocales` (#1504 - the user's full learning-locale set).
-  //   - `timezone`: scalar column (migration 019) - used for "today" bucketing
-  //     and for converting the local preferred hour to UTC (#1315).
-  //   - `push_notification_hour`: scalar column (migration 030, #1315) - the
-  //     user's preferred local hour for the daily reminder (0-23 or NULL).
-  // Users without a stored settings record fall back to DEFAULT_ELIGIBILITY.
-  const uniqueUserIds = Array.from(new Set(subscriptions.map((s) => s.user_id)));
-  const { data: settingsData, error: settingsError } = await admin
-    .from("user_settings")
-    .select("user_id, timezone, settings, push_notification_hour")
-    .in("user_id", uniqueUserIds);
-  if (settingsError) {
-    return NextResponse.json(
-      { ok: false, error: "settings_query_failed" },
-      { status: 502 },
-    );
-  }
+  const subscriptions = targets.map((t) => ({
+    id: t.subscription_id,
+    user_id: t.user_id,
+    endpoint: t.endpoint,
+    p256dh: t.p256dh,
+    auth_secret: t.auth_secret,
+  }));
+
+  // A user with several devices appears once per subscription row with
+  // identical settings fields, so re-setting the per-user maps is harmless.
   const timezoneByUser = new Map<string, string>();
   const eligibilityByUser = new Map<string, UserEligibility>();
   const pushHourByUser = new Map<string, number | null>();
-  for (const row of (settingsData ?? []) as SettingsRow[]) {
+  for (const row of targets) {
     if (row.timezone) timezoneByUser.set(row.user_id, row.timezone);
     eligibilityByUser.set(row.user_id, parseEligibility(row.settings));
     // Store the raw column value (null = no preference).
@@ -716,13 +720,14 @@ export async function POST(request: Request) {
     // user can exceed 1000 due rows, and the bucket covers multiple users.
     // ORDER BY user_id, due_date gives a stable total order for offset
     // pagination so rows don't shift/skip between pages.
+    // #1100: the read goes through the `get_push_due_cards` SECURITY DEFINER
+    // RPC (migration 046) - the due_date <= today, user_id IN bucket, and
+    // hidden_since IS NULL filters live inside the function. The ORDER BY
+    // (user_id, due_date) is applied on the RPC result so offset pagination
+    // stays stable across pages, exactly as the raw query did.
     const dueData = await fetchAllPages<DueRow>((from, to) =>
       admin
-        .from("card_reviews")
-        .select("user_id, card_type, subject_key, first_seen, locale")
-        .lte("due_date", today)
-        .in("user_id", userIds)
-        .is("hidden_since", null)
+        .rpc("get_push_due_cards", { user_ids: userIds, today_input: today })
         .order("user_id", { ascending: true })
         .order("due_date", { ascending: true })
         .range(from, to),
