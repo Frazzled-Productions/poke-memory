@@ -27,7 +27,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [privacy-expert](.claude/agents/privacy-expert.md) | Data-protection / compliance advice - GDPR/UK-GDPR controller obligations, Children's Code, PECR/cookies, privacy notice + Terms drafting, DPIA upkeep, sub-processor classification | Yes |
 | [i18n-expert](.claude/agents/i18n-expert.md) | Multi-locale design - `pokemonNameLocale` vs. `appLocale`, transliteration sources (rōmaji, pinyin), message catalogs, `next-intl` routing, locale-aware sync, `<lang>` placement, adding a new locale | Yes |
 | [ux-advisor](.claude/agents/ux-advisor.md) | Information architecture, feature discoverability, onboarding patterns, empty/locked-state design, accessibility - invoked on the brief for any change adding a user-facing feature or changing how something is displayed/discovered; advises, `ui-coder` implements | Yes |
-| [workflow-expert](.claude/agents/workflow-expert.md) | Reviews GitHub Actions / orchestration changes - idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
+| [workflow-expert](.claude/agents/workflow-expert.md) | Mandatory review on EVERY GitHub Actions / orchestration change - idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
 
 ---
 
@@ -50,16 +50,17 @@ Standard flow for non-trivial work:
 - it states the **expected outcome** concretely enough to write acceptance criteria from directly;
 - there are **zero open design questions** - nothing the planner would tag `[EXPERT-RESEARCH]`, `[USER-DECISION]`, or `[USER-DECISION + RESEARCH]`.
 
-When every box is ticked the issue *is* the plan and a planner round-trip would return precisely what the issue already says - validated by 25+ consecutive retros. If any box is unticked (a file is unnamed, an outcome is fuzzy, a design choice is open), run the planner. Implement directly only against an issue that meets the full checklist.
+When every box is ticked the issue *is* the plan and a planner round-trip would return precisely what the issue already says - validated by 49 consecutive retros. If any box is unticked (a file is unnamed, an outcome is fuzzy, a design choice is open), run the planner. Implement directly only against an issue that meets the full checklist.
 
 **Planner-skip decision tree (#1248).** A simpler yes/no version of the checklist above, for quick triage:
 
 **Skip the planner when the issue body already contains:**
 - Root cause (what is broken and why)
 - Fix location (file path or function)
-- Acceptance criteria (what the change should achieve)
+- Fix direction (how the change should work)
+- Testable acceptance criteria (what the change should achieve)
 
-If any of the three is missing, run the planner. If all three are present, go straight to implement.
+If any of the four is missing, run the planner. If all four are present, go straight to implement.
 
 **Record the skip.** When skipping the planner, the orchestrator posts a one-line comment on the issue - `<!-- planner-skipped: <reason> -->` - so the decision is auditable at retro time without a planner round-trip (#1856). Full criteria and the template live in `.claude/agents/planner.md` under "Skip criteria and recording".
 
@@ -71,7 +72,7 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 
 **Orchestration entrypoints - `/batch-issues` and `/ship`.** Two local slash-commands run the playbook end-to-end so the gate, the in-session `code-reviewer` pass, the issue-first cross-check, and branch-off-`qa` are not re-derived by hand each time:
 
-- **`/batch-issues`** (`.claude/commands/batch-issues.md`) - drains the open backlog in conflict-minimizing batches, parallel where safe, draining into `qa` and opening a draft `qa -> main` promotion PR. Use for a backlog pass. Drain protocol (the command file is canonical; these are the load-bearing steps):
+- **`/batch-issues`** (`.claude/commands/batch-issues.md`) - drains the open backlog in conflict-minimising batches, parallel where safe, draining into `qa` and opening a draft `qa -> main` promotion PR. Use for a backlog pass. Drain protocol (the command file is canonical; these are the load-bearing steps):
   1. Pre-flight: list the backlog, then **suspend Auto Review before dispatching the first implementer** - run `gh workflow disable "Auto Review"` (allow-listed in `.claude/settings.json`). During the drain the in-session `code-reviewer` is the sole review gate; each PR `auto-review.yml` touches before the disable incurs a concrete reconciliation round (#1764/#1765: #1777 needed one purely from this collision). Do not dispatch any implementer until the disable succeeds.
   2. Implement per batch: worktree off `origin/qa`, coder agents, in-session `code-reviewer`, `npm run pre-pr`, PR into `qa`.
   3. Close-out: fire the QA preview deploy, then **re-enable Auto Review** - `gh workflow enable "Auto Review"` - as the last action (the graceful-exit guardrail also runs the enable, so a halted run never leaves it disabled).

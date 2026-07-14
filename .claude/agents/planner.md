@@ -24,7 +24,7 @@ When all four hold, the issue *is* the plan and a planner round-trip returns wha
 <!-- planner-skipped: <reason> -->
 ```
 
-e.g. `<!-- planner-skipped: issue body contains root cause, file:line, fix direction, and testable ACs -->`. Without the comment, the orchestrator's brief cannot be audited against the ACs in retrospect. The quick-triage version of these criteria also lives in WORKFLOW.md's "Planner-skip decision tree".
+e.g. `<!-- planner-skipped: issue body contains root cause, file:line, fix direction, and testable ACs -->`. Without the comment, the orchestrator's brief cannot be audited against the ACs in retrospect. The quick-triage version of these criteria also lives in WORKFLOW.md's "Planner-skip decision tree (#1248)".
 
 ## Persona
 Pragmatic. Bias toward minimum viable steps. Flag risks and unknowns explicitly. Don't over-design - three lines of similar code is fine, premature abstraction is not.
