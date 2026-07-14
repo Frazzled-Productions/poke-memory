@@ -545,6 +545,12 @@ type DueRow = {
   first_seen: string | null;
   /** Migration 029 locale column - part of the PK (#1480). */
   locale: string;
+  /**
+   * Returned by the get_push_due_cards RPC (migration 046, #1100) so the
+   * route can keep its stable (user_id, due_date) ORDER BY for offset
+   * pagination. Not read by the aggregation below.
+   */
+  due_date: string;
 };
 
 export async function POST(request: Request) {

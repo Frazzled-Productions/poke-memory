@@ -118,6 +118,7 @@ function buildAdminMock(opts: {
   subsError?: unknown;
   settings?: SettingsMockRow[];
   due?: DueRow[];
+  dueError?: unknown;
   deleteError?: unknown;
   deleteCount?: number;
 }) {
@@ -157,7 +158,12 @@ function buildAdminMock(opts: {
     // so fetchAllPages stops after one trip).
     const builder = {
       order: vi.fn(() => builder),
-      range: vi.fn(() => Promise.resolve({ data: dueRows, error: null })),
+      range: vi.fn(() =>
+        Promise.resolve({
+          data: opts.dueError ? null : dueRows,
+          error: opts.dueError ?? null,
+        }),
+      ),
     };
     return builder;
   });
@@ -481,6 +487,29 @@ describe("POST /api/push/send-daily - happy path", () => {
     // The only .from() access left is the dead-endpoint DELETE, which this
     // happy path never reaches.
     expect(admin.client.from).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 when the get_push_due_cards RPC errors", async () => {
+    const admin = buildAdminMock({
+      subscriptions: [
+        {
+          id: "sub-1",
+          user_id: "user-a",
+          endpoint: "https://push.example/a",
+          p256dh: "p256-a",
+          auth_secret: "auth-a",
+        },
+      ],
+      settings: [{ user_id: "user-a", timezone: "UTC", settings: ALL_ENABLED_SETTINGS }],
+      dueError: { message: "boom" },
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toBe("due_query_failed");
+    expect(mockSendNotification).not.toHaveBeenCalled();
   });
 
   it("returns 502 when the get_push_targets RPC errors", async () => {

@@ -81,7 +81,9 @@ $func$;
 -- due_date is included in the return shape so the route can keep the stable
 -- (user_id, due_date) ORDER BY it already uses for offset pagination via
 -- PostgREST .range() - fetchAllPages needs a total order that does not shift
--- between pages.
+-- between pages. The ordering itself is the caller's job (PostgREST applies
+-- the route's .order() around the function call), so the body carries no
+-- ORDER BY of its own.
 CREATE OR REPLACE FUNCTION public.get_push_due_cards(
   user_ids    uuid[],
   today_input date
@@ -109,8 +111,7 @@ AS $func$
   FROM public.card_reviews cr
   WHERE cr.due_date <= today_input
     AND cr.user_id = ANY (user_ids)
-    AND cr.hidden_since IS NULL
-  ORDER BY cr.user_id, cr.due_date;
+    AND cr.hidden_since IS NULL;
 $func$;
 
 -- ── Grants ───────────────────────────────────────────────────────────────────

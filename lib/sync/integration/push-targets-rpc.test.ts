@@ -276,6 +276,16 @@ describe("get_push_due_cards - EXECUTE grants", () => {
       ).rejects.toMatchObject({ code: "42501" });
     }
   });
+
+  it("allows EXECUTE to service_role", async () => {
+    const res = await queryAsRole(
+      adminPool,
+      "service_role",
+      `SELECT * FROM public.get_push_due_cards($1::uuid[], $2::date)`,
+      [[USER_A], TODAY],
+    );
+    expect(res.rows.length).toBeGreaterThan(0);
+  });
 });
 
 describe("get_push_due_cards - filtering and row shape", () => {
