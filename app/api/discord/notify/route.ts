@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
+import { isAuthorized } from "@/lib/auth/bearerAuth";
 
 /**
  * POST /api/discord/notify (#1653, #1848)
@@ -29,18 +29,6 @@ import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js
  *   URL. Keeping the Discord webhook URL in Vercel env means it never touches
  *   the DB or pg_net payload logs.
  */
-
-/** Constant-time bearer comparison (mirrors push/send-daily/route.ts). */
-function isAuthorized(headerValue: string | null, secret: string): boolean {
-  if (!headerValue || !secret) return false;
-  const expected = `Bearer ${secret}`;
-  if (headerValue.length !== expected.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(headerValue), Buffer.from(expected));
-  } catch {
-    return false;
-  }
-}
 
 /** Shape of the JSON body sent by the pg_net trigger. */
 type NotifyBody = {

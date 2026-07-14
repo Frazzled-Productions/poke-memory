@@ -41,7 +41,7 @@ jobs:
     outputs:
       perf_relevant: ${{ steps.decide.outputs.perf_relevant }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Detect changed paths
         id: filter
         if: github.event_name == 'pull_request'
@@ -91,12 +91,12 @@ jobs:
         if: needs.changes.outputs.perf_relevant != 'true'
         run: echo "No perf-relevant changes detected — skipping perf budget run."
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: needs.changes.outputs.perf_relevant == 'true'
 
       - name: Cache npm
         if: needs.changes.outputs.perf_relevant == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.npm
           key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}

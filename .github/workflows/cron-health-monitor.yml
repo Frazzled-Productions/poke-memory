@@ -43,7 +43,7 @@ jobs:
       # commit that first added each workflow file (Fix 1, #971). The
       # default shallow checkout would not contain that commit.
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -74,6 +74,21 @@ jobs:
           )
 
           NOW=$(date -u +%s)
+
+          # Marker-based dedup, fetched once for the whole run. The GitHub
+          # search index strips HTML comments (WORKFLOW.md), so we do NOT use
+          # `--search`: that pre-filter silently matched nothing here (the
+          # marker's colon made it parse as an unknown search qualifier), so
+          # every run saw "no existing issue", filed duplicates, and never
+          # found the issue to auto-close (#1919). Instead pull the full
+          # open-issue list (capped at 100) and match each marker locally with
+          # jq, which is reliable. No `2>/dev/null` either: a gh failure must
+          # surface via `set -euo pipefail` rather than look like "no existing
+          # issue" and open a duplicate on every run. One fetch outside the
+          # loop suffices because the per-workflow markers are disjoint and
+          # this run is the only writer of these issues.
+          ALL_OPEN_ISSUES=$(gh issue list --repo "$REPO" --state open \
+            --json number,body --limit 100)
 
           for entry in "${WORKFLOWS[@]}"; do
             FILE="${entry%%|*}"
@@ -227,13 +242,7 @@ jobs:
             # opening duplicates.
             MARKER="<!-- cron-health-monitor:$FILE -->"
 
-            EXISTING=$(gh issue list \
-              --repo "$REPO" \
-              --state open \
-              --search "$MARKER in:body" \
-              --json number,body \
-              --limit 10 \
-              2>/dev/null | jq -r --arg marker "$MARKER" \
+            EXISTING=$(echo "$ALL_OPEN_ISSUES" | jq -r --arg marker "$MARKER" \
               '[.[] | select(.body | contains($marker))] | .[0].number // empty')
 
             if [ -z "$PROBLEM" ]; then

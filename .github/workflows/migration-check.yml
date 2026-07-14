@@ -20,11 +20,16 @@ jobs:
     permissions:
       contents: read
     # Fork PRs don't see secrets - skip rather than fail. Same guard as auto-review.yml.
+    # Dependabot-triggered runs read the Dependabot secrets store, so
+    # SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF are empty and the script exits 2
+    # (#1918). A dependency bump cannot add a migration file, so skipping keeps parity
+    # enforcement intact for human-authored PRs. The guard is scoped to pull_request
+    # events so the prod check on push to main stays unconditional.
     # `push` events have no `pull_request` context, so gate them in explicitly
     # (a bare `pull_request.head.repo.fork == false` is falsy on push).
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.fork == false
+    if: github.event_name == 'push' || (github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]')
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc

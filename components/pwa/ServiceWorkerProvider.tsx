@@ -44,6 +44,31 @@ import { isSessionActive } from "@/lib/review/sessionActive";
  * Registration is skipped outside production builds so a `next dev` session
  * is never shadowed by a cached shell.
  */
+/**
+ * Builds a rejection handler for a best-effort service-worker call.
+ *
+ * Every promise this component starts is fire-and-forget. The `void` operator
+ * discards the resolved value but does NOT handle a rejection, so before
+ * #1913 a failed `register()` escaped to `window.onunhandledrejection` and
+ * Sentry captured it as an unhandled `error`-level exception.
+ *
+ * Registration failing is expected, not exceptional. It happens for the
+ * GoogleOther crawler (whose renderer stubs `register()` to reject outright),
+ * in private-browsing modes, under enterprise policy, and on WebKit under
+ * storage pressure (which rejects natively with `TypeError: Internal error`).
+ * None of these are actionable: the service worker only adds offline support,
+ * so the app degrades to an ordinary online-only page.
+ *
+ * `console.debug` keeps the failure diagnosable in devtools without paging
+ * anyone. Do not escalate this to `Sentry.captureException` and do not paper
+ * over it with an `ignoreErrors` filter in `instrumentation-client.ts`.
+ */
+function swFailure(context: string) {
+  return (error: unknown) => {
+    console.debug(`[sw] ${context} failed; continuing without a service worker`, error);
+  };
+}
+
 export function ServiceWorkerProvider() {
   const serwistRef = useRef<Serwist | null>(null);
   // Guards the single post-activation reload so an update can't loop reloads.
@@ -86,9 +111,12 @@ export function ServiceWorkerProvider() {
     // worker, so a user who backgrounded the page after the event fired and
     // before this component remounted would otherwise never trip the
     // activator. Probing the registration directly closes that gap.
-    void navigator.serviceWorker.getRegistration().then((registration) => {
-      if (registration?.waiting) waitingRef.current = true;
-    });
+    void navigator.serviceWorker
+      .getRegistration()
+      .then((registration) => {
+        if (registration?.waiting) waitingRef.current = true;
+      })
+      .catch(swFailure("getRegistration on mount"));
 
     // A worker has taken control. Reload only when this is the result of the
     // silent activator posting SKIP_WAITING - `clientsClaim` also fires this
@@ -130,11 +158,14 @@ export function ServiceWorkerProvider() {
         // calling serwistRef.current?.messageSkipWaiting(), which would send
         // the built-in "SKIP_WAITING" type that Serwist intercepts and handles
         // unconditionally (bypassing the SW's client-count gate).
-        void navigator.serviceWorker.getRegistration().then((registration) => {
-          if (registration?.waiting) {
-            void messageSW(registration.waiting, { type: "REQUEST_SKIP_WAITING" });
-          }
-        });
+        void navigator.serviceWorker
+          .getRegistration()
+          .then((registration) => {
+            if (registration?.waiting) {
+              return messageSW(registration.waiting, { type: "REQUEST_SKIP_WAITING" });
+            }
+          })
+          .catch(swFailure("REQUEST_SKIP_WAITING dispatch"));
         return;
       }
 
@@ -150,7 +181,7 @@ export function ServiceWorkerProvider() {
       if (sinceLastUpdate < UPDATE_CHECK_THROTTLE_MS) return;
 
       lastUpdateAtRef.current = Date.now();
-      void serwistRef.current?.update();
+      void serwistRef.current?.update().catch(swFailure("visibility update check"));
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
 
@@ -160,10 +191,10 @@ export function ServiceWorkerProvider() {
     // hour.
     const intervalId = window.setInterval(() => {
       lastUpdateAtRef.current = Date.now();
-      void serwistRef.current?.update();
+      void serwistRef.current?.update().catch(swFailure("background update check"));
     }, BACKGROUND_UPDATE_INTERVAL_MS);
 
-    void serwist.register();
+    void serwist.register().catch(swFailure("registration"));
 
     return () => {
       serwist.removeEventListener("waiting", onWaiting);

@@ -285,6 +285,88 @@ test.describe("Higher-or-Lower mini-game", () => {
     }
   });
 
+  test("tiles keep content-height proportions and stay clear of the viewport edges (#1892)", async ({ page }) => {
+    // Regression test for the two v0.11.5 layout breaks (#1889):
+    //   (a) tiles stretched to the full card-position height, leaving a large
+    //       empty band inside each tile, and
+    //   (b) the coloured highlight rings clipped at the viewport edges because
+    //       the tiles sat flush against them.
+    // Bounding-box assertions are used instead of pixel snapshots: they are
+    // deterministic across font rendering / sprite decode timing and fail on
+    // exactly the geometry that regressed.
+    //
+    // EDGE_MARGIN: the highlight ring is ring-2 (2px drawn outside the tile's
+    // border box), so each tile needs at least 2px of clearance on both sides;
+    // 4px gives headroom without constraining the design.
+    const EDGE_MARGIN = 4;
+    // A content-height tile (sprite capped at h-24 / sm:h-32, name, stat line,
+    // padding and gaps) is well under half the viewport height on every
+    // supported viewport; a full-height stretched tile fills the flex-1 tiles
+    // region and blows straight past this cap.
+    const MAX_HEIGHT_RATIO = 0.5;
+
+    for (const { width, height } of [
+      { width: 375, height: 667 }, // iPhone SE (shortest supported, #1837)
+      { width: 402, height: 874 }, // iPhone 17 Pro (#1447/#1837)
+      { width: 1280, height: 720 }, // desktop
+    ]) {
+      await page.setViewportSize({ width, height });
+      await seedSessionIdb(page, buildCompletedSession({
+        pokemonIds: SEED_POKEMON_IDS,
+        evolutionCardIds: EVOLUTION_CARD_IDS,
+      }));
+      await page.goto("/");
+      await awaitSeedIdb(page);
+
+      await expect(page.getByText("All caught up!")).toBeVisible();
+      await enterGame(page);
+
+      const gameRegion = page.getByRole("region", {
+        name: /higher or lower mini-game/i,
+      });
+      const tiles = gameRegion.getByRole("button");
+      await expect(tiles).toHaveCount(2);
+
+      const assertTileGeometry = async (label: string) => {
+        for (const index of [0, 1]) {
+          const box = await tiles.nth(index).boundingBox();
+          expect(box, `${label}: tile ${index} bounding box at ${width}x${height}`).not.toBeNull();
+          if (!box) continue;
+
+          // (a) Proportions: content-height, not stretched to the full
+          // card-position height.
+          expect(
+            box.height,
+            `${label}: tile ${index} height at ${width}x${height} (full-height stretch regression, #1889)`,
+          ).toBeLessThanOrEqual(height * MAX_HEIGHT_RATIO);
+
+          // (b) Border clipping: both edges sit inside the viewport with
+          // enough margin for the ring-2 highlight to render unclipped.
+          expect(
+            box.x,
+            `${label}: tile ${index} left edge at ${width}x${height} (ring clipped at viewport edge, #1889)`,
+          ).toBeGreaterThanOrEqual(EDGE_MARGIN);
+          expect(
+            box.x + box.width,
+            `${label}: tile ${index} right edge at ${width}x${height} (ring clipped at viewport edge, #1889)`,
+          ).toBeLessThanOrEqual(width - EDGE_MARGIN);
+        }
+      };
+
+      // Picking phase: geometry must be sane before any interaction.
+      await assertTileGeometry("picking");
+
+      // Revealed phase: the highlight rings are only rendered after a pick, so
+      // re-assert the same geometry in the state where the clipped-border
+      // regression was actually visible.
+      await tiles.first().click();
+      await expect(
+        page.getByText(/correct!|equal, both count\.|game over/i),
+      ).toBeVisible();
+      await assertTileGeometry("revealed");
+    }
+  });
+
   test("returns to the summary from the game (reversible)", async ({ page }) => {
     // Acceptance criterion: the collapse is reversible - there is a way back
     // to the full summary from the game (#1882).

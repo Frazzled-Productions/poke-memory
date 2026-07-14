@@ -609,10 +609,10 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | | |
 |---|---|
 | **Trigger** | `issues: [edited]` |
-| **Guard** | Issue authored by `poke-memory-bot[bot]` AND body contains `<!-- auto-codequality-suggest -->` or `<!-- auto-app-suggest -->` (#1859 - digest bodies are user-editable, so the marker alone is spoofable) |
+| **Guard** | Issue authored by `poke-memory-bot[bot]` AND body contains `<!-- auto-codequality-suggest -->`, `<!-- auto-app-suggest -->` or `<!-- auto-workflow-suggest -->` (#1859 - digest bodies are user-editable, so the marker alone is spoofable) |
 | **Permissions** | `issues: write` only - never touches the git tree |
 | **Concurrency** | `digest-fanout-{issue}`, `cancel-in-progress: false` - queues runs, never cancels, so each re-trigger after a body PATCH does a fast no-op |
-| **What it does** | For each proposal whose `- [ ] File this as an issue <!-- proposal:N -->` checkbox is newly checked: extracts the title and `**Priority:**` label, creates a child issue (with `area:app` and the extracted priority, never `auto`), writes ` → filed as #N` onto the proposal heading as an idempotency marker, then posts a single summary comment on the parent |
+| **What it does** | For each proposal whose `- [ ] File this as an issue <!-- proposal:N -->` checkbox is newly checked: extracts the title and `**Priority:**` label, creates a child issue (with the area mapped from the digest marker - `area:app` for the code-quality and app digests, `area:workflow` for the workflow digest - plus the extracted priority; app-digest children additionally get `enhancement`, and no child ever gets `auto`), writes ` → filed as #N` onto the proposal heading as an idempotency marker, then posts a single summary comment on the parent |
 | **Idempotency** | The `→ filed as #N` back-marker on the heading is the source of truth - checked proposals that already carry a marker are skipped unconditionally |
 | **Un-check behaviour** | Un-checking a filed proposal does NOT close or delete the child - manual cleanup only (out of scope for v1) |
 | **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY` |
@@ -808,6 +808,18 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 ## Build gates
 
 Two separate gates catch type/build/test errors at different points:
+
+### Local pre-PR gate (`npm run pre-pr`)
+
+After pushing, before opening the PR, run **`npm run pre-pr`** (`scripts/pre-pr.mjs`, #1716) - it runs the full gate in order, fail-fast: lint -> typecheck -> build -> test -> coverage -> diff-coverage, and exits non-zero on the first failure. This is THE local gate; it mirrors the CI required checks (CI remains the enforcement layer) and removes the per-step skip risk of re-deriving the chain by hand.
+
+- `npm run lint` (em-dash + i18n + pseudo-locale + agents-size) catches errors that do **not** surface in typecheck/build/test, so a hand-run that omits it ships a red PR (#1541).
+- The diff-coverage leg is the one that has bitten most (green-locally-then-red on CI's per-diff bar, #1642 / #1646 / #1649): `test:coverage` enforces only the global floor; the 90% per-diff patch bar runs after it against the fresh `coverage/coverage-final.json`. Override the diff base for a main-targeting PR with `DIFF_COVERAGE_BASE=origin/main npm run pre-pr`.
+- An opt-in `pre-push` git hook running the same command is documented but not installed by default.
+
+**Pre-PR e2e smoke** for high-surface-area diffs (touching `app/layout.tsx`, `app/page.tsx`, `components/onboarding/**`, `components/Nav.tsx` / `BottomTabBar.tsx` / `MobileNavPaddingWrapper.tsx`, `lib/settings/persistence.ts`, or `playwright.config.ts`): run `scripts/pre-pr-smoke.sh` (chromium-only subset in the pinned Docker image). Same two-attempt budget.
+
+**Push discipline.** Push with an explicit `git push origin <branch>` - never a bare `git push`. A worktree created via `git worktree add -b <branch> origin/qa` sets the branch's upstream to `origin/qa`, so a bare `git push` does NOT update `origin/<branch>`: at best it fast-fails (rejected, harmless), and at worst it silently pushes to `origin/qa` or no-ops, leaving the PR branch stale and CI red on the old commit. Always name the remote and branch (mirrors the `gh pr create --head <branch>` rule). Worked example: a pseudo-locale regen "pushed" but never landed on the PR branch (#1474).
 
 ### Pre-PR gate (`auto-issue.yml` only)
 
