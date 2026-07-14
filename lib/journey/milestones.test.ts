@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { detectTopMilestone, MASTERY_COUNT_MILESTONES } from "./milestones";
+import {
+  detectTopMilestone,
+  toRoman,
+  MASTERY_COUNT_MILESTONES,
+} from "./milestones";
 import type { GenerationStats } from "@/lib/stats/derive";
 
 // ---------------------------------------------------------------------------
@@ -74,9 +78,26 @@ describe("detectTopMilestone - mastery-count kind", () => {
     expect(result!.id).toBe("mastery-1000");
   });
 
-  it("share text contains the count number", () => {
+  it("carries the crossed threshold as structured data", () => {
     const result = detectTopMilestone(100, EMPTY_GENS);
-    expect(result!.shareText).toContain("100");
+    expect(result!.kind).toBe("mastery-count");
+    if (result!.kind === "mastery-count") {
+      expect(result!.threshold).toBe(100);
+    }
+  });
+
+  it("returns the crossed threshold, not the live count, when above a threshold (#1933)", () => {
+    // 137 mastered: the crossed milestone is 100. The structured shape carries
+    // the threshold only - no pre-rendered label that could read as a live
+    // count. Rendering happens in the component through the catalogue with
+    // explicit achievement framing.
+    const result = detectTopMilestone(137, EMPTY_GENS);
+    expect(result!.id).toBe("mastery-100");
+    if (result!.kind === "mastery-count") {
+      expect(result!.threshold).toBe(100);
+    }
+    expect(result).not.toHaveProperty("label");
+    expect(result).not.toHaveProperty("shareText");
   });
 
   it("every threshold in MASTERY_COUNT_MILESTONES maps to its own id (below 1025)", () => {
@@ -84,11 +105,6 @@ describe("detectTopMilestone - mastery-count kind", () => {
       const result = detectTopMilestone(n, EMPTY_GENS);
       expect(result!.id).toBe(`mastery-${n}`);
     }
-  });
-
-  it("label contains the count", () => {
-    const result = detectTopMilestone(50, EMPTY_GENS);
-    expect(result!.label).toContain("50");
   });
 });
 
@@ -118,16 +134,13 @@ describe("detectTopMilestone - gen-complete kind", () => {
     expect(result!.id).toBe("gen-2-complete");
   });
 
-  it("share text contains the roman numeral for gen 1", () => {
-    const gens = [makeGen(1, 151, 151)];
-    const result = detectTopMilestone(200, gens);
-    expect(result!.shareText).toContain("I");
-  });
-
-  it("share text contains the roman numeral for gen 4", () => {
+  it("carries the generation number as structured data", () => {
     const gens = [makeGen(4, 107, 107)];
     const result = detectTopMilestone(500, gens);
-    expect(result!.shareText).toContain("IV");
+    expect(result!.kind).toBe("gen-complete");
+    if (result!.kind === "gen-complete") {
+      expect(result!.gen).toBe(4);
+    }
   });
 
   it("does not trigger on a partially mastered generation", () => {
@@ -165,5 +178,22 @@ describe("detectTopMilestone - all-mastered kind", () => {
   it("returns all-mastered above 1025", () => {
     const result = detectTopMilestone(1030, EMPTY_GENS);
     expect(result!.id).toBe("all-mastered");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toRoman
+// ---------------------------------------------------------------------------
+
+describe("toRoman", () => {
+  it("maps generations 1-9 to roman numerals", () => {
+    expect(toRoman(1)).toBe("I");
+    expect(toRoman(4)).toBe("IV");
+    expect(toRoman(9)).toBe("IX");
+  });
+
+  it("falls back to the decimal string outside 1-9", () => {
+    expect(toRoman(10)).toBe("10");
+    expect(toRoman(0)).toBe("0");
   });
 });

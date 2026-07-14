@@ -17,15 +17,36 @@ export const MASTERY_COUNT_MILESTONES = [
 
 export type MilestoneKind = "mastery-count" | "gen-complete" | "all-mastered";
 
-export type Milestone = {
-  /** Stable identifier - used for deduplication, analytics, and test assertions. */
-  id: string;
-  kind: MilestoneKind;
-  /** Human-readable label shown on the banner. */
-  label: string;
-  /** Pre-formatted share text. */
-  shareText: string;
-};
+/**
+ * Structured milestone data. User-facing strings are NOT built here - the
+ * component layer renders them through the message catalogue
+ * (`journey.milestoneShare.*` via next-intl), keyed by `kind`, so every
+ * locale gets a properly translated banner and share text (#1933).
+ *
+ * `id` stays a stable identifier - used for deduplication, analytics, and
+ * test assertions.
+ */
+export type Milestone =
+  | {
+      id: "all-mastered";
+      kind: "all-mastered";
+    }
+  | {
+      id: `gen-${number}-complete`;
+      kind: "gen-complete";
+      /** Generation number (1-9). */
+      gen: number;
+    }
+  | {
+      id: `mastery-${number}`;
+      kind: "mastery-count";
+      /**
+       * The crossed round-number threshold (e.g. 100). This is NOT the live
+       * mastered count - the banner must frame it as an achievement, never as
+       * a current stat (#1933).
+       */
+      threshold: number;
+    };
 
 // ---------------------------------------------------------------------------
 // Roman numeral helper (Gen I – Gen IX only)
@@ -43,7 +64,12 @@ const ROMAN: Record<number, string> = {
   9: "IX",
 };
 
-function toRoman(n: number): string {
+/**
+ * Roman numeral for a generation number, falling back to the decimal string
+ * for out-of-range values. Exported so the rendering layer can pass it as an
+ * ICU argument to locale messages that use the western "Generation IX" form.
+ */
+export function toRoman(n: number): string {
   return ROMAN[n] ?? String(n);
 }
 
@@ -70,9 +96,6 @@ export function detectTopMilestone(
     return {
       id: "all-mastered",
       kind: "all-mastered",
-      label: "You've mastered all Pokémon!",
-      shareText:
-        "I've mastered all 1 025 Pokémon in Poké Memory! 🎉 https://pokememory.com",
     };
   }
 
@@ -82,12 +105,10 @@ export function detectTopMilestone(
     .filter((g) => g.total > 0 && g.mastered === g.total);
   if (completedGens.length > 0) {
     const top = completedGens[0]!;
-    const roman = toRoman(top.gen);
     return {
       id: `gen-${top.gen}-complete`,
       kind: "gen-complete",
-      label: `Generation ${roman} complete!`,
-      shareText: `I've mastered every Generation ${roman} Pokémon in Poké Memory! 🏆 https://pokememory.com`,
+      gen: top.gen,
     };
   }
 
@@ -96,12 +117,11 @@ export function detectTopMilestone(
     MASTERY_COUNT_MILESTONES as readonly number[]
   ).filter((n) => totalMastered >= n);
   if (thresholdsCrossed.length > 0) {
-    const count = thresholdsCrossed[thresholdsCrossed.length - 1]!;
+    const threshold = thresholdsCrossed[thresholdsCrossed.length - 1]!;
     return {
-      id: `mastery-${count}`,
+      id: `mastery-${threshold}`,
       kind: "mastery-count",
-      label: `${count} Pokémon mastered`,
-      shareText: `I've mastered ${count} Pokémon in Poké Memory! 🌟 https://pokememory.com`,
+      threshold,
     };
   }
 

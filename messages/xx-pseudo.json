@@ -1025,7 +1025,16 @@
       "shareAriaLabel": "[Share milestone: {label}]",
       "share": "[Share]",
       "copied": "[Copied to clipboard]",
-      "copyError": "[Couldn't copy. Please try again.]"
+      "copyError": "[Couldn't copy. Please try again.]",
+      "bannerMasteryCount": "[Milestone reached: {threshold, number} Pokémon mastered!]",
+      "bannerGenComplete": "[Generation {roman} complete!]",
+      "bannerAllMastered": "[You've mastered all Pokémon!]",
+      "shareMasteryCount": "[I've passed the {threshold, number} Pokémon mastered milestone in Poké Memory! 🌟 https://pokememory.com]",
+      "shareGenComplete": "[I've mastered every Generation {roman} Pokémon in Poké Memory! 🏆 https://pokememory.com]",
+      "shareAllMastered": "[I've mastered all 1,025 Pokémon in Poké Memory! 🎉 https://pokememory.com]",
+      "cardMasteredLabel": "[Pokémon mastered]",
+      "cardGenCompleteLabel": "[Gen {roman} complete]",
+      "cardAllMasteredLabel": "[All Pokémon mastered]"
     },
     "badges": {
       "heading": "[Gym badges]",
