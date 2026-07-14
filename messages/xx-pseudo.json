@@ -156,7 +156,14 @@
         "description": "[Type the name instead of grading yourself. Grades are decided automatically based on how close your answer is.]",
         "mcRampNote": "[New cards start as multiple choice during the learning phase. Once a card has been reviewed enough times to graduate, it switches to verified typed entry.]",
         "bannerText": "[Verified typed entry is on. New cards will show multiple choice for the first few reviews. Once a card graduates into long-term review, you will be asked to type the name.]",
-        "dismissBannerAriaLabel": "[Dismiss typed entry notice]"
+        "dismissBannerAriaLabel": "[Dismiss typed entry notice]",
+        "strictness": {
+          "label": "[Answer matching for other languages]",
+          "description": "[How typed answers are checked when the learning language is Japanese or Chinese.]",
+          "legendAriaLabel": "[Typed-entry answer matching]",
+          "lenient": "[Native script or romanised]",
+          "strict": "[Native script only]"
+        }
       },
       "evolutionCards": {
         "heading": "[Evolution cards]",
@@ -468,7 +475,6 @@
     "allCaughtUpInLanguage": "[All caught up in {language}!]",
     "switchToLanguageWithDue": "[{count, plural, one {{count, number} card due in {language}} other {{count, number} cards due in {language}}}]",
     "todayDoneHeadingWithLanguage": "[Done today ({language})]",
-    "typedEntryEnglishOnly": "[Typed entry is only available for English. Switch back to use it.]",
     "nothingDue": "[Nothing due right now.]",
     "nothingDueBody": "[No more cards due today. Come back tomorrow to keep going.]",
     "newCardsLocked": "[New cards locked for today]",
@@ -636,7 +642,13 @@
       "barDueTomorrowAriaLabel": "[{count, plural, one {# card due tomorrow} other {# cards due tomorrow}}]"
     },
     "typedEntry": {
-      "inputAriaLabel": "[Type the Pokémon name]"
+      "inputAriaLabel": "[Type the Pokémon name]",
+      "inputPlaceholder": "[Type the name...]",
+      "submit": "[Submit]",
+      "dontKnow": "[I don't know]",
+      "correct": "[Correct!]",
+      "close": "[Close!]",
+      "notQuite": "[Not quite.]"
     }
   },
   "pokedex": {

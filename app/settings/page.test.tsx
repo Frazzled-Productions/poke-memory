@@ -433,6 +433,7 @@ function defaultSettings() {
     },
     verifiedTypedEntryMode: false,
     typedEntryOnboardingShown: false,
+    typedEntryStrictness: "lenient" as const,
     mcCardOnboardingShown: false,
     labsFlags: {},
     learningLocales: ["en"] as AppLocale[],
@@ -816,6 +817,54 @@ describe("SettingsPage - updated descriptive copy (#835)", () => {
       );
       expect(allMatches.length).toBeGreaterThan(0);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Typed-entry strictness control (#1576)
+// ---------------------------------------------------------------------------
+
+describe("SettingsPage - typed-entry strictness (#1576)", () => {
+  it("is hidden while verified typed entry is off", async () => {
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: /verified typed entry/i }),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByText(/answer matching for other languages/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows lenient selected by default and persists a switch to strict", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      verifiedTypedEntryMode: true,
+    });
+
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/answer matching for other languages/i),
+      ).toBeInTheDocument();
+    });
+
+    const lenient = screen.getByRole("radio", { name: /native script or romanised/i });
+    const strict = screen.getByRole("radio", { name: /native script only/i });
+    expect(lenient).toBeChecked();
+    expect(strict).not.toBeChecked();
+
+    await user.click(strict);
+
+    expect(strict).toBeChecked();
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ typedEntryStrictness: "strict" }),
+    );
   });
 });
 

@@ -453,6 +453,154 @@ test.describe("Typed entry onboarding (#1271) - Touch 3 (MC card banner)", () =>
   });
 });
 
+// ---------------------------------------------------------------------------
+// Locale-aware typed entry (#1576)
+// ---------------------------------------------------------------------------
+
+// Helper: enable typed entry with a non-English active learning locale. The
+// app chrome stays English (appLocale is cookie-driven and untouched), so the
+// Submit / feedback copy assertions below match the English catalogue.
+async function enableTypedEntryLocale(
+  page: import("@playwright/test").Page,
+  locale: "ja" | "zh-Hans" | "zh-Hant",
+) {
+  await page.addInitScript((loc) => {
+    try {
+      const KEY = "poke-memory:settings:v1";
+      const raw = localStorage.getItem(KEY);
+      let existing: Record<string, unknown> = { mobileNav: "bottom" };
+      if (raw !== null) {
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (typeof parsed === "object" && parsed !== null) {
+            existing = parsed as Record<string, unknown>;
+          }
+        } catch {
+          /* malformed - keep defaults */
+        }
+      }
+      localStorage.setItem(
+        KEY,
+        JSON.stringify({
+          ...existing,
+          verifiedTypedEntryMode: true,
+          typedEntryOnboardingShown: true,
+          learningLocales: ["en", loc],
+          activePokemonNameLocale: loc,
+          onboarding: {
+            ...(typeof existing.onboarding === "object" && existing.onboarding !== null
+              ? (existing.onboarding as Record<string, unknown>)
+              : {}),
+            firstVisitOnboardingDismissed: true,
+          },
+        }),
+      );
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, locale);
+}
+
+// Build the Bulbasaur-due session with every card stamped with `locale`, so
+// the locale-filtered session view (#1562) contains exactly the same cards as
+// the English fixture and hydrateSession adds no new (id, locale) entries.
+function sessionWithBulbasaurDueInLocale(locale: "ja" | "zh-Hans" | "zh-Hant") {
+  return {
+    ...SESSION_WITH_BULBASAUR_DUE,
+    cards: (SESSION_WITH_BULBASAUR_DUE.cards as Array<Record<string, unknown>>).map(
+      (c) => ({ ...c, locale }),
+    ),
+  };
+}
+
+test.describe("Locale-aware typed entry (#1576)", () => {
+  test("ja: the exact katakana name grades Correct and reveals both scripts", async ({
+    page,
+  }) => {
+    await enableTypedEntryLocale(page, "ja");
+    await seedSessionIdb(page, sessionWithBulbasaurDueInLocale("ja"));
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    // Typed entry must be active for the ja card - no Reveal button.
+    const input = page.getByRole("textbox", { name: /type the pokémon name/i });
+    await expect(input).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: /^reveal$/i })).not.toBeVisible();
+
+    // Bulbasaur's ja name (from the locale-names sidecar).
+    await input.fill("フシギダネ");
+    await page.getByRole("button", { name: /^submit$/i }).click();
+
+    await expect(input).not.toBeVisible();
+    await expect(
+      page.getByRole("paragraph").filter({ hasText: /correct!/i }),
+    ).toBeVisible();
+    // The reveal always shows the native script AND the romanisation, so the
+    // accepted answer set is never hidden.
+    await expect(page.getByText("フシギダネ")).toBeVisible();
+    await expect(page.getByText("Fushigidane")).toBeVisible();
+  });
+
+  test("ja: the romanised name is accepted in the default lenient mode", async ({
+    page,
+  }) => {
+    await enableTypedEntryLocale(page, "ja");
+    await seedSessionIdb(page, sessionWithBulbasaurDueInLocale("ja"));
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    const input = page.getByRole("textbox", { name: /type the pokémon name/i });
+    await expect(input).toBeVisible({ timeout: 10000 });
+
+    await input.fill("fushigidane");
+    await page.getByRole("button", { name: /^submit$/i }).click();
+
+    await expect(
+      page.getByRole("paragraph").filter({ hasText: /correct!/i }),
+    ).toBeVisible();
+    // Native script is still shown for a romanised answer.
+    await expect(page.getByText("フシギダネ")).toBeVisible();
+  });
+
+  test("zh-Hans: the exact native name grades Correct", async ({ page }) => {
+    await enableTypedEntryLocale(page, "zh-Hans");
+    await seedSessionIdb(page, sessionWithBulbasaurDueInLocale("zh-Hans"));
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    const input = page.getByRole("textbox", { name: /type the pokémon name/i });
+    await expect(input).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: /^reveal$/i })).not.toBeVisible();
+
+    await input.fill("妙蛙种子");
+    await page.getByRole("button", { name: /^submit$/i }).click();
+
+    await expect(
+      page.getByRole("paragraph").filter({ hasText: /correct!/i }),
+    ).toBeVisible();
+    await expect(page.getByText("妙蛙种子")).toBeVisible();
+  });
+
+  test("zh-Hans: tone- and spacing-free pinyin is accepted in lenient mode", async ({
+    page,
+  }) => {
+    await enableTypedEntryLocale(page, "zh-Hans");
+    await seedSessionIdb(page, sessionWithBulbasaurDueInLocale("zh-Hans"));
+    await page.goto("/");
+    await awaitSeedIdb(page);
+
+    const input = page.getByRole("textbox", { name: /type the pokémon name/i });
+    await expect(input).toBeVisible({ timeout: 10000 });
+
+    await input.fill("miaowazhongzi");
+    await page.getByRole("button", { name: /^submit$/i }).click();
+
+    await expect(
+      page.getByRole("paragraph").filter({ hasText: /correct!/i }),
+    ).toBeVisible();
+  });
+});
+
 test.describe("MC learning step - Practice flow (#1237)", () => {
   test("a new name card in learning phase shows 4 MC buttons, not the typed-entry input", async ({
     page,
