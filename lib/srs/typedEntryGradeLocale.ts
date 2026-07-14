@@ -101,6 +101,11 @@ export function normaliseCjkInput(input: string, locale: TypedEntryLocale): stri
  * tone diacritics (`miào wā zhǒng zǐ` → `miaowazhongzi`) - tone marks are
  * never required of the learner. Spacing- and case-insensitive via the same
  * strip/lowercase rules as the native normaliser.
+ *
+ * Known limitation (deliberate, like the Hans/Hant note above): the blanket
+ * `\p{M}` strip also removes the pinyin ü-diaeresis, so the `lü`/`nü`
+ * syllable family folds into `lu`/`nu`. Lenient mode therefore slightly
+ * over-accepts on those rare names; it never over-rejects.
  */
 export function normaliseRomanisation(input: string): string {
   return input

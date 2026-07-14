@@ -221,7 +221,14 @@ export function TypedEntryNameCard({
                   </p>
                   {revealAnswer?.transliteration !== null &&
                     revealAnswer?.transliteration !== undefined && (
-                      <p className={mutedText}>{revealAnswer.transliteration}</p>
+                      /* Romanisation is the Latin-script form of the locale's
+                         name, e.g. "ja-Latn" (i18n-expert review, #1576). */
+                      <p
+                        lang={`${locale.split("-")[0]}-Latn`}
+                        className={mutedText}
+                      >
+                        {revealAnswer.transliteration}
+                      </p>
                     )}
                 </>
               ))}
