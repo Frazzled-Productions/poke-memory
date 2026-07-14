@@ -2,8 +2,78 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { Milestone } from "@/lib/journey/milestones";
+import { toRoman, type Milestone } from "@/lib/journey/milestones";
 import { generateMilestoneShareImage } from "@/lib/share/generateShareImage";
+
+// ---------------------------------------------------------------------------
+// Milestone string rendering
+// ---------------------------------------------------------------------------
+
+type MilestoneStrings = {
+  /** Achievement-framed banner label, e.g. "Milestone reached: 100 Pokémon mastered!". */
+  label: string;
+  /** Localised share text for the text-share / clipboard paths. */
+  shareText: string;
+  /** Large text inside the share-image hero disc. */
+  heroNumber: string;
+  /** Short localised label beneath the hero number on the share image. */
+  heroLabel: string;
+};
+
+/** The subset of the `useTranslations("journey.milestoneShare")` t function we need. */
+type Translator = (
+  key:
+    | "bannerAllMastered"
+    | "bannerGenComplete"
+    | "bannerMasteryCount"
+    | "shareAllMastered"
+    | "shareGenComplete"
+    | "shareMasteryCount"
+    | "cardAllMasteredLabel"
+    | "cardGenCompleteLabel"
+    | "cardMasteredLabel",
+  values?: Record<string, string | number>,
+) => string;
+
+/**
+ * Render the user-facing strings for a structured milestone through the
+ * message catalogue. `detectTopMilestone` returns data only (kind + threshold
+ * or gen number); all copy lives in `journey.milestoneShare.*` so every
+ * locale gets a translated banner and share text, and the mastery-count
+ * branch is framed as a crossed achievement rather than a live count (#1933).
+ */
+function renderMilestoneStrings(
+  milestone: Milestone,
+  t: Translator,
+): MilestoneStrings {
+  switch (milestone.kind) {
+    case "all-mastered":
+      return {
+        label: t("bannerAllMastered"),
+        shareText: t("shareAllMastered"),
+        heroNumber: "★",
+        heroLabel: t("cardAllMasteredLabel"),
+      };
+    case "gen-complete": {
+      // Pass both forms so each locale can pick: en uses the roman numeral
+      // ("Generation I"), ja / zh use the decimal number ("第1世代").
+      const args = { gen: milestone.gen, roman: toRoman(milestone.gen) };
+      return {
+        label: t("bannerGenComplete", args),
+        shareText: t("shareGenComplete", args),
+        heroNumber: "★",
+        heroLabel: t("cardGenCompleteLabel", args),
+      };
+    }
+    case "mastery-count":
+      return {
+        label: t("bannerMasteryCount", { threshold: milestone.threshold }),
+        shareText: t("shareMasteryCount", { threshold: milestone.threshold }),
+        heroNumber: String(milestone.threshold),
+        heroLabel: t("cardMasteredLabel"),
+      };
+  }
+}
 
 type Props = {
   /**
@@ -43,7 +113,10 @@ export function MilestoneShareButton({ milestone }: Props) {
   // the superuser guard.
   if (milestone === null) return null;
 
-  const { label, shareText } = milestone;
+  const { label, shareText, heroNumber, heroLabel } = renderMilestoneStrings(
+    milestone,
+    t,
+  );
 
   function scheduleReset(nextStatus: "copied" | "error") {
     if (timeoutRef.current !== null) {
@@ -62,7 +135,7 @@ export function MilestoneShareButton({ milestone }: Props) {
     setStatus("idle");
 
     // Try to render the image card first.
-    const blob = await generateMilestoneShareImage({ label, shareText }).catch(() => null);
+    const blob = await generateMilestoneShareImage({ heroNumber, heroLabel }).catch(() => null);
     const file =
       blob !== null
         ? new File([blob], "poke-memory.png", { type: "image/png" })

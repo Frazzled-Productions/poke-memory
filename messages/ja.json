@@ -1025,7 +1025,16 @@
       "shareAriaLabel": "マイルストーンをシェア: {label}",
       "share": "シェア",
       "copied": "クリップボードにコピーしました",
-      "copyError": "コピーできませんでした。もう一度お試しください。"
+      "copyError": "コピーできませんでした。もう一度お試しください。",
+      "bannerMasteryCount": "マイルストーン達成：{threshold, number}匹のポケモンを習得！",
+      "bannerGenComplete": "第{gen}世代コンプリート！",
+      "bannerAllMastered": "すべてのポケモンを習得しました！",
+      "shareMasteryCount": "Poké Memoryで{threshold, number}匹習得のマイルストーンを達成しました！🌟 https://pokememory.com",
+      "shareGenComplete": "Poké Memoryで第{gen}世代のポケモンをすべて習得しました！🏆 https://pokememory.com",
+      "shareAllMastered": "Poké Memoryで全1,025匹のポケモンを習得しました！🎉 https://pokememory.com",
+      "cardMasteredLabel": "ポケモン習得",
+      "cardGenCompleteLabel": "第{gen}世代コンプリート",
+      "cardAllMasteredLabel": "全ポケモン習得"
     },
     "badges": {
       "heading": "ジムバッジ",

@@ -1025,7 +1025,16 @@
       "shareAriaLabel": "分享里程碑: {label}",
       "share": "分享",
       "copied": "已複製到剪貼簿",
-      "copyError": "無法複製。請重試。"
+      "copyError": "無法複製。請重試。",
+      "bannerMasteryCount": "達成里程碑：已掌握 {threshold, number} 隻寶可夢！",
+      "bannerGenComplete": "第 {gen} 世代全部掌握！",
+      "bannerAllMastered": "你已掌握所有寶可夢！",
+      "shareMasteryCount": "我在 Poké Memory 達成了掌握 {threshold, number} 隻寶可夢的里程碑！🌟 https://pokememory.com",
+      "shareGenComplete": "我在 Poké Memory 掌握了第 {gen} 世代的所有寶可夢！🏆 https://pokememory.com",
+      "shareAllMastered": "我在 Poké Memory 掌握了全部 1,025 隻寶可夢！🎉 https://pokememory.com",
+      "cardMasteredLabel": "已掌握寶可夢",
+      "cardGenCompleteLabel": "第 {gen} 世代完成",
+      "cardAllMasteredLabel": "全部寶可夢已掌握"
     },
     "badges": {
       "heading": "道館徽章",
