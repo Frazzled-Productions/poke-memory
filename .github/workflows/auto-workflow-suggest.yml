@@ -121,8 +121,10 @@ jobs:
             --jq '.[] | {body: .body, html_url: .html_url, issue_url: .issue_url}' \
             > /tmp/signals/comments.ndjson
 
-          # Signal 1: retro comments (marker: <!-- auto-retro -->).
-          jq -r 'select(.body | startswith("<!-- auto-retro -->"))
+          # Signal 1: retro comments (marker: <!-- auto-retro -->). Null-guard
+          # .body: startswith on a null (deleted/ghost comment) exits jq with
+          # status 5 and, under set -e, aborts the whole pre-gather.
+          jq -r 'select((.body // "") | startswith("<!-- auto-retro -->"))
             | "### " + .html_url + "\n\n" + .body + "\n"' \
             /tmp/signals/comments.ndjson > /tmp/signals/retro-comments.md
 
@@ -139,11 +141,14 @@ jobs:
             --json number,title,headRefName,mergedAt,url,body \
             --jq 'map(.body = ((.body // "")[0:4000]))' \
             > /tmp/signals/merged-prs.json
+          if [ "$(jq length /tmp/signals/merged-prs.json)" -eq 100 ]; then
+            echo "WARNING: PR list capped at 100 - the window may contain more merged PRs than were gathered."
+          fi
 
           # Signal 2b: structured auto-review comments posted in the window.
           # Not filtered to a PR-number set: the reviewer comments on whichever
           # head branch the pipeline used, and the window is the real scope.
-          jq -r 'select(.body | startswith("<!-- auto-review"))
+          jq -r 'select((.body // "") | startswith("<!-- auto-review"))
             | "### " + .html_url + "\n\n" + .body + "\n"' \
             /tmp/signals/comments.ndjson > /tmp/signals/auto-review-comments.md
 
@@ -159,8 +164,8 @@ jobs:
 
           # Signal 3: WIP-salvage commits in the window.
           gh api "repos/${REPO}/commits?since=${SINCE}&per_page=100" --paginate \
-            --jq '.[] | select(.commit.message | startswith("WIP:"))
-              | .sha[0:7] + " " + (.commit.message | split("\n")[0]) + " " + .html_url' \
+            --jq '.[] | select((.commit.message // "") | startswith("WIP:"))
+              | .sha[0:7] + " " + ((.commit.message // "") | split("\n")[0]) + " " + .html_url' \
             > /tmp/signals/wip-commits.txt
 
           rm -f /tmp/signals/comments.ndjson
@@ -168,13 +173,16 @@ jobs:
           # Context guard: cap each text file at 150 KB so a noisy month
           # cannot blow the agent's context window either. merged-prs.json is
           # exempt (byte-truncation would corrupt the JSON); its bodies are
-          # already capped at 4000 chars each above.
+          # already capped at 4000 chars each above. nullglob so a future
+          # missing file cannot leave a literal glob for wc -c to crash on.
+          shopt -s nullglob
           for f in /tmp/signals/*.md /tmp/signals/*.txt; do
             if [ "$(wc -c < "$f")" -gt 150000 ]; then
               head -c 150000 "$f" > "$f.tmp" && mv "$f.tmp" "$f"
               printf '\n\n[TRUNCATED at 150 KB]\n' >> "$f"
             fi
           done
+          shopt -u nullglob
 
           echo "Gathered signal files:"
           wc -c /tmp/signals/*
@@ -198,7 +206,8 @@ jobs:
           # activity grew (#1917, W29 hit error_max_turns at 61 turns), because
           # the agent was doing the per-issue/per-PR gather itself. The
           # pre-gather step now does all API fetching deterministically, so the
-          # agent only reads 5 prepared files, synthesises, and files one issue
+          # agent only reads 4 signal groups across 5 prepared files,
+          # synthesises, and files one issue
           # (~10-15 turns). Do NOT raise this again; if it overflows, the
           # pre-gather step is failing to keep the agent phase bounded and that
           # is the thing to fix.
