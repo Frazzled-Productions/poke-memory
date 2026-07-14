@@ -4,11 +4,11 @@ name: Auto Workflow Suggest
 # creates a single digest issue per ISO week with ≤5 curated improvement
 # proposals targeting workflow files, agent definitions, and process docs.
 #
-# Signals consumed:
+# Signals consumed (pre-gathered into /tmp/signals/ by a shell step, #1917):
 #   - Retro comments (last 30d) on closed issues
-#   - PR review comments on `auto/*` PRs (last 30d)
+#   - auto-review comments + PR review bodies on merged PRs (last 30d)
 #   - WIP-salvage commits (last 30d)
-#   - Agent invocation patterns in merged PR descriptions
+#   - Agent invocation patterns in merged PR descriptions (last 30d)
 #
 # Idempotency: skips silently when a digest issue for the current ISO week
 # already exists (open or closed), or when nothing crosses the relevance
@@ -30,9 +30,9 @@ jobs:
   suggest:
     name: Weekly Workflow Digest
     runs-on: ubuntu-latest
-    # 30 (was 20): the --max-turns bump to 60 (#1795) raises the worst-case
-    # wall-clock, and the 30-day signal window grows over time. Matches the
-    # auto-retro-harvest peer. 30 turns ran in ~2.5 min, so this is ample headroom.
+    # 30: the pre-gather step (#1917) does the 30-day signal fetch in shell,
+    # so the agent phase is bounded (~10-15 turns); the W28 agent-side gather
+    # ran ~17 min, the pre-gathered shape should be well under 10.
     timeout-minutes: 30
     permissions:
       contents: read
@@ -95,6 +95,90 @@ jobs:
             echo "area:workflow label already exists."
           fi
 
+      # Pre-gather the 30-day process signals deterministically in shell so the
+      # agent reads prepared files instead of paginating the API turn-by-turn.
+      # The agent-side gather was unbounded: up to 50 `gh issue view` + 30
+      # `gh pr view` calls, so the turn count depended on repo activity and on
+      # whether the model happened to batch its loops (W28 ran in 25 turns, W29
+      # died at the 60-turn cap, #1917). Fetch count here is bounded: one
+      # paginated comments feed, one PR list, at most 100 review fetches, one
+      # commits feed, well inside the App token's rate budget.
+      - name: Pre-gather process signals
+        if: steps.idempotency.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/signals
+          SINCE=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Single paginated feed of all issue/PR comments updated in the
+          # window (NDJSON: one compact JSON object per line). Both retro
+          # comments and auto-review comments are issue comments, so one
+          # feed serves signals 1 and 2.
+          gh api "repos/${REPO}/issues/comments?since=${SINCE}&per_page=100" --paginate \
+            --jq '.[] | {body: .body, html_url: .html_url, issue_url: .issue_url}' \
+            > /tmp/signals/comments.ndjson
+
+          # Signal 1: retro comments (marker: <!-- auto-retro -->).
+          jq -r 'select(.body | startswith("<!-- auto-retro -->"))
+            | "### " + .html_url + "\n\n" + .body + "\n"' \
+            /tmp/signals/comments.ndjson > /tmp/signals/retro-comments.md
+
+          # Signal 2a: PRs merged in the window, with bodies (also feeds
+          # signal 4). The old `--search "head:auto/"` shape returned 30
+          # ancient best-match PRs (the pipeline no longer uses auto/*
+          # branches) and never filtered on the window, so the review-comment
+          # and agent-pattern signals were being read off stale data;
+          # window-filter server-side and keep headRefName so auto/* PRs are
+          # still distinguishable.
+          SINCE_DAY=$(date -u -d "30 days ago" +"%Y-%m-%d")
+          gh pr list --state merged --limit 100 \
+            --search "merged:>=${SINCE_DAY} sort:updated-desc" \
+            --json number,title,headRefName,mergedAt,url,body \
+            --jq 'map(.body = ((.body // "")[0:4000]))' \
+            > /tmp/signals/merged-prs.json
+
+          # Signal 2b: structured auto-review comments posted in the window.
+          # Not filtered to a PR-number set: the reviewer comments on whichever
+          # head branch the pipeline used, and the window is the real scope.
+          jq -r 'select(.body | startswith("<!-- auto-review"))
+            | "### " + .html_url + "\n\n" + .body + "\n"' \
+            /tmp/signals/comments.ndjson > /tmp/signals/auto-review-comments.md
+
+          # Signal 2c: formal PR review bodies on the window's merged PRs
+          # (bounded loop, at most 100 calls).
+          : > /tmp/signals/pr-reviews.md
+          while read -r N; do
+            gh api "repos/${REPO}/pulls/${N}/reviews" \
+              --jq '.[] | select((.body // "") != "")
+                | "### Review (" + .state + ") - " + .html_url + "\n\n" + .body + "\n"' \
+              >> /tmp/signals/pr-reviews.md || echo "(reviews fetch failed for PR #${N} - skipped)" >> /tmp/signals/pr-reviews.md
+          done < <(jq -r '.[].number' /tmp/signals/merged-prs.json)
+
+          # Signal 3: WIP-salvage commits in the window.
+          gh api "repos/${REPO}/commits?since=${SINCE}&per_page=100" --paginate \
+            --jq '.[] | select(.commit.message | startswith("WIP:"))
+              | .sha[0:7] + " " + (.commit.message | split("\n")[0]) + " " + .html_url' \
+            > /tmp/signals/wip-commits.txt
+
+          rm -f /tmp/signals/comments.ndjson
+
+          # Context guard: cap each text file at 150 KB so a noisy month
+          # cannot blow the agent's context window either. merged-prs.json is
+          # exempt (byte-truncation would corrupt the JSON); its bodies are
+          # already capped at 4000 chars each above.
+          for f in /tmp/signals/*.md /tmp/signals/*.txt; do
+            if [ "$(wc -c < "$f")" -gt 150000 ]; then
+              head -c 150000 "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+              printf '\n\n[TRUNCATED at 150 KB]\n' >> "$f"
+            fi
+          done
+
+          echo "Gathered signal files:"
+          wc -c /tmp/signals/*
+
       # Pinned to an immutable release SHA, not the floating `@v1` tag.
       # The scheduled 2026-06-01 run failed inside the action with the
       # same internal "directory mismatch for ... tsconfig.json" build
@@ -110,14 +194,15 @@ jobs:
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # 30 turns was too few: the sequential 30-day signal gather (retro
-          # comments + auto/* PR reviews + WIP commits + agent patterns) now
-          # exceeds it and the run dies with error_max_turns before it can
-          # synthesise or take the no-op skip path (#1795). 60 gives headroom as
-          # the repo history grows; the job's 20-min wall-clock is the real cap
-          # (30 turns ran in ~2.5 min). If this recurs, make the gather batch its
-          # per-issue/per-PR fetches rather than raising the budget again.
-          claude_args: --max-turns 60 --disable-slash-commands --disallowed-tools Skill
+          # 30 (was 60, #1795): the 60-turn budget still overflowed once repo
+          # activity grew (#1917, W29 hit error_max_turns at 61 turns), because
+          # the agent was doing the per-issue/per-PR gather itself. The
+          # pre-gather step now does all API fetching deterministically, so the
+          # agent only reads 5 prepared files, synthesises, and files one issue
+          # (~10-15 turns). Do NOT raise this again; if it overflows, the
+          # pre-gather step is failing to keep the agent phase bounded and that
+          # is the thing to fix.
+          claude_args: --max-turns 30 --disable-slash-commands --disallowed-tools Skill
           prompt: |
             You are generating a weekly workflow improvement digest for this repository.
 
@@ -137,51 +222,38 @@ jobs:
             4. If you have ≥1 item worth raising, create exactly one digest
                issue for this week (title: `Weekly workflow review — ${{ steps.week.outputs.key }}`).
 
-            ## Signals to gather
+            ## Signals (pre-gathered)
 
-            Work through these sequentially (not in parallel) to stay within
-            rate limits:
+            All signals have already been fetched into `/tmp/signals/` by a
+            previous workflow step. Do NOT re-fetch them from the GitHub API;
+            just read these files:
 
             ### 1. Retro comments (last 30 days)
-            ```
-            SINCE=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-30d +"%Y-%m-%dT%H:%M:%SZ")
-            gh issue list --state closed --limit 50 --json number,closedAt \
-              --jq ".[] | select(.closedAt >= \"$SINCE\") | .number"
-            ```
-            For each issue number, fetch:
-            ```
-            gh issue view <N> --json comments \
-              --jq '.comments[] | select(.body | startswith("<!-- auto-retro -->")) | .body'
-            ```
-            Summarise the lessons in aggregate — do NOT quote verbatim.
+            `/tmp/signals/retro-comments.md`: every `<!-- auto-retro -->`
+            comment posted in the window, each headed by its GitHub URL.
+            Summarise the lessons in aggregate; do NOT quote verbatim. An
+            empty file means no retros this window.
 
-            ### 2. PR review comments on `auto/*` PRs (last 30 days)
-            ```
-            gh pr list --state merged --limit 30 --search "head:auto/" --json number,title,mergedAt \
-              --jq ".[] | select(.mergedAt != null)"
-            ```
-            For each PR number, fetch:
-            ```
-            gh pr view <N> --json comments,reviews \
-              --jq '.comments[].body, .reviews[].body'
-            ```
-            Focus on `<!-- auto-review:N -->` comments — they are the
-            structured review output. Summarise findings; do not quote verbatim.
+            ### 2. Review feedback on merged PRs (last 30 days)
+            `/tmp/signals/auto-review-comments.md`: the structured
+            `<!-- auto-review:N -->` comments posted in the window, each headed
+            by its GitHub URL. `/tmp/signals/pr-reviews.md`: formal PR review
+            bodies on the window's merged PRs. Summarise findings; do not
+            quote verbatim.
 
             ### 3. WIP-salvage commits (last 30 days)
-            ```
-            SINCE=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-30d +"%Y-%m-%dT%H:%M:%SZ")
-            gh api "repos/${{ github.repository }}/commits?since=${SINCE}&per_page=100" \
-              --jq '.[] | select(.commit.message | startswith("WIP:")) | {sha: .sha[0:7], message: .commit.message}'
-            ```
-            Note how many WIP salvages occurred and what they were on.
+            `/tmp/signals/wip-commits.txt`: one line per `WIP:` commit
+            (short SHA, first message line, commit URL). Note how many WIP
+            salvages occurred and what they were on. An empty file means none.
 
             ### 4. Agent invocation patterns in merged PR descriptions
-            Reuse the 30 merged `auto/*` PRs from step 2. Extract from each
-            PR body: mentions of `subagent_type:`, agent names from the roster
-            (planner, next16-expert, pokeapi-expert, etc.), and any notes about
-            agent overhead or skipped agents. Look for patterns (agents
-            frequently skipped, agents that ran but added no value, etc.).
+            `/tmp/signals/merged-prs.json`: the PRs merged in the window, with
+            `number`, `title`, `headRefName`, `mergedAt`, `url`, and `body`
+            (capped at 4000 chars). Extract from each PR body: mentions of `subagent_type:`,
+            agent names from the roster (planner, next16-expert,
+            pokeapi-expert, etc.), and any notes about agent overhead or
+            skipped agents. Look for patterns (agents frequently skipped,
+            agents that ran but added no value, etc.).
 
             ## Synthesis rules
 
@@ -221,7 +293,7 @@ jobs:
             <!-- auto-workflow-suggest -->
             ## Weekly workflow review — WEEK_KEY
 
-            Signals scanned: retro comments, PR review comments on `auto/*` PRs,
+            Signals scanned: retro comments, review feedback on merged PRs,
             WIP-salvage commits, agent invocation patterns — last 30 days.
 
             ---
