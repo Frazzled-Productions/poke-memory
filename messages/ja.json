@@ -156,7 +156,14 @@
         "description": "自己採点の代わりに名前を入力します。回答の近さに基づいて自動的に採点されます。",
         "mcRampNote": "新規カードは学習フェーズ中は選択式で表示されます。カードが卒業するのに十分な回数レビューされると、確認入力に切り替わります。",
         "bannerText": "確認入力がオンになりました。新規カードは最初の数回は選択式で表示されます。カードが長期レビューに卒業すると、名前の入力を求められます。",
-        "dismissBannerAriaLabel": "入力モードの通知を閉じる"
+        "dismissBannerAriaLabel": "入力モードの通知を閉じる",
+        "strictness": {
+          "label": "他言語の解答判定",
+          "description": "学習言語が日本語または中国語のとき、入力した答えをどのように判定するかを設定します。",
+          "legendAriaLabel": "入力解答の判定方法",
+          "lenient": "ネイティブ表記またはローマ字",
+          "strict": "ネイティブ表記のみ"
+        }
       },
       "evolutionCards": {
         "heading": "進化カード",
@@ -468,7 +475,6 @@
     "allCaughtUpInLanguage": "{language}はすべて完了！",
     "switchToLanguageWithDue": "{count, plural, other {{language}に{count, number}件}}",
     "todayDoneHeadingWithLanguage": "今日の記録（{language}）",
-    "typedEntryEnglishOnly": "入力による回答は英語のみ対応しています。戻って英語を使用してください。",
     "nothingDue": "今はレビューがありません。",
     "nothingDueBody": "今日のカードはすべて完了です。明日また来て続けましょう。",
     "newCardsLocked": "今日の新規カードはロックされています",
@@ -636,7 +642,13 @@
       "barDueTomorrowAriaLabel": "明日{count}枚のカードが期限切れ"
     },
     "typedEntry": {
-      "inputAriaLabel": "ポケモンの名前を入力"
+      "inputAriaLabel": "ポケモンの名前を入力",
+      "inputPlaceholder": "名前を入力…",
+      "submit": "送信",
+      "dontKnow": "わからない",
+      "correct": "正解！",
+      "close": "おしい！",
+      "notQuite": "不正解。"
     }
   },
   "pokedex": {

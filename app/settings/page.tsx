@@ -1228,6 +1228,53 @@ export default function SettingsPage() {
                       <p className={`mt-2 ${mutedTextXs}`}>
                         {t("settings.practice.typedEntry.mcRampNote")}
                       </p>
+                      {/* Typed-entry strictness for non-English learning
+                          languages (#1576). Only relevant while verified
+                          typed entry is on, so it reveals with the toggle. */}
+                      {settings.verifiedTypedEntryMode && (
+                        <div className="mt-4">
+                          <p className="text-sm font-medium text-foreground">
+                            {t("settings.practice.typedEntry.strictness.label")}
+                          </p>
+                          <p className={`mt-1 ${mutedTextXs}`}>
+                            {t("settings.practice.typedEntry.strictness.description")}
+                          </p>
+                          <fieldset className="mt-3 flex gap-2">
+                            <legend className="sr-only">
+                              {t("settings.practice.typedEntry.strictness.legendAriaLabel")}
+                            </legend>
+                            {(
+                              [
+                                { value: "lenient" as const, labelKey: "settings.practice.typedEntry.strictness.lenient" },
+                                { value: "strict" as const, labelKey: "settings.practice.typedEntry.strictness.strict" },
+                              ]
+                            ).map(({ value, labelKey: strictnessLabelKey }) => (
+                              <label
+                                key={value}
+                                className={`flex flex-1 cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-foreground focus-within:ring-offset-2 ${
+                                  settings.typedEntryStrictness === value
+                                    ? "border-foreground bg-foreground text-background"
+                                    : "border-zinc-300 bg-background text-foreground hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900"
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="typedEntryStrictness"
+                                  value={value}
+                                  checked={settings.typedEntryStrictness === value}
+                                  onChange={() => {
+                                    const updated = { ...settings, typedEntryStrictness: value };
+                                    setSettings(updated);
+                                    saveSettings(updated);
+                                  }}
+                                  className="sr-only"
+                                />
+                                {t(strictnessLabelKey)}
+                              </label>
+                            ))}
+                          </fieldset>
+                        </div>
+                      )}
                       {typedEntryBannerVisible && (
                         <div
                           role="status"

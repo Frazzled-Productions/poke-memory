@@ -108,6 +108,7 @@ const VALID_SETTINGS: UserSettings = {
     lastAcknowledgedProtectionEventDate: null,
   },
   verifiedTypedEntryMode: false,
+  typedEntryStrictness: "lenient",
   typedEntryOnboardingShown: false,
   mcCardOnboardingShown: false,
   labsFlags: { ...DEFAULT_LABS_FLAGS },

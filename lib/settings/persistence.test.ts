@@ -172,6 +172,7 @@ describe('loadSettings migration', () => {
         lastAcknowledgedProtectionEventDate: null,
       },
       verifiedTypedEntryMode: false,
+      typedEntryStrictness: 'strict' as const,
       typedEntryOnboardingShown: false,
       mcCardOnboardingShown: false,
       labsFlags: { ...DEFAULT_LABS_FLAGS },
@@ -185,6 +186,28 @@ describe('loadSettings migration', () => {
     saveSettings(custom);
     const loaded = loadSettings();
     expect(loaded).toEqual(custom);
+  });
+});
+
+describe('loadSettings: typedEntryStrictness (#1576)', () => {
+  it('defaults to lenient when the field is absent (back-fill for pre-#1576 records)', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+    expect(loadSettings().typedEntryStrictness).toBe('lenient');
+  });
+
+  it('round-trips strict', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, typedEntryStrictness: 'strict' });
+    expect(loadSettings().typedEntryStrictness).toBe('strict');
+  });
+
+  it('falls back to lenient on an unknown value', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ typedEntryStrictness: 'super-strict' }));
+    expect(loadSettings().typedEntryStrictness).toBe('lenient');
+  });
+
+  it('falls back to lenient on a non-string value', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ typedEntryStrictness: true }));
+    expect(loadSettings().typedEntryStrictness).toBe('lenient');
   });
 });
 

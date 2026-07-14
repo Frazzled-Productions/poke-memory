@@ -156,7 +156,14 @@
         "description": "輸入名稱而非自行評分。根據答案的準確程度自動評分。",
         "mcRampNote": "新卡片在學習階段以選擇題形式顯示。卡片畢業後將切換為驗證輸入。",
         "bannerText": "驗證輸入已開啟。新卡片在最初幾次複習中將顯示選擇題。卡片進入長期複習後，您將被要求輸入名稱。",
-        "dismissBannerAriaLabel": "關閉輸入模式提示"
+        "dismissBannerAriaLabel": "關閉輸入模式提示",
+        "strictness": {
+          "label": "其他語言的答案匹配",
+          "description": "學習語言為日語或中文時，如何判定輸入的答案。",
+          "legendAriaLabel": "輸入答案匹配方式",
+          "lenient": "原文或羅馬拼寫",
+          "strict": "僅限原文"
+        }
       },
       "evolutionCards": {
         "heading": "進化卡片",
@@ -468,7 +475,6 @@
     "allCaughtUpInLanguage": "{language}全部完成！",
     "switchToLanguageWithDue": "{count, plural, other {{language}還有{count, number}張}}",
     "todayDoneHeadingWithLanguage": "今日完成（{language}）",
-    "typedEntryEnglishOnly": "輸入模式僅支援英語。請切換回英語使用。",
     "nothingDue": "現在沒有待複習的內容。",
     "nothingDueBody": "今日卡片已全部完成。明天再來繼續吧。",
     "newCardsLocked": "今日新卡片已鎖定",
@@ -636,7 +642,13 @@
       "barDueTomorrowAriaLabel": "明天有{count}張卡片到期"
     },
     "typedEntry": {
-      "inputAriaLabel": "輸入寶可夢的名字"
+      "inputAriaLabel": "輸入寶可夢的名字",
+      "inputPlaceholder": "輸入名字…",
+      "submit": "提交",
+      "dontKnow": "不知道",
+      "correct": "答對了！",
+      "close": "很接近！",
+      "notQuite": "不對。"
     }
   },
   "pokedex": {
