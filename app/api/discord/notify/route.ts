@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { isAuthorized } from "@/lib/auth/bearerAuth";
+import { parseJsonBody } from "@/lib/api/parseJsonBody";
 
 /**
  * POST /api/discord/notify (#1653, #1848)
@@ -111,12 +112,9 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 401 });
   }
 
-  let body: NotifyBody;
-  try {
-    body = (await request.json()) as NotifyBody;
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<NotifyBody>(request);
+  if (parsed instanceof NextResponse) return parsed;
+  const body = parsed.data;
 
   // Validate that neither message nor user_id are present in the body
   // (belt-and-braces guard - the trigger never sends them, but we assert here

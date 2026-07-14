@@ -10,6 +10,7 @@ import {
   saveSettings,
   type OnboardingFlags,
 } from "@/lib/settings/persistence";
+import { sectionHeadingSm } from "@/lib/utils/class-names";
 
 type Tone = "hint" | "callout";
 
@@ -94,7 +95,7 @@ export function OnboardingHint({
   const padding = tone === "callout" ? "px-5 py-4" : "px-4 py-3";
   const titleClass =
     tone === "callout"
-      ? "text-base font-semibold text-foreground"
+      ? sectionHeadingSm
       : "text-sm font-semibold text-foreground";
   const bodyClass =
     tone === "callout"

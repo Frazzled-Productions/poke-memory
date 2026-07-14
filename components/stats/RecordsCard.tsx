@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import type { Records } from "@/lib/stats/records";
 import { cn } from "@/lib/utils/cn";
-import { cardPanel, mutedTextXs } from "@/lib/utils/class-names";
+import { cardPanel, mutedTextXs, sectionHeadingSm } from "@/lib/utils/class-names";
 
 type Props = { records: Records };
 
@@ -41,7 +41,7 @@ export function RecordsCard({ records }: Props) {
     <section aria-labelledby="records-heading">
       <h3
         id="records-heading"
-        className="mb-3 text-base font-semibold text-foreground"
+        className={`mb-3 ${sectionHeadingSm}`}
       >
         {t("heading")}
       </h3>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 import { hashIp } from "@/lib/auth/rateLimitIp";
+import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import type { RateLimitAction } from "@/lib/auth/rateLimitIp";
 
 /**
@@ -44,12 +45,9 @@ export async function POST(request: Request) {
   }
 
   // --- Parse body ---
-  let body: FeedbackBody;
-  try {
-    body = (await request.json()) as FeedbackBody;
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<FeedbackBody>(request);
+  if (parsed instanceof NextResponse) return parsed;
+  const body = parsed.data;
 
   // --- Validate category ---
   if (typeof body.category !== "string" || !VALID_CATEGORIES.has(body.category)) {

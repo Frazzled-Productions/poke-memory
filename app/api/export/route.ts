@@ -20,6 +20,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth/requireAuth";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { Subject } from "@/lib/cards/subjectKey";
 import { fetchAllPages } from "@/lib/sync/paginatedFetch";
@@ -106,14 +107,9 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
   }
 
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const auth = await requireAuth(supabase);
+  if (auth instanceof NextResponse) return auth;
+  const { user } = auth;
 
   // Fetch all grade_log rows for this user, ordered chronologically so the
   // CSV reads in review order. Paginated to avoid the PostgREST 1000-row

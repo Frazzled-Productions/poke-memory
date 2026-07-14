@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import type { Grade } from "@/lib/review/session";
 import { triggerHaptic } from "@/lib/review/haptic";
 import { useHapticSwitch } from "@/components/review/useHapticSwitch";
+import { sectionHeadingSm } from "@/lib/utils/class-names";
 
 type Props = {
   onGrade: (grade: Grade) => void;
@@ -110,7 +111,7 @@ export function KeyboardShortcutsOverlay({ onClose }: { onClose: () => void }) {
           </span>
         </button>
 
-        <h2 className="mb-4 text-base font-semibold text-foreground">
+        <h2 className={`mb-4 ${sectionHeadingSm}`}>
           {t("keyboardShortcuts.title")}
         </h2>
 

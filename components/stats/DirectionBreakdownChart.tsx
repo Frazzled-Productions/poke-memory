@@ -15,7 +15,7 @@ import {
   type DirectionBreakdownRow,
 } from "@/lib/stats/direction-breakdown";
 import type { CardDirection } from "@/lib/stats/direction-breakdown";
-import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue, sectionHeadingSm } from "@/lib/utils/class-names";
 
 type Props = {
   /** One row per card direction, from `computeDirectionBreakdown`. */
@@ -112,7 +112,7 @@ export function DirectionBreakdownChart({ rows }: Props) {
     <section aria-labelledby="direction-heading">
       <h2
         id="direction-heading"
-        className="mb-1 text-base font-semibold text-foreground"
+        className={`mb-1 ${sectionHeadingSm}`}
       >
         {tDir("heading")}
       </h2>

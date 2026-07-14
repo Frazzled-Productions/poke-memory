@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import type { HeatmapCell } from "@/lib/stats/heatmap";
 import { intensityBucket } from "@/lib/stats/heatmap";
-import { cardPanel, mutedTextXs } from "@/lib/utils/class-names";
+import { cardPanel, mutedTextXs, sectionHeadingSm } from "@/lib/utils/class-names";
 import { formatDate } from "@/lib/utils/format-date";
 
 type Props = {
@@ -127,7 +127,7 @@ export function ReviewHeatmap({ columns }: Props) {
     <section aria-labelledby="heatmap-heading">
       <h2
         id="heatmap-heading"
-        className="mb-3 text-base font-semibold text-foreground"
+        className={`mb-3 ${sectionHeadingSm}`}
       >
         {tH("heading")}
       </h2>

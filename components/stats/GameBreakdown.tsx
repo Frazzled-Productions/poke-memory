@@ -8,7 +8,7 @@ import {
   versionGroupGeneration,
   VERSION_GROUP_ORDER,
 } from "@/lib/pokemon/versionGroupLabels";
-import { mutedText, colStack, mutedTextXs } from "@/lib/utils/class-names";
+import { mutedText, colStack, mutedTextXs, sectionHeadingSm } from "@/lib/utils/class-names";
 import { MeterBar } from "@/components/ui/MeterBar";
 
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ export function GameBreakdown({ perGame }: Props) {
       <section aria-labelledby="game-breakdown-heading">
         <h2
           id="game-breakdown-heading"
-          className="mb-3 text-base font-semibold text-foreground"
+          className={`mb-3 ${sectionHeadingSm}`}
         >
           {tG("heading")}
         </h2>
@@ -200,7 +200,7 @@ export function GameBreakdown({ perGame }: Props) {
     <section aria-labelledby="game-breakdown-heading">
       <h2
         id="game-breakdown-heading"
-        className="mb-3 text-base font-semibold text-foreground"
+        className={`mb-3 ${sectionHeadingSm}`}
       >
         {tG("heading")}
       </h2>
