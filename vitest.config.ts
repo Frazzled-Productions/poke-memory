@@ -56,16 +56,15 @@ export default defineConfig({
         // Generated seed payload — produced by scripts/seed-pokemon.mjs, not
         // hand-written, so it carries no meaningful coverage signal.
         "lib/pokemon/generated.json",
-        // Service-worker code (#703). The SW source runs in a
-        // ServiceWorkerGlobalScope and the registration component drives the
-        // browser SW lifecycle; neither is meaningfully unit-testable. The
-        // pure, testable half lives in lib/pwa/cacheStrategy.ts, which is
-        // covered. Excluding these keeps them out of the diff-coverage gate.
+        // Service-worker source (#703). Runs in a ServiceWorkerGlobalScope,
+        // not reachable from jsdom, so it carries no unit-coverage signal.
+        // The pure, testable half lives in lib/pwa/cacheStrategy.ts, which is
+        // covered. ServiceWorkerProvider.tsx is instrumented again (#1915):
+        // it has jsdom tests mocking @serwist/window at the module boundary.
         "app/sw.ts",
         "app/sw/**",
         // Test-only throw route exercised by the e2e error-boundary spec, not unit tests.
         "app/test-error/**",
-        "components/pwa/ServiceWorkerProvider.tsx",
         "**/*.d.ts",
         "node_modules/**",
       ],
