@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { pickDailySpecies, pickDailyFact } from "@/lib/pokemon/dailySpotlight";
-import { loadFlavorTexts, getPokemonFacts, type PokemonFact } from "@/lib/pokemon/facts";
+import { loadFlavorTexts, getPokemonFacts, isFlavorTextsReady, type PokemonFact } from "@/lib/pokemon/facts";
 import { todayInTimezone } from "@/lib/utils/format-date";
 import { POKEDEX_DETAIL_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { cardPanelPadded, mutedText, sectionLabelSubtle } from "@/lib/utils/class-names";
@@ -31,13 +31,18 @@ export function DailySpotlight({ timezone }: Props) {
   const t = useTranslations("practice");
   const { seed } = useSeed();
   const [revealed, setRevealed] = useState(false);
-  const [factsReady, setFactsReady] = useState(false);
+  // Seed from the already-resolved cache when available, so the common case
+  // (the user reaches the all-done screen after reviewing cards, which
+  // pre-warms the flavour-text cache) doesn't pop in a tick late.
+  const [factsReady, setFactsReady] = useState(isFlavorTextsReady());
 
   // Flavour text is lazy-loaded (generated-flavor.json). Wait for it before
   // computing the fact pool so the deterministic fact index is stable - the
   // facts list length changes once flavour text arrives, which would shift
-  // the fnv1a-derived index mid-render.
+  // the fnv1a-derived index mid-render. Only needed for the cold-cache case;
+  // the initial state above already covers the warm-cache case.
   useEffect(() => {
+    if (isFlavorTextsReady()) return;
     let cancelled = false;
     loadFlavorTexts().then(() => {
       if (!cancelled) setFactsReady(true);

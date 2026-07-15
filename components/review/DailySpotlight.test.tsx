@@ -6,7 +6,7 @@
  * - Empty seed (state "out"): renders nothing while there is no species to show.
  * - Populated seed (state "in"): renders a sprite, a fact, and the reveal control.
  * - The reveal control toggles the hidden name into view.
- * - The Pokémon name renders correctly in en and a non-en locale.
+ * - The Pokémon name renders correctly in en, ja, zh-Hans, and zh-Hant.
  */
 
 import { render, screen, waitFor } from "@testing-library/react";
@@ -16,6 +16,8 @@ import { NextIntlClientProvider } from "next-intl";
 import { DailySpotlight } from "@/components/review/DailySpotlight";
 import enMessages from "@/messages/en.json";
 import jaMessages from "@/messages/ja.json";
+import zhHansMessages from "@/messages/zh-Hans.json";
+import zhHantMessages from "@/messages/zh-Hant.json";
 import type { SeedPokemon } from "@/lib/pokemon/seed-builder";
 
 vi.mock("next/image", () => ({
@@ -90,8 +92,15 @@ function makeBulbasaur(): SeedPokemon {
   } as SeedPokemon;
 }
 
-function renderSpotlight(locale: "en" | "ja" = "en") {
-  const messages = locale === "ja" ? jaMessages : enMessages;
+const LOCALE_MESSAGES = {
+  en: enMessages,
+  ja: jaMessages,
+  "zh-Hans": zhHansMessages,
+  "zh-Hant": zhHantMessages,
+} as const;
+
+function renderSpotlight(locale: keyof typeof LOCALE_MESSAGES = "en") {
+  const messages = LOCALE_MESSAGES[locale];
   return render(
     <NextIntlClientProvider locale={locale} messages={messages}>
       <DailySpotlight timezone="UTC" />
@@ -162,5 +171,37 @@ describe("DailySpotlight", () => {
     await user.click(revealBtn);
 
     expect(await screen.findByText("フシギダネ")).toBeInTheDocument();
+  });
+
+  it("renders the localised name and copy in a non-en locale (zh-Hans)", async () => {
+    const user = userEvent.setup();
+    mockContextValue = { locale: "zh-Hans", languagesEnabled: true, learningLocales: ["en", "zh-Hans"] };
+    mockGetLocaleName.mockReturnValue("妙蛙种子");
+    mockSeed.mockReturnValue({ seed: { seedPokemon: [makeBulbasaur()] } });
+    renderSpotlight("zh-Hans");
+
+    // zh-Hans copy for the heading.
+    expect(await screen.findByText("今日宝可梦")).toBeInTheDocument();
+
+    const revealBtn = screen.getByRole("button", { name: "揭晓名字" });
+    await user.click(revealBtn);
+
+    expect(await screen.findByText("妙蛙种子")).toBeInTheDocument();
+  });
+
+  it("renders the localised name and copy in a non-en locale (zh-Hant)", async () => {
+    const user = userEvent.setup();
+    mockContextValue = { locale: "zh-Hant", languagesEnabled: true, learningLocales: ["en", "zh-Hant"] };
+    mockGetLocaleName.mockReturnValue("妙蛙種子");
+    mockSeed.mockReturnValue({ seed: { seedPokemon: [makeBulbasaur()] } });
+    renderSpotlight("zh-Hant");
+
+    // zh-Hant copy for the heading.
+    expect(await screen.findByText("今日寶可夢")).toBeInTheDocument();
+
+    const revealBtn = screen.getByRole("button", { name: "揭曉名字" });
+    await user.click(revealBtn);
+
+    expect(await screen.findByText("妙蛙種子")).toBeInTheDocument();
   });
 });
