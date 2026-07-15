@@ -3781,6 +3781,39 @@ describe("Tomorrow teaser includes a new-cards count (#1945)", () => {
 
     vi.useRealTimers();
   });
+
+  it("shows the reviews-only teaser and its aria-label on the Higher-or-Lower highlights bar in Traditional Chinese when newTomorrow is 0 (#1945, #1951)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const seenNotDue = makeSeenNotDueCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+    const reverseA = makeGraduatedReverseCard(1);
+    const reverseB = makeGraduatedReverseCard(2);
+
+    mockSeedPokemon.mockReturnValue([seenNotDue, dueTomorrowCard]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [seenNotDue, dueTomorrowCard, reverseA, reverseB],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 10 });
+
+    const user = userEvent.setup({ delay: null });
+    renderZhHant(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: "高還是低" });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "高還是低小遊戲" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("明天1項")).toBeInTheDocument();
+    expect(screen.getByLabelText("明天有1項複習到期")).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
 });
 
 // ---------------------------------------------------------------------------
