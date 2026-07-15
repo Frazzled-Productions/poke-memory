@@ -396,10 +396,12 @@ test.describe("Pokédex detail - Forms section hidden when locked (#495)", () =>
   });
 });
 
-test.describe("Pokédex mastery-status filter (#542)", () => {
-  test("selecting a type then 'Not yet mastered' narrows the grid", async ({ page }) => {
-    // Seed Bulbasaur (id=1) as mastered so there is at least one mastered species,
-    // and leave all others at default (locked) so "not-yet-mastered" yields results.
+test.describe("Pokédex mastery-status filter (#1944)", () => {
+  test("selecting a type then 'New' or 'Learning' narrows the grid", async ({ page }) => {
+    // Seed Bulbasaur (id=1) as mastered and Chikorita (id=152) as learning
+    // (graded at least once, stability below the mastery threshold), so all
+    // three cardClasses ("locked", "learning", "mastered") are represented
+    // among Grass-type species. Everything else stays at default (locked).
     await seedSessionIdb(page, {
       cards: [
         {
@@ -418,6 +420,26 @@ test.describe("Pokédex mastery-status filter (#542)", () => {
             dueDate: "2099-01-01",
             lastReview: "2026-05-01",
             firstSeen: "2026-04-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+        {
+          id: 152,
+          name: "Chikorita",
+          spriteUrl: "/sprites/pokemon/152.png",
+          cardType: "name",
+          state: {
+            stability: 3,
+            difficulty: 4,
+            elapsedDays: 1,
+            scheduledDays: 3,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-05-01",
             learningStep: null,
             stepStartedAt: null,
           },
@@ -451,16 +473,27 @@ test.describe("Pokédex mastery-status filter (#542)", () => {
     const grassCount = await pokemonLists.getByRole("listitem").count();
     expect(grassCount).toBeGreaterThan(0);
 
-    // Now narrow by "Not yet mastered" - Bulbasaur is mastered so it should drop out.
     const masteryGroup = page.getByRole("group", { name: "Filter by mastery" });
-    await masteryGroup.getByRole("button", { name: "Not yet mastered" }).click();
-    await page.waitForURL(/mastery=not-yet-mastered/);
 
-    // The result should still have some Grass Pokémon (the locked ones) but
-    // strictly fewer than the full Grass set (Bulbasaur is now excluded).
-    const notYetMasteredCount = await pokemonLists.getByRole("listitem").count();
-    expect(notYetMasteredCount).toBeGreaterThan(0);
-    expect(notYetMasteredCount).toBeLessThan(grassCount);
+    // Narrow by "New" - Bulbasaur (mastered) and Chikorita (learning) should
+    // both drop out, leaving only locked Grass species.
+    await masteryGroup.getByRole("button", { name: "New" }).click();
+    await page.waitForURL(/mastery=new/);
+    const newCount = await pokemonLists.getByRole("listitem").count();
+    expect(newCount).toBeGreaterThan(0);
+    expect(newCount).toBeLessThan(grassCount);
+    await expect(pokemonLists.getByRole("link", { name: "Bulbasaur" })).not.toBeVisible();
+    await expect(pokemonLists.getByRole("link", { name: "Chikorita" })).not.toBeVisible();
+
+    // Narrow by "Learning" instead - only Chikorita (learning) should show,
+    // Bulbasaur (mastered) and the locked species should drop out.
+    await masteryGroup.getByRole("button", { name: "Learning" }).click();
+    await page.waitForURL(/mastery=learning/);
+    const learningCount = await pokemonLists.getByRole("listitem").count();
+    expect(learningCount).toBeGreaterThan(0);
+    expect(learningCount).toBeLessThan(grassCount);
+    await expect(pokemonLists.getByRole("link", { name: "Chikorita" })).toBeVisible();
+    await expect(pokemonLists.getByRole("link", { name: "Bulbasaur" })).not.toBeVisible();
   });
 
   test("mastery filter URL param is preserved on page load", async ({ page }) => {

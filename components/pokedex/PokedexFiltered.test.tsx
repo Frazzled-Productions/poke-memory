@@ -86,6 +86,8 @@ vi.mock("@/components/pokedex/PokedexFilterBar", () => ({
       <button onClick={() => onGenChange(null)}>All Gens</button>
       <button onClick={onAlternateFormsToggle}>Has Forms</button>
       <button onClick={() => onMasteryChange("mastered")}>Mastered</button>
+      <button onClick={() => onMasteryChange("new")}>New</button>
+      <button onClick={() => onMasteryChange("learning")}>Learning</button>
       <button onClick={() => onMasteryChange("all")}>All Mastery</button>
       <button onClick={() => onSortChange("alphabetical")}>Sort Alphabetical</button>
       <button onClick={() => onSortChange("closest-to-mastery")}>Sort Mastery</button>
@@ -357,12 +359,40 @@ describe("PokedexFiltered - grid receives filtered pokemon", () => {
     expect(grid).not.toHaveTextContent("Squirtle");
   });
 
-  it("filters to empty when mastery=not-yet-mastered and all are mastered (pretendAllMastered)", () => {
+  it("filters grid to only learning pokemon when mastery=learning", () => {
+    setSearchParams({ mastery: "learning" });
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    const grid = screen.getByTestId("pokedex-grid");
+    expect(grid).not.toHaveTextContent("Bulbasaur");
+    expect(grid).toHaveTextContent("Charmander");
+    expect(grid).not.toHaveTextContent("Squirtle");
+  });
+
+  it("filters grid to only new (locked) pokemon when mastery=new", () => {
+    setSearchParams({ mastery: "new" });
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+    const grid = screen.getByTestId("pokedex-grid");
+    expect(grid).not.toHaveTextContent("Bulbasaur");
+    expect(grid).not.toHaveTextContent("Charmander");
+    expect(grid).toHaveTextContent("Squirtle");
+  });
+
+  it("filters to empty when mastery=learning and all are mastered (pretendAllMastered)", () => {
     // With pretendAllMastered=true, effectiveMasteryStatus is forced to "all".
     mockFlags.pretendAllMastered = true;
-    setSearchParams({ mastery: "not-yet-mastered" });
+    setSearchParams({ mastery: "learning" });
     renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     // All three should still appear because mastery override kicks in.
+    const grid = screen.getByTestId("pokedex-grid");
+    expect(grid).toHaveTextContent("Bulbasaur");
+    expect(grid).toHaveTextContent("Charmander");
+    expect(grid).toHaveTextContent("Squirtle");
+  });
+
+  it("filters to empty when mastery=new and all are mastered (pretendAllMastered)", () => {
+    mockFlags.pretendAllMastered = true;
+    setSearchParams({ mastery: "new" });
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
     const grid = screen.getByTestId("pokedex-grid");
     expect(grid).toHaveTextContent("Bulbasaur");
     expect(grid).toHaveTextContent("Charmander");
@@ -431,6 +461,36 @@ describe("PokedexFiltered - URL updates from FilterBar callbacks", () => {
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith(
         expect.stringContaining("mastery=mastered"),
+        expect.any(Object),
+      );
+    });
+  });
+
+  it("calls router.replace with mastery=new when New is clicked", async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+
+    await user.click(screen.getByRole("button", { name: /Filters/i }));
+    await user.click(screen.getByRole("button", { name: "New" }));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.stringContaining("mastery=new"),
+        expect.any(Object),
+      );
+    });
+  });
+
+  it("calls router.replace with mastery=learning when Learning is clicked", async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<PokedexFiltered enrichedPokemon={SAMPLE} />);
+
+    await user.click(screen.getByRole("button", { name: /Filters/i }));
+    await user.click(screen.getByRole("button", { name: "Learning" }));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.stringContaining("mastery=learning"),
         expect.any(Object),
       );
     });

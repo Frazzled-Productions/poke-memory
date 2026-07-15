@@ -62,8 +62,9 @@ export default function PokedexFilterBar({
   // Defined inside the component so t() is in scope.
   const MASTERY_OPTIONS: { value: MasteryStatus; label: string }[] = [
     { value: "all", label: t("masteryAll") },
+    { value: "new", label: t("masteryNew") },
+    { value: "learning", label: t("masteryLearning") },
     { value: "mastered", label: t("masteryMastered") },
-    { value: "not-yet-mastered", label: t("masteryNotYet") },
   ];
 
   const SORT_OPTIONS: { value: PokedexSortOrder; label: string }[] = [
