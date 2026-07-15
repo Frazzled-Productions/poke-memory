@@ -1114,6 +1114,5 @@ export function saveSettings(settings: UserSettings): void {
 // distinguish "never written" from "written with defaults" - sync logic needs
 // this to know whether a pulled cloud value should overlay local defaults.
 export function hasStoredSettings(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(STORAGE_KEY) !== null;
+  return readLocalStorage(STORAGE_KEY, () => true, false);
 }

@@ -2,14 +2,16 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { colStackLg, sectionLabelSm } from "@/lib/utils/class-names";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 
 const STORAGE_PREFIX = "poke-memory:settings-section:";
 
 function readOpenState(sectionId: string): boolean {
-  if (typeof window === "undefined") return false;
-  const raw = window.localStorage.getItem(`${STORAGE_PREFIX}${sectionId}`);
-  if (raw === null) return false;
-  return raw === "1";
+  return readLocalStorage(
+    `${STORAGE_PREFIX}${sectionId}`,
+    (raw) => raw === "1",
+    false,
+  );
 }
 
 function writeOpenState(sectionId: string, open: boolean): void {

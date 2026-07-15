@@ -212,4 +212,28 @@ describe("MachineTranslationBanner", () => {
       expect(mtBannerDismissedKey("zh-Hans")).toBe("poke-memory:mt-banner-dismissed:zh-Hans");
     });
   });
+
+  describe("null localStorage (#1952 - Windows, site data blocked)", () => {
+    beforeEach(() => {
+      vi.mocked(useAppLocale).mockReturnValue("ja");
+      // window.localStorage is `null` in this configuration (not merely
+      // absent) - a direct `localStorage.getItem(...)` throws a TypeError.
+      Object.defineProperty(window, "localStorage", {
+        value: null,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it("renders without throwing and degrades to 'not dismissed' (banner shows)", () => {
+      expect(() => renderJa(<MachineTranslationBanner />)).not.toThrow();
+      expect(screen.getByRole("note")).toBeTruthy();
+    });
+
+    it("clicking dismiss does not throw", () => {
+      renderJa(<MachineTranslationBanner />);
+      const button = screen.getByRole("button");
+      expect(() => fireEvent.click(button)).not.toThrow();
+    });
+  });
 });
