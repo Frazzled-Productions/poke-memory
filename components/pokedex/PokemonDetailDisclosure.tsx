@@ -39,17 +39,47 @@ function zeroPad(id: number): string {
 // Per-leg status hook + sub-component (#1766)
 // ---------------------------------------------------------------------------
 
+/** Combined result of the single `loadSession()` read shared by both the
+ * per-leg status section and the #1948 journey line. */
+type SpeciesJourney = {
+  legStatus: SpeciesLegStatus | null;
+  firstSeen: string | null;
+};
+
+const EMPTY_JOURNEY: SpeciesJourney = { legStatus: null, firstSeen: null };
+
 /**
- * Loads the session and derives per-leg status for one species.
- * Returns null while loading or when the species has no cards.
+ * Loads the session ONCE and derives both the per-leg status (#1766) and the
+ * first-reviewed date (#1948) for one species from the same `session.cards`
+ * snapshot - two independent `loadSession()` calls per detail-page open
+ * (one IDB read each) were merged into this single hook per review feedback
+ * on #1954.
+ *
+ * `legStatus`: null while loading or when the species has no cards.
  * Suppressed when pretendAllMastered is on (caller must check).
+ *
+ * `firstSeen`: "For name cards, the card id IS the species id" (see
+ * `computeSpeciesLegStatuses`) - so this filters on `card.id === speciesId`.
+ * Deliberately LOCALE-INDEPENDENT (#1954 correctness fix): "first reviewed"
+ * is a journey milestone, not a per-locale mastery fact, so this takes the
+ * EARLIEST non-null `firstSeen` across ALL of the species' name cards
+ * regardless of `locale` - a species practised only in English still shows
+ * its first-reviewed date after the display language switches to Japanese.
+ * (Contrast with `legStatus`, which stays correctly per-locale.) Also
+ * deliberately gated on `firstSeen !== null` directly by the caller, NOT on
+ * card class - `firstSeen` is set on the first grade even during a learning
+ * step when `lastReview` is still null, so a just-started species should show
+ * its first-reviewed date immediately. null while loading, when the species
+ * has no cards, or when no name card has ever been graded.
  */
-function useSpeciesLegStatus(speciesId: number, locale: string): SpeciesLegStatus | null {
-  const [status, setStatus] = useState<SpeciesLegStatus | null>(null);
+function useSpeciesJourney(speciesId: number, locale: string): SpeciesJourney {
+  const [journey, setJourney] = useState<SpeciesJourney>(EMPTY_JOURNEY);
 
   useEffect(() => {
+    let cancelled = false;
     void loadSession().then((session) => {
-      if (session === null) return;
+      if (cancelled || session === null) return;
+
       // Cast locale: the helper accepts AppLocale; if an unsupported string
       // is passed it degrades gracefully (no matching cards, null return).
       const map = computeSpeciesLegStatuses(
@@ -57,46 +87,28 @@ function useSpeciesLegStatus(speciesId: number, locale: string): SpeciesLegStatu
         locale as Parameters<typeof computeSpeciesLegStatuses>[1],
         false,
       );
-      setStatus(map.get(speciesId) ?? null);
-    });
-  }, [speciesId, locale]);
+      const legStatus = map.get(speciesId) ?? null;
 
-  return status;
-}
+      // Locale-independent by design (#1954): earliest firstSeen across ALL
+      // of the species' name cards, not just the one matching the current
+      // display locale.
+      const firstSeenDates = session.cards
+        .filter((c) => c.cardType === "name" && c.id === speciesId)
+        .map((c) => c.state.firstSeen)
+        .filter((d): d is string => d !== null);
+      const firstSeen =
+        firstSeenDates.length === 0
+          ? null
+          : firstSeenDates.reduce((min, d) => (d < min ? d : min), firstSeenDates[0]);
 
-/**
- * Loads the session and reads `firstSeen` off the species' name card (#1948).
- *
- * "For name cards, the card id IS the species id" (see
- * `computeSpeciesLegStatuses`) - so this filters on `card.id === speciesId`
- * and the active Pokémon-name locale, mirroring `useSpeciesLegStatus`.
- *
- * Deliberately gated on `firstSeen !== null` directly by the caller, NOT on
- * card class - `firstSeen` is set on the first grade even during a learning
- * step when `lastReview` is still null, so a just-started species should show
- * its first-reviewed date immediately.
- *
- * Returns null while loading, when the species has no cards, or when the
- * name card has never been graded.
- */
-function useFirstReviewedDate(speciesId: number, locale: string): string | null {
-  const [firstSeen, setFirstSeen] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadSession().then((session) => {
-      if (cancelled || session === null) return;
-      const nameCard = session.cards.find(
-        (c) => c.cardType === "name" && c.id === speciesId && (c.locale ?? "en") === locale,
-      );
-      setFirstSeen(nameCard?.state.firstSeen ?? null);
+      setJourney({ legStatus, firstSeen });
     });
     return () => {
       cancelled = true;
     };
   }, [speciesId, locale]);
 
-  return firstSeen;
+  return journey;
 }
 
 /**
@@ -324,13 +336,13 @@ export function PokemonDetailDisclosure({
   // the SRS schedule, so showing schedule info alongside faked-mastery UI
   // would be misleading.
   const nextReview = useNextReviewDate(id);
-  // Per-leg status for the direction progress rows (#1766). Always called
-  // (hooks must not be conditional). Suppressed in render when pretendAllMastered
-  // is on or the species is locked/pending.
-  const legStatus = useSpeciesLegStatus(pokemon.speciesId, pokemonLocale);
-  // First-reviewed date (#1948) - real `firstSeen` timestamp off the name
-  // card, never fabricated even under pretendAllMastered (see hook doc).
-  const firstSeen = useFirstReviewedDate(pokemon.speciesId, pokemonLocale);
+  // Per-leg status (#1766) + first-reviewed date (#1948) for this species,
+  // derived from a single shared `loadSession()` read (see hook doc - #1954
+  // review feedback merged what were two independent IDB reads). Always
+  // called (hooks must not be conditional). `legStatus` is suppressed in
+  // render when pretendAllMastered is on or the species is locked/pending;
+  // `firstSeen` is a real timestamp never fabricated under pretendAllMastered.
+  const { legStatus, firstSeen } = useSpeciesJourney(pokemon.speciesId, pokemonLocale);
   // Regional prefs for date rendering, resolved the same way as
   // useNextReviewDate.ts / app/stats/page.tsx: stored setting first, browser
   // detection as the fallback. Lazy `useState` initializer keeps this a
