@@ -322,8 +322,8 @@ describe("generateDailyShareImage", () => {
 describe("generateMilestoneShareImage", () => {
   it("returns null when canvas.getContext returns null", async () => {
     const result = await generateMilestoneShareImage({
-      label: "100 Pokémon mastered",
-      shareText: "I've mastered 100 Pokémon!",
+      heroNumber: "100",
+      heroLabel: "Pokémon mastered",
     });
     expect(result).toBeNull();
   });
@@ -333,8 +333,8 @@ describe("generateMilestoneShareImage", () => {
     mockCanvasToBlob(expectedBlob);
 
     const result = await generateMilestoneShareImage({
-      label: "100 Pokémon mastered",
-      shareText: "I've mastered 100 Pokémon!",
+      heroNumber: "100",
+      heroLabel: "Pokémon mastered",
     });
     expect(result).toBe(expectedBlob);
   });
@@ -343,8 +343,8 @@ describe("generateMilestoneShareImage", () => {
     mockCanvasToBlob(null);
 
     const result = await generateMilestoneShareImage({
-      label: "Generation I complete!",
-      shareText: "Mastered all Gen I Pokémon!",
+      heroNumber: "★",
+      heroLabel: "Gen I complete",
     });
     expect(result).toBeNull();
   });
@@ -368,8 +368,8 @@ describe("generateMilestoneShareImage", () => {
     });
 
     await generateMilestoneShareImage({
-      label: "100 Pokémon mastered",
-      shareText: "I've mastered 100!",
+      heroNumber: "100",
+      heroLabel: "Pokémon mastered",
     });
 
     expect(capturedCanvas).not.toBeNull();
@@ -379,7 +379,7 @@ describe("generateMilestoneShareImage", () => {
     expect(capturedCanvas!.height).toBe(1440);
   });
 
-  it("strips leading number so fillText receives 'POKÉMON MASTERED', not '100 POKÉMON MASTERED'", async () => {
+  it("paints the caller-supplied hero number and upper-cased hero label", async () => {
     const expectedBlob = new Blob(["png"], { type: "image/png" });
     const originalCreate = document.createElement.bind(document);
     let capturedCtx: ReturnType<typeof makeCtxStub> | null = null;
@@ -399,14 +399,15 @@ describe("generateMilestoneShareImage", () => {
     });
 
     await generateMilestoneShareImage({
-      label: "100 Pokémon mastered",
-      shareText: "I've mastered 100 Pokémon!",
+      heroNumber: "100",
+      heroLabel: "Pokémon mastered",
     });
 
     expect(capturedCtx).not.toBeNull();
     const textArgs = capturedCtx!.fillText.mock.calls.map(
       (c: unknown[]) => c[0]
     );
+    expect(textArgs).toContain("100");
     expect(textArgs).toContain("POKÉMON MASTERED");
     expect(textArgs).not.toContain("100 POKÉMON MASTERED");
   });
@@ -424,13 +425,13 @@ describe("generateMilestoneShareImage", () => {
     mockCanvasToBlob(expectedBlob);
 
     const result = await generateMilestoneShareImage({
-      label: "50 Pokémon mastered",
-      shareText: "Mastered 50!",
+      heroNumber: "50",
+      heroLabel: "Pokémon mastered",
     });
     expect(result).toBe(expectedBlob);
   });
 
-  it("handles comma-formatted milestone numbers (e.g. '1,000 Pokémon mastered')", async () => {
+  it("paints comma-formatted hero numbers verbatim and falls back to MILESTONE for over-long labels", async () => {
     const expectedBlob = new Blob(["png"], { type: "image/png" });
     const originalCreate = document.createElement.bind(document);
     let capturedCtx: ReturnType<typeof makeCtxStub> | null = null;
@@ -450,8 +451,10 @@ describe("generateMilestoneShareImage", () => {
     });
 
     await generateMilestoneShareImage({
-      label: "1,000 Pokémon mastered",
-      shareText: "I've mastered 1,000 Pokémon!",
+      heroNumber: "1,000",
+      // 25 chars - exceeds the 20-char disc cap, so the painter falls back
+      // to the generic MILESTONE marker rather than overflowing the disc.
+      heroLabel: "an unreasonably long label",
     });
 
     expect(capturedCtx).not.toBeNull();
@@ -459,6 +462,6 @@ describe("generateMilestoneShareImage", () => {
       (c: unknown[]) => c[0]
     );
     expect(textArgs).toContain("1,000");
-    expect(textArgs).toContain("POKÉMON MASTERED");
+    expect(textArgs).toContain("MILESTONE");
   });
 });

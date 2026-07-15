@@ -20,7 +20,7 @@ import type {
   FamilyNode,
 } from "@/lib/evolution/chains";
 import { computeEvolutionWallStats } from "@/lib/evolution/chains";
-import { mutedText, mutedTextXs } from "@/lib/utils/class-names";
+import { mutedText, mutedTextXs, sectionHeadingSm } from "@/lib/utils/class-names";
 import { POKEDEX_NODE_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
@@ -415,7 +415,7 @@ export function EvolutionWall({
       <div className="flex items-center justify-between gap-3">
         <h3
           id={headingId}
-          className="text-base font-semibold text-foreground"
+          className={sectionHeadingSm}
         >
           {tWidget("heading")}
         </h3>

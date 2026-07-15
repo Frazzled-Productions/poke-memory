@@ -12,7 +12,7 @@ import { useFormatter } from "next-intl";
 import type { ActivityPoint } from "@/lib/stats/activity-history";
 import { isActivityHistoryEmpty } from "@/lib/stats/activity-history";
 import { formatChartDate, type DateFormat } from "@/lib/utils/format-date";
-import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue, sectionHeadingSm } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Palette - consistent with other Stats components (zinc/emerald/rose)
@@ -159,7 +159,7 @@ export function ActivityHistoryChart({
     <section aria-labelledby="activity-history-heading">
       <h2
         id="activity-history-heading"
-        className="mb-1 text-base font-semibold text-foreground"
+        className={`mb-1 ${sectionHeadingSm}`}
       >
         Daily activity
       </h2>

@@ -49,7 +49,7 @@ import {
 import { seedOptsFromSettings } from "@/lib/review/seedOpts";
 import type { CloudRow } from "@/lib/sync/cloud";
 import type { ReviewableCard } from "@/lib/review/session";
-import { mutedText, pageTitle } from "@/lib/utils/class-names";
+import { mutedText, pageTitle, sectionHeadingSm } from "@/lib/utils/class-names";
 type ConflictData = {
   localCards: ReviewableCard[];
   cloudCards: CloudRow[];
@@ -494,7 +494,7 @@ function SideCard({
   const t = useTranslations("auth");
   return (
     <div className="rounded-xl border border-zinc-200 bg-background p-6 dark:border-zinc-800">
-      <h2 className="text-base font-semibold text-foreground">{heading}</h2>
+      <h2 className={sectionHeadingSm}>{heading}</h2>
       <ul className={`mt-2 space-y-1 ${mutedText}`}>
         <li>
           {t("cardsReviewed", { count: cardCount })}

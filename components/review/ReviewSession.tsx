@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslations } from "next-intl";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { TypedEntryNameCard } from "@/components/review/TypedEntryNameCard";
+import type { TypedEntryStrictness } from "@/lib/srs/typedEntryGradeLocale";
 import { MultipleChoiceNameCard } from "@/components/review/MultipleChoiceNameCard";
 import { EvolutionCard } from "@/components/review/EvolutionCard";
 import { SpritePicker } from "@/components/review/SpritePicker";
@@ -105,7 +106,7 @@ import { HigherOrLowerGame } from "@/components/review/HigherOrLowerGame";
 import { getSeenPokemon } from "@/lib/minigame/higherOrLower";
 import { incompleteChainSpeciesIds } from "@/lib/evolution/chains";
 import { computeSpeciesLegStatuses } from "@/lib/stats/legStatus";
-import { mutedText, mutedTextXs, sectionLabel, colStack } from "@/lib/utils/class-names";
+import { mutedText, mutedTextXs, sectionLabel, colStack, sectionHeadingSm } from "@/lib/utils/class-names";
 import { getOrCreateClientSalt } from "@/lib/identity/clientSalt";
 import { addDaysToIsoDate } from "@/lib/utils/dates";
 import { useShareSheet } from "@/components/review/useShareSheet";
@@ -801,6 +802,9 @@ export function ReviewSession() {
   // session-load effect. Same-tab toggles take effect on the next session via the
   // storage event; the in-flight card always uses the value captured at load time.
   const [verifiedTypedEntryMode, setVerifiedTypedEntryMode] = useState(false);
+  // Grading strictness for non-English typed entry (#1576).
+  const [typedEntryStrictness, setTypedEntryStrictness] =
+    useState<TypedEntryStrictness>("lenient");
   // Default true pre-hydration so the banner doesn't flash for users whose
   // persisted setting is true. The session-load effect (~line 939) overwrites
   // this with the actual persisted value (default false for new users).
@@ -1373,6 +1377,7 @@ export function ReviewSession() {
       setActiveLocale(sessionLocale);
       setLearningLocales(sessionLearningLocales);
       setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
+      setTypedEntryStrictness(settings.typedEntryStrictness ?? "lenient");
       setMcCardOnboardingShown(settings.mcCardOnboardingShown ?? false);
       setFirstVisitDone(settings.onboarding?.firstVisitOnboardingDismissed === true);
       // Scope-nudge gate signals (#1482). Read from persisted settings.
@@ -3058,7 +3063,7 @@ export function ReviewSession() {
                 >
                   🔊
                 </button>
-                <p className="text-base font-semibold text-foreground">
+                <p className={sectionHeadingSm}>
                   {t("cryPrompt")}
                 </p>
               </div>
@@ -3225,11 +3230,11 @@ export function ReviewSession() {
     (effectiveCard.state.lastReview === null ||
       effectiveCard.state.learningStep !== null);
   const isMcLearningActive = verifiedTypedEntryMode && isInLearningPhase;
-  // Typed entry is English-only. Non-English sessions fall back to flip /
-  // multiple-choice so the typed answer is never compared against a
-  // Japanese (or other locale) display name. Full fix tracked in #1561.
+  // Typed entry works for every learning locale (#1576): non-English cards
+  // are graded against the native-script name (plus its romanisation in
+  // lenient mode) inside TypedEntryNameCard via gradeTypedAnswerLocale.
   const isTypedEntryActive =
-    verifiedTypedEntryMode && isNameCard && !isInLearningPhase && activeLocale === "en";
+    verifiedTypedEntryMode && isNameCard && !isInLearningPhase;
 
   // Pre-build MC options when we know we will render the MC card. The options
   // array is stable per card id: the same 4 options and order appear on every
@@ -3311,6 +3316,8 @@ export function ReviewSession() {
             id={effectiveCard.id}
             onGrade={handleGrade}
             grading={grading}
+            locale={effectiveCard.locale ?? activeLocale}
+            strictness={typedEntryStrictness}
           />
         ) : (
           /* Swipeable card wrapper - pointer listeners attached here (#1052).
@@ -3366,14 +3373,6 @@ export function ReviewSession() {
           />
         ) : (
           <div className="flex flex-col items-center gap-2">
-            {verifiedTypedEntryMode && activeLocale !== "en" && (
-              <p
-                role="note"
-                className={`max-w-xs text-center ${mutedTextXs}`}
-              >
-                {t("typedEntryEnglishOnly")}
-              </p>
-            )}
             <button
               type="button"
               onClick={handleReveal}

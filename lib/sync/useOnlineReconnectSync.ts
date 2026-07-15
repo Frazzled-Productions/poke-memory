@@ -4,17 +4,10 @@ import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
-import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
-import {
-  loadSyncStatus,
-  markPushSucceeded,
-  savePendingQueue,
-  loadPendingQueue,
-  clearPendingQueue,
-} from "@/lib/sync/persistence";
+import { isSyncSafe } from "@/lib/sync/cloud";
+import { loadSyncStatus, markPushSucceeded } from "@/lib/sync/persistence";
+import { pushWithFallback } from "@/lib/sync/pushWithFallback";
 import { resetStructuralProbe } from "@/lib/sync/structuralError";
-import { loadSession } from "@/lib/review/persistence";
-import { todayString } from "@/lib/review/session";
 import { SW_REPLAY_MESSAGE } from "@/lib/sync/backgroundSync";
 
 /**
@@ -103,74 +96,33 @@ export function useOnlineReconnectSync(
         const pushUid = userIdRef.current;
         if (!pushClient || !pushUid) return;
 
-        // Prefer the persisted queue when it is non-empty (#893). The persisted
-        // queue contains the exact cards `usePerGradeSync` had not yet delivered,
-        // so it is always more precise than the session-card heuristic below.
-        const persistedQueue = loadPendingQueue();
-        if (persistedQueue.length > 0) {
-          const queueResults = await Promise.allSettled(
-            persistedQueue.map((card) => pushSingleCard(pushClient, pushUid, card)),
-          );
+        // Card selection, queue slimming, and the session-card heuristic all
+        // live in the shared engine (#893) - this hook only translates the
+        // outcome into SyncStatus writes and console warnings.
+        const outcome = await pushWithFallback(pushClient, pushUid, {
+          failedCardCount: status.failedCardCount,
+          skipSessionWhenCountZero: true,
+          isCardEligible: isSyncSafe,
+        });
 
-          const failedCards = persistedQueue.filter((_, i) => {
-            const r = queueResults[i];
-            // "rejected" (Promise rejected) or "failed" (tri-state from pushSingleCard)
-            // both warrant a retry. "rejected" (23514) is evicted - cloud row is newer.
-            if (r.status === "rejected") return true;
-            if (r.status !== "fulfilled") return false;
-            return r.value === "failed";
-          });
-
-          if (failedCards.length > 0) {
-            // Partial or total failure: slim the persisted queue to only the
-            // cards that failed so the next retry does not re-push cards that
-            // already reached the cloud (#893 partial-success slimming).
-            savePendingQueue(failedCards);
+        if (outcome.kind === "queue") {
+          if (outcome.failedCards.length > 0) {
+            // Partial or total failure: the engine has already slimmed the
+            // persisted queue to only the cards that failed (#893).
             console.warn("[online-reconnect] some persisted-queue cards failed to push; will retry on next grade or reconnect");
           } else {
-            // All persisted-queue cards succeeded - clear both the failure signal
-            // and the persisted queue so stale data does not accumulate.
+            // All persisted-queue cards succeeded (queue already cleared) -
+            // clear the failure signal.
             markPushSucceeded();
-            clearPendingQueue();
           }
           return;
         }
 
-        // No persisted queue: fall back to the session-card heuristic.
-        const session = await loadSession();
-        const allReviewed = (session?.cards ?? []).filter(
-          (card) => card.state.lastReview !== null && isSyncSafe(card),
-        );
+        // "session-skipped" (failedCardCount explicitly 0) and
+        // "session-empty" (nothing eligible to push): nothing to do.
+        if (outcome.kind !== "session") return;
 
-        if (status.failedCardCount === 0) {
-          // failedCardCount is explicitly 0 - nothing to re-push.
-          return;
-        }
-
-        let cardsToRetry = allReviewed;
-        if (status.failedCardCount !== null && status.failedCardCount > 0) {
-          // Positive count: push today's reviewed cards (approximation of the
-          // cards the per-grade path failed to deliver). Fall back to all
-          // reviewed cards when the today-filter is empty (e.g. user returns
-          // the next day after going offline).
-          const today = todayString(new Date());
-          const todayOnly = allReviewed.filter(
-            (card) => card.state.lastReview === today,
-          );
-          cardsToRetry = todayOnly.length > 0 ? todayOnly : allReviewed;
-        }
-
-        if (cardsToRetry.length === 0) return;
-
-        const results = await Promise.allSettled(
-          cardsToRetry.map((card) => pushSingleCard(pushClient, pushUid, card)),
-        );
-
-        const anyFailed = results.some(
-          (r) => r.status === "rejected" || (r.status === "fulfilled" && r.value === "failed"),
-        );
-
-        if (anyFailed) {
+        if (outcome.anyFailed) {
           // Keep lastPushFailed true so the retry banner stays visible and the
           // next reconnect / manual retry attempt can re-push the missing cards.
           // Mirrors useRetryPush semantics: only clear the flag when every card

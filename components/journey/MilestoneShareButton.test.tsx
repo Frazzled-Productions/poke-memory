@@ -12,30 +12,31 @@ vi.mock("@/lib/share/generateShareImage", () => ({
 import { generateMilestoneShareImage } from "@/lib/share/generateShareImage";
 
 // ---------------------------------------------------------------------------
-// Fixtures - use the flat Milestone shape produced by detectTopMilestone.
+// Fixtures - the structured Milestone shape produced by detectTopMilestone.
+// All user-facing strings are rendered by the component via the catalogue.
 // ---------------------------------------------------------------------------
 
 const countMilestone: Milestone = {
   id: "mastery-100",
   kind: "mastery-count",
-  label: "100 Pokémon mastered",
-  shareText: "I've mastered 100 Pokémon in Poké Memory! 🌟 https://pokememory.com",
+  threshold: 100,
 };
 
 const genMilestone: Milestone = {
   id: "gen-1-complete",
   kind: "gen-complete",
-  label: "Generation I complete!",
-  shareText:
-    "I've mastered every Generation I Pokémon in Poké Memory! 🏆 https://pokememory.com",
+  gen: 1,
 };
 
 const allMasteredMilestone: Milestone = {
   id: "all-mastered",
   kind: "all-mastered",
-  label: "You've mastered all Pokémon!",
-  shareText: "I've mastered all 1 025 Pokémon in Poké Memory! 🎉 https://pokememory.com",
 };
+
+// Expected en copy for the count milestone (kept in one place for reuse).
+const COUNT_LABEL_EN = "Milestone reached: 100 Pokémon mastered!";
+const COUNT_SHARE_TEXT_EN =
+  "I've passed the 100 Pokémon mastered milestone in Poké Memory! 🌟 https://pokememory.com";
 
 // ---------------------------------------------------------------------------
 // Null guard
@@ -53,9 +54,13 @@ describe("MilestoneShareButton - null prop", () => {
 // ---------------------------------------------------------------------------
 
 describe("MilestoneShareButton - rendering", () => {
-  it("shows the mastery-count label for a count milestone", () => {
+  it("frames the mastery-count banner as a crossed achievement, not a live count (#1933)", () => {
+    // Scenario: the live count (e.g. 137, shown by the mastery pill) exceeds
+    // the crossed threshold (100). The banner must read as an achievement, so
+    // the bare threshold string that read as a wrong live stat must be gone.
     renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
-    expect(screen.getByText("100 Pokémon mastered")).toBeInTheDocument();
+    expect(screen.getByText(COUNT_LABEL_EN)).toBeInTheDocument();
+    expect(screen.queryByText("100 Pokémon mastered")).toBeNull();
   });
 
   it("shows the gen-complete label for a generation milestone", () => {
@@ -70,7 +75,9 @@ describe("MilestoneShareButton - rendering", () => {
 
   it("renders a Share button with an accessible label", () => {
     renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
-    const btn = screen.getByRole("button", { name: /Share milestone: 100 Pokémon mastered/i });
+    const btn = screen.getByRole("button", {
+      name: /Share milestone: Milestone reached: 100 Pokémon mastered/i,
+    });
     expect(btn).toBeInTheDocument();
   });
 
@@ -124,7 +131,7 @@ describe("MilestoneShareButton - clipboard fallback", () => {
       fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
     });
 
-    expect(writeText).toHaveBeenCalledWith(countMilestone.shareText);
+    expect(writeText).toHaveBeenCalledWith(COUNT_SHARE_TEXT_EN);
     expect(screen.getByText("Copied to clipboard")).toBeInTheDocument();
 
     // After 2 s the confirmation message resets.
@@ -198,6 +205,12 @@ describe("MilestoneShareButton - Web Share API file path", () => {
     expect(Array.isArray(arg.files)).toBe(true);
     expect(arg.files![0]).toBeInstanceOf(File);
     expect(arg.files![0].name).toBe("poke-memory.png");
+    // The image generator receives pre-rendered hero strings (threshold as the
+    // hero number, localised disc label), not raw catalogue-bypassing labels.
+    expect(vi.mocked(generateMilestoneShareImage)).toHaveBeenCalledWith({
+      heroNumber: "100",
+      heroLabel: "Pokémon mastered",
+    });
     // No status message because share succeeded.
     expect(screen.queryByRole("status")).toBeNull();
   });
@@ -253,7 +266,7 @@ describe("MilestoneShareButton - Web Share API file path", () => {
     // share called with text, not files.
     expect(shareFn).toHaveBeenCalledOnce();
     const arg = shareFn.mock.calls[0][0] as { text?: string; files?: File[] };
-    expect(arg.text).toBe(countMilestone.shareText);
+    expect(arg.text).toBe(COUNT_SHARE_TEXT_EN);
     expect(arg.files).toBeUndefined();
   });
 });

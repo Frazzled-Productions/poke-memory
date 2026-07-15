@@ -23,6 +23,7 @@ import {
   type LabsFlags,
 } from "@/lib/labs/flags";
 import { DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
+import type { TypedEntryStrictness } from "@/lib/srs/typedEntryGradeLocale";
 
 // localStorage key for all user-configurable settings
 export const STORAGE_KEY = KEY_SETTINGS;
@@ -435,6 +436,15 @@ export type UserSettings = {
    */
   verifiedTypedEntryMode: boolean;
   /**
+   * Grading strictness for non-English typed entry (#1576). `"lenient"`
+   * (default) accepts native script OR the pre-baked romanisation (rōmaji /
+   * pinyin), tone/spacing/case-insensitively; `"strict"` accepts native
+   * script only. The English typed-entry path ignores this value. Absent in
+   * pre-#1576 records; back-fills to `"lenient"` on read. Plain JSONB field -
+   * syncs via merge_user_settings, no migration.
+   */
+  typedEntryStrictness: TypedEntryStrictness;
+  /**
    * One-time onboarding toast for typed entry (#1271). Set to true after the
    * first-enable toast is shown so it never fires again. Default false - absent
    * in pre-#1271 records; bool parser back-fills to false.
@@ -573,6 +583,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   streakProtection: { ...DEFAULT_STREAK_PROTECTION },
   // Default off: existing users keep the honour-system flow unchanged.
   verifiedTypedEntryMode: false,
+  // Default lenient (#1576): romanised input is accepted for ja/zh typed entry.
+  typedEntryStrictness: "lenient",
   // Default false: absent in pre-#1271 records; bool parser back-fills to false.
   typedEntryOnboardingShown: false,
   // Default false: absent in pre-#1271 records; bool parser back-fills to false.
@@ -834,6 +846,12 @@ function parseStoredSettings(raw: string | null): UserSettings {
     // Default false: existing records without this field keep the honour-system
     // flow unchanged (#1251).
     verifiedTypedEntryMode: bool(obj, "verifiedTypedEntryMode"),
+    // Default "lenient": absent in pre-#1576 records; only the known literals
+    // are kept (same defensive posture as reverseFeedbackDelay).
+    typedEntryStrictness:
+      obj.typedEntryStrictness === "strict" || obj.typedEntryStrictness === "lenient"
+        ? obj.typedEntryStrictness
+        : DEFAULT_SETTINGS.typedEntryStrictness,
     // Default false: absent in pre-#1271 records (#1271).
     typedEntryOnboardingShown: bool(obj, "typedEntryOnboardingShown"),
     // Default false: absent in pre-#1271 records (#1271).

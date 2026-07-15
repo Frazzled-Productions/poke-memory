@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { BADGE_CATALOG, type BadgeDefinition } from "@/lib/badges/catalog";
 import { BadgeGalleryCard } from "@/components/badges/BadgeGalleryCard";
 import { cn } from "@/lib/utils/cn";
-import { mutedText } from "@/lib/utils/class-names";
+import { mutedText, sectionHeadingSm } from "@/lib/utils/class-names";
 
 type Props = {
   /**
@@ -101,7 +101,7 @@ export function BadgeGallery({
     <section aria-labelledby="badge-gallery-heading">
       <h3
         id="badge-gallery-heading"
-        className="mb-3 text-base font-semibold text-foreground"
+        className={`mb-3 ${sectionHeadingSm}`}
       >
         {t("heading")}
       </h3>

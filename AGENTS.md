@@ -41,12 +41,12 @@ Issue-first, acceptance-criteria cross-check, and skip-the-ceremony: `ops/standa
 | SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
 | PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
 | Supabase schema / RLS | supabase-expert designs; data-coder implements |
-| Privacy notice / Terms / `docs/` compliance files (`dpia.md`, `childrens-code-assessment.md`, `cookies-pecr.md`) | privacy-expert advises (read-only); ui-coder edits the `/privacy` and `/terms` pages, orchestrator edits the `docs/` compliance files |
+| Privacy notice / Terms / `docs/` compliance files (`dpia.md`, `childrens-code-assessment.md`, `cookies-pecr.md`); any third-party SDK/service install that could collect, transmit, or log personal data (analytics, error monitoring, messaging, A/B testing) | privacy-expert advises (read-only); ui-coder edits the `/privacy` and `/terms` pages, orchestrator edits the `docs/` compliance files |
 | Multi-locale work (`pokemonNameLocale`, `appLocale`, transliteration, message catalogs, locale routing, locale-aware sync, adding a new locale) | i18n-expert advises (read-only); data-coder implements settings/sync/seed changes, ui-coder implements rendering, catalogs, and `<lang>` placement |
 | Onboarding / discoverability surfaces (`components/onboarding/**`, empty states, locked-state UI, first-contact flows, nav affordances) | ux-advisor advises (read-only); ui-coder implements |
 | `README.md`, `CHANGELOG.md` | orchestrator - updated inline as part of each commit, no specialist agent |
 | `e2e/**` | playwright |
-| `.github/workflows/**` | workflow-expert (review); orchestrator (edits) |
+| `.github/workflows/**` | workflow-expert review on EVERY change, no mechanical-change exception (complexity is not the gate, YAML's silent-failure mode is - #1859/#1815/#1806); orchestrator (edits) |
 | `.claude/agents/**` | workflow-expert (review); orchestrator (edits) |
 
 **Cross-layer fixes.** Default routing, not a hard wall: `ops/standards/process.md` → File-ownership pattern (#1125). Worked example: a `ui-coder` finding the root cause in `lib/` touches the helper in the same change (#1117 / #1121).

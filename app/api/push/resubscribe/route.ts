@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { parseJsonBody } from "@/lib/api/parseJsonBody";
+import { requireAuth } from "@/lib/auth/requireAuth";
 
 /**
  * Push subscription re-persist endpoint (#1858 F35).
@@ -18,12 +20,9 @@ import { createClient } from "@/lib/supabase/server";
  * policies (there is no UPDATE policy on `push_subscriptions`).
  */
 export async function POST(request: Request) {
-  let body: { endpoint?: unknown; p256dh?: unknown; auth?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
+  const parsed = await parseJsonBody<{ endpoint?: unknown; p256dh?: unknown; auth?: unknown }>(request);
+  if (parsed instanceof NextResponse) return parsed;
+  const body = parsed.data;
 
   const { endpoint, p256dh, auth } = body;
   if (
@@ -35,14 +34,9 @@ export async function POST(request: Request) {
   }
 
   const supabase = (await createClient()) as unknown as SupabaseClient;
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAuth(supabase, { withOkField: true });
+  if (authResult instanceof NextResponse) return authResult;
+  const { user } = authResult;
 
   // Delete any existing row for this (user_id, endpoint) pair and re-insert.
   // Matching the delete-then-insert pattern from lib/push/subscribe.ts::subscribeToPush.

@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { useTranslations, useFormatter } from "next-intl";
 import type { GradeDistribution, GradeTrendPoint } from "@/lib/stats/grade-distribution";
-import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue, sectionHeadingSm } from "@/lib/utils/class-names";
 
 // ---------------------------------------------------------------------------
 // Colour palette - consistent with GradeBreakdownBar and the Stats accent vocabulary
@@ -181,7 +181,7 @@ export function GradeDistributionChart({ distribution, trend }: Props) {
     <section aria-labelledby="grade-dist-heading">
       <h2
         id="grade-dist-heading"
-        className="mb-1 text-base font-semibold text-foreground"
+        className={`mb-1 ${sectionHeadingSm}`}
       >
         {tGD("heading")}
       </h2>

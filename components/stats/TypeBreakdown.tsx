@@ -5,7 +5,7 @@ import type { TypeStats } from "@/lib/stats/derive";
 import { TYPE_COLORS } from "@/lib/pokemon/types";
 import { MeterBar } from "@/components/ui/MeterBar";
 import { getTypeName } from "@/lib/i18n/typeNames";
-import { colStack, mutedTextXs } from "@/lib/utils/class-names";
+import { colStack, mutedTextXs, sectionHeadingSm } from "@/lib/utils/class-names";
 
 type Props = {
   perType: readonly TypeStats[];
@@ -32,7 +32,7 @@ export function TypeBreakdown({ perType }: Props) {
     <section aria-labelledby="type-heading">
       <h3
         id="type-heading"
-        className="mb-3 text-base font-semibold text-foreground"
+        className={`mb-3 ${sectionHeadingSm}`}
       >
         {tTB("heading")}
       </h3>

@@ -14,7 +14,7 @@ import {
   totalHistogramCards,
   type DifficultyBucket,
 } from "@/lib/stats/difficulty-histogram";
-import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue } from "@/lib/utils/class-names";
+import { cardPanel, chartTickText, chartTooltipCard, mutedText, mutedTextXs, statValue, sectionHeadingSm } from "@/lib/utils/class-names";
 
 type Props = {
   /** The nine difficulty buckets, from `computeDifficultyHistogram`. */
@@ -77,7 +77,7 @@ export function DifficultyHistogram({ buckets, mean }: Props) {
     <section aria-labelledby="difficulty-heading">
       <h2
         id="difficulty-heading"
-        className="mb-1 text-base font-semibold text-foreground"
+        className={`mb-1 ${sectionHeadingSm}`}
       >
         Card difficulty spread
       </h2>

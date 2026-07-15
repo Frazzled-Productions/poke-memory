@@ -4279,9 +4279,9 @@ describe("ReviewSession per-locale session (#1562)", () => {
     });
   });
 
-  it("suppresses typed entry when activeLocale is not 'en' (#1561)", async () => {
-    // Session with a graduated ja name card - typed-entry would fire for en
-    // but must be suppressed for ja since typed answers are English-only.
+  it("renders typed entry when activeLocale is not 'en' (#1576)", async () => {
+    // Session with a graduated ja name card - typed entry now fires for
+    // non-English locales too, grading against the native-script name.
     const graduatedJaCard: NameReviewCard = {
       ...jaNameCard,
       state: {
@@ -4310,11 +4310,11 @@ describe("ReviewSession per-locale session (#1562)", () => {
 
     renderWithIntl(<ReviewSession />);
 
-    // Must NOT render a text input - typed entry is English-only (#1561).
+    // The typed-entry input renders for the graduated ja card (#1576).
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
     });
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^reveal$/i })).not.toBeInTheDocument();
   });
 });
 
@@ -4421,8 +4421,8 @@ describe("ReviewSession Phase 2 - multi-locale crown-jewel invariant (#1562)", (
     expect(hasJa).toBe(true);
   });
 
-  it("typed-entry note shows only when activeLocale is not en", async () => {
-    // A graduated ja card so typed-entry mode would otherwise trigger.
+  it("typed entry is active for a graduated ja card (#1576)", async () => {
+    // A graduated ja card - typed entry now works for non-English locales.
     const graduatedJaCard: NameReviewCard = {
       ...jaCard,
       locale: "ja" as const,
@@ -4451,13 +4451,16 @@ describe("ReviewSession Phase 2 - multi-locale crown-jewel invariant (#1562)", (
 
     renderWithIntl(<ReviewSession />);
 
+    // The typed-entry input renders instead of the honour-system Reveal
+    // button - the English-only gate is gone (#1576).
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("textbox", { name: /type the pokémon name/i }),
+      ).toBeInTheDocument();
     });
-
-    // The typed-entry note must be present (#1562).
-    expect(screen.getByRole("note")).toBeInTheDocument();
-    expect(screen.getByRole("note")).toHaveTextContent(/typed entry is only available/i);
+    expect(screen.queryByRole("button", { name: /^reveal$/i })).not.toBeInTheDocument();
+    // The retired English-only note must be gone too.
+    expect(screen.queryByText(/typed entry is only available/i)).not.toBeInTheDocument();
   });
 
   it("typed-entry note is absent when activeLocale is en", async () => {

@@ -13,10 +13,18 @@
 import type { DailySummaryParts } from "@/lib/review/share";
 
 export type MilestoneShareData = {
-  /** Human-readable milestone label, e.g. "100 Pokémon mastered". */
-  label: string;
-  /** Pre-formatted plain share text (kept for the text-only fallback path). */
-  shareText: string;
+  /**
+   * The large text rendered inside the hero disc - a number for count
+   * milestones ("100"), or a symbol ("★") for non-numeric milestones.
+   * Pre-rendered by the caller so this module stays locale-agnostic (#1933).
+   */
+  heroNumber: string;
+  /**
+   * Short label painted beneath the hero number, already localised by the
+   * caller (e.g. "Pokémon mastered"). Upper-cased before painting; falls back
+   * to "MILESTONE" when longer than the disc can fit.
+   */
+  heroLabel: string;
 };
 
 // Re-export DailySummaryParts so callers can use a single import path.
@@ -577,16 +585,11 @@ export async function generateMilestoneShareImage(
 
   const tokens = readThemeTokens();
 
-  // Extract a leading number from the label ("100 Pokémon mastered" → "100",
-  // "1,000 Pokémon mastered" → "1,000"). Fall back to a star for non-numeric milestones.
-  const match = data.label.match(/[\d,]+/);
-  const heroNumber = match ? match[0] : "★";
-  // Strip a leading number from the label so it is not repeated beneath the
-  // hero number ("100 Pokémon mastered" → "POKÉMON MASTERED"). Upper-case the
-  // remainder when short enough; otherwise fall back to "MILESTONE".
-  const labelText = match
-    ? data.label.replace(/^\s*[\d,]+\s*/, "").trim()
-    : data.label;
+  // The caller supplies pre-rendered, localised hero strings (#1933).
+  // Upper-case the label (a no-op for CJK scripts) and fall back to a generic
+  // marker when it is too long to fit the disc at the label font size.
+  const heroNumber = data.heroNumber;
+  const labelText = data.heroLabel.trim();
   const heroLabel =
     labelText.length > 0 && labelText.length <= DISC_LABEL_MAX_LEN
       ? labelText.toUpperCase()

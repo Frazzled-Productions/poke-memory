@@ -22,6 +22,29 @@ vi.mock("@/lib/i18n/useLocalePokemonName", () => ({
   }),
 }));
 
+// Deterministic locale-names sidecar for the non-English grading tests
+// (#1576). Bulbasaur (speciesId 1) only; every other id resolves undefined,
+// which exercises the English-canonical fallback.
+vi.mock("@/lib/pokemon/localeNames", () => {
+  const NAMES: Record<string, string> = {
+    ja: "フシギダネ",
+    "zh-Hans": "妙蛙种子",
+    "zh-Hant": "妙蛙種子",
+  };
+  const TRANSLITERATIONS: Record<string, string> = {
+    ja: "Fushigidane",
+    "zh-Hans": "miào wā zhǒng zi",
+    "zh-Hant": "miào wā zhǒng zǐ",
+  };
+  return {
+    loadLocaleNames: async () => new Map(),
+    getLocaleName: (id: number, locale: string) =>
+      id === 1 ? NAMES[locale] : undefined,
+    getTransliteration: (id: number, locale: string) =>
+      id === 1 ? TRANSLITERATIONS[locale] : undefined,
+  };
+});
+
 type TestProps = {
   spriteUrl?: string;
   canonicalName?: string;
@@ -156,6 +179,183 @@ describe("TypedEntryNameCard", () => {
     renderCard({ grading: true });
     expect(screen.getByRole("button", { name: /submit/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /i don.t know/i })).toBeDisabled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locale-aware grading (#1576)
+// ---------------------------------------------------------------------------
+
+type LocaleTestProps = {
+  locale: "ja" | "zh-Hans" | "zh-Hant";
+  strictness?: "strict" | "lenient";
+  onGrade?: (grade: Grade) => void;
+};
+
+function renderLocaleCard(overrides: LocaleTestProps) {
+  const onGrade = overrides.onGrade ?? vi.fn<(grade: Grade) => void>();
+  render(
+    <TypedEntryNameCard
+      spriteUrl="/sprites/pokemon/webp/320/1.webp"
+      canonicalName="Bulbasaur"
+      id={1}
+      onGrade={onGrade}
+      locale={overrides.locale}
+      strictness={overrides.strictness}
+    />,
+  );
+  return { onGrade };
+}
+
+// Submit is async for non-English locales (it awaits the sidecar), so flush
+// microtasks with an async act before asserting.
+async function submitAnswer(value: string) {
+  fireEvent.change(screen.getByRole("textbox"), { target: { value } });
+  fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+  await act(async () => {});
+}
+
+describe("TypedEntryNameCard - locale-aware grading (#1576)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("ja: typed entry is active and the exact katakana name fires Good (4)", async () => {
+    const { onGrade } = renderLocaleCard({ locale: "ja" });
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+    await submitAnswer("フシギダネ");
+    expect(screen.getByText(/correct!/i)).toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    expect(onGrade).toHaveBeenCalledWith(4);
+  });
+
+  it("ja: the hiragana form of a katakana name fires Good (4)", async () => {
+    const { onGrade } = renderLocaleCard({ locale: "ja" });
+    await submitAnswer("ふしぎだね");
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    expect(onGrade).toHaveBeenCalledWith(4);
+  });
+
+  it("ja lenient: the romanised name fires Good (4)", async () => {
+    const { onGrade } = renderLocaleCard({ locale: "ja", strictness: "lenient" });
+    await submitAnswer("fushigidane");
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    expect(onGrade).toHaveBeenCalledWith(4);
+  });
+
+  it("ja strict: the romanised name is rejected with Again (1)", async () => {
+    const { onGrade } = renderLocaleCard({ locale: "ja", strictness: "strict" });
+    await submitAnswer("fushigidane");
+    expect(screen.getByText(/not quite/i)).toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    expect(onGrade).toHaveBeenCalledWith(1);
+  });
+
+  it("zh-Hans: typed entry is active and the exact native name fires Good (4)", async () => {
+    const { onGrade } = renderLocaleCard({ locale: "zh-Hans" });
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+    await submitAnswer("妙蛙种子");
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    expect(onGrade).toHaveBeenCalledWith(4);
+  });
+
+  it("zh-Hans lenient: tone- and spacing-free pinyin fires Good (4)", async () => {
+    const { onGrade } = renderLocaleCard({ locale: "zh-Hans", strictness: "lenient" });
+    await submitAnswer("miaowazhongzi");
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    expect(onGrade).toHaveBeenCalledWith(4);
+  });
+
+  it("zh-Hant strict: pinyin is rejected with Again (1)", async () => {
+    const { onGrade } = renderLocaleCard({ locale: "zh-Hant", strictness: "strict" });
+    await submitAnswer("miaowazhongzi");
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    expect(onGrade).toHaveBeenCalledWith(1);
+  });
+
+  it("reveal shows BOTH the native script and the romanisation on a wrong answer", async () => {
+    renderLocaleCard({ locale: "ja" });
+    await submitAnswer("ゼニガメ");
+    expect(screen.getByText("フシギダネ")).toBeInTheDocument();
+    expect(screen.getByText("Fushigidane")).toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+  });
+
+  it("reveal shows the accepted answer set even on a correct romanised answer", async () => {
+    // A learner answering in romaji must still be shown the native script -
+    // the accept-set is never hidden (#1576).
+    renderLocaleCard({ locale: "ja" });
+    await submitAnswer("fushigidane");
+    expect(screen.getByText(/correct!/i)).toBeInTheDocument();
+    expect(screen.getByText("フシギダネ")).toBeInTheDocument();
+    expect(screen.getByText("Fushigidane")).toBeInTheDocument();
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+  });
+
+  it("English behaviour is unchanged: no romanisation line, correct hides the answer", () => {
+    const onGrade = vi.fn<(grade: Grade) => void>();
+    render(
+      <TypedEntryNameCard
+        spriteUrl="/sprites/pokemon/webp/320/1.webp"
+        canonicalName="Bulbasaur"
+        id={1}
+        onGrade={onGrade}
+        locale="en"
+      />,
+    );
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Bulbasaur" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    expect(screen.getByText(/correct!/i)).toBeInTheDocument();
+    // English exact match reveals nothing - and never a transliteration.
+    expect(screen.queryByText("フシギダネ")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fushigidane")).not.toBeInTheDocument();
+    expect(screen.queryAllByText("Bulbasaur")).toHaveLength(0);
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    expect(onGrade).toHaveBeenCalledWith(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// IME composition guard (#1576)
+// ---------------------------------------------------------------------------
+
+describe("TypedEntryNameCard - IME composition guard (#1576)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("submit is disabled mid-composition and form submit is a no-op", async () => {
+    const { onGrade } = renderLocaleCard({ locale: "ja" });
+    const input = screen.getByRole("textbox");
+
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "ふしぎだね" } });
+
+    // The submit button is disabled while composing.
+    expect(screen.getByRole("button", { name: /submit/i })).toBeDisabled();
+
+    // A form submit (e.g. Enter confirming an IME candidate) is ignored.
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+    await act(async () => {});
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    expect(onGrade).not.toHaveBeenCalled();
+    expect(input).toBeInTheDocument();
+
+    // Composition ends: submit re-enables and grading works.
+    fireEvent.compositionEnd(input);
+    expect(screen.getByRole("button", { name: /submit/i })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    await act(async () => {});
+    act(() => { vi.advanceTimersByTime(FEEDBACK_HOLD_MS); });
+    expect(onGrade).toHaveBeenCalledWith(4);
   });
 });
 
