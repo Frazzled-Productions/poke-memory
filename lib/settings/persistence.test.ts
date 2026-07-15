@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   loadSettings,
   saveSettings,
+  hasStoredSettings,
   DEFAULT_SETTINGS,
   DEFAULT_ONBOARDING,
   validateRemovedLocales,
@@ -1284,5 +1285,36 @@ describe('saveSettings / F44: pre-#1484 backup pokemonNameLocale preservation', 
     const loaded = loadSettings();
     // Should fall back to pokemonNameLocale rather than writing undefined.
     expect(loaded.pokemonNameLocale).toBe('ja');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hasStoredSettings
+// ---------------------------------------------------------------------------
+
+describe('hasStoredSettings', () => {
+  it('returns false when nothing has been saved', () => {
+    expect(hasStoredSettings()).toBe(false);
+  });
+
+  it('returns true after saveSettings has written a record', () => {
+    saveSettings(DEFAULT_SETTINGS);
+    expect(hasStoredSettings()).toBe(true);
+  });
+
+  // #1952: some browser configurations (e.g. Windows with site data/cookies
+  // blocked) expose `window.localStorage` as `null` rather than merely
+  // absent - a direct `.getItem` call throws. hasStoredSettings must degrade
+  // to `false` and never throw.
+  it('returns false and does not throw when window.localStorage is null', () => {
+    vi.stubGlobal('window', { localStorage: null, dispatchEvent: vi.fn() });
+    vi.stubGlobal('localStorage', null);
+
+    expect(() => hasStoredSettings()).not.toThrow();
+    expect(hasStoredSettings()).toBe(false);
+
+    // Restore the shared mock for subsequent tests in this file.
+    vi.stubGlobal('window', { localStorage: mockLocalStorage, dispatchEvent: vi.fn() });
+    vi.stubGlobal('localStorage', mockLocalStorage);
   });
 });

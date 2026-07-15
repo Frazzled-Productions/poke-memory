@@ -179,6 +179,27 @@ describe("usePastureMasteryState - SETTINGS_SAVED_EVENT re-derivation", () => {
   });
 });
 
+describe("usePastureMasteryState - null localStorage (#1952)", () => {
+  it("falls back to the full IDB check without throwing when window.localStorage is null", async () => {
+    Object.defineProperty(window, "localStorage", {
+      value: null,
+      configurable: true,
+      writable: true,
+    });
+    mockLoadSession.mockResolvedValue({ cards: [{ id: 1 }] });
+    mockFilterMastered.mockReturnValue([{ id: 1 }]);
+
+    let result: { current: { showPasture: boolean } };
+    expect(() => {
+      ({ result } = renderHook(() => usePastureMasteryState()));
+    }).not.toThrow();
+
+    await waitFor(() => {
+      expect(result.current.showPasture).toBe(true);
+    });
+  });
+});
+
 describe("usePastureMasteryState - epoch catch-up guard", () => {
   it("schedules a rAF load when the write epoch has advanced since last attach", async () => {
     // Advance the epoch to simulate a write that happened before the effect
