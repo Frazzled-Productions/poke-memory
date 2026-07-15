@@ -529,6 +529,7 @@
     "cardTypeReverse": "反向",
     "cardTypeCry": "叫声",
     "cardTypeReverseEvo": "反向进化",
+    "randomEvolutionNote": "<preEvoTag>{preEvoName}</preEvoTag>的进化是随机的：它可能进化成<firstTag>{firstName}</firstTag>或<secondTag>{secondName}</secondTag>。",
     "graduatedHint": "复习仅针对已毕业的卡片，因此某一方向可能占主导。仍在学习步骤中的卡片在单独的队列中等待。",
     "todayNew": "新卡",
     "todayReviewed": "已复习",
