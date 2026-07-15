@@ -710,7 +710,9 @@
     "lockedSectionHint": "掌握这只宝可梦后解锁。",
     "loadingAriaLabel": "正在加载 Pokédex",
     "allPokemonAriaLabel": "宝可梦列表",
-    "generationPokemonAriaLabel": "{name}的宝可梦"
+    "generationPokemonAriaLabel": "{name}的宝可梦",
+    "firstReviewed": "首次学习: {date}",
+    "mastered": "已掌握"
   },
   "pasture": {
     "title": "牧场",

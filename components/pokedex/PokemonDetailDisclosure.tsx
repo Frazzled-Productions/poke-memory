@@ -28,6 +28,8 @@ import { computeSpeciesLegStatuses } from "@/lib/stats/legStatus";
 import type { SpeciesLegStatus } from "@/lib/stats/legStatus";
 import { LegStatusText } from "@/components/ui/LegStatusText";
 import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
+import { loadSettings } from "@/lib/settings/persistence";
+import { formatDate, detectDateFormat, detectTimezone, type DateFormat } from "@/lib/utils/format-date";
 
 function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
@@ -60,6 +62,41 @@ function useSpeciesLegStatus(speciesId: number, locale: string): SpeciesLegStatu
   }, [speciesId, locale]);
 
   return status;
+}
+
+/**
+ * Loads the session and reads `firstSeen` off the species' name card (#1948).
+ *
+ * "For name cards, the card id IS the species id" (see
+ * `computeSpeciesLegStatuses`) - so this filters on `card.id === speciesId`
+ * and the active Pokémon-name locale, mirroring `useSpeciesLegStatus`.
+ *
+ * Deliberately gated on `firstSeen !== null` directly by the caller, NOT on
+ * card class - `firstSeen` is set on the first grade even during a learning
+ * step when `lastReview` is still null, so a just-started species should show
+ * its first-reviewed date immediately.
+ *
+ * Returns null while loading, when the species has no cards, or when the
+ * name card has never been graded.
+ */
+function useFirstReviewedDate(speciesId: number, locale: string): string | null {
+  const [firstSeen, setFirstSeen] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadSession().then((session) => {
+      if (cancelled || session === null) return;
+      const nameCard = session.cards.find(
+        (c) => c.cardType === "name" && c.id === speciesId && (c.locale ?? "en") === locale,
+      );
+      setFirstSeen(nameCard?.state.firstSeen ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [speciesId, locale]);
+
+  return firstSeen;
 }
 
 /**
@@ -291,6 +328,15 @@ export function PokemonDetailDisclosure({
   // (hooks must not be conditional). Suppressed in render when pretendAllMastered
   // is on or the species is locked/pending.
   const legStatus = useSpeciesLegStatus(pokemon.speciesId, pokemonLocale);
+  // First-reviewed date (#1948) - real `firstSeen` timestamp off the name
+  // card, never fabricated even under pretendAllMastered (see hook doc).
+  const firstSeen = useFirstReviewedDate(pokemon.speciesId, pokemonLocale);
+  // Regional prefs for date rendering, resolved the same way as
+  // useNextReviewDate.ts / app/stats/page.tsx: stored setting first, browser
+  // detection as the fallback. Lazy `useState` initializer keeps this a
+  // one-off synchronous read (no flicker from an async effect).
+  const [dateFormat] = useState<DateFormat>(() => loadSettings().dateFormat ?? detectDateFormat());
+  const [timezone] = useState<string>(() => loadSettings().timezone ?? detectTimezone());
   // Resolve locale-aware name for audio buttons on the main species heading.
   // Falls back to `name` synchronously until the locale sidecar loads (#1327).
   // eslint-disable-next-line no-restricted-syntax -- displayName is the English-fallback arg to useLocalePokemonName, not a direct render
@@ -438,6 +484,29 @@ export function PokemonDetailDisclosure({
               : t("nextReviewInDays", { count: nextReview.days })}
           </p>
         )}
+
+      {/* Journey line (#1948): first-reviewed date + a "Mastered" badge.
+          "First reviewed" is gated on the real `firstSeen` timestamp
+          directly (not on card class) so a species mid-way through its
+          first learning step still shows the date. The Mastered badge
+          reflects CURRENT mastery (same source as the tile colour) rather
+          than a stored "mastered on" date, which isn't reliably tracked and
+          would drift to "last reviewed" if derived - it correctly
+          disappears again if the species lapses. */}
+      {!isLocked && !isPending && (firstSeen !== null || isMasteredCard) && (
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          {firstSeen !== null && (
+            <span className={mutedTextXs}>
+              {t("firstReviewed", { date: formatDate(firstSeen, dateFormat, timezone) })}
+            </span>
+          )}
+          {isMasteredCard && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+              {t("mastered")}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Per-direction leg status (#1766). Shown only when the species is
           learning/mastered and pretendAllMastered is off - faked mastery

@@ -710,7 +710,9 @@
     "lockedSectionHint": "[Unlocks when you master this Pokémon.]",
     "loadingAriaLabel": "[Loading Pokédex]",
     "allPokemonAriaLabel": "[Pokémon]",
-    "generationPokemonAriaLabel": "[{name} Pokémon]"
+    "generationPokemonAriaLabel": "[{name} Pokémon]",
+    "firstReviewed": "[First reviewed {date}]",
+    "mastered": "[Mastered]"
   },
   "pasture": {
     "title": "[Pasture]",
