@@ -484,6 +484,8 @@
     "doneForToday": "今天到此为止",
     "keepReviewing": "继续复习",
     "dueTomorrow": "明天有 {count} 张卡片到期",
+    "dueAndNewTomorrow": "明天有 {count} 项复习 + {newCount} 张新卡片",
+    "newTomorrow": "明天有 {newCount} 张新卡片",
     "nextCardIn": "下一张卡片",
     "nextCardHangTight": "稍等，学习卡片即将准备好。",
     "reveal": "翻牌",
@@ -639,7 +641,11 @@
       "backToSummaryAriaLabel": "返回本局总结",
       "barStreakAriaLabel": "连续{count}天",
       "barDueTomorrow": "明天{count}张",
-      "barDueTomorrowAriaLabel": "明天有{count}张卡片到期"
+      "barDueTomorrowAriaLabel": "明天有{count}张卡片到期",
+      "barDueAndNewTomorrow": "明天{count}+{newCount}",
+      "barDueAndNewTomorrowAriaLabel": "明天有 {count} 项复习和 {newCount} 张新卡片",
+      "barNewTomorrow": "+{newCount}张新卡片",
+      "barNewTomorrowAriaLabel": "明天有 {newCount} 张新卡片"
     },
     "typedEntry": {
       "inputAriaLabel": "输入宝可梦的名字",

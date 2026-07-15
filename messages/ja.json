@@ -484,6 +484,8 @@
     "doneForToday": "今日はここまで",
     "keepReviewing": "レビューを続ける",
     "dueTomorrow": "{count}枚のカードが明日期限切れ",
+    "dueAndNewTomorrow": "明日は復習{count}件 + 新規{newCount}匹",
+    "newTomorrow": "明日は新規{newCount}匹",
     "nextCardIn": "次のカードまで",
     "nextCardHangTight": "もうすぐ学習カードが準備できます。",
     "reveal": "めくる",
@@ -639,7 +641,11 @@
       "backToSummaryAriaLabel": "セッションサマリーに戻る",
       "barStreakAriaLabel": "{count}日連続",
       "barDueTomorrow": "明日{count}枚",
-      "barDueTomorrowAriaLabel": "明日{count}枚のカードが期限切れ"
+      "barDueTomorrowAriaLabel": "明日{count}枚のカードが期限切れ",
+      "barDueAndNewTomorrow": "明日{count}件+{newCount}匹",
+      "barDueAndNewTomorrowAriaLabel": "明日は復習{count}件と新規{newCount}匹が予定されています",
+      "barNewTomorrow": "+新規{newCount}匹",
+      "barNewTomorrowAriaLabel": "明日は新規{newCount}匹が予定されています"
     },
     "typedEntry": {
       "inputAriaLabel": "ポケモンの名前を入力",
