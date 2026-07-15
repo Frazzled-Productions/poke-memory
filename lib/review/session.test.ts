@@ -4,6 +4,7 @@ import {
   buildSession,
   buildSessionQueues,
   countDueTomorrow,
+  countNewTomorrow,
   limitBucket,
   cardTypeIsEnabled,
   groupNewCandidatesBySpecies,
@@ -1596,6 +1597,105 @@ describe('countDueTomorrow', () => {
       }),
     ];
     expect(countDueTomorrow(cards, TOMORROW)).toBe(1);
+  });
+});
+
+describe('countNewTomorrow', () => {
+  const limits: DailyLimits = {
+    name: { maxNewPerDay: 2, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+    reverse: { maxNewPerDay: 3, maxReviewsPerDay: 100 },
+    cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  };
+
+  function reverseCard(pokemonId: number, overrides: Partial<SeedPokemon> = {}): ReverseReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId, overrides),
+      id: REVERSE_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'reverse',
+      subjectKey: String(pokemonId),
+      state: initialReviewState(NOW),
+    };
+  }
+
+  it('returns 0 for an empty card list', () => {
+    expect(countNewTomorrow([], limits)).toBe(0);
+  });
+
+  it('counts only the canonical (name) type and caps at maxNewPerDay - not summed across directions', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1)),
+      makeCard(makeSeedPokemon(2)),
+      makeCard(makeSeedPokemon(3)),
+      reverseCard(1),
+      reverseCard(2),
+      reverseCard(3),
+      reverseCard(4),
+      reverseCard(5),
+    ];
+    // 3 fresh name cards, cap is 2 -> min(2, 3) = 2. Must NOT be 4 (uncapped)
+    // and must NOT be 8 (summed across name + reverse).
+    expect(countNewTomorrow(cards, limits, { nameEnabled: true, reverseEnabled: true })).toBe(2);
+  });
+
+  it('returns poolSize when the pool is smaller than the cap', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1)),
+    ];
+    expect(countNewTomorrow(cards, limits)).toBe(1);
+  });
+
+  it('falls through to reverse when name is disabled', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1)),
+      makeCard(makeSeedPokemon(2)),
+      reverseCard(1),
+      reverseCard(2),
+      reverseCard(3),
+      reverseCard(4),
+    ];
+    // name disabled -> canonical type is reverse (cap 3); pool of 4 -> capped at 3.
+    expect(
+      countNewTomorrow(cards, limits, { nameEnabled: false, reverseEnabled: true }),
+    ).toBe(3);
+  });
+
+  it('returns 0 when none of name/reverse/cry is enabled (evolution-only practice)', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1)),
+    ];
+    expect(
+      countNewTomorrow(cards, limits, { nameEnabled: false, reverseEnabled: false, cryEnabled: false }),
+    ).toBe(0);
+  });
+
+  it('gates on activeLocale, excluding cards for other locales', () => {
+    const cards: ReviewableCard[] = [
+      { ...makeCard(makeSeedPokemon(1)), locale: 'en' },
+      { ...makeCard(makeSeedPokemon(2)), locale: 'ja' },
+      { ...makeCard(makeSeedPokemon(3)), locale: 'ja' },
+    ];
+    expect(countNewTomorrow(cards, limits, {}, undefined, 'en')).toBe(1);
+    expect(countNewTomorrow(cards, limits, {}, undefined, 'ja')).toBe(2);
+  });
+
+  it('shrinks the count via eligibleCardIds', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1)),
+      makeCard(makeSeedPokemon(2)),
+      makeCard(makeSeedPokemon(3)),
+    ];
+    // Cap is 2, but scope narrows the eligible pool to just id=1.
+    expect(countNewTomorrow(cards, limits, {}, new Set([1]))).toBe(1);
+  });
+
+  it('ignores cards already introduced (lastReview !== null)', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(1), { lastReview: '2026-05-09' }),
+      makeCard(makeSeedPokemon(2)),
+    ];
+    expect(countNewTomorrow(cards, limits)).toBe(1);
   });
 });
 

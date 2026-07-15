@@ -484,6 +484,8 @@
     "doneForToday": "[Done for today]",
     "keepReviewing": "[Keep reviewing]",
     "dueTomorrow": "[{count, plural, one {1 card} other {{count} cards}} due tomorrow]",
+    "dueAndNewTomorrow": "[{count, plural, one {1 review} other {{count} reviews}} + {newCount, plural, one {1 new card} other {{newCount} new cards}} due tomorrow]",
+    "newTomorrow": "[{newCount, plural, one {1 new card} other {{newCount} new cards}} due tomorrow]",
     "nextCardIn": "[Next card in]",
     "nextCardHangTight": "[Hang tight, a learning card will be ready shortly.]",
     "reveal": "[Reveal]",
@@ -640,7 +642,11 @@
       "backToSummaryAriaLabel": "[Back to session summary]",
       "barStreakAriaLabel": "[{count, plural, one {# day streak} other {# days streak}}]",
       "barDueTomorrow": "[{count} tomorrow]",
-      "barDueTomorrowAriaLabel": "[{count, plural, one {# card due tomorrow} other {# cards due tomorrow}}]"
+      "barDueTomorrowAriaLabel": "[{count, plural, one {# card due tomorrow} other {# cards due tomorrow}}]",
+      "barDueAndNewTomorrow": "[{count} + {newCount} tomorrow]",
+      "barDueAndNewTomorrowAriaLabel": "[{count, plural, one {# review} other {# reviews}} and {newCount, plural, one {# new card} other {# new cards}} due tomorrow]",
+      "barNewTomorrow": "[+{newCount} new tomorrow]",
+      "barNewTomorrowAriaLabel": "[{newCount, plural, one {# new card} other {# new cards}} due tomorrow]"
     },
     "typedEntry": {
       "inputAriaLabel": "[Type the Pokémon name]",
