@@ -527,7 +527,7 @@ type EndOfSessionVariant =
  * Single component that covers all three end-of-session states:
  * "all caught up" (SESSION_COMPLETE), "new cards locked" (NEW_CARDS_LOCKED),
  * and "daily review limit reached" (REVIEW_SOFT_WALL). Shared affordances - 
- * the "N cards due tomorrow" teaser (#914), the TodayPill, the Share button,
+ * the "N reviews due tomorrow" teaser (#914), the TodayPill, the Share button,
  * and the card-types onboarding nudge - render on every variant when applicable.
  */
 function EndOfSessionScreen({
