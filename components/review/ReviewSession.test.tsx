@@ -1703,6 +1703,31 @@ describe("Practice scope: completed-scope end state persists across remount (#17
     ).toBeInTheDocument();
   });
 
+  it("shows the daily spotlight on the unscoped all-caught-up end-of-session screen (#1949)", async () => {
+    const card = makeReviewedTodayCard();
+    const reverseCard = makeGraduatedReverseCard(1);
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [card, reverseCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...scopedSettings(),
+      practiceScope: { gens: [], types: [], presets: [] },
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/pokémon of the day/i)).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: /reveal the name/i })).toBeInTheDocument();
+  });
+
   it("does NOT show the clear-filter button when no scope is active on the end-of-session screen", async () => {
     // Empty seed → immediate SESSION_COMPLETE with no scope.
     mockSeedPokemon.mockReturnValue([]);
@@ -1818,8 +1843,11 @@ describe("Practice scope: completed-scope end state persists across remount (#17
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
     });
+    // Exact match: the practice card's "Reveal" button must be gone. A loose
+    // /reveal/i match would also catch the end-of-session daily spotlight's
+    // "Reveal the name" button (#1949), which is expected to be present here.
     expect(
-      screen.queryByRole("button", { name: /reveal/i }),
+      screen.queryByRole("button", { name: /^reveal$/i }),
     ).not.toBeInTheDocument();
 
     // The clear-filter affordance must still be present.
@@ -4636,9 +4664,11 @@ describe("ReviewSession per-locale session (#1562)", () => {
 
     renderWithIntl(<ReviewSession />);
 
-    // No Reveal button - no en card is due.
+    // No Reveal button - no en card is due. Exact match: a loose /reveal/i
+    // match would also catch the end-of-session daily spotlight's "Reveal
+    // the name" button (#1949), which may legitimately be present here.
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^reveal$/i })).not.toBeInTheDocument();
     });
   });
 
