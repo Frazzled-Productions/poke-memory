@@ -6,6 +6,22 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.7] - 2026-07-15
+
+### Added
+
+- Verified typed entry now works for Japanese and Chinese learning languages: answers are graded against the native-script name, with romanised input (romaji / pinyin) accepted in the default lenient mode. A new answer-matching setting under Practice switches between lenient and native-script-only strict matching, and the reveal always shows both the native script and the romanisation.
+
+### Changed
+
+- The daily Web Push reminder route now reads through two SECURITY DEFINER RPCs (`get_push_targets`, `get_push_due_cards`, migration 046) instead of raw service-role table SELECTs, narrowing its cross-user read surface to the functions' explicit return contracts.
+- Extracted four duplicated code patterns into single-source helpers (weekly code-quality digest #1906, items 2-5): the persisted-queue push + session-fallback engine shared by the sync retry and reconnect hooks (`lib/sync/pushWithFallback.ts`), the `getUser()` + 401 guard used by authenticated API routes (`lib/auth/requireAuth.ts`), the JSON-body parse guard used by POST API routes (`lib/api/parseJsonBody.ts`), and the inline section-heading Tailwind literal now routed through `sectionHeadingSm`. No behaviour change.
+
+### Fixed
+
+- Weekly workflow digest cron no longer dies at the agent turn cap: the 30-day signal gather (retro comments, review feedback, WIP commits, merged-PR bodies) is pre-fetched deterministically in a shell step and the agent reads prepared files.
+- Journey milestone banner now reads as a crossed achievement ("Milestone reached: 100 Pokémon mastered!") instead of a bare number that looked like a wrong live count, and its banner and share text are localised in all four app locales.
+
 ## [0.11.6] - 2026-07-14
 
 ### Added
@@ -1824,7 +1840,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.6...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.7...HEAD
+[0.11.7]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.7
 [0.11.6]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.6
 [0.11.5]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.5
 [0.11.4]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.4
