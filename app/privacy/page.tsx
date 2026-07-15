@@ -170,7 +170,11 @@ export default async function PrivacyPage() {
             We record which calendar dates you completed at least one review.
             This is stored in a <code>streak_days</code> table and used to
             calculate your review streak. It is an append-only log: dates are
-            never removed except by a full progress reset.
+            never removed except by a full progress reset. If you have turned
+            on the streak reminder (see Web Push subscriptions below), this
+            table is also read server-side, late in your local day, to decide
+            whether you have an active streak and have not yet reviewed
+            today.
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
@@ -200,12 +204,16 @@ export default async function PrivacyPage() {
             table, scoped to your account.
           </p>
           <p className="mt-2">
-            We use these values for one purpose only: to send a single daily
-            notification when you have Pokémon cards due for review. The
-            subscription is deleted as soon as you turn the toggle off, when
-            you delete your account, or when your browser or operating system
-            invalidates the endpoint. No notification content includes
-            personal data beyond the count of cards waiting for review.
+            We use these values to send Web Push notifications: a daily
+            reminder when you have Pokémon cards due for review, and, if you
+            have an active review streak and have separately turned on the
+            streak reminder toggle, an additional late-day reminder if you
+            have not yet reviewed that day. You will never receive more than
+            two notifications in a day. The subscription is deleted as soon as
+            you turn the daily reminder toggle off, when you delete your
+            account, or when your browser or operating system invalidates the
+            endpoint. No notification content includes personal data beyond
+            the count of cards waiting for review.
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">

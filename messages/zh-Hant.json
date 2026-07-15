@@ -408,7 +408,13 @@
     },
     "loadingAriaLabel": "載入設定中",
     "pushOptIn": {
-      "ariaLabel": "每日複習提醒"
+      "ariaLabel": "每日複習提醒",
+      "streakNudge": {
+        "label": "連勝提醒",
+        "description": "如果你當天還沒有練習，我們會在當天稍晚再溫柔地提醒你一次，幫助你繼續保持連勝。",
+        "ariaLabel": "連勝提醒",
+        "disabledHint": "請先開啟「每日複習提醒」"
+      }
     },
     "qaSeed": {
       "applyAriaLabel": "套用 QA 種子：{scenario}",
@@ -1247,5 +1253,9 @@
       "fixed": "修復",
       "security": "安全"
     }
+  },
+  "pushStreak": {
+    "title": "繼續保持連勝",
+    "body": "{days, plural, other {你已經連續練習了#天。今天再練一會兒，就能繼續保持。}}"
   }
 }

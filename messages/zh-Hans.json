@@ -408,7 +408,13 @@
     },
     "loadingAriaLabel": "加载设置中",
     "pushOptIn": {
-      "ariaLabel": "每日复习提醒"
+      "ariaLabel": "每日复习提醒",
+      "streakNudge": {
+        "label": "连胜提醒",
+        "description": "如果你当天还没有练习，我们会在当天稍晚再温柔地提醒你一次，帮助你继续保持连胜。",
+        "ariaLabel": "连胜提醒",
+        "disabledHint": "请先开启“每日复习提醒”"
+      }
     },
     "qaSeed": {
       "applyAriaLabel": "应用 QA 种子：{scenario}",
@@ -1247,5 +1253,9 @@
       "fixed": "修复",
       "security": "安全"
     }
+  },
+  "pushStreak": {
+    "title": "继续保持连胜",
+    "body": "{days, plural, other {你已经连续练习了#天。今天再练一会儿，就能继续保持。}}"
   }
 }

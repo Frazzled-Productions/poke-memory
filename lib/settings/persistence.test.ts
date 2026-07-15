@@ -183,6 +183,7 @@ describe('loadSettings migration', () => {
       pushNotificationHour: 20,
       dismissedMtBannerLocales: ['ja', 'zh-Hans'],
       removedLocales: ['zh-Hant' as const],
+      streakNudgeEnabled: true,
     };
     saveSettings(custom);
     const loaded = loadSettings();
@@ -238,6 +239,27 @@ describe('loadSettings: typedEntryOnboardingShown / mcCardOnboardingShown (#1271
   it('non-boolean value falls back to false for mcCardOnboardingShown', () => {
     mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ mcCardOnboardingShown: 'yes' }));
     expect(loadSettings().mcCardOnboardingShown).toBe(false);
+  });
+});
+
+describe('loadSettings: streakNudgeEnabled (#1950)', () => {
+  it('DEFAULT_SETTINGS has streakNudgeEnabled: false', () => {
+    expect(DEFAULT_SETTINGS.streakNudgeEnabled).toBe(false);
+  });
+
+  it('defaults to false when the field is absent (back-fill for pre-#1950 records)', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({}));
+    expect(loadSettings().streakNudgeEnabled).toBe(false);
+  });
+
+  it('round-trips streakNudgeEnabled: true', () => {
+    saveSettings({ ...DEFAULT_SETTINGS, streakNudgeEnabled: true });
+    expect(loadSettings().streakNudgeEnabled).toBe(true);
+  });
+
+  it('non-boolean value falls back to false for streakNudgeEnabled', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({ streakNudgeEnabled: 'yes' }));
+    expect(loadSettings().streakNudgeEnabled).toBe(false);
   });
 });
 

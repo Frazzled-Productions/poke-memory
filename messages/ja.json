@@ -408,7 +408,13 @@
     },
     "loadingAriaLabel": "設定を読み込み中",
     "pushOptIn": {
-      "ariaLabel": "毎日のレビューリマインダー"
+      "ariaLabel": "毎日のレビューリマインダー",
+      "streakNudge": {
+        "label": "ストリークリマインダー",
+        "description": "まだ練習していない場合、その日の後半にもう一度やさしく通知して、ストリークを続けられるようお手伝いします。",
+        "ariaLabel": "ストリークリマインダー",
+        "disabledHint": "まず「毎日のレビューリマインダー」をオンにしてください"
+      }
     },
     "qaSeed": {
       "applyAriaLabel": "QA シードを適用: {scenario}",
@@ -1247,5 +1253,9 @@
       "fixed": "修正",
       "security": "セキュリティ"
     }
+  },
+  "pushStreak": {
+    "title": "ストリークを続けよう",
+    "body": "{days, plural, other {#日連続で練習中です。今日も少し練習すれば、続けられます。}}"
   }
 }
