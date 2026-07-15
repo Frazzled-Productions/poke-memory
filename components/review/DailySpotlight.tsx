@@ -58,10 +58,15 @@ export function DailySpotlight({ timezone }: Props) {
   // eslint-disable-next-line no-restricted-syntax -- English-fallback argument to useLocalePokemonName, not a render value.
   const localeName = useLocalePokemonName(species?.speciesId, species?.displayName ?? "");
 
-  if (species === null || !factsReady) return null;
+  if (species === null) return null;
 
-  const facts: PokemonFact[] = getPokemonFacts(species);
-  const fact = pickDailyFact(dateStr, facts);
+  // Render the heading, sprite and reveal immediately - they need no flavour
+  // data. Only the fact line waits for the lazy flavour-text load, so the
+  // spotlight never blocks its whole render on a slow fetch (which made the
+  // heading flaky on CI webkit prod builds, and delayed the whole card for
+  // real users on a cold cache). The fact fills in once ready.
+  const facts: PokemonFact[] = factsReady ? getPokemonFacts(species) : [];
+  const fact = factsReady ? pickDailyFact(dateStr, facts) : null;
 
   return (
     <div className={`${cardPanelPadded} flex w-full max-w-xs flex-col items-center gap-2 text-center`}>

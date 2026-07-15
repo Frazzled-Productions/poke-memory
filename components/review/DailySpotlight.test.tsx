@@ -135,6 +135,14 @@ describe("DailySpotlight", () => {
     mockSeed.mockReturnValue({ seed: { seedPokemon: [makeBulbasaur()] } });
     renderSpotlight();
 
+    // The heading, sprite and reveal control render immediately - they are NOT
+    // gated on the async flavour-text load (only the fact line is). This guards
+    // the #1949 fix that stopped the spotlight blocking its whole render on a
+    // slow flavour-text fetch (which made the heading flaky on CI webkit).
+    expect(screen.getByText(/pokémon of the day/i)).toBeInTheDocument();
+    expect(screen.getByRole("img")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reveal the name/i })).toBeInTheDocument();
+
     await waitFor(() => {
       expect(screen.getByRole("img")).toBeInTheDocument();
     });
