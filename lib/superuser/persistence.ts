@@ -59,16 +59,19 @@ export const DEFAULT_FLAGS: SuperuserFlags = {
 };
 
 export function isUnlocked(): boolean {
-  // Raw string "true" - not JSON, so read directly rather than via readLocalStorage.
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(UNLOCKED_KEY) === "true";
+  // Raw string "true" - not JSON, so read via readLocalStorage's raw-string form.
+  return readLocalStorage(UNLOCKED_KEY, (raw) => raw === "true", false);
 }
 
 export function setUnlocked(value: boolean): void {
   if (value) writeLocalStorageRaw(UNLOCKED_KEY, "true");
   else {
     if (typeof window === "undefined") return;
-    localStorage.removeItem(UNLOCKED_KEY);
+    try {
+      localStorage.removeItem(UNLOCKED_KEY);
+    } catch {
+      // Private browsing / storage unavailable - non-fatal.
+    }
   }
 }
 
@@ -95,7 +98,11 @@ export function saveFlags(flags: SuperuserFlags): void {
 
 export function clearFlags(): void {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(FLAGS_KEY);
+  try {
+    localStorage.removeItem(FLAGS_KEY);
+  } catch {
+    // Private browsing / storage unavailable - non-fatal.
+  }
 }
 
 export function anyFlagTrue(flags: SuperuserFlags): boolean {
@@ -110,7 +117,11 @@ export function anyFlagTrue(flags: SuperuserFlags): boolean {
 // until exitCleanup completes successfully, preventing QA-seeded data from
 // reaching Supabase during a degraded or in-progress cleanup.
 export function isAnyFlagOn(): boolean {
-  if (typeof window === "undefined") return false;
-  if (localStorage.getItem(KEY_SUPERUSER_CLEANUP_PENDING) === "true") return true;
+  const cleanupPending = readLocalStorage(
+    KEY_SUPERUSER_CLEANUP_PENDING,
+    (raw) => raw === "true",
+    false,
+  );
+  if (cleanupPending) return true;
   return anyFlagTrue(loadFlags());
 }

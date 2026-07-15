@@ -7,6 +7,7 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { SETTINGS_SAVED_EVENT } from "@/lib/settings/persistence";
 import { KEY_HAS_MASTERED } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 
 /**
  * Derives whether the user has at least one mastered species, which controls
@@ -76,7 +77,7 @@ export function usePastureMasteryState(): { showPasture: boolean } {
     // so that threshold changes (via SETTINGS_SAVED_EVENT) are always reflected
     // correctly.
     async function load() {
-      if (localStorage.getItem(KEY_HAS_MASTERED) === "true") {
+      if (readLocalStorage(KEY_HAS_MASTERED, (raw) => raw === "true", false)) {
         setHasMastered(true);
         return;
       }

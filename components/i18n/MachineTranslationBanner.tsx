@@ -34,6 +34,8 @@ import { useAppLocale } from "@/lib/i18n/useAppLocale";
 import { LOCALE_ENDONYMS } from "@/i18n/locales";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { mtBannerDismissedKey } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
 
 export function MachineTranslationBanner() {
   const t = useTranslations("banner");
@@ -47,14 +49,15 @@ export function MachineTranslationBanner() {
     // paint are consistent. Without this guard the server renders the banner
     // open (it has no localStorage), and the client immediately hides it - 
     // producing a visible flash.
-    const stored = localStorage.getItem(mtBannerDismissedKey(locale));
-    setDismissed(stored === "1");
+    setDismissed(
+      readLocalStorage(mtBannerDismissedKey(locale), (raw) => raw === "1", false),
+    );
   }, [locale]);
 
   function handleDismiss() {
     // Write the standalone key (fast synchronous read path - component never
     // changes its useEffect to read from settings directly).
-    localStorage.setItem(mtBannerDismissedKey(locale), "1");
+    writeLocalStorageRaw(mtBannerDismissedKey(locale), "1");
     setDismissed(true);
 
     // Also persist in UserSettings so the dismissal syncs to other devices via

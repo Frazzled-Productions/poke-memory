@@ -17,6 +17,7 @@
 
 import { useEffect } from "react";
 import { KEY_PERSIST_REQUESTED } from "@/lib/storage/keys";
+import { readLocalStorage } from "@/lib/storage/readLocalStorage";
 import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
 
 export function usePersistentStorage(): void {
@@ -33,7 +34,7 @@ export function usePersistentStorage(): void {
 
     // Avoid a redundant request on every mount. One successful grant is
     // permanent for the origin (until the user revokes it via browser settings).
-    if (localStorage.getItem(KEY_PERSIST_REQUESTED) === "true") {
+    if (readLocalStorage(KEY_PERSIST_REQUESTED, (raw) => raw === "true", false)) {
       return;
     }
 

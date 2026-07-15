@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   isUnlocked,
   setUnlocked,
@@ -245,5 +245,65 @@ describe("isAnyFlagOn - cleanup-pending marker (#1854 F16)", () => {
     // Simulate a failed cleanup: marker is left set (the catch branch logs but
     // does NOT removeItem). Writes must remain suppressed.
     expect(isAnyFlagOn()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// null localStorage (#1952) - some browser configurations (e.g. Windows with
+// site data/cookies blocked) expose `window.localStorage` as `null` rather
+// than merely absent; a direct `.getItem`/`.setItem`/`.removeItem` call
+// throws. Every read here must degrade to its safe default and every write
+// must swallow the error, WITHOUT throwing.
+// ---------------------------------------------------------------------------
+
+describe("null localStorage (#1952)", () => {
+  // Captured fresh in beforeEach (not at module-load time) - the outer
+  // top-level beforeEach runs first on each test and (re)installs the
+  // polyfilled localStorage/window, so we stash THAT before nulling it out.
+  let realLocalStorage: Storage | undefined;
+  let realWindow: typeof globalThis.window | undefined;
+
+  beforeEach(() => {
+    realLocalStorage = globalThis.localStorage;
+    realWindow = globalThis.window;
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: null,
+    });
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { localStorage: null },
+    });
+  });
+
+  afterEach(() => {
+    // Restore the polyfilled localStorage/window so subsequent describe
+    // blocks (and their own beforeEach) are not polluted by the null stub.
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: realLocalStorage,
+    });
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: realWindow,
+    });
+  });
+
+  it("isUnlocked() returns false (locked) and does not throw", () => {
+    expect(() => isUnlocked()).not.toThrow();
+    expect(isUnlocked()).toBe(false);
+  });
+
+  it("isAnyFlagOn() returns false and does not throw - the sync write-guard must default to not-paused when storage is unavailable", () => {
+    expect(() => isAnyFlagOn()).not.toThrow();
+    expect(isAnyFlagOn()).toBe(false);
+  });
+
+  it("setUnlocked(false) does not throw", () => {
+    expect(() => setUnlocked(false)).not.toThrow();
+  });
+
+  it("clearFlags() does not throw", () => {
+    expect(() => clearFlags()).not.toThrow();
   });
 });
