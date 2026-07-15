@@ -1419,3 +1419,254 @@ test.describe("Pokédex detail - game-label facts (#1559)", () => {
     await expect(page.getByText("Pokédex entry")).not.toBeVisible();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Pokédex detail - journey line: first-reviewed date + Mastered badge (#1948)
+// ---------------------------------------------------------------------------
+
+/**
+ * Seeds `dateFormat: "dmy"` and `timezone: "UTC"` into the settings key so the
+ * journey line's `formatDate` output is deterministic across CI locales
+ * (mirrors the merge pattern `setLocale` uses above for the same key).
+ */
+async function setDeterministicDateSettings(page: Page): Promise<void> {
+  await page.addInitScript(({ key }: { key: string }) => {
+    try {
+      const raw = localStorage.getItem(key);
+      let existing: Record<string, unknown> = {};
+      if (raw !== null) {
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (typeof parsed === "object" && parsed !== null) {
+            existing = parsed as Record<string, unknown>;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      const merged = {
+        ...existing,
+        dateFormat: "dmy",
+        timezone: "UTC",
+      };
+      localStorage.setItem(key, JSON.stringify(merged));
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, { key: SETTINGS_KEY });
+}
+
+test.describe("Pokédex detail - journey line (#1948)", () => {
+  test("started (non-mastered) species shows 'First reviewed' and no Mastered badge", async ({
+    page,
+  }) => {
+    await setDeterministicDateSettings(page);
+    // Seed Bulbasaur (id=1) with a learning-only name card - firstSeen is set
+    // but reps/scheduledDays are below the mastery gate, so cardClass is
+    // "learning", not "mastered".
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-13",
+            firstSeen: "2026-05-13",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+    await expect(page.getByRole("heading", { name: "Bulbasaur" })).toBeVisible();
+
+    // Assert the "First reviewed" label renders; do NOT pin the exact
+    // formatted date ("Wed 13 May") - Intl date output differs by platform
+    // ICU (macOS vs CI Linux webkit), so an exact-string match is flaky on
+    // mobile-safari in CI. The label prefix is deterministic.
+    await expect(page.getByText(/First reviewed/)).toBeVisible();
+    // Scope to the journey-line container (the div holding "First reviewed")
+    // rather than a bare page-wide "Mastered" text match: the per-direction
+    // leg-status rows below also render the localised "Mastered" token, so an
+    // unscoped match is ambiguous once that section renders.
+    const journeyLine = page
+      .locator("div")
+      .filter({ hasText: "First reviewed" })
+      .last();
+    await expect(journeyLine.getByText("Mastered", { exact: true })).not.toBeVisible();
+  });
+
+  test("mastered species shows both 'First reviewed' and the Mastered badge", async ({
+    page,
+  }) => {
+    await setDeterministicDateSettings(page);
+    // Species-level mastery requires BOTH the name card and the paired reverse
+    // card to clear the FSRS gate (#1448) - same seed shape as the #1559 test
+    // above.
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 30,
+            difficulty: 4,
+            elapsedDays: 30,
+            scheduledDays: 30,
+            reps: 5,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-04-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+        {
+          id: 2_000_001,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "reverse",
+          state: {
+            stability: 30,
+            difficulty: 4,
+            elapsedDays: 30,
+            scheduledDays: 30,
+            reps: 5,
+            lapses: 0,
+            fsrsState: "review",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-01",
+            firstSeen: "2026-04-01",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+    await expect(page.getByRole("heading", { name: "Bulbasaur" })).toBeVisible();
+
+    // Assert the "First reviewed" label renders; do NOT pin the exact
+    // formatted date - Intl output differs by platform ICU (flaky on CI
+    // mobile-safari). The label prefix is deterministic.
+    await expect(page.getByText(/First reviewed/)).toBeVisible();
+    // Scope to the journey-line container - the per-direction leg-status rows
+    // below also render the localised "Mastered" token, so an unscoped match
+    // is ambiguous (multiple "Mastered" strings on a fully-mastered page).
+    const journeyLine = page
+      .locator("div")
+      .filter({ hasText: "First reviewed" })
+      .last();
+    await expect(journeyLine.getByText("Mastered", { exact: true })).toBeVisible();
+  });
+
+  test("never-seen (locked) species shows neither 'First reviewed' nor the Mastered badge", async ({
+    page,
+  }) => {
+    // Empty session - Bulbasaur is locked.
+    await seedSessionIdb(page, {
+      cards: [],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+
+    // Locked species: h1 shows the zero-padded dex number (#1734 / #1729).
+    await expect(
+      page.getByRole("heading", { level: 1, name: /^#\d{3} \(locked\)$/i }),
+    ).toBeVisible();
+    await expect(page.getByText(/First reviewed/)).not.toBeVisible();
+    await expect(page.getByText("Mastered", { exact: true })).not.toBeVisible();
+  });
+
+  test("Japanese app locale renders the localised 'First reviewed' label", async ({
+    page,
+    context,
+  }) => {
+    // Locale coverage (AGENTS.md "Names/labels in every locale"): the journey
+    // line's label text must be localised. This is the `appLocale` axis (UI
+    // chrome / interface language, set via the `poke-memory:locale` cookie -
+    // see i18n.spec.ts), NOT `pokemonNameLocale` (which only controls the
+    // rendered Pokémon name and is independent - #1259/#1327). `firstSeen` is
+    // locale-independent (earliest across all of the species' name cards), so
+    // the date shows regardless of the display locale (#1948).
+    await context.addCookies([
+      { name: "poke-memory:locale", value: "ja", domain: "localhost", path: "/" },
+    ]);
+    await setDeterministicDateSettings(page);
+    await seedSessionIdb(page, {
+      cards: [
+        {
+          id: 1,
+          name: "Bulbasaur",
+          spriteUrl: "/sprites/pokemon/1.png",
+          cardType: "name",
+          state: {
+            stability: 1,
+            difficulty: 5,
+            elapsedDays: 1,
+            scheduledDays: 1,
+            reps: 1,
+            lapses: 0,
+            fsrsState: "learning",
+            dueDate: "2099-01-01",
+            lastReview: "2026-05-13",
+            firstSeen: "2026-05-13",
+            learningStep: null,
+            stepStartedAt: null,
+          },
+        },
+      ],
+      limits: {
+        name: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        evolution: { maxNewPerDay: 5, maxReviewsPerDay: 50 },
+        reverse: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+        cry: { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+      },
+    });
+
+    await page.goto("/pokedex/1");
+    await awaitSeedIdb(page);
+    await expect(page.getByText("Bulbasaur")).toBeVisible();
+
+    // ja: messages/ja.json "firstReviewed": "初回学習: {date}".
+    await expect(page.getByText(/初回学習/)).toBeVisible();
+  });
+});

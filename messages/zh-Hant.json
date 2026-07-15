@@ -714,7 +714,9 @@
     "lockedSectionHint": "掌握這隻寶可夢後解鎖。",
     "loadingAriaLabel": "正在載入 Pokédex",
     "allPokemonAriaLabel": "寶可夢列表",
-    "generationPokemonAriaLabel": "{name}的寶可夢"
+    "generationPokemonAriaLabel": "{name}的寶可夢",
+    "firstReviewed": "首次學習: {date}",
+    "mastered": "已掌握"
   },
   "pasture": {
     "title": "牧場",

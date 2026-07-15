@@ -30,9 +30,13 @@ vi.mock("@/lib/audio/cry", () => ({ playCry: mockPlayCry }));
 // Mocks for hooks PokemonDetailDisclosure depends on
 // ---------------------------------------------------------------------------
 
-const { mockCardClass, mockPretendAllMastered } = vi.hoisted(() => ({
+const { mockCardClass, mockPretendAllMastered, mockPokemonLocale } = vi.hoisted(() => ({
   mockCardClass: { value: "mastered" as string },
   mockPretendAllMastered: { value: false },
+  // Display Pokémon-name locale (#1954): defaults to "en" so existing tests
+  // are unaffected; the journey-line locale-independence test below
+  // overrides this to "ja" to prove firstSeen ignores it.
+  mockPokemonLocale: { value: "en" as string },
 }));
 
 vi.mock("@/lib/review/useCardClass", () => ({
@@ -41,6 +45,15 @@ vi.mock("@/lib/review/useCardClass", () => ({
 
 vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => ({ flags: { pretendAllMastered: mockPretendAllMastered.value } }),
+}));
+
+vi.mock("@/lib/i18n/PokemonLocaleContext", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/i18n/PokemonLocaleContext")>()),
+  usePokemonLocaleContext: () => ({
+    locale: mockPokemonLocale.value,
+    languagesEnabled: true,
+    learningLocales: ["en"],
+  }),
 }));
 
 // SEED_POKEMON used for evolution sprite lookup - empty array is fine for these tests
@@ -73,14 +86,15 @@ vi.mock("@/lib/review/useNextReviewDate", () => ({
   useNextReviewDate: () => ({ status: "not-started" }),
 }));
 
-// useSpeciesLegStatus internals (#1766): loadSession provides the cards;
-// computeSpeciesLegStatuses is stubbed so tests control the per-leg status
-// without constructing full card fixtures (the derivation itself is covered
-// in lib/stats/legStatus.test.ts).
+// useSpeciesJourney internals (#1766 / #1948): loadSession provides the
+// cards (shared by both the per-leg status and first-reviewed derivations -
+// #1954); computeSpeciesLegStatuses is stubbed so tests control the per-leg
+// status without constructing full card fixtures (the derivation itself is
+// covered in lib/stats/legStatus.test.ts).
 const { mockLoadSession, mockLegStatusMap } = vi.hoisted(() => ({
-  // Default: resolve null so the useSpeciesLegStatus hook no-ops in every
-  // existing test that renders the component (only the #1766 tests below
-  // opt into a populated session).
+  // Default: resolve null so the useSpeciesJourney hook no-ops in every
+  // existing test that renders the component (only the #1766/#1948 tests
+  // below opt into a populated session).
   mockLoadSession: vi.fn(
     (): Promise<{ cards: unknown[] } | null> => Promise.resolve(null),
   ),
@@ -97,6 +111,20 @@ vi.mock("@/lib/stats/legStatus", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/stats/legStatus")>()),
   computeSpeciesLegStatuses: (() =>
     mockLegStatusMap.value) as typeof import("@/lib/stats/legStatus").computeSpeciesLegStatuses,
+}));
+
+// loadSettings (#1948) - fixed dateFormat/timezone so the first-reviewed date
+// assertions are deterministic regardless of the CI machine's locale/tz.
+const { mockLoadSettings } = vi.hoisted(() => ({
+  mockLoadSettings: vi.fn(() => ({
+    dateFormat: "dmy" as const,
+    timezone: "UTC",
+  })),
+}));
+vi.mock("@/lib/settings/persistence", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/settings/persistence")>()),
+  loadSettings: (() =>
+    mockLoadSettings()) as typeof import("@/lib/settings/persistence").loadSettings,
 }));
 
 // ---------------------------------------------------------------------------
@@ -755,7 +783,10 @@ describe("PokemonDetailDisclosure - per-direction leg status (#1766)", () => {
     expect(await screen.findByText("Blocked on reverse card")).toBeInTheDocument();
     expect(screen.getByText("Name card")).toBeInTheDocument();
     expect(screen.getByText("Reverse card")).toBeInTheDocument();
-    expect(screen.getByText("Mastered")).toBeInTheDocument();
+    // "Mastered" appears twice here: the per-direction leg-status label (this
+    // fixture's name leg) and the #1948 journey badge (mockCardClass is
+    // "mastered" in this describe's beforeEach).
+    expect(screen.getAllByText("Mastered").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Learning")).toBeInTheDocument();
   });
 
@@ -797,5 +828,168 @@ describe("PokemonDetailDisclosure - per-direction leg status (#1766)", () => {
       await Promise.resolve();
     });
     expect(screen.queryByText("Name card")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests - journey line: first-reviewed date + Mastered badge (#1948)
+// ---------------------------------------------------------------------------
+
+import { formatDate } from "@/lib/utils/format-date";
+
+describe("PokemonDetailDisclosure - journey line (#1948)", () => {
+  const FIRST_SEEN_ISO = "2026-04-14";
+  const EXPECTED_DATE = formatDate(FIRST_SEEN_ISO, "dmy", "UTC");
+
+  function nameCardWithFirstSeen(
+    speciesId: number,
+    firstSeen: string | null,
+    locale = "en",
+  ) {
+    return {
+      cardType: "name" as const,
+      id: speciesId,
+      locale,
+      state: { firstSeen, lastReview: null, dueDate: "2026-01-01" },
+    };
+  }
+
+  beforeEach(() => {
+    mockPretendAllMastered.value = false;
+    mockPokemonLocale.value = "en";
+    mockLegStatusMap.value = new Map();
+  });
+
+  it("never-seen species: shows neither first-reviewed nor Mastered", async () => {
+    mockCardClass.value = "locked";
+    mockLoadSession.mockResolvedValue({ cards: [] });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(/First reviewed/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Mastered")).not.toBeInTheDocument();
+  });
+
+  it("started but not mastered: shows First reviewed, no Mastered badge", async () => {
+    mockCardClass.value = "learning";
+    mockLoadSession.mockResolvedValue({
+      cards: [nameCardWithFirstSeen(1, FIRST_SEEN_ISO)],
+    });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+
+    expect(
+      await screen.findByText(`First reviewed ${EXPECTED_DATE}`),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Mastered")).not.toBeInTheDocument();
+  });
+
+  it("mastered species: shows both First reviewed and the Mastered badge", async () => {
+    mockCardClass.value = "mastered";
+    mockLoadSession.mockResolvedValue({
+      cards: [nameCardWithFirstSeen(1, FIRST_SEEN_ISO)],
+    });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+
+    expect(
+      await screen.findByText(`First reviewed ${EXPECTED_DATE}`),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Mastered")).toBeInTheDocument();
+  });
+
+  it("locale-independent (#1954): a species with only an English name card still shows its first-reviewed date when the display locale is Japanese", async () => {
+    mockCardClass.value = "learning";
+    mockPokemonLocale.value = "ja";
+    // Only an English-locale name card exists - no "ja" card at all.
+    mockLoadSession.mockResolvedValue({
+      cards: [nameCardWithFirstSeen(1, FIRST_SEEN_ISO, "en")],
+    });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "ja" });
+
+    // Label text is localised (ja catalogue), but the date itself must still
+    // render - "first reviewed" is a journey milestone, not a per-locale fact.
+    expect(
+      await screen.findByText(`初回学習: ${EXPECTED_DATE}`),
+    ).toBeInTheDocument();
+  });
+
+  it("earliest firstSeen wins across multiple locale name cards for the same species", async () => {
+    mockCardClass.value = "learning";
+    const earlier = "2026-01-05";
+    const later = "2026-04-14";
+    mockLoadSession.mockResolvedValue({
+      cards: [
+        nameCardWithFirstSeen(1, later, "en"),
+        nameCardWithFirstSeen(1, earlier, "ja"),
+      ],
+    });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+
+    const expectedEarliest = formatDate(earlier, "dmy", "UTC");
+    expect(
+      await screen.findByText(`First reviewed ${expectedEarliest}`),
+    ).toBeInTheDocument();
+  });
+
+  it("lapsed species (was mastered, now not): Mastered badge disappears, date remains", async () => {
+    mockCardClass.value = "learning";
+    mockLoadSession.mockResolvedValue({
+      cards: [nameCardWithFirstSeen(1, FIRST_SEEN_ISO)],
+    });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+
+    expect(
+      await screen.findByText(`First reviewed ${EXPECTED_DATE}`),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Mastered")).not.toBeInTheDocument();
+  });
+
+  it("pretendAllMastered on, never-seen species: Mastered badge shown, no fabricated date", async () => {
+    mockCardClass.value = "locked";
+    mockPretendAllMastered.value = true;
+    mockLoadSession.mockResolvedValue({ cards: [] });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+
+    expect(await screen.findByText("Mastered")).toBeInTheDocument();
+    expect(screen.queryByText(/First reviewed/)).not.toBeInTheDocument();
+  });
+
+  it("renders the first-reviewed label in Japanese", async () => {
+    mockCardClass.value = "mastered";
+    mockLoadSession.mockResolvedValue({
+      cards: [nameCardWithFirstSeen(1, FIRST_SEEN_ISO)],
+    });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "ja" });
+
+    expect(
+      await screen.findByText(`初回学習: ${EXPECTED_DATE}`),
+    ).toBeInTheDocument();
+    expect(screen.getByText("習得済み")).toBeInTheDocument();
+  });
+
+  it("renders the first-reviewed label in Simplified Chinese", async () => {
+    mockCardClass.value = "mastered";
+    mockLoadSession.mockResolvedValue({
+      cards: [nameCardWithFirstSeen(1, FIRST_SEEN_ISO)],
+    });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "zh-Hans" });
+
+    expect(
+      await screen.findByText(`首次学习: ${EXPECTED_DATE}`),
+    ).toBeInTheDocument();
+    expect(screen.getByText("已掌握")).toBeInTheDocument();
+  });
+
+  it("renders the first-reviewed label in Traditional Chinese", async () => {
+    mockCardClass.value = "mastered";
+    mockLoadSession.mockResolvedValue({
+      cards: [nameCardWithFirstSeen(1, FIRST_SEEN_ISO)],
+    });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "zh-Hant" });
+
+    expect(
+      await screen.findByText(`首次學習: ${EXPECTED_DATE}`),
+    ).toBeInTheDocument();
+    expect(screen.getByText("已掌握")).toBeInTheDocument();
   });
 });

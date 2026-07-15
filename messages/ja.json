@@ -714,7 +714,9 @@
     "lockedSectionHint": "この Pokémon を習得すると解放されます。",
     "loadingAriaLabel": "Pokédex を読み込み中",
     "allPokemonAriaLabel": "ポケモン一覧",
-    "generationPokemonAriaLabel": "{name} のポケモン"
+    "generationPokemonAriaLabel": "{name} のポケモン",
+    "firstReviewed": "初回学習: {date}",
+    "mastered": "習得済み"
   },
   "pasture": {
     "title": "牧場",
