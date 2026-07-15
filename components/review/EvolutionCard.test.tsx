@@ -410,3 +410,81 @@ describe("EvolutionCard - question-side name uses useLocalePokemonName", () => {
     expect(screen.queryByText("charmeleon")).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Random-evolution note gating (#1932)
+//
+// Wurmple's two forward evolution edges (-> Silcoon / -> Cascoon) share an
+// identical trigger phrase because the branch is chosen by hidden in-game
+// randomness - there is no honest way to disambiguate the prompt. Rather than
+// guessing at one answer, the forward card renders a caption explaining the
+// ambiguity. It must render ONLY on the forward direction, and ONLY for
+// pre-evos with an entry in RANDOM_BRANCH_NOTE_SPECIES (currently Wurmple,
+// species id 265).
+// ---------------------------------------------------------------------------
+
+const WURMPLE_SPRITE = "https://example.com/wurmple.png";
+const SILCOON_SPRITE = "https://example.com/silcoon.png";
+
+describe("EvolutionCard - random-evolution note (#1932)", () => {
+  it("renders the random-evolution note on Wurmple's forward card", () => {
+    render(
+      <EvolutionCard
+        direction="evolution"
+        preEvoSpriteUrl={WURMPLE_SPRITE}
+        preEvoName="Wurmple"
+        preEvoId={265}
+        postEvoName="Silcoon"
+        postEvoSpriteUrl={SILCOON_SPRITE}
+        postEvoId={266}
+        triggerPhrase={null}
+        revealed={false}
+      />,
+    );
+
+    expect(
+      screen.getByText(/evolution is random: it can become/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Silcoon")).toBeInTheDocument();
+    expect(screen.getByText("Cascoon")).toBeInTheDocument();
+  });
+
+  it("does not render the note for a non-random forward card (Charmander)", () => {
+    render(
+      <EvolutionCard
+        direction="evolution"
+        preEvoSpriteUrl={PRE_SPRITE}
+        preEvoName="charmander"
+        preEvoId={4}
+        postEvoName="charmeleon"
+        postEvoSpriteUrl={POST_SPRITE}
+        triggerPhrase="at level 16"
+        revealed={false}
+      />,
+    );
+
+    expect(
+      screen.queryByText(/evolution is random/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not render the note on Wurmple's reverse-evolution card", () => {
+    render(
+      <EvolutionCard
+        direction="reverse-evolution"
+        preEvoName="Wurmple"
+        preEvoId={265}
+        preEvoSpriteUrl={WURMPLE_SPRITE}
+        postEvoName="Silcoon"
+        postEvoId={266}
+        postEvoSpriteUrl={SILCOON_SPRITE}
+        triggerPhrase={null}
+        revealed={false}
+      />,
+    );
+
+    expect(
+      screen.queryByText(/evolution is random/),
+    ).not.toBeInTheDocument();
+  });
+});

@@ -25,6 +25,12 @@ type Props = {
   /** The full prompt sentence, including any inline TTS button. */
   prompt: ReactNode;
   /**
+   * Optional small muted caption rendered below the prompt (e.g. the
+   * random-evolution note on Wurmple's forward card, #1932). Visible both
+   * before and after reveal.
+   */
+  note?: ReactNode;
+  /**
    * Which side of the arrow is hidden before reveal.
    * - `"post"`: pre-evo is always visible; post-evo is hidden until reveal.
    * - `"pre"`: post-evo is always visible; pre-evo is hidden until reveal.
@@ -66,6 +72,7 @@ type Props = {
 export function EvolutionCardLayout({
   direction,
   prompt,
+  note,
   hiddenSide,
   preEvoSpriteUrl,
   preEvoName,
@@ -135,6 +142,7 @@ export function EvolutionCardLayout({
       <p className={`${sectionHeadingSm} sm:text-lg`}>
         {prompt}
       </p>
+      {note}
       <div
         className="flex items-center justify-center gap-3 sm:gap-6"
         aria-live="polite"

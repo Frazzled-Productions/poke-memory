@@ -529,6 +529,7 @@
     "cardTypeReverse": "逆引き",
     "cardTypeCry": "鳴き声",
     "cardTypeReverseEvo": "逆引き進化",
+    "randomEvolutionNote": "<preEvoTag>{preEvoName}</preEvoTag>の進化はランダムです。<firstTag>{firstName}</firstTag>にも<secondTag>{secondName}</secondTag>にもなり得ます。",
     "graduatedHint": "レビューは卒業済みのカードのみが対象のため、特定の方向が多くなることがあります。学習ステップ中のカードは別のキューで待機しています。",
     "todayNew": "新規",
     "todayReviewed": "復習済み",

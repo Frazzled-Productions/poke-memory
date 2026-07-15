@@ -11,6 +11,7 @@
 
 import type { EvolutionDetail } from "@/lib/pokemon/triggers";
 import { triggerPhrase } from "@/lib/pokemon/triggers";
+import { disambiguateTriggerPhrase } from "@/lib/pokemon/disambiguateTrigger";
 import type { FormCategory } from "@/lib/pokemon/forms";
 import {
   EVOLUTION_ID_OFFSET,
@@ -333,7 +334,11 @@ export function buildSeed(
           postEvoId: postEvo.id,
           postEvoName: postEvo.name,
           postEvoSpriteUrl: postEvo.spriteUrl,
-          triggerPhrase: triggerPhrase(node.detail ?? null),
+          triggerPhrase: disambiguateTriggerPhrase(
+            pokemon.id,
+            postEvo.id,
+            triggerPhrase(node.detail ?? null),
+          ),
         });
       }
     }

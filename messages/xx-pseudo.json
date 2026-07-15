@@ -529,6 +529,7 @@
     "cardTypeReverse": "[Reverse]",
     "cardTypeCry": "[Cry]",
     "cardTypeReverseEvo": "[Reverse evo]",
+    "randomEvolutionNote": "[<preEvoTag>{preEvoName}</preEvoTag>'s evolution is random: it can become <firstTag>{firstName}</firstTag> or <secondTag>{secondName}</secondTag>.]",
     "graduatedHint": "[Reviews surface only graduated cards, so one direction can dominate. Cards still in learning steps wait in a separate queue.]",
     "todayNew": "[new]",
     "todayReviewed": "[reviewed]",
