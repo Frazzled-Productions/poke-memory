@@ -15,14 +15,19 @@ export type PokemonCellData = SeedPokemon & {
   masteryProgress?: MasteryProgress;
 };
 
-export type MasteryStatus = "all" | "mastered" | "not-yet-mastered";
+export type MasteryStatus = "all" | "new" | "learning" | "mastered";
 
 export type PokedexFilters = {
   query: string;              // substring match on name or form displayName; empty = no filter
   types: string[];            // AND/intersection: pokemon must have all selected types; empty = no type filter
   gen: number | null;         // null = all gens; 1–9 = specific gen
   hasAlternateForms: boolean; // true = only species with at least one non-default form
-  masteryStatus: MasteryStatus; // "all" = no mastery filter; "mastered" / "not-yet-mastered" = filter by cardClass
+  // "all" = no mastery filter; "new" / "learning" / "mastered" map 1:1 onto
+  // CardClass ("locked" / "learning" / "mastered"). This intentionally matches
+  // the grid's OWN visual mastery state (the name-card cardClass, stability
+  // >= 21 days), not the two-leg badge mastery definition used elsewhere in
+  // the app (Stats page, badges) - do not "fix" this to badge mastery.
+  masteryStatus: MasteryStatus;
 };
 
 // Lazily-derived lookup maps - memoised only once the seed has loaded.
@@ -122,10 +127,11 @@ export function filterPokemon(
     }
 
     if (filters.masteryStatus !== "all") {
-      if (filters.masteryStatus === "mastered" && p.cardClass !== "mastered") {
-        return false;
-      }
-      if (filters.masteryStatus === "not-yet-mastered" && p.cardClass === "mastered") {
+      // "new" -> locked, "learning" -> learning, "mastered" -> mastered. Direct
+      // 1:1 mapping onto the grid's own cardClass; see the MasteryStatus comment.
+      const wantedCardClass: CardClass =
+        filters.masteryStatus === "new" ? "locked" : filters.masteryStatus;
+      if (p.cardClass !== wantedCardClass) {
         return false;
       }
     }
@@ -153,7 +159,7 @@ export function parseFilters(
 
   const masteryParam = searchParams.get("mastery") ?? "";
   const masteryStatus: MasteryStatus =
-    masteryParam === "mastered" || masteryParam === "not-yet-mastered"
+    masteryParam === "mastered" || masteryParam === "new" || masteryParam === "learning"
       ? masteryParam
       : "all";
 
