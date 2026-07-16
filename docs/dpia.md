@@ -65,6 +65,7 @@ Poké Memory is a hobby and fan project operated by Frazzled Productions Ltd (co
 2. Optimise FSRS scheduler weights for each user's individual retention target, using that user's own grade-event log.
 3. Understand aggregate usage patterns via anonymous, cookieless analytics.
 4. Receive and act on voluntarily submitted feedback to improve the service and resolve reported issues.
+5. Send opt-in Web Push reminders to users who have enabled push notifications: a daily reminder when the user has cards due for review, and, for users who have separately opted in and hold an active review streak, a late-day reminder if they have not yet reviewed that day. (This purpose is recorded here retroactively for the existing daily reminder and extended for the late-day streak reminder added in #1950. Targeting reads the user's own streak dates and today's-review state to decide whether to send; it produces no profile and is not shared with any third party.)
 
 ### Data categories
 
@@ -75,7 +76,8 @@ All of the following apply to **authenticated users only** unless stated otherwi
 | Per-card FSRS parameters | Stability, difficulty, scheduled interval (days), reps, lapses, state, due date, last review, first seen - keyed by opaque UUID | `card_reviews` |
 | Daily activity dates | Calendar dates on which at least one review was completed | `streak_days` |
 | Grade events | Card type, subject identifier, grade chosen, entry date, precise timestamp | `grade_log` |
-| User settings | Daily review limits, practice scope, theme, timezone | `user_settings` |
+| User settings | Daily review limits, practice scope, theme, timezone, notification preferences (daily-reminder and streak-reminder opt-ins, reminder hour) | `user_settings` |
+| Web Push subscription | Browser-issued push endpoint URL plus the `p256dh` and `auth` encryption keys, scoped to the account. Present only for users who have opted into push notifications. Used solely to deliver the reminders described in purpose 5. | `push_subscriptions` |
 | Auth account record (held by Supabase Auth, not our own tables) | For OAuth accounts: the email address and display name returned by the provider, used only for authentication. For username/password accounts: the chosen username (also stored in `public.usernames`) plus a synthetic internal email that is not a real address and is never shown to the user or used to send mail. A username may be personal data if the user chooses a name that identifies them. | Supabase Auth schema; `public.usernames` |
 | Aggregate analytics (all users) | Page path, referrer, country, device type, Core Web Vitals - no per-user identifier, no cookie | Vercel infrastructure |
 | Feedback submissions | Category label, free-text message (up to 2,000 chars), page pathname, app version. user_id nullable (null for guest submissions). May contain personal data typed by the user. | `feedback` |
@@ -93,6 +95,8 @@ As of #1369, the app UI renders in the user's chosen locale (`en` / `ja` / `zh-H
 | Discord | Bug-report triage notifications (processor / sub-processor) | DPA in place; SCCs / IDTA addendum |
 
 GitHub and Google act as **independent controllers** for the OAuth authentication interaction only. They are not processors for our review data. The app itself never sees the OAuth token - the exchange is handled server-side by Supabase Auth.
+
+The browser's Web Push service (Google FCM, Mozilla, or Apple, depending on the user's browser) acts as a **protocol-level conduit** for delivering push messages, not a sub-processor with access to message content: the notification payload is end-to-end encrypted under the Web Push standard using the subscription's `p256dh`/`auth` keys, so the push service relays ciphertext it cannot read. No new sub-processor is therefore added by the push feature.
 
 ### Retention
 
@@ -129,6 +133,7 @@ Each data category is assessed against the purposes stated in Step 2:
 - **Auth account record** (Supabase Auth): Supabase Auth requires a profile record to identify the user on subsequent sign-ins. For OAuth accounts this is handled entirely by the provider exchange. For username/password accounts, the chosen username is the user-visible identifier (stored in `public.usernames`) and the synthetic internal email is a technical artefact required by Supabase Auth's data model, carrying no personal data. Necessary for authentication.
 - **Aggregate analytics** (Vercel): Anonymous, cookieless usage data enables the controller to understand whether the service is reaching users and identify performance regressions. No individual is identified. Proportionate.
 - **Feedback submissions** (`feedback`): Category, message, and pathname are consumed for issue investigation and service improvement. App version is included to contextualise reports against a specific release. user_id is included where present (authenticated users) to enable follow-up with the submitter if needed; it is nullable so guests can submit without being identified. The 2,000-character message limit prevents excessive data collection. Necessary.
+- **Web Push subscription** (`push_subscriptions`): The endpoint and encryption keys are the minimum needed to deliver a push message to the user's browser; they exist only for users who opted in and are used for no other purpose. **Streak/review-recency read for targeting:** the late-day at-risk reminder cannot be scoped without knowing which users have an active streak and have not yet reviewed today, so the send job reads `streak_days` and today's `card_reviews.last_review` state for candidate users. No broader read is performed - no grade content, card difficulty, or review history beyond the dates needed to determine "active streak, not reviewed today, genuinely at risk". Necessary and minimal.
 
 **Conclusion:** Every data category collected is necessary for its stated purpose. No data is collected for speculative future use.
 
@@ -145,6 +150,7 @@ Per the privacy notice (§5):
 - **Cross-device sync and scheduler optimisation:** Contract performance - the user explicitly requests this service by choosing to sign in.
 - **Aggregate analytics:** Legitimate interest - cookieless, no individual tracking, no cookie consent required (see `docs/cookies-pecr.md`).
 - **Feedback submissions:** Legitimate interest in improving the service and resolving reported issues. Feedback is voluntarily submitted; it is not used for profiling, marketing, or any purpose other than service improvement and issue resolution.
+- **Push notification reminders (daily due-card reminder and late-day streak-at-risk reminder):** Legitimate interest - proportionate, opt-in, no-cost re-engagement messaging for a service the user actively uses and has enabled push for. It is not profiling for external purposes and is not shared with third parties. The user can withdraw at any time by turning off the relevant reminder toggle in Settings or by uninstalling the PWA / revoking the browser notification permission. The streak-at-risk reminder additionally suppresses itself when the user's streak is not genuinely at risk that day (e.g. a streak-protection token would cover the gap), so it does not manufacture false urgency (see also Standard 13 in `docs/childrens-code-assessment.md`).
 
 ### Children's Code compatibility
 
@@ -169,6 +175,7 @@ Risks are rated on a two-axis grid: **Likelihood** (Very Low / Low / Medium / Hi
 | R5 | Data retained beyond its useful life after account deletion | Low | Low | Low |
 | R6 | Anonymous analytics data re-identified and linked to an individual | Very Low | Low | Very Low |
 | R7 | User types personal or sensitive data into the free-text feedback field | Low | Low | Low |
+| R8 | Push targeting logic reads streak / last-review state to decide who to contact; a bug could over-notify, send a false "at risk" message, or leak streak state via notification content | Low | Low | Low |
 
 See Step 6 for the mitigation and residual-risk assessment for each row.
 
@@ -285,6 +292,22 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 
 ---
 
+### R8 - Push targeting reads streak / last-review state to decide who to contact
+
+**Review trigger:** The late-day streak-at-risk reminder (#1950) was added, firing the "engagement mechanic / new push use case" trigger recorded at Step 7 and the equivalent trigger in `docs/childrens-code-assessment.md` (Standard 13). This risk row is added accordingly.
+
+- The send job reads only the minimum needed: `streak_days` (which dates had a review) and today's `card_reviews.last_review` state for the candidate users, to determine "active streak, not reviewed today, genuinely at risk". No grade content, difficulty, or wider history is read.
+- The reminder is **opt-in and default-off**, gated behind a separate, clearly-labelled Settings toggle in addition to the primary push permission, and is authenticated-path only (guests have no subscription).
+- The notification body carries no personal data beyond a streak-length framing already accepted for the primary reminder; it never includes another user's data.
+- The at-risk determination suppresses itself when the streak is not genuinely at risk (e.g. a streak-protection token would bridge the gap), so no false-urgency message is sent - an honesty control required by the Standard 13 re-check.
+- The suppression and targeting logic (`lib/push/streakNudgePredicate.ts`) is covered by unit tests, and the new read RPCs by a real-RPC integration test, so a regression that over-notifies or mis-targets is caught in CI.
+
+**Residual risk:** Low. The read is minimal and scoped, the feature is opt-in/default-off, and the targeting and honesty controls are tested. No additional measure is currently required.
+
+**Acceptable:** Yes.
+
+---
+
 ### Overall conclusion
 
 No residual risk identified in this assessment is rated as unacceptable. No further technical or organisational measures are currently required. The processing described in this DPIA is proportionate and appropriate for the service.
@@ -335,6 +358,7 @@ This DPIA should be reviewed and updated if any of the following occur:
 - A new category of personal data is collected (e.g. age data, payment data, precise location).
 - Social, community, or user-to-user features are added.
 - Advertising, marketing, affiliate, or behavioural-profiling integrations are added.
+- A new push-notification use case reads an existing data category for a new targeting purpose. (Fired by #1950: the late-day streak-at-risk reminder reads `streak_days` / `card_reviews.last_review` for targeting. Purposes, data categories, lawful basis, and R8 were updated accordingly.)
 - Own-account creation was added in #1671 (username/password, June 2026): this trigger fired and R4 was updated accordingly. A further review is required if magic-link (#1670) or email + password (#1673) sign-in is added, since those introduce real email collection.
 - A new sub-processor is engaged.
 - A significant security incident occurs affecting the confidentiality, integrity, or availability of user data.

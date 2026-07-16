@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { PokemonCard } from "@/components/review/PokemonCard";
+import { DailySpotlight } from "@/components/review/DailySpotlight";
 import { TypedEntryNameCard } from "@/components/review/TypedEntryNameCard";
 import type { TypedEntryStrictness } from "@/lib/srs/typedEntryGradeLocale";
 import { MultipleChoiceNameCard } from "@/components/review/MultipleChoiceNameCard";
@@ -28,6 +29,7 @@ import {
   buildSession,
   buildSessionQueues,
   countDueTomorrow,
+  countNewTomorrow,
   getNextCardId,
   hydrateSession,
   limitBucket,
@@ -526,7 +528,7 @@ type EndOfSessionVariant =
  * Single component that covers all three end-of-session states:
  * "all caught up" (SESSION_COMPLETE), "new cards locked" (NEW_CARDS_LOCKED),
  * and "daily review limit reached" (REVIEW_SOFT_WALL). Shared affordances - 
- * the "N cards due tomorrow" teaser (#914), the TodayPill, the Share button,
+ * the "N reviews due tomorrow" teaser (#914), the TodayPill, the Share button,
  * and the card-types onboarding nudge - render on every variant when applicable.
  */
 function EndOfSessionScreen({
@@ -540,6 +542,7 @@ function EndOfSessionScreen({
   shareText,
   shareParts,
   dueTomorrow,
+  newTomorrow,
   showCardTypesHint,
   directionGrades,
   activeLocale,
@@ -547,6 +550,7 @@ function EndOfSessionScreen({
   dueCountByLocale,
   onSwitchLocale,
   onClearScope,
+  timezone,
 }: {
   variant: EndOfSessionVariant;
   perType: PerTypeTodayCounts;
@@ -561,6 +565,11 @@ function EndOfSessionScreen({
   shareParts: DailySummaryParts | null;
   /** Count of graduated cards whose dueDate falls exactly on tomorrow. 0 hides the teaser. */
   dueTomorrow: number;
+  /**
+   * Rough count of new Pokémon tomorrow's session will introduce (#1945).
+   * 0 falls back to the reviews-only `dueTomorrow` string.
+   */
+  newTomorrow: number;
   /**
    * True when at least one off-by-default card type is still disabled, so the
    * one-time card-types nudge (#702) is worth showing here. The hint itself
@@ -583,6 +592,8 @@ function EndOfSessionScreen({
    * filter is active; absence means no filter is set (#1797).
    */
   onClearScope?: () => void;
+  /** The user's timezone, passed through to the daily spotlight (#1949). */
+  timezone: string;
 }) {
   const t = useTranslations("practice");
 
@@ -609,6 +620,7 @@ function EndOfSessionScreen({
           <p className="text-zinc-500 dark:text-zinc-400">
             {t("nothingDueBody")}
           </p>
+          <DailySpotlight timezone={timezone} />
           {onClearScope !== undefined && (
             <button
               type="button"
@@ -657,9 +669,13 @@ function EndOfSessionScreen({
           </p>
         </>
       )}
-      {dueTomorrow > 0 && (
+      {(dueTomorrow > 0 || newTomorrow > 0) && (
         <p className={mutedText}>
-          {t("dueTomorrow", { count: dueTomorrow })}
+          {dueTomorrow > 0 && newTomorrow > 0
+            ? t("dueAndNewTomorrow", { count: dueTomorrow, newCount: newTomorrow })
+            : dueTomorrow > 0
+              ? t("dueTomorrow", { count: dueTomorrow })
+              : t("newTomorrow", { newCount: newTomorrow })}
         </p>
       )}
       <TodayPill
@@ -2144,6 +2160,16 @@ export function ReviewSession() {
     // in lib/stats - replaces the inline setUTCDate arithmetic (#1522).
     const tomorrow = addDaysToIsoDate(todayTz, 1);
     const dueTomorrow = countDueTomorrow(cards, tomorrow, eligibleCardIds, activeLocale);
+    // Rough "how many new Pokémon tomorrow" signal alongside dueTomorrow
+    // (#1945). See countNewTomorrow's doc comment for the species-grouped,
+    // canonical-card-type definition.
+    const newTomorrow = countNewTomorrow(
+      cards,
+      limits,
+      { nameEnabled: true, reverseEnabled, cryEnabled: cryCardsEnabled },
+      eligibleCardIds,
+      activeLocale,
+    );
     // shareParts / shareText are derived unconditionally by useShareSheet above
     // (hooks must be called before early returns). They are used here in the
     // end-of-session branch (#1520).
@@ -2209,14 +2235,31 @@ export function ReviewSession() {
               🔥{shareParts?.streak ?? 0}
             </span>
 
-            {/* Due-tomorrow count. Hidden when 0. min-h-[44px] for touch sizing
-                even though this is a <span> (for visual alignment). */}
-            {dueTomorrow > 0 && (
+            {/* Due-tomorrow / new-tomorrow count. Hidden only when BOTH are 0.
+                min-h-[44px] for touch sizing even though this is a <span>
+                (for visual alignment). */}
+            {(dueTomorrow > 0 || newTomorrow > 0) && (
               <span
-                aria-label={tReview("higherOrLower.barDueTomorrowAriaLabel", { count: dueTomorrow })}
+                aria-label={
+                  dueTomorrow > 0 && newTomorrow > 0
+                    ? tReview("higherOrLower.barDueAndNewTomorrowAriaLabel", {
+                        count: dueTomorrow,
+                        newCount: newTomorrow,
+                      })
+                    : dueTomorrow > 0
+                      ? tReview("higherOrLower.barDueTomorrowAriaLabel", { count: dueTomorrow })
+                      : tReview("higherOrLower.barNewTomorrowAriaLabel", { newCount: newTomorrow })
+                }
                 className="flex-none text-sm text-zinc-500 dark:text-zinc-400 tabular-nums"
               >
-                {tReview("higherOrLower.barDueTomorrow", { count: dueTomorrow })}
+                {dueTomorrow > 0 && newTomorrow > 0
+                  ? tReview("higherOrLower.barDueAndNewTomorrow", {
+                      count: dueTomorrow,
+                      newCount: newTomorrow,
+                    })
+                  : dueTomorrow > 0
+                    ? tReview("higherOrLower.barDueTomorrow", { count: dueTomorrow })
+                    : tReview("higherOrLower.barNewTomorrow", { newCount: newTomorrow })}
               </span>
             )}
 
@@ -2277,6 +2320,7 @@ export function ReviewSession() {
             shareText={shareText}
             shareParts={shareParts}
             dueTomorrow={dueTomorrow}
+            newTomorrow={newTomorrow}
             showCardTypesHint={!cardTypesAllOn}
             directionGrades={sessionDirectionGrades}
             activeLocale={activeLocale}
@@ -2284,6 +2328,7 @@ export function ReviewSession() {
             dueCountByLocale={readDueCountCache()}
             onSwitchLocale={handleSwitchLocale}
             onClearScope={!isScopeEmpty(scope) ? () => handleScopeChange(EMPTY_SCOPE) : undefined}
+            timezone={timezone}
           />
 
           {/* Play Higher or Lower entry area.

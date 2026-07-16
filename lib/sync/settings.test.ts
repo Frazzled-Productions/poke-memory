@@ -107,6 +107,7 @@ const SAMPLE: UserSettings = {
   pushNotificationHour: null,
   dismissedMtBannerLocales: [],
   removedLocales: [],
+  streakNudgeEnabled: false,
 };
 
 describe("pushSettings", () => {

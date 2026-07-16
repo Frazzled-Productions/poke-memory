@@ -79,11 +79,31 @@ describe("Privacy Notice page", () => {
         }),
       ).toBeTruthy();
       expect(
-        screen.getByText(/single daily notification when you have/i),
+        screen.getByText(/a daily reminder when you have pok.mon cards due/i),
       ).toBeTruthy();
       // Mentions the table name push_subscriptions so the reader can map the
       // notice to the schema.
       expect(screen.getByText(/push_subscriptions/i)).toBeTruthy();
+    });
+
+    it("describes both notification types for #1950 and drops the stale single-notification wording", async () => {
+      await renderPage();
+      // The old wording claimed exactly one notification purpose; that is no
+      // longer true now the streak reminder exists (#1950).
+      expect(
+        screen.queryByText(/for one purpose only: to send a single daily/i),
+      ).toBeNull();
+      expect(
+        screen.getByText(/an additional late-day reminder if you have not yet reviewed/i),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(/never receive more than two notifications in a day/i),
+      ).toBeTruthy();
+      // The streak_days section now discloses the server-side read that
+      // decides whether to send the streak reminder.
+      expect(
+        screen.getByText(/read server-side, late in your local day, to decide/i),
+      ).toBeTruthy();
     });
 
     it("still renders the unchanged sections it already covered", async () => {

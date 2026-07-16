@@ -929,3 +929,55 @@ export function countDueTomorrow(
   }
   return count;
 }
+
+/**
+ * Estimates how many NEW cards tomorrow's session will introduce, as a
+ * companion to countDueTomorrow's review-count teaser (#1945).
+ *
+ * New-card admission is species-grouped and atomic across name/reverse/cry
+ * directions (one species = one admission), so summing per-direction pools
+ * would double- or triple-count a single species. Instead this counts
+ * exactly one canonical card type - the first ENABLED type in priority order
+ * name > reverse > cry (a name card's id is 1:1 with speciesId, making it the
+ * natural species-shaped proxy). Evolution cards are edge-keyed, not
+ * species-shaped, and are deliberately excluded - this answers "how many new
+ * Pokémon", not "how many new cards of any type".
+ *
+ * Unlike countDueTomorrow, this IS capped at the canonical type's
+ * maxNewPerDay: the new-card pool is a large near-static "whole undiscovered
+ * deck" figure, so reporting it uncapped would be misleading. Tomorrow resets
+ * the daily new-card counter, so the type's maxNewPerDay is the ceiling for
+ * that type. This stays a rough signal, not an exact promise: with independent
+ * per-type caps where a co-enabled reverse/cry budget is smaller than name's,
+ * atomic species-grouped admission can introduce fewer species than the
+ * canonical cap suggests, so the figure may slightly overstate what actually
+ * lands. That is an accepted trade for keeping this a cheap single-pass count
+ * rather than a full replay of buildSessionQueues.
+ *
+ * If none of name/reverse/cry is enabled (e.g. evolution-only practice),
+ * returns 0 rather than falling back to evolution cards.
+ */
+export function countNewTomorrow(
+  cards: readonly ReviewableCard[],
+  limits: DailyLimits,
+  opts: Pick<CardTypeOpts, "nameEnabled" | "reverseEnabled" | "cryEnabled"> = {},
+  eligibleCardIds?: ReadonlySet<number>,
+  activeLocale: AppLocale = "en",
+): number {
+  const { nameEnabled = true, reverseEnabled = false, cryEnabled = false } = opts;
+  let canonicalType: "name" | "reverse" | "cry" | null = null;
+  if (nameEnabled) canonicalType = "name";
+  else if (reverseEnabled) canonicalType = "reverse";
+  else if (cryEnabled) canonicalType = "cry";
+  if (canonicalType === null) return 0;
+
+  let poolSize = 0;
+  for (const card of cards) {
+    if (card.cardType !== canonicalType) continue;
+    if ((card.locale ?? "en") !== activeLocale) continue;
+    if (card.state.lastReview !== null) continue;
+    if (eligibleCardIds !== undefined && !eligibleCardIds.has(card.id)) continue;
+    poolSize += 1;
+  }
+  return Math.min(limits[canonicalType].maxNewPerDay, poolSize);
+}

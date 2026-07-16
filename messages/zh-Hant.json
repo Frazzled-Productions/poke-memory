@@ -408,7 +408,13 @@
     },
     "loadingAriaLabel": "載入設定中",
     "pushOptIn": {
-      "ariaLabel": "每日複習提醒"
+      "ariaLabel": "每日複習提醒",
+      "streakNudge": {
+        "label": "連勝提醒",
+        "description": "如果你當天還沒有練習，我們會在當天稍晚再溫柔地提醒你一次，幫助你繼續保持連勝。",
+        "ariaLabel": "連勝提醒",
+        "disabledHint": "請先開啟「每日複習提醒」"
+      }
     },
     "qaSeed": {
       "applyAriaLabel": "套用 QA 種子：{scenario}",
@@ -477,13 +483,19 @@
     "todayDoneHeadingWithLanguage": "今日完成（{language}）",
     "nothingDue": "現在沒有待複習的內容。",
     "nothingDueBody": "今日卡片已全部完成。明天再來繼續吧。",
+    "spotlightHeading": "今日寶可夢",
+    "spotlightRevealPrompt": "翻開查看名字",
+    "spotlightRevealButton": "揭曉名字",
+    "spotlightHiddenAlt": "寶可夢精靈圖，名字已隱藏",
     "newCardsLocked": "今日新卡片已鎖定",
     "newCardsLockedBody": "已達到每日新卡片上限。明天再來獲取更多；保持此限制可防止明天的複習堆積過多。",
     "reviewWall": "已達到每日複習上限",
     "reviewWallBody": "已達到每日複習上限。還有更多卡片待複習。要繼續嗎？",
     "doneForToday": "今天到此為止",
     "keepReviewing": "繼續複習",
-    "dueTomorrow": "明天有 {count} 張卡片到期",
+    "dueTomorrow": "明天有 {count} 項複習到期",
+    "dueAndNewTomorrow": "明天有 {count} 項複習 + {newCount} 張新卡片",
+    "newTomorrow": "明天有 {newCount} 張新卡片",
     "nextCardIn": "下一張卡片",
     "nextCardHangTight": "稍等，學習卡片即將準備好。",
     "reveal": "翻牌",
@@ -529,6 +541,7 @@
     "cardTypeReverse": "反向",
     "cardTypeCry": "叫聲",
     "cardTypeReverseEvo": "反向進化",
+    "randomEvolutionNote": "<preEvoTag>{preEvoName}</preEvoTag>的進化是隨機的：牠可能進化成<firstTag>{firstName}</firstTag>或<secondTag>{secondName}</secondTag>。",
     "graduatedHint": "複習僅針對已畢業的卡片，因此某一方向可能佔主導。仍在學習步驟中的卡片在獨立的佇列中等待。",
     "todayNew": "新卡",
     "todayReviewed": "已複習",
@@ -638,8 +651,12 @@
       "backToSummary": "← 總結",
       "backToSummaryAriaLabel": "返回本局總結",
       "barStreakAriaLabel": "連續{count}天",
-      "barDueTomorrow": "明天{count}張",
-      "barDueTomorrowAriaLabel": "明天有{count}張卡片到期"
+      "barDueTomorrow": "明天{count}項",
+      "barDueTomorrowAriaLabel": "明天有{count}項複習到期",
+      "barDueAndNewTomorrow": "明天{count}+{newCount}",
+      "barDueAndNewTomorrowAriaLabel": "明天有 {count} 項複習和 {newCount} 張新卡片",
+      "barNewTomorrow": "+{newCount}張新卡片",
+      "barNewTomorrowAriaLabel": "明天有 {newCount} 張新卡片"
     },
     "typedEntry": {
       "inputAriaLabel": "輸入寶可夢的名字",
@@ -672,8 +689,9 @@
     "sortClosestToMasteryInfoAriaLabel": "關於「最接近掌握」排序",
     "sortClosestToMasteryInfoPanel": "將你最接近掌握的寶可夢排在最前面：已掌握的在最前，其次是學習中的（按複習次數和間隔排序），最後是未開始的。在超級使用者模式下開啟假設全部已掌握時，排序將退化為全國圖鑑編號順序。",
     "masteryAll": "全部",
+    "masteryNew": "未開始",
+    "masteryLearning": "學習中",
     "masteryMastered": "已掌握",
-    "masteryNotYet": "未掌握",
     "masteryFilterUnavailable": "假裝全部掌握模式開啟時，掌握度篩選不可用",
     "filterByTypeAriaLabel": "按屬性篩選",
     "filterByGenerationAriaLabel": "按世代篩選",
@@ -702,7 +720,9 @@
     "lockedSectionHint": "掌握這隻寶可夢後解鎖。",
     "loadingAriaLabel": "正在載入 Pokédex",
     "allPokemonAriaLabel": "寶可夢列表",
-    "generationPokemonAriaLabel": "{name}的寶可夢"
+    "generationPokemonAriaLabel": "{name}的寶可夢",
+    "firstReviewed": "首次學習: {date}",
+    "mastered": "已掌握"
   },
   "pasture": {
     "title": "牧場",
@@ -1239,5 +1259,9 @@
       "fixed": "修復",
       "security": "安全"
     }
+  },
+  "pushStreak": {
+    "title": "繼續保持連勝",
+    "body": "{days, plural, other {你已經連續練習了#天。今天再練一會兒，就能繼續保持。}}"
   }
 }

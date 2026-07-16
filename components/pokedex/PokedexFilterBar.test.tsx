@@ -19,6 +19,7 @@ import {
   renderWithIntl,
   renderJa,
   screen,
+  within,
 } from "@/components/test-utils/renderWithIntl";
 import type { IntlRenderOptions } from "@/components/test-utils/renderWithIntl";
 import PokedexFilterBar from "@/components/pokedex/PokedexFilterBar";
@@ -298,6 +299,13 @@ describe("PokedexFilterBar - existing filter controls", () => {
     expect(screen.getByRole("group", { name: "Filter by mastery" })).toBeInTheDocument();
   });
 
+  it("renders all four mastery pills: All / New / Learning / Mastered", () => {
+    renderBar();
+    const masteryGroup = screen.getByRole("group", { name: "Filter by mastery" });
+    const labels = Array.from(masteryGroup.querySelectorAll("button")).map((b) => b.textContent);
+    expect(labels).toEqual(["All", "New", "Learning", "Mastered"]);
+  });
+
   it("calls onMasteryChange with 'mastered' when Mastered button is clicked", async () => {
     const user = userEvent.setup();
     const { onMasteryChange } = renderBar();
@@ -305,10 +313,36 @@ describe("PokedexFilterBar - existing filter controls", () => {
     expect(onMasteryChange).toHaveBeenCalledWith("mastered");
   });
 
+  it("calls onMasteryChange with 'new' when New button is clicked", async () => {
+    const user = userEvent.setup();
+    const { onMasteryChange } = renderBar();
+    await user.click(screen.getByRole("button", { name: "New" }));
+    expect(onMasteryChange).toHaveBeenCalledWith("new");
+  });
+
+  it("calls onMasteryChange with 'learning' when Learning button is clicked", async () => {
+    const user = userEvent.setup();
+    const { onMasteryChange } = renderBar();
+    await user.click(screen.getByRole("button", { name: "Learning" }));
+    expect(onMasteryChange).toHaveBeenCalledWith("learning");
+  });
+
+  it("calls onMasteryChange with 'all' when All button is clicked", async () => {
+    const user = userEvent.setup();
+    const { onMasteryChange } = renderBar(defaultFilters({ masteryStatus: "mastered" }));
+    const masteryGroup = screen.getByRole("group", { name: "Filter by mastery" });
+    await user.click(within(masteryGroup).getByRole("button", { name: "All" }));
+    expect(onMasteryChange).toHaveBeenCalledWith("all");
+  });
+
   it("disables non-all mastery buttons when superuserMasteryLocked is true", () => {
     renderBar(defaultFilters(), "national", { superuserMasteryLocked: true });
     const masteredBtn = screen.getByRole("button", { name: "Mastered" });
     expect(masteredBtn).toBeDisabled();
+    const newBtn = screen.getByRole("button", { name: "New" });
+    expect(newBtn).toBeDisabled();
+    const learningBtn = screen.getByRole("button", { name: "Learning" });
+    expect(learningBtn).toBeDisabled();
     // "All" in the mastery group must remain enabled. Scope to the mastery group
     // because the generation group also has an "All" button.
     const masteryGroup = screen.getByRole("group", { name: "Filter by mastery" });
@@ -390,6 +424,72 @@ describe("PokedexFilterBar - Japanese locale", () => {
     );
     // messages/ja.json pokedex.generationLabel = "第{gen}世代" → "第I世代"
     expect(screen.getByRole("button", { name: "第I世代" })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mastery pill locale coverage (#1944) - New / Learning labels in every locale
+// ---------------------------------------------------------------------------
+
+describe("PokedexFilterBar - mastery pills in Japanese locale", () => {
+  it("renders New and Learning pills in Japanese", () => {
+    renderJa(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+    );
+    const masteryGroup = screen.getByRole("group", { name: "習得状況でフィルター" });
+    expect(within(masteryGroup).getByRole("button", { name: "未学習" })).toBeInTheDocument();
+    expect(within(masteryGroup).getByRole("button", { name: "学習中" })).toBeInTheDocument();
+  });
+});
+
+describe("PokedexFilterBar - mastery pills in Simplified Chinese locale", () => {
+  it("renders New and Learning pills in Simplified Chinese", () => {
+    renderWithIntl(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+      { locale: "zh-Hans" },
+    );
+    const masteryGroup = screen.getByRole("group", { name: "按掌握度筛选" });
+    expect(within(masteryGroup).getByRole("button", { name: "未开始" })).toBeInTheDocument();
+    expect(within(masteryGroup).getByRole("button", { name: "学习中" })).toBeInTheDocument();
+  });
+});
+
+describe("PokedexFilterBar - mastery pills in Traditional Chinese locale", () => {
+  it("renders New and Learning pills in Traditional Chinese", () => {
+    renderWithIntl(
+      <PokedexFilterBar
+        filters={defaultFilters()}
+        sort="national"
+        onQueryChange={vi.fn()}
+        onTypeToggle={vi.fn()}
+        onGenChange={vi.fn()}
+        onAlternateFormsToggle={vi.fn()}
+        onMasteryChange={vi.fn()}
+        onSortChange={vi.fn()}
+      />,
+      { locale: "zh-Hant" },
+    );
+    const masteryGroup = screen.getByRole("group", { name: "按掌握度篩選" });
+    expect(within(masteryGroup).getByRole("button", { name: "未開始" })).toBeInTheDocument();
+    expect(within(masteryGroup).getByRole("button", { name: "學習中" })).toBeInTheDocument();
   });
 });
 

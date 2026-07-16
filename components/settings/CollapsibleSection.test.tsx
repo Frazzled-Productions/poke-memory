@@ -251,6 +251,45 @@ describe("CollapsibleSection", () => {
     });
   });
 
+  // null localStorage (#1952) - some browser configurations (e.g. Windows
+  // with site data/cookies blocked) expose `window.localStorage` as `null`
+  // rather than merely absent; a direct `.getItem`/`.setItem` call throws.
+  describe("null localStorage", () => {
+    beforeEach(() => {
+      Object.defineProperty(window, "localStorage", {
+        value: null,
+        configurable: true,
+        writable: true,
+      });
+    });
+
+    it("renders collapsed by default without throwing", () => {
+      expect(() =>
+        render(
+          <CollapsibleSection sectionId="test-section" heading="Test Section">
+            <p>Section content</p>
+          </CollapsibleSection>,
+        ),
+      ).not.toThrow();
+
+      const button = screen.getByRole("button", { name: /test section/i });
+      expect(button).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("toggling does not throw when localStorage is null", async () => {
+      const user = userEvent.setup();
+      render(
+        <CollapsibleSection sectionId="test-section" heading="Test Section">
+          <p>Section content</p>
+        </CollapsibleSection>,
+      );
+
+      const button = screen.getByRole("button", { name: /test section/i });
+      await expect(user.click(button)).resolves.not.toThrow();
+      expect(button).toHaveAttribute("aria-expanded", "true");
+    });
+  });
+
   // onFirstCollapse - one-shot "default open" dismissal
   describe("onFirstCollapse", () => {
     it("calls onFirstCollapse when the user manually collapses the section", async () => {

@@ -643,6 +643,20 @@ test.describe("Settings page - Web Push opt-in (#1056)", () => {
     await expect(toggle).toHaveAttribute("aria-label", "Daily review reminder");
     await expect(toggle).toHaveAttribute("aria-checked", "false");
 
+    // #1950 streak reminder toggle: nested under the primary toggle, same
+    // card. It must render and be OFF + disabled while the primary daily
+    // reminder is not yet subscribed - state IN (disabled) before state OUT
+    // (enabled) below.
+    const streakToggle = page.getByTestId("push-streak-optin-button");
+    await expect(streakToggle).toBeVisible();
+    await expect(streakToggle).toHaveAttribute("aria-checked", "false");
+    await expect(streakToggle).toBeDisabled();
+
+    // Clicking while disabled must not flip the state (defence in depth on
+    // top of the native `disabled` attribute already blocking the click).
+    await streakToggle.click({ force: true });
+    await expect(streakToggle).toHaveAttribute("aria-checked", "false");
+
     // Core interaction: clicking the toggle drives subscribeToPush, which
     // exercises the helper's full happy path (permission gate → SW ready →
     // PushManager.subscribe → DB persist). aria-checked flipping to "true"
@@ -651,6 +665,22 @@ test.describe("Settings page - Web Push opt-in (#1056)", () => {
     await expect(toggle).toHaveAttribute("aria-checked", "true", {
       timeout: 10_000,
     });
+
+    // Once the primary reminder is on, the streak toggle becomes usable.
+    await expect(streakToggle).toBeEnabled();
+    await streakToggle.click();
+    await expect(streakToggle).toHaveAttribute("aria-checked", "true");
+
+    // Turning the primary reminder back off must re-disable the streak
+    // toggle (its dependency is gone) without erroring.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false", {
+      timeout: 10_000,
+    });
+    await expect(streakToggle).toBeDisabled();
+    // Consent hygiene: the streak opt-in resets to off on unsubscribe, so its
+    // visual state must not stay "true" while disabled (#1950 review).
+    await expect(streakToggle).toHaveAttribute("aria-checked", "false");
   });
 });
 

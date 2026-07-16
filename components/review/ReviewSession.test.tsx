@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   renderWithIntl,
   renderJa,
+  renderZhHans,
+  renderZhHant,
   screen,
   waitFor,
   act,
@@ -1703,6 +1705,31 @@ describe("Practice scope: completed-scope end state persists across remount (#17
     ).toBeInTheDocument();
   });
 
+  it("shows the daily spotlight on the unscoped all-caught-up end-of-session screen (#1949)", async () => {
+    const card = makeReviewedTodayCard();
+    const reverseCard = makeGraduatedReverseCard(1);
+    mockSeedPokemon.mockReturnValue([card]);
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [card, reverseCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...scopedSettings(),
+      practiceScope: { gens: [], types: [], presets: [] },
+    });
+
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/pokémon of the day/i)).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: /reveal the name/i })).toBeInTheDocument();
+  });
+
   it("does NOT show the clear-filter button when no scope is active on the end-of-session screen", async () => {
     // Empty seed → immediate SESSION_COMPLETE with no scope.
     mockSeedPokemon.mockReturnValue([]);
@@ -1818,8 +1845,11 @@ describe("Practice scope: completed-scope end state persists across remount (#17
     await waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
     });
+    // Exact match: the practice card's "Reveal" button must be gone. A loose
+    // /reveal/i match would also catch the end-of-session daily spotlight's
+    // "Reveal the name" button (#1949), which is expected to be present here.
     expect(
-      screen.queryByRole("button", { name: /reveal/i }),
+      screen.queryByRole("button", { name: /^reveal$/i }),
     ).not.toBeInTheDocument();
 
     // The clear-filter affordance must still be present.
@@ -2804,8 +2834,12 @@ describe("EndOfSessionScreen unification - share button and due-tomorrow on ever
       expect(screen.getByText(/new cards locked for today/i)).toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(screen.getByText(/1 card due tomorrow/i)).toBeInTheDocument();
+      expect(screen.getByText(/1 review due tomorrow/i)).toBeInTheDocument();
     });
+    // newTomorrow is 0 here (maxNewPerDay: 0 caps the pool at 0), so the
+    // "+ N new cards" clause must not appear (#1945) - the teaser stays the
+    // plain reviews-only "1 review due tomorrow" string, not a compound one.
+    expect(screen.queryByText(/\+.*new card/i)).not.toBeInTheDocument();
 
     vi.useRealTimers();
   });
@@ -2973,8 +3007,838 @@ describe("EndOfSessionScreen unification - share button and due-tomorrow on ever
       expect(screen.getByText(/daily review limit reached/i)).toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(screen.getByText(/1 card due tomorrow/i)).toBeInTheDocument();
+      expect(screen.getByText(/1 review due tomorrow/i)).toBeInTheDocument();
     });
+    // newTomorrow is 0 (maxNewPerDay: 0), so the compound clause is suppressed.
+    expect(screen.queryByText(/\+.*new card/i)).not.toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tomorrow's new-card count in the tomorrow teaser (#1945)
+// ---------------------------------------------------------------------------
+
+describe("Tomorrow teaser includes a new-cards count (#1945)", () => {
+  // Base "review" state fields shared by every fixture card below - only
+  // dueDate / lastReview / firstSeen vary per role (introduced-today,
+  // due-tomorrow, unseen).
+  const baseReviewState = {
+    stability: 10,
+    difficulty: 5,
+    elapsedDays: 10,
+    scheduledDays: 21,
+    reps: 3,
+    lapses: 0,
+    fsrsState: "review" as const,
+    learningStep: null,
+    stepStartedAt: null,
+    hiddenSince: null,
+    seenInPasture: false,
+  };
+
+  // A card first-seen (and reviewed) "today" - counts toward newIntroducedToday
+  // for the "name" canonical type, letting a small maxNewPerDay hit its cap.
+  function makeIntroducedTodayCard(id: number, name: string): NameReviewCard {
+    return {
+      ...FIXTURE_CARD,
+      id,
+      name,
+      displayName: name,
+      subjectKey: String(id),
+      state: {
+        ...baseReviewState,
+        reps: 1,
+        dueDate: "2099-01-01",
+        lastReview: "2026-05-17",
+        firstSeen: "2026-05-17",
+      },
+    };
+  }
+
+  // A graduated card due on "tomorrow" (2026-05-18) - contributes to dueTomorrow.
+  function makeDueTomorrowCard(id: number, name: string): NameReviewCard {
+    return {
+      ...FIXTURE_CARD,
+      id,
+      name,
+      displayName: name,
+      subjectKey: String(id),
+      state: {
+        ...baseReviewState,
+        dueDate: "2026-05-18",
+        lastReview: "2026-04-27",
+        firstSeen: "2026-01-01",
+      },
+    };
+  }
+
+  // An unseen card - one candidate in tomorrow's new-card pool.
+  function makeUnseenCard(id: number, name: string): NameReviewCard {
+    return {
+      ...FIXTURE_CARD,
+      id,
+      name,
+      displayName: name,
+      subjectKey: String(id),
+      state: {
+        ...FIXTURE_CARD.state,
+        lastReview: null,
+        firstSeen: null,
+      },
+    };
+  }
+
+  // A fully-graduated card, due far in the future - contributes to neither
+  // dueTomorrow nor newTomorrow, but counts toward getSeenPokemon so the
+  // Higher-or-Lower entry button can be enabled without perturbing the counts.
+  function makeSeenNotDueCard(id: number, name: string): NameReviewCard {
+    return {
+      ...FIXTURE_CARD,
+      id,
+      name,
+      displayName: name,
+      subjectKey: String(id),
+      state: {
+        ...baseReviewState,
+        dueDate: "2099-01-01",
+        lastReview: "2026-01-01",
+        firstSeen: "2026-01-01",
+      },
+    };
+  }
+
+  // Graduated reverse card for a species - already reviewed and due far in
+  // the future. Included alongside a name card so hydrateSession (reverseEnabled
+  // is always true) does not inject a fresh unseen reverse card, which would
+  // trigger NEW_CARDS_LOCKED via the "reverse" type (maxNewReversePerDay: 0
+  // in baseSettings) and mask the "all caught up" (SESSION_COMPLETE) variant.
+  function makeGraduatedReverseCard(speciesId: number) {
+    const REVERSE_ID_OFFSET_LOCAL = 2_000_000;
+    return {
+      ...FIXTURE_CARD,
+      id: REVERSE_ID_OFFSET_LOCAL + speciesId,
+      pokemonId: speciesId,
+      cardType: "reverse" as const,
+      subjectKey: String(speciesId),
+      state: {
+        ...baseReviewState,
+        dueDate: "2099-01-01",
+        lastReview: "2026-01-01",
+        firstSeen: "2026-01-01",
+      },
+    };
+  }
+
+  const baseSettings = {
+    masteryRepetitions: 3,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 50,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 100,
+    cryCardsEnabled: false,
+    maxNewCryPerDay: 0,
+    maxReviewsCryPerDay: 0,
+    evolutionCardsEnabled: true,
+    reverseEvolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+    earnedBadges: [] as { id: string; earnedAt: string }[],
+  };
+
+  it("shows a singular combined 'reviews + new cards' teaser on the full summary in English when both counts are 1 (#1945)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introduced = makeIntroducedTodayCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+    const unseen = makeUnseenCard(3, "Venusaur");
+
+    mockSeedPokemon.mockReturnValue([introduced, dueTomorrowCard, unseen]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [introduced, dueTomorrowCard, unseen],
+      limits: DEFAULT_LIMITS,
+    });
+    // maxNewPerDay: 1 - already hit by `introduced` today, so the wall fires
+    // (NEW_CARDS_LOCKED) and tomorrow's pool (the `unseen` card) is capped
+    // at 1, matching dueTomorrow's count of 1 for a clean singular/singular case.
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 1 });
+
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/new cards locked for today/i)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("1 review + 1 new card due tomorrow")).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("shows a plural combined teaser and localises to Japanese when both counts are 2 (#1945)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introducedA = makeIntroducedTodayCard(1, "Bulbasaur");
+    const introducedB = makeIntroducedTodayCard(4, "Charmander");
+    const dueTomorrowA = makeDueTomorrowCard(2, "Ivysaur");
+    const dueTomorrowB = makeDueTomorrowCard(5, "Charmeleon");
+    const unseenA = makeUnseenCard(3, "Venusaur");
+    const unseenB = makeUnseenCard(6, "Charizard");
+
+    const allCards = [introducedA, introducedB, dueTomorrowA, dueTomorrowB, unseenA, unseenB];
+    mockSeedPokemon.mockReturnValue(allCards);
+    vi.mocked(loadSession).mockResolvedValue({ cards: allCards, limits: DEFAULT_LIMITS });
+    // maxNewPerDay: 2 - hit today by the two `introduced*` cards, capping
+    // tomorrow's pool (two unseen cards) at 2, matching dueTomorrow's count of 2.
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 2 });
+
+    renderJa(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/今日の新規カードはロックされています/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("明日は復習2件 + 新規2匹")).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("shows a plural combined teaser and localises to Simplified Chinese when both counts are 2 (#1945, #1947)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introducedA = makeIntroducedTodayCard(1, "Bulbasaur");
+    const introducedB = makeIntroducedTodayCard(4, "Charmander");
+    const dueTomorrowA = makeDueTomorrowCard(2, "Ivysaur");
+    const dueTomorrowB = makeDueTomorrowCard(5, "Charmeleon");
+    const unseenA = makeUnseenCard(3, "Venusaur");
+    const unseenB = makeUnseenCard(6, "Charizard");
+
+    const allCards = [introducedA, introducedB, dueTomorrowA, dueTomorrowB, unseenA, unseenB];
+    mockSeedPokemon.mockReturnValue(allCards);
+    vi.mocked(loadSession).mockResolvedValue({ cards: allCards, limits: DEFAULT_LIMITS });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 2 });
+
+    renderZhHans(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/今日新卡片已锁定/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("明天有 2 项复习 + 2 张新卡片")).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("shows a plural combined teaser and localises to Traditional Chinese when both counts are 2 (#1945, #1947)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introducedA = makeIntroducedTodayCard(1, "Bulbasaur");
+    const introducedB = makeIntroducedTodayCard(4, "Charmander");
+    const dueTomorrowA = makeDueTomorrowCard(2, "Ivysaur");
+    const dueTomorrowB = makeDueTomorrowCard(5, "Charmeleon");
+    const unseenA = makeUnseenCard(3, "Venusaur");
+    const unseenB = makeUnseenCard(6, "Charizard");
+
+    const allCards = [introducedA, introducedB, dueTomorrowA, dueTomorrowB, unseenA, unseenB];
+    mockSeedPokemon.mockReturnValue(allCards);
+    vi.mocked(loadSession).mockResolvedValue({ cards: allCards, limits: DEFAULT_LIMITS });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 2 });
+
+    renderZhHant(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/今日新卡片已鎖定/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("明天有 2 項複習 + 2 張新卡片")).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("shows the combined teaser and its aria-label on the Higher-or-Lower highlights bar (#1945)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introduced = makeIntroducedTodayCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+    const unseen = makeUnseenCard(3, "Venusaur");
+
+    // introduced and dueTomorrowCard both have firstSeen !== null, so
+    // getSeenPokemon reports 2 distinct species - enough to enable the
+    // Higher-or-Lower entry button.
+    mockSeedPokemon.mockReturnValue([introduced, dueTomorrowCard, unseen]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [introduced, dueTomorrowCard, unseen],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 1 });
+
+    const user = userEvent.setup({ delay: null });
+    renderWithIntl(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: /play higher or lower/i });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /higher or lower mini-game/i }),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("1 + 1 tomorrow")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("1 review and 1 new card due tomorrow"),
+    ).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows the combined teaser and its aria-label on the Higher-or-Lower highlights bar in Simplified Chinese (#1945, #1947)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introduced = makeIntroducedTodayCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+    const unseen = makeUnseenCard(3, "Venusaur");
+
+    mockSeedPokemon.mockReturnValue([introduced, dueTomorrowCard, unseen]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [introduced, dueTomorrowCard, unseen],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 1 });
+
+    const user = userEvent.setup({ delay: null });
+    renderZhHans(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: "高还是低" });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "高还是低小游戏" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("明天1+1")).toBeInTheDocument();
+    expect(screen.getByLabelText("明天有 1 项复习和 1 张新卡片")).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows the combined teaser and its aria-label on the Higher-or-Lower highlights bar in Traditional Chinese (#1945, #1947)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introduced = makeIntroducedTodayCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+    const unseen = makeUnseenCard(3, "Venusaur");
+
+    mockSeedPokemon.mockReturnValue([introduced, dueTomorrowCard, unseen]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [introduced, dueTomorrowCard, unseen],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 1 });
+
+    const user = userEvent.setup({ delay: null });
+    renderZhHant(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: "高還是低" });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "高還是低小遊戲" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("明天1+1")).toBeInTheDocument();
+    expect(screen.getByLabelText("明天有 1 項複習和 1 張新卡片")).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows a singular 'new cards only' teaser on the full summary in English when dueTomorrow is 0 (#1945)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    // No due-tomorrow card in this fixture at all - dueTomorrow must be 0.
+    const introduced = makeIntroducedTodayCard(1, "Bulbasaur");
+    const unseen = makeUnseenCard(2, "Ivysaur");
+
+    mockSeedPokemon.mockReturnValue([introduced, unseen]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [introduced, unseen],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 1 });
+
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/new cards locked for today/i)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("1 new card due tomorrow")).toBeInTheDocument();
+    });
+    // Confirms the combined "N review(s) + M new card(s)" string is NOT used.
+    expect(screen.queryByText(/\+.*due tomorrow/i)).not.toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows a plural 'new cards only' teaser and localises to Japanese when dueTomorrow is 0 (#1945)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introducedA = makeIntroducedTodayCard(1, "Bulbasaur");
+    const introducedB = makeIntroducedTodayCard(3, "Venusaur");
+    const unseenA = makeUnseenCard(2, "Ivysaur");
+    const unseenB = makeUnseenCard(4, "Charmander");
+
+    const allCards = [introducedA, introducedB, unseenA, unseenB];
+    mockSeedPokemon.mockReturnValue(allCards);
+    vi.mocked(loadSession).mockResolvedValue({ cards: allCards, limits: DEFAULT_LIMITS });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 2 });
+
+    renderJa(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/今日の新規カードはロックされています/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("明日は新規2匹")).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("shows a plural 'new cards only' teaser and localises to Simplified Chinese when dueTomorrow is 0 (#1945, #1947)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introducedA = makeIntroducedTodayCard(1, "Bulbasaur");
+    const introducedB = makeIntroducedTodayCard(3, "Venusaur");
+    const unseenA = makeUnseenCard(2, "Ivysaur");
+    const unseenB = makeUnseenCard(4, "Charmander");
+
+    const allCards = [introducedA, introducedB, unseenA, unseenB];
+    mockSeedPokemon.mockReturnValue(allCards);
+    vi.mocked(loadSession).mockResolvedValue({ cards: allCards, limits: DEFAULT_LIMITS });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 2 });
+
+    renderZhHans(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/今日新卡片已锁定/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("明天有 2 张新卡片")).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("shows a plural 'new cards only' teaser and localises to Traditional Chinese when dueTomorrow is 0 (#1945, #1947)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introducedA = makeIntroducedTodayCard(1, "Bulbasaur");
+    const introducedB = makeIntroducedTodayCard(3, "Venusaur");
+    const unseenA = makeUnseenCard(2, "Ivysaur");
+    const unseenB = makeUnseenCard(4, "Charmander");
+
+    const allCards = [introducedA, introducedB, unseenA, unseenB];
+    mockSeedPokemon.mockReturnValue(allCards);
+    vi.mocked(loadSession).mockResolvedValue({ cards: allCards, limits: DEFAULT_LIMITS });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 2 });
+
+    renderZhHant(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/今日新卡片已鎖定/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("明天有 2 張新卡片")).toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("shows the new-cards-only teaser and its aria-label on the Higher-or-Lower highlights bar when dueTomorrow is 0 (#1945)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introduced = makeIntroducedTodayCard(1, "Bulbasaur");
+    const unseen = makeUnseenCard(2, "Ivysaur");
+    // Bumps getSeenPokemon to 2 distinct species without affecting dueTomorrow
+    // or newTomorrow, so the Higher-or-Lower entry button is enabled.
+    const seenNotDue = makeSeenNotDueCard(3, "Venusaur");
+
+    mockSeedPokemon.mockReturnValue([introduced, unseen, seenNotDue]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [introduced, unseen, seenNotDue],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 1 });
+
+    const user = userEvent.setup({ delay: null });
+    renderWithIntl(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: /play higher or lower/i });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /higher or lower mini-game/i }),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("+1 new tomorrow")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("1 new card due tomorrow"),
+    ).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows the new-cards-only teaser and its aria-label on the Higher-or-Lower highlights bar in Simplified Chinese when dueTomorrow is 0 (#1945, #1947)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introduced = makeIntroducedTodayCard(1, "Bulbasaur");
+    const unseen = makeUnseenCard(2, "Ivysaur");
+    const seenNotDue = makeSeenNotDueCard(3, "Venusaur");
+
+    mockSeedPokemon.mockReturnValue([introduced, unseen, seenNotDue]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [introduced, unseen, seenNotDue],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 1 });
+
+    const user = userEvent.setup({ delay: null });
+    renderZhHans(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: "高还是低" });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "高还是低小游戏" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("+1张新卡片")).toBeInTheDocument();
+    expect(screen.getByLabelText("明天有 1 张新卡片")).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows the new-cards-only teaser and its aria-label on the Higher-or-Lower highlights bar in Traditional Chinese when dueTomorrow is 0 (#1945, #1947)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const introduced = makeIntroducedTodayCard(1, "Bulbasaur");
+    const unseen = makeUnseenCard(2, "Ivysaur");
+    const seenNotDue = makeSeenNotDueCard(3, "Venusaur");
+
+    mockSeedPokemon.mockReturnValue([introduced, unseen, seenNotDue]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [introduced, unseen, seenNotDue],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 1 });
+
+    const user = userEvent.setup({ delay: null });
+    renderZhHant(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: "高還是低" });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "高還是低小遊戲" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("+1張新卡片")).toBeInTheDocument();
+    expect(screen.getByLabelText("明天有 1 張新卡片")).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows no tomorrow teaser at all (full summary or bar) when both dueTomorrow and newTomorrow are 0 (#1945)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    // Two fully-graduated cards, both far from due and both already seen (so
+    // the Higher-or-Lower entry button is enabled) - no unseen cards and no
+    // card due tomorrow, so both counts are 0. Graduated reverse counterparts
+    // prevent hydrateSession injecting fresh unseen reverse cards that would
+    // otherwise trigger NEW_CARDS_LOCKED and mask the "all caught up" variant.
+    const seenA = makeSeenNotDueCard(1, "Bulbasaur");
+    const seenB = makeSeenNotDueCard(2, "Ivysaur");
+    const reverseA = makeGraduatedReverseCard(1);
+    const reverseB = makeGraduatedReverseCard(2);
+
+    mockSeedPokemon.mockReturnValue([seenA, seenB]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [seenA, seenB, reverseA, reverseB],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 10 });
+
+    const user = userEvent.setup({ delay: null });
+    renderWithIntl(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/due tomorrow/i)).not.toBeInTheDocument();
+
+    const entryBtn = await screen.findByRole("button", { name: /play higher or lower/i });
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /higher or lower mini-game/i }),
+      ).toBeInTheDocument();
+    });
+    // Scoped to the game/bar view, where the ONLY possible "tomorrow" text is
+    // the due/new-tomorrow span itself (the "nothingDueBody" summary copy
+    // that also mentions "tomorrow" is not part of this view) - so a bare
+    // /tomorrow/i match is a strong signal the span wrongly rendered.
+    expect(screen.queryByText(/tomorrow/i)).not.toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows the reviews-only teaser on the full summary in Japanese when newTomorrow is 0 (#1945, #1951)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    // No unseen name cards at all, so newTomorrow must be 0 regardless of the
+    // new cap - only the reviews-only "dueTomorrow" branch can render. Lands
+    // on NEW_CARDS_LOCKED (maxNewReversePerDay: 0 in baseSettings caps
+    // hydrateSession's fresh reverse cards at 0), but the tomorrow teaser
+    // renders on every end-of-session variant.
+    const seenNotDue = makeSeenNotDueCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+
+    mockSeedPokemon.mockReturnValue([seenNotDue, dueTomorrowCard]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [seenNotDue, dueTomorrowCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 10 });
+
+    renderJa(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/今日の新規カードはロックされています/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("明日は復習1件")).toBeInTheDocument();
+    });
+    vi.useRealTimers();
+  });
+
+  it("shows the reviews-only teaser on the full summary in Simplified Chinese when newTomorrow is 0 (#1945, #1951)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const seenNotDue = makeSeenNotDueCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+
+    mockSeedPokemon.mockReturnValue([seenNotDue, dueTomorrowCard]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [seenNotDue, dueTomorrowCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 10 });
+
+    renderZhHans(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/今日新卡片已锁定/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("明天有 1 项复习到期")).toBeInTheDocument();
+    });
+    vi.useRealTimers();
+  });
+
+  it("shows the reviews-only teaser on the full summary in Traditional Chinese when newTomorrow is 0 (#1945, #1951)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const seenNotDue = makeSeenNotDueCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+
+    mockSeedPokemon.mockReturnValue([seenNotDue, dueTomorrowCard]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [seenNotDue, dueTomorrowCard],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 10 });
+
+    renderZhHant(<ReviewSession />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/今日新卡片已鎖定/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByText("明天有 1 項複習到期")).toBeInTheDocument();
+    });
+    vi.useRealTimers();
+  });
+
+  it("shows the reviews-only teaser and its aria-label on the Higher-or-Lower highlights bar in English when newTomorrow is 0 (#1945, #1951)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    // seenNotDue + dueTomorrowCard give 2 distinct seen species (enables the
+    // Higher-or-Lower entry button) with no unseen cards, so newTomorrow is 0
+    // and only the reviews-only "barDueTomorrow" branch can render. Graduated
+    // reverse counterparts stop hydrateSession injecting fresh unseen reverse
+    // cards that would otherwise trigger NEW_CARDS_LOCKED.
+    const seenNotDue = makeSeenNotDueCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+    const reverseA = makeGraduatedReverseCard(1);
+    const reverseB = makeGraduatedReverseCard(2);
+
+    mockSeedPokemon.mockReturnValue([seenNotDue, dueTomorrowCard]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [seenNotDue, dueTomorrowCard, reverseA, reverseB],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 10 });
+
+    const user = userEvent.setup({ delay: null });
+    renderWithIntl(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: /play higher or lower/i });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: /higher or lower mini-game/i }),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("1 tomorrow")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 review due tomorrow")).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows the reviews-only teaser and its aria-label on the Higher-or-Lower highlights bar in Japanese when newTomorrow is 0 (#1945, #1951)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const seenNotDue = makeSeenNotDueCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+    const reverseA = makeGraduatedReverseCard(1);
+    const reverseB = makeGraduatedReverseCard(2);
+
+    mockSeedPokemon.mockReturnValue([seenNotDue, dueTomorrowCard]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [seenNotDue, dueTomorrowCard, reverseA, reverseB],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 10 });
+
+    const user = userEvent.setup({ delay: null });
+    renderJa(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: "ハイ・ロー勝負" });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("region", { name: "高い or 低いミニゲーム" }),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("明日1件")).toBeInTheDocument();
+    expect(screen.getByLabelText("明日は復習1件が予定されています")).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows the reviews-only teaser and its aria-label on the Higher-or-Lower highlights bar in Simplified Chinese when newTomorrow is 0 (#1945, #1951)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const seenNotDue = makeSeenNotDueCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+    const reverseA = makeGraduatedReverseCard(1);
+    const reverseB = makeGraduatedReverseCard(2);
+
+    mockSeedPokemon.mockReturnValue([seenNotDue, dueTomorrowCard]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [seenNotDue, dueTomorrowCard, reverseA, reverseB],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 10 });
+
+    const user = userEvent.setup({ delay: null });
+    renderZhHans(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: "高还是低" });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "高还是低小游戏" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("明天1项")).toBeInTheDocument();
+    expect(screen.getByLabelText("明天有1项复习到期")).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("shows the reviews-only teaser and its aria-label on the Higher-or-Lower highlights bar in Traditional Chinese when newTomorrow is 0 (#1945, #1951)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-17T12:00:00Z"));
+
+    const seenNotDue = makeSeenNotDueCard(1, "Bulbasaur");
+    const dueTomorrowCard = makeDueTomorrowCard(2, "Ivysaur");
+    const reverseA = makeGraduatedReverseCard(1);
+    const reverseB = makeGraduatedReverseCard(2);
+
+    mockSeedPokemon.mockReturnValue([seenNotDue, dueTomorrowCard]);
+    vi.mocked(loadSession).mockResolvedValue({
+      cards: [seenNotDue, dueTomorrowCard, reverseA, reverseB],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({ ...baseSettings, maxNewPerDay: 10 });
+
+    const user = userEvent.setup({ delay: null });
+    renderZhHant(<ReviewSession />);
+
+    const entryBtn = await screen.findByRole("button", { name: "高還是低" });
+    expect(entryBtn).not.toBeDisabled();
+    await user.click(entryBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: "高還是低小遊戲" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("明天1項")).toBeInTheDocument();
+    expect(screen.getByLabelText("明天有1項複習到期")).toBeInTheDocument();
 
     vi.useRealTimers();
   });
@@ -4259,9 +5123,11 @@ describe("ReviewSession per-locale session (#1562)", () => {
 
     renderWithIntl(<ReviewSession />);
 
-    // No Reveal button - no en card is due.
+    // No Reveal button - no en card is due. Exact match: a loose /reveal/i
+    // match would also catch the end-of-session daily spotlight's "Reveal
+    // the name" button (#1949), which may legitimately be present here.
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: /reveal/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^reveal$/i })).not.toBeInTheDocument();
     });
   });
 

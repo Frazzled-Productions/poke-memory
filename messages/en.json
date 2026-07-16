@@ -408,7 +408,13 @@
     },
     "loadingAriaLabel": "Loading settings",
     "pushOptIn": {
-      "ariaLabel": "Daily review reminder"
+      "ariaLabel": "Daily review reminder",
+      "streakNudge": {
+        "label": "Streak reminder",
+        "description": "A gentle nudge later in the day if you haven't practised yet, to help keep your streak going.",
+        "ariaLabel": "Streak reminder",
+        "disabledHint": "Turn on Daily review reminder first"
+      }
     },
     "qaSeed": {
       "applyAriaLabel": "Apply QA seed: {scenario}",
@@ -477,13 +483,19 @@
     "todayDoneHeadingWithLanguage": "Done today ({language})",
     "nothingDue": "Nothing due right now.",
     "nothingDueBody": "No more cards due today. Come back tomorrow to keep going.",
+    "spotlightHeading": "Pokémon of the day",
+    "spotlightRevealPrompt": "Flip for its name",
+    "spotlightRevealButton": "Reveal the name",
+    "spotlightHiddenAlt": "A Pokémon sprite, name hidden",
     "newCardsLocked": "New cards locked for today",
     "newCardsLockedBody": "You have hit a daily new-card cap. Come back tomorrow for more; keeping this limit prevents tomorrow's review pile from growing too large.",
     "reviewWall": "Daily review limit reached",
     "reviewWallBody": "You have hit a daily review cap. More cards are due. Keep going?",
     "doneForToday": "Done for today",
     "keepReviewing": "Keep reviewing",
-    "dueTomorrow": "{count, plural, one {1 card} other {{count} cards}} due tomorrow",
+    "dueTomorrow": "{count, plural, one {1 review} other {{count} reviews}} due tomorrow",
+    "dueAndNewTomorrow": "{count, plural, one {1 review} other {{count} reviews}} + {newCount, plural, one {1 new card} other {{newCount} new cards}} due tomorrow",
+    "newTomorrow": "{newCount, plural, one {1 new card} other {{newCount} new cards}} due tomorrow",
     "nextCardIn": "Next card in",
     "nextCardHangTight": "Hang tight, a learning card will be ready shortly.",
     "reveal": "Reveal",
@@ -529,6 +541,7 @@
     "cardTypeReverse": "Reverse",
     "cardTypeCry": "Cry",
     "cardTypeReverseEvo": "Reverse evo",
+    "randomEvolutionNote": "<preEvoTag>{preEvoName}</preEvoTag>'s evolution is random: it can become <firstTag>{firstName}</firstTag> or <secondTag>{secondName}</secondTag>.",
     "graduatedHint": "Reviews surface only graduated cards, so one direction can dominate. Cards still in learning steps wait in a separate queue.",
     "todayNew": "new",
     "todayReviewed": "reviewed",
@@ -639,7 +652,11 @@
       "backToSummaryAriaLabel": "Back to session summary",
       "barStreakAriaLabel": "{count, plural, one {# day streak} other {# days streak}}",
       "barDueTomorrow": "{count} tomorrow",
-      "barDueTomorrowAriaLabel": "{count, plural, one {# card due tomorrow} other {# cards due tomorrow}}"
+      "barDueTomorrowAriaLabel": "{count, plural, one {# review due tomorrow} other {# reviews due tomorrow}}",
+      "barDueAndNewTomorrow": "{count} + {newCount} tomorrow",
+      "barDueAndNewTomorrowAriaLabel": "{count, plural, one {# review} other {# reviews}} and {newCount, plural, one {# new card} other {# new cards}} due tomorrow",
+      "barNewTomorrow": "+{newCount} new tomorrow",
+      "barNewTomorrowAriaLabel": "{newCount, plural, one {# new card} other {# new cards}} due tomorrow"
     },
     "typedEntry": {
       "inputAriaLabel": "Type the Pokémon name",
@@ -672,8 +689,9 @@
     "sortClosestToMasteryInfoAriaLabel": "About Closest to mastery sort",
     "sortClosestToMasteryInfoPanel": "Puts Pokémon you are closest to mastering at the top: mastered first, then those you are learning (by review count and interval), then those not yet started. When pretend-all-mastered is on in superuser mode, the sort degenerates to national order.",
     "masteryAll": "All",
+    "masteryNew": "New",
+    "masteryLearning": "Learning",
     "masteryMastered": "Mastered",
-    "masteryNotYet": "Not yet mastered",
     "masteryFilterUnavailable": "Mastery filter unavailable while pretend-all-mastered is on",
     "filterByTypeAriaLabel": "Filter by type",
     "filterByGenerationAriaLabel": "Filter by generation",
@@ -702,7 +720,9 @@
     "lockedSectionHint": "Unlocks when you master this Pokémon.",
     "loadingAriaLabel": "Loading Pokédex",
     "allPokemonAriaLabel": "Pokémon",
-    "generationPokemonAriaLabel": "{name} Pokémon"
+    "generationPokemonAriaLabel": "{name} Pokémon",
+    "firstReviewed": "First reviewed {date}",
+    "mastered": "Mastered"
   },
   "pasture": {
     "title": "Pasture",
@@ -1239,5 +1259,9 @@
       "fixed": "Fixed",
       "security": "Security"
     }
+  },
+  "pushStreak": {
+    "title": "Keep your streak going",
+    "body": "You're on a {days, plural, one {# day} other {# days}} streak. A few minutes today keeps it going."
   }
 }

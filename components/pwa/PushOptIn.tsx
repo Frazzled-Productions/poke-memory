@@ -13,6 +13,7 @@ import {
 } from "@/lib/push/subscribe";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { cardPanelPadded, mutedTextXs } from "@/lib/utils/class-names";
+import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 
 /**
  * Daily-reminder opt-in toggle (#1056).
@@ -62,6 +63,9 @@ export function PushOptIn({
   const [subscribed, setSubscribed] = useState<boolean>(false);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<ErrorReason | null>(null);
+  // Nested "streak reminder" toggle (#1950). Default false; back-fills to
+  // false on read for pre-#1950 records via the settings bool parser.
+  const [streakNudgeEnabled, setStreakNudgeEnabled] = useState<boolean>(false);
 
   // Gate detection runs on mount. The three checks are all sync (or fast
   // async) so the loading window is essentially the first paint after
@@ -112,6 +116,19 @@ export function PushOptIn({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Load the streak-nudge preference once on mount. It rides the existing
+  // JSONB settings blob (no new sync leg), so it is a plain synchronous read.
+  useEffect(() => {
+    setStreakNudgeEnabled(loadSettings().streakNudgeEnabled);
+  }, []);
+
+  const onToggleStreakNudge = useCallback(() => {
+    if (anyFlagOn || !subscribed) return;
+    const next = !streakNudgeEnabled;
+    setStreakNudgeEnabled(next);
+    saveSettings({ ...loadSettings(), streakNudgeEnabled: next });
+  }, [anyFlagOn, subscribed, streakNudgeEnabled]);
+
   const onSubscribe = useCallback(async () => {
     if (anyFlagOn) return;
     setStatus("subscribing");
@@ -135,6 +152,11 @@ export function PushOptIn({
     const result = await unsubscribeFromPush(supabase, user.id);
     if (result.ok) {
       setSubscribed(false);
+      // Consent hygiene (#1950): reset the dependent streak-nudge opt-in so
+      // re-subscribing later requires a fresh, explicit choice rather than
+      // silently reactivating a second notification the user never revisited.
+      setStreakNudgeEnabled(false);
+      saveSettings({ ...loadSettings(), streakNudgeEnabled: false });
     } else {
       setError(result.reason);
     }
@@ -198,6 +220,54 @@ export function PushOptIn({
             />
           </button>
         )}
+      </div>
+      {/* Streak reminder (#1950) - nested under the primary toggle, same card.
+          Distinct opt-in: a second daily notification is a meaningfully
+          different commitment, so it is off by default and only usable once
+          the primary daily reminder is on. Rendered visible-but-disabled
+          rather than hidden when the dependency is unmet, so users discover
+          the capability and understand why it is inert. */}
+      <div className="ml-4 mt-3 flex items-center justify-between gap-4 border-l-2 border-zinc-200 pl-4 dark:border-zinc-700">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-foreground">
+            {t("streakNudge.label")}
+          </p>
+          <p className={`mt-1 ${mutedTextXs}`}>
+            {t("streakNudge.description")}
+          </p>
+          {anyFlagOn ? (
+            <p className={`mt-1 ${mutedTextXs}`}>
+              Notifications are paused while a superuser flag is on.
+            </p>
+          ) : (
+            !subscribed && (
+              <p className={`mt-1 ${mutedTextXs}`}>
+                {t("streakNudge.disabledHint")}
+              </p>
+            )
+          )}
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={streakNudgeEnabled}
+          aria-disabled={!subscribed || anyFlagOn}
+          aria-label={t("streakNudge.ariaLabel")}
+          disabled={!subscribed || anyFlagOn}
+          data-testid="push-streak-optin-button"
+          onClick={onToggleStreakNudge}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+            streakNudgeEnabled
+              ? "bg-foreground"
+              : "bg-zinc-300 dark:bg-zinc-600"
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+              streakNudgeEnabled ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
       </div>
       {permissionDenied && (
         <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">

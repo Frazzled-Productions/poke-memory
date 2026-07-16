@@ -144,10 +144,16 @@ describe('filterPokemon - masteryStatus filter', () => {
     expect(names).toEqual(['charizard', 'squirtle']);
   });
 
-  it('masteryStatus "not-yet-mastered" returns locked and learning pokemon', () => {
-    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, masteryStatus: 'not-yet-mastered' });
+  it('masteryStatus "new" returns only locked pokemon', () => {
+    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, masteryStatus: 'new' });
     const names = result.map((p) => p.name).sort();
-    expect(names).toEqual(['bulbasaur', 'charmander']);
+    expect(names).toEqual(['bulbasaur']);
+  });
+
+  it('masteryStatus "learning" returns only learning pokemon', () => {
+    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, masteryStatus: 'learning' });
+    const names = result.map((p) => p.name).sort();
+    expect(names).toEqual(['charmander']);
   });
 
   it('masteryStatus "mastered" composes with type filter (AND semantics)', () => {
@@ -157,11 +163,18 @@ describe('filterPokemon - masteryStatus filter', () => {
     expect(result[0].name).toBe('charizard');
   });
 
-  it('masteryStatus "not-yet-mastered" composes with type filter', () => {
-    // charmander is fire + not-yet-mastered; charizard is fire but mastered
-    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, types: ['fire'], masteryStatus: 'not-yet-mastered' });
+  it('masteryStatus "learning" composes with type filter', () => {
+    // charmander is fire + learning; charizard is fire but mastered
+    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, types: ['fire'], masteryStatus: 'learning' });
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('charmander');
+  });
+
+  it('masteryStatus "new" composes with type filter', () => {
+    // bulbasaur is grass/poison + locked; no fire pokemon are locked
+    const result = filterPokemon(MASTERY_FIXTURES, { ...noFilters, types: ['grass'], masteryStatus: 'new' });
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('bulbasaur');
   });
 });
 
@@ -353,9 +366,21 @@ describe('parseFilters', () => {
     expect(result.masteryStatus).toBe('mastered');
   });
 
-  it('parses mastery=not-yet-mastered', () => {
-    const result = parseFilters(params({ mastery: 'not-yet-mastered' }));
-    expect(result.masteryStatus).toBe('not-yet-mastered');
+  it('parses mastery=new', () => {
+    const result = parseFilters(params({ mastery: 'new' }));
+    expect(result.masteryStatus).toBe('new');
+  });
+
+  it('parses mastery=learning', () => {
+    const result = parseFilters(params({ mastery: 'learning' }));
+    expect(result.masteryStatus).toBe('learning');
+  });
+
+  it('round-trips all four mastery values through parseFilters', () => {
+    for (const value of ['all', 'new', 'learning', 'mastered'] as const) {
+      const result = parseFilters(params(value === 'all' ? {} : { mastery: value }));
+      expect(result.masteryStatus).toBe(value);
+    }
   });
 
   it('maps missing mastery param to "all"', () => {

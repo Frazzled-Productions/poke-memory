@@ -195,7 +195,7 @@ export default function PokedexFiltered({ enrichedPokemon }: Props) {
   );
 
   // When pretendAllMastered is on, every Pokémon reads as mastered in the grid,
-  // so "not-yet-mastered" would always yield an empty result. Override the
+  // so "new" or "learning" would always yield an empty result. Override the
   // effective mastery filter to "all" so the grid stays coherent.
   const effectiveMasteryStatus: MasteryStatus = flags.pretendAllMastered
     ? "all"

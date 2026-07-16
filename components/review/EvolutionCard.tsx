@@ -3,7 +3,9 @@
 import type { PokemonFact } from "@/lib/pokemon/facts";
 import { EvolutionCardLayout } from "@/components/review/EvolutionCardLayout";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
+import { RandomEvolutionNote } from "@/components/review/RandomEvolutionNote";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import { RANDOM_BRANCH_PRE_EVO_IDS } from "@/lib/pokemon/disambiguateTrigger";
 
 type Props = {
   /**
@@ -99,10 +101,21 @@ export function EvolutionCard({
     </>
   );
 
+  // Some pre-evolutions (currently only Wurmple) have sibling branches chosen
+  // by hidden in-game randomness rather than any encodable condition - both
+  // forward cards legitimately share this prompt, so a caption explains the
+  // ambiguity instead of the card guessing at one answer (#1932). Only the
+  // forward direction needs this: the reverse card names a unique target.
+  const randomEvolutionNote =
+    preEvoId != null && RANDOM_BRANCH_PRE_EVO_IDS.has(preEvoId) ? (
+      <RandomEvolutionNote preEvoId={preEvoId} preEvoName={preEvoName} />
+    ) : null;
+
   return (
     <EvolutionCardLayout
       direction="evolution"
       prompt={prompt}
+      note={randomEvolutionNote}
       hiddenSide="post"
       preEvoSpriteUrl={preEvoSpriteUrl}
       preEvoName={preEvoName}
