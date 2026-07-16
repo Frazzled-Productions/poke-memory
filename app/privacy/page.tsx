@@ -212,8 +212,9 @@ export default async function PrivacyPage() {
             two notifications in a day. The subscription is deleted as soon as
             you turn the daily reminder toggle off, when you delete your
             account, or when your browser or operating system invalidates the
-            endpoint. No notification content includes personal data beyond
-            the count of cards waiting for review.
+            endpoint. Notification content is limited to the number of cards
+            waiting for review (daily reminder) or your current streak length
+            (streak reminder); no other personal data appears in a notification.
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">

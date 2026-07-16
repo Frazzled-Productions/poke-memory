@@ -678,6 +678,9 @@ test.describe("Settings page - Web Push opt-in (#1056)", () => {
       timeout: 10_000,
     });
     await expect(streakToggle).toBeDisabled();
+    // Consent hygiene: the streak opt-in resets to off on unsubscribe, so its
+    // visual state must not stay "true" while disabled (#1950 review).
+    await expect(streakToggle).toHaveAttribute("aria-checked", "false");
   });
 });
 
