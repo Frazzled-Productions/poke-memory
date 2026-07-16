@@ -6,6 +6,25 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.8] - 2026-07-16
+
+### Added
+
+- The end-of-session summary now previews how many new cards tomorrow will introduce alongside the reviews already due, so you can see the full shape of your next session at a glance.
+- The Pokédex detail page now shows a "First reviewed" date for any species you have started, and a "Mastered" badge for species you currently have mastered, turning each entry into a small record of your learning journey.
+- The all-done end-of-session screen now shows a "Pokémon of the day" spotlight: a daily-rotating species with its sprite and a fact, and a "reveal the name" prompt to flip it into view. The same Pokémon shows all day and rotates the next day.
+- Signed-in users can now opt in to a late-day reminder that only fires when their streak is genuinely at risk (they have not practised today and no streak-protection token would save it automatically), never a duplicate of the primary daily reminder.
+
+### Changed
+
+- The Pokédex mastery filter now splits "Not yet mastered" into separate "New" and "Learning" pills, so you can browse only the species you have never seen or only the ones you are actively learning.
+
+### Fixed
+
+- Branching evolutions with identical triggers no longer show two forward cards with the same question but different answers: Cosmoem, Meowth and Wooper now name the game version or regional form in the prompt, and Wurmple (which evolves at random) carries a note that either result is correct.
+- The Pokémon of the day spotlight now shows its sprite and heading straight away rather than waiting for its fact to load, so it no longer appears blank for a moment on a slow connection.
+- Fixed a crash on browsers that block site data or cookies (seen on Windows), where the machine-translation notice and a few other storage reads could throw instead of degrading gracefully.
+
 ## [0.11.7] - 2026-07-15
 
 ### Added
@@ -1840,7 +1859,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.7...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.8...HEAD
+[0.11.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.8
 [0.11.7]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.7
 [0.11.6]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.6
 [0.11.5]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.5
