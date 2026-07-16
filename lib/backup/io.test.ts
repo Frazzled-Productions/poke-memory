@@ -118,6 +118,7 @@ const VALID_SETTINGS: UserSettings = {
   pushNotificationHour: null,
   dismissedMtBannerLocales: [],
   removedLocales: [],
+  streakNudgeEnabled: false,
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

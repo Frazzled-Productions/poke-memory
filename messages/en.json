@@ -408,7 +408,13 @@
     },
     "loadingAriaLabel": "Loading settings",
     "pushOptIn": {
-      "ariaLabel": "Daily review reminder"
+      "ariaLabel": "Daily review reminder",
+      "streakNudge": {
+        "label": "Streak reminder",
+        "description": "A gentle nudge later in the day if you haven't practised yet, to help keep your streak going.",
+        "ariaLabel": "Streak reminder",
+        "disabledHint": "Turn on Daily review reminder first"
+      }
     },
     "qaSeed": {
       "applyAriaLabel": "Apply QA seed: {scenario}",
@@ -1253,5 +1259,9 @@
       "fixed": "Fixed",
       "security": "Security"
     }
+  },
+  "pushStreak": {
+    "title": "Keep your streak going",
+    "body": "You're on a {days, plural, one {# day} other {# days}} streak. A few minutes today keeps it going."
   }
 }

@@ -93,7 +93,17 @@ The Code's 15 standards are assessed below. Each is marked **Met**, **Met (recor
 
 ### 13. Nudge techniques
 
-**Met.** The app uses no dark patterns to push children toward lower-privacy choices or to extend engagement against their interests. The streak counter and daily review limits are study-habit features common to spaced-repetition tools, and the daily review cap actively works against over-engagement by design. The `onboarding.guestStorage.body` copy was updated in #1431 to remove a soft sign-in nudge (the previous hazard-with-remedy framing presented sign-in as the fix for local-storage eviction). Sign-in is now described as a neutral capability (cross-device access) with no urgency framing. This standard should be re-checked whenever engagement-oriented features (notifications, reminders, reward mechanics) are added.
+**Met, re-checked #1950.** The app uses no dark patterns to push children toward lower-privacy choices or to extend engagement against their interests. The streak counter and daily review limits are study-habit features common to spaced-repetition tools, and the daily review cap actively works against over-engagement by design. The `onboarding.guestStorage.body` copy was updated in #1431 to remove a soft sign-in nudge (the previous hazard-with-remedy framing presented sign-in as the fix for local-storage eviction). Sign-in is now described as a neutral capability (cross-device access) with no urgency framing. This standard should be re-checked whenever engagement-oriented features (notifications, reminders, reward mechanics) are added.
+
+**Re-check for #1950 (late-day streak-at-risk push).** A "streak at risk" reminder is inherently a re-engagement nudge, so it was assessed against Standard 13's nudge-technique guidance and found acceptable **only under recorded constraints**, which are conditions of the implementation, not aspirations:
+
+1. **No urgency, anxiety, or loss framing in the copy.** The notification uses factual, encouraging language (e.g. "Keep your streak going - you're on an N-day streak") and must not use loss language ("don't lose your streak!"), exclamation-driven urgency, or guilt. This mirrors the #1431 precedent where a prior nudge was reframed as neutral.
+2. **Frequency cap: at most one at-risk notification per day**, and it must not stack with the primary daily reminder (a collision guard skips the at-risk send when it would land within a few hours of the user's primary reminder). Repeated same-day nudging would itself be an engagement-extension pattern.
+3. **Opt-out is exactly as prominent as opt-in.** The reminder is behind a separate, clearly-labelled, **default-off** Settings toggle, in addition to the primary push permission. It is never auto-enabled under the existing push grant, and the toggle description states plainly what it does.
+4. **No push to under-age / guest accounts** - structurally satisfied: `push_subscriptions` is authenticated-only, guests have no subscription, and the targeting query is scoped to subscription rows by construction.
+5. **No false urgency.** The send is suppressed when the streak is not genuinely at risk that day (e.g. an available streak-protection token would silently bridge the miss), so the app never tells a child their streak is at risk when it is not - an honesty control central to passing Standard 13.
+
+Conclusion: **Met**, with the five constraints above recorded as implementation conditions. See `docs/dpia.md` (purpose 5, R8) for the data-protection side.
 
 ### 14. Connected toys and devices
 
@@ -119,7 +129,7 @@ The Code's 15 standards are assessed below. Each is marked **Met**, **Met (recor
 | 10 | Geolocation | Met (record only) |
 | 11 | Parental controls | Met (not applicable) |
 | 12 | Profiling | Met (record only) |
-| 13 | Nudge techniques | Met (updated #1431) |
+| 13 | Nudge techniques | Met (re-checked #1950) |
 | 14 | Connected toys and devices | Met (not applicable) |
 | 15 | Online tools | Met |
 
@@ -203,5 +213,5 @@ This assessment should be revisited if any of the following change:
 - The app UI is translated into a new locale, or machine-translated copy is replaced by human-reviewed copy.
 - Social, community, or user-to-user features are added.
 - Advertising, marketing, affiliate, or behavioural-profiling integrations are added.
-- Engagement mechanics (push notifications, reminders, reward loops) are added - re-check Standard 13.
+- Engagement mechanics (push notifications, reminders, reward loops) are added - re-check Standard 13. (Fired by #1950: the late-day streak-at-risk push was re-checked against Standard 13 and found Met under five recorded copy/frequency/opt-out/no-false-urgency constraints - see Standard 13 above.)
 - Geolocation or any new category of personal data starts being collected.

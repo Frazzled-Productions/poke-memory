@@ -537,6 +537,15 @@ export type UserSettings = {
    * undefined on read (trigger treats absent OLD as '' for the comparison).
    */
   onboardingResetAt?: string;
+  /**
+   * Opt-in for the late-day "streak at risk" push (#1950). Default false: a
+   * second daily notification is a meaningfully different commitment from the
+   * primary daily reminder, so it must be explicitly enabled, not inherited
+   * from push-subscription presence alone. Stored inside the JSONB blob (rides
+   * the existing best-effort settings sync leg, no new column); absent in
+   * pre-#1950 records - the bool parser back-fills to false on read.
+   */
+  streakNudgeEnabled: boolean;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -601,6 +610,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   dismissedMtBannerLocales: [],
   // Default []: absent in pre-#1568 records; back-fills to empty array on read.
   removedLocales: [],
+  // Default false: opt-in, not inherited from push-subscription presence (#1950).
+  streakNudgeEnabled: false,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -878,6 +889,8 @@ function parseStoredSettings(raw: string | null): UserSettings {
     // Absent in records that predate the first onboarding reset; back-fills to
     // undefined so the trigger treats it as '' (no bypass).
     onboardingResetAt: typeof obj.onboardingResetAt === 'string' ? obj.onboardingResetAt : undefined,
+    // Default false: absent in pre-#1950 records (#1950).
+    streakNudgeEnabled: bool(obj, "streakNudgeEnabled"),
   };
 }
 

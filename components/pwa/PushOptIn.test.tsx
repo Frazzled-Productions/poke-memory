@@ -14,10 +14,23 @@
  * project picks it up (per AGENTS.md "Testing").
  */
 
-import { renderWithIntl as render, renderJa, screen } from "@/components/test-utils/renderWithIntl";
-import { waitFor, fireEvent, act } from "@testing-library/react";
+import {
+  renderWithIntl as render,
+  renderJa,
+  renderZhHans,
+  renderZhHant,
+  screen,
+} from "@/components/test-utils/renderWithIntl";
+import type { ReactElement } from "react";
+import { waitFor, fireEvent, act, cleanup } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import {
+  DEFAULT_SETTINGS,
+  loadSettings,
+  saveSettings,
+} from "@/lib/settings/persistence";
+import type { UserSettings } from "@/lib/settings/persistence";
 
 // ---------------------------------------------------------------------------
 // Mocks - declared before the component import.
@@ -87,6 +100,7 @@ beforeEach(() => {
   mockUnsubscribeFromPush.mockResolvedValue({ ok: true });
   mockUseSuperuser.mockReturnValue({ anyFlagOn: false });
   setNotificationPermission("default");
+  window.localStorage.clear();
 });
 
 // ---------------------------------------------------------------------------
@@ -300,6 +314,191 @@ describe("PushOptIn - localised aria-label", () => {
 // ---------------------------------------------------------------------------
 // Permission-denied explainer branch.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Streak reminder toggle (#1950) - nested under the primary toggle.
+// ---------------------------------------------------------------------------
+
+describe("PushOptIn - streak reminder toggle", () => {
+  function settingsWith(overrides: Partial<UserSettings>): UserSettings {
+    return { ...DEFAULT_SETTINGS, ...overrides };
+  }
+
+  it("defaults OFF and is DISABLED (aria-disabled) while the primary toggle is off", async () => {
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const primary = await screen.findByTestId("push-optin-button");
+    await waitFor(() => {
+      expect(primary.getAttribute("aria-checked")).toBe("false");
+    });
+
+    const streakToggle = await screen.findByTestId("push-streak-optin-button");
+    expect(streakToggle.getAttribute("aria-checked")).toBe("false");
+    expect(streakToggle.getAttribute("aria-disabled")).toBe("true");
+    expect(streakToggle.hasAttribute("disabled")).toBe(true);
+    // The dependency hint is shown while the primary toggle is off.
+    expect(
+      screen.getByText(/turn on daily review reminder first/i),
+    ).toBeTruthy();
+  });
+
+  it("becomes enabled once the primary toggle is subscribed", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const primary = await screen.findByTestId("push-optin-button");
+    await waitFor(() => {
+      expect(primary.getAttribute("aria-checked")).toBe("true");
+    });
+
+    const streakToggle = await screen.findByTestId("push-streak-optin-button");
+    await waitFor(() => {
+      expect(streakToggle.hasAttribute("disabled")).toBe(false);
+    });
+    expect(streakToggle.getAttribute("aria-disabled")).toBe("false");
+    expect(
+      screen.queryByText(/turn on daily review reminder first/i),
+    ).toBeNull();
+  });
+
+  it("reflects a previously-persisted streakNudgeEnabled=true on load", async () => {
+    saveSettings(settingsWith({ streakNudgeEnabled: true }));
+    mockHasLocalSubscription.mockResolvedValue(true);
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const streakToggle = await screen.findByTestId("push-streak-optin-button");
+    await waitFor(() => {
+      expect(streakToggle.getAttribute("aria-checked")).toBe("true");
+    });
+  });
+
+  it("toggling persists streakNudgeEnabled via saveSettings", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const streakToggle = await screen.findByTestId("push-streak-optin-button");
+    await waitFor(() => {
+      expect(streakToggle.hasAttribute("disabled")).toBe(false);
+    });
+
+    await act(async () => {
+      fireEvent.click(streakToggle);
+    });
+
+    await waitFor(() => {
+      expect(streakToggle.getAttribute("aria-checked")).toBe("true");
+    });
+    expect(loadSettings().streakNudgeEnabled).toBe(true);
+
+    await act(async () => {
+      fireEvent.click(streakToggle);
+    });
+    await waitFor(() => {
+      expect(streakToggle.getAttribute("aria-checked")).toBe("false");
+    });
+    expect(loadSettings().streakNudgeEnabled).toBe(false);
+  });
+
+  it("clicking while disabled does not toggle or persist", async () => {
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const streakToggle = await screen.findByTestId("push-streak-optin-button");
+    await waitFor(() => {
+      expect(streakToggle.hasAttribute("disabled")).toBe(true);
+    });
+
+    await act(async () => {
+      fireEvent.click(streakToggle);
+    });
+
+    expect(streakToggle.getAttribute("aria-checked")).toBe("false");
+    expect(loadSettings().streakNudgeEnabled).toBe(false);
+  });
+
+  it("is disabled when a superuser flag is on, even with a subscribed primary toggle", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    mockUseSuperuser.mockReturnValue({ anyFlagOn: true });
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const streakToggle = await screen.findByTestId("push-streak-optin-button");
+    expect(streakToggle.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("shows the superuser-paused reason (not the primary-off hint) when a flag is on, even if subscribed", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    mockUseSuperuser.mockReturnValue({ anyFlagOn: true });
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    await screen.findByTestId("push-streak-optin-button");
+    expect(
+      screen.getByText(/notifications are paused while a superuser flag is on/i),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(/turn on daily review reminder first/i),
+    ).toBeNull();
+  });
+
+  it("resets streakNudgeEnabled to false when the primary toggle is turned off", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    saveSettings(settingsWith({ streakNudgeEnabled: true }));
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const primary = await screen.findByTestId("push-optin-button");
+    await waitFor(() => {
+      expect(primary.getAttribute("aria-checked")).toBe("true");
+    });
+    const streakToggle = await screen.findByTestId("push-streak-optin-button");
+    await waitFor(() => {
+      expect(streakToggle.getAttribute("aria-checked")).toBe("true");
+    });
+
+    await act(async () => {
+      fireEvent.click(primary);
+    });
+
+    await waitFor(() => {
+      expect(primary.getAttribute("aria-checked")).toBe("false");
+    });
+    await waitFor(() => {
+      expect(streakToggle.getAttribute("aria-checked")).toBe("false");
+    });
+    expect(loadSettings().streakNudgeEnabled).toBe(false);
+  });
+
+  it("renders the label and helper text in en, ja, zh-Hans, and zh-Hant", async () => {
+    const cases: Array<{
+      renderFn: (ui: ReactElement) => unknown;
+      label: string;
+      description: string;
+    }> = [
+      {
+        renderFn: render,
+        label: "Streak reminder",
+        description:
+          "A gentle nudge later in the day if you haven't practised yet, to help keep your streak going.",
+      },
+      {
+        renderFn: renderJa,
+        label: "ストリークリマインダー",
+        description:
+          "まだ練習していない場合、その日の後半にもう一度やさしく通知して、ストリークを続けられるようお手伝いします。",
+      },
+      {
+        renderFn: renderZhHans,
+        label: "连胜提醒",
+        description:
+          "如果你当天还没有练习，我们会在当天稍晚再温柔地提醒你一次，帮助你继续保持连胜。",
+      },
+      {
+        renderFn: renderZhHant,
+        label: "連勝提醒",
+        description:
+          "如果你當天還沒有練習，我們會在當天稍晚再溫柔地提醒你一次，幫助你繼續保持連勝。",
+      },
+    ];
+
+    for (const { renderFn, label, description } of cases) {
+      renderFn(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+      const toggle = await screen.findByTestId("push-streak-optin-button");
+      expect(toggle.getAttribute("aria-label")).toBe(label);
+      expect(screen.getByText(label)).toBeTruthy();
+      expect(screen.getByText(description)).toBeTruthy();
+      cleanup();
+    }
+  });
+});
 
 describe("PushOptIn - permission denied", () => {
   it("shows the iOS Settings explainer when Notification.permission is 'denied'", async () => {
