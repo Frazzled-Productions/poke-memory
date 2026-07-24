@@ -198,6 +198,21 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 
 ---
 
+### `dependabot-hotfix-label.yml` - Dependabot hotfix label
+
+| | |
+|---|---|
+| **Trigger** | `pull_request_target: [opened, synchronize, reopened]` |
+| **Job** | `label` (`Apply hotfix label`) |
+| **What it does** | Dependabot SECURITY-advisory PRs ignore `target-branch` in `dependabot.yml` and always open against `main`, where they immediately fail the required `Restrict main PR source` check (`main-pr-source-gate.yml`). Auto-retargeting the base to `qa` doesn't stick - Dependabot resets it back to `main` on its next push (#1942) - so this workflow instead applies the `hotfix` label, the bypass `main-pr-source-gate.yml` already understands. Guarded to `github.actor == 'dependabot[bot]'` with `base.ref == 'main'`, so normal version-update PRs (which already target `qa`) never match. |
+| **Token** | Mints a `poke-memory-bot` App installation token (`actions/create-github-app-token@v3`, same pattern as `qa-issue-label.yml`) for the label mutation. The default `GITHUB_TOKEN` cannot be used here: GitHub suppresses new workflow runs for events triggered by `GITHUB_TOKEN`, so a `github.token`-applied label would never re-fire `main-pr-source-gate.yml`'s `labeled` trigger and the gate would stay red. |
+| **`pull_request_target` trust boundary** | No `actions/checkout`, no execution of PR-head code; only reads `github.event.pull_request` fields and calls `gh pr edit --add-label`. |
+| **Activation caveat** | Because `pull_request_target` resolves the workflow definition from the PR's BASE branch, this has no effect on `main`-targeted Dependabot PRs until the file itself is promoted `qa -> main`. Landing it on `qa` alone does not activate it. |
+| **Required check** | No - convenience labelling only. |
+| **Concurrency** | Cancels concurrent runs on the same PR. |
+
+---
+
 ### `migration-check.yml` - Migration drift check
 
 | | |
