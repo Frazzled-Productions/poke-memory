@@ -174,7 +174,7 @@ E2E smoke tests run automatically against Vercel preview deployments in CI.
 `package.json`'s `overrides` block pins transitive dependencies that npm/Dependabot can't bump directly because nothing in `package.json` names them:
 
 - `postcss` - pinned to clear a prior transitive advisory (no direct dependency to bump).
-- `@babel/core` (`>=7.29.6`) - clears Dependabot alert #13 (arbitrary file read via a `sourceMappingURL` comment, patched in 7.29.6). `@babel/core` arrives via `@sentry/nextjs` → `@sentry/bundler-plugin-core` (build-time only, not shipped to the deployed app) and via `eslint-config-next` → `eslint-plugin-react-hooks`. Drop this override once `@sentry/nextjs` ships a `@sentry/bundler-plugin-core` release that pulls a patched `@babel/core` on its own (check with `npm ls @babel/core` after a routine Sentry bump).
+- `@babel/core` (`^7.29.6`) - clears Dependabot alert #13 (arbitrary file read via a `sourceMappingURL` comment, patched in 7.29.6). Pinned to the `7.x` line deliberately, not an open-ended range: `@babel/core@8` is a major version, and an open range would force it across the build toolchain, a bigger blast radius than the advisory needs. `@babel/core` arrives via `@sentry/nextjs` → `@sentry/bundler-plugin-core` (build-time only, not shipped to the deployed app) and via `eslint-config-next` → `eslint-plugin-react-hooks`. Drop this override once `@sentry/nextjs` ships a `@sentry/bundler-plugin-core` release that pulls a patched `@babel/core` on its own (check with `npm ls @babel/core` after a routine Sentry bump).
 
 ## Development
 
