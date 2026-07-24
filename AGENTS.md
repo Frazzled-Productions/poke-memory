@@ -63,7 +63,7 @@ Principle + forcing-function requirement: `ops/standards/conventions.md` → Sin
 
 - `useLocalePokemonName(id, fallback)` from `lib/i18n/useLocalePokemonName.ts` - Pokémon name rendering (locale-aware).
 - `formatDate(iso, fmt, tz)` / `formatShortDate(iso, fmt)` from `lib/utils/format-date.ts` - user-facing date display. `todayInTimezone(tz)` for the current day boundary; `isoDate(d)` for the scheduling-internal `"YYYY-MM-DD"` form.
-- `isMastered(state, masteryRepetitions)` from `lib/stats/derive.ts` - single mastery check.
+- `isMastered(state)` from `lib/stats/derive.ts` - single mastery check.
 - `filterMastered(cards, …)` from `lib/pasture/arrivals.ts` - mastery filter honouring the superuser `forceAllMastered` axis.
 - `computeStats(…)` from `lib/stats/derive.ts` - aggregate stats with the same superuser axis.
 - `masteredSpeciesIds(…)` from `lib/badges/derive.ts` - mastered species set.
@@ -143,7 +143,7 @@ Canonical reference: **[docs/sprites.md](docs/sprites.md)**. Headline rules:
 Canonical reference: **[docs/srs.md](docs/srs.md)**. Headline facts:
 
 - **Grading**: `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5), mapped to FSRS's `Rating` enum at the boundary in `lib/srs/scheduler.ts`.
-- **Mastery**: `reps >= masteryRepetitions && scheduledDays >= 21`.
+- **Mastery**: `stability >= MASTERY_STABILITY_DAYS` (21). The old `reps >= 3` sub-gate was removed in #1765 - `MASTERY_REPETITIONS` still exists for test fixtures and QA-seed descriptions, but must NOT be used in any new mastery-checking code path. A lapse that drops stability below 21 reverts a species to learning; gym badges are latched separately and stay earned.
 - **Dates**: scheduling-internal dates are `"YYYY-MM-DD"` UTC strings; user-facing day boundaries (today / streak / daily cap) are timezone-aware via `todayInTimezone(tz)` + `user_settings.timezone` (migration 019). Pass the user's tz through display/daily-cap code; stay UTC inside the scheduler.
 - **Scheduler is pure**, in `lib/srs/`. `nextReview(state, grade, now, options?)` is the single chokepoint reading `retentionTarget`.
 
