@@ -476,7 +476,7 @@ jobs:
           git config user.name "poke-memory-bot[bot]"
           git config user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           # Node major is read from .nvmrc (single source of truth). Drifting to
           # an older major here fails `npm ci` with a missing @swc/helpers
@@ -938,7 +938,7 @@ jobs:
           git config user.name "poke-memory-bot[bot]"
           git config user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           # Node major is read from .nvmrc (single source of truth). Drifting to
           # an older major here fails `npm ci` with a missing @swc/helpers
