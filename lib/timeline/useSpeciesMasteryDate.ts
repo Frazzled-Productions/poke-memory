@@ -74,7 +74,6 @@ export function useSpeciesMasteryDate(
 
   useEffect(() => {
     let cancelled = false;
-    setDate(null);
     void loadSpeciesMasteryDates(locale, forceAllMastered).then((map) => {
       if (!cancelled) setDate(map.get(speciesId) ?? null);
     });
