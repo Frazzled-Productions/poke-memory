@@ -42,6 +42,15 @@ NAMED_KEYS: dict[str, tuple[int, int, int]] = {
     "magenta": (255, 0, 255),  # fallback when the subject contains green
 }
 
+# Per-key default colour-distance threshold. The API does not reliably render a pure, saturated
+# magenta backdrop (it tends to come back as a muted ~(205, 30, 183) rather than (255, 0, 255)),
+# which sits further from the nominal magenta key than a typical green render sits from the
+# nominal green key. Using the green default (0.18) on a magenta render leaves the background at
+# a partial alpha (a visible magenta tint) instead of fully transparent - found while fixing #831's
+# starter-badge leaves. Verified against the badge set's own artwork (leaf/flame/water-droplet
+# colours) staying well outside this band, so raising it does not eat legitimate subject pixels.
+DEFAULT_THRESHOLD: dict[str, float] = {"green": 0.18, "magenta": 0.24}
+
 
 def _parse_key(key: str) -> tuple[int, int, int]:
     """Resolve a key name ('green'/'magenta') or a 6-hex 'RRGGBB' to an (r, g, b) tuple."""
@@ -60,11 +69,26 @@ def _alpha_min(img: Image.Image) -> int:
     return int(np.asarray(img)[..., 3].min())
 
 
-def assert_has_transparency(img: Image.Image, *, source: str = "output") -> None:
-    """Raise if `img` has no transparent pixels (the white/green-box guard).
+_CORNER_ALPHA_MAX = 10  # a genuinely-keyed corner should be all but fully transparent
+_MIN_TRANSPARENT_FRACTION = 0.02  # at least 2% of the image should be true background (alpha<=CORNER_ALPHA_MAX)
 
-    A correct chroma-key MUST punch some pixels out, so an alpha minimum of 255 means the key did
-    nothing and the subject would render on an opaque (green) box. Fail loudly rather than ship it.
+
+def assert_has_transparency(img: Image.Image, *, source: str = "output") -> None:
+    """Raise if `img` doesn't have a genuinely-transparent background (the white/green-box guard).
+
+    Two checks, because a single alpha-minimum check missed a real regression (#831 starter-badge
+    magenta background left the whole background at a partial ~90 alpha rather than 0 - the key
+    matched *some* pixels but not fully, so `alpha.min() < 255` alone passed while the badge still
+    shipped with a visible tinted background):
+
+    1. Alpha minimum below full-opaque - a correct chroma-key MUST punch some pixels fully out, so
+       an alpha minimum of 255 means the key did nothing.
+    2. The four corners (background territory on every centred-medallion badge in this set) are
+       near-zero alpha, AND at least a small fraction of the whole image is near-zero alpha - not
+       just "the darkest pixel happens to be under 255", which a wrongly-thresholded key still
+       satisfies.
+
+    Fail loudly rather than ship a translucent-background badge.
     """
     amin = _alpha_min(img)
     if amin >= 255:
@@ -72,14 +96,36 @@ def assert_has_transparency(img: Image.Image, *, source: str = "output") -> None
             f"{source} has a fully-opaque alpha channel (alpha min == {amin}); chroma-key produced "
             "NO transparency. Check the --key / --threshold for this image.")
 
+    if img.mode != "RGBA":
+        return
+    arr = np.asarray(img)
+    alpha = arr[..., 3]
+    h, w = alpha.shape
+    corners = [alpha[0, 0], alpha[0, w - 1], alpha[h - 1, 0], alpha[h - 1, w - 1]]
+    bad_corners = [int(a) for a in corners if a > _CORNER_ALPHA_MAX]
+    if bad_corners:
+        raise ValueError(
+            f"{source} has non-transparent corner pixel(s) (alpha={bad_corners}, want <= "
+            f"{_CORNER_ALPHA_MAX}); the background was only partially keyed out (a visible tint "
+            "would ship). Check the --key / --threshold for this image.")
+
+    transparent_fraction = float((alpha <= _CORNER_ALPHA_MAX).mean())
+    if transparent_fraction < _MIN_TRANSPARENT_FRACTION:
+        raise ValueError(
+            f"{source} has only {transparent_fraction:.1%} near-zero-alpha background pixels "
+            f"(want >= {_MIN_TRANSPARENT_FRACTION:.0%}); the chroma-key barely punched through. "
+            "Check the --key / --threshold for this image.")
+
 
 def chroma_key(in_path: str, out_path: str, *, key: str = "green",
-               threshold: float = 0.18, softness: float = 0.08,
+               threshold: float | None = None, softness: float = 0.08,
                despill: float = 1.0, erode: int = 1, feather: float = 1.0,
                resize: int | None = None, sanity_check: bool = True) -> str:
     """Lift the subject off a chroma screen and write a transparent PNG. Returns out_path.
 
     threshold: colour-distance (0-1) at/under which a pixel is fully keyed-out (transparent).
+               Defaults to `DEFAULT_THRESHOLD[key]` when not given (0.18 for green, 0.24 for
+               magenta - the API's magenta renders are less saturated than its greens).
     softness:  distance band above the threshold over which alpha ramps 0->255 (the soft edge).
     despill:   0-1 strength of pulling the screen channel back on kept pixels (rim de-greening).
     erode:     pixels of alpha erosion to bite off the last screen fringe (0 to disable).
@@ -87,6 +133,8 @@ def chroma_key(in_path: str, out_path: str, *, key: str = "green",
     resize:    if set, the final square size in px (NEAREST resampling, keeps pixel-art crisp).
     """
     key_rgb = np.array(_parse_key(key), dtype=np.float32)
+    if threshold is None:
+        threshold = DEFAULT_THRESHOLD.get(key.strip().lower(), 0.18)
     src = Image.open(in_path).convert("RGBA")
     arr = np.asarray(src, dtype=np.float32)
     rgb = arr[..., :3]
@@ -147,7 +195,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("in_path")
     ap.add_argument("out_path")
     ap.add_argument("--key", default="green", help="green | magenta | RRGGBB hex")
-    ap.add_argument("--threshold", type=float, default=0.18)
+    ap.add_argument("--threshold", type=float, default=None,
+                     help="colour-distance threshold; defaults to DEFAULT_THRESHOLD[key] (0.18 green, 0.24 magenta)")
     ap.add_argument("--softness", type=float, default=0.08)
     ap.add_argument("--despill", type=float, default=1.0)
     ap.add_argument("--erode", type=int, default=1)

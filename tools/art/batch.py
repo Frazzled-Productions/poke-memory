@@ -48,9 +48,10 @@ def run(manifest_path: str, out_dir: str = DEFAULT_OUT_DIR, only: set[str] | Non
         if dry_run:
             print(f"[dry-run] {asset_id}: generate -> {raw_path}, chroma-key -> {out_path}")
             continue
-        print(f"generating {asset_id} ...")
-        generate(asset["prompt"], raw_path, aspect="1:1")
-        chroma_key(raw_path, out_path, resize=resize)
+        key = asset.get("key", "green")
+        print(f"generating {asset_id} (key={key}) ...")
+        generate(asset["prompt"], raw_path, aspect="1:1", key=key)
+        chroma_key(raw_path, out_path, resize=resize, key=key)
         print(f"wrote {out_path}")
 
 

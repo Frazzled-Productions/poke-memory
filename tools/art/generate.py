@@ -37,20 +37,34 @@ KEY_PATH = os.environ.get("POKE_MEMORY_GEMINI_API_KEY_PATH", DEFAULT_KEY_PATH)
 DEFAULT_MODEL = "gemini-3-pro-image"  # Nano Banana Pro
 
 # Prepended to every prompt so the full 17-badge set shares one readable, consistent pixel-art
-# look. Kept in lockstep with README.md's style notes.
-STYLE_PREAMBLE = (
-    "Poke Memory gym-badge icon, true 8-bit / 16-bit retro pixel-art style: hard pixel edges, no "
-    "anti-aliasing, no gradients, limited flat colour palette per icon, strong black or dark "
-    "outline around every shape so the icon stays readable at small sizes (it renders as small as "
-    "40x40 CSS pixels in the app). Compose as a single chunky badge/medallion emblem, centred, "
-    "filling most of the frame, in the classic circular-pin gym-badge silhouette (a simple "
-    "geometric medallion, star-points or gem-cut edge, NOT a photo-real object). Palette: warm "
-    "saturated jewel tones (this badge's own theme colour) with a metallic gold or silver rim "
-    "highlight, consistent line weight across the whole set. Absolutely NO text, letters or "
-    "numbers in the image. Background is a solid flat chroma-key green (#00B140), completely "
-    "uniform, no shading, no texture, no vignette, filling every pixel outside the badge shape "
-    "edge to edge, so the background can be keyed out to transparency afterwards. "
-)
+# look. Kept in lockstep with README.md's style notes. `style_preamble(key)` parameterises only
+# the chroma-screen colour so a badge whose own artwork contains green (e.g. a leaf) can be
+# rendered on magenta instead, without the green screen eating the artwork during chroma-keying.
+_SCREEN_HEX = {"green": "#00B140", "magenta": "#FF00FF"}
+
+
+def style_preamble(key: str = "green") -> str:
+    screen_hex = _SCREEN_HEX[key]
+    return (
+        "Poke Memory gym-badge icon, true 8-bit / 16-bit retro pixel-art style: hard pixel edges, no "
+        "anti-aliasing, no gradients, limited flat colour palette per icon, strong black or dark "
+        "outline around every shape so the icon stays readable at small sizes (it renders as small as "
+        "40x40 CSS pixels in the app). Compose as a single chunky badge/medallion emblem, centred, "
+        "filling most of the frame, in the classic circular-pin gym-badge silhouette (a simple "
+        "geometric medallion, star-points or gem-cut edge, NOT a photo-real object), unless the "
+        "prompt below explicitly specifies a different medallion silhouette, in which case follow "
+        "that instead. Palette: warm saturated jewel tones (this badge's own theme colour) with a "
+        "metallic rim highlight (gold, silver, bronze, copper or dark iron as specified below), "
+        "consistent line weight across the whole set. Absolutely NO text, letters or numbers in the "
+        f"image. Background is a solid flat chroma-key {key} ({screen_hex}), completely uniform, no "
+        "shading, no texture, no vignette, filling every pixel outside the badge shape edge to edge, "
+        "so the background can be keyed out to transparency afterwards. "
+    )
+
+
+# Backwards-compatible module-level constant (green screen), used by anything that imports it
+# directly rather than calling style_preamble().
+STYLE_PREAMBLE = style_preamble("green")
 
 
 def _api_key() -> str:
@@ -66,20 +80,22 @@ def _api_key() -> str:
 
 def generate(prompt: str, out_path: str, refs: list[str] | None = None,
              model: str = DEFAULT_MODEL, with_style: bool = True,
-             aspect: str | None = None, size: str | None = None) -> str:
+             aspect: str | None = None, size: str | None = None, key: str = "green") -> str:
     """Generate one image to out_path. `refs` are reference/edit input images (paths). Returns out_path.
 
     `aspect` sets the output aspect ratio ("1:1", "16:9", "9:16", "4:3", "3:4", "21:9"). `size` sets
     the resolution ("1K", "2K", "4K"). Badge art defaults to a 1:1 square medallion; without an
     explicit aspect the API returns a 1:1 1024px square by default anyway, so badges rarely need
-    to pass either flag.
+    to pass either flag. `key` picks the chroma-screen colour ("green" or "magenta") baked into
+    the style preamble - use "magenta" for any badge whose own artwork is green (e.g. a leaf),
+    since a green screen would eat green artwork during chroma-keying.
     """
     parts: list[dict] = []
     for ref in refs or []:
         mime = mimetypes.guess_type(ref)[0] or "image/png"
         parts.append({"inlineData": {"mimeType": mime,
                                      "data": base64.b64encode(open(ref, "rb").read()).decode()}})
-    parts.append({"text": (STYLE_PREAMBLE + prompt) if with_style else prompt})
+    parts.append({"text": (style_preamble(key) + prompt) if with_style else prompt})
 
     gen_config: dict = {"responseModalities": ["IMAGE"]}
     image_config: dict = {}
@@ -118,9 +134,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-style", action="store_true", help="do not prepend the badge style preamble")
     ap.add_argument("--aspect", help='output aspect ratio: 1:1, 16:9, 9:16, 4:3, 3:4, 21:9 (default 1:1)')
     ap.add_argument("--size", help='output resolution: 1K, 2K, 4K (default 1K)')
+    ap.add_argument("--key", default="green", help='chroma-screen colour to render on: green | magenta')
     args = ap.parse_args(argv)
     path = generate(args.prompt, args.out, refs=args.ref, model=args.model,
-                    with_style=not args.no_style, aspect=args.aspect, size=args.size)
+                    with_style=not args.no_style, aspect=args.aspect, size=args.size, key=args.key)
     print("wrote", path)
     return 0
 
