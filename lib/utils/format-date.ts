@@ -167,6 +167,37 @@ export function formatChartDate(iso: string, fmt: DateFormat): string {
 }
 
 /**
+ * Month + year only, no day - for values whose real precision doesn't
+ * support a day-level claim (e.g. the FSRS-replay-derived mastery date on
+ * the Pokédex detail page, #1956). Always English (en-GB/en-US), matching
+ * every other formatter in this file - date rendering is locale-format
+ * (`dmy`/`mdy`/`iso`) driven, not `appLocale`-driven, across the app.
+ *
+ * Examples (iso = "2026-03-14"):
+ *   dmy / dmy-year → "March 2026"
+ *   mdy / mdy-year → "March 2026"
+ *   iso            → "2026-03"
+ */
+export function formatMonthYear(iso: string, fmt: DateFormat): string {
+  try {
+    if (fmt === "iso") {
+      const [year, month] = iso.split("-");
+      if (!year || !month) return iso;
+      return `${year}-${month}`;
+    }
+    const d = new Date(iso + "T12:00:00Z");
+    const localeTag = fmt === "mdy" || fmt === "mdy-year" ? "en-US" : "en-GB";
+    return new Intl.DateTimeFormat(localeTag, {
+      timeZone: "UTC",
+      month: "long",
+      year: "numeric",
+    }).format(d);
+  } catch {
+    return iso;
+  }
+}
+
+/**
  * Inspect the user's locale to infer a sensible default DateFormat.
  * Heuristic:
  *   - If the locale formats a known date with year first → 'iso'

@@ -27,6 +27,7 @@ import { nextReview, initialReviewState, type ReviewState, type Grade } from "@/
 import { isMastered, MASTERY_REPETITIONS, MASTERY_INTERVAL_DAYS } from "@/lib/stats/derive";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import type { AppLocale } from "@/i18n/locales";
+import { isoDate } from "@/lib/utils/format-date";
 import { computeDecayFactor, generatorParameters } from "ts-fsrs";
 
 // Compute FSRS power-law decay/factor once from the default parameters.
@@ -114,13 +115,25 @@ function groupByCard(
 
 /**
  * Map from species subjectKey to the epoch-ms timestamps of:
- *   firstSeen - when this species was first graded (for any card type)
- *   masteredAt - when it first crossed the mastery threshold
- *               (null if never mastered in the log)
+ *   firstSeen      - when this species was first graded (for any card type)
+ *   masteredAtMs   - when it FIRST crossed the mastery threshold (null if
+ *                    never mastered in the log). Never revoked by a later
+ *                    lapse (#1448) - this is what the aggregate past
+ *                    timeline uses, so a species that lapses still counts
+ *                    towards "mastered" at every checkpoint after its first
+ *                    crossing.
+ *   lastMasteredAtMs - when it MOST RECENTLY crossed the mastery threshold
+ *                    (null if never mastered in the log). Updates again
+ *                    after a lapse-then-remaster cycle, unlike masteredAtMs.
+ *                    Added for #1956 (per-species mastery date on the
+ *                    Pokédex detail page): a badge that is true NOW should
+ *                    carry the date of the run that made it true now, not
+ *                    silently omit an intervening lapse.
  */
 type SpeciesEvent = {
   firstSeenMs: number;
   masteredAtMs: number | null;
+  lastMasteredAtMs: number | null;
 };
 
 const VALID_GRADES = new Set([1, 2, 4, 5]);
@@ -146,12 +159,15 @@ function replayLog(
   // Per-species output keyed by subjectKey (numeric species ID string).
   const speciesEvents = new Map<string, SpeciesEvent>();
 
-  // Track per-species whether each leg (name / reverse) has crossed the
-  // mastery gate, and when. Species mastery requires BOTH legs (#1448/#1234).
-  // nameMasteredAtMs / reverseMasteredAtMs store the epoch-ms when each leg
-  // first crossed, so we can record `masteredAtMs` as the later of the two.
-  const nameMasteredAtMs = new Map<string, number>();
-  const reverseMasteredAtMs = new Map<string, number>();
+  // Track per-species, per-leg CURRENT mastery (not just first crossing) so
+  // we can detect every name+reverse transition into species-level mastery,
+  // including a re-crossing after a lapse (#1956). Species mastery requires
+  // BOTH legs currently mastered (#1448/#1234).
+  const nameLegMastered = new Map<string, boolean>();
+  const reverseLegMastered = new Map<string, boolean>();
+  // Species-level "currently mastered" from the previous entry, used to spot
+  // a false → true transition (a crossing) as we replay chronologically.
+  const speciesCurrentlyMastered = new Map<string, boolean>();
 
   const byCard = groupByCard(log);
 
@@ -192,54 +208,51 @@ function replayLog(
       const existing = speciesEvents.get(speciesKey);
       const firstSeenMs = existing?.firstSeenMs ?? entry.occurredAt;
       if (existing === undefined) {
-        speciesEvents.set(speciesKey, { firstSeenMs, masteredAtMs: null });
+        speciesEvents.set(speciesKey, {
+          firstSeenMs,
+          masteredAtMs: null,
+          lastMasteredAtMs: null,
+        });
       }
-
-      // Record when the name leg first crossed mastery.
-      if (nowMastered && !nameMasteredAtMs.has(speciesKey)) {
-        nameMasteredAtMs.set(speciesKey, entry.occurredAt);
-        // Check whether the reverse leg was already mastered - if so, this
-        // grade completes species-level mastery.
-        const revMs = reverseMasteredAtMs.get(speciesKey);
-        if (revMs !== undefined) {
-          const speciesmasteredAtMs = Math.max(entry.occurredAt, revMs);
-          const ev = speciesEvents.get(speciesKey);
-          if (ev !== undefined && ev.masteredAtMs === null) {
-            speciesEvents.set(speciesKey, {
-              firstSeenMs: ev.firstSeenMs,
-              masteredAtMs: speciesmasteredAtMs,
-            });
-          }
-        }
-      }
+      nameLegMastered.set(speciesKey, nowMastered);
     } else if (entry.cardType === "reverse") {
-      // Record when the reverse leg first crossed mastery.
-      if (nowMastered && !reverseMasteredAtMs.has(speciesKey)) {
-        reverseMasteredAtMs.set(speciesKey, entry.occurredAt);
-        // Check whether the name leg was already mastered - if so, this
-        // grade completes species-level mastery.
-        const nameMs = nameMasteredAtMs.get(speciesKey);
-        if (nameMs !== undefined) {
-          const speciesmasteredAtMs = Math.max(entry.occurredAt, nameMs);
-          const ev = speciesEvents.get(speciesKey);
-          if (ev !== undefined && ev.masteredAtMs === null) {
-            speciesEvents.set(speciesKey, {
-              firstSeenMs: ev.firstSeenMs,
-              masteredAtMs: speciesmasteredAtMs,
-            });
-          } else if (ev === undefined) {
-            // Defensive: species event absent (e.g. log begins with reverse
-            // entries after a local reset + cloud pull). Create it now.
-            speciesEvents.set(speciesKey, {
-              firstSeenMs: entry.occurredAt,
-              masteredAtMs: speciesmasteredAtMs,
-            });
-          }
-        }
+      // Defensive: species event absent (e.g. log begins with reverse
+      // entries after a local reset + cloud pull). Create it now.
+      if (!speciesEvents.has(speciesKey)) {
+        speciesEvents.set(speciesKey, {
+          firstSeenMs: entry.occurredAt,
+          masteredAtMs: null,
+          lastMasteredAtMs: null,
+        });
+      }
+      reverseLegMastered.set(speciesKey, nowMastered);
+    } else {
+      // Evolution and other card types don't map 1:1 to a species
+      // introduction; they contribute to per-card FSRS state tracking but
+      // not to species-level mastery legs.
+      continue;
+    }
+
+    // Species-level mastery requires BOTH legs currently mastered
+    // (#1448/#1234). Detect a false → true transition (a crossing) at this
+    // entry's timestamp - this fires again after a lapse-then-remaster
+    // cycle, which is exactly what `lastMasteredAtMs` needs to track (#1956).
+    const speciesNowMastered =
+      (nameLegMastered.get(speciesKey) ?? false) &&
+      (reverseLegMastered.get(speciesKey) ?? false);
+    const wasSpeciesMastered = speciesCurrentlyMastered.get(speciesKey) ?? false;
+
+    if (speciesNowMastered && !wasSpeciesMastered) {
+      const ev = speciesEvents.get(speciesKey);
+      if (ev !== undefined) {
+        speciesEvents.set(speciesKey, {
+          firstSeenMs: ev.firstSeenMs,
+          masteredAtMs: ev.masteredAtMs ?? entry.occurredAt,
+          lastMasteredAtMs: entry.occurredAt,
+        });
       }
     }
-    // Evolution and other card types don't map 1:1 to a species introduction;
-    // they contribute to per-card FSRS state tracking but not to species events.
+    speciesCurrentlyMastered.set(speciesKey, speciesNowMastered);
   }
 
   return speciesEvents;
@@ -535,7 +548,11 @@ export function buildCollectionTimeline(
     const syntheticMs = nowMs - DAILY_RESOLUTION_DAYS * 86_400_000 - 1;
     speciesEvents = new Map();
     for (const key of currentNameCards.keys()) {
-      speciesEvents.set(key, { firstSeenMs: syntheticMs, masteredAtMs: syntheticMs });
+      speciesEvents.set(key, {
+        firstSeenMs: syntheticMs,
+        masteredAtMs: syntheticMs,
+        lastMasteredAtMs: syntheticMs,
+      });
     }
   } else {
     speciesEvents = replayLog(localeLog);
@@ -583,6 +600,72 @@ export function snapshotAtPosition(
   const idx = Math.round(position * (timeline.future.length - 1));
   const clamped = Math.max(0, Math.min(timeline.future.length - 1, idx));
   return timeline.future[clamped];
+}
+
+// ---------------------------------------------------------------------------
+// Per-species mastery dates (#1956, rescoped: derive, don't store)
+// ---------------------------------------------------------------------------
+
+export type SpeciesMasteryDatesOptions = {
+  /** Grade log from loadGradeLog(). */
+  log: readonly GradeLogEntry[];
+  /** Active pokemonNameLocale - see the locale-isolation note on `locale`
+   * in `BuildTimelineOptions` above; the same reasoning applies here. */
+  locale: AppLocale;
+  /**
+   * Superuser pretendAllMastered flag. The flag fakes CURRENT mastery
+   * without altering grade-log history, so there is no real crossing to
+   * report while it is on - this returns an empty map rather than
+   * fabricating a date, and the caller's date-less "Mastered" badge (driven
+   * independently by the flag) still renders correctly.
+   */
+  forceAllMastered?: boolean;
+};
+
+/**
+ * Reconstruct, for every species with a recoverable mastery crossing in the
+ * grade log, the epoch-ms timestamp of its MOST RECENT crossing (deliberately
+ * not the first) - a species that lapsed and was re-mastered reports the date
+ * of the run that made the badge true NOW, rather than silently carrying the
+ * date of an earlier run that the badge no longer reflects (#1956).
+ *
+ * Reuses the SAME replay pass as `buildCollectionTimeline`'s past direction
+ * (`replayLog`) rather than running a second, parallel replay - see the
+ * SRS-expert verdict in the module docstring above for the accuracy bar this
+ * inherits: default FSRS weights (not per-user optimised), month-level
+ * granularity only, legacy entries without `subjectKey` skipped.
+ *
+ * Guest users lose grade-log entries older than 365 days (`pruneGradeLog`) -
+ * a species mastered further back than that has no recoverable crossing and
+ * is simply absent from the returned map. Callers must degrade gracefully to
+ * the existing date-less "Mastered" badge in that case, never fabricate or
+ * guess a date.
+ *
+ * @returns Map from numeric species ID to a "YYYY-MM-DD" UTC date string
+ *          (the day of the most recent crossing - render at month
+ *          granularity only, per the accuracy bar above).
+ */
+export function buildSpeciesMasteryDates(
+  opts: SpeciesMasteryDatesOptions,
+): Map<number, string> {
+  const { log, locale, forceAllMastered = false } = opts;
+  const result = new Map<number, string>();
+
+  if (forceAllMastered) return result;
+
+  // Per-locale isolation (#1851/#1562) - see the matching note in
+  // `buildCollectionTimeline`.
+  const localeLog = log.filter((entry) => (entry.locale ?? "en") === locale);
+  const speciesEvents = replayLog(localeLog);
+
+  for (const [speciesKey, ev] of speciesEvents) {
+    if (ev.lastMasteredAtMs === null) continue;
+    const speciesId = Number(speciesKey);
+    if (!Number.isFinite(speciesId)) continue;
+    result.set(speciesId, isoDate(new Date(ev.lastMasteredAtMs)));
+  }
+
+  return result;
 }
 
 // Re-export for consumers that need to check mastery in their own context.
