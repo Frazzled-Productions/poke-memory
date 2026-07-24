@@ -15,9 +15,15 @@ name: Dependabot hotfix label
 # already understands — no retargeting, no flip-flopping.
 #
 # main-pr-source-gate.yml listens on `pull_request: [..., labeled, ...]` for
-# `branches: [main]`, so adding the label here fires GitHub's own `labeled`
-# event and the existing gate re-evaluates and passes on its own. No
-# additional cross-trigger is needed.
+# `branches: [main]`. GitHub deliberately does NOT fire that event for label
+# mutations made with the default `GITHUB_TOKEN` (its recursion-prevention
+# rule: "events triggered by the GITHUB_TOKEN will not create a new workflow
+# run"). So the label step below mints a `poke-memory-bot` App installation
+# token and uses that for the `gh pr edit --add-label` call, matching the
+# pattern already used in qa-issue-label.yml, auto-close-umbrella.yml and
+# auto-retro-harvest.yml. The App-attributed `labeled` event DOES cascade,
+# so the gate re-evaluates and passes on its own without any further
+# cross-trigger.
 #
 # Guard: actor must be `dependabot[bot]` AND the PR base must be `main`.
 # Normal Dependabot version-update PRs already target `qa` (per
@@ -54,9 +60,16 @@ jobs:
     permissions:
       pull-requests: write
     steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
       - name: Apply hotfix label if missing
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
