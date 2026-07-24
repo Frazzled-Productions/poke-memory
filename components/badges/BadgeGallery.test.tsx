@@ -11,6 +11,7 @@ const BOULDER: BadgeDefinition = {
   description: "You've mastered Brock's roster.",
   lockedHint: "A Kanto gym leader's rocky roster…",
   criterion: { kind: "all-mastered", speciesIds: [74, 95] },
+  artwork: "/badges/boulder-badge.png",
 };
 
 const CASCADE: BadgeDefinition = {
@@ -19,6 +20,7 @@ const CASCADE: BadgeDefinition = {
   description: "You've mastered Misty's roster.",
   lockedHint: "A Cerulean gym leader favours the sea…",
   criterion: { kind: "all-mastered", speciesIds: [120, 121] },
+  artwork: "/badges/cascade-badge.png",
 };
 
 describe("BadgeGallery proximity hint", () => {

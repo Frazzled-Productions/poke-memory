@@ -9,6 +9,7 @@ const CATALOG: readonly BadgeDefinition[] = [
     description: "",
     lockedHint: "Three legendary wings soar above Kanto…",
     criterion: { kind: "all-mastered", speciesIds: [144, 145, 146] },
+    artwork: "/badges/birds.png",
   },
   {
     id: "starters",
@@ -16,6 +17,7 @@ const CATALOG: readonly BadgeDefinition[] = [
     description: "",
     lockedHint: "Three Kanto partners and the paths they grow into…",
     criterion: { kind: "all-mastered", speciesIds: [1, 4, 7] },
+    artwork: "/badges/starters.png",
   },
 ];
 
@@ -87,6 +89,7 @@ describe("checkBadges", () => {
         description: "",
         lockedHint: "…",
         criterion: { kind: "all-mastered", speciesIds: [] },
+        artwork: "/badges/empty-criterion.png",
       },
     ];
     const result = checkBadges(

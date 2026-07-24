@@ -1076,7 +1076,9 @@
       "earnedAriaLabel": "Earned gym badges",
       "lockedAriaLabel": "Locked gym badges",
       "hideLocked": "Hide locked badges ({count})",
-      "viewAll": "View all badges ({count} locked)"
+      "viewAll": "View all badges ({count} locked)",
+      "earnedArtworkAlt": "{name} badge artwork",
+      "lockedArtworkAlt": "Locked badge silhouette"
     },
     "masteryExplainer": {
       "title": "What the rings mean",

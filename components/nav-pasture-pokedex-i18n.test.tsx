@@ -241,6 +241,7 @@ const STUB_BADGE: BadgeDefinition = {
   description: "You've mastered Brock's roster.",
   lockedHint: "A Kanto gym leader's rocky roster…",
   criterion: { kind: "all-mastered", speciesIds: [74, 95] },
+  artwork: "/badges/boulder-badge.png",
 };
 
 describe("BadgeGallery - locale coverage", () => {
@@ -283,6 +284,54 @@ describe("BadgeGallery - locale coverage", () => {
     expect(
       screen.getByRole("heading", { level: 3, name: "道館徽章" }),
     ).toBeInTheDocument();
+  });
+
+  // Badge artwork alt text (#831) - earned tiles carry the badge name in the
+  // image alt; locked tiles use a generic non-spoiler alt (no badge name).
+  it("en: earned badge artwork alt text includes the badge name", () => {
+    renderWithIntl(<BadgeGallery earnedBadges={[STUB_BADGE]} />);
+    expect(
+      screen.getByAltText("Boulder Badge badge artwork"),
+    ).toBeInTheDocument();
+  });
+
+  it("ja: earned badge artwork alt text is localised", () => {
+    renderJa(<BadgeGallery earnedBadges={[STUB_BADGE]} />);
+    expect(
+      screen.getByAltText("Boulder Badgeバッジのアートワーク"),
+    ).toBeInTheDocument();
+  });
+
+  it("zh-Hans: earned badge artwork alt text is localised", () => {
+    renderZhHans(<BadgeGallery earnedBadges={[STUB_BADGE]} />);
+    expect(
+      screen.getByAltText("Boulder Badge徽章插图"),
+    ).toBeInTheDocument();
+  });
+
+  it("zh-Hant: earned badge artwork alt text is localised", () => {
+    renderZhHant(<BadgeGallery earnedBadges={[STUB_BADGE]} />);
+    expect(
+      screen.getByAltText("Boulder Badge徽章插圖"),
+    ).toBeInTheDocument();
+  });
+
+  it("en: locked badge artwork alt text is generic (no badge name leaked)", () => {
+    renderWithIntl(<BadgeGallery earnedBadges={[]} />);
+    const toggle = screen.getByRole("button", { name: /View all badges/i });
+    fireEvent.click(toggle);
+    expect(
+      screen.getAllByAltText("Locked badge silhouette").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("ja: locked badge artwork alt text is localised and generic", () => {
+    renderJa(<BadgeGallery earnedBadges={[]} />);
+    const toggle = screen.getByRole("button", { name: /すべてのバッジを表示/ });
+    fireEvent.click(toggle);
+    expect(
+      screen.getAllByAltText("ロックされたバッジのシルエット").length,
+    ).toBeGreaterThan(0);
   });
 });
 

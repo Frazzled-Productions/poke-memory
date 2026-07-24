@@ -193,6 +193,7 @@ describe("TrainerCard", () => {
             description: "Eevee + all eight evolutions.",
             lockedHint: "One adaptable Pokémon…",
             criterion: { kind: "all-mastered", speciesIds: [133] },
+            artwork: "/badges/eeveelutions.png",
           },
           {
             id: "cascade-badge",
@@ -200,6 +201,7 @@ describe("TrainerCard", () => {
             description: "x",
             lockedHint: "A Cerulean gym leader favours the sea…",
             criterion: { kind: "all-mastered", speciesIds: [120, 121] },
+            artwork: "/badges/cascade-badge.png",
           },
         ]}
       />,
@@ -258,6 +260,7 @@ describe("TrainerCard - locale coverage (i18n #1393)", () => {
             description: "Test badge",
             lockedHint: "Hint",
             criterion: { kind: "all-mastered", speciesIds: [1] },
+            artwork: "/badges/test-badge.png",
           },
         ]}
       />,

@@ -1076,7 +1076,9 @@
       "earnedAriaLabel": "已獲得的道館徽章",
       "lockedAriaLabel": "未獲得的道館徽章",
       "hideLocked": "隱藏未獲得的徽章（{count} 個）",
-      "viewAll": "查看所有徽章（{count} 個已鎖定）"
+      "viewAll": "查看所有徽章（{count} 個已鎖定）",
+      "earnedArtworkAlt": "{name}徽章插圖",
+      "lockedArtworkAlt": "已鎖定徽章的剪影"
     },
     "masteryExplainer": {
       "title": "圓環含義",
