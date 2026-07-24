@@ -127,6 +127,17 @@ vi.mock("@/lib/settings/persistence", async (importOriginal) => ({
     mockLoadSettings()) as typeof import("@/lib/settings/persistence").loadSettings,
 }));
 
+// useSpeciesMasteryDate (#1956) - default to null so existing tests (which
+// predate the derived mastery date) are unaffected; the dedicated describe
+// block below overrides this to exercise both states (recoverable /
+// unrecoverable crossing).
+const { mockMasteryDate } = vi.hoisted(() => ({
+  mockMasteryDate: { value: null as string | null },
+}));
+vi.mock("@/lib/timeline/useSpeciesMasteryDate", () => ({
+  useSpeciesMasteryDate: () => mockMasteryDate.value,
+}));
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -858,6 +869,7 @@ describe("PokemonDetailDisclosure - journey line (#1948)", () => {
     mockPretendAllMastered.value = false;
     mockPokemonLocale.value = "en";
     mockLegStatusMap.value = new Map();
+    mockMasteryDate.value = null;
   });
 
   it("never-seen species: shows neither first-reviewed nor Mastered", async () => {
@@ -991,5 +1003,103 @@ describe("PokemonDetailDisclosure - journey line (#1948)", () => {
       await screen.findByText(`首次學習: ${EXPECTED_DATE}`),
     ).toBeInTheDocument();
     expect(screen.getByText("已掌握")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests - approximate mastery date (#1956, rescoped: derive, don't store)
+// ---------------------------------------------------------------------------
+
+import { formatMonthYear } from "@/lib/utils/format-date";
+
+describe("PokemonDetailDisclosure - approximate mastery date (#1956)", () => {
+  const MASTERY_DATE_ISO = "2026-03-27";
+  const EXPECTED_MONTH = formatMonthYear(MASTERY_DATE_ISO, "dmy");
+
+  beforeEach(() => {
+    mockPretendAllMastered.value = false;
+    mockPokemonLocale.value = "en";
+    mockLegStatusMap.value = new Map();
+    mockLoadSession.mockResolvedValue({ cards: [] });
+  });
+
+  it("state WITH a recoverable crossing: mastered species shows 'Mastered around <month year>'", () => {
+    mockCardClass.value = "mastered";
+    mockMasteryDate.value = MASTERY_DATE_ISO;
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+
+    expect(screen.getByText("Mastered")).toBeInTheDocument();
+    expect(
+      screen.getByText(`Mastered around ${EXPECTED_MONTH}`),
+    ).toBeInTheDocument();
+    // Never a day-level claim - the annotation must not carry a day digit.
+    expect(screen.queryByText(/27/)).not.toBeInTheDocument();
+  });
+
+  it("state WITHOUT a recoverable crossing: mastered species still shows the date-less 'Mastered' badge", () => {
+    mockCardClass.value = "mastered";
+    mockMasteryDate.value = null;
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+
+    expect(screen.getByText("Mastered")).toBeInTheDocument();
+    expect(screen.queryByText(/Mastered around/)).not.toBeInTheDocument();
+  });
+
+  it("not-mastered state: no 'Mastered around' text even if a stray date were resolved", () => {
+    mockCardClass.value = "learning";
+    mockMasteryDate.value = MASTERY_DATE_ISO;
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+
+    expect(screen.queryByText("Mastered")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Mastered around/)).not.toBeInTheDocument();
+  });
+
+  it("locked state: no 'Mastered around' text", () => {
+    mockCardClass.value = "locked";
+    mockMasteryDate.value = MASTERY_DATE_ISO;
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+
+    expect(screen.queryByText(/Mastered around/)).not.toBeInTheDocument();
+  });
+
+  it("superuser pretendAllMastered on: badge shows without a fabricated date", () => {
+    mockCardClass.value = "locked";
+    mockPretendAllMastered.value = true;
+    // The hook itself returns null under forceAllMastered - simulate that.
+    mockMasteryDate.value = null;
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+
+    expect(screen.getByText("Mastered")).toBeInTheDocument();
+    expect(screen.queryByText(/Mastered around/)).not.toBeInTheDocument();
+  });
+
+  it("renders the mastered-around label in Japanese", () => {
+    mockCardClass.value = "mastered";
+    mockMasteryDate.value = MASTERY_DATE_ISO;
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "ja" });
+
+    expect(
+      screen.getByText(`${EXPECTED_MONTH}頃に習得`),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the mastered-around label in Simplified Chinese", () => {
+    mockCardClass.value = "mastered";
+    mockMasteryDate.value = MASTERY_DATE_ISO;
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "zh-Hans" });
+
+    expect(
+      screen.getByText(`约 ${EXPECTED_MONTH} 掌握`),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the mastered-around label in Traditional Chinese", () => {
+    mockCardClass.value = "mastered";
+    mockMasteryDate.value = MASTERY_DATE_ISO;
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />, { locale: "zh-Hant" });
+
+    expect(
+      screen.getByText(`約 ${EXPECTED_MONTH} 掌握`),
+    ).toBeInTheDocument();
   });
 });

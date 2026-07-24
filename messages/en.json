@@ -722,7 +722,8 @@
     "allPokemonAriaLabel": "Pokémon",
     "generationPokemonAriaLabel": "{name} Pokémon",
     "firstReviewed": "First reviewed {date}",
-    "mastered": "Mastered"
+    "mastered": "Mastered",
+    "masteredAround": "Mastered around {date}"
   },
   "pasture": {
     "title": "Pasture",

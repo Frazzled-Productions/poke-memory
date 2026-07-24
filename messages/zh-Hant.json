@@ -722,7 +722,8 @@
     "allPokemonAriaLabel": "寶可夢列表",
     "generationPokemonAriaLabel": "{name}的寶可夢",
     "firstReviewed": "首次學習: {date}",
-    "mastered": "已掌握"
+    "mastered": "已掌握",
+    "masteredAround": "約 {date} 掌握"
   },
   "pasture": {
     "title": "牧場",
