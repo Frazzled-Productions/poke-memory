@@ -1,0 +1,73 @@
+name: Dependabot hotfix label
+
+# Dependabot SECURITY updates ignore `target-branch` in dependabot.yml and are
+# always opened against the repository's default branch (`main`), even though
+# both ecosystems set `target-branch: "qa"` for scheduled version updates.
+# That lands every security-advisory PR on `main`, where it immediately fails
+# the required `Restrict main PR source` gate (main-pr-source-gate.yml), which
+# only allows a `qa` head branch or the `hotfix` label.
+#
+# An earlier design (#1963) tried auto-retargeting these PRs to `qa` via
+# `gh pr edit --base qa`. That does not stick: Dependabot resets the base back
+# to `main` on its next push (confirmed on #1942), so a retarget workflow
+# would just flip-flop the base on every Dependabot commit. This workflow
+# instead applies the `hotfix` label, the bypass main-pr-source-gate.yml
+# already understands — no retargeting, no flip-flopping.
+#
+# main-pr-source-gate.yml listens on `pull_request: [..., labeled, ...]` for
+# `branches: [main]`, so adding the label here fires GitHub's own `labeled`
+# event and the existing gate re-evaluates and passes on its own. No
+# additional cross-trigger is needed.
+#
+# Guard: actor must be `dependabot[bot]` AND the PR base must be `main`.
+# Normal Dependabot version-update PRs already target `qa` (per
+# dependabot.yml) and never match this, so only the security-update path is
+# affected.
+#
+# `pull_request_target` runs with a token scoped to the BASE branch's
+# workflow file, which is required here because a Dependabot PR carries a
+# read-only token under plain `pull_request`. Per pull_request_target's trust
+# boundary: this workflow never checks out or executes PR-head code — it only
+# reads `github.event.pull_request` fields and calls `gh pr edit --add-label`.
+#
+# NOTE: because `pull_request_target` resolves the workflow definition from
+# the PR's base branch, this only takes effect once the file itself has been
+# promoted to `main` (qa -> main). Landing it on `qa` alone does not activate
+# it for `main`-targeted Dependabot PRs.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: dependabot-hotfix-label-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Apply hotfix label
+    if: >-
+      github.actor == 'dependabot[bot]'
+      && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Apply hotfix label if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          set -euo pipefail
+
+          # jq -e exits non-zero when no element matches; stdout suppressed.
+          if echo "$PR_LABELS" | jq -e '.[] | select(.name == "hotfix")' >/dev/null; then
+            echo "PR #$PR already carries the 'hotfix' label; nothing to do."
+            exit 0
+          fi
+
+          echo "Labelling Dependabot PR #$PR 'hotfix' to clear the main-pr-source-gate."
+          gh pr edit "$PR" --repo "$REPO" --add-label "hotfix"
