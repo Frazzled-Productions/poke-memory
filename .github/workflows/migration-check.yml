@@ -30,7 +30,7 @@ jobs:
     if: github.event_name == 'push' || (github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]')
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       # Env-to-branch parity (#1806): a PR into `qa` rehearses the migration on

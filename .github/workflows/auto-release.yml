@@ -86,7 +86,7 @@ jobs:
       # engines.node ("24.x") + engine-strict (#1512); without a pin the runner
       # defaults to an older major and `npm install` below fails EBADENGINE,
       # which broke the release job (#210).
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
 

@@ -8,9 +8,11 @@
 import { describe, it, expect } from "vitest";
 import {
   buildCollectionTimeline,
+  buildSpeciesMasteryDates,
   snapshotAtPosition,
   type BuildTimelineOptions,
   type CollectionTimeline,
+  type SpeciesMasteryDatesOptions,
 } from "./reconstruct";
 import { initialReviewState, type ReviewState } from "@/lib/srs/scheduler";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
@@ -599,5 +601,130 @@ describe("buildCollectionTimeline locale isolation (#1851)", () => {
     // Under ja the same entries drive the replay.
     const underJa = buildCollectionTimeline(baseOpts({ log: jaLog, locale: "ja" }));
     expect(underJa.past).not.toEqual(emptyLog.past);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildSpeciesMasteryDates (#1956, rescoped: derive, don't store)
+// ---------------------------------------------------------------------------
+
+function masteryDatesOpts(
+  extra: Partial<SpeciesMasteryDatesOptions> = {},
+): SpeciesMasteryDatesOptions {
+  return { log: [], locale: "en", ...extra };
+}
+
+/** Both legs' graduation sequence used by the #1448 tests above, reused here
+ * so a species crosses species-level mastery (both name + reverse) at the
+ * final offset in `offsets`. */
+function makeGraduationLog(
+  subjectKey: string,
+  baseTime: number,
+  offsets: number[],
+  reverseTimeOffsetMs = 500,
+): GradeLogEntry[] {
+  const nameLog = offsets.map((o) => ({
+    date: "2026-01-01",
+    grade: 4 as GradeLogEntry["grade"],
+    cardType: "name" as const,
+    occurredAt: baseTime + o * DAY_MS,
+    subjectKey,
+  }));
+  const reverseLog = offsets.map((o) => ({
+    date: "2026-01-01",
+    grade: 4 as GradeLogEntry["grade"],
+    cardType: "reverse" as const,
+    occurredAt: baseTime + o * DAY_MS + reverseTimeOffsetMs,
+    subjectKey,
+  }));
+  return [...nameLog, ...reverseLog];
+}
+
+describe("buildSpeciesMasteryDates", () => {
+  it("returns an empty map for an empty log (not-mastered state, no crossing)", () => {
+    const result = buildSpeciesMasteryDates(masteryDatesOpts());
+    expect(result.size).toBe(0);
+  });
+
+  it("reports a recoverable crossing date for a species that reaches mastery (both legs)", () => {
+    const baseTime = NOW_MS - 50 * DAY_MS;
+    const log = makeGraduationLog("1", baseTime, [0, 1, 2, 9, 20]);
+    const result = buildSpeciesMasteryDates(masteryDatesOpts({ log }));
+    expect(result.has(1)).toBe(true);
+    expect(result.get(1)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("omits a species with no recoverable crossing (name-only grades, reverse leg absent)", () => {
+    const baseTime = NOW_MS - 50 * DAY_MS;
+    const log: GradeLogEntry[] = [0, 1, 2, 9, 20].map((o) => ({
+      date: "2026-01-01",
+      grade: 4,
+      cardType: "name",
+      occurredAt: baseTime + o * DAY_MS,
+      subjectKey: "1",
+    }));
+    const result = buildSpeciesMasteryDates(masteryDatesOpts({ log }));
+    expect(result.has(1)).toBe(false);
+  });
+
+  it("reports the MOST RECENT crossing, not the first, after a lapse then re-mastery", () => {
+    const baseTime = NOW_MS - 100 * DAY_MS;
+    // First graduation, crossing around day 20.
+    const firstMastery = makeGraduationLog("1", baseTime, [0, 1, 2, 9, 20]);
+    // Lapse the name leg (Again) at day 25 - drops stability below the
+    // mastery threshold (verified: this specific offset/grade sequence is
+    // the same one used by the #1448 "not revoked" aggregate test).
+    const lapse: GradeLogEntry = {
+      date: "2026-01-01",
+      grade: 1,
+      cardType: "name",
+      occurredAt: baseTime + 25 * DAY_MS,
+      subjectKey: "1",
+    };
+    // Re-graduate the name leg; the reverse leg never lapsed, so the species
+    // re-crosses mastery on the name leg's final Good grade at day 55.
+    const reGraduateName: GradeLogEntry[] = [26, 27, 28, 35, 55].map((o) => ({
+      date: "2026-01-01",
+      grade: 4,
+      cardType: "name",
+      occurredAt: baseTime + o * DAY_MS,
+      subjectKey: "1",
+    }));
+    const log = [...firstMastery, lapse, ...reGraduateName];
+
+    const firstOnly = buildSpeciesMasteryDates(
+      masteryDatesOpts({ log: firstMastery }),
+    );
+    const withLapse = buildSpeciesMasteryDates(masteryDatesOpts({ log }));
+
+    expect(firstOnly.has(1)).toBe(true);
+    expect(withLapse.has(1)).toBe(true);
+    // The re-crossing date must be later than the first crossing date - the
+    // badge is true again because of the day-55 run, not the day-20 run.
+    expect(withLapse.get(1)! > firstOnly.get(1)!).toBe(true);
+  });
+
+  it("degrades gracefully to an empty map under the superuser pretendAllMastered flag", () => {
+    const baseTime = NOW_MS - 50 * DAY_MS;
+    const log = makeGraduationLog("1", baseTime, [0, 1, 2, 9, 20]);
+    const result = buildSpeciesMasteryDates(
+      masteryDatesOpts({ log, forceAllMastered: true }),
+    );
+    // No real crossing exists under the flag - never fabricate a date.
+    expect(result.size).toBe(0);
+  });
+
+  it("respects locale isolation - entries from another locale do not leak in (#1851)", () => {
+    const baseTime = NOW_MS - 50 * DAY_MS;
+    const jaLog = makeGraduationLog("1", baseTime, [0, 1, 2, 9, 20]).map((e) => ({
+      ...e,
+      locale: "ja" as const,
+    }));
+    const underEn = buildSpeciesMasteryDates(masteryDatesOpts({ log: jaLog }));
+    expect(underEn.size).toBe(0);
+    const underJa = buildSpeciesMasteryDates(
+      masteryDatesOpts({ log: jaLog, locale: "ja" }),
+    );
+    expect(underJa.has(1)).toBe(true);
   });
 });

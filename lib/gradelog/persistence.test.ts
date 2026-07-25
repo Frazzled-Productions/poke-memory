@@ -196,6 +196,60 @@ describe("appendGradeEntry (IDB-backed)", () => {
   });
 });
 
+// #1978 review fix: GRADE_LOG_CHANGED_EVENT is the single choke point
+// lib/timeline/useSpeciesMasteryDate.ts listens on to invalidate its
+// module-level replay cache. Every writer in this module - append, save
+// (bulk overwrite from a cloud pull/merge), and remove (undo) - must fire it.
+describe("GRADE_LOG_CHANGED_EVENT", () => {
+  let dispatched: string[];
+
+  beforeEach(async () => {
+    await resetIdb();
+    dispatched = [];
+    vi.stubGlobal("window", {
+      indexedDB: globalThis.indexedDB,
+      localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+      dispatchEvent: (e: Event) => {
+        dispatched.push(e.type);
+        return true;
+      },
+    });
+    vi.stubGlobal("CustomEvent", class extends Event {
+      detail: unknown;
+      constructor(type: string, init?: { detail?: unknown }) {
+        super(type);
+        this.detail = init?.detail;
+      }
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("fires on appendGradeEntry", async () => {
+    const { GRADE_LOG_CHANGED_EVENT } = await import("./persistence");
+    await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
+    expect(dispatched).toContain(GRADE_LOG_CHANGED_EVENT);
+  });
+
+  it("fires on saveGradeLog (the bulk-overwrite path used by cloud pull/merge)", async () => {
+    const { GRADE_LOG_CHANGED_EVENT, saveGradeLog } = await import("./persistence");
+    await saveGradeLog([
+      { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 1 },
+    ]);
+    expect(dispatched).toContain(GRADE_LOG_CHANGED_EVENT);
+  });
+
+  it("fires on removeGradeEntry (the undo path)", async () => {
+    const { GRADE_LOG_CHANGED_EVENT, removeGradeEntry } = await import("./persistence");
+    const entry = await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
+    dispatched = [];
+    await removeGradeEntry(entry!.occurredAt);
+    expect(dispatched).toContain(GRADE_LOG_CHANGED_EVENT);
+  });
+});
+
 describe("pruneGradeLog", () => {
   const log: GradeLogEntry[] = [
     { date: "2026-04-01", grade: 4, cardType: "name", occurredAt: 1 },

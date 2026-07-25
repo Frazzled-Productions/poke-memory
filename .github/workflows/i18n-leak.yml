@@ -54,7 +54,7 @@ jobs:
               - 'app/**/*.tsx'
               - 'messages/**'
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: github.event_name == 'workflow_dispatch' || steps.filter.outputs.i18n == 'true'
         with:
           node-version-file: .nvmrc

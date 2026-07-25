@@ -29,7 +29,8 @@ import type { SpeciesLegStatus } from "@/lib/stats/legStatus";
 import { LegStatusText } from "@/components/ui/LegStatusText";
 import { usePokemonLocaleContext } from "@/lib/i18n/PokemonLocaleContext";
 import { loadSettings } from "@/lib/settings/persistence";
-import { formatDate, detectDateFormat, detectTimezone, type DateFormat } from "@/lib/utils/format-date";
+import { formatDate, formatMonthYear, detectDateFormat, detectTimezone, type DateFormat } from "@/lib/utils/format-date";
+import { useSpeciesMasteryDate } from "@/lib/timeline/useSpeciesMasteryDate";
 
 function zeroPad(id: number): string {
   return String(id).padStart(3, "0");
@@ -343,6 +344,17 @@ export function PokemonDetailDisclosure({
   // render when pretendAllMastered is on or the species is locked/pending;
   // `firstSeen` is a real timestamp never fabricated under pretendAllMastered.
   const { legStatus, firstSeen } = useSpeciesJourney(pokemon.speciesId, pokemonLocale);
+  // Approximate mastery-crossing date (#1956, rescoped: derive, don't
+  // store), from a single FSRS replay of the grade log shared across every
+  // detail-page mount (see lib/timeline/useSpeciesMasteryDate.ts). Always
+  // called (hooks must not be conditional). Returns null while loading, when
+  // no crossing is recoverable, or when pretendAllMastered is on - the
+  // caller must degrade to the existing date-less badge in every case.
+  const masteryDate = useSpeciesMasteryDate(
+    pokemon.speciesId,
+    pokemonLocale,
+    flags.pretendAllMastered,
+  );
   // Regional prefs for date rendering, resolved the same way as
   // useNextReviewDate.ts / app/stats/page.tsx: stored setting first, browser
   // detection as the fallback. Lazy `useState` initializer keeps this a
@@ -497,14 +509,20 @@ export function PokemonDetailDisclosure({
           </p>
         )}
 
-      {/* Journey line (#1948): first-reviewed date + a "Mastered" badge.
+      {/* Journey line (#1948): first-reviewed date + a "Mastered" badge, plus
+          an approximate mastery date (#1956, rescoped: derive, don't store).
           "First reviewed" is gated on the real `firstSeen` timestamp
           directly (not on card class) so a species mid-way through its
           first learning step still shows the date. The Mastered badge
-          reflects CURRENT mastery (same source as the tile colour) rather
-          than a stored "mastered on" date, which isn't reliably tracked and
-          would drift to "last reviewed" if derived - it correctly
-          disappears again if the species lapses. */}
+          reflects CURRENT mastery (same source as the tile colour) - it
+          correctly disappears again if the species lapses. The mastery date
+          only ANNOTATES an already-true badge (never gates it): it's derived
+          from a best-effort FSRS replay of the grade log, so it degrades to
+          the plain date-less badge whenever no crossing is recoverable
+          (never mastered in the log, guest's 365-day window exceeded, or
+          pretendAllMastered fakes mastery without a real crossing). The date
+          text is a SEPARATE element from "Mastered" so the badge's
+          accessible name/exact-text match is unaffected. */}
       {!isLocked && !isPending && (firstSeen !== null || isMasteredCard) && (
         <div className="mt-2 flex items-center gap-2 text-xs">
           {firstSeen !== null && (
@@ -515,6 +533,11 @@ export function PokemonDetailDisclosure({
           {isMasteredCard && (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
               {t("mastered")}
+            </span>
+          )}
+          {isMasteredCard && masteryDate !== null && (
+            <span className={mutedTextXs}>
+              {t("masteredAround", { date: formatMonthYear(masteryDate, dateFormat) })}
             </span>
           )}
         </div>

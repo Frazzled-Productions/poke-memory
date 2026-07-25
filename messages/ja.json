@@ -722,7 +722,8 @@
     "allPokemonAriaLabel": "ポケモン一覧",
     "generationPokemonAriaLabel": "{name} のポケモン",
     "firstReviewed": "初回学習: {date}",
-    "mastered": "習得済み"
+    "mastered": "習得済み",
+    "masteredAround": "{date}頃に習得"
   },
   "pasture": {
     "title": "牧場",
@@ -1076,7 +1077,9 @@
       "earnedAriaLabel": "獲得済みジムバッジ",
       "lockedAriaLabel": "未獲得ジムバッジ",
       "hideLocked": "未獲得バッジを隠す（{count}個）",
-      "viewAll": "すべてのバッジを表示（{count}個ロック中）"
+      "viewAll": "すべてのバッジを表示（{count}個ロック中）",
+      "earnedArtworkAlt": "{name}バッジのアートワーク",
+      "lockedArtworkAlt": "ロックされたバッジのシルエット"
     },
     "masteryExplainer": {
       "title": "リングの意味",

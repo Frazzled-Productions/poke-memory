@@ -143,7 +143,7 @@ jobs:
             echo "clean=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: steps.preflight.outputs.skip == 'false'
         with:
           # Node major is read from .nvmrc (single source of truth). Drifting to

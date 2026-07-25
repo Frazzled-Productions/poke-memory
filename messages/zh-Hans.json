@@ -722,7 +722,8 @@
     "allPokemonAriaLabel": "宝可梦列表",
     "generationPokemonAriaLabel": "{name}的宝可梦",
     "firstReviewed": "首次学习: {date}",
-    "mastered": "已掌握"
+    "mastered": "已掌握",
+    "masteredAround": "约 {date} 掌握"
   },
   "pasture": {
     "title": "牧场",
@@ -1076,7 +1077,9 @@
       "earnedAriaLabel": "已获得的道馆徽章",
       "lockedAriaLabel": "未获得的道馆徽章",
       "hideLocked": "隐藏未获得的徽章（{count} 个）",
-      "viewAll": "查看所有徽章（{count} 个已锁定）"
+      "viewAll": "查看所有徽章（{count} 个已锁定）",
+      "earnedArtworkAlt": "{name}徽章插图",
+      "lockedArtworkAlt": "已锁定徽章的剪影"
     },
     "masteryExplainer": {
       "title": "圆环含义",

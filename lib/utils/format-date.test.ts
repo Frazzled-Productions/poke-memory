@@ -4,6 +4,7 @@ import {
   todayInTimezone,
   formatDate,
   formatShortDate,
+  formatMonthYear,
   detectDateFormat,
   detectTimezone,
   type DateFormat,
@@ -189,6 +190,42 @@ describe("formatShortDate", () => {
     expect(() => formatShortDate("not-a-date", "dmy")).not.toThrow();
     // ISO passthrough is always the original string unchanged.
     expect(formatShortDate("not-a-date", "iso")).toBe("not-a-date");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatMonthYear (#1956 - month-level precision for the derived mastery date)
+// ---------------------------------------------------------------------------
+
+describe("formatMonthYear", () => {
+  it("iso returns YYYY-MM with no day component", () => {
+    expect(formatMonthYear("2026-03-14", "iso")).toBe("2026-03");
+  });
+
+  it("dmy renders 'Month YYYY' with no day", () => {
+    expect(formatMonthYear("2026-03-14", "dmy")).toBe("March 2026");
+  });
+
+  it("mdy renders 'Month YYYY' with no day", () => {
+    expect(formatMonthYear("2026-03-14", "mdy")).toBe("March 2026");
+  });
+
+  it("never includes a day-of-month digit for any format", () => {
+    const formats: DateFormat[] = ["iso", "dmy", "mdy", "dmy-year", "mdy-year"];
+    for (const fmt of formats) {
+      const result = formatMonthYear("2026-03-27", fmt);
+      expect(result).not.toMatch(/27/);
+    }
+  });
+
+  it("is stable regardless of the day-of-month in the input (same month renders identically)", () => {
+    expect(formatMonthYear("2026-03-01", "dmy")).toBe(
+      formatMonthYear("2026-03-28", "dmy"),
+    );
+  });
+
+  it("does not throw on malformed input", () => {
+    expect(() => formatMonthYear("not-a-date", "dmy")).not.toThrow();
   });
 });
 
