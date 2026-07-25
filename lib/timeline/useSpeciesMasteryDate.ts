@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadGradeLog, GRADE_LOG_APPENDED_EVENT } from "@/lib/gradelog/persistence";
+import { loadGradeLog, GRADE_LOG_CHANGED_EVENT } from "@/lib/gradelog/persistence";
+import { KEY_GRADE_LOG } from "@/lib/storage/keys";
 import { buildSpeciesMasteryDates } from "@/lib/timeline/reconstruct";
 import type { AppLocale } from "@/i18n/locales";
 
@@ -13,6 +14,14 @@ import type { AppLocale } from "@/i18n/locales";
  * Pokédex detail-page mount - not re-run per species and not re-run per
  * render. Keyed only by locale + forceAllMastered (not speciesId): every
  * species page looks up its own entry in the same shared Map.
+ *
+ * SSR safety: this module is only ever populated from inside the
+ * `useEffect` below, which React never runs during server rendering / RSC
+ * prerender - so `cache` is guaranteed to stay `null` on the server and
+ * there is no cross-request leak risk despite the module-level `let`. The
+ * listener-registration block a few lines down is additionally guarded by
+ * `typeof window !== "undefined"` so it never touches a server-side
+ * `window` global either.
  */
 let cache: {
   key: string;
@@ -38,14 +47,31 @@ function loadSpeciesMasteryDates(
   return promise;
 }
 
-// Grade-log writes (`appendGradeEntry`) fire this custom event rather than a
-// native `StorageEvent` (IndexedDB is the primary store, not localStorage),
-// so invalidate the cache on it directly instead of via `useLocalStorageKey`.
-// A fresh grade recorded elsewhere (e.g. the practice page in another tab, or
-// after navigating back from a session) must not serve a stale replay.
+// Invalidate on every write that goes through lib/gradelog/persistence.ts -
+// `appendGradeEntry` (a new grade), `removeGradeEntry` (an undo), AND
+// `saveGradeLog` (a bulk overwrite: cloud pull/merge in `pullAndMerge.ts`,
+// superuser force-pull, post-sign-in merge, manual force-pull). All four fire
+// `GRADE_LOG_CHANGED_EVENT` (a custom event, not a native `StorageEvent`,
+// because IndexedDB - not localStorage - is the primary store).
+//
+// Writers that bypass persistence.ts and delete/restore the IDB store
+// directly - a guest progress reset or the superuser "reset everywhere" path
+// (`lib/storage/reset.ts`), multi-account archive/restore on a device switch
+// (`lib/storage/userArchive.ts`), and the QA-seed clear path
+// (`lib/qa-seed/apply.ts`) - do not go through `GRADE_LOG_CHANGED_EVENT`.
+// They instead dispatch a synthetic `StorageEvent` keyed to `KEY_GRADE_LOG`,
+// the same convention `PracticeSidebar` already relies on - so listen for
+// that too. Without this leg, a reset ("Mastered around March 2026" on a
+// species with no history left) or an account switch would keep serving the
+// stale cached Map until a full page reload.
 if (typeof window !== "undefined") {
-  window.addEventListener(GRADE_LOG_APPENDED_EVENT, () => {
+  window.addEventListener(GRADE_LOG_CHANGED_EVENT, () => {
     cache = null;
+  });
+  window.addEventListener("storage", (e: StorageEvent) => {
+    if (e.key === KEY_GRADE_LOG) {
+      cache = null;
+    }
   });
 }
 

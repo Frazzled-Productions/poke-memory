@@ -276,4 +276,14 @@ describe("clearIdbUserData", () => {
     // (see the clearIdbUserData doc comment).
     expect(deletedKeys).not.toContain("migration_done_v1");
   });
+
+  it("dispatches a synthetic StorageEvent keyed to KEY_GRADE_LOG unconditionally (#1978)", async () => {
+    await clearIdbUserData();
+
+    const dispatched = (window.dispatchEvent as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[0] as StorageEvent,
+    );
+    const gradeLogEvent = dispatched.find((e) => e.key === KEY_GRADE_LOG);
+    expect(gradeLogEvent).toBeDefined();
+  });
 });
