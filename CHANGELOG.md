@@ -6,6 +6,17 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.9] - 2026-07-25
+
+### Added
+
+- The Pokédex detail page shows an approximate "Mastered around <month year>" date, derived from your existing review history rather than a new stored field.
+- Gym badges now show distinct 8-bit pixel-art medallion artwork instead of a plain star; locked badges show a greyed silhouette of their artwork.
+
+### Security
+
+- Pinned `@babel/core` to `^7.29.6` via npm `overrides` to clear Dependabot alert #13 (arbitrary file read via `sourceMappingURL` comment); it arrives transitively through `@sentry/nextjs`'s build-time bundler plugin and `eslint-config-next`, so it could not be bumped directly.
+
 ## [0.11.8] - 2026-07-16
 
 ### Added
@@ -1859,7 +1870,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.8...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.9...HEAD
+[0.11.9]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.9
 [0.11.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.8
 [0.11.7]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.7
 [0.11.6]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.6
