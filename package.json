@@ -50,7 +50,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "esbuild-wasm": "^0.28.0",
     "idb": "^8.0.3",
-    "next": "16.2.10",
+    "next": "16.2.11",
     "next-intl": "^4.13.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
