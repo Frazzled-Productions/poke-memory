@@ -207,10 +207,26 @@ export async function clearIdbPendingQueue(): Promise<void> {
  * device-level (see the header above). Keeping it set also prevents a
  * re-triggered LS-to-IDB migration from racing restoreUserData and
  * overwriting a restored IDB value with a stale LS fallback.
+ *
+ * Dispatches a synthetic StorageEvent keyed to KEY_GRADE_LOG unconditionally
+ * (#1978 review fix), independent of whatever `restoreUserData` does next.
+ * Without this, a switch to an incoming user with NO local archive and a
+ * cloud grade log the same length as the (now-empty) local one never fires
+ * `saveGradeLog` inside the following `pullAndMerge`, so nothing invalidates
+ * `useSpeciesMasteryDate`'s module-level cache - the outgoing user's derived
+ * mastery dates would keep rendering under the incoming user's session.
  */
 export async function clearIdbUserData(): Promise<void> {
   await Promise.all([
     idbDelete(KEY_REVIEW_SESSION),
     idbDelete(KEY_GRADE_LOG),
   ]);
+
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new StorageEvent("storage", { key: KEY_GRADE_LOG }));
+    } catch {
+      // Older browsers / non-standard envs without a StorageEvent constructor.
+    }
+  }
 }

@@ -58,6 +58,29 @@ const STORAGE_KEY = KEY_GRADE_LOG;
  */
 export const GRADE_LOG_APPENDED_EVENT = "poke-memory:grade-log-appended";
 
+/**
+ * Fires after ANY successful write to the grade log through this module -
+ * `appendGradeEntry`, `removeGradeEntry`, and `saveGradeLog` alike. Carries
+ * no detail (unlike `GRADE_LOG_APPENDED_EVENT`, whose detail is a single
+ * appended entry - not meaningful for a bulk overwrite or a removal).
+ *
+ * This is the single choke point for "the persisted grade log may have
+ * changed, re-derive anything computed from it" - used by
+ * `lib/timeline/useSpeciesMasteryDate.ts` (#1956) to invalidate its
+ * module-level replay cache after a cloud pull/merge (`saveGradeLog`, e.g.
+ * `lib/sync/pullAndMerge.ts`, `lib/superuser/SuperuserContext.tsx`,
+ * `app/auth/callback-complete/page.tsx`, `components/settings/ForcePullSection.tsx`)
+ * or an undo (`removeGradeEntry`).
+ *
+ * Writers that bypass this module entirely and delete/restore the IDB store
+ * directly (`lib/storage/reset.ts`, `lib/storage/userArchive.ts`,
+ * `lib/qa-seed/apply.ts`) do NOT go through here - they already dispatch a
+ * synthetic `StorageEvent` keyed to `KEY_GRADE_LOG` by established
+ * convention (see `PracticeSidebar`'s dual-listener pattern); consumers that
+ * need full coverage must listen to both.
+ */
+export const GRADE_LOG_CHANGED_EVENT = "poke-memory:grade-log-changed";
+
 const EMPTY_TOTALS: GradeTotals = { 1: 0, 2: 0, 4: 0, 5: 0 };
 
 /**
@@ -249,6 +272,7 @@ export async function appendGradeEntry(
     window.dispatchEvent(
       new CustomEvent(GRADE_LOG_APPENDED_EVENT, { detail: stamped }),
     );
+    window.dispatchEvent(new CustomEvent(GRADE_LOG_CHANGED_EVENT));
     return stamped;
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
@@ -276,6 +300,7 @@ export async function removeGradeEntry(occurredAt: number): Promise<void> {
     } else {
       saveGradeLogLS(log);
     }
+    window.dispatchEvent(new CustomEvent(GRADE_LOG_CHANGED_EVENT));
   } catch (err) {
     console.error("poke-memory: grade log remove failed", err);
   }
@@ -329,6 +354,7 @@ export async function saveGradeLog(log: GradeLog): Promise<void> {
     } else {
       saveGradeLogLS(log);
     }
+    window.dispatchEvent(new CustomEvent(GRADE_LOG_CHANGED_EVENT));
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
       console.warn("poke-memory: grade log write failed - localStorage quota exceeded");

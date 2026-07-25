@@ -722,7 +722,8 @@
     "allPokemonAriaLabel": "ポケモン一覧",
     "generationPokemonAriaLabel": "{name} のポケモン",
     "firstReviewed": "初回学習: {date}",
-    "mastered": "習得済み"
+    "mastered": "習得済み",
+    "masteredAround": "{date}頃に習得"
   },
   "pasture": {
     "title": "牧場",
