@@ -28,4 +28,10 @@ describe("BADGE_CATALOG", () => {
       expect(badge.criterion.speciesIds.length).toBeGreaterThan(0);
     }
   });
+
+  it("every badge's artwork path matches its own id under /badges/ (#831)", () => {
+    for (const badge of BADGE_CATALOG) {
+      expect(badge.artwork).toBe(`/badges/${badge.id}.png`);
+    }
+  });
 });

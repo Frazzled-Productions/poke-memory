@@ -249,6 +249,7 @@ vi.mock("@/lib/badges/catalog", () => ({
       description: "Mastered 1 Pokémon.",
       lockedHint: "A bronze badge…",
       criterion: { kind: "all-mastered", speciesIds: [1] },
+      artwork: "/badges/badge-1.png",
     },
   ],
 }));
@@ -636,6 +637,7 @@ describe("JourneyPage - retroactive badge award", () => {
         description: "Mastered 1 Pokémon.",
         lockedHint: "A bronze badge…",
         criterion: { kind: "all-mastered", speciesIds: [1] },
+        artwork: "/badges/badge-1.png",
       },
     ]);
 
@@ -669,6 +671,7 @@ describe("JourneyPage - retroactive badge award", () => {
         description: "Mastered 1 Pokémon.",
         lockedHint: "A bronze badge…",
         criterion: { kind: "all-mastered", speciesIds: [1] },
+        artwork: "/badges/badge-1.png",
       },
     ]);
 

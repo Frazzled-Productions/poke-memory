@@ -1,0 +1,96 @@
+{
+    "set": "gym-badges",
+    "description": "17 gym-badge medallions for lib/badges/catalog.ts (#831). The 8 Kanto gym-leader badges use an octagonal medallion silhouette; the 9 themed/legendary/starter badges use a circular medallion silhouette, so the two badge families read as visually distinct groups at a glance while sharing the same 8-bit palette family and line weight.",
+    "assets": [
+        {
+            "id": "boulder-badge",
+            "out": "boulder-badge.png",
+            "prompt": "A chunky octagonal gym badge medallion, the theme is raw earthy stone and boulders (Brock's rock-type gym): rough grey granite-textured facets, a jagged split boulder or craggy rock crystal shape as the central icon, deep umber-brown and slate-grey palette with a bronze rim highlight."
+        },
+        {
+            "id": "cascade-badge",
+            "out": "cascade-badge.png",
+            "prompt": "A chunky octagonal gym badge medallion, the theme is a rushing waterfall (Misty's water-type gym): a stylised cascading wave or teardrop-shaped water droplet as the central icon, deep cerulean-blue and teal palette with a silver rim highlight."
+        },
+        {
+            "id": "thunder-badge",
+            "out": "thunder-badge.png",
+            "prompt": "A chunky octagonal gym badge medallion, the theme is crackling electricity (Lt. Surge's electric-type gym): a bold jagged lightning-bolt as the central icon, bright yellow and dark charcoal palette with a chrome rim highlight."
+        },
+        {
+            "id": "rainbow-badge",
+            "out": "rainbow-badge.png",
+            "prompt": "A chunky octagonal gym badge medallion, the theme is a tended flower garden (Erika's grass-type gym): a stylised five-petal flower or leaf-cluster as the central icon, spring-green palette with a soft petal-pink accent and a gold rim highlight."
+        },
+        {
+            "id": "soul-badge",
+            "out": "soul-badge.png",
+            "prompt": "A chunky octagonal gym badge medallion, the theme is hidden ninja toxins (Koga's poison-type gym): a stylised skull-and-crossbones or dripping toxic droplet as the central icon, deep violet-purple palette with a sickly yellow-green accent and a dark iron rim."
+        },
+        {
+            "id": "marsh-badge",
+            "out": "marsh-badge.png",
+            "prompt": "A chunky octagonal gym badge medallion, the theme is psychic mind-bending power (Sabrina's psychic-type gym): a swirling hypnotic spiral or a stylised third eye as the central icon, magenta-pink and deep indigo palette with a silver rim highlight."
+        },
+        {
+            "id": "volcano-badge",
+            "out": "volcano-badge.png",
+            "prompt": "A chunky octagonal gym badge medallion, the theme is a smoking volcano (Blaine's fire-type gym): a stylised erupting flame or volcanic peak as the central icon, blazing red-orange palette with a charcoal-black accent and a bronze rim highlight."
+        },
+        {
+            "id": "earth-badge",
+            "out": "earth-badge.png",
+            "prompt": "A chunky octagonal gym badge medallion, the theme is a cracked earthy fissure (Giovanni's ground-type gym): a stylised jagged canyon crack or globe-with-fault-line as the central icon, burnt-orange and dark-umber palette with a shadowy black accent and a bronze rim highlight."
+        },
+        {
+            "id": "kanto-starters",
+            "out": "kanto-starters.png",
+            "prompt": "A chunky gym badge medallion depicting the Indigo Plateau, the Kanto region's crowning landmark: a stately domed building set on a hill, rendered as a bold flat silhouette icon at the centre. The overall medallion silhouette is a PLAIN THIN CIRCULAR RING (a simple unbroken hoop, no teeth, no facets, no rays) with a warm metallic GOLD rim highlight, since this is the original founding region. Palette: slate-grey building, warm sand-gold hillside, sky-blue dome accents. CRITICAL CONSTRUCTION RULE: behind the icon, the entire disc-shaped area enclosed by the ring must be filled with a single solid opaque background colour, edge to edge, right up to the inside of the ring, with NO gaps or see-through patches anywhere inside the frame - only the region strictly OUTSIDE the ring's outer silhouette is transparent background.",
+            "key": "magenta"
+        },
+        {
+            "id": "johto-starters",
+            "out": "johto-starters.png",
+            "prompt": "A chunky gym badge medallion depicting the Tin Tower, the sacred bell tower shrine of the Johto region: a tall stepped pagoda tower with a curved multi-tier roofline and a rooftop finial, rendered as a bold flat silhouette icon at the centre. The medallion's outer frame is a TOOTHED GEAR / COG outline (eight blunt rectangular teeth spaced evenly around the rim, like a mechanical cog) with a bright metallic SILVER rim highlight, in forest-green, warm wood-brown and pale-gold roof tones. CRITICAL CONSTRUCTION RULE: behind the tower icon, the entire disc-shaped area enclosed by the gear frame must be filled with a single solid opaque background colour (a deep slate or midnight-blue disc), edge to edge, right up to the inside of the gear teeth, with NO gaps, NO slits and NO see-through wedges between the teeth or anywhere inside the frame - the interior of the badge is a completely solid opaque disc, only the region strictly OUTSIDE the gear's outer silhouette is transparent background.",
+            "key": "magenta"
+        },
+        {
+            "id": "hoenn-starters",
+            "out": "hoenn-starters.png",
+            "prompt": "A chunky gym badge medallion depicting Hoenn's sea and volcano, the region's two defining landscapes: a sharp volcanic peak with a red lava crown rising behind a curling teal ocean wave, rendered as a bold flat silhouette icon at the centre. The overall medallion silhouette is a FACETED GEM-CUT HEXAGON (six flat angular facet edges, like a cut jewel, clearly NOT a plain circle) with a warm metallic BRONZE rim highlight, in blazing red-orange volcano and deep teal-blue sea tones. CRITICAL CONSTRUCTION RULE: behind the icon, the entire area enclosed by the hexagon must be filled with a single solid opaque background colour, edge to edge, right up to the inside of the hexagon's facet edges, with NO gaps or see-through patches anywhere inside the frame - only the region strictly OUTSIDE the hexagon's outer silhouette is transparent background.",
+            "key": "magenta"
+        },
+        {
+            "id": "sinnoh-starters",
+            "out": "sinnoh-starters.png",
+            "prompt": "A chunky gym badge medallion depicting Mt Coronet, the towering mountain spine that divides the Sinnoh region: a tall snow-capped triple-peaked mountain, rendered as a bold flat silhouette icon at the centre. The overall medallion silhouette is a SUNBURST with eight short triangular rays radiating outward from a circular core (clearly NOT a plain circle) with a warm metallic COPPER rim highlight, in slate-grey rock, frosty-white snow caps and a dusky sky-orange backdrop. CRITICAL CONSTRUCTION RULE: behind the mountain icon, the entire disc-shaped core enclosed by the sunburst rays must be filled with a single solid opaque background colour, edge to edge, right up to the inside of the rays, with NO gaps or see-through patches anywhere inside the frame - only the region strictly OUTSIDE the sunburst's outer silhouette is transparent background.",
+            "key": "magenta"
+        },
+        {
+            "id": "galar-starters",
+            "out": "galar-starters.png",
+            "prompt": "A chunky gym badge medallion depicting a Galar stadium, the region's grand open-air football-style arena: a curved tiered stadium bowl with a bright green pitch at its base and floodlight towers at each side, rendered as a bold flat silhouette icon at the centre. The overall medallion silhouette is a HERALDIC SHIELD / CREST outline (a rounded-top, pointed-bottom shield shape, clearly NOT a plain circle) with a dark metallic DARK-IRON / GUNMETAL rim highlight, in bright pitch-green, stone-grey terraces and sky-blue accents. CRITICAL CONSTRUCTION RULE: behind the stadium icon, the entire area enclosed by the shield must be filled with a single solid opaque background colour, edge to edge, right up to the shield's inner edge, with NO gaps or see-through patches anywhere inside the frame - only the region strictly OUTSIDE the shield's outer silhouette is transparent background. The magenta chroma-key background fills every pixel OUTSIDE the shield's own outline, right up to the shield edge, with NO white card, NO frame, NO border box and NO vignette behind or around the shield - the shield shape sits directly on the flat magenta screen, edge to edge to the corners of the image.",
+            "key": "magenta"
+        },
+        {
+            "id": "legendary-birds",
+            "out": "legendary-birds.png",
+            "prompt": "A chunky circular gym badge medallion celebrating three legendary birds soaring together: three sweeping wing shapes fanned out from the centre in ice-blue, thunder-yellow and flame-orange, a bold tri-colour palette with a bright silver rim highlight, majestic and powerful."
+        },
+        {
+            "id": "legendary-beasts",
+            "out": "legendary-beasts.png",
+            "prompt": "A chunky circular gym badge medallion celebrating three legendary beasts running together: three sweeping claw-mark or paw-print shapes radiating from the centre in storm-purple, blazing-crimson and deep-sapphire, a bold tri-colour palette with a bright silver rim highlight, fierce and dynamic."
+        },
+        {
+            "id": "lake-trio",
+            "out": "lake-trio.png",
+            "prompt": "A chunky circular gym badge medallion celebrating three lake guardian spirits: three faceted gem-teardrop shapes arranged in a triangle around the centre in soft rose-pink, sky-blue and mint-teal, a serene tri-colour palette with a pale silver rim highlight, still and mystical."
+        },
+        {
+            "id": "eeveelutions",
+            "out": "eeveelutions.png",
+            "prompt": "A chunky circular gym badge medallion celebrating one adaptable partner and every path it can take: an eight-pointed radiating star or prism at the centre, each point tinted a different elemental colour (brown, yellow, blue, pink, purple, teal, gold and dark-violet) fanning out from a warm cream core, a joyful multi-colour palette with a bright gold rim highlight."
+        }
+    ]
+}
