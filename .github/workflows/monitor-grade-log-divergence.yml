@@ -91,7 +91,7 @@ jobs:
             echo "user_count=$USER_COUNT" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Open alert issue
+      - name: Open or update alert issue
         if: steps.check.outputs.alert == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -99,9 +99,35 @@ jobs:
         # `gh issue create --body-file` is the supported path. We avoid
         # `--json` here per the #537 lesson: gh's `--json` flag is for
         # output formatting and is not accepted on `issue create`.
+        #
+        # DEDUPE (#2003). This step used to call `gh issue create`
+        # unconditionally, so a divergence that persists filed a fresh issue
+        # every single day: #1999, #2000, #2001 and #2002 are one unresolved
+        # single-user problem, four days running, all unactioned. Four issues
+        # about one problem reads as four problems, and a signal that arrives
+        # daily and identically stops being read at all.
+        #
+        # An open issue carrying the marker is now updated with a recurrence
+        # comment instead. A NEW issue is opened only when there is no open one,
+        # so a genuinely new occurrence after a fix still gets your attention.
         run: |
-          gh issue create \
-            --title "[monitoring] grade_log divergence detected (${USER_COUNT} users)" \
-            --body-file /tmp/divergence-body.md \
-            --label monitoring \
-            --label "area:workflow"
+          set -euo pipefail
+          MARKER="<!-- monitor:grade-log-divergence -->"
+
+          EXISTING=$(gh issue list \
+            --state open --label monitoring --limit 50 \
+            --search "$MARKER in:body" \
+            --json number --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            echo "Divergence still present; issue #${EXISTING} is already open. Commenting rather than opening a duplicate."
+            gh issue comment "$EXISTING" --body \
+              "Still diverging as of $(date -u +'%Y-%m-%d %H:%M UTC') (${USER_COUNT} user(s) affected). This is a recurrence on the existing issue, not a new problem."
+          else
+            { printf '%s\n\n' "$MARKER"; cat /tmp/divergence-body.md; } > /tmp/divergence-body-marked.md
+            gh issue create \
+              --title "[monitoring] grade_log divergence detected (${USER_COUNT} users)" \
+              --body-file /tmp/divergence-body-marked.md \
+              --label monitoring \
+              --label "area:workflow"
+          fi

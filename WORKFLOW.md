@@ -1,5 +1,29 @@
 # Workflow
 
+> ## ⚠️ Partly historical as of 2026-08-16
+>
+> The **fourteen Claude-driven GitHub Actions workflows were removed** on 2026-08-16:
+> `auto-issue`, `auto-pr`, `auto-review`, `auto-resolve`, `auto-retro`,
+> `auto-retro-harvest`, `auto-backlog-groom`, `auto-deep-audit`,
+> `auto-workflow-suggest`, `auto-app-suggest`, `auto-codequality-suggest`,
+> `issue-overlap-scan`, `settings-coverage-audit`, and `auto-digest-fanout`
+> (whose four digest producers had all gone).
+>
+> Agent automation is moving to a **Mac-local loop**, because koinori is a native
+> iOS app whose builds need macOS and GitHub-hosted macOS minutes are too
+> expensive. See `Frazzled-Productions/frazzled-loop`.
+>
+> **What this means for this document.** Everything below describing genuine CI
+> (`ci`, `coverage`, `e2e`, `codeql`, `visual-regression`, the policy and drift
+> gates), the qa-to-main promotion, and the issue conventions is **still current**.
+> Everything describing the `auto-*` workflows, the `/go` `/fix` `/continue`
+> comment commands, the digest fan-out, and the states they drove is **historical**:
+> those triggers no longer exist and nothing responds to them.
+>
+> This banner is deliberate rather than a rewrite. Describing the replacement
+> process would mean inventing one before it has been decided, and a confidently
+> wrong process map is worse than an honestly dated one.
+
 This is the **process map** for poke-memory - how work flows through this repo end-to-end. It covers the sub-agent roster, orchestration playbook, GitHub Actions catalog, issue lifecycle, build gates, and retrospectives.
 
 For implementation conventions (caching, SRS, PokéAPI integration, file ownership), see [AGENTS.md](AGENTS.md).
