@@ -60,16 +60,15 @@ jobs:
           # (which can run hours late under load) and dispatch skew.
           # Daily workflows: 48h. Weekly digests: 240h (10 days).
           # Monthly workflows: 840h (35 days) — a full month plus headroom.
+          # The six Claude-driven digest and audit workflows were removed when the
+          # agent automation moved off GitHub to the Mac-local loop. They are not
+          # listed here any more: a health monitor watching for a workflow that was
+          # deliberately deleted files a fresh issue every week about its own
+          # tidy-up, which is exactly the noise this monitor exists to prevent.
           WORKFLOWS=(
             "auto-release.yml|Auto Release|48"
             "refresh-user-count.yml|Refresh User Count|48"
             "monitor-grade-log-divergence.yml|Monitor Grade-Log Divergence|48"
-            "auto-workflow-suggest.yml|Auto Workflow Suggest|240"
-            "auto-codequality-suggest.yml|Auto Code-Quality Suggest|240"
-            "auto-app-suggest.yml|Auto App Suggest|240"
-            "auto-backlog-groom.yml|Auto Backlog Groom|240"
-            "auto-retro-harvest.yml|Auto Retro Harvest|240"
-            "auto-deep-audit.yml|Auto Deep Audit|840"
             "pokeapi-species-monitor.yml|PokéAPI Species Monitor|840"
           )
 
