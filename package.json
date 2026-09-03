@@ -64,7 +64,7 @@
     "@babel/core": "^7.29.6"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0",
+    "@playwright/test": "^1.62.1",
     "@serwist/build": "^9.5.11",
     "@serwist/turbopack": "^9.5.11",
     "@serwist/utils": "^9.5.11",
