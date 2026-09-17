@@ -1,5 +1,10 @@
 version: 2
 updates:
+  # A `@playwright/test` bump also needs every `mcr.microsoft.com/playwright`
+  # image tag moved in the same PR; Dependabot only moves the lockfile.
+  # scripts/check-playwright-version-drift.mjs lists the file:line of each, and
+  # its test fails the full vitest run (the required `Test coverage report`
+  # check) until they all match (#2074).
   - package-ecosystem: "npm"
     directory: "/"
     # Open PRs against the qa integration branch, not main. All PR-producing

@@ -27,9 +27,12 @@
  *    failure mode it documents), so a generic prose scan would false-positive.
  *    Only README prose carries the canonical "Node N" statement, so prose stays
  *    README-only.
- *  - The Playwright container image tag (`mcr.microsoft.com/playwright:vX-noble`)
- *    bakes its own Node; that image's Node is a SEPARATE manual-bump invariant
- *    and is intentionally not tied to .nvmrc here.
+ *  - The Playwright container image (`mcr.microsoft.com/playwright`) bakes its
+ *    own Node, so its tag is not tied to .nvmrc here. The tag is tied to the
+ *    locked `@playwright/test` version instead, and
+ *    scripts/check-playwright-version-drift.mjs enforces that (#2074). Moving
+ *    the tag still means checking by hand that the new image's Node major
+ *    matches .nvmrc.
  *
  * Mirrors the pseudo-locale-drift.yml / scope-lookup-drift.yml model. Imports
  * only Node built-ins so CI can run it with plain `node` (no `npm ci`).
