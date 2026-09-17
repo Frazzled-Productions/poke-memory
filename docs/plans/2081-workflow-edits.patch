@@ -1,0 +1,299 @@
+diff --git a/.github/workflows/auto-release.yml b/.github/workflows/auto-release.yml
+--- a/.github/workflows/auto-release.yml
++++ b/.github/workflows/auto-release.yml
+@@ -261,17 +261,13 @@
+             DRIFTED=true
+           fi
+
+-          # Marker-based dedup. The GitHub search index strips HTML comments
+-          # (WORKFLOW.md), so we do NOT use `--search`: that pre-filter could
+-          # drop the tracking issue unpredictably and, capped at a low limit,
+-          # hide it from the jq match entirely. Instead pull the full open-issue
+-          # list (capped at 100) and match the marker locally with jq, which is
+-          # reliable. No `2>/dev/null` either: a gh failure must surface via
+-          # `set -euo pipefail` rather than look like "no existing issue" and
+-          # open a duplicate on every run.
+-          EXISTING=$(gh issue list --repo "$REPO" --state open \
+-            --json number,body --limit 100 \
+-            | jq -r --arg m "$MARKER" '[.[] | select(.body | contains($m))] | .[0].number // empty')
++          # Marker-based dedup through the shared lookup (#2081): the open issue
++          # whose body STARTS with the marker line. An unanchored match here
++          # once took over an unrelated issue that quoted the marker, then
++          # overwrote and closed it (#1997). The helper exits non-zero if gh
++          # fails, which `set -euo pipefail` turns into a failed step rather
++          # than "no existing issue" and a duplicate.
++          EXISTING=$(node .github/scripts/find-marker-issue.mjs --repo "$REPO" --marker "$MARKER")
+
+           if [ "$DRIFTED" = "false" ]; then
+             echo "qa is healthy: main is an ancestor of qa."
+diff --git a/.github/workflows/cron-health-monitor.yml b/.github/workflows/cron-health-monitor.yml
+--- a/.github/workflows/cron-health-monitor.yml
++++ b/.github/workflows/cron-health-monitor.yml
+@@ -74,21 +74,6 @@
+
+           NOW=$(date -u +%s)
+
+-          # Marker-based dedup, fetched once for the whole run. The GitHub
+-          # search index strips HTML comments (WORKFLOW.md), so we do NOT use
+-          # `--search`: that pre-filter silently matched nothing here (the
+-          # marker's colon made it parse as an unknown search qualifier), so
+-          # every run saw "no existing issue", filed duplicates, and never
+-          # found the issue to auto-close (#1919). Instead pull the full
+-          # open-issue list (capped at 100) and match each marker locally with
+-          # jq, which is reliable. No `2>/dev/null` either: a gh failure must
+-          # surface via `set -euo pipefail` rather than look like "no existing
+-          # issue" and open a duplicate on every run. One fetch outside the
+-          # loop suffices because the per-workflow markers are disjoint and
+-          # this run is the only writer of these issues.
+-          ALL_OPEN_ISSUES=$(gh issue list --repo "$REPO" --state open \
+-            --json number,body --limit 100)
+-
+           for entry in "${WORKFLOWS[@]}"; do
+             FILE="${entry%%|*}"
+             REST="${entry#*|}"
+@@ -241,8 +226,15 @@
+             # opening duplicates.
+             MARKER="<!-- cron-health-monitor:$FILE -->"
+
+-            EXISTING=$(echo "$ALL_OPEN_ISSUES" | jq -r --arg marker "$MARKER" \
+-              '[.[] | select(.body | contains($marker))] | .[0].number // empty')
++            # Marker-based dedup through the shared lookup (#2081): the open
++            # issue whose body STARTS with this marker line. A search-based
++            # lookup silently matched nothing here, because the marker's colon
++            # parsed as a search qualifier, so every run filed a duplicate
++            # (#1919). An unanchored match would instead take over any issue
++            # that quotes the marker (#1997). The helper exits non-zero if gh
++            # fails, which `set -euo pipefail` turns into a failed step rather
++            # than "no existing issue" and a duplicate.
++            EXISTING=$(node .github/scripts/find-marker-issue.mjs --repo "$REPO" --marker "$MARKER")
+
+             if [ -z "$PROBLEM" ]; then
+               # Healthy: close any stale tracking issue so it does not
+diff --git a/.github/workflows/pokeapi-species-monitor.yml b/.github/workflows/pokeapi-species-monitor.yml
+--- a/.github/workflows/pokeapi-species-monitor.yml
++++ b/.github/workflows/pokeapi-species-monitor.yml
+@@ -92,19 +92,13 @@
+           # --- Open or update the tracking issue in place -------------------
+           MARKER="<!-- pokeapi-species-monitor -->"
+
+-          # Marker-based dedup. The GitHub search index strips HTML comments
+-          # (WORKFLOW.md), so we do NOT use `--search`: that pre-filter is
+-          # unreliable for marker text (it broke cron-health-monitor.yml
+-          # outright, #1919, and only worked here by accident of this marker
+-          # being colon-free). Instead pull the full open-issue list (capped
+-          # at 100) and match the marker locally with jq, which is reliable.
+-          # No `2>/dev/null` either: a gh failure must surface via
+-          # `set -euo pipefail` rather than look like "no existing issue" and
+-          # open a duplicate on every run.
+-          EXISTING=$(gh issue list --repo "$REPO" --state open \
+-            --json number,body --limit 100 \
+-            | jq -r --arg marker "$MARKER" \
+-            '[.[] | select(.body | contains($marker))] | .[0].number // empty')
++          # Marker-based dedup through the shared lookup (#2081): the open issue
++          # whose body STARTS with the marker line. Search-based lookups miss
++          # HTML-comment markers (#1919), and an unanchored match takes over any
++          # issue that quotes the marker (#1997). The helper exits non-zero if
++          # gh fails, which `set -euo pipefail` turns into a failed step rather
++          # than "no existing issue" and a duplicate.
++          EXISTING=$(node .github/scripts/find-marker-issue.mjs --repo "$REPO" --marker "$MARKER")
+
+           # Build the body with printf rather than a heredoc: a plain heredoc
+           # inside a `run: |` block cannot have its closing delimiter at column
+diff --git a/.github/workflows/monitor-grade-log-divergence.yml b/.github/workflows/monitor-grade-log-divergence.yml
+--- a/.github/workflows/monitor-grade-log-divergence.yml
++++ b/.github/workflows/monitor-grade-log-divergence.yml
+@@ -95,6 +95,7 @@
+         if: steps.check.outputs.alert == 'true'
+         env:
+           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++          REPO: ${{ github.repository }}
+           USER_COUNT: ${{ steps.check.outputs.user_count }}
+         # `gh issue create --body-file` is the supported path. We avoid
+         # `--json` here per the #537 lesson: gh's `--json` flag is for
+@@ -107,25 +108,33 @@
+         # about one problem reads as four problems, and a signal that arrives
+         # daily and identically stops being read at all.
+         #
+-        # An open issue carrying the marker is now updated with a recurrence
+-        # comment instead. A NEW issue is opened only when there is no open one,
+-        # so a genuinely new occurrence after a fix still gets your attention.
++        # An open issue whose body starts with the marker is now updated with a
++        # recurrence comment instead. A NEW issue is opened only when there is
++        # no open one, so a genuinely new occurrence after a fix still gets your
++        # attention.
++        #
++        # The lookup goes through the shared helper (#2081). #2003 first used
++        # `gh issue list --search "<marker> in:body"`, which cannot see an
++        # HTML-comment marker and would have misread this one's colon as a
++        # search qualifier (#1919), so a persisting divergence would still have
++        # filed a new issue every day. The helper lists open issues and matches
++        # line 1 locally, and exits non-zero if gh fails, which
++        # `set -euo pipefail` turns into a failed step rather than a duplicate.
++        # The lookup no longer filters on the `monitoring` label: gh sends
++        # `--label` through the same search API.
+         run: |
+           set -euo pipefail
+           MARKER="<!-- monitor:grade-log-divergence -->"
+
+-          EXISTING=$(gh issue list \
+-            --state open --label monitoring --limit 50 \
+-            --search "$MARKER in:body" \
+-            --json number --jq '.[0].number // empty')
++          EXISTING=$(node .github/scripts/find-marker-issue.mjs --repo "$REPO" --marker "$MARKER")
+
+           if [ -n "$EXISTING" ]; then
+             echo "Divergence still present; issue #${EXISTING} is already open. Commenting rather than opening a duplicate."
+-            gh issue comment "$EXISTING" --body \
++            gh issue comment "$EXISTING" --repo "$REPO" --body \
+               "Still diverging as of $(date -u +'%Y-%m-%d %H:%M UTC') (${USER_COUNT} user(s) affected). This is a recurrence on the existing issue, not a new problem."
+           else
+             { printf '%s\n\n' "$MARKER"; cat /tmp/divergence-body.md; } > /tmp/divergence-body-marked.md
+-            gh issue create \
++            gh issue create --repo "$REPO" \
+               --title "[monitoring] grade_log divergence detected (${USER_COUNT} users)" \
+               --body-file /tmp/divergence-body-marked.md \
+               --label monitoring \
+diff --git a/.claude/agents/workflow-expert.md b/.claude/agents/workflow-expert.md
+--- a/.claude/agents/workflow-expert.md
++++ b/.claude/agents/workflow-expert.md
+@@ -32,6 +32,8 @@
+ | `<!-- auto-status -->` | Live status comment; only one exists per issue/PR | Identified by startswith check; PATCHed in-place rather than re-posted |
+ | `<!-- overlap-scan:i+j:<kind> -->` | kinds: `merge`, `overlap`, `conflict` | De-duped on exact (i, j, kind) across runs; `conflict` blocks `/go` |
+ | `<!-- vercel-autofix -->` | Posted by `vercel-failure-autofix.yml` | Idempotency window: 10 minutes from post time |
++
++**Looking a marker up (#2081).** A scheduled job that keeps a tracking issue finds it with `.github/scripts/find-marker-issue.mjs --repo "$REPO" --marker "$MARKER"`, which lists open issues and matches the marker as the whole of line 1. A comment lookup anchors on line 1 with jq `startswith` or Actions `startsWith`. Flag as a Blocker any `gh ... --search "... in:body"` (the search index strips HTML comments, so it silently matched nothing, #1919) and any unanchored `contains()` on a body (it matches anything that quotes the marker, which is how `qa-drift-check` overwrote and closed #1997). `npm run lint:marker-lookups` enforces both; an exemption belongs in that script's `ALLOWLIST` with a reason, not in the YAML.
+
+ ## Salvage pattern
+
+diff --git a/scripts/lint-marker-lookups.mjs b/scripts/lint-marker-lookups.mjs
+--- a/scripts/lint-marker-lookups.mjs
++++ b/scripts/lint-marker-lookups.mjs
+@@ -50,13 +50,6 @@
+   },
+ ];
+
+-// Pending the #2081 workflow edit, which this lane could not make: see
+-// docs/plans/2081-question.md. Applying that edit makes these four entries
+-// stale, and the check then fails until they are removed.
+-const PENDING_2081 =
+-  "tracking-issue lookup still to be switched to find-marker-issue.mjs " +
+-  "(docs/plans/2081-workflow-edits.patch)";
+-
+ // PR-comment lookups. Their writers put the marker on line 1, so each could be
+ // anchored with startswith; whether to do that here is Q1 in
+ // docs/plans/2081-question.md.
+@@ -66,26 +59,6 @@
+
+ /** @type {{ file: string, needle: string, reason: string }[]} */
+ export const ALLOWLIST = [
+-  {
+-    file: "auto-release.yml",
+-    needle: "select(.body | contains($m))",
+-    reason: PENDING_2081,
+-  },
+-  {
+-    file: "cron-health-monitor.yml",
+-    needle: "select(.body | contains($marker))",
+-    reason: PENDING_2081,
+-  },
+-  {
+-    file: "pokeapi-species-monitor.yml",
+-    needle: "select(.body | contains($marker))",
+-    reason: PENDING_2081,
+-  },
+-  {
+-    file: "monitor-grade-log-divergence.yml",
+-    needle: '--search "$MARKER in:body"',
+-    reason: PENDING_2081,
+-  },
+   {
+     file: "coverage.yml",
+     needle: 'select(.body | contains(\\"$MARKER\\"))',
+diff --git a/scripts/find-marker-issue.test.mjs b/scripts/find-marker-issue.test.mjs
+--- a/scripts/find-marker-issue.test.mjs
++++ b/scripts/find-marker-issue.test.mjs
+@@ -7,6 +7,9 @@
+  * scripts/** and lib/**, and lib/** changes trip the changelog gate.
+  */
+
++import { readFileSync } from "node:fs";
++import { dirname, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
+ import { describe, it, expect } from "vitest";
+ import {
+   ISSUE_LIMIT,
+@@ -16,6 +19,8 @@
+   main,
+   parseCliArgs,
+ } from "../.github/scripts/find-marker-issue.mjs";
++
++const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+ const DRIFT = "<!-- qa-drift-check -->";
+ const GRADE_LOG = "<!-- monitor:grade-log-divergence -->";
+@@ -236,3 +241,26 @@
+     expect(h.stderr()).toMatch(/^::error::/);
+   });
+ });
++
++describe("monitor workflows use the shared lookup", () => {
++  // scripts/lint-marker-lookups.mjs bans the two lookup forms that misfired;
++  // this pins that each monitor owning a tracking issue goes through the
++  // helper rather than growing another inline copy of the lookup.
++  const monitors = [
++    "auto-release.yml",
++    "cron-health-monitor.yml",
++    "pokeapi-species-monitor.yml",
++    "monitor-grade-log-divergence.yml",
++  ];
++  const HELPER_CALL =
++    'EXISTING=$(node .github/scripts/find-marker-issue.mjs --repo "$REPO" --marker "$MARKER")';
++
++  it.each(monitors)("%s calls find-marker-issue.mjs and lists no issues itself", (file) => {
++    const code = readFileSync(resolve(repoRoot, ".github/workflows", file), "utf8")
++      .split("\n")
++      .filter((line) => !line.trim().startsWith("#"))
++      .join("\n");
++    expect(code).toContain(HELPER_CALL);
++    expect(code).not.toContain("gh issue list");
++  });
++});
+diff --git a/WORKFLOW.md b/WORKFLOW.md
+--- a/WORKFLOW.md
++++ b/WORKFLOW.md
+@@ -586,7 +586,7 @@
+ |---|---|
+ | **Trigger** | `schedule: '0 10 * * 1'` (weekly, Monday 10:00 UTC); `workflow_dispatch` |
+ | **What it does** | For each cron-driven workflow (`auto-release`, `refresh-user-count`, `monitor-grade-log-divergence`, the four weekly digests `auto-workflow-suggest` / `auto-codequality-suggest` / `auto-app-suggest` / `auto-backlog-groom`, and the monthly `auto-deep-audit`), calls `gh run list --workflow=<file> --event schedule --branch <default-branch>` and checks (a) a scheduled run exists within the expected interval (48h for daily workflows, 240h for weekly, 840h for monthly) and (b) the most recent completed run succeeded - any non-`success`/`skipped` conclusion (`failure`, `timed_out`, `startup_failure`, `cancelled`) counts as unhealthy. On a stale or unhealthy workflow it opens or updates a per-workflow tracking issue. If the `gh run list` call itself errors (transient GitHub API failure), that workflow is skipped for the run rather than treated as stale, so an outage cannot spam a tracking issue for every monitored workflow at once. |
+-| **Dedup** | A `<!-- cron-health-monitor:{file} -->` HTML marker keyed by workflow filename gives each watched workflow its own tracking issue. Re-runs edit that issue in place and add a re-check comment rather than opening duplicates. When a workflow recovers, the monitor closes its tracking issue automatically. |
++| **Dedup** | A `<!-- cron-health-monitor:{file} -->` HTML marker keyed by workflow filename gives each watched workflow its own tracking issue, found through `.github/scripts/find-marker-issue.mjs`: the open issue whose body starts with that marker line (a search-based lookup matched nothing, #1919). Re-runs edit that issue in place and add a re-check comment rather than opening duplicates. When a workflow recovers, the monitor closes its tracking issue automatically. |
+ | **Why schedule?** | The monitor runs on GitHub's internal cron queue, independently of the workflows it watches - so it still fires even if those workflows have stopped. It cannot detect its own staleness, but the blast radius of one un-monitored monitor is small. |
+ | **Permissions** | `contents: read`, `actions: read`, `issues: write`. `GITHUB_TOKEN` only - no Claude, no App token, no app checkout. |
+ | **Why monitor cron workflows?** | GitHub disables scheduled workflows after 60 days of repo inactivity, and a malformed cron or an expired secret can silently stop a workflow firing - none of which produces an alert on its own. `pr-check-monitor` watches open PRs; this watches the schedule-driven workflows themselves. |
+@@ -804,7 +804,7 @@
+ | **Bootstrap** | One-time: on first run, if no `v0.1.0` tag exists, creates `v0.1.0` at SHA `cddb3a8` (last commit whose CHANGELOG content matched the current `[0.1.0]` section) and the matching GitHub Release. Subsequent runs no-op the bootstrap. |
+ | **Loop break** | Structural: none of the triggers (`pull_request`, `schedule`, `workflow_dispatch`) is `push`, so the release commit landing on `main` cannot re-fire this workflow. The `[skip ci]` marker on the release commit is defence in depth only - it suppresses the `push`-triggered workflows (`ci.yml`, `migration-check.yml`) on that commit, but it is not what stops `auto-release.yml` from looping. |
+ | **qa reset** | On a `qa -> main` trigger only (`github.event_name == 'pull_request'`), a final step force-updates `qa` to `main` (`git push origin +HEAD:refs/heads/qa`) so the next batch run starts from a clean integration branch. `schedule`/`workflow_dispatch` runs skip this - `qa` may hold in-progress batch work. |
+-| **qa drift guard** | The reset step is gated on `success()`, so a failed prior step (e.g. a `cut-release` crash) skips it, leaving `qa` un-reset (#1659/#1664). The sibling `qa-drift-check` job runs on the daily `schedule`/`workflow_dispatch` (not `pull_request`, to avoid racing the reset), checks `git merge-base --is-ancestor origin/main origin/qa`, and opens/updates a marker-keyed (`<!-- qa-drift-check -->`) tracking issue when `main` is not an ancestor of `qa`. It is **alert-only** (no auto-reset): `qa` may carry un-promoted batch work a force-reset would destroy, so reconciliation stays human-in-the-loop. The issue auto-closes once `qa` is back in sync. Permissions: `contents: read` + `issues: write` (uses `GITHUB_TOKEN`, no App token / push). |
++| **qa drift guard** | The reset step is gated on `success()`, so a failed prior step (e.g. a `cut-release` crash) skips it, leaving `qa` un-reset (#1659/#1664). The sibling `qa-drift-check` job runs on the daily `schedule`/`workflow_dispatch` (not `pull_request`, to avoid racing the reset), checks `git merge-base --is-ancestor origin/main origin/qa`, and opens/updates a marker-keyed (`<!-- qa-drift-check -->`) tracking issue when `main` is not an ancestor of `qa`. The tracking issue is found through `.github/scripts/find-marker-issue.mjs`, which only accepts the marker as the whole of line 1: an unanchored match once took over, overwrote and closed an unrelated issue that quoted the marker (#1997). It is **alert-only** (no auto-reset): `qa` may carry un-promoted batch work a force-reset would destroy, so reconciliation stays human-in-the-loop. The issue auto-closes once `qa` is back in sync. Permissions: `contents: read` + `issues: write` (uses `GITHUB_TOKEN`, no App token / push). |
+ | **Vercel interaction** | The release commit touches `package.json`, which is in `WATCH_PATHS` in `scripts/vercel-ignored-build.sh` - so Vercel rebuilds and the in-app version banner (`NEXT_PUBLIC_APP_VERSION`) updates. |
+ | **Prerequisite** | The `poke-memory-bot` App must be a bypass actor on **both** the `main-protection` ruleset (to land the release commit on `main`) and the `qa-staging` ruleset (to force-push the qa reset). If a push step fails with a protected-branch error, that is the missing setup. |
+ | **Concurrency** | `group: auto-release` with `cancel-in-progress: false` - back-to-back merges queue rather than collapse. |
+@@ -817,7 +817,7 @@
+ |---|---|
+ | **Trigger** | Daily `schedule` (`0 8 * * *` - 08:00 UTC); `workflow_dispatch` (with an optional `threshold` input overriding the default divergence threshold of 5) |
+ | **Job** | `check` |
+-| **What it does** | Runs `.github/scripts/check-grade-log-divergence.mjs`, which flags users whose `grade_log` shows activity but whose `card_reviews` table is missing the corresponding rows - the #584 sync-break signature. If divergence is detected, the workflow opens an issue titled `[monitoring] grade_log divergence detected (N users)` from a generated body file, labelled `monitoring` and `area:workflow`. The `monitoring` label is self-healing - created with `gh label create ... || true`. |
++| **What it does** | Runs `.github/scripts/check-grade-log-divergence.mjs`, which flags users whose `grade_log` shows activity but whose `card_reviews` table is missing the corresponding rows - the #584 sync-break signature. If divergence is detected and an alert is already open, the workflow comments on that alert instead of filing another (#2003); the alert is found through `.github/scripts/find-marker-issue.mjs` by the `<!-- monitor:grade-log-divergence -->` marker on line 1 of its body. Otherwise it opens an issue titled `[monitoring] grade_log divergence detected (N users)` from a generated body file, labelled `monitoring` and `area:workflow`. It never closes an alert itself. The `monitoring` label is self-healing - created with `gh label create ... || true`. |
+ | **Required secrets** | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`. |
+ | **Cron-only** | Does not fire on push, so the workflow file landing in a PR will not raise an alert on the PR itself - the first real run is the next 08:00 UTC tick after merge. |
+ | **Concurrency** | `group: monitor-grade-log-divergence` with `cancel-in-progress: false`. |
+@@ -842,7 +842,7 @@
+ |---|---|
+ | **Trigger** | Monthly `schedule` (`0 7 1 * *` - 07:00 UTC on the 1st); `workflow_dispatch`. Gated `if: github.repository == 'Frazzled-Productions/poke-memory'`. |
+ | **Job** | `monitor` |
+-| **What it does** | Detects upstream species growth (#1739, parent #1644). One HTTP call reads the live `/pokemon-species` `count`; it compares against the seeded default-form count derived from `lib/pokemon/generated-core.json` filtered to `isDefaultForm` (1025 today). On growth it opens, or updates in place (HTML marker `<!-- pokeapi-species-monitor -->`), a `priority:later` tracking issue listing the new species ids; no-op when counts match. The re-seed + binary review stay human-driven (no auto-PR). Species-count-to-species-count avoids the 10001+ mega/regional/gigantamax trap - never switch to `/pokemon`, never use the raw 1174 record count. |
++| **What it does** | Detects upstream species growth (#1739, parent #1644). One HTTP call reads the live `/pokemon-species` `count`; it compares against the seeded default-form count derived from `lib/pokemon/generated-core.json` filtered to `isDefaultForm` (1025 today). On growth it opens, or updates in place (HTML marker `<!-- pokeapi-species-monitor -->` on line 1, looked up through `.github/scripts/find-marker-issue.mjs`), a `priority:later` tracking issue listing the new species ids; no-op when counts match. The re-seed + binary review stay human-driven (no auto-PR). Species-count-to-species-count avoids the 10001+ mega/regional/gigantamax trap - never switch to `/pokemon`, never use the raw 1174 record count. |
+ | **Why not a failure monitor** | The alert IS the issue. The job exits 0 on growth (it files/updates the issue), so `cron-health-monitor.yml` does not flag it as failing. |
+ | **Health watch** | Registered in `cron-health-monitor.yml`'s `WORKFLOWS` list at 840h tolerance (matching the monthly `auto-deep-audit` entry). |
+ | **Required check** | No - cron, not a PR gate. |
