@@ -61,7 +61,8 @@
   },
   "overrides": {
     "postcss": ">=8.5.23",
-    "@babel/core": "^7.29.6"
+    "@babel/core": "^7.29.6",
+    "browserslist": "$browserslist"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
