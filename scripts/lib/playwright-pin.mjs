@@ -13,8 +13,16 @@
  * Imports nothing, so it runs under plain `node` and in the vitest node project.
  */
 
-/** Matches a Playwright image tag and captures its X.Y.Z version. */
-export const PLAYWRIGHT_IMAGE_TAG = /playwright:v(\d+\.\d+\.\d+)/g;
+/**
+ * Matches a Playwright image tag and captures its version. Deliberately loose
+ * about the number of version parts, so a truncated pin such as
+ * `playwright:v1.63-noble` or `playwright:v1-noble` is captured as "1.63" or
+ * "1" and reported as a mismatch, rather than slipping past the check.
+ */
+export const PLAYWRIGHT_IMAGE_TAG = /playwright:v(\d+(?:\.\d+)*)/g;
+
+/** The file that must always carry a pin, so a deleted pin cannot pass. */
+export const REQUIRED_PIN_PATH = ".github/workflows/ci.yml";
 
 /**
  * The lockfile entries that must all resolve to the same version. The image
@@ -79,4 +87,28 @@ export function findImageTagDrift(files, version) {
     });
   }
   return errors;
+}
+
+/**
+ * Guards against the check passing vacuously: if no tag is found at all, or the
+ * required file has lost its pin, the drift scan proved nothing.
+ *
+ * @param {{ path: string, text: string }[]} files
+ * @param {string} requiredPath a file that must contain at least one tag
+ * @returns {string[]}
+ */
+export function findMissingPins(files, requiredPath = REQUIRED_PIN_PATH) {
+  const hasTag = (text) => new RegExp(PLAYWRIGHT_IMAGE_TAG.source).test(text);
+  const tagged = files.filter((f) => hasTag(f.text));
+  if (tagged.length === 0) {
+    return [
+      "no Playwright image tags (`playwright:vX.Y.Z`) found in any tracked file; the pin may have been removed.",
+    ];
+  }
+  if (!tagged.some((f) => f.path === requiredPath)) {
+    return [
+      `${requiredPath} has no Playwright image tag; the browser jobs' container pin may have been removed.`,
+    ];
+  }
+  return [];
 }
