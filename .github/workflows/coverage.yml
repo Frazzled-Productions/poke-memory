@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Skip fork PRs: pull_request from a fork runs with a read-only token, so
-    # the comment step would fail. Same guard pattern as auto-review.yml.
+    # the comment step would fail.
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.fork == false
     permissions:
       contents: read

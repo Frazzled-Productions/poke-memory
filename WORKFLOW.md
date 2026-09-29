@@ -23,6 +23,10 @@
 > This banner is deliberate rather than a rewrite. Describing the replacement
 > process would mean inventing one before it has been decided, and a confidently
 > wrong process map is worse than an honestly dated one.
+>
+> The **GitHub Actions catalog** has since been pruned to the workflows that still
+> exist (#2020 / #2022): the removed ones, plus the two dead autofix workflows,
+> are listed once under [Removed workflows](#removed-workflows).
 
 This is the **process map** for poke-memory - how work flows through this repo end-to-end. It covers the sub-agent roster, orchestration playbook, GitHub Actions catalog, issue lifecycle, build gates, and retrospectives.
 
@@ -51,7 +55,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [privacy-expert](.claude/agents/privacy-expert.md) | Data-protection / compliance advice - GDPR/UK-GDPR controller obligations, Children's Code, PECR/cookies, privacy notice + Terms drafting, DPIA upkeep, sub-processor classification | Yes |
 | [i18n-expert](.claude/agents/i18n-expert.md) | Multi-locale design - `pokemonNameLocale` vs. `appLocale`, transliteration sources (rōmaji, pinyin), message catalogs, `next-intl` routing, locale-aware sync, `<lang>` placement, adding a new locale | Yes |
 | [ux-advisor](.claude/agents/ux-advisor.md) | Information architecture, feature discoverability, onboarding patterns, empty/locked-state design, accessibility - invoked on the brief for any change adding a user-facing feature or changing how something is displayed/discovered; advises, `ui-coder` implements | Yes |
-| [workflow-expert](.claude/agents/workflow-expert.md) | Mandatory review on EVERY GitHub Actions / orchestration change - idempotency markers, salvage patterns, fork-PR guard, cycle caps | Yes |
+| [workflow-expert](.claude/agents/workflow-expert.md) | Mandatory review on EVERY GitHub Actions / orchestration change - idempotency markers, fork-PR and author guards, required-check names | Yes |
 
 ---
 
@@ -90,9 +94,11 @@ If any of the four is missing, run the planner. If all four are present, go stra
 
 When *not* to use a sub-agent: small one-off edits, single-file changes, or anything where the round-trip cost outweighs the value.
 
-**Hard rule - `workflow-expert` reviews EVERY `.github/workflows/**` change.** No exception for mechanical-looking edits: complexity is not the gate, YAML's silent-failure mode is. Three separate incidents (#1859, #1815, #1806) came from bypassing the review because a change "looked mechanical". Additionally, for any change that involves marker-based dedup (HTML-comment idempotency markers) or GitHub search-index lookups, invoke `workflow-expert` **before** writing the change, not only as a reviewer afterwards. GitHub's search index strips HTML comments, so a `<!-- marker -->` dedup that relies on search to find prior comments silently fails - exactly the platform quirk a `workflow-expert` design-time pass surfaces before it costs a fix commit at auto-review time.
+**Hard rule - `workflow-expert` reviews EVERY `.github/workflows/**` change.** No exception for mechanical-looking edits: complexity is not the gate, YAML's silent-failure mode is. Three separate incidents (#1859, #1815, #1806) came from bypassing the review because a change "looked mechanical". Additionally, for any change that involves marker-based dedup (HTML-comment idempotency markers) or GitHub search-index lookups, invoke `workflow-expert` **before** writing the change, not only as a reviewer afterwards. GitHub's search index strips HTML comments, so a `<!-- marker -->` dedup that relies on search to find prior comments silently fails - exactly the platform quirk a `workflow-expert` design-time pass surfaces before it costs a fix commit at review time.
 
-**`ux-advisor` before writing onboarding/discoverability code.** On the same design-time pattern as `workflow-expert` before GitHub Actions, invoke `ux-advisor` on the brief **before** dispatching the implementer for any change that adds a user-facing feature, changes how something is displayed, or changes how something is accessed/discovered. The planner's testability + first-contact UX pre-flight (#1276) names this hook; any discoverability gap `ux-advisor` cannot resolve from the existing code becomes a `[USER-DECISION]` open question or a dedicated acceptance criterion. At review time, `code-reviewer` raises a new surface with no declared discovery path as a Concern (the "Discoverability" check in its step-3 list) - auto-review.yml is unchanged, the check lives in the agent definition.
+**`ux-advisor` before writing onboarding/discoverability code.** On the same design-time pattern as `workflow-expert` before GitHub Actions, invoke `ux-advisor` on the brief **before** dispatching the implementer for any change that adds a user-facing feature, changes how something is displayed, or changes how something is accessed/discovered. The planner's testability + first-contact UX pre-flight (#1276) names this hook; any discoverability gap `ux-advisor` cannot resolve from the existing code becomes a `[USER-DECISION]` open question or a dedicated acceptance criterion. At review time, `code-reviewer` raises a new surface with no declared discovery path as a Concern (the "Discoverability" check in its step-3 list); the check lives in the agent definition.
+
+**Service Worker cache changes (#1247).** vitest cannot surface failures that only manifest under the deployed CDN's URL shape (versioned cache buckets, Vercel `dpl` image params, cache-tag expiry branches). Treat `code-reviewer` as a blocking gate, not advisory, for any change under `app/sw.ts`, `app/sw/**`, or `lib/pwa/**`. See retros #1166 and #1168 for the cases that prompted this.
 
 **Orchestration entrypoints - `/batch-issues` and `/ship`.** Two local slash-commands run the playbook end-to-end so the gate, the in-session `code-reviewer` pass, the issue-first cross-check, and branch-off-`qa` are not re-derived by hand each time:
 
@@ -108,37 +114,18 @@ Both run the same `npm run pre-pr` gate (AGENTS.md "Pre-PR build gate") and the 
 
 ## Issue lifecycle
 
-Issues move through the following states on the [project board](https://github.com/orgs/Frazzled-Productions/projects/1):
-
-```
-Todo → Planned → In Progress → PR → Ready to merge → Done
-```
-
-| Transition | Trigger |
-|---|---|
-| **Todo → Planned** | `auto-issue.yml` plan job posts the `<!-- auto-plan -->` comment |
-| **Planned → In Progress** | Maintainer comments `/go`; implement job starts |
-| **In Progress → PR** | Implement job opens a PR |
-| **PR → Ready to merge** | `auto-review.yml` posts verdict `Looks good to me` |
-| **Any open → Done** | Issue closes (via `closes #N` on merge, or manually) |
+Issues sit on the [project board](https://github.com/orgs/Frazzled-Productions/projects/1). Only one transition is automated: **any open -> Done**, by `auto-status.yml` when the issue closes (via `closes #N` on merge, or manually). The intermediate states (Planned, In Progress, PR, Ready to merge) were driven by the removed `auto-issue` / `auto-pr` / `auto-review` workflows and are now set by hand, if at all.
 
 ### Commands
 
-| Comment | Where | Effect |
-|---|---|---|
-| `/go` | On an issue | Triggers the implement job in `auto-issue.yml` |
-| `/continue` | On an issue | Resumes a halted implement run from the saved branch |
-| `/split` | On an issue | Files sub-issues from the planner's **Suggested split** block |
-| `/replan` | On an issue | Re-runs the plan job against the current tree; use after a staleness gate refusal |
-| `/fix` | On a PR | Runs a fix cycle in `auto-pr.yml` (up to 3 cycles per PR) |
-| `/resolve` | On a PR | Merges the PR's base branch (`qa` or `main`), resolves conflicts via Claude, runs build gate, pushes (`auto-resolve.yml`) |
+The `/go`, `/continue`, `/split`, `/replan`, `/fix` and `/resolve` comment commands were removed with their workflows; nothing responds to them. The only surviving comment command is `/preview` on a PR (OWNER / MEMBER / COLLABORATOR), handled by `vercel-preview-on-ready.yml`, which is currently disabled.
 
 ### Backlog ownership
 
 - Backlog lives in GitHub Issues, labelled `priority:now` / `priority:next` / `priority:later`.
 - The [Poké Memory roadmap](https://github.com/orgs/Frazzled-Productions/projects/1) is a kanban view over the same issues with a `Priority` field matching those labels.
 - **The user owns priorities.** Don't move issues between priority labels or columns without explicit user direction.
-- Issues filed from mobile (or anywhere) are labelled manually or by the workflow that created them (e.g. `auto-app-suggest.yml` applies all three label dimensions at creation).
+- Issues filed from mobile (or anywhere) are labelled manually, or by the monitor workflow that filed them.
 
 ---
 
@@ -152,8 +139,8 @@ Batch PRs ─▶ qa ─▶ (preview deploy + maintainer QA) ─▶ qa→main PR 
 
 | Branch | Ruleset | Who PRs into it |
 |---|---|---|
-| `main` | `main-protection` - strict-up-to-date; required checks `test`, `e2e`, `Check version bump approval`, `Restrict main PR source` | Only `qa`. A non-`qa` PR needs the `hotfix` label. |
-| `qa` | `qa-staging` - required checks `test`, `e2e`; **not** strict-up-to-date. Bypass actors: `poke-memory-bot` and the repo admin role. | `/batch-issues`, the `auto` pipeline, and one-off feature branches. |
+| `main` | `main-protection` - strict-up-to-date; required checks `test`, `e2e`, `Test coverage report`, `Check version bump approval`, `Restrict main PR source` | Only `qa`. A non-`qa` PR needs the `hotfix` label. |
+| `qa` | `qa-staging` - required checks `test`, `e2e`, `Test coverage report`, `integration-gate`, `changelog-gate`, `i18n-leak`; **not** strict-up-to-date. Bypass actors: `poke-memory-bot` and the repo admin role. | `/batch-issues`, `/ship`, and one-off feature branches. |
 
 **Why `qa` exists.** `main`'s strict-up-to-date rule forces every queued PR to rebase + re-run CI one at a time - the serial-rebase tax. A GitHub merge queue would remove it but is unavailable for personal-account repos (#797). `qa` is non-strict, so `/batch-issues` merges PRs back-to-back with no rebase tax, then promotes the bundled result to `main` in a single PR.
 
@@ -181,7 +168,7 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 
 ## GitHub Actions catalog
 
-**Trust rule for comment/edit-triggered jobs (#1859).** Any job triggered by a user-authorable event (`issue_comment`, `issues: edited`, and similar) must gate on the event author before any secret-bearing or write-token step runs: bot-produced artefacts (review verdicts, digests, idempotency markers) are only trusted when the comment/issue author is `poke-memory-bot[bot]`, and human commands (`/preview`, `/resolve`) require `author_association` OWNER / MEMBER / COLLABORATOR. Body-content markers alone are attacker-postable and never sufficient.
+**Trust rule for comment/edit-triggered jobs (#1859).** Any job triggered by a user-authorable event (`issue_comment`, `issues: edited`, and similar) must gate on the event author before any secret-bearing or write-token step runs: bot-produced artefacts (idempotency markers, tracking issues) are only trusted when the comment/issue author is `poke-memory-bot[bot]`, and human commands (today only `/preview`) require `author_association` OWNER / MEMBER / COLLABORATOR. Body-content markers alone are attacker-postable and never sufficient.
 
 ### `ci.yml` - CI
 
@@ -245,7 +232,7 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 | **Job** | `check` |
 | **What it does** | Runs `scripts/check-migrations.mjs`, which lists files in `db/migrations/` (excluding the bootstrap `001_initial_sync_schema.sql`), calls the Supabase Management API to list applied migrations, and exits non-zero if any committed file is not in the applied list. **Env-to-branch parity (#1806):** a PR whose base is `qa` is checked against the **QA** project (staging rehearsal); a push to `main` (and a PR into `main`) is checked against **prod**. Routing is purely on `github.event_name` + `pull_request.base.ref` (secrets can't be read in `if:`), so the matching secret set is injected per step. |
 | **Required secrets** | `SUPABASE_ACCESS_TOKEN` (Supabase Management-API PAT, account-scoped so it reads BOTH projects) plus the per-project ref: `SUPABASE_PROJECT_REF` (prod, e.g. `nvxvvtvnthsgdxgksmju`) or `QA_SUPABASE_PROJECT_REF` (QA). No separate QA token - the PAT is account-level. The relevant ref must be set before the matching trigger can run; without it the script exits 2 with a clear error (the loud failure mode during the secrets-provisioning window). |
-| **Fork PRs** | Skipped (`github.event_name == 'push' || head.repo.fork == false` guard - same pattern as `auto-review.yml`, with the push path gated in explicitly). No secrets exposed. |
+| **Fork PRs** | Skipped (`github.event_name == 'push' || head.repo.fork == false` guard - the push path is gated in explicitly because a bare fork check is falsy on push). No secrets exposed. |
 | **Required check** | No - informational. Failure flags the gap; the recovery action is to run `mcp__supabase__apply_migration` against the named file. |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
 
@@ -387,148 +374,13 @@ in-memory fixture.
 
 ---
 
-### `auto-issue.yml` - Auto Issue Worker
-
-Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
-
-#### Plan job
-
-| | |
-|---|---|
-| **Trigger** | Issue labeled `auto` |
-| **What it does** | Invokes the `planner` sub-agent; posts `<!-- auto-plan -->` comment; moves issue to **Planned** on the project board |
-| **Scope check** | Planner assesses scope (≥4 files, ≥3 surfaces, infra+logic, ≥6 acceptance criteria) and runs a coupling check before offering `/split` |
-| **Overlap annotation** | If the issue has `<!-- overlap-scan:i+j:<kind> -->` markers, the orchestrator extracts the verbatim reason from each marker's comment body and passes the list to the planner, which appends a `**Related issues:**` section to the plan (one `- #<num> (<kind>): <reason>` line per linked issue) - informational only |
-| **Salvage** | Post-step runs with `if: always()` - if the orchestrator halts before posting the plan, it salvages `/tmp/plan-body.md` to the issue |
-
-#### Implement job
-
-| | |
-|---|---|
-| **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR) comments `/go` on an open `auto`-labelled issue |
-| **Conflict gate** | Checks for `<!-- overlap-scan:i+j:conflict -->` markers linked to open issues; refuses to proceed if unresolved |
-| **Staleness gate** | Parses `<!-- plan-meta: base=<sha> files=<list> -->` from the most recent `<!-- auto-plan -->` comment; runs `git diff --name-only <base>..origin/qa -- <files>` (implement PRs target `qa`); non-empty intersection → posts a comment naming the conflicting files and the commits that touched them, then exits 1. Missing `plan-meta` (older plans) → warning only, proceeds. Empty `files=` → proceeds. Comment `/replan` to recover. |
-| **What it does** | Runs the orchestration playbook (plan → research → implement → review), pushes a branch, runs the build gate, opens a PR **into `qa`** (the staging branch - `main` only takes promotion PRs) |
-| **Build gate** | `npm run typecheck && npm run build && npm test` - up to 2 fix attempts before stopping without a PR |
-| **Git credential** | `claude-code-action` URL-embeds the App installation token (passed via `github_token:`) into the origin remote, so subprocess pushes authenticate as `poke-memory-bot` and CI fires on the resulting `synchronize` events. Do NOT add a `git config --global http.https://github.com/.extraheader` step in front of the action - that layers a Bearer header on top of the URL-embedded Basic auth, GitHub rejects the dual-auth request, and the action's internal `git fetch origin main --depth=1` fails before Claude is invoked. |
-| **Post-step** | Runs `if: always()` - salvages uncommitted edits as a `WIP: halted run on #N` commit, verifies the branch on origin before advertising `/continue`, updates the live status comment |
-| **Project status** | Moves to **In Progress** on start; to **PR** when a PR opens |
-
-#### Continue job
-
-| | |
-|---|---|
-| **Trigger** | Maintainer comments `/continue` on an open `auto`-labelled issue |
-| **Pre-flight** | Guards against existing open PR; parses branch name from the last `<!-- auto-status -->` comment; verifies branch exists on origin |
-| **What it does** | Checks out the saved branch and resumes implementation from where it left off; follows the same workflow as implement |
-| **Git credential** | Same as the implement job - `claude-code-action`'s URL-embedded App token handles subprocess pushes. No global git credential step. |
-| **WIP handling** | If the last commit subject starts with `WIP:`, the resumed orchestrator inspects `git diff HEAD~1` and amends or reverts before continuing |
-
-#### Split job
-
-| | |
-|---|---|
-| **Trigger** | Maintainer comments `/split` on an open `auto`-labelled issue |
-| **What it does** | Parses numbered titles from the `**Suggested split:**` block in the most recent planner comment; creates a child issue per title; links as native GitHub sub-issues; inherits the parent's `priority:*` label plus `auto` |
-| **Cascade** | Each child gets the `auto` label, which triggers its own plan run - the planner breaks the work down further without manual intervention |
-| **Idempotency** | Posts `<!-- auto-split:N -->` marker *before* the create loop; re-runs bail when the marker exists |
-
-#### Replan job
-
-| | |
-|---|---|
-| **Trigger** | Maintainer comments `/replan` on an open `auto`-labelled issue |
-| **What it does** | Mirrors the plan job - invokes `planner`, posts a fresh `<!-- auto-plan -->` comment, moves issue to **Planned** |
-| **Use case** | Recovery after a staleness gate refusal (`/go` blocked because `origin/qa` moved into planned files); also useful when scope has changed since the original plan |
-| **Overlap annotation** | Same as plan job - overlap-scan markers are parsed and passed to the planner, which appends a `**Related issues:**` section to the plan |
-| **Salvage** | Same `if: always()` post-step as the plan job |
-
----
-
-### `auto-pr.yml` - Auto PR Fix
-
-| | |
-|---|---|
-| **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR), or the `poke-memory-bot` GitHub App, posts `/fix` on a PR |
-| **Cycle cap** | 3 auto-review cycles per PR (counted by `<!-- auto-review:N -->` markers). After 3, the workflow posts a stop comment and exits. |
-| **LGTM short-circuit** | Bare `/fix` on an already-approved PR does nothing - the orchestrator posts a note and stops. `/fix <inline findings>` overrides and forces a fix run using the inline body as the punch list. |
-| **CI pre-flight** | Before the agent runs, a bash step fetches the PR's `statusCheckRollup` for the `test` check and sets `CI_FAILING_AT_HEAD=true` in the environment when CI is currently failing. The agent prompt checks this env var first: if `true`, the LGTM short-circuit is bypassed unconditionally, and the CI error excerpt in `FIX_COMMENT_BODY` becomes the punch list. This prevents the race where a queued fix run inherits a stale LGTM verdict from a previous cycle. |
-| **Review producer** | `auto-pr.yml` does **not** run `code-reviewer` or post an `<!-- auto-review:N -->` comment itself. It addresses findings, commits, and pushes - and stops. The push fires `auto-review.yml` on `synchronize`, which is the **single** review producer: it reviews the resulting diff, posts the next `auto-review:N` comment, and kicks the next `/fix` if needed. Previously both workflows posted reviews, racing to compute the same `N` and producing duplicate `auto-review:N` comments with conflicting verdicts (and a corrupted cycle counter). |
-| **No-progress guard** | If a fix cycle produces zero commits, nothing is pushed - no `synchronize` event fires, so no new review runs and the chain ends. |
-| **What it does** | Reads the latest `<!-- auto-review:N -->` comment (or the inline `/fix` body), addresses findings, commits, and pushes. The run ends at the push; `auto-review.yml` reviews the pushed commit. |
-| **Git credential** | `actions/checkout` writes the App token to the repo-local `.git/config`. `claude-code-action`'s `git-config.ts` then unsets that local extraheader and embeds the App token directly in the remote URL (`https://x-access-token:${TOKEN}@github.com/...`), so subprocess fetches and pushes authenticate as `poke-memory-bot`. No global git credential is set: doing so injects a second `Authorization` header (Bearer) on top of the URL-embedded Basic auth, which GitHub rejects, and the action's `git fetch origin main --depth=1` step fails before Claude is invoked. |
-| **Project status** | Moves to **In Progress** during the fix. The post-fix **PR** / **Ready to merge** transition is owned by `auto-review.yml` when it reviews the pushed commit. |
-
----
-
-### `auto-resolve.yml` - Auto Resolve
-
-| | |
-|---|---|
-| **Trigger** | Maintainer (OWNER / MEMBER / COLLABORATOR) or `poke-memory-bot` posts `/resolve` on an open PR |
-| **Fork guard** | Fork PRs are excluded - `isCrossRepository` is fetched via `gh pr view` and the job bails early if true |
-| **Pre-flight** | Retries `mergeableState` up to 3× while `UNKNOWN` (posts a warning comment if still `UNKNOWN` after 3 retries); exits with a comment if already `CLEAN` |
-| **Fast-path** | If merging the PR's base branch (`origin/<base>`) cleanly succeeds, runs the build gate (`typecheck` / `build` / `test`), then pushes and posts `<!-- auto-resolve:N -->` - no Claude invocation |
-| **Conflict path** | Claude resolves each conflicted file; reads both sides + recent main history per file; bails if any file is under `lib/srs/`, `db/migrations/`, or is `next.config.ts`, or if more than 5 files conflict |
-| **Build gate** | `npm run typecheck && npm run build && npm test` - two attempts. On second failure, posts last 80 lines of output and stops without pushing |
-| **Idempotency** | `<!-- auto-resolve:N -->` marker (N = count of existing resolve comments + 1) is posted in the summary; concurrent `/resolve` comments queue via `cancel-in-progress: false` and the second run finds a clean PR |
-| **What it does** | Merges the PR's base branch (`qa` for staged work, `main` for hotfixes) into the PR branch, resolves conflicts, runs the build gate, pushes, and posts an `<!-- auto-resolve:N -->` summary listing each conflicted file and how it was resolved |
-
----
-
-### `auto-review.yml` - Auto Review
-
-| | |
-|---|---|
-| **Trigger** | `pull_request: [opened, synchronize, reopened, ready_for_review]` |
-| **Gate** | Skip-list (inverted from the earlier allow-list - see #469): drafts, fork PRs (`head.repo.fork == false`), base branches other than `main` or `qa`, the `qa -> main` promotion PR (`head.ref == 'qa'`), Dependabot PRs, `chore(release):` titles, and `[skip ci]` in the title or body are all skipped. So it reviews PRs into `qa` (one-off and `auto`-pipeline PRs) and into `main` (hotfixes). `/batch-issues` disables the workflow during its drain, since batch PRs get the in-session `code-reviewer` instead (#814). |
-| **Single review producer** | `auto-review.yml` posts every `auto-review:N` comment - the first review on PR open and every follow-up review after a `/fix` push (which arrives as a `synchronize` event). `auto-pr.yml` only fixes and pushes; it never posts a review. This is the design that removes the duplicate-post race. |
-| **Cycle-aware review** | First review (no prior `auto-review:N` comments) reviews the full diff. A follow-up review of a `/fix` push verifies the prior Blocker/Concern findings are resolved and flags only genuine **new** regressions the fix introduced - it does not re-scan untouched code for fresh nitpicks or escalate severities, so the bar does not drift between cycles. |
-| **Linked-issue resolution** | A pre-action step parses `closes/fixes/resolves #N` (case-insensitive) from the PR body, branch name, and commit messages via `.github/scripts/extract-linked-issues.sh`, deduplicates the issue numbers, runs `gh issue view` for each, and writes the bodies to `/tmp/linked-issues.md`. The `claude-code-action@v1` prompt then `cat`s that file and briefs the `code-reviewer` sub-agent to cross-check the diff against every acceptance criterion in the linked issue(s). An uncovered criterion is raised as a **Blocker** (anchored on `issue #N:criterion text`, not a file:line). If no issue can be resolved, the file is empty and the prompt notes "no linked issue - coverage check skipped"; the diff-quality checks still run. This is the reviewer-side counterpart of the implementer cross-check in the coder sub-agents; together they close the partial-scope gap surfaced by #1259 / #1260. |
-| **Severity calibration** | `Blocker` / `Concern` / `Nit` / `Praise`, calibrated strictly: `Concern` is reserved for real correctness/security/convention problems in the changed code; hypothetical, pre-existing, or stylistic items are `Nit`. A `Needs fixes` verdict needs at least one Blocker or Concern, so over-tagging Nits as Concerns is what burns extra fix cycles. |
-| **Idempotency** | Each review comment includes `<!-- auto-review-sha:<head-sha> -->` on row 2; re-triggers at the same SHA are skipped. |
-| **Auto-fix trigger** | When verdict is `Needs fixes` and the cycle count is below 2 (i.e. there is at most one existing auto-review), automatically posts a `<!-- auto-review-autofix:N -->` `/fix` comment (N = the new review number) - which triggers `auto-pr.yml` without manual intervention. The marker is cycle-specific, so idempotent re-runs skip a duplicate post. The existing cycle cap (3) and no-progress guard still hold. |
-| **LGTM mention** | When verdict is `Looks good to me`, the comment body includes `@fraserbrookhouse` so the maintainer receives a GitHub notification. |
-| **What it does** | Runs `code-reviewer` sub-agent; posts `<!-- auto-review:N -->` comment; upgrades project status to **Ready to merge** if verdict is `Looks good to me`; auto-posts `/fix` if verdict is `Needs fixes` |
-| **Check gate** | Final job step exits non-zero when the latest verdict scoped to the current head SHA is `Needs fixes` - PR checks show red until a `/fix` cycle lands an approval at a new SHA |
-
-**Service Worker cache changes (#1247).** vitest cannot surface failures that only manifest under the deployed CDN's URL shape (versioned cache buckets, Vercel `dpl` image params, cache-tag expiry branches). Treat `code-reviewer` as a blocking gate, not advisory, for any change under `app/sw.ts`, `app/sw/**`, or `lib/pwa/**`. See retros #1166 and #1168 for the cases that prompted this.
-
----
-
-### `auto-retro.yml` - Auto Retro
-
-| | |
-|---|---|
-| **Trigger** | `issues: [closed]` |
-| **Skips** | Issues closed as `not_planned`; issues with no linked merged PR; issues already having an `<!-- auto-retro -->` comment |
-| **What it does** | Fetches the PR diff and metadata; posts a single `<!-- auto-retro -->` comment on the closed issue covering: which sub-agents ran, what worked, what was overhead, and one transferable lesson |
-| **Scope** | Process reflection only - no code change recommendations |
-
----
-
-### `auto-retro-harvest.yml` - Auto Retro Harvest
-
-| | |
-|---|---|
-| **Trigger** | Weekly cron Monday 10:00 UTC + `workflow_dispatch` |
-| **Inputs** | Every `<!-- auto-retro -->` comment posted by `auto-retro.yml` across closed issues. Purely additive - does not change `auto-retro.yml`'s per-issue behaviour. |
-| **Output 1 - digest** | Regenerates `docs/retros.md` wholesale, aggregating every retro most-recent-first, and commits it to `qa` (`docs(retros): refresh retrospectives digest [skip ci]`). Regenerating the whole file each run is the idempotency mechanism - no per-entry markers, a no-op commit is skipped via `git diff --cached --quiet`. |
-| **Output 2 - recurring-pattern auto-file** | When the *same concrete problem* recurs across **≥ 3 distinct retros**, files exactly one tracking issue for that pattern. Behavioural-rule lessons (reusable conventions) are not filed - they stay in the digest only. There is deliberately no per-lesson filer. |
-| **Idempotency key** | Per-pattern body marker `<!-- auto-retro-pattern:<slug> -->`. A pattern with an open marker-carrying issue - or a closed one within the last 60 days - is not re-filed. The slug is derived from the concrete problem, not the contributing issues, so it is stable across runs. |
-| **Issue-filing rules** | Auto-filed issues are `priority:later` only - never `auto`, never `priority:now`/`priority:next`. The user owns promotion. One issue per cluster; contributing retro comments linked as evidence. |
-| **No-op** | Zero retros found → writes nothing, files nothing. No cluster reaching 3 → digest still refreshed, no issues filed. |
-| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY`; `permissions` `contents: write` (commit the digest) + `issues: write` (file tracking issues), rest read |
-
----
-
 ### `auto-status.yml` - Auto Status
 
 | | |
 |---|---|
 | **Trigger** | `issues: [closed]` |
 | **What it does** | Moves the issue to **Done** on the project board - regardless of how it was closed (PR merge, manual close, or `not_planned`) |
-| **Note** | All other project-status transitions are driven from `auto-issue.yml` and `auto-pr.yml`. This workflow owns only the terminal **Done** state. |
+| **Note** | The only automated board transition. The others were driven by the removed `auto-issue.yml` / `auto-pr.yml` and are now set by hand. |
 
 ---
 
@@ -541,7 +393,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **What it does** | When a child issue closes, finds any OPEN umbrella that tracks it, checks whether ALL of that umbrella's tracked children are now closed, and if so closes the umbrella with a comment noting all tracked items are complete. Saves the maintainer from hand-closing digests / epics once their children ship. |
 | **How children are declared** | A task-list of `#N` refs in the umbrella body (`- [ ] #N` / `- [x] #N`). The checkbox tick is not trusted - each child's real state is read from the API. GitHub-native sub-issues are read as a best-effort secondary signal and unioned in; sub-issue API errors are non-fatal. Plain `#N` prose refs are ignored. |
 | **Opt-in gate** | Fires only for umbrellas carrying the `auto-close-when-complete` label - the umbrella, not the child, must carry it. Weekly digests (snapshots) should carry it by default; open-ended epics (e.g. #1445) deliberately omit it so they never auto-close prematurely. The maintainer creates the label once (no label-sync manifest exists in `.github/`). |
-| **Candidate lookup** | Lists open issues with the gate label and filters locally with jq on the fetched body - never `gh issue list --search '... in:body'`, which the GitHub search index strips (same caveat as `auto-retro-harvest.yml`). |
+| **Candidate lookup** | Lists open issues with the gate label and filters locally with jq on the fetched body - never `gh issue list --search '... in:body'`, which the GitHub search index strips. |
 | **Child-reopened** | No `reopened` trigger by design - reopening a child leaves the umbrella closed; a human reopens it if needed. Avoids open/close thrash. |
 | **Batch-close race** | A `qa -> main` promotion PR closing ~20 issues fires ~20 runs against the same umbrella; the "already closed" guard plus `cancel-in-progress: false` make this safe (first run closes, the rest find it closed). |
 | **Dry run** | `workflow_dispatch` with `dry_run: true` posts a `[DRY RUN] Would close ...` comment instead of closing. |
@@ -560,7 +412,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **What it does** | Bridges the gap left by GitHub auto-closing `closes #N` issues only on the default branch. When a PR merges into `qa`, it parses the PR body and commit messages for `closes/fixes/resolves #N` keywords and adds the `status:in-qa` label to each referenced issue - a board signal that the work is done and staged. When the `qa -> main` promotion PR merges (`base: main`, `head: qa`), GitHub auto-closes those issues on `main`, so this run strips the now-stale `status:in-qa` label for tidiness. |
 | **Label creation** | The `status:in-qa` label (colon-namespaced, consistent with `priority:*`) is created idempotently on first run via `gh label create ... \|\| true`. The workflow owns the label - it is not created by hand. |
 | **Scope** | Label only. Project-board column transitions are deliberately left to `auto-status.yml`; this workflow never touches board columns. |
-| **Fork PRs** | Skipped (`head.repo.fork == false` guard - same pattern as `auto-review.yml`; fork PRs run with a read-only token and cannot edit issue labels). |
+| **Fork PRs** | Skipped (`head.repo.fork == false` guard - same pattern as `coverage.yml`; fork PRs run with a read-only token and cannot edit issue labels). |
 | **Idempotency** | `gh label create ... \|\| true` no-ops once the label exists; `--add-label` / `--remove-label` are idempotent by nature, so a re-run changes nothing. |
 | **Required check** | No - board hygiene only, does not gate merge. |
 | **Concurrency** | Serialized per PR (`cancel-in-progress: false`). |
@@ -585,7 +437,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | | |
 |---|---|
 | **Trigger** | `schedule: '0 10 * * 1'` (weekly, Monday 10:00 UTC); `workflow_dispatch` |
-| **What it does** | For each cron-driven workflow (`auto-release`, `refresh-user-count`, `monitor-grade-log-divergence`, the four weekly digests `auto-workflow-suggest` / `auto-codequality-suggest` / `auto-app-suggest` / `auto-backlog-groom`, and the monthly `auto-deep-audit`), calls `gh run list --workflow=<file> --event schedule --branch <default-branch>` and checks (a) a scheduled run exists within the expected interval (48h for daily workflows, 240h for weekly, 840h for monthly) and (b) the most recent completed run succeeded - any non-`success`/`skipped` conclusion (`failure`, `timed_out`, `startup_failure`, `cancelled`) counts as unhealthy. On a stale or unhealthy workflow it opens or updates a per-workflow tracking issue. If the `gh run list` call itself errors (transient GitHub API failure), that workflow is skipped for the run rather than treated as stale, so an outage cannot spam a tracking issue for every monitored workflow at once. |
+| **What it does** | For each cron-driven workflow (`auto-release`, `refresh-user-count`, `monitor-grade-log-divergence`, and `pokeapi-species-monitor`), calls `gh run list --workflow=<file> --event schedule --branch <default-branch>` and checks (a) a scheduled run exists within the expected interval (48h for the daily workflows, 840h for `pokeapi-species-monitor`) and (b) the most recent completed run succeeded - any non-`success`/`skipped` conclusion (`failure`, `timed_out`, `startup_failure`, `cancelled`) counts as unhealthy. On a stale or unhealthy workflow it opens or updates a per-workflow tracking issue. If the `gh run list` call itself errors (transient GitHub API failure), that workflow is skipped for the run rather than treated as stale, so an outage cannot spam a tracking issue for every monitored workflow at once. |
 | **Dedup** | A `<!-- cron-health-monitor:{file} -->` HTML marker keyed by workflow filename gives each watched workflow its own tracking issue. Re-runs edit that issue in place and add a re-check comment rather than opening duplicates. When a workflow recovers, the monitor closes its tracking issue automatically. |
 | **Why schedule?** | The monitor runs on GitHub's internal cron queue, independently of the workflows it watches - so it still fires even if those workflows have stopped. It cannot detect its own staleness, but the blast radius of one un-monitored monitor is small. |
 | **Permissions** | `contents: read`, `actions: read`, `issues: write`. `GITHUB_TOKEN` only - no Claude, no App token, no app checkout. |
@@ -593,157 +445,18 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
-### `issue-overlap-scan.yml` - Issue Overlap Scan
-
-| | |
-|---|---|
-| **Trigger** | Issues labeled `auto`; `workflow_dispatch` (manual) |
-| **Scope** | Only `priority:now` and `priority:next` issues |
-| **Kinds** | `merge` (duplicate intent), `overlap` (same area, partial intersection), `conflict` (mutually exclusive - one blocks the other) |
-| **Markers** | Posts `<!-- overlap-scan:i+j:<kind> -->` on both issues in each pair; de-dupes on exact (i, j, kind) across runs |
-| **Load-bearing** | `conflict` markers are checked by `auto-issue.yml`'s implement job - `/go` refuses to run on an issue with an unresolved conflict marker linked to an open issue |
-| **Plan annotation** | When overlap-scan markers exist on an issue, the plan-job and replan-job append a `**Related issues:**` section to the plan body (one line per linked issue, format `#<num> (<kind>): <reason>`) - informational only, does not affect scope decisions |
-
----
-
-### `auto-workflow-suggest.yml` - Weekly Workflow Digest
-
-| | |
-|---|---|
-| **Trigger** | Weekly cron Monday 09:00 UTC + `workflow_dispatch` |
-| **Idempotency key** | ISO week string in issue title (`Weekly workflow review - YYYY-Www`). Checks all states (open + closed). |
-| **Inputs** | Retro comments (last 30d), PR review comments on `auto/*` PRs (last 30d), WIP-salvage commits (last 30d), agent invocation patterns in merged PR bodies |
-| **Output** | One digest issue per ISO week, ≤5 curated items, each with evidence links and a priority label recommendation |
-| **No-op** | Skips silently when nothing crosses the relevance threshold or when a digest issue already exists for the week |
-| **Scope** | Only proposes changes to `.github/workflows/**`, `.claude/agents/**`, `WORKFLOW.md`, or `AGENTS.md` - never app code or individual issue filings |
-| **Label** | Digest issue is labelled `area:workflow`; label is created if absent |
-
----
-
-### `auto-codequality-suggest.yml` - Weekly Code-Quality Digest
-
-| | |
-|---|---|
-| **Trigger** | Weekly cron Wednesday 09:00 UTC + `workflow_dispatch` |
-| **Idempotency key** | ISO week string in issue title (`Weekly code-quality review - YYYY-Www`). Checks all states (open + closed). |
-| **Inputs** | Files changed in `app/**`, `components/**`, `lib/**`, `db/**` in the last 30 days |
-| **Signal constraints** | A - Recency filter (only recently-changed files); B - Recurrence filter (only patterns spanning ≥2 files) |
-| **Output** | One digest issue per ISO week, ≤5 curated items, each with file paths, a concrete evidence snippet, and a `- [ ] File this as an issue <!-- proposal:N -->` checkbox |
-| **No-op** | Skips silently when nothing crosses the recurrence threshold or when a digest issue already exists for the week |
-| **Scope** | Tech debt, missing tests, dead code, and accessibility gaps within `app/**`, `components/**`, `lib/**`, or `db/**` - never workflow files, feature ideas, or individual issue filings |
-| **Label** | Digest issue is labelled `area:app`; label is created if absent |
-
----
-
-### `auto-app-suggest.yml` - Weekly Feature Ideas Digest
-
-| | |
-|---|---|
-| **Trigger** | Weekly cron Thursday 09:00 UTC + `workflow_dispatch` |
-| **Idempotency key** | ISO week string in issue title (`Weekly feature ideas - YYYY-Www`). Checks all states (open + closed). |
-| **Inputs** | Open enhancement issues (clusters/gaps); user-facing pages under `app/**/page.tsx` and `components/**`; README "Features" section vs. codebase; last 3 CHANGELOG releases; latest `auto-workflow-suggest` digest (UX themes) |
-| **Output** | One digest issue per ISO week, ≤5 proposals, each with surface, why-it-matters, priority, and a `- [ ] File this as an issue <!-- proposal:N -->` checkbox |
-| **No-op** | Skips silently when nothing crosses the bar or when a digest issue already exists for the week |
-| **Scope** | User-facing behaviour changes only - explicitly forbids refactors, test additions, dead-code removal, dependency bumps, accessibility gaps, and CI/workflow changes |
-| **Labels** | Digest issue is labelled `area:app`, `enhancement`, `priority:later`; labels are created if absent |
-
----
-
-### `auto-digest-fanout.yml` - Digest Fan-out
-
-| | |
-|---|---|
-| **Trigger** | `issues: [edited]` |
-| **Guard** | Issue authored by `poke-memory-bot[bot]` AND body contains `<!-- auto-codequality-suggest -->`, `<!-- auto-app-suggest -->` or `<!-- auto-workflow-suggest -->` (#1859 - digest bodies are user-editable, so the marker alone is spoofable) |
-| **Permissions** | `issues: write` only - never touches the git tree |
-| **Concurrency** | `digest-fanout-{issue}`, `cancel-in-progress: false` - queues runs, never cancels, so each re-trigger after a body PATCH does a fast no-op |
-| **What it does** | For each proposal whose `- [ ] File this as an issue <!-- proposal:N -->` checkbox is newly checked: extracts the title and `**Priority:**` label, creates a child issue (with the area mapped from the digest marker - `area:app` for the code-quality and app digests, `area:workflow` for the workflow digest - plus the extracted priority; app-digest children additionally get `enhancement`, and no child ever gets `auto`), writes ` → filed as #N` onto the proposal heading as an idempotency marker, then posts a single summary comment on the parent |
-| **Idempotency** | The `→ filed as #N` back-marker on the heading is the source of truth - checked proposals that already carry a marker are skipped unconditionally |
-| **Un-check behaviour** | Un-checking a filed proposal does NOT close or delete the child - manual cleanup only (out of scope for v1) |
-| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY` |
-
----
-
-### `auto-backlog-groom.yml` - Weekly Backlog Grooming Digest
-
-| | |
-|---|---|
-| **Trigger** | Weekly cron Friday 09:00 UTC + `workflow_dispatch` |
-| **Idempotency key** | ISO week string in issue title (`Weekly backlog grooming - YYYY-Www`). Checks all states (open + closed). |
-| **Inputs** | All open issues across `priority:now`, `priority:next`, `priority:later`; comment threads for retro signals, blocking cross-references, and overlap-scan conflict markers |
-| **Staleness thresholds** | `priority:now` ≥ 4 weeks, `priority:next` ≥ 8 weeks, `priority:later` ≥ 16 weeks |
-| **Move types** | Promote, Demote, Leapfrog, Flag stale |
-| **Output** | One digest issue per ISO week, ≤5 curated proposals, each citing a specific named signal |
-| **No-op** | Skips silently when nothing crosses the signal bar or when a digest issue already exists for the week |
-| **Scope** | Proposals only - never edits labels or moves issues |
-| **Label** | Digest issue is labelled `area:backlog`; label is created if absent |
-
----
-
-### `auto-deep-audit.yml` - Monthly Deep Audit
-
-| | |
-|---|---|
-| **Trigger** | Monthly cron 1st of the month 08:00 UTC + `workflow_dispatch` (optional `axis` input forces a single axis) |
-| **Rotation** | One rotating workflow covering four axes. Keyed on calendar month: code-quality (#739) and test-coverage (#741) run **every** month; workflow-structural (#743) runs in months 1/4/7/10; sub-agent roster (#744) runs in months 2/5/8/11. A normal month runs two axes; a quarter-boundary month runs three. |
-| **Idempotency key** | Per-axis dated comment marker `<!-- auto-deep-audit:<axis>:YYYY-MM -->` on the umbrella issue. An axis whose marker for the current month already exists is skipped. |
-| **Inputs** | Full codebase (no recency window) - distinguishes a deep audit from the 30-day `auto-*-suggest.yml` digests. Code-quality scans `app/**`/`components/**`/`lib/**`/`db/**`; workflow scans `.github/workflows/**` plus `gh run list` history; sub-agent scans `.claude/agents/**`. |
-| **Output** | A fresh dated report comment on the **existing** umbrella issue (#739/#741/#743/#744 - reused, never re-spawned), plus one scoped follow-up issue per finding (≤8 per axis), each labelled `priority:later`. |
-| **No-op** | If an axis finds nothing actionable it still posts a marker-carrying "no findings" comment (so idempotency holds) and files no issues. |
-| **Issue-filing rules** | Follow-up issues are `priority:later` only - never `auto`, never `priority:now`/`priority:next`. The user owns promotion. |
-| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY`; minimal `permissions` (`issues: write`, rest read) |
-
----
-
-### `settings-coverage-audit.yml` - Settings Coverage Audit
-
-| | |
-|---|---|
-| **Trigger** | `pull_request` (opened/synchronize/reopened) path-filtered to `lib/settings/**`, `lib/superuser/**`, `components/superuser/**`, `components/settings/**`, `app/settings/**` + `workflow_dispatch`. Event-driven rather than cron - settings-coverage drift (#738, exemplar #731) is introduced by code changes, not by the calendar. |
-| **Idempotency key** | Monthly dated comment marker `<!-- settings-coverage-audit:YYYY-MM -->` on umbrella issue #738. Several settings PRs in one month trigger the audit once, not once per PR. |
-| **Inputs** | Full-codebase audit of every `UserSettings` field and every superuser flag against every code path that should honour it (card-type render paths, daily caps, practice scope, secondary surfaces). |
-| **Output** | A dated report comment on existing umbrella issue #738, plus one scoped `priority:later` follow-up issue per missed-path finding (≤8). |
-| **No-op** | Posts a marker-carrying "no missed paths" comment when clean; files no issues. Advisory - never fails the job or blocks the PR. |
-| **Fork PRs** | Skipped (`head.repo.fork == false` guard - fork PRs run with a read-only token and cannot post comments or create issues). |
-| **Auth** | `actions/create-github-app-token@v3` with `vars.BOT_APP_ID` / `secrets.BOT_APP_PRIVATE_KEY`; minimal `permissions` (`issues: write`, rest read) |
-
----
-
-### `vercel-failure-autofix.yml` - Vercel Auto-fix
-
-| | |
-|---|---|
-| **Trigger** | `deployment_status: failure` on branches matching `auto/issue-*` |
-| **Requires** | `VERCEL_TOKEN` repo secret (Vercel personal access token scoped to the account owning the deployment). No-op when the secret is absent. |
-| **What it does** | Fetches the error excerpt from Vercel's events API; posts a `/fix` comment on the PR - which triggers `auto-pr.yml`'s fix cycle |
-| **Idempotency** | Skips if a `<!-- vercel-autofix -->` comment was posted on the same PR in the last 10 minutes (Vercel sometimes fires multiple `failure` events for one deployment) |
-
----
-
-### `ci-failure-autofix.yml` - CI Auto-fix
-
-| | |
-|---|---|
-| **Trigger** | `workflow_run` on `CI` workflow `completed` with `conclusion == 'failure'`, branches matching `auto/issue-*` |
-| **What it does** | Finds the failed `test` job, fetches the last 80 lines of its log, and posts a `/fix` comment on the PR - which triggers `auto-pr.yml`'s fix cycle |
-| **Idempotency** | Skips if a `<!-- ci-autofix:$RUN_ID -->` comment already exists on the PR - exact match by run ID, so re-delivery of the same `workflow_run` event is a no-op |
-| **Cycle-cap interaction** | `auto-pr.yml`'s 3-cycle cap does not prevent this workflow from posting a `/fix` on the next CI failure. On a capped PR, `auto-pr.yml` will silently drop the comment; no further fix cycles run, but stale `/fix` comments may accumulate. |
-| **Race-condition guard** | When a `/fix` posted by this workflow queues behind an active `auto-pr.yml` run, the queued run may encounter an LGTM verdict posted by the active run even though CI is still red. `auto-pr.yml`'s CI pre-flight step (`Check CI status at HEAD`) detects this: it reads the PR's `statusCheckRollup` before the agent starts and sets `CI_FAILING_AT_HEAD=true` when CI is failing. The agent bypasses the LGTM short-circuit when that env var is set, so the fix cycle runs regardless of what auto-review verdict was posted by the previous cycle. |
-| **Coupling** | Job selector matches by name `"test"` (the API-returned display name). After any `ci.yml` change, verify the name with `gh api repos/{owner}/{repo}/actions/runs/{id}/jobs --jq '.jobs[].name'` and update the `jq` selector in the `Fetch failing job log` step if needed. |
-
----
-
 ### `vercel-preview-on-ready.yml` - Vercel Preview on Ready
 
 | | |
 |---|---|
-| **Status** | **Disabled** (`disabled_manually`). Under the qa staging flow, QA happens on the bundled `qa` branch via `qa-preview-deploy.yml`, so per-PR previews are redundant and were retired to stay within Vercel's deploy rate limit (#814). Re-enable with `gh workflow enable "Vercel Preview on Ready"` if per-PR previews are wanted again. |
-| **Trigger** | `workflow_run` on `CI` (`completed`); `issue_comment: created` |
-| **Gate** | Fires the Vercel Deploy Hook only when both conditions hold on the same HEAD SHA: the `test` check is `success` AND the latest **bot-authored** `<!-- auto-review:N -->` comment scoped to that SHA carries `Verdict: Looks good to me`. The auto-review SHA scope comes from the `<!-- auto-review-sha:<sha> -->` row that `auto-review.yml` writes on every comment. Only comments authored by `poke-memory-bot[bot]` count for the verdict, the idempotency marker, and the `issue_comment` trigger itself (#1859). |
-| **Manual override** | A `/preview` PR comment from OWNER / MEMBER / COLLABORATOR bypasses both gates and fires the hook unconditionally - for mid-iteration peeks before LGTM. The association is checked at the job trigger as well as in the override step (#1859). |
-| **Fork guard** | `workflow_run` arm requires `head_repository.fork == false`; the `issue_comment` arm requires bot authorship for review-marker comments and OWNER / MEMBER / COLLABORATOR for `/preview` (#1859). |
+| **Status** | **Disabled** (`disabled_manually`). Under the qa staging flow, QA happens on the bundled `qa` branch via `qa-preview-deploy.yml`, so per-PR previews are redundant and were retired to stay within Vercel's deploy rate limit (#814). **Keep it disabled unless per-PR previews are wanted again**: since #2020 the gate no longer waits for an auto-review verdict, so re-enabling (`gh workflow enable "Vercel Preview on Ready"`) fires a preview on every green CI run of every non-`qa` PR head SHA - the deploy volume that hit Vercel's rate limit (#814). |
+| **Trigger** | `workflow_run` on `CI` (`completed`); `issue_comment: created` (for `/preview` only) |
+| **Gate** | Fires the Vercel Deploy Hook when the `test` check is `success` on the PR's HEAD SHA. The former second condition (a bot-authored `auto-review` LGTM on the same SHA) was removed in #2020: `auto-review.yml` was its only writer, so after 2026-08-16 the gate could never open. Only comments authored by `poke-memory-bot[bot]` count for the idempotency marker (#1859). |
+| **Manual override** | A `/preview` PR comment from OWNER / MEMBER / COLLABORATOR bypasses the CI gate and fires the hook unconditionally - for mid-iteration peeks before CI is green. The association is checked at the job trigger as well as in the override step (#1859). |
+| **Fork guard** | `workflow_run` arm requires `head_repository.fork == false`; the `issue_comment` arm requires OWNER / MEMBER / COLLABORATOR for `/preview` (#1859), an exact `/preview` command (not a prefix), and a same-repo PR head (`isCrossRepository == false`). |
+| **Concurrency** | Keyed on the PR number for both arms (head SHA as fallback), so a `/preview` and a CI completion on one PR queue rather than race past the fired-marker dedup. |
 | **Idempotency** | Posts `<!-- vercel-preview-fired:<sha> -->` on the PR after a successful fire; subsequent re-evaluations at the same SHA are no-ops. |
-| **Why two triggers** | CI and auto-review run independently; whichever finishes second flips the gate. Both events re-evaluate against the current HEAD SHA, so order doesn't matter. |
+| **Why two triggers** | `workflow_run` drives the automatic path; `issue_comment` exists only for the `/preview` override. |
 | **qa promotion PRs** | Skipped - a `qa -> main` PR's head branch is `qa`, and its preview is handled by `qa-preview-deploy.yml`. Firing here too would double-deploy `qa`. |
 | **Required secrets** | `VERCEL_DEPLOY_HOOK_URL`, `BOT_APP_PRIVATE_KEY`, `BOT_APP_ID` (var). |
 | **Context** | `vercel.json` sets `git.deploymentEnabled = { "**": false, "main": true }`, so non-`main` branches do not auto-deploy. This workflow is the path that creates preview deployments for batch / feature PRs. Production deploys on `main` are unaffected. `e2e.yml` triggers on the `deployment_status` that Vercel fires when the gated preview deploys, so it inherits the gate. |
@@ -787,7 +500,7 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 | **Why** | A hand-rolled promotion opened by hand skips the aggregated `Closes #N` and the aggregate diff-coverage check. The v0.10.35 release missed every `Closes #N` (11 issues left open, reconciled manually + the #1714 label safety net) and skipped the aggregate check. This makes the correct promotion PR a single dispatch, whether or not the batch came through `/batch-issues` (it reads the live range, not session state). |
 | **Idempotency** | Looks up an existing open PR (`--base main --head qa`) and edits it; never opens a duplicate on re-dispatch. |
 | **Coverage breach** | Below-bar aggregate diff coverage fails the job *after* the PR is opened/updated (so the maintainer still gets the PR), unless the `coverage_fail_on_breach` dispatch input is set false (annotate-only). |
-| **Token** | Mints a `poke-memory-bot` App installation token (same as `auto-release.yml`) so the PR behaves like a bot-opened promotion and `auto-review.yml`'s `head.ref == 'qa'` skip applies. **Does not merge** - the maintainer's preview QA is the gate. |
+| **Token** | Mints a `poke-memory-bot` App installation token (same as `auto-release.yml`) so the PR behaves like a bot-opened promotion. **Does not merge** - the maintainer's preview QA is the gate. |
 | **Concurrency** | Shares `group: auto-release` (`cancel-in-progress: false`) so a dispatch cannot race a release run touching the same qa/main state. |
 
 ---
@@ -850,9 +563,15 @@ Handles five commands: `plan`, `implement`, `continue`, `split`, and `replan`.
 
 ---
 
+### Removed workflows
+
+Deleted on 2026-08-16 with the rest of the Claude automation (#2003 / #2004): `auto-issue`, `auto-pr`, `auto-review`, `auto-resolve`, `auto-retro`, `auto-retro-harvest`, `auto-backlog-groom`, `auto-deep-audit`, `auto-workflow-suggest`, `auto-app-suggest`, `auto-codequality-suggest`, `auto-digest-fanout`, `issue-overlap-scan`, `settings-coverage-audit`. Deleted in #2022 as dead leftovers: `ci-failure-autofix` and `vercel-failure-autofix` (gated on `auto/issue-*` branches nothing creates, posting `/fix` comments nothing reads), and the `extract-linked-issues.sh` helper only `auto-review.yml` called. Their catalog entries are in git history before those PRs.
+
+---
+
 ## Build gates
 
-Two separate gates catch type/build/test errors at different points:
+The local gate and CI catch type/build/test errors at different points:
 
 ### Local pre-PR gate (`npm run pre-pr`)
 
@@ -865,14 +584,6 @@ After pushing, before opening the PR, run **`npm run pre-pr`** (`scripts/pre-pr.
 **Pre-PR e2e smoke** for high-surface-area diffs (touching `app/layout.tsx`, `app/page.tsx`, `components/onboarding/**`, `components/Nav.tsx` / `BottomTabBar.tsx` / `MobileNavPaddingWrapper.tsx`, `lib/settings/persistence.ts`, or `playwright.config.ts`): run `scripts/pre-pr-smoke.sh` (chromium-only subset in the pinned Docker image). Same two-attempt budget.
 
 **Push discipline.** Push with an explicit `git push origin <branch>` - never a bare `git push`. A worktree created via `git worktree add -b <branch> origin/qa` sets the branch's upstream to `origin/qa`, so a bare `git push` does NOT update `origin/<branch>`: at best it fast-fails (rejected, harmless), and at worst it silently pushes to `origin/qa` or no-ops, leaving the PR branch stale and CI red on the old commit. Always name the remote and branch (mirrors the `gh pr create --head <branch>` rule). Worked example: a pseudo-locale regen "pushed" but never landed on the PR branch (#1474).
-
-### Pre-PR gate (`auto-issue.yml` only)
-
-Runs before opening a PR: `npm run typecheck && npm run build && npm test`
-
-- Orchestrator is allowed up to **2 targeted fix attempts** (commit + push + retry).
-- After the second failure: post a comment on the issue with the last 80 lines of build output and stop. Branch stays pushed for manual inspection.
-- Goal: surface errors in the same run that produced them, before Vercel or CI finds them.
 
 ### CI gate (`ci.yml`)
 
@@ -912,25 +623,7 @@ When a workflow uses `paths-ignore` on a `pull_request` trigger, GitHub still fi
 
 ---
 
-## Graceful exit & WIP salvage
-
-When an implement (or continue) run hits its turn cap, times out, or errors mid-flight, the post-step runs with `if: always()` and:
-
-1. **Salvage push** - if uncommitted edits exist in the working tree, stages and commits them as `WIP: halted run on #N`, then pushes to origin. This ensures `/continue` always has a branch to resume from.
-2. **Status update** - PATCHes the live `<!-- auto-status -->` comment with a "Run finished" section showing outcome, branch, last commit, and recovery instructions. When the run ends without a PR (turn-cap, timeout, build-gate failure, or deliberate blocker stop), the recovery sub-block includes `@fraserbrookhouse` so the maintainer is notified.
-3. **Recovery footer** - only advertises `/continue` when the branch is confirmed on origin via `git ls-remote`. Falls back to `/go` if the salvage push itself failed.
-
-When resuming via `/continue`, the orchestrator checks `git log -1 --format=%s`. If the subject starts with `WIP:`, it inspects `git diff HEAD~1` and amends or reverts the WIP commit before continuing.
-
-**After a halt, decide before retrying (#1249):**
-- If the halted diff is already complete and the plan is a verbatim line-by-line spec, open the PR directly from the WIP commit rather than retrying the pipeline.
-- If the diff is incomplete or the plan needs interpretation, `/continue` to resume the pipeline.
-
-Retrying a complete-but-halted change tends to produce a second WIP commit and a follow-up cleanup PR (#1208 → #1217 + #1223).
-
----
-
-## Scope warning & `/split`
+## Scope warning
 
 When the planner posts its plan, it assesses scope against four thresholds. When any is crossed, it appends a warning block:
 
@@ -943,7 +636,7 @@ When the planner posts its plan, it assesses scope against four thresholds. When
 
 Before offering `/split`, the planner runs a **coupling check** - it sketches the boundary between proposed children and checks whether they would share surface area (same symbol name, same `localStorage` key or DB table, same leaf module directory, or same file). If coupling is found, `/split` is **not** offered; the warning still fires but the recommendation is to proceed as a single issue.
 
-When children are cleanly independent, the warning includes a numbered **Suggested split** block. Commenting `/split` triggers the split job (see [auto-issue.yml](#auto-issueyml--auto-issue-worker) above).
+When children are cleanly independent, the warning includes a numbered **Suggested split** block; file the children by hand (the `/split` command was removed with `auto-issue.yml`).
 
 ---
 
@@ -1010,17 +703,6 @@ The throttle is triggered by automation density, not by any single workflow. Hig
 
 ## Retrospectives
 
-After each merged PR, `auto-retro.yml` posts a `<!-- auto-retro -->` comment on the closed issue covering:
-- **Agents used** - which sub-agents ran
-- **What worked** - specific evidence (review finding, planner question that surfaced a risk)
-- **What didn't / overhead** - where a round-trip cost more than it returned
-- **Lesson** - one transferable rule for future changes
+`auto-retro.yml` (per-issue retro comments) and `auto-retro-harvest.yml` (the weekly digest and recurring-pattern filer) were removed on 2026-08-16. [`docs/retros.md`](docs/retros.md) is the frozen digest of the retros they produced, kept as a historical record.
 
-Retros are process reflection only - no code change recommendations.
-
-A single retro comment on a closed issue is effectively write-once and unread. `auto-retro-harvest.yml` (weekly cron) closes that loop:
-
-- **Digest** - it regenerates [`docs/retros.md`](docs/retros.md), one most-recent-first surface aggregating every retro, and commits it to `qa`. That is the place to read retros in bulk.
-- **Recurring-pattern auto-file** - when the *same concrete problem* recurs across **≥ 3 retros**, it files one `priority:later` tracking issue for that pattern (idempotent on a `<!-- auto-retro-pattern:<slug> -->` marker). So "several retros independently grumbled about this" becomes a tracked backlog item instead of being lost.
-
-Behavioural-rule lessons (reusable conventions, not specific defects) are still promoted to `AGENTS.md` by hand - the harvest job deliberately does not file issues for them, since they are not issue-shaped.
+Behavioural-rule lessons (reusable conventions, not specific defects) are promoted to `AGENTS.md` by hand.

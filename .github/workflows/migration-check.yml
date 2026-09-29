@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 3
     permissions:
       contents: read
-    # Fork PRs don't see secrets - skip rather than fail. Same guard as auto-review.yml.
+    # Fork PRs don't see secrets - skip rather than fail. Same guard as coverage.yml.
     # Dependabot-triggered runs read the Dependabot secrets store, so
     # SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF are empty and the script exits 2
     # (#1918). A dependency bump cannot add a migration file, so skipping keeps parity
