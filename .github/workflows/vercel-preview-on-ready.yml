@@ -152,6 +152,7 @@ jobs:
           # SHA is a hex commit id - safe to interpolate directly. Only count
           # markers the bot itself posted (#1859), so a third party cannot
           # suppress legitimate fires with a forged marker comment.
+          # marker-lookup-exempt: PR-comment dedup filtered to poke-memory-bot[bot] authorship and keyed on a per-SHA marker, not a tracking-issue body.
           MATCH=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
             --jq "[.[] | select(.user.login == \"poke-memory-bot[bot]\")
                        | select(.body | contains(\"<!-- vercel-preview-fired:$SHA -->\"))] | length")

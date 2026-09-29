@@ -148,6 +148,7 @@ jobs:
           MARKER="<!-- coverage-report -->"
 
           # Find an existing coverage comment by its hidden marker.
+          # marker-lookup-exempt: finds this PR's own coverage comment, not a tracking-issue body (no author filter yet: #2124).
           COMMENT_ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
             --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1 || echo "")
 

@@ -1,6 +1,6 @@
 /**
- * Tests for the monitor tracking-issue lookup (#2010, #2081) used by
- * .github/workflows/monitor-grade-log-divergence.yml.
+ * Tests for the monitor tracking-issue lookup (#2010, #2081) used by every
+ * monitor workflow that keeps a tracking issue.
  *
  * It lives under scripts/ (the node vitest project) rather than lib/ because it
  * guards CI tooling, not product code. The CLI cases run the script the way
@@ -11,7 +11,11 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
-import { findMarkerIssue } from "../.github/scripts/find-marker-issue.mjs";
+import {
+  findMarkerIssue,
+  normaliseLogin,
+  parseArgs,
+} from "../.github/scripts/find-marker-issue.mjs";
 
 const MARKER = "<!-- monitor:grade-log-divergence -->";
 const SCRIPT = resolve(
@@ -70,20 +74,102 @@ describe("findMarkerIssue", () => {
   });
 });
 
+describe("findMarkerIssue author filter (#2081 review)", () => {
+  const bot = { login: "app/github-actions" };
+  const human = { login: "someone" };
+
+  it("ignores an OLDER issue with the exact marker opened by another author", () => {
+    const issues = [
+      { number: 10, body: `${MARKER}\n\nhijack`, author: human },
+      { number: 40, body: `${MARKER}\n\nreal`, author: bot },
+    ];
+    expect(findMarkerIssue(issues, MARKER, { authors: ["github-actions"] })).toBe(40);
+  });
+
+  it("returns null when only a non-allowed author carries the marker", () => {
+    const issues = [{ number: 10, body: `${MARKER}\n\nhijack`, author: human }];
+    expect(findMarkerIssue(issues, MARKER, { authors: ["github-actions"] })).toBeNull();
+  });
+
+  it("normalises app/ and [bot] spellings on both sides", () => {
+    const issues = [{ number: 5, body: MARKER, author: { login: "github-actions[bot]" } }];
+    expect(findMarkerIssue(issues, MARKER, { authors: ["app/github-actions"] })).toBe(5);
+    const issues2 = [{ number: 6, body: MARKER, author: { login: "app/poke-memory-bot" } }];
+    expect(findMarkerIssue(issues2, MARKER, { authors: ["poke-memory-bot[bot]"] })).toBe(6);
+    expect(normaliseLogin("App/GitHub-Actions[bot]")).toBe("github-actions");
+  });
+
+  it("accepts any of several allowed authors", () => {
+    const issues = [{ number: 7, body: MARKER, author: { login: "app/poke-memory-bot" } }];
+    expect(
+      findMarkerIssue(issues, MARKER, { authors: ["github-actions", "poke-memory-bot"] }),
+    ).toBe(7);
+  });
+
+  it("does not match an issue whose author is null (deleted account)", () => {
+    expect(
+      findMarkerIssue([{ number: 8, body: MARKER, author: null }], MARKER, {
+        authors: ["github-actions"],
+      }),
+    ).toBeNull();
+  });
+
+  it("throws when the author field was not requested, rather than matching nothing", () => {
+    expect(() =>
+      findMarkerIssue([{ number: 8, body: MARKER }], MARKER, { authors: ["github-actions"] }),
+    ).toThrow(/--json number,body,author/);
+  });
+
+  it("throws on an empty authors list", () => {
+    expect(() => findMarkerIssue([], MARKER, { authors: [] })).toThrow(TypeError);
+  });
+});
+
+describe("parseArgs", () => {
+  it("collects every --author", () => {
+    expect(parseArgs([MARKER, "--author", "a", "--author", "b"])).toEqual({
+      marker: MARKER,
+      authors: ["a", "b"],
+    });
+  });
+
+  it("requires at least one --author", () => {
+    expect(() => parseArgs([MARKER])).toThrow(/--author/);
+  });
+
+  it("rejects a dangling or unknown argument", () => {
+    expect(() => parseArgs([MARKER, "--author"])).toThrow(TypeError);
+    expect(() => parseArgs([MARKER, "--author", "a", "--bogus"])).toThrow(TypeError);
+  });
+});
+
 describe("find-marker-issue CLI", () => {
-  const run = (input, marker = MARKER) =>
-    spawnSync(process.execPath, [SCRIPT, marker], { input, encoding: "utf8" });
+  const AUTH = ["--author", "github-actions"];
+  const bot = { login: "app/github-actions" };
+  const run = (input, args = [MARKER, ...AUTH]) =>
+    spawnSync(process.execPath, [SCRIPT, ...args], { input, encoding: "utf8" });
 
   it("prints the matching issue number", () => {
-    const out = execFileSync(process.execPath, [SCRIPT, MARKER], {
-      input: JSON.stringify([{ number: 40, body: `${MARKER}\n\nreport` }]),
+    const out = execFileSync(process.execPath, [SCRIPT, MARKER, ...AUTH], {
+      input: JSON.stringify([{ number: 40, body: `${MARKER}\n\nreport`, author: bot }]),
       encoding: "utf8",
     });
     expect(out.trim()).toBe("40");
   });
 
+  it("skips a same-marker issue from another author", () => {
+    const res = run(
+      JSON.stringify([
+        { number: 3, body: MARKER, author: { login: "someone" } },
+        { number: 40, body: MARKER, author: bot },
+      ]),
+    );
+    expect(res.status).toBe(0);
+    expect(res.stdout.trim()).toBe("40");
+  });
+
   it("prints nothing and exits 0 when no issue matches", () => {
-    const res = run(JSON.stringify([{ number: 12, body: `quote ${MARKER}` }]));
+    const res = run(JSON.stringify([{ number: 12, body: `quote ${MARKER}`, author: bot }]));
     expect(res.status).toBe(0);
     expect(res.stdout).toBe("");
   });
@@ -92,6 +178,18 @@ describe("find-marker-issue CLI", () => {
     const res = run("HTTP 502 Bad Gateway");
     expect(res.status).not.toBe(0);
     expect(res.stdout).toBe("");
+  });
+
+  it("exits non-zero when the author field is missing from the input", () => {
+    const res = run(JSON.stringify([{ number: 40, body: MARKER }]));
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain("author");
+  });
+
+  it("exits non-zero without --author", () => {
+    const res = run("[]", [MARKER]);
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain("--author");
   });
 
   it("exits non-zero when the marker argument is missing", () => {
