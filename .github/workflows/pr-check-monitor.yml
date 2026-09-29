@@ -88,7 +88,7 @@ jobs:
 
             # Check for existing monitor comment at this SHA to avoid duplicates
             DEDUP_MARKER="<!-- pr-check-monitor:$SHA -->"
-            # marker-lookup-exempt: PR-comment dedup keyed on a per-SHA marker, not a tracking-issue body lookup.
+            # marker-lookup-exempt: PR-comment dedup keyed on a per-SHA marker, not a tracking-issue body lookup (no author filter yet: #2124).
             EXISTING=$(gh pr view "$NUMBER" --repo "$REPO" \
               --json comments \
               2>/dev/null | jq -r --arg marker "$DEDUP_MARKER" \

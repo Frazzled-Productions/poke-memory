@@ -106,6 +106,7 @@ jobs:
           # body tracks the just-closed number as a task-list item. The jq regex
           # matches `- [ ] #N` and `- [x] #N` but requires a non-digit (or end
           # of line) after N, so #157 does not match a closed #1573.
+          # issue-body-read-exempt: parses task-list checkboxes (`- [ ] #N`) in labelled umbrellas, not a tracking-issue marker.
           CANDIDATES=$(gh issue list \
             --repo "$REPO" \
             --state open \

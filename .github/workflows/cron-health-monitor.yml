@@ -97,7 +97,7 @@ jobs:
           # this run is the only writer of these issues.
           LIMIT=500
           ALL_OPEN_ISSUES=$(gh issue list --repo "$REPO" --state open \
-            --limit "$LIMIT" --json number,body)
+            --limit "$LIMIT" --json number,body,author)
           OPEN_COUNT=$(jq 'length' <<<"$ALL_OPEN_ISSUES")
           if [ "$OPEN_COUNT" -ge "$LIMIT" ]; then
             echo "::error::gh issue list returned ${OPEN_COUNT} open issues (limit ${LIMIT}); a tracking issue could be beyond the limit, so the lookup cannot be trusted. Raise LIMIT."
@@ -257,7 +257,11 @@ jobs:
             MARKER="<!-- cron-health-monitor:$FILE -->"
 
             # Marker must be the whole first line; the oldest match wins.
-            EXISTING=$(node .github/scripts/find-marker-issue.mjs "$MARKER" <<<"$ALL_OPEN_ISSUES")
+            # Author filter (#2081 review): the repo is public, so anyone could open
+            # an issue whose first line is exactly this marker; only issues opened by
+            # this step's own token (GITHUB_TOKEN, shown by gh as app/github-actions)
+            # count. Keep --author in step with GH_TOKEN if the token ever changes.
+            EXISTING=$(node .github/scripts/find-marker-issue.mjs "$MARKER" --author github-actions <<<"$ALL_OPEN_ISSUES")
 
             if [ -z "$PROBLEM" ]; then
               # Healthy: close any stale tracking issue so it does not

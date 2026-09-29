@@ -110,14 +110,18 @@ jobs:
           # may relabel the issue), hence the generous limit.
           LIMIT=500
           OPEN_ISSUES=$(gh issue list --repo "$REPO" --state open \
-            --limit "$LIMIT" --json number,body)
+            --limit "$LIMIT" --json number,body,author)
           OPEN_COUNT=$(jq 'length' <<<"$OPEN_ISSUES")
           if [ "$OPEN_COUNT" -ge "$LIMIT" ]; then
             echo "::error::gh issue list returned ${OPEN_COUNT} open issues (limit ${LIMIT}); the tracking issue could be beyond the limit, so the lookup cannot be trusted. Raise LIMIT."
             exit 1
           fi
           # Marker must be the whole first line; the oldest match wins.
-          EXISTING=$(node .github/scripts/find-marker-issue.mjs "$MARKER" <<<"$OPEN_ISSUES")
+          # Author filter (#2081 review): the repo is public, so anyone could open
+          # an issue whose first line is exactly this marker; only issues opened by
+          # this step's own token (GITHUB_TOKEN, shown by gh as app/github-actions)
+          # count. Keep --author in step with GH_TOKEN if the token ever changes.
+          EXISTING=$(node .github/scripts/find-marker-issue.mjs "$MARKER" --author github-actions <<<"$OPEN_ISSUES")
 
           # Build the body with printf rather than a heredoc: a plain heredoc
           # inside a `run: |` block cannot have its closing delimiter at column
