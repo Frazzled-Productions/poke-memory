@@ -179,9 +179,29 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 11 June 2026 (#1848)", async () => {
+    it("shows the last updated date as 29 September 2026 (#2103)", async () => {
       await renderPage();
-      expect(screen.getByText(/11 june 2026/i)).toBeTruthy();
+      expect(screen.getByText(/29 september 2026/i)).toBeTruthy();
+    });
+
+    it("lists Sentry as a sub-processor and discloses it applies to guests (#2103)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/Sentry \(Functional Software, Inc\.\)/),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(/Error and performance diagnostics \(all users\)/),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(/Error reports and performance traces held by Sentry are kept for 90 days/i),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(/Nothing about your cards is transmitted to any server we operate/i),
+      ).toBeTruthy();
+      expect(screen.getByText(/no progress or account data is sent to us/i)).toBeTruthy();
+      expect(screen.getByText(/we do not send your card progress or review history/i)).toBeTruthy();
+      expect(screen.getByText(/carry no identifier, so we usually cannot find or delete/i)).toBeTruthy();
+      expect(screen.getByText(/EU-US Data Privacy Framework/i)).toBeTruthy();
     });
 
     it("states the ICO registration number in section 1 (#698)", async () => {

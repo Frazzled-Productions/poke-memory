@@ -1242,7 +1242,7 @@
   "privacy": {
     "childFriendlySummary": {
       "heading": "[In plain language: what does Poké Memory do with your data?]",
-      "item1": "[<s>Just playing (no sign-in).</s> When you play without signing in, the app saves your Pokémon progress only on your own device, and nothing is sent to us or stored anywhere on the internet.]",
+      "item1": "[<s>Just playing (no sign-in).</s> When you play without signing in, the app saves your Pokémon progress only on your own device, and your progress is never sent to us or stored anywhere on the internet. The app may also quietly tell a helper company called Sentry when something breaks, like which page you were on and what kind of phone or browser you use. It never says who you are and never includes your progress.]",
       "item2": "[<s>Signing in.</s> If you sign in with GitHub, Google, or a username and password, we save your card progress to a secure database so you can keep it across different devices. If you are under 13, please use the app without signing in instead.]",
       "item3": "[<s>What we save.</s> We only save which Pokémon cards you've practised, how well you know them, and when you last practised, and nothing else. We don't know your name, your address, or anything about you as a person.]",
       "item4": "[<s>Who else can see it.</s> Nobody else can see your progress. Only you can see your own cards. We never share your progress with anyone else or use it to show you adverts.]",
