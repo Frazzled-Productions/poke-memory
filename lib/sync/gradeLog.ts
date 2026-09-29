@@ -95,26 +95,48 @@ export function isGradeLogEntry(value: unknown): value is GradeLogEntry {
   );
 }
 
-export async function pushGradeLog(
+/**
+ * Outcome of a grade-log upsert, distinguishing a server REJECTION (an error
+ * response the server produced about the rows: a Postgres SQLSTATE code or a
+ * 4xx status other than 408/429) from any other failure (thrown error, network
+ * failure, timeout, 5xx, rate limit), which says nothing about the rows.
+ */
+export type GradeLogPushResult = "ok" | "rejected" | "failed";
+
+const SQLSTATE = /^[0-9A-Z]{5}$/;
+
+export async function pushGradeLogDetailed(
   client: SupabaseClient,
   userId: string,
   entries: GradeLogEntry[],
-): Promise<boolean> {
+): Promise<GradeLogPushResult> {
   // Migration 009 extended the card_type CHECK to include 'cry' and
   // 'reverse-evolution', so all card types are now supported.
-  if (entries.length === 0) return true;
+  if (entries.length === 0) return "ok";
   try {
     const rows = entries.map((e) => toGradeLogDbRow(userId, e));
-    const { error } = await client
+    const { error, status } = await client
       .from("grade_log")
       .upsert(rows, {
         onConflict: GRADE_LOG_CONFLICT_COLS,
         ignoreDuplicates: true,
       });
-    return !error;
+    if (!error) return "ok";
+    const code = typeof error.code === "string" ? error.code : "";
+    const clientRejection =
+      typeof status === "number" && status >= 400 && status < 500 && status !== 408 && status !== 429;
+    return SQLSTATE.test(code) || clientRejection ? "rejected" : "failed";
   } catch {
-    return false;
+    return "failed";
   }
+}
+
+export async function pushGradeLog(
+  client: SupabaseClient,
+  userId: string,
+  entries: GradeLogEntry[],
+): Promise<boolean> {
+  return (await pushGradeLogDetailed(client, userId, entries)) === "ok";
 }
 
 type GradeLogCloudRow = {

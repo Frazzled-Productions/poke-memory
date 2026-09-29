@@ -3,7 +3,7 @@ import { pullAndMerge, SYNC_PULL_APPLIED_EVENT } from "./pullAndMerge";
 import { pullSession, mergeCloudIntoLocalSilent } from "@/lib/sync/cloud";
 import { pullUserSettingsRow, pushSettings, pullRegionalPrefs } from "@/lib/sync/settings";
 import { pullStreak } from "@/lib/sync/streak";
-import { pullGradeLog, pushGradeLog } from "@/lib/sync/gradeLog";
+import { pullGradeLog, pushGradeLogDetailed } from "@/lib/sync/gradeLog";
 import { saveSession, loadSession } from "@/lib/review/persistence";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { buildSession } from "@/lib/review/session";
@@ -103,7 +103,7 @@ vi.mock("@/lib/sync/gradeLog", async () => {
   return {
     ...actual,
     pullGradeLog: vi.fn().mockResolvedValue(null),
-    pushGradeLog: vi.fn().mockResolvedValue(true),
+    pushGradeLogDetailed: vi.fn().mockResolvedValue("ok"),
   };
 });
 
@@ -120,7 +120,7 @@ const mockPullRegionalPrefs = vi.mocked(pullRegionalPrefs);
 const mockClearLocalProgress = vi.mocked(clearLocalProgress);
 const mockPullStreak = vi.mocked(pullStreak);
 const mockPullGradeLog = vi.mocked(pullGradeLog);
-const mockPushGradeLog = vi.mocked(pushGradeLog);
+const mockPushGradeLog = vi.mocked(pushGradeLogDetailed);
 const mockLoadGradeLog = vi.mocked(loadGradeLog);
 const mockSaveGradeLog = vi.mocked(saveGradeLog);
 const mockMerge = vi.mocked(mergeCloudIntoLocalSilent);
@@ -583,7 +583,7 @@ describe("pullAndMerge", () => {
   it("a failing re-push never flips the sync result into error", async () => {
     mockLoadGradeLog.mockResolvedValue([oldValid(2_000_000)]);
     mockPullGradeLog.mockResolvedValue([]);
-    mockPushGradeLog.mockResolvedValue(false);
+    mockPushGradeLog.mockResolvedValue("failed");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     expect(await pullAndMerge(fakeClient, fakeUserId)).toBe("ok");

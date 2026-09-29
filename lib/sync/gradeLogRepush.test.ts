@@ -9,7 +9,7 @@ import {
   repushLocalGradeLog,
   selectRepushEntries,
 } from "./gradeLogRepush";
-import { pushGradeLog } from "@/lib/sync/gradeLog";
+import { pushGradeLogDetailed } from "@/lib/sync/gradeLog";
 import { HELD_COPY_STALE_MS } from "@/lib/sync/heldGrade";
 
 const isHeld = vi.fn((_occurredAt: number) => false);
@@ -19,10 +19,10 @@ vi.mock("@/lib/gradelog/persistence", () => ({
 
 vi.mock("@/lib/sync/gradeLog", async () => {
   const actual = await vi.importActual<typeof import("@/lib/sync/gradeLog")>("@/lib/sync/gradeLog");
-  return { ...actual, pushGradeLog: vi.fn().mockResolvedValue(true) };
+  return { ...actual, pushGradeLogDetailed: vi.fn().mockResolvedValue("ok") };
 });
 
-const mockPush = vi.mocked(pushGradeLog);
+const mockPush = vi.mocked(pushGradeLogDetailed);
 const NOW = 1_790_000_000_000;
 const OLD = NOW - HELD_COPY_STALE_MS - 1_000;
 
@@ -34,7 +34,7 @@ const client = {} as SupabaseClient;
 beforeEach(() => {
   resetRejectedGradeLogRepush();
   isHeld.mockReturnValue(false);
-  mockPush.mockResolvedValue(true);
+  mockPush.mockResolvedValue("ok");
 });
 afterEach(() => vi.clearAllMocks());
 
@@ -119,46 +119,98 @@ describe("repushLocalGradeLog", () => {
     ]);
   });
 
-  it("bisects a failed batch so one poisoned row does not block the others", async () => {
+  const poisonable = (poison: Set<number>) => async (_c: unknown, _u: unknown, rows: GradeLogEntry[]) =>
+    rows.some((r) => poison.has(r.occurredAt)) ? ("rejected" as const) : ("ok" as const);
+
+  it("bisects a rejected batch so one poisoned row does not block the others", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const poison = OLD - 3;
     const local = Array.from({ length: 8 }, (_, i) => entry(OLD - i));
     const landed: number[] = [];
-    mockPush.mockImplementation(async (_c, _u, rows) => {
-      if (rows.some((r) => r.occurredAt === poison)) return false;
-      landed.push(...rows.map((r) => r.occurredAt));
-      return true;
+    mockPush.mockImplementation(async (c, u, rows) => {
+      const r = await poisonable(new Set([poison]))(c, u, rows);
+      if (r === "ok") landed.push(...rows.map((x) => x.occurredAt));
+      return r;
     });
     const pushed = await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
     expect(pushed).toBe(7);
     expect(landed.sort()).toEqual(local.map((e) => e.occurredAt).filter((t) => t !== poison).sort());
-    expect(warn).toHaveBeenCalledOnce();
     warn.mockRestore();
   });
 
-  it("skips a row rejected as a single request on the next cycle in the same session", async () => {
+  it("makes progress when the poison is within the first 25 of 200 rows (oldest)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const local = Array.from({ length: 200 }, (_, i) => entry(OLD - i));
+    // Oldest rows sort first: OLD - 199 is index 0 after sorting; poison index 5.
+    const poison = OLD - 194;
+    const landed: number[] = [];
+    mockPush.mockImplementation(async (c, u, rows) => {
+      const r = await poisonable(new Set([poison]))(c, u, rows);
+      if (r === "ok") landed.push(...rows.map((x) => x.occurredAt));
+      return r;
+    });
+    const pushed = await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
+    expect(pushed).toBe(199);
+    expect(landed).not.toContain(poison);
+    expect(mockPush.mock.calls.length).toBeLessThanOrEqual(GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE);
+    // Blacklisted: the next cycle does not resend it.
+    mockPush.mockClear();
+    mockPush.mockResolvedValue("ok");
+    await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
+    expect(mockPush.mock.calls.flatMap((c) => c[2].map((r) => r.occurredAt))).not.toContain(poison);
+    warn.mockRestore();
+  });
+
+  it("handles alternating ok/rejected batches without aborting", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const local = Array.from({ length: 400 }, (_, i) => entry(OLD - i));
+    // First batch clean, second batch holds one poisoned row.
+    const poison = new Set([OLD - 10]);
+    mockPush.mockImplementation(poisonable(poison));
+    const pushed = await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
+    expect(pushed).toBe(399);
+    warn.mockRestore();
+  });
+
+  it("skips a row rejected alone on the next cycle in the same session", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const poison = OLD - 1;
     const local = [entry(OLD), entry(poison), entry(OLD - 2)];
-    mockPush.mockImplementation(async (_c, _u, rows) => !rows.some((r) => r.occurredAt === poison));
+    mockPush.mockImplementation(poisonable(new Set([poison])));
     await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
     mockPush.mockClear();
-    mockPush.mockResolvedValue(true);
+    mockPush.mockResolvedValue("ok");
     const pushed = await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
     expect(pushed).toBe(2);
     expect(mockPush.mock.calls.flatMap((c) => c[2].map((r) => r.occurredAt))).not.toContain(poison);
     warn.mockRestore();
   });
 
-  it("does not blacklist rows when every request fails (offline) and stops early", async () => {
+  it("a network/server failure stops the leg and blacklists nothing (even after an earlier success)", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    mockPush.mockResolvedValue(false);
-    const local = Array.from({ length: 50 }, (_, i) => entry(OLD - i));
-    expect(await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW })).toBe(0);
-    expect(mockPush.mock.calls.length).toBeLessThan(GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE);
+    const local = Array.from({ length: 400 }, (_, i) => entry(OLD - i));
+    mockPush.mockResolvedValueOnce("ok").mockResolvedValue("failed");
+    const pushed = await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
+    expect(pushed).toBe(200);
+    expect(mockPush).toHaveBeenCalledTimes(2);
     mockPush.mockClear();
-    mockPush.mockResolvedValue(true);
-    expect(await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW })).toBe(50);
+    mockPush.mockResolvedValue("ok");
+    expect(await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW })).toBe(400);
+    warn.mockRestore();
+  });
+
+  it("a throw-style failure mid-bisection stops bisecting and blacklists nothing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const local = Array.from({ length: 8 }, (_, i) => entry(OLD - i));
+    mockPush
+      .mockResolvedValueOnce("rejected")
+      .mockResolvedValueOnce("ok")
+      .mockResolvedValue("failed");
+    await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
+    expect(mockPush).toHaveBeenCalledTimes(3);
+    mockPush.mockClear();
+    mockPush.mockResolvedValue("ok");
+    expect(await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW })).toBe(8);
     warn.mockRestore();
   });
 
@@ -169,19 +221,17 @@ describe("repushLocalGradeLog", () => {
     expect(first).toBe(GRADE_LOG_REPUSH_MAX_ROWS_PER_CYCLE);
     const sent = mockPush.mock.calls.flatMap((c) => c[2].map((r) => r.occurredAt));
     expect(Math.min(...sent)).toBe(OLD - (GRADE_LOG_REPUSH_MAX_ROWS_PER_CYCLE - 1) - 30);
-    // Second cycle: cloud now has those; the remainder (the newest 30) goes.
     const cloud = local.filter((e) => sent.includes(e.occurredAt));
     mockPush.mockClear();
     expect(await repushLocalGradeLog(client, "u", local, cloud, { lastResetAt: null, now: NOW })).toBe(30);
   });
 
-  it("bounds requests per cycle including bisection retries", async () => {
+  it("bounds requests per cycle when everything is rejected", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    // First request succeeds (so bisection is allowed), everything after fails.
-    mockPush.mockResolvedValueOnce(true).mockResolvedValue(false);
+    mockPush.mockResolvedValue("rejected");
     const local = Array.from({ length: 600 }, (_, i) => entry(OLD - i));
     await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
-    expect(mockPush.mock.calls.length).toBeLessThanOrEqual(GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE);
+    expect(mockPush.mock.calls.length).toBe(GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE);
     warn.mockRestore();
   });
 });

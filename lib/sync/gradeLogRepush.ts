@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import { isCloudPushHeld } from "@/lib/gradelog/persistence";
-import { isGradeLogEntry, pushGradeLog } from "@/lib/sync/gradeLog";
+import { isGradeLogEntry, pushGradeLogDetailed } from "@/lib/sync/gradeLog";
 import { HELD_COPY_STALE_MS } from "@/lib/sync/heldGrade";
 
 /**
@@ -24,9 +24,6 @@ export const GRADE_LOG_REPUSH_MAX_ROWS_PER_CYCLE = 1000;
 
 /** Max upsert requests per cycle, including bisection retries. */
 export const GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE = 25;
-
-/** With no request having succeeded yet, give up after this many (network is likely down). */
-const ABORT_AFTER_FAILURES_WITHOUT_SUCCESS = 4;
 
 /**
  * `occurredAt` values the server rejected as single-row requests, kept for
@@ -99,12 +96,13 @@ export function selectRepushEntries(
 /**
  * Pushes the local-only entries, oldest first, capped per cycle. Never throws.
  *
- * A failed batch is bisected (retried in halves down to single rows) so one
- * server-rejected row cannot block the valid rows beside it. A row that fails
- * alone is remembered for this session (only once some request in the cycle
- * has succeeded, so an offline cycle never blacklists good rows). Total rows
- * and requests per cycle are bounded; the rest drains on later cycles.
- * Returns the number of entries pushed.
+ * A batch the server REJECTS (an error response about the rows) is bisected
+ * (retried in halves down to single rows) so one bad row cannot block the
+ * valid rows beside it; a row rejected on its own is remembered for this page
+ * load so it is not retried every cycle. Any other failure (thrown error,
+ * network, timeout, 5xx, rate limit) says nothing about the rows: it stops the
+ * leg for this cycle and blacklists nothing. Total rows and requests per cycle
+ * are bounded; the rest drains on later cycles. Returns the number pushed.
  *
  * `lastResetAt` may be null because the user never reset OR because the
  * settings pull failed (a null settings row also skips the tombstone wipe). In
@@ -125,26 +123,24 @@ export async function repushLocalGradeLog(
 
   let pushed = 0;
   let requests = 0;
-  let failuresWithoutSuccess = 0;
-  let anySucceeded = false;
-  const failedSingles: number[] = [];
-  let aborted = false;
+  let rejectedRows = 0;
+  let stopped = false;
 
   const attempt = async (rows: GradeLogEntry[]): Promise<void> => {
-    if (aborted) return;
-    if (requests >= GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE) return;
+    if (stopped || requests >= GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE) return;
     requests++;
-    if (await pushGradeLog(client, userId, rows)) {
+    const result = await pushGradeLogDetailed(client, userId, rows);
+    if (result === "ok") {
       pushed += rows.length;
-      anySucceeded = true;
       return;
     }
-    if (!anySucceeded && ++failuresWithoutSuccess >= ABORT_AFTER_FAILURES_WITHOUT_SUCCESS) {
-      aborted = true;
+    if (result === "failed") {
+      stopped = true;
       return;
     }
     if (rows.length === 1) {
-      failedSingles.push(rows[0].occurredAt);
+      rejectedThisSession.add(rows[0].occurredAt);
+      rejectedRows++;
       return;
     }
     const mid = Math.ceil(rows.length / 2);
@@ -156,12 +152,9 @@ export async function repushLocalGradeLog(
     await attempt(pending.slice(i, i + GRADE_LOG_REPUSH_BATCH_SIZE));
   }
 
-  if (anySucceeded) {
-    for (const t of failedSingles) rejectedThisSession.add(t);
-  }
-  if (failedSingles.length > 0 || aborted) {
+  if (rejectedRows > 0 || stopped) {
     console.warn(
-      `[pullAndMerge] grade-log re-push incomplete (${failedSingles.length} rejected rows, ${aborted ? "aborted, likely offline, " : ""}non-fatal, retried on a later cycle)`,
+      `[pullAndMerge] grade-log re-push incomplete (${rejectedRows} rejected rows${stopped ? ", stopped on a network/server failure" : ""}, non-fatal, retried on a later cycle)`,
     );
   }
   return pushed;
