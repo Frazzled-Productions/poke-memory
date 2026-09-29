@@ -43,12 +43,17 @@ export const KEY_SYNC_STATUS = "poke-memory:sync-status:v1";
 export const KEY_PENDING_GRADE_QUEUE = "poke-memory:pending-grade-queue:v1";
 
 /**
- * Durability copy of the single grade still inside its undo window (#2052).
- * localStorage only, and deliberately NOT the pending queue key: the queue is
- * mirrored to IDB for the service worker and read by pushWithFallback, both of
- * which would push a grade the user can still undo.
+ * Durability copy of the single grade a tab holds inside its undo window
+ * (#2052): one localStorage key PER TAB (`<prefix><tabId>`) so two tabs holding
+ * at once never overwrite each other. Deliberately NOT the pending queue key:
+ * the queue is mirrored to IDB for the service worker and read by
+ * pushWithFallback, both of which would push a grade the user can still undo.
+ * Per-user state: archived and wiped on an account switch.
  */
-export const KEY_HELD_GRADE = "poke-memory:held-grade:v1";
+export const KEY_HELD_GRADE_PREFIX = "poke-memory:held-grade:v1:";
+
+/** Per-tab id (sessionStorage): survives a reload of the tab, differs per tab (#2052). */
+export const KEY_TAB_ID = "poke-memory:tab-id:v1";
 
 // ─── Streak ───────────────────────────────────────────────────────────────────
 

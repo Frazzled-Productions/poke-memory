@@ -34,9 +34,9 @@ vi.mock("@/lib/sync/gradeLogPush", () => ({
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
 import { savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
 import { pushGradeLogEntry } from "@/lib/sync/gradeLogPush";
-import { loadHeldCard, saveHeldCard, isCardPushHeld, cardPushKey } from "@/lib/sync/heldGrade";
+import { loadHeldCard, saveHeldCard, isCardPushHeld, cardPushKey, getTabId } from "@/lib/sync/heldGrade";
 import { loadPendingQueue } from "@/lib/sync/persistence";
-import { KEY_HELD_GRADE } from "@/lib/storage/keys";
+import { KEY_HELD_GRADE_PREFIX } from "@/lib/storage/keys";
 import {
   usePerGradeSync,
   UNDO_HOLD_HIDDEN_GRACE_MS,
@@ -46,6 +46,7 @@ import { isCloudPushHeld, type GradeLogEntry } from "@/lib/gradelog/persistence"
 import type { ReviewableCard } from "@/lib/review/session";
 
 const CLIENT = {} as unknown as SupabaseClient;
+const TAB = getTabId();
 const USER = "00000000-0000-0000-0000-000000000000";
 
 function makeCard(id: number, stability = 1): ReviewableCard {
@@ -138,7 +139,7 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
       result.current.enqueueGrade(held, { hold: true });
     });
     // Written straight away (no debounce), so a kill right after grading is safe.
-    expect(loadHeldCard()).toEqual(held);
+    expect(loadHeldCard(TAB)).toEqual(held);
     expect(isCardPushHeld(cardPushKey(held))).toBe(true);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(600);
@@ -157,8 +158,8 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     act(() => {
       result.current.discardHeld();
     });
-    expect(loadHeldCard()).toBeNull();
-    expect(window.localStorage.getItem(KEY_HELD_GRADE)).toBeNull();
+    expect(loadHeldCard(TAB)).toBeNull();
+    expect(window.localStorage.getItem(KEY_HELD_GRADE_PREFIX + TAB)).toBeNull();
     expect(isCardPushHeld(cardPushKey(held))).toBe(false);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(UNDO_HOLD_MAX_MS + 1000);
@@ -288,7 +289,7 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     const snap = result.current.flushPending(false);
     expect(snap.cards).toEqual([]);
     expect(snap.gradeLog).toEqual([]);
-    expect(loadHeldCard()).toEqual(held);
+    expect(loadHeldCard(TAB)).toEqual(held);
     expect(onCommitted).not.toHaveBeenCalled();
   });
 
@@ -311,7 +312,7 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     expect(pushGradeLogEntry).not.toHaveBeenCalled();
     expect(isCloudPushHeld(555)).toBe(false);
     // Final teardown path: no drain or persist is scheduled, and the held copy is gone.
-    expect(loadHeldCard()).toBeNull();
+    expect(loadHeldCard(TAB)).toBeNull();
     expect(savePendingQueue).not.toHaveBeenCalled();
   });
 
@@ -323,7 +324,7 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     });
     act(() => setVisibility("hidden"));
     // The held copy was written at grade time; hiding must not touch the queue.
-    expect(loadHeldCard()?.id).toBe(1);
+    expect(loadHeldCard(TAB)?.id).toBe(1);
     expect(savePendingQueue).not.toHaveBeenCalled();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(UNDO_HOLD_HIDDEN_GRACE_MS - 1);
@@ -447,7 +448,7 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(250);
     });
-    expect(loadHeldCard()).toEqual(held);
+    expect(loadHeldCard(TAB)).toEqual(held);
     for (const call of vi.mocked(savePendingQueue).mock.calls) {
       expect((call[0] as ReviewableCard[]).some((c) => c.id === 1)).toBe(false);
     }
@@ -461,7 +462,7 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     });
     const saved = vi.mocked(savePendingQueue).mock.calls.at(-1)![0] as ReviewableCard[];
     expect(saved.map((c) => c.id)).toEqual([1]);
-    expect(loadHeldCard()?.id).toBe(2);
+    expect(loadHeldCard(TAB)?.id).toBe(2);
   });
 
   it("commit collapses a same-key queued entry: one entry per primary key", () => {
@@ -485,12 +486,12 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     act(() => {
       result.current.enqueueGrade(makeCard(1), { hold: true });
     });
-    expect(loadHeldCard()).not.toBeNull();
+    expect(loadHeldCard(TAB)).not.toBeNull();
     rerender({ client: null, uid: null });
     act(() => {
       result.current.flushPending(true);
     });
-    expect(loadHeldCard()).toBeNull();
+    expect(loadHeldCard(TAB)).toBeNull();
   });
 
   it("a hold created while the tab is already hidden arms the grace timer", async () => {
@@ -521,9 +522,9 @@ describe("usePerGradeSync - mount seeding (#2052)", () => {
   });
 
   it("reload with a persisted held card: seeded as COMMITTED, pushed, and its own key cleared", async () => {
-    saveHeldCard(makeCard(7));
+    saveHeldCard(makeCard(7), USER, TAB);
     renderHook(() => usePerGradeSync(CLIENT, USER));
-    expect(loadHeldCard()).toBeNull();
+    expect(loadHeldCard(TAB)).toBeNull();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(250);
     });
@@ -548,18 +549,18 @@ describe("usePerGradeSync - mount seeding (#2052)", () => {
   });
 
   it("guest / signed out: nothing is seeded or pushed and the held copy is left alone", async () => {
-    saveHeldCard(makeCard(7));
+    saveHeldCard(makeCard(7), USER, TAB);
     renderHook(() => usePerGradeSync(null, null));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(250);
     });
     expect(pushSingleCard).not.toHaveBeenCalled();
-    expect(loadHeldCard()).not.toBeNull();
+    expect(loadHeldCard(TAB)).not.toBeNull();
   });
 
   it("dedupes by key: persisted duplicates and a held copy of a queued card collapse to one push each", async () => {
     vi.mocked(loadPendingQueue).mockReturnValue([makeCard(3, 1), makeCard(3, 2), makeCard(4)]);
-    saveHeldCard(makeCard(4, 8));
+    saveHeldCard(makeCard(4, 8), USER, TAB);
     renderHook(() => usePerGradeSync(CLIENT, USER));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(250);
@@ -580,6 +581,6 @@ describe("usePerGradeSync - mount seeding (#2052)", () => {
       await vi.advanceTimersByTimeAsync(250);
     });
     expect(pushSingleCard).not.toHaveBeenCalled();
-    expect(loadHeldCard()?.id).toBe(1);
+    expect(loadHeldCard(TAB)?.id).toBe(1);
   });
 });

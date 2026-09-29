@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { pushSingleCard, isSyncSafe, type PushSingleCardResult } from "@/lib/sync/cloud";
@@ -20,32 +20,23 @@ import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 import { releaseCloudPushHold, type GradeLogEntry } from "@/lib/gradelog/persistence";
 import { pushGradeLogEntry } from "@/lib/sync/gradeLogPush";
 import {
+  UNDO_HOLD_HIDDEN_GRACE_MS,
+  UNDO_HOLD_MAX_MS,
   cardPushKey,
   clearHeldCard,
-  loadHeldCard,
+  getTabId,
   markCardPushHeld,
   releaseCardPushHold,
   saveHeldCard,
+  takeLeftoverHeldCards,
 } from "@/lib/sync/heldGrade";
 
 /** Number of consecutive all-failure drains before the banner is shown. */
 const FAILURE_THRESHOLD = 3;
 
-/**
- * How long the tab may stay hidden before an undoable grade is committed to
- * the cloud and its undo expires (#2052). Short enough that a backgrounded
- * mobile tab still syncs, long enough that a quick app switch keeps undo.
- */
-export const UNDO_HOLD_HIDDEN_GRACE_MS = 30_000;
-
-/**
- * Total cap on how long a grade can be held, counted from the moment it is
- * graded, whether the tab is visible or not and whatever the user does in the
- * meantime (#2052). It is NOT an idle timer: it does not reset on activity.
- * After this the grade is committed and Undo silently expires, so an
- * abandoned-but-open session cannot hold a grade off the cloud indefinitely.
- */
-export const UNDO_HOLD_MAX_MS = 300_000;
+// Timings live with the held-copy rules in heldGrade.ts (a stale persisted copy
+// is defined in terms of them); re-exported here for the hook's consumers.
+export { UNDO_HOLD_HIDDEN_GRACE_MS, UNDO_HOLD_MAX_MS };
 
 /**
  * What the unload safety-net sends: the unsynced cards plus the grade-log
@@ -143,6 +134,8 @@ export function usePerGradeSync(
   const pendingQueueRef = useRef<ReviewableCard[]>([]);
   const heldRef = useRef<HeldGrade | null>(null);
   const holdTokenRef = useRef(0);
+  // Stable per-tab id (sessionStorage) stamping this tab's held copy (#2052).
+  const [tabId] = useState(getTabId);
   const holdCapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hiddenGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onCommittedRef = useLatestRef(options?.onCommitted);
@@ -416,11 +409,11 @@ export function usePerGradeSync(
           else void pushGradeLogEntry(c, uid, held.gradeLog);
         }
       }
-      clearHeldCard();
+      clearHeldCard(tabId);
       onCommittedRef.current?.(held.token);
       return forBeacon;
     },
-    [clearHoldTimers, releaseHeldMarkers, upsertIntoQueue, persistQueue, scheduleDrain],
+    [clearHoldTimers, releaseHeldMarkers, upsertIntoQueue, persistQueue, scheduleDrain, tabId],
   );
 
   const discardHeld = useCallback(() => {
@@ -432,8 +425,8 @@ export function usePerGradeSync(
     // The held card was never in the shared queue, so nothing there needs
     // rewriting; dropping its own persisted copy is enough for a reload not to
     // push a grade the user undid.
-    clearHeldCard();
-  }, [clearHoldTimers, releaseHeldMarkers]);
+    clearHeldCard(tabId);
+  }, [clearHoldTimers, releaseHeldMarkers, tabId]);
 
   const attachHeldGradeLog = useCallback((token: number, entry: GradeLogEntry | null): boolean => {
     const held = heldRef.current;
@@ -513,17 +506,16 @@ export function usePerGradeSync(
 
     for (const card of loadPendingQueue()) seed(card);
 
-    // A live hold owns the persisted held key (this effect re-runs when the
-    // client or user changes mid-hold); only a leftover from an earlier page
-    // life is seeded.
-    if (heldRef.current === null) {
-      const leftover = loadHeldCard();
-      if (leftover !== null) {
-        seed(leftover);
-        clearHeldCard();
-        persistQueue();
-      }
-    }
+    // Leftover held copies (#2052): same user only (never push one account's
+    // grade under another), and only when safe: left by THIS tab (a reload ended
+    // the undo window) or stale (its owner tab is gone). A copy a live other tab
+    // owns is left alone, and so is this tab's own record while it has a live
+    // hold (this effect re-runs when the client or user changes mid-hold).
+    const leftovers = takeLeftoverHeldCards(userId, tabId, {
+      ownHoldLive: heldRef.current !== null,
+    });
+    for (const card of leftovers) seed(card);
+    if (leftovers.length > 0) persistQueue();
 
     if (queue.length > 0) scheduleDrain();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -574,7 +566,7 @@ export function usePerGradeSync(
           markCardPushHeld(cardLocaleKey(holdCard));
           // Durability copy, written straight away and kept out of the shared
           // queue (see heldGrade.ts).
-          saveHeldCard(holdCard);
+          saveHeldCard(holdCard, userIdRef.current!, tabId);
         }
         holdCapTimerRef.current = setTimeout(() => {
           holdCapTimerRef.current = null;
@@ -600,7 +592,7 @@ export function usePerGradeSync(
       schedulePersist();
       return null;
     },
-    [commitHeld, armHiddenGrace, upsertIntoQueue, scheduleDrain, schedulePersist],
+    [commitHeld, armHiddenGrace, upsertIntoQueue, scheduleDrain, schedulePersist, tabId],
   );
 
   const flushPending = useCallback((final = false): UnsyncedSnapshot => {

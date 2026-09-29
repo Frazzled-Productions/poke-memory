@@ -19,14 +19,15 @@ vi.mock("@/lib/sync/pullAndMerge", () => ({
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
 import { useOnlineReconnectSync } from "@/lib/sync/useOnlineReconnectSync";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
-import { loadHeldCard } from "@/lib/sync/heldGrade";
+import { loadHeldCard, getTabId, saveHeldCard } from "@/lib/sync/heldGrade";
 import { loadPendingQueue, saveSyncStatus, loadSyncStatus } from "@/lib/sync/persistence";
 import { saveSession } from "@/lib/review/persistence";
 import { DEFAULT_LIMITS, todayString, type ReviewableCard } from "@/lib/review/session";
-import { KEY_HELD_GRADE, KEY_PENDING_GRADE_QUEUE } from "@/lib/storage/keys";
+import { KEY_HELD_GRADE_PREFIX, KEY_PENDING_GRADE_QUEUE } from "@/lib/storage/keys";
 import { idbGet, __resetForTests } from "@/lib/idb/db";
 import type { ReviewState } from "@/lib/srs/scheduler";
 
+const TAB = getTabId();
 const USER = "00000000-0000-0000-0000-0000000000bb";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -98,12 +99,13 @@ describe("undo hold vs the shared pending queue (#2052)", () => {
       req.onblocked = () => resolve();
     });
     window.localStorage.clear();
-    cardUpserts = [];
+    const mine: Record<string, unknown>[] = [];
+    cardUpserts = mine;
     client = {
       from: (table: string) => ({
         upsert: async (rows: Record<string, unknown> | Record<string, unknown>[]) => {
           if (table === "card_reviews") {
-            cardUpserts.push(...(Array.isArray(rows) ? rows : [rows]));
+            mine.push(...(Array.isArray(rows) ? rows : [rows]));
           }
           return { error: null };
         },
@@ -173,6 +175,22 @@ describe("undo hold vs the shared pending queue (#2052)", () => {
     expect(cardUpserts.map((r) => r.subject_key)).toEqual(["1"]);
   });
 
+  it("B2: the session fallback also skips a card held by ANOTHER live tab (reads the per-tab copies)", async () => {
+    armFailedPushState();
+    const graded = makeCard(1);
+    await saveSession({ cards: [graded], limits: DEFAULT_LIMITS });
+    // Another tab holds this grade; this tab has no in-memory hold at all.
+    saveHeldCard(graded, USER, "some-other-tab");
+    renderHook(() => useOnlineReconnectSync(client, USER));
+
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+      await sleep(300);
+    });
+
+    expect(cardUpserts).toEqual([]);
+  });
+
   it("the service worker's IDB mirror and the shared queue key never contain a held card", async () => {
     const hook = renderHook(() => usePerGradeSync(client, USER));
 
@@ -187,8 +205,8 @@ describe("undo hold vs the shared pending queue (#2052)", () => {
     expect(window.localStorage.getItem(KEY_PENDING_GRADE_QUEUE)).toBeNull();
     expect(loadPendingQueue()).toEqual([]);
     // Its own key is localStorage-only.
-    expect(window.localStorage.getItem(KEY_HELD_GRADE)).not.toBeNull();
-    expect(await idbGet(KEY_HELD_GRADE)).toBeNull();
+    expect(window.localStorage.getItem(KEY_HELD_GRADE_PREFIX + TAB)).not.toBeNull();
+    expect(await idbGet(KEY_HELD_GRADE_PREFIX + TAB)).toBeNull();
   });
 
   it("once committed the card is mirrored for the service worker exactly once", async () => {
@@ -209,7 +227,7 @@ describe("undo hold vs the shared pending queue (#2052)", () => {
       const rows = JSON.parse(raw) as { subject_key: string }[];
       expect(new Set(rows.map((r) => r.subject_key)).size).toBe(rows.length);
     }
-    expect(window.localStorage.getItem(KEY_HELD_GRADE)).toContain('"id":2');
+    expect(window.localStorage.getItem(KEY_HELD_GRADE_PREFIX + TAB)).toContain('"id":2');
   });
 
   it("S3: an Undo during an in-flight visibilitychange fetch is not resurrected when the fetch settles", async () => {
@@ -243,8 +261,8 @@ describe("undo hold vs the shared pending queue (#2052)", () => {
       await sleep(50);
     });
 
-    expect(loadHeldCard()).toBeNull();
-    expect(window.localStorage.getItem(KEY_HELD_GRADE)).toBeNull();
+    expect(loadHeldCard(TAB)).toBeNull();
+    expect(window.localStorage.getItem(KEY_HELD_GRADE_PREFIX + TAB)).toBeNull();
     expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).toBeNull();
     expect(window.localStorage.getItem(KEY_PENDING_GRADE_QUEUE)).toBeNull();
   });
@@ -273,7 +291,7 @@ describe("undo hold vs the shared pending queue (#2052)", () => {
       await sleep(50);
     });
 
-    expect(loadHeldCard()?.id).toBe(1);
+    expect(loadHeldCard(TAB)?.id).toBe(1);
     expect(window.localStorage.getItem(KEY_PENDING_GRADE_QUEUE)).toBeNull();
   });
 });

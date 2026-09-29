@@ -180,6 +180,17 @@ describe("switch path (ownerUserId !== incomingUserId)", () => {
     expect(storage.getItem(KEY_SETTINGS_LAST_PUSHED)).toBeNull();
   });
 
+  it("wipes the per-tab held-grade copies of the outgoing user (#2052)", async () => {
+    saveSyncStatus({ ...ZERO_STATUS, ownerUserId: "user-A" });
+    storage.setItem("poke-memory:held-grade:v1:tab-1", JSON.stringify({ userId: "user-A" }));
+    storage.setItem("poke-memory:held-grade:v1:tab-2", JSON.stringify({ userId: "user-A" }));
+
+    await guardAccountSwitch("user-B");
+
+    expect(storage.getItem("poke-memory:held-grade:v1:tab-1")).toBeNull();
+    expect(storage.getItem("poke-memory:held-grade:v1:tab-2")).toBeNull();
+  });
+
   it("writes a fresh SyncStatus with incomingUserId and null cursors when no archive was present", async () => {
     // restoreUserData mock does nothing - simulates no archive for user-B.
     saveSyncStatus({
