@@ -22,11 +22,11 @@ import { applyProtectionStep, effectiveStreakDates, type StreakProtection } from
 import { computeStreak } from "@/lib/streak/compute";
 
 export type StreakNudgeInput = {
-  /** Every streak_days review date for this user ("YYYY-MM-DD", UTC). */
+  /** Every streak_days review date for this user ("YYYY-MM-DD", user-local days). */
   streakDays: readonly string[];
   /** The user's persisted streak-protection state (from `user_settings.settings`). */
   streakProtection: StreakProtection;
-  /** Whether the user has already reviewed today (from `get_push_reviewed_today`). */
+  /** Whether the user's local `today` is already in their streak_days (#2073). */
   reviewedToday: boolean;
   /** "Today" in the user's own timezone ("YYYY-MM-DD"). */
   today: string;
@@ -44,9 +44,11 @@ export function isEligibleForStreakNudge(input: StreakNudgeInput): boolean {
   if (reviewedToday) return false;
 
   // Gate 2: active streak, honouring already-bridged gaps (grace window).
-  // `streakDays` never includes today's date (reviewedToday is false), so
-  // `computeStreak`'s grace window (today missing, yesterday present) applies
-  // when the streak is genuinely still alive pending today's review.
+  // Reaching here means `reviewedToday` is false, so `streakDays` does not
+  // include today's date (callers derive `reviewedToday` from that very
+  // membership), and `computeStreak`'s grace window (today missing, yesterday
+  // present) applies when the streak is genuinely still alive pending today's
+  // review.
   const effectiveDatesSoFar = effectiveStreakDates(
     streakDays,
     streakProtection.spendDates,
