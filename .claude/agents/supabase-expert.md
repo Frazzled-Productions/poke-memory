@@ -45,19 +45,12 @@ Supabase Auth (GitHub OAuth), per-user RLS policies, `@supabase/ssr` client spli
 
 ### Schema today
 
-Four tables in `public`. All RLS-on. All FK'd to `auth.users(id) ON DELETE CASCADE`.
+The table inventory lives in **`docs/persistence.md` → Tables today** (every table, its migration, its shape, and the deliberate FK exceptions: `feedback.user_id` is nullable, `rate_limit_buckets` has no user link). `scripts/persistence-tables.test.mjs` fails when that list drifts from `db/migrations/`, so read it (and the migrations themselves) rather than keeping a copy here. Facts it does not spell out:
 
-**`card_reviews`** (migrations 001 → 002 (trigger) → 004 (FSRS swap)):
-- Primary key: `id uuid` (gen_random_uuid). `UNIQUE (user_id, pokemon_id)` is the upsert conflict target. Standard Pokémon use `pokemon_id` = Pokédex number; evolution cards use `pokemon_id` = `EVOLUTION_ID_OFFSET + pokédex_number` (≥ 1_000_001). No `card_type` column - the offset encodes type.
-- FSRS state columns: `stability` (numeric), `difficulty` (numeric), `elapsed_days` (int), `scheduled_days` (int), `reps` (int), `lapses` (int), `fsrs_state` (text, CHECK in `('new','learning','review','relearning')`).
-- Lifecycle timestamps: `due_date`, `last_review`, `first_seen`, `updated_at`. Guarded by the regression trigger.
-- Dates are `date` (not `timestamp`) to match the `"YYYY-MM-DD"` string convention used throughout the app. No timezone math.
-
-**`streak_days`** (migration 001): `(user_id, review_date)` UNIQUE. One row per day the user reviewed. Append-only by convention. Streak length is derived from the date set - don't denormalize it onto a column.
-
-**`user_settings`** (migrations 001 → 003 (jsonb) → 005 (drop legacy cols)): `(user_id PK, settings jsonb NOT NULL DEFAULT '{}', updated_at)`. Whole-object last-write-wins for cross-device sync. New per-user toggles go inside `settings`, not as new columns.
-
-**`grade_log`** (migration 006): `(user_id, occurred_at bigint, entry_date date, card_type, grade smallint)`. `UNIQUE (user_id, occurred_at)` is the cross-device dedup key. 365-day rolling history; client prunes on append.
+- **`card_reviews` key**: PK `(user_id, card_type, subject_key, locale)` since migration 029 (010/012 replaced the old integer `pokemon_id` identity). Client upserts name exactly these columns (`CARD_REVIEWS_CONFLICT_COLS` in `lib/sync/cloud.ts`); identity model in `docs/card-identity.md`. Changing a PK or any `onConflict` target needs the three-migration rollout in `docs/persistence.md` → Constraint-affecting migrations (#1344).
+- **`card_reviews.updated_at` is server-stamped** by a `BEFORE UPDATE` trigger (043); clients do not send it.
+- **`user_settings.settings` is written through the `merge_user_settings` RPC** (a JSONB deep merge since 037, not a whole-object overwrite) and has its own regression trigger (038).
+- **Scheduling dates are `date` columns** (`due_date`, `last_review`, `first_seen`), matching the app's `"YYYY-MM-DD"` UTC string convention.
 
 ### Destructive-write protection (read before designing any change)
 
@@ -66,7 +59,7 @@ Migration 002 installed a `BEFORE UPDATE` trigger on `card_reviews` named `card_
 - `OLD.first_seen IS NOT NULL AND NEW.first_seen IS NULL`
 - `OLD.last_review IS NOT NULL AND NEW.last_review < OLD.last_review`
 
-Reps / scheduled_days / stability / difficulty decreasing is allowed - FSRS lapse semantics. The trigger is the last line of defense against client bugs like #293, which clobbered 99.4% of one user's cloud rows. Any feature that legitimately resets a card (delete account, "wipe my progress") needs a `SECURITY DEFINER` RPC that bypasses the trigger AND explicit user confirmation. Do not propose disabling the trigger without one of those.
+Migrations 015 / 016 / 017 extended it (non-decreasing `reps` / `lapses`, same-date `scheduled_days` drops, one-way `seen_in_pasture`); `docs/persistence.md` → Invariants on existing data is the current list. Stability / difficulty decreasing is allowed - FSRS lapse semantics. The trigger is the last line of defense against client bugs like #293, which clobbered 99.4% of one user's cloud rows. Any feature that legitimately resets a card (delete account, "wipe my progress") needs a `SECURITY DEFINER` RPC that bypasses the trigger AND explicit user confirmation. Do not propose disabling the trigger without one of those.
 
 ### Designing a new table
 
@@ -99,7 +92,7 @@ Active sync paths as defined in `docs/sync.md` (which AGENTS.md "Sync" section p
 
 `pushSession` (batched) is the escape hatch - currently called from `app/auth/callback-complete/page.tsx` on first sign-in and the "Keep local" branch of the conflict picker.
 
-Streak sync: `streak_days` rows are union-merged (monotonic) and append-only at the DB layer after migration 018. Settings sync: `user_settings.settings` is last-write-wins on the whole jsonb object; cloud overlays local only when `hasStoredSettings()` is false. Regional-prefs scalars (`timezone`, `date_format`) live as separate columns and bypass the LWW race on the JSONB blob.
+Streak sync: `streak_days` rows are union-merged (monotonic) and append-only at the DB layer after migration 018. Settings sync: `user_settings.settings` is last-write-wins per key (pushes go through `merge_user_settings`'s deep merge, so a patch never drops keys it did not send); cloud overlays local only when `hasStoredSettings()` is false. Regional-prefs scalars (`timezone`, `date_format`) live as separate columns and bypass the LWW race on the JSONB blob.
 
 ### Hand-offs
 
