@@ -18,6 +18,7 @@ import { Subject, appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKe
 import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 import { markStructuralSyncError, clearStructuralSyncError } from "@/lib/sync/structuralError";
 import type { AppLocale } from "@/i18n/locales";
+import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 
 // cloud.ts imports markStructuralSyncError from structuralError.ts - a leaf
 // module that has no imports from cloud.ts or persistence.ts - so there is no
@@ -411,9 +412,13 @@ export function maxCloudUpdatedAt(rows: CloudRow[]): string {
  * Content-Type is set to application/json via the Blob constructor - sendBeacon
  * does not accept a headers option, so this is the only way to set it.
  */
-export function buildBeaconPayload(cards: ReviewableCard[]): Blob {
+export function buildBeaconPayload(cards: ReviewableCard[], gradeLog: GradeLogEntry[] = []): Blob {
   const safeRows = cards.filter(isSyncSafe).map(toCloudRow);
-  return new Blob([JSON.stringify({ cards: safeRows })], { type: "application/json" });
+  // `gradeLog` carries the grade-log entry of a just-committed held grade
+  // (#2052); omitted when empty so the payload stays byte-compatible with
+  // older servers and the service-worker replay path.
+  const body = gradeLog.length > 0 ? { cards: safeRows, gradeLog } : { cards: safeRows };
+  return new Blob([JSON.stringify(body)], { type: "application/json" });
 }
 
 /**

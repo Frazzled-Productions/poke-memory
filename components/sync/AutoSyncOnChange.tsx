@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { pushSettings } from "@/lib/sync/settings";
 import { pushStreak } from "@/lib/sync/streak";
-import { pushGradeLog } from "@/lib/sync/gradeLog";
+import { pushGradeLogEntry } from "@/lib/sync/gradeLogPush";
 import { markPushSucceeded } from "@/lib/sync/persistence";
 import {
   SETTINGS_SAVED_EVENT,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/streak/persistence";
 import {
   GRADE_LOG_APPENDED_EVENT,
+  isCloudPushHeld,
   type GradeLogEntry,
 } from "@/lib/gradelog/persistence";
 
@@ -92,13 +93,10 @@ export function AutoSyncOnChange() {
     function handleGradeLog(e: Event) {
       const detail = (e as CustomEvent<GradeLogEntry>).detail;
       if (!detail) return;
-      void pushGradeLog(client!, userId!, [detail]).then((ok) => {
-        if (ok) {
-          markPushSucceeded();
-        } else {
-          console.warn("[auto-sync] grade log push failed; will retry on next grade");
-        }
-      });
+      // An undoable grade is held on the device (#2052): usePerGradeSync
+      // pushes it via the same helper once the undo window has closed.
+      if (isCloudPushHeld(detail.occurredAt)) return;
+      void pushGradeLogEntry(client!, userId!, detail);
     }
 
     window.addEventListener(SETTINGS_SAVED_EVENT, handleSettings);

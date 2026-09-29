@@ -70,7 +70,11 @@ import {
   STREAK_UPDATED_EVENT,
   loadStreakData,
 } from "@/lib/streak/persistence";
-import { GRADE_LOG_APPENDED_EVENT } from "@/lib/gradelog/persistence";
+import {
+  GRADE_LOG_APPENDED_EVENT,
+  appendGradeEntry,
+  releaseCloudPushHold,
+} from "@/lib/gradelog/persistence";
 
 describe("AutoSyncOnChange", () => {
   beforeEach(() => {
@@ -489,5 +493,52 @@ describe("AutoSyncOnChange - superuser write-guard", () => {
     await Promise.resolve();
 
     expect(vi.mocked(markPushSucceeded)).not.toHaveBeenCalled();
+  });
+});
+
+// #2052: a grade that is still undoable is held on the device. AutoSyncOnChange
+// must skip the held entry (usePerGradeSync pushes it at commit) and keep
+// pushing everything else immediately. Drives the real appendGradeEntry so the
+// hold-before-event ordering is exercised end to end.
+describe("AutoSyncOnChange - held grade-log entries (#2052)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuth).mockReturnValue({
+      user: FAKE_USER as unknown as ReturnType<typeof useAuth>["user"],
+      supabase: FAKE_CLIENT,
+    } as ReturnType<typeof useAuth>);
+    mockUseSuperuser.mockReturnValue({
+      unlocked: false,
+      flags: { pretendAllMastered: false },
+      anyFlagOn: false,
+      setFlag: vi.fn(),
+    });
+    vi.mocked(pushGradeLog).mockResolvedValue(true);
+  });
+
+  it("skips a held entry (append event still fires for local listeners)", async () => {
+    render(<AutoSyncOnChange />);
+    const seenByOthers = vi.fn();
+    window.addEventListener(GRADE_LOG_APPENDED_EVENT, seenByOthers);
+
+    const entry = await appendGradeEntry(
+      { date: "2026-05-12", grade: 4, cardType: "name" },
+      { holdCloudPush: true },
+    );
+
+    window.removeEventListener(GRADE_LOG_APPENDED_EVENT, seenByOthers);
+    expect(entry).not.toBeNull();
+    expect(seenByOthers).toHaveBeenCalledTimes(1);
+    expect(pushGradeLog).not.toHaveBeenCalled();
+    releaseCloudPushHold(entry!.occurredAt);
+  });
+
+  it("pushes a non-held entry immediately (KnownPokemonQuiz and other writers)", async () => {
+    render(<AutoSyncOnChange />);
+
+    const entry = await appendGradeEntry({ date: "2026-05-12", grade: 4, cardType: "name" });
+
+    expect(pushGradeLog).toHaveBeenCalledTimes(1);
+    expect(pushGradeLog).toHaveBeenCalledWith(FAKE_CLIENT, FAKE_USER.id, [entry]);
   });
 });

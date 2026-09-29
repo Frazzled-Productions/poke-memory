@@ -5,6 +5,7 @@ import {
   savePendingQueue,
   clearPendingQueue,
 } from "@/lib/sync/persistence";
+import { heldCardPushKeys, cardPushKey } from "@/lib/sync/heldGrade";
 import { loadSession } from "@/lib/review/persistence";
 import { todayString } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
@@ -128,9 +129,16 @@ export async function pushWithFallback(
 
   // No persisted queue: fall back to the session-card heuristic.
   const session = await loadSession();
+  // Cards inside an undo window in ANY tab (in-memory holds plus the live
+  // per-tab persisted copies), read once for the whole filter.
+  const heldKeys = heldCardPushKeys();
   const allReviewed = (session?.cards ?? []).filter(
     (card) =>
       card.state.lastReview !== null &&
+      // A grade still inside its undo window is already in the saved session
+      // (saveSession runs before commit) but must not reach the cloud until it
+      // is committed (#2052).
+      !heldKeys.has(cardPushKey(card)) &&
       (isCardEligible ? isCardEligible(card) : true),
   );
 
