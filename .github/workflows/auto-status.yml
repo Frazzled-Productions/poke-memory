@@ -1,9 +1,10 @@
 name: Auto Status
 
 # Sets the project Status to Done when an issue closes (whether merged via
-# `closes #N` on a PR, manually closed, or closed as not-planned). The other
-# transitions (Planned, In Progress, PR, Ready to merge) are driven from
-# auto-issue.yml and auto-pr.yml at the matching workflow phases.
+# `closes #N` on a PR, manually closed, or closed as not-planned). This is the
+# only automated board transition left: the others (Planned, In Progress, PR,
+# Ready to merge) were driven by auto-issue.yml / auto-pr.yml, removed in
+# #2003 / #2004, and are now set by hand if at all.
 
 on:
   issues:

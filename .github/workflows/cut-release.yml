@@ -30,7 +30,7 @@ name: Cut Release
 #
 # Token: mints a poke-memory-bot App installation token (same as
 # auto-release.yml) so the opened PR and its CI behave like the bot-opened batch
-# promotion PR (and so auto-review.yml's `head.ref == 'qa'` skip still applies).
+# promotion PR.
 #
 # This does NOT merge anything. The maintainer's QA of the qa preview is the gate
 # between batch work and production (mirrors the /batch-issues "never merge the

@@ -40,7 +40,7 @@ name: QA Issue Label
 # board; this workflow only touches the `status:in-qa` label.
 #
 # Fork guard: fork PRs are excluded (`head.repo.fork == false`, matching
-# auto-review.yml). Fork PRs run with a read-only token and cannot edit
+# coverage.yml). Fork PRs run with a read-only token and cannot edit
 # issue labels; the `== false` form keeps a null fork value gated out.
 #
 # Idempotency: `gh label create ... || true` is a no-op once the label

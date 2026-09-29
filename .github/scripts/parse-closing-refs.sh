@@ -8,7 +8,7 @@
 # Why a standalone script: this parser is the bit that broke (#1763) and it is
 # fiddly enough to deserve a forcing-function test. The matching shell test
 # (`parse-closing-refs.test.sh`, run directly: `bash <file>`) pins the
-# behaviour, mirroring the `extract-linked-issues.sh` + `.test.sh` pair.
+# behaviour.
 #
 # Input is a single newline-joined string on stdin (PR body, then a blank line,
 # then every commit headline/body). Numbers are printed to stdout.
