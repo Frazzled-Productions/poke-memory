@@ -27,7 +27,7 @@ on:
         #     or `reps = 0` despite ≥3 grade_log entries in the last 48h
         #     (the #584 "row stuck stale" shape).
         #   * Option C - a graduated subject (a grade_log row with
-        #     learning_step IS NULL AND grade >= 4, #2096) with no
+        #     learning_step IS NULL, #2096) with no
         #     card_reviews row at all, REGARDLESS of the 2-day grace
         #     (#1357). Catches fresh graduated orphans that Option A's
         #     grace window misses.
@@ -123,9 +123,17 @@ jobs:
         #     QUOTES the marker (a retro, a review, this workflow's own issue
         #     threads) would be taken over and have its body overwritten, as
         #     happened to #1997 in auto-release.yml's drift check.
-        # The list call is a plain assignment with no `|| true` and no
-        # `2>/dev/null`, so a gh failure fails the step under `set -e` rather
-        # than reading as "no existing issue" and opening a duplicate.
+        # The matching lives in .github/scripts/find-marker-issue.mjs (tested by
+        # scripts/find-marker-issue.test.mjs). Every lookup command is a plain
+        # assignment with no `|| true` and no `2>/dev/null`, so a gh or parse
+        # failure fails the step under `set -e` rather than reading as "no
+        # existing issue" and opening a duplicate. Hitting the list limit fails
+        # the step too: the tracking issue could be beyond it.
+        #
+        # The body is OVERWRITTEN on every alerting run (`gh issue edit
+        # --body-file`), so human notes belong in comments. Removing the
+        # `monitoring` label from the tracking issue takes it out of the lookup
+        # and the next alert opens a new issue.
         #
         # No auto-close when the check goes back to OK: Option A and C only look
         # back 4 days (#1230), so a real break the user never touches again
@@ -144,15 +152,12 @@ jobs:
           # the step instead of being swallowed inside the `if` test.
           OPEN_COUNT=$(jq 'length' <<<"$OPEN_ISSUES")
           if [ "$OPEN_COUNT" -ge "$LIMIT" ]; then
-            echo "::warning::gh issue list hit the ${LIMIT}-issue limit; an existing tracking issue beyond it would be missed."
+            echo "::error::gh issue list returned ${OPEN_COUNT} open monitoring issues (limit ${LIMIT}); the tracking issue could be beyond the limit, so the lookup cannot be trusted. Close stale monitoring issues or raise LIMIT."
+            exit 1
           fi
 
-          # Oldest matching issue wins, so the original thread keeps the history.
-          EXISTING=$(jq -r --arg marker "$MARKER" '
-            [ .[]
-              | select(((.body // "") | split("\n") | .[0] | rtrimstr("\r")) == $marker)
-              | .number ]
-            | sort | .[0] // empty' <<<"$OPEN_ISSUES")
+          # Marker must be the whole first line; the oldest match wins.
+          EXISTING=$(node .github/scripts/find-marker-issue.mjs "$MARKER" <<<"$OPEN_ISSUES")
 
           { printf '%s\n\n' "$MARKER"; cat /tmp/divergence-body.md; } > /tmp/divergence-body-marked.md
 

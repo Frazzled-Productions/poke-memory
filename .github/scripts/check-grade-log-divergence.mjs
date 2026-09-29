@@ -49,14 +49,16 @@
 // Options A and C only count a subject that has actually GRADUATED out of
 // its learning steps, because `isSyncSafe()` (`lib/sync/cloud.ts`) withholds
 // the card_reviews upsert until then. The signal is a grade_log row with
-// `learning_step IS NULL AND grade >= 4`:
+// `learning_step IS NULL`:
 //
 //   * `grade_log.learning_step` records the scheduler's step AFTER the grade
 //     (#1416: ReviewSession passes the post-grade `nextState.learningStep`),
-//     so NULL means the grade left the card graduated.
-//   * `grade >= 4` guards pre-#1416 rows, where NULL only means "not
-//     recorded". The look-back windows here are entirely post-#1416, so the
-//     guard is belt and braces.
+//     so NULL means the grade left the card graduated, whatever the grade.
+//     A Hard on a graduated card stays graduated (scheduler case A4), so a
+//     grade filter such as `grade >= 4` would hide real orphans.
+//   * Assumption: every row in the look-back windows was written after #1416.
+//     On older rows NULL only means "not recorded", so this signal must not
+//     be used on a window that reaches back before #1416 (migration 033).
 //
 // Any such row in the window counts, not only the latest one. Once a card
 // has graduated its `lastReview` is set, so `isSyncSafe()` stays true even if
@@ -265,7 +267,7 @@ const OPTION_C_LOWER_BOUND_DAYS_AGO = OPTION_A_LOWER_BOUND_DAYS_AGO;
 // window. A subject graded today and again 3 days ago should not flag,
 // because the recent grade means the card is still in-step.
 //
-// The `BOOL_OR(learning_step IS NULL AND grade >= 4)` clause is the
+// The `BOOL_OR(learning_step IS NULL)` clause is the
 // graduation signal (#2096, replacing #1253's `MAX(grade) >= 4` proxy; see
 // "Graduation signal" in the header). A subject that never graduated keeps
 // `lastReview = null`, so `isSyncSafe()` blocks the per-grade upsert by
@@ -288,7 +290,7 @@ WITH gl_distinct AS (
   WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_A_LOWER_BOUND_DAYS_AGO} days')::date
   GROUP BY user_id, card_type, subject_key, locale
   HAVING MAX(entry_date) <= (CURRENT_DATE - INTERVAL '${OPTION_A_UPPER_BOUND_DAYS_AGO} days')::date
-     AND BOOL_OR(learning_step IS NULL AND grade >= 4)
+     AND BOOL_OR(learning_step IS NULL)
 )
 SELECT
   g.user_id::text AS user_id,
@@ -377,7 +379,7 @@ ORDER BY stuck_subjects DESC;
 // card.
 //
 // "Graduated" is the real graduation signal from the header (#2096): a
-// grade_log row with `learning_step IS NULL AND grade >= 4`. This arm used
+// grade_log row with `learning_step IS NULL`. This arm used
 // to approximate it with `MAX(grade) >= 4`, which also matched a Good on a
 // brand-new card (scheduler case A1 only enters step 0) or at an
 // intermediate step, so in-step cards the user never came back to were
@@ -408,7 +410,7 @@ WITH gl_graduated AS (
   FROM grade_log
   WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_C_LOWER_BOUND_DAYS_AGO} days')::date
   GROUP BY user_id, card_type, subject_key, locale
-  HAVING BOOL_OR(learning_step IS NULL AND grade >= 4)
+  HAVING BOOL_OR(learning_step IS NULL)
 )
 SELECT
   g.user_id::text AS user_id,
@@ -466,7 +468,7 @@ function formatOptionASection(rows) {
   lines.push("user's sync state is silently drifting. Investigate immediately.");
   lines.push("");
   lines.push("Only subjects that actually graduated count (a grade_log row with");
-  lines.push("`learning_step IS NULL AND grade >= 4`, #2096); cards still in their");
+  lines.push("`learning_step IS NULL`, #2096); cards still in their");
   lines.push("learning steps are excluded whatever their grades.");
   lines.push("");
   lines.push("The 2-day offset is the in-step grace period introduced in #1221:");
@@ -530,7 +532,7 @@ function formatOptionCSection(rows) {
   lines.push("### Option C — graduated subject with no `card_reviews` row (no grace)");
   lines.push("");
   lines.push(
-    `**${rows.length} user(s)** have a subject whose grade_log shows it graduated (a row with \`learning_step IS NULL AND grade >= 4\`) within the last ${OPTION_C_LOWER_BOUND_DAYS_AGO} days but **no matching \`card_reviews\` row at all**, regardless of how recent the grade is.`,
+    `**${rows.length} user(s)** have a subject whose grade_log shows it graduated (a row with \`learning_step IS NULL\`) within the last ${OPTION_C_LOWER_BOUND_DAYS_AGO} days but **no matching \`card_reviews\` row at all**, regardless of how recent the grade is.`,
   );
   lines.push("");
   lines.push("This is the blind spot Option A cannot see (#1357, from the #1344");
@@ -717,10 +719,19 @@ async function main() {
 
 // Run only when executed directly (`node check-grade-log-divergence.mjs`), so
 // the integration test can import the query constants without calling the
-// Management API (#2096).
-const invokedDirectly =
-  process.argv[1] !== undefined &&
-  realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+// Management API (#2096). A realpath failure (for example an argv[1] that is
+// not a file) means "not invoked directly", never a crash on import.
+function isInvokedDirectly() {
+  try {
+    return (
+      process.argv[1] !== undefined &&
+      realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+}
+const invokedDirectly = isInvokedDirectly();
 
 if (invokedDirectly) {
   main().catch((err) => {

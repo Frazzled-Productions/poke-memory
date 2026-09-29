@@ -12,8 +12,10 @@
  * (scheduler case A1), so cards still inside their learning steps, which
  * `isSyncSafe()` deliberately keeps out of card_reviews, were flagged as
  * orphans. The graduation signal is now a grade_log row with
- * `learning_step IS NULL AND grade >= 4` (`learning_step` is the step AFTER
- * the grade, #1416).
+ * `learning_step IS NULL` (`learning_step` is the step AFTER the grade,
+ * #1416), whatever the grade: a Hard on a graduated card stays graduated
+ * (scheduler case A4). This assumes every row in the look-back window was
+ * written after #1416; on older rows NULL only means "not recorded".
  *
  * Dates are written as `CURRENT_DATE - n` in SQL rather than computed in JS,
  * so they share the query's own notion of "today" whatever the host timezone.
@@ -194,14 +196,47 @@ describe("grade_log divergence monitor: Option C (graduated orphan, no grace)", 
     expect(await optionC()).toBe(1);
   });
 
-  it("does NOT treat a NULL step on an Again/Hard grade as graduation (pre-#1416 guard)", async () => {
+  it("flags a graduated card reviewed Hard (2@null, case A4) with no card_reviews row", async () => {
+    // A Hard on a graduated card keeps it graduated, so the NULL step is a real
+    // graduation signal whatever the grade. A `grade >= 4` filter would hide it.
     await insertGrades({ grades: [{ grade: 2, step: null }], daysAgo: 0 });
-    expect(await optionC()).toBe(0);
+    expect(await optionC()).toBe(1);
   });
 
   it("joins on locale: a row in another locale does not mask the orphan", async () => {
     await insertGrades({ grades: [{ grade: 4, step: null }], daysAgo: 0, locale: "ja" });
     await insertCardReview({ locale: "en" });
+    expect(await optionC()).toBe(1);
+  });
+
+  it("flags a graduated evolution card with no card_reviews row", async () => {
+    await insertGrades({
+      grades: [{ grade: 4, step: null }],
+      daysAgo: 0,
+      cardType: "evolution",
+      subjectKey: "1>>>2",
+    });
+    expect(await optionC()).toBe(1);
+  });
+
+  it("normalises reverse-evolution card_type to the card_reviews vocabulary (#970)", async () => {
+    await insertGrades({
+      grades: [{ grade: 4, step: null }],
+      daysAgo: 0,
+      cardType: "reverse-evolution",
+      subjectKey: "1>>>2",
+    });
+    await insertCardReview({ cardType: "reverse-evolution-edge", subjectKey: "1>>>2" });
+    expect(await optionC()).toBe(0);
+  });
+
+  it("flags a graduated reverse-evolution card with no card_reviews row", async () => {
+    await insertGrades({
+      grades: [{ grade: 4, step: null }],
+      daysAgo: 0,
+      cardType: "reverse-evolution",
+      subjectKey: "1>>>2",
+    });
     expect(await optionC()).toBe(1);
   });
 
@@ -236,6 +271,11 @@ describe("grade_log divergence monitor: Option A (row never written, 2-day grace
 
   it("flags a card that graduated 3 days ago (4@null) with no card_reviews row", async () => {
     await insertGrades({ grades: [{ grade: 4, step: null }], daysAgo: 3 });
+    expect(await optionA()).toBe(1);
+  });
+
+  it("flags a graduated card reviewed Hard 3 days ago (2@null, case A4) with no card_reviews row", async () => {
+    await insertGrades({ grades: [{ grade: 2, step: null }], daysAgo: 3 });
     expect(await optionA()).toBe(1);
   });
 
