@@ -138,6 +138,10 @@ Sync paths to Supabase, in order of how data normally flows:
 - **Volume**: 100 reviews/day → at most 100 single-row upserts (often fewer after debounce coalescing). Well within Supabase free-tier limits.
 - Guest-mode guard runs on every `enqueueGrade` call, not just at mount, so mid-session sign-out is safe.
 
+### Paginated pulls need a stable sort (#2053)
+
+every paginated pull goes through `fetchAllPages` (`lib/sync/paginatedFetch.ts`) and MUST `.order()` before `.range()`. Offset pagination without a total order can skip a row when a concurrent UPDATE moves it between page requests, and a skipped `card_reviews` row is silently never merged (and `lastPullAt` then advances past it). `pullSession` orders by `card_type, subject_key, locale` (the PK minus `user_id`); `pullStreak` by `review_date` (the `UNIQUE (user_id, review_date)` constraint); `pullGradeLog` by `occurred_at`. `lib/sync/pagination-order.test.ts` fails if any `.range(` call under `lib/**` or `app/api/**` lacks an `.order(` earlier in its chain.
+
 ## Offline behaviour and online-reconnect catch-up
 
 When the device loses connectivity:
@@ -158,8 +162,6 @@ The `online` event listener is registered once at mount (empty deps, ref-based) 
 ## Background pull on visibility
 
 When a signed-in tab regains focus after being hidden ≥ 30 seconds, `useVisibilityPull` (mounted via `SyncOnVisible` in the root layout) silently calls `pullAndMerge`, which pulls all cloud rows and merges them into `localStorage`.
-
-**Stable sort for paginated pulls (#2053)**: every paginated pull goes through `fetchAllPages` (`lib/sync/paginatedFetch.ts`) and MUST `.order()` before `.range()`. Offset pagination without a total order can skip a row when a concurrent UPDATE moves it between page requests, and a skipped `card_reviews` row is silently never merged (and `lastPullAt` then advances past it). `pullSession` orders by `card_type, subject_key, locale` (the PK minus `user_id`); `pullStreak` by `review_date`; `pullGradeLog` by `occurred_at`. `lib/sync/pagination-order.test.ts` fails if a `lib/sync` source file calls `.range(` without `.order(`.
 
 **Blocked routes**: `["/"]` - the practice session is excluded to avoid interrupting an active review. The block is route-level; the session-complete screen (still at `/`) is also excluded, which is the accepted tradeoff for keeping the implementation simple.
 

@@ -6,8 +6,12 @@
  * `.range()` requests until a short page is returned, collecting all
  * rows across pages.
  *
- * Modelled after `pullSession` in `lib/sync/cloud.ts` (the canonical
- * existing paginator in this codebase).
+ * Used by `pullSession`, `pullStreak` and `pullGradeLog`.
+ *
+ * Callers MUST apply a deterministic `.order()` (a total order, ideally the
+ * unique key) before `.range()` inside `fetchPage`. Offset pagination without
+ * one can skip or duplicate rows when a concurrent write moves them between
+ * page requests (#2053). `lib/sync/pagination-order.test.ts` enforces this.
  *
  * @param fetchPage  Callback that receives `(from, to)` inclusive row
  *                   indices and returns a PostgREST-style `{ data, error }`.
