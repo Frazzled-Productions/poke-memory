@@ -2,8 +2,8 @@
  * Tests for POST /api/push/send-streak-nudge (#1950).
  *
  * Mirrors app/api/push/send-daily/route.test.tsx's structure: auth/config
- * gates, the RPC-based read surface (get_push_targets / get_push_streak_days
- * / get_push_reviewed_today, migrations 046/047), the late-hour fan-out, the
+ * gates, the RPC-based read surface (get_push_targets / get_push_streak_days,
+ * migrations 046/047), the late-hour fan-out, the
  * collision guard against the primary reminder, the opt-in gate, the
  * reviewed-today drop, and the genuinely-at-risk streak filter (including the
  * honesty case where a protection token would auto-bridge the gap).
@@ -25,12 +25,9 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(),
 }));
 
-// Pin the timezone helper so tests are deterministic regardless of system
-// clock, same approach as send-daily's test.
-vi.mock("@/lib/utils/format-date", () => ({
-  todayInTimezone: () => "2026-05-20",
-  isoDate: (d: Date) => d.toISOString().slice(0, 10),
-}));
+// `todayInTimezone` is deliberately NOT mocked (#2073): the timezone tests
+// below depend on the real local-day maths. Determinism comes from
+// `vi.setSystemTime` in beforeEach.
 
 import { POST, buildStreakNudgeMessage, STREAK_NUDGE_LOCAL_HOUR } from "./route";
 import webpush from "web-push";
@@ -63,25 +60,21 @@ type TargetRow = {
 };
 
 type StreakDayRow = { user_id: string; review_date: string };
-type ReviewedTodayRow = { user_id: string };
 
 /**
- * Builds a Supabase admin-client mock covering the three RPCs the route
- * calls (get_push_targets, get_push_reviewed_today, get_push_streak_days)
+ * Builds a Supabase admin-client mock covering the two RPCs the route
+ * calls (get_push_targets, get_push_streak_days)
  * plus the dead-endpoint DELETE.
  */
 function buildAdminMock(opts: {
   targets?: TargetRow[];
   targetsError?: unknown;
-  reviewedToday?: ReviewedTodayRow[];
-  reviewedTodayError?: unknown;
   streakDays?: StreakDayRow[];
   streakDaysError?: unknown;
   deleteError?: unknown;
   deleteCount?: number;
 }) {
   const targets = opts.targets ?? [];
-  const reviewedToday = opts.reviewedToday ?? [];
   const streakDays = opts.streakDays ?? [];
   const deleteCount = opts.deleteCount ?? 0;
   const deleteCalls: Array<{ ids: unknown[] }> = [];
@@ -94,10 +87,8 @@ function buildAdminMock(opts: {
       });
     }
     if (fn === "get_push_reviewed_today") {
-      return Promise.resolve({
-        data: opts.reviewedTodayError ? null : reviewedToday,
-        error: opts.reviewedTodayError ?? null,
-      });
+      // Gate D no longer uses this RPC (#2073); any call is a regression.
+      throw new Error("get_push_reviewed_today must not be called (#2073)");
     }
     if (fn === "get_push_streak_days") {
       return Promise.resolve({
@@ -230,7 +221,6 @@ describe("POST /api/push/send-streak-nudge - happy path", () => {
   it("sends a nudge to an opted-in user with an active, genuinely-at-risk streak", async () => {
     const admin = buildAdminMock({
       targets: [optedInTarget()],
-      reviewedToday: [],
       streakDays: [
         { user_id: "user-a", review_date: "2026-05-18" },
         { user_id: "user-a", review_date: "2026-05-19" },
@@ -245,10 +235,6 @@ describe("POST /api/push/send-streak-nudge - happy path", () => {
     expect(body.sent).toBe(1);
     expect(mockSendNotification).toHaveBeenCalledTimes(1);
     expect(admin.client.rpc).toHaveBeenCalledWith("get_push_targets");
-    expect(admin.client.rpc).toHaveBeenCalledWith("get_push_reviewed_today", {
-      user_ids: ["user-a"],
-      today_input: "2026-05-20",
-    });
     expect(admin.client.rpc).toHaveBeenCalledWith("get_push_streak_days", {
       user_ids: ["user-a"],
     });
@@ -337,14 +323,13 @@ describe("POST /api/push/send-streak-nudge - collision guard", () => {
 
 // ─── Gate D: reviewed-today ─────────────────────────────────────────────────
 
-describe("POST /api/push/send-streak-nudge - reviewed-today gate", () => {
-  it("skips a user who has already reviewed today", async () => {
+describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #2073)", () => {
+  it("skips a user whose local today is already in streak_days", async () => {
     const admin = buildAdminMock({
       targets: [optedInTarget()],
-      reviewedToday: [{ user_id: "user-a" }],
       streakDays: [
-        { user_id: "user-a", review_date: "2026-05-18" },
         { user_id: "user-a", review_date: "2026-05-19" },
+        { user_id: "user-a", review_date: "2026-05-20" },
       ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
@@ -352,24 +337,97 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate", () => {
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(0);
     expect(mockSendNotification).not.toHaveBeenCalled();
-    // The streak-days RPC should never be called - reviewed-today users are
-    // dropped before the (more expensive) streak query.
-    expect(admin.client.rpc).not.toHaveBeenCalledWith(
-      "get_push_streak_days",
-      expect.anything(),
-    );
   });
 
-  it("returns 502 when get_push_reviewed_today errors", async () => {
+  it("learning-steps-only practice: today's streak day recorded suppresses the nudge with no card_reviews involvement", async () => {
+    // No graduation means no card_reviews.last_review = today; the streak day
+    // alone must be enough.
     const admin = buildAdminMock({
       targets: [optedInTarget()],
-      reviewedTodayError: { message: "boom" },
+      streakDays: [
+        { user_id: "user-a", review_date: "2026-05-18" },
+        { user_id: "user-a", review_date: "2026-05-19" },
+        { user_id: "user-a", review_date: "2026-05-20" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    await POST(makeRequest());
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it("west of UTC: nudges a Los Angeles user whose last streak day was yesterday-local, even though that review fell on today's UTC date", async () => {
+    // 20:00 local PDT on 16 Sep = 03:00 UTC on 17 Sep. Last practice 18:30
+    // local on 15 Sep (01:30 UTC on 16 Sep): streak day is 2026-09-15.
+    vi.setSystemTime(new Date("2026-09-17T03:00:00Z"));
+    const admin = buildAdminMock({
+      targets: [optedInTarget({ timezone: "America/Los_Angeles" })],
+      streakDays: [
+        { user_id: "user-a", review_date: "2026-09-14" },
+        { user_id: "user-a", review_date: "2026-09-15" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+    const res = await POST(makeRequest());
+    const body = (await res.json()) as { sent: number };
+    expect(body.sent).toBe(1);
+  });
+
+  it("west of UTC: a Los Angeles user who kept today-local (streak day 16 Sep) is not nudged", async () => {
+    vi.setSystemTime(new Date("2026-09-17T03:00:00Z"));
+    const admin = buildAdminMock({
+      targets: [optedInTarget({ timezone: "America/Los_Angeles" })],
+      streakDays: [
+        { user_id: "user-a", review_date: "2026-09-15" },
+        { user_id: "user-a", review_date: "2026-09-16" },
+      ],
     });
     mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
     const res = await POST(makeRequest());
-    expect(res.status).toBe(502);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe("reviewed_today_query_failed");
+    const body = (await res.json()) as { sent: number };
+    expect(body.sent).toBe(0);
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it("east of UTC: a Tokyo user who practised this morning-local (streak day 16 Sep, review on 15 Sep UTC) is not nudged", async () => {
+    // 20:00 JST on 16 Sep = 11:00 UTC on 16 Sep. Morning review at 07:30 JST
+    // was 22:30 UTC on 15 Sep, so last_review would be 2026-09-15 (UTC).
+    vi.setSystemTime(new Date("2026-09-16T11:00:00Z"));
+    const admin = buildAdminMock({
+      targets: [optedInTarget({ timezone: "Asia/Tokyo" })],
+      streakDays: [
+        { user_id: "user-a", review_date: "2026-09-15" },
+        { user_id: "user-a", review_date: "2026-09-16" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    const res = await POST(makeRequest());
+    const body = (await res.json()) as { sent: number };
+    expect(body.sent).toBe(0);
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it("east of UTC: a Tokyo user who has not practised today-local is nudged", async () => {
+    vi.setSystemTime(new Date("2026-09-16T11:00:00Z"));
+    const admin = buildAdminMock({
+      targets: [optedInTarget({ timezone: "Asia/Tokyo" })],
+      streakDays: [
+        { user_id: "user-a", review_date: "2026-09-14" },
+        { user_id: "user-a", review_date: "2026-09-15" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+    const res = await POST(makeRequest());
+    const body = (await res.json()) as { sent: number };
+    expect(body.sent).toBe(1);
+  });
+
+  it("never calls get_push_reviewed_today (the UTC last_review RPC)", async () => {
+    const admin = buildAdminMock({ targets: [optedInTarget()] });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    await POST(makeRequest());
+    expect(admin.client.rpc).not.toHaveBeenCalledWith("get_push_reviewed_today", expect.anything());
   });
 });
 

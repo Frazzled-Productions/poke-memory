@@ -138,11 +138,6 @@ type StreakDayRow = {
   review_date: string;
 };
 
-/** Row shape returned by `get_push_reviewed_today` (migration 047). */
-type ReviewedTodayRow = {
-  user_id: string;
-};
-
 /**
  * Parse the `streakNudgeEnabled` opt-in flag from the raw settings JSONB.
  * Default false: absent/malformed values never enable the nudge (matches
@@ -271,48 +266,16 @@ export async function POST(request: Request) {
 
   const activeUserIds = Array.from(new Set(filteredSubscriptions.map((s) => s.user_id)));
 
-  // Gate D: reviewed-today. Bucket by "today in the user's own timezone" so
-  // each distinct calendar date is queried at most once, same pattern as
-  // send-daily's usersByDueDate bucketing.
-  const usersByToday = new Map<string, string[]>();
-  for (const userId of activeUserIds) {
-    const tz = timezoneByUser.get(userId) ?? "UTC";
-    const today = todayInTimezone(tz, now);
-    const bucket = usersByToday.get(today);
-    if (bucket) bucket.push(userId);
-    else usersByToday.set(today, [userId]);
-  }
-
-  const reviewedTodaySet = new Set<string>();
-  const todayByUser = new Map<string, string>();
-  for (const [today, userIds] of usersByToday) {
-    for (const userId of userIds) todayByUser.set(userId, today);
-
-    const { data: reviewedData, error: reviewedError } = await admin.rpc(
-      "get_push_reviewed_today",
-      { user_ids: userIds, today_input: today },
-    );
-    if (reviewedError || reviewedData === null) {
-      return NextResponse.json(
-        { ok: false, error: "reviewed_today_query_failed" },
-        { status: 502 },
-      );
-    }
-    for (const row of reviewedData as ReviewedTodayRow[]) {
-      reviewedTodaySet.add(row.user_id);
-    }
-  }
-
-  const notReviewedUserIds = activeUserIds.filter((id) => !reviewedTodaySet.has(id));
-  if (notReviewedUserIds.length === 0) {
-    return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
-  }
-
-  // Gate E: genuinely-at-risk streak. Fetch every streak_days row for the
-  // remaining candidates in one call and group by user.
+  // Gate D: reviewed-today, derived from `streak_days`, NOT `card_reviews.last_review`
+  // (#2073). `last_review` is a UTC scheduling date set only on graduation or
+  // lapse, so comparing it with the user's local date is wrong for anyone off
+  // UTC and blind to learning-step practice. `streak_days.review_date` is
+  // written in the user's own local day (`recordReview(localToday, ...)`), the
+  // same calendar as `todayInTimezone(tz)` below, so membership is exact.
+  // Fetch every streak_days row for the candidates in one call and group by user.
   const { data: streakDaysData, error: streakDaysError } = await admin.rpc(
     "get_push_streak_days",
-    { user_ids: notReviewedUserIds },
+    { user_ids: activeUserIds },
   );
   if (streakDaysError || streakDaysData === null) {
     return NextResponse.json(
@@ -328,17 +291,20 @@ export async function POST(request: Request) {
     else streakDaysByUser.set(row.user_id, [row.review_date]);
   }
 
+  // Gate E: genuinely-at-risk streak, evaluated per user against their own
+  // local "today".
   const eligibleUserIds = new Set<string>();
   const streakLengthByUser = new Map<string, number>();
-  for (const userId of notReviewedUserIds) {
+  for (const userId of activeUserIds) {
     const streakDays = streakDaysByUser.get(userId) ?? [];
     const streakProtection = streakProtectionByUser.get(userId) ?? validateStreakProtection(null);
-    const today = todayByUser.get(userId) ?? todayInTimezone("UTC", now);
+    const today = todayInTimezone(timezoneByUser.get(userId) ?? "UTC", now);
+    const reviewedToday = streakDays.includes(today);
 
     const eligible = isEligibleForStreakNudge({
       streakDays,
       streakProtection,
-      reviewedToday: false,
+      reviewedToday,
       today,
     });
     if (eligible) {
