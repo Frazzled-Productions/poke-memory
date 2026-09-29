@@ -324,21 +324,29 @@ describe("pushGradeLogDetailed (#2117)", () => {
     expect(await pushGradeLogDetailed(clientResolving({ error: null }), "u", [])).toBe("ok");
   });
 
-  it("rejected for a Postgres SQLSTATE error response", async () => {
-    const c = clientResolving({ error: { code: "23514", message: "check" }, status: 400 });
+  it.each([
+    ["23514", 400],
+    ["23502", 400],
+    ["22P02", 400],
+  ])("rejected for data/integrity SQLSTATE %s", async (code, status) => {
+    const c = clientResolving({ error: { code, message: "x" }, status });
     expect(await pushGradeLogDetailed(c, "u", entries)).toBe("rejected");
   });
 
-  it("rejected for a 4xx status without a code", async () => {
-    const c = clientResolving({ error: { code: "", message: "bad" }, status: 422 });
-    expect(await pushGradeLogDetailed(c, "u", entries)).toBe("rejected");
-  });
-
-  it("failed for a network-style error (no code, status 0), 5xx, 408 and 429", async () => {
-    for (const status of [0, 500, 408, 429]) {
-      const c = clientResolving({ error: { code: "", message: "Failed to fetch" }, status });
-      expect(await pushGradeLogDetailed(c, "u", entries)).toBe("failed");
-    }
+  it.each([
+    ["42501", 403],
+    ["PGRST301", 401],
+    ["PGRST204", 400],
+    ["57014", 500],
+    ["40001", 409],
+    ["08006", 500],
+    ["", 0],
+    ["", 422],
+    ["", 500],
+    ["", 429],
+  ])("failed (not a row rejection) for code %j status %d", async (code, status) => {
+    const c = clientResolving({ error: { code, message: "x" }, status });
+    expect(await pushGradeLogDetailed(c, "u", entries)).toBe("failed");
   });
 
   it("failed when the client throws; pushGradeLog stays boolean", async () => {

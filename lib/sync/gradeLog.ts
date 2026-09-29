@@ -96,14 +96,18 @@ export function isGradeLogEntry(value: unknown): value is GradeLogEntry {
 }
 
 /**
- * Outcome of a grade-log upsert, distinguishing a server REJECTION (an error
- * response the server produced about the rows: a Postgres SQLSTATE code or a
- * 4xx status other than 408/429) from any other failure (thrown error, network
- * failure, timeout, 5xx, rate limit), which says nothing about the rows.
+ * Outcome of a grade-log upsert, distinguishing a server REJECTION of the rows
+ * themselves from any other failure. "rejected" is an ALLOWLIST: only a
+ * Postgres SQLSTATE in class 22 (data exception, e.g. 22P02) or class 23
+ * (integrity constraint violation: the pre-reset trigger raises 23514, NOT NULL
+ * is 23502). Everything else is "failed" and says nothing about the rows:
+ * thrown errors, network, timeouts, 4xx/5xx statuses, auth expiry (PGRST301),
+ * RLS denial (42501), request/schema errors (PGRST*), and transient DB states
+ * (class 40/53/57/08).
  */
 export type GradeLogPushResult = "ok" | "rejected" | "failed";
 
-const SQLSTATE = /^[0-9A-Z]{5}$/;
+const ROW_REJECTION_SQLSTATE = /^2[23][0-9A-Z]{3}$/;
 
 export async function pushGradeLogDetailed(
   client: SupabaseClient,
@@ -115,7 +119,7 @@ export async function pushGradeLogDetailed(
   if (entries.length === 0) return "ok";
   try {
     const rows = entries.map((e) => toGradeLogDbRow(userId, e));
-    const { error, status } = await client
+    const { error } = await client
       .from("grade_log")
       .upsert(rows, {
         onConflict: GRADE_LOG_CONFLICT_COLS,
@@ -123,9 +127,7 @@ export async function pushGradeLogDetailed(
       });
     if (!error) return "ok";
     const code = typeof error.code === "string" ? error.code : "";
-    const clientRejection =
-      typeof status === "number" && status >= 400 && status < 500 && status !== 408 && status !== 429;
-    return SQLSTATE.test(code) || clientRejection ? "rejected" : "failed";
+    return ROW_REJECTION_SQLSTATE.test(code) ? "rejected" : "failed";
   } catch {
     return "failed";
   }
