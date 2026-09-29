@@ -3,7 +3,7 @@ import { pullAndMerge, SYNC_PULL_APPLIED_EVENT } from "./pullAndMerge";
 import { pullSession, mergeCloudIntoLocalSilent } from "@/lib/sync/cloud";
 import { pullUserSettingsRow, pushSettings, pullRegionalPrefs } from "@/lib/sync/settings";
 import { pullStreak } from "@/lib/sync/streak";
-import { pullGradeLog } from "@/lib/sync/gradeLog";
+import { pullGradeLog, pushGradeLogDetailed } from "@/lib/sync/gradeLog";
 import { saveSession, loadSession } from "@/lib/review/persistence";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { buildSession } from "@/lib/review/session";
@@ -103,12 +103,14 @@ vi.mock("@/lib/sync/gradeLog", async () => {
   return {
     ...actual,
     pullGradeLog: vi.fn().mockResolvedValue(null),
+    pushGradeLogDetailed: vi.fn().mockResolvedValue("ok"),
   };
 });
 
 vi.mock("@/lib/gradelog/persistence", () => ({
   loadGradeLog: vi.fn(async () => []),
   saveGradeLog: vi.fn(async () => {}),
+  isCloudPushHeld: vi.fn(() => false),
 }));
 
 const mockPullSession = vi.mocked(pullSession);
@@ -118,6 +120,7 @@ const mockPullRegionalPrefs = vi.mocked(pullRegionalPrefs);
 const mockClearLocalProgress = vi.mocked(clearLocalProgress);
 const mockPullStreak = vi.mocked(pullStreak);
 const mockPullGradeLog = vi.mocked(pullGradeLog);
+const mockPushGradeLog = vi.mocked(pushGradeLogDetailed);
 const mockLoadGradeLog = vi.mocked(loadGradeLog);
 const mockSaveGradeLog = vi.mocked(saveGradeLog);
 const mockMerge = vi.mocked(mergeCloudIntoLocalSilent);
@@ -491,6 +494,102 @@ describe("pullAndMerge", () => {
     await pullAndMerge(fakeClient, fakeUserId);
 
     expect(mockSaveGradeLog).not.toHaveBeenCalled();
+  });
+
+  // ─── grade_log re-push (#2117) ─────────────────────────────────────────────
+
+  const oldValid = (occurredAt: number, date = "2026-05-12") => ({
+    occurredAt,
+    date,
+    cardType: "name" as const,
+    grade: 4 as const,
+    subjectKey: "25",
+  });
+
+  it("pushes a local-only grade-log entry after a successful pull", async () => {
+    mockLoadGradeLog.mockResolvedValue([oldValid(1_000_000), oldValid(2_000_000)]);
+    mockPullGradeLog.mockResolvedValue([oldValid(1_000_000)]);
+
+    const result = await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(result).toBe("ok");
+    expect(mockPushGradeLog).toHaveBeenCalledOnce();
+    expect(mockPushGradeLog).toHaveBeenCalledWith(fakeClient, fakeUserId, [oldValid(2_000_000)]);
+    // Pull-before-push: the pull was issued before the push.
+    expect(mockPullGradeLog.mock.invocationCallOrder[0]).toBeLessThan(
+      mockPushGradeLog.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("pushes nothing when the grade-log pull fails (null)", async () => {
+    mockLoadGradeLog.mockResolvedValue([oldValid(2_000_000)]);
+    mockPullGradeLog.mockResolvedValue(null);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockPushGradeLog).not.toHaveBeenCalled();
+  });
+
+  it("pushes nothing when the grade-log pull throws", async () => {
+    mockLoadGradeLog.mockResolvedValue([oldValid(2_000_000)]);
+    mockPullGradeLog.mockRejectedValue(new Error("boom"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(await pullAndMerge(fakeClient, fakeUserId)).toBe("ok");
+
+    expect(mockPushGradeLog).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("pushes nothing when local has no entries the cloud lacks", async () => {
+    mockLoadGradeLog.mockResolvedValue([oldValid(1_000_000)]);
+    mockPullGradeLog.mockResolvedValue([oldValid(1_000_000)]);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockPushGradeLog).not.toHaveBeenCalled();
+  });
+
+  it("skips the re-push under the superuser write-guard but still pulls", async () => {
+    mockLoadGradeLog.mockResolvedValue([oldValid(2_000_000)]);
+    mockPullGradeLog.mockResolvedValue([]);
+
+    await pullAndMerge(fakeClient, fakeUserId, true);
+
+    expect(mockPullGradeLog).toHaveBeenCalledOnce();
+    expect(mockPushGradeLog).not.toHaveBeenCalled();
+  });
+
+  it("does not push for guests (no client)", async () => {
+    await pullAndMerge(null, null);
+    expect(mockPushGradeLog).not.toHaveBeenCalled();
+  });
+
+  it("filters entries dated before the cloud last_reset_at", async () => {
+    mockPullUserSettingsRow.mockResolvedValue({
+      settings: null,
+      updatedAt: null,
+      lastResetAt: "2026-05-13T10:00:00.000Z",
+    });
+    mockLoadSyncStatus.mockReturnValue({ ...baseSyncStatus, lastSeenResetAt: "2026-05-13T10:00:00.000Z" });
+    mockLoadGradeLog.mockResolvedValue([oldValid(1_000_000, "2026-05-12"), oldValid(2_000_000, "2026-05-13")]);
+    mockPullGradeLog.mockResolvedValue([]);
+
+    await pullAndMerge(fakeClient, fakeUserId);
+
+    expect(mockPushGradeLog).toHaveBeenCalledWith(fakeClient, fakeUserId, [oldValid(2_000_000, "2026-05-13")]);
+  });
+
+  it("a failing re-push never flips the sync result into error", async () => {
+    mockLoadGradeLog.mockResolvedValue([oldValid(2_000_000)]);
+    mockPullGradeLog.mockResolvedValue([]);
+    mockPushGradeLog.mockResolvedValue("failed");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(await pullAndMerge(fakeClient, fakeUserId)).toBe("ok");
+
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   // ─── regional prefs pull (timezone / dateFormat / pushNotificationHour) ────

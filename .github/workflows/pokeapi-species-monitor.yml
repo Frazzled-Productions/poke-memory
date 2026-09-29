@@ -92,19 +92,36 @@ jobs:
           # --- Open or update the tracking issue in place -------------------
           MARKER="<!-- pokeapi-species-monitor -->"
 
-          # Marker-based dedup. The GitHub search index strips HTML comments
-          # (WORKFLOW.md), so we do NOT use `--search`: that pre-filter is
-          # unreliable for marker text (it broke cron-health-monitor.yml
-          # outright, #1919, and only worked here by accident of this marker
-          # being colon-free). Instead pull the full open-issue list (capped
-          # at 100) and match the marker locally with jq, which is reliable.
-          # No `2>/dev/null` either: a gh failure must surface via
-          # `set -euo pipefail` rather than look like "no existing issue" and
-          # open a duplicate on every run.
-          EXISTING=$(gh issue list --repo "$REPO" --state open \
-            --json number,body --limit 100 \
-            | jq -r --arg marker "$MARKER" \
-            '[.[] | select(.body | contains($marker))] | .[0].number // empty')
+          # Marker-based dedup via the shared helper (#2081). The marker must be
+          # the WHOLE first line of the body, which is where the printf below
+          # writes it. Two lookups are ruled out (and `npm run lint` fails on
+          # both, scripts/lint-workflow-marker-lookups.mjs):
+          #   * `--search "... in:body"`: GitHub's search index drops HTML
+          #     comments, so it is unreliable for marker text (it broke
+          #     cron-health-monitor.yml outright, #1919).
+          #   * an unanchored jq `contains($marker)`: any open issue that merely
+          #     QUOTES the marker (a retro, a review) would be taken over and
+          #     have its body overwritten, as happened to #1997.
+          # Every lookup command is a plain assignment with no `|| true` and no
+          # `2>/dev/null`, so a gh, jq or parse failure fails the step under
+          # `set -euo pipefail` instead of reading as "no existing issue" and
+          # opening a duplicate. Hitting the list limit fails the step too: the
+          # tracking issue could be beyond it. The list is unfiltered (a human
+          # may relabel the issue), hence the generous limit.
+          LIMIT=500
+          OPEN_ISSUES=$(gh issue list --repo "$REPO" --state open \
+            --limit "$LIMIT" --json number,body,author)
+          OPEN_COUNT=$(jq 'length' <<<"$OPEN_ISSUES")
+          if [ "$OPEN_COUNT" -ge "$LIMIT" ]; then
+            echo "::error::gh issue list returned ${OPEN_COUNT} open issues (limit ${LIMIT}); the tracking issue could be beyond the limit, so the lookup cannot be trusted. Raise LIMIT."
+            exit 1
+          fi
+          # Marker must be the whole first line; the oldest match wins.
+          # Author filter (#2081 review): the repo is public, so anyone could open
+          # an issue whose first line is exactly this marker; only issues opened by
+          # this step's own token (GITHUB_TOKEN, shown by gh as app/github-actions)
+          # count. Keep --author in step with GH_TOKEN if the token ever changes.
+          EXISTING=$(node .github/scripts/find-marker-issue.mjs "$MARKER" --author github-actions <<<"$OPEN_ISSUES")
 
           # Build the body with printf rather than a heredoc: a plain heredoc
           # inside a `run: |` block cannot have its closing delimiter at column

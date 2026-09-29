@@ -1,25 +1,33 @@
 name: Vercel Preview on Ready
 
-# Fires the Vercel Deploy Hook for a PR's HEAD SHA only when both gates pass:
-#   1. CI `test` check is `success` on that SHA.
-#   2. Latest `<!-- auto-review:N -->` PR comment carries
-#      `Verdict: Looks good to me` on that same SHA.
+# Fires the Vercel Deploy Hook for a PR's HEAD SHA once the CI `test` check
+# is `success` on that SHA.
+#
+# The second gate (an `auto-review` LGTM verdict on the same SHA) was removed
+# with the rest of the Claude automation (#2003 / #2004, #2020): nothing posts
+# that verdict any more, so the gate could never open. Code review now happens
+# in-session before a merge is requested, not as a precondition for a preview.
 #
 # Non-main git-driven auto-deploys are disabled in `vercel.json` via
 # `git.deploymentEnabled.** = false`, so this workflow is the only path that
 # creates preview deployments. Production deploys on `main` are unaffected.
 #
 # Manual override: `/preview` PR comment from OWNER / MEMBER / COLLABORATOR
-# bypasses both gates and fires the hook unconditionally — for mid-iteration
-# peeks before LGTM.
+# bypasses the CI gate and fires the hook unconditionally, for mid-iteration
+# peeks before CI is green.
 #
 # Idempotency: each fire posts a hidden
 # `<!-- vercel-preview-fired:<sha> -->` marker comment so subsequent
 # re-evaluations at the same SHA are no-ops.
 #
-# Why two triggers: CI and auto-review run independently; whichever finishes
-# second flips the gate. Both events re-evaluate the same gate against the
-# current HEAD SHA, so the order doesn't matter.
+# Triggers: `workflow_run` (CI completed) drives the automatic path;
+# `issue_comment` exists only for the `/preview` override.
+#
+# STATUS: disabled (`disabled_manually`), and it should stay disabled unless
+# per-PR previews are wanted again. Re-enabling fires a Vercel preview on every
+# green CI run of every non-`qa` PR head SHA, which is exactly the deploy
+# volume that hit Vercel's rate limit and got it retired (#814). QA happens on
+# the bundled `qa` preview (`qa-preview-deploy.yml`) instead.
 
 on:
   workflow_run:
@@ -28,8 +36,14 @@ on:
   issue_comment:
     types: [created]
 
+# Keyed on the PR number for BOTH arms (`issue.number` for `/preview`,
+# `workflow_run.pull_requests[0].number` for a CI completion), so a `/preview`
+# and a CI completion on the same PR queue behind each other and the second
+# one sees the first one's `vercel-preview-fired` marker instead of racing
+# past the dedup and firing twice. `pull_requests` is empty for fork PRs
+# (already excluded by the job guard); the head SHA is the fallback key.
 concurrency:
-  group: vercel-preview-${{ github.event.issue.number || github.event.workflow_run.id }}
+  group: vercel-preview-${{ github.event.issue.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
   cancel-in-progress: false
 
 jobs:
@@ -37,14 +51,14 @@ jobs:
     name: Fire deploy hook
     # `workflow_run` fork guard: workflow_run runs in the base-repo context and
     # has access to secrets, so fork PRs would otherwise be able to trigger a
-    # secret-bearing job. auto-review.yml already excludes forks (so the LGTM
-    # gate stays closed for them anyway), but belt-and-braces here.
+    # secret-bearing job.
     #
-    # `issue_comment` author gates (#1859): the auto-review branch only accepts
-    # comments authored by the bot itself, and `/preview` only from
+    # `issue_comment` author gate (#1859): `/preview` is accepted only from
     # OWNER/MEMBER/COLLABORATOR (the same check the override step applies) -
-    # otherwise any commenter could start this secret-bearing job by posting
-    # the marker substring.
+    # otherwise any commenter could start this secret-bearing job. The
+    # `startsWith` here is only a cheap prefilter (expressions have no regex);
+    # the override step requires the exact command, and the resolve step
+    # rejects fork PRs.
     if: |
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
@@ -53,11 +67,9 @@ jobs:
       ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request != null &&
-       ((contains(github.event.comment.body, '<!-- auto-review:') &&
-         github.event.comment.user.login == 'poke-memory-bot[bot]') ||
-        (startsWith(github.event.comment.body, '/preview') &&
-         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
-                  github.event.comment.author_association))))
+       startsWith(github.event.comment.body, '/preview') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+                github.event.comment.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -76,33 +88,48 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          # Event values go through env, never inline `${{ }}` in the script:
+          # a branch name is attacker-choosable text (script injection).
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            SHA="${{ github.event.workflow_run.head_sha }}"
-            BRANCH="${{ github.event.workflow_run.head_branch }}"
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            SHA="$RUN_HEAD_SHA"
+            BRANCH="$RUN_HEAD_BRANCH"
             PR=$(gh api "repos/$REPO/commits/$SHA/pulls" \
               --jq '[.[] | select(.state == "open")] | .[0].number // ""')
           else
-            PR="${{ github.event.issue.number }}"
-            STATE=$(gh pr view "$PR" --repo "$REPO" --json state --jq '.state')
+            PR="$ISSUE_NUMBER"
+            PR_JSON=$(gh pr view "$PR" --repo "$REPO" \
+              --json state,headRefOid,headRefName,isCrossRepository)
+            STATE=$(jq -r '.state' <<<"$PR_JSON")
             if [[ "$STATE" != "OPEN" ]]; then
-              echo "PR #$PR is $STATE — skipping."
+              echo "PR #$PR is $STATE - skipping."
               echo "skip=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            SHA=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq '.headRefOid')
-            BRANCH=$(gh pr view "$PR" --repo "$REPO" --json headRefName --jq '.headRefName')
+            # Fork guard for the `/preview` arm (the `workflow_run` arm is
+            # guarded at job level): never deploy a fork's head with our hook.
+            if [[ "$(jq -r '.isCrossRepository' <<<"$PR_JSON")" != "false" ]]; then
+              echo "PR #$PR's head is not in $REPO (fork PR) - /preview refused; skipping."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            SHA=$(jq -r '.headRefOid' <<<"$PR_JSON")
+            BRANCH=$(jq -r '.headRefName' <<<"$PR_JSON")
           fi
           if [[ -z "$PR" || "$PR" == "null" ]]; then
-            echo "No open PR for this event — skipping."
+            echo "No open PR for this event - skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # A `qa -> main` promotion PR is previewed by the QA Preview Deploy
-          # workflow before the PR is opened — don't double-fire the hook.
+          # workflow before the PR is opened - don't double-fire the hook.
           if [[ "$BRANCH" == "qa" ]]; then
-            echo "Head branch is 'qa' — preview handled by QA Preview Deploy; skipping."
+            echo "Head branch is 'qa' - preview handled by QA Preview Deploy; skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -112,7 +139,7 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "Resolved PR #$PR @ $SHA ($BRANCH)"
 
-      - name: Idempotency — skip if already fired at this SHA
+      - name: Idempotency - skip if already fired at this SHA
         id: idem
         if: steps.pr.outputs.skip != 'true'
         env:
@@ -122,14 +149,15 @@ jobs:
           SHA: ${{ steps.pr.outputs.sha }}
         run: |
           set -euo pipefail
-          # SHA is a hex commit id — safe to interpolate directly. Only count
+          # SHA is a hex commit id - safe to interpolate directly. Only count
           # markers the bot itself posted (#1859), so a third party cannot
           # suppress legitimate fires with a forged marker comment.
+          # marker-lookup-exempt: PR-comment dedup filtered to poke-memory-bot[bot] authorship and keyed on a per-SHA marker, not a tracking-issue body.
           MATCH=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
             --jq "[.[] | select(.user.login == \"poke-memory-bot[bot]\")
                        | select(.body | contains(\"<!-- vercel-preview-fired:$SHA -->\"))] | length")
           if [[ "$MATCH" -gt 0 ]]; then
-            echo "Already fired at SHA $SHA — skipping."
+            echo "Already fired at SHA $SHA - skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -146,20 +174,25 @@ jobs:
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           set -euo pipefail
-          if [[ "$COMMENT_BODY" == "/preview"* ]] \
+          # Exact command only: `/preview` followed by whitespace or the end
+          # of the comment. `/previewfoo` and the like are not the command.
+          if [[ "$COMMENT_BODY" =~ ^/preview([[:space:]]|$) ]] \
              && [[ "$AUTHOR_ASSOC" =~ ^(OWNER|MEMBER|COLLABORATOR)$ ]]; then
-            echo "Manual /preview override from $AUTHOR_ASSOC — bypassing gates."
+            echo "Manual /preview override from $AUTHOR_ASSOC - bypassing the CI gate."
             echo "is_override=true" >> "$GITHUB_OUTPUT"
           else
+            echo "Comment is not an exact /preview command - skipping."
             echo "is_override=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check CI `test` status on HEAD SHA
         id: ci
+        # Automatic path only: an `issue_comment` that is not an exact
+        # `/preview` must not fall through to the CI gate and fire.
         if: |
           steps.pr.outputs.skip != 'true' &&
           steps.idem.outputs.skip != 'true' &&
-          steps.override.outputs.is_override != 'true'
+          github.event_name == 'workflow_run'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
@@ -178,55 +211,25 @@ jobs:
             echo "pass=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check latest auto-review verdict for this SHA
-        id: review
-        if: |
-          steps.pr.outputs.skip != 'true' &&
-          steps.idem.outputs.skip != 'true' &&
-          steps.override.outputs.is_override != 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          REPO: ${{ github.repository }}
-          PR: ${{ steps.pr.outputs.pr }}
-          SHA: ${{ steps.pr.outputs.sha }}
-        run: |
-          set -euo pipefail
-          # Scope to the current HEAD SHA via the `<!-- auto-review-sha:SHA -->`
-          # marker auto-review.yml writes on row 2 of every review comment, so
-          # a stale LGTM on an earlier SHA does not satisfy the gate. Only
-          # bot-authored comments count (#1859): without the author filter,
-          # any commenter could paste the marker plus a "Verdict: Looks good
-          # to me" line and open the deploy gate themselves.
-          BODY=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq "[.[] | select(.user.login == \"poke-memory-bot[bot]\")
-                       | select(.body | contains(\"<!-- auto-review-sha:$SHA -->\"))]
-                  | sort_by(.created_at) | last | .body // \"\"")
-          VERDICT=$(printf '%s\n' "$BODY" | grep -E '^Verdict:' | head -1 || true)
-          echo "Latest verdict at $SHA: ${VERDICT:-<none>}"
-          if [[ "$VERDICT" == *"Looks good to me"* ]]; then
-            echo "pass=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "pass=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Fire Vercel Deploy Hook
         id: fire
         if: |
           steps.pr.outputs.skip != 'true' &&
           steps.idem.outputs.skip != 'true' &&
           (steps.override.outputs.is_override == 'true' ||
-           (steps.ci.outputs.pass == 'true' && steps.review.outputs.pass == 'true'))
+           steps.ci.outputs.pass == 'true')
         env:
           HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
           BRANCH: ${{ steps.pr.outputs.branch }}
         run: |
           set -euo pipefail
           if [[ -z "$HOOK_URL" ]]; then
-            echo "preview deploys paused — VERCEL_DEPLOY_HOOK_URL not configured"
+            echo "preview deploys paused - VERCEL_DEPLOY_HOOK_URL not configured"
             echo "fired=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          RESPONSE=$(curl -fsSL -X POST "${HOOK_URL}?ref=${BRANCH}")
+          REF=$(jq -rn --arg b "$BRANCH" '$b | @uri')
+          RESPONSE=$(curl -fsSL -X POST "${HOOK_URL}?ref=${REF}")
           echo "Deploy hook response: $RESPONSE"
           echo "fired=true" >> "$GITHUB_OUTPUT"
 
@@ -239,7 +242,7 @@ jobs:
           OVERRIDE: ${{ steps.override.outputs.is_override }}
         run: |
           set -euo pipefail
-          REASON="CI + auto-review gate green"
+          REASON="CI test check green"
           if [[ "$OVERRIDE" == "true" ]]; then
             REASON="manual /preview override"
           fi

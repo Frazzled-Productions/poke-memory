@@ -4,6 +4,7 @@ import {
   mergeGradeLog,
   pullGradeLog,
   pushGradeLog,
+  pushGradeLogDetailed,
   GRADE_LOG_CONFLICT_COLS,
   toGradeLogDbRow,
   isGradeLogEntry,
@@ -308,5 +309,49 @@ describe("toGradeLogDbRow / isGradeLogEntry (#2052)", () => {
     ]) {
       expect(isGradeLogEntry(bad)).toBe(false);
     }
+  });
+});
+
+describe("pushGradeLogDetailed (#2117)", () => {
+  const entries = [makeEntry(1, { date: "2026-05-12", grade: 4, cardType: "name", subjectKey: "1" })];
+  function clientResolving(value: unknown) {
+    const upsert = vi.fn().mockResolvedValue(value);
+    return { from: vi.fn().mockReturnValue({ upsert }) } as unknown as SupabaseClient;
+  }
+
+  it("ok on success and for an empty batch", async () => {
+    expect(await pushGradeLogDetailed(clientResolving({ error: null }), "u", entries)).toBe("ok");
+    expect(await pushGradeLogDetailed(clientResolving({ error: null }), "u", [])).toBe("ok");
+  });
+
+  it.each([
+    ["23514", 400],
+    ["23502", 400],
+    ["22P02", 400],
+  ])("rejected for data/integrity SQLSTATE %s", async (code, status) => {
+    const c = clientResolving({ error: { code, message: "x" }, status });
+    expect(await pushGradeLogDetailed(c, "u", entries)).toBe("rejected");
+  });
+
+  it.each([
+    ["42501", 403],
+    ["PGRST301", 401],
+    ["PGRST204", 400],
+    ["57014", 500],
+    ["40001", 409],
+    ["08006", 500],
+    ["", 0],
+    ["", 422],
+    ["", 500],
+    ["", 429],
+  ])("failed (not a row rejection) for code %j status %d", async (code, status) => {
+    const c = clientResolving({ error: { code, message: "x" }, status });
+    expect(await pushGradeLogDetailed(c, "u", entries)).toBe("failed");
+  });
+
+  it("failed when the client throws; pushGradeLog stays boolean", async () => {
+    const c = { from: () => { throw new Error("boom"); } } as unknown as SupabaseClient;
+    expect(await pushGradeLogDetailed(c, "u", entries)).toBe("failed");
+    expect(await pushGradeLog(c, "u", entries)).toBe(false);
   });
 });
