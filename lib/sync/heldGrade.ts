@@ -25,8 +25,9 @@ import { KEY_HELD_GRADE_PREFIX, KEY_TAB_ID } from "@/lib/storage/keys";
  *     cards, which are already in the saved session because `saveSession` runs
  *     before the grade is committed.
  *
- * Not persisted: the held grade-log entry. It stays local-only if the page
- * dies mid-hold (the pre-existing grade-log retry gap, #2117).
+ * Not persisted: the held grade-log entry. If the page dies mid-hold it stays
+ * local-only until the grade-log re-push leg in `pullAndMerge` sends it once it
+ * is older than `HELD_COPY_STALE_MS` (`lib/sync/gradeLogRepush.ts`, #2117).
  */
 
 /**

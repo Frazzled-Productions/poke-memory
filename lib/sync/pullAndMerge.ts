@@ -10,6 +10,7 @@ import {
 } from "@/lib/sync/settings";
 import { pullStreak, mergeStreak } from "@/lib/sync/streak";
 import { pullGradeLog, mergeGradeLog } from "@/lib/sync/gradeLog";
+import { repushLocalGradeLog } from "@/lib/sync/gradeLogRepush";
 import { pullPushSubscriptionCount } from "@/lib/sync/pushSubscriptions";
 import { loadSyncStatus, saveSyncStatus } from "@/lib/sync/persistence";
 import { loadSession, saveSession, bumpSessionStorageKey } from "@/lib/review/persistence";
@@ -559,6 +560,16 @@ export async function pullAndMerge(
           // re-runs its useLocalStorageKey effect and reads the freshly-
           // written grade_log without waiting for the next pull cycle.
           bumpSessionStorageKey();
+        }
+        // Re-push local entries the cloud lacks (#2117): an append push that
+        // failed, or a grade held for undo when the tab died, never reaches the
+        // cloud otherwise. Runs only here, after a successful pull, so
+        // pull-before-push holds; skipped under the superuser write-guard.
+        // Best-effort: a failure is warned inside and never affects the result.
+        if (!superuserPaused) {
+          await repushLocalGradeLog(client, userId, localLog, cloudLog, {
+            lastResetAt: pulledRow?.lastResetAt ?? null,
+          });
         }
       }
     } catch (e) {

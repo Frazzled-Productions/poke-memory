@@ -83,7 +83,15 @@ Cards are the primary contract - they flow through `usePerGradeSync` (per-grade 
 - **Undo path.** Both undo handlers `await persistenceChainRef.current` first (the grade-log entry must exist before it is removed), call `discardHeld()`, then roll local state back. The undo snapshot is armed only after the entry is appended and attached.
 - **`/api/sync` beacon `gradeLog`.** Optional array, validated entry by entry (`isGradeLogEntry`), capped at 200, upserted with `ignoreDuplicates` using the same column mapper as `pushGradeLog` (`toGradeLogDbRow`). Best-effort: a `grade_log` failure never changes the response status, and the card leg never waits on it (it is started first and awaited only after the card leg has responded, including on early returns).
 - **Unaffected.** Guests and the superuser write-guard (`enqueueGrade` returns before holding when the client is null). `KnownPokemonQuiz` has no Undo and keeps immediate pushes (default `enqueueGrade`). Legacy rows already resurrected in the cloud are left alone.
-- **Known gap (pre-existing, #2117).** A `grade_log` entry whose push fails, or that is held across a reload, is never re-pushed: the grade-log leg has no retry queue.
+- **Re-push of local-only entries (#2117).** See [Grade-log re-push](#grade-log-re-push-2117).
+
+### Grade-log re-push (#2117)
+
+A `grade_log` entry whose append push failed, or that was held for undo when the tab died, is local-only. `pullAndMerge`'s grade-log leg now, after a SUCCESSFUL `pullGradeLog` (pull-before-push preserved: if the pull fails nothing is pushed), pushes the local entries whose `occurredAt` the cloud lacks (`lib/sync/gradeLogRepush.ts`, `selectRepushEntries` + `repushLocalGradeLog`) through `pushGradeLog` (`ignoreDuplicates`, so idempotent). Best-effort: a failed batch `console.warn`s and never flips the sync status. Skipped for guests (no client) and under the superuser write-guard. Filters, each because one bad row would fail a whole batched upsert or break an invariant:
+
+- `isGradeLogEntry` fails (e.g. legacy entries without `subjectKey`; the column is NOT NULL).
+- Dated before the user's `last_reset_at` (migration 022's `grade_log_reject_pre_reset_trigger` RAISEs). The client already has it: `pullUserSettingsRow` returns `lastResetAt`, compared by UTC date like the trigger's `reset_at::date`. If that pull failed the cutoff is unknown, so the batching (200 rows per request) limits the blast radius to one batch.
+- Still held for undo (#2052): `isCloudPushHeld` for this tab, plus anything newer than `HELD_COPY_STALE_MS` so another tab's live hold (invisible to module state) is never pushed early. Such entries wait for a later cycle.
 
 ### Per-table conflict policy
 
