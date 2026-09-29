@@ -59,7 +59,7 @@ Sprite infrastructure is neutral and lives outside `lib/review/` so non-review s
 
 Rule of thumb: `preload` is reserved for the one sprite that *is* the page (or card). Everything else is lazy, including decorative chrome (omit the prop; `preload={false}` is the default).
 
-**`priority` is deprecated (#2015):** Next.js 16 replaced `priority` with `preload` (`node_modules/next/dist/docs/01-app/03-api-reference/02-components/image.md`, sections `preload` and `priority`). All call sites are migrated and an ESLint `no-restricted-syntax` rule bans `priority` on `<Image>`. `preload` is a drop-in replacement (eager load plus a `<link rel="preload">` in the head). Never set it together with `loading` or `fetchPriority`; for a sprite that could be the LCP element only depending on viewport, prefer `loading="eager"` or `fetchPriority="high"` as the Next docs advise.
+**`priority` is deprecated (#2015):** Next.js 16 replaced `priority` with `preload` (`node_modules/next/dist/docs/01-app/03-api-reference/02-components/image.md`, sections `preload` and `priority`). All call sites are migrated and an ESLint `no-restricted-syntax` rule bans `priority` on `<Image>`. `preload` is a drop-in replacement (eager load plus a `<link rel="preload">` in the head). Only `preload` plus `loading="lazy"` throws; `preload` plus `loading="eager"` (or `fetchPriority`) is merely discouraged by the Next docs, which prefer `loading="eager"` or `fetchPriority="high"` for a sprite that could be the LCP element depending on the viewport. #2015 was a deliberate 1:1 behaviour-preserving migration; whether the review-card sprites should move to `loading="eager"` / `fetchPriority="high"` is evaluated per site in #2138.
 
 ## Sprite sizes (`lib/sprites/sizes.ts`)
 
