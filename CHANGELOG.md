@@ -6,6 +6,12 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.10] - 2026-09-29
+
+### Changed
+
+- Removed the Sentry `webpack.treeshake.removeDebugLogging` build option, which did nothing because Next 16 builds with Turbopack, and corrected the `next.config.ts` notes that described the build as webpack-based. A new guard test (`lib/observability/nextConfigSentry.test.ts`) fails if a `webpack` Sentry option returns or the source-map upload hook is switched off. No behaviour change.
+
 ## [0.11.9] - 2026-07-25
 
 ### Added
@@ -1870,7 +1876,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.9...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.10...HEAD
+[0.11.10]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.10
 [0.11.9]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.9
 [0.11.8]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.8
 [0.11.7]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.7
