@@ -63,7 +63,7 @@ Smoke tests in `e2e/` run against Vercel previews via `e2e.yml`; config in `play
   viewport). **Base URL**: `PLAYWRIGHT_BASE_URL`. **Run locally**: `npm run test:e2e` (after
   `npx playwright install`).
 - **Node version must match CI** (the major baked into
-  `mcr.microsoft.com/playwright:v1.60.0-noble`). Run `nvm use` (`.nvmrc` pins the recommended e2e
+  `mcr.microsoft.com/playwright:v1.63.0-noble`). Run `nvm use` (`.nvmrc` pins the recommended e2e
   Node major; `package.json` `engines.node` is a deliberately looser `>=20` floor). Running under
   Node 26 produces local-only failures (#657 / #614).
 - **Selectors**: prefer `getByRole` / `getByText` / `getByLabel` over CSS or test IDs; match the

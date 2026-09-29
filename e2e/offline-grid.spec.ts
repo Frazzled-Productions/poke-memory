@@ -17,9 +17,11 @@
  *      all the necessary resources and they are cached.
  *   4. Poll until the pages cache contains the /pokedex navigation URL,
  *      confirming the StaleWhileRevalidate background write has completed.
- *   5. Switch offline and reload; the SW must serve from cache.
- *   6. Wait for the grid list with images to render offline (React must hydrate
- *      from cached JS bundles). Assert at least one sprite has naturalWidth > 0.
+ *   5. Seed the IndexedDB offline pack with the on-screen sprites (the store the
+ *      SW serves `/sprites/` from since #1803; see Step 6b).
+ *   6. Switch offline and reload; the SW must serve from cache.
+ *   7. Wait for the grid list with images to render offline (React must hydrate
+ *      from cached JS bundles). Assert a seeded sprite has naturalWidth > 0.
  *
  * This approach is deliberately lightweight compared to triggering the full
  * ~5.5 MB precache download from the Settings offline section. The SW caches
@@ -168,6 +170,52 @@ test.describe("Offline Pokédex grid (#1773)", () => {
       { timeout: 20_000 },
     );
 
+    // --- Step 6b: seed the offline sprite pack in IndexedDB ---
+    //
+    // Since #1803 the SW no longer caches sprites in Cache Storage: `/sprites/`
+    // is `idb-first` (lib/pwa/cacheStrategy.ts), served from the `offline-pack`
+    // store and otherwise fetched from the network. That store is normally filled
+    // by the Settings "Download" flow (lib/pwa/precache.ts), which pulls the whole
+    // multi-thousand-file pack - too heavy for a smoke test. Write the same
+    // shape (`{ blob, contentType }` keyed by the relative path) for the first
+    // sprites on screen instead.
+    //
+    // Do NOT rely on the browser HTTP cache to satisfy the offline render. This
+    // spec used to, by accident: on Playwright 1.60 the SW's network fallback
+    // was answered from the HTTP cache while "offline", so it passed with an
+    // empty pack. From 1.61+ (Chromium 153) offline emulation also fails those
+    // cache-served fetches (img requests report status 0), so only genuinely
+    // pack-served sprites render offline (#2074 / PR #2102).
+    const seededSrcs = await page.evaluate(async () => {
+      const imgs = Array.from(
+        document.querySelectorAll<HTMLImageElement>('[role="list"] img'),
+      )
+        .filter((i) => i.naturalWidth > 0)
+        .slice(0, 5);
+      const paths = imgs.map((i) => new URL(i.currentSrc).pathname);
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open("poke-memory", 2);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      for (const path of paths) {
+        const res = await fetch(path);
+        const blob = await res.blob();
+        await new Promise<void>((resolve, reject) => {
+          const tx = db.transaction("offline-pack", "readwrite");
+          tx.objectStore("offline-pack").put(
+            { blob, contentType: res.headers.get("content-type") ?? "image/webp" },
+            path,
+          );
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      }
+      db.close();
+      return paths;
+    });
+    expect(seededSrcs.length).toBeGreaterThan(0);
+
     // --- Step 7: go offline ---
     await page.context().setOffline(true);
 
@@ -198,21 +246,26 @@ test.describe("Offline Pokédex grid (#1773)", () => {
       { timeout: 30_000 },
     );
 
-    // --- Step 11: assert at least one sprite has naturalWidth > 0 ---
+    // --- Step 11: assert the pack-served sprites decode offline ---
     //
-    // CacheFirst serves sprites from the SW cache offline; naturalWidth > 0
-    // confirms the cached bytes were decoded successfully.
-    const foundLoadedImage = await page.waitForFunction(
-      () => {
-        const imgs = document.querySelectorAll('[role="list"] img');
-        for (const img of Array.from(imgs).slice(0, 10)) {
-          if ((img as HTMLImageElement).naturalWidth > 0) return true;
-        }
-        return false;
-      },
-      null,
-      { timeout: 15_000 },
-    ).then(() => true).catch(() => false);
+    // The SW serves the seeded URLs from the IndexedDB pack; naturalWidth > 0
+    // confirms the stored bytes were returned and decoded. Assert on those exact
+    // sprites (not "any of the first N") so a silent fallback to the network or
+    // the HTTP cache cannot satisfy it.
+    const foundLoadedImage = await page
+      .waitForFunction(
+        (paths) =>
+          paths.some((path) => {
+            const img = Array.from(
+              document.querySelectorAll<HTMLImageElement>('[role="list"] img'),
+            ).find((i) => i.currentSrc.endsWith(path));
+            return img !== undefined && img.naturalWidth > 0;
+          }),
+        seededSrcs,
+        { timeout: 15_000 },
+      )
+      .then(() => true)
+      .catch(() => false);
 
     expect(
       foundLoadedImage,

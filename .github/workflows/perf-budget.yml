@@ -76,7 +76,7 @@ jobs:
     # @playwright/test version resolved in package-lock.json. Node 24
     # ships in this image, matching the rest of CI.
     container:
-      image: mcr.microsoft.com/playwright:v1.60.0-noble
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     timeout-minutes: 15
     permissions:
       contents: read

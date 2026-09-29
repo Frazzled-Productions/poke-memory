@@ -33,7 +33,7 @@ jobs:
     # @playwright/test version resolved in package-lock.json; the image ships
     # Node 24 (an upgrade from the previous Node 20 pin on this job).
     container:
-      image: mcr.microsoft.com/playwright:v1.60.0-noble
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     # Scoped to the auth specs only (#829), so the previous 10-minute wall is
     # comfortably oversized; 6 minutes leaves ample headroom for a slow preview
     # plus the two Playwright retries while still failing fast on a real hang.
