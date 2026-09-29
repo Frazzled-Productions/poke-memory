@@ -198,6 +198,10 @@ describe("Privacy Notice page", () => {
       expect(
         screen.getByText(/Nothing about your cards is transmitted to any server we operate/i),
       ).toBeTruthy();
+      expect(screen.getByText(/no progress or account data is sent to us/i)).toBeTruthy();
+      expect(screen.getByText(/we do not send your card progress or review history/i)).toBeTruthy();
+      expect(screen.getByText(/carry no identifier, so we usually cannot find or delete/i)).toBeTruthy();
+      expect(screen.getByText(/EU-US Data Privacy Framework/i)).toBeTruthy();
     });
 
     it("states the ICO registration number in section 1 (#698)", async () => {

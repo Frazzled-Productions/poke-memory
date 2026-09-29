@@ -89,9 +89,9 @@ export default async function PrivacyPage() {
             local storage. Nothing about your cards is transmitted to any
             server we operate. Like every visitor, guests are covered by the
             technical error and performance diagnostics described in §3, which
-            are sent to Sentry and contain no card progress. Pokémon sprites are served as static files from the same Vercel
-            infrastructure that hosts the app; no third-party image CDN is
-            involved.
+            are sent to Sentry and contain no card progress. Pokémon sprites
+            are served as static files from the same Vercel infrastructure
+            that hosts the app; no third-party image CDN is involved.
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
@@ -243,18 +243,20 @@ export default async function PrivacyPage() {
           <p>
             To keep the service working and secure, we use Sentry to detect and
             fix faults. When the app hits an error, a report is sent
-            containing the type of error, its message, a stack trace, your
-            browser, operating system and device type, and the page route
-            where it happened. For roughly 10% of visits, a performance trace
-            (how long pages and requests take) is also sent. This applies to
-            guests as well as signed-in users, but it never includes your card
-            progress or review history. We configure Sentry not to collect user
-            identifiers, IP addresses, cookies, request headers or bodies, or
-            URL query parameters, and Session Replay (recording of screen
-            activity) is switched off. Reports are sent through a first-party
-            route on our own domain (<code>/monitoring</code>) to Sentry&rsquo;s
-            EU region (Germany) and are kept for 90 days. Sentry is a
-            sub-processor under a data processing agreement (see §6).
+            containing the type of error, its message, a stack trace, standard
+            browser details (browser, operating system and device type), the
+            address of the page you were on, and a short trail of recent app
+            events (breadcrumbs). For roughly 10% of visits, a performance
+            trace (how long pages and requests take) is also sent. This
+            applies to guests as well as signed-in users, but we do not send
+            your card progress or review history. We do not attach your name,
+            email address, account identifier or IP address to these reports,
+            we do not send cookies or request bodies, and Session Replay
+            (recording of screen activity) is switched off. Reports are sent
+            through a first-party route on our own domain
+            (<code>/monitoring</code>) to Sentry&rsquo;s EU region (Germany)
+            and are kept for 90 days. Sentry is a sub-processor under a data
+            processing agreement (see §6).
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
@@ -425,7 +427,7 @@ export default async function PrivacyPage() {
                   </td>
                   <td className="py-2">
                     Legitimate interest in keeping the service working and
-                    secure (no cookie, no user identifiers)
+                    secure (no cookie, no name or account identifier attached)
                   </td>
                 </tr>
                 <tr>
@@ -480,7 +482,9 @@ export default async function PrivacyPage() {
                     Hosting and static asset delivery
                   </td>
                   <td className="py-2">
-                    Aggregate, anonymous analytics only; no card data
+                    Aggregate, anonymous analytics only; no card data. Our{" "}
+                    <code>/monitoring</code> route passes error reports
+                    through to Sentry without storing them.
                   </td>
                 </tr>
                 <tr>
@@ -491,11 +495,13 @@ export default async function PrivacyPage() {
                     Error monitoring and performance tracing
                   </td>
                   <td className="py-2">
-                    Error reports (error type, message, stack trace, browser,
-                    operating system and device type, page route) and a
+                    Error reports (error type, message, stack trace, standard
+                    browser details, page address, recent app events) and a
                     sample of performance traces, from guests and signed-in
-                    users. No card data, user identifiers, IP addresses or
-                    cookies. EU region (Germany); kept for 90 days.
+                    users. No card data. We do not attach your name, email,
+                    account identifier or IP address, and we do not send
+                    cookies or request bodies. EU region (Germany); kept for
+                    90 days.
                   </td>
                 </tr>
                 <tr>
@@ -628,9 +634,15 @@ export default async function PrivacyPage() {
             Vercel, Supabase, and Discord (our sub-processors) operate under
             the EU Standard Contractual Clauses (SCCs), providing equivalent
             safeguards via the UK International Data Transfer Agreement (IDTA)
-            addendum. Sentry stores our data in its EU region (Germany); the
-            transfer from the UK to the EU relies on the UK adequacy
-            regulations for the EEA. GitHub and Google act as independent controllers under
+            addendum. Sentry stores our data in its EU region (Germany), which
+            the UK treats as adequate under the UK adequacy regulations for the
+            EEA. Sentry&rsquo;s contracting company, Functional Software, Inc.,
+            is based in the United States, so its staff may access reports
+            remotely from there. Our data processing agreement with Sentry
+            covers this: it relies on the EU-US Data Privacy Framework
+            (including its UK Extension) and, where that does not apply, on the
+            EU Standard Contractual Clauses together with the UK International
+            Data Transfer Addendum issued by the ICO. GitHub and Google act as independent controllers under
             their own applicable transfer mechanisms, including their own
             published SCCs with end-users.
           </p>
@@ -698,7 +710,11 @@ export default async function PrivacyPage() {
               history immediately, and <em>Delete account</em> permanently
               erases your account, all cloud data, and your sign-in identity,
               with no email request needed. Deleting your account also
-              permanently deletes any feedback submissions linked to it.
+              permanently deletes any feedback submissions linked to it. Error
+              reports held by Sentry carry no identifier, so we usually
+              cannot find or delete a specific person&rsquo;s reports; they
+              are deleted automatically after 90 days and are unaffected by
+              account deletion.
             </li>
             <li>
               <strong>Data portability</strong>: receive your data in a
@@ -781,7 +797,7 @@ export default async function PrivacyPage() {
             not knowingly collect personal data from under-13s. If you are
             under 13, please use guest mode only and do not create an account or
             sign in; guest mode stores your progress on your own device and
-            nothing is sent to us. For a plain-language version of this notice
+            no progress or account data is sent to us. For a plain-language version of this notice
             suited to younger readers, see the summary above. If you believe a
             child under 13 has created an account, please contact us at{" "}
             <a
