@@ -24,7 +24,7 @@ Sentry.init({
   beforeSend: scrubSentryEvent,
 
   // Keep the v10 environment names (vercel-production / vercel-preview).
-  environment: process.env.SENTRY_ENVIRONMENT ?? sentryEnvironment(process.env.NEXT_PUBLIC_VERCEL_ENV),
+  environment: sentryEnvironment(process.env.NEXT_PUBLIC_VERCEL_ENV),
 
   // Capture a small fraction of page-load and navigation transactions.
   // Override at deploy time via NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE env var

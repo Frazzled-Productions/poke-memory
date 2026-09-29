@@ -11,6 +11,7 @@ import {
   SENTRY_DATA_COLLECTION,
   scrubSentryEvent,
   sentryEnvironment,
+  stripUrlQueryAndFragment,
 } from "@/lib/observability/sentryPrivacy";
 
 const { mockInit } = vi.hoisted(() => ({ mockInit: vi.fn() }));
@@ -97,9 +98,40 @@ describe("scrubSentryEvent", () => {
     expect(crumbs[3].data).toEqual({ k: 1 });
   });
 
+  it("strips query and fragment from request.url, nextjs request_path and navigation breadcrumbs", () => {
+    const event = {
+      request: { url: "https://pokememory.com/review?token=abc#x" },
+      contexts: { nextjs: { request_path: "/review?token=abc", other: 1 } },
+      breadcrumbs: [
+        {
+          category: "navigation",
+          data: { from: "/stats?a=1#h", to: "https://pokememory.com/review?token=abc#x" },
+        },
+      ],
+    } as unknown as ErrorEvent;
+    const out = scrubSentryEvent(event);
+    expect(out.request?.url).toBe("https://pokememory.com/review");
+    expect(out.contexts?.nextjs).toEqual({ request_path: "/review", other: 1 });
+    expect(out.breadcrumbs![0].data).toEqual({
+      from: "/stats",
+      to: "https://pokememory.com/review",
+    });
+  });
+
   it("tolerates an event with no user, request or breadcrumbs", () => {
     const event = { message: "boom" } as ErrorEvent;
     expect(scrubSentryEvent(event)).toEqual({ message: "boom" });
+  });
+});
+
+describe("stripUrlQueryAndFragment", () => {
+  it("handles absolute URLs, bare paths and fragment-only input", () => {
+    expect(stripUrlQueryAndFragment("https://pokememory.com/a?b=1#c")).toBe(
+      "https://pokememory.com/a",
+    );
+    expect(stripUrlQueryAndFragment("/a/b?x=1")).toBe("/a/b");
+    expect(stripUrlQueryAndFragment("/a#frag")).toBe("/a");
+    expect(stripUrlQueryAndFragment("/plain")).toBe("/plain");
   });
 });
 

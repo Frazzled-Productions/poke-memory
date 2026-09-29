@@ -35,22 +35,52 @@ export const SENTRY_DATA_COLLECTION = {
 
 const SCRUBBED_BREADCRUMB_CATEGORIES = new Set(["fetch", "xhr"]);
 
+/**
+ * Removes the query string and fragment from a URL or path (both can carry
+ * tokens). Absolute URLs are parsed with `URL`; anything unparseable (a bare
+ * path, say) falls back to cutting at the first `?` or `#`.
+ */
+export function stripUrlQueryAndFragment(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return url.split(/[?#]/)[0];
+  }
+}
+
+function scrubNavigationData(
+  data: NonNullable<Breadcrumb["data"]>,
+): NonNullable<Breadcrumb["data"]> {
+  const out = { ...data };
+  for (const key of ["from", "to"]) {
+    if (typeof out[key] === "string") out[key] = stripUrlQueryAndFragment(out[key]);
+  }
+  return out;
+}
+
 function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
-  if (
-    breadcrumb.category !== undefined &&
-    SCRUBBED_BREADCRUMB_CATEGORIES.has(breadcrumb.category) &&
-    breadcrumb.data !== undefined
-  ) {
+  if (breadcrumb.category === undefined || breadcrumb.data === undefined) {
+    return breadcrumb;
+  }
+  if (SCRUBBED_BREADCRUMB_CATEGORIES.has(breadcrumb.category)) {
     const { data: _data, ...rest } = breadcrumb;
     return rest;
+  }
+  if (breadcrumb.category === "navigation") {
+    return { ...breadcrumb, data: scrubNavigationData(breadcrumb.data) };
   }
   return breadcrumb;
 }
 
 /**
  * Defence in depth behind `SENTRY_DATA_COLLECTION`: removes user, cookie,
- * body, query-string and header data from an error event, and drops `data`
- * from fetch/xhr breadcrumbs (it carries URLs). Mutates and returns the event.
+ * body, query-string and header data from an error event, strips query and
+ * fragment from the request URL, `nextjs.request_path` and navigation
+ * breadcrumb `from`/`to`, and drops `data` from fetch/xhr breadcrumbs.
+ * Mutates and returns the event.
  *
  * `beforeSendTransaction` is deliberately not set: v11 streams spans by
  * default (`traceLifecycle: 'stream'`), and the SDK ignores that hook then.
@@ -63,6 +93,19 @@ export function scrubSentryEvent(event: ErrorEvent): ErrorEvent {
     delete event.request.data;
     delete event.request.query_string;
     delete event.request.headers;
+    // The browser httpContext sets url to location.href, which 11.1.0 does not
+    // gate by dataCollection.
+    if (typeof event.request.url === "string") {
+      event.request.url = stripUrlQueryAndFragment(event.request.url);
+    }
+  }
+  // captureRequestError sets request_path from Next's request.path, which
+  // includes the query string.
+  const nextjsContext = event.contexts?.nextjs as
+    | { request_path?: unknown }
+    | undefined;
+  if (typeof nextjsContext?.request_path === "string") {
+    nextjsContext.request_path = stripUrlQueryAndFragment(nextjsContext.request_path);
   }
   if (event.breadcrumbs) {
     event.breadcrumbs = event.breadcrumbs.map(scrubBreadcrumb);
