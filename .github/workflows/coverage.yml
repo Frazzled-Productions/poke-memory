@@ -147,10 +147,15 @@ jobs:
           set -euo pipefail
           MARKER="<!-- coverage-report -->"
 
-          # Find an existing coverage comment by its hidden marker.
-          # marker-lookup-exempt: finds this PR's own coverage comment, not a tracking-issue body (no author filter yet: #2124).
+          # Find this workflow's own coverage comment: posted with GITHUB_TOKEN
+          # (REST `user.login` is `github-actions[bot]`, a login no human
+          # account can hold) and carrying the marker as its whole first line,
+          # as the build step above writes it. A comment anyone else posts with
+          # the marker is ignored rather than PATCHed (#2124).
           COMMENT_ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -1 || echo "")
+            | jq -r --arg marker "$MARKER" --arg author "github-actions[bot]" \
+                '.[] | select(.user.login == $author and (((.body // "") | split("\n")[0] | rtrimstr("\r")) == $marker)) | .id' \
+            | head -1 || echo "")
 
           if [ -n "$COMMENT_ID" ]; then
             echo "Updating existing coverage comment #$COMMENT_ID"
