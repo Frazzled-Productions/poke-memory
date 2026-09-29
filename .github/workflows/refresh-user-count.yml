@@ -14,7 +14,12 @@ name: Refresh user count badge
 # it; the "Backmerge main into qa" step below merges it into `qa` straight
 # away. Without that, `qa` falls behind `main` and qa-drift-check files a
 # drift issue (#1989 was exactly this; #2058). The same App token is the
-# bypass actor on the `qa-staging` ruleset.
+# bypass actor on the `qa-staging` ruleset. If the backmerge fails (a merge
+# conflict, or a qa-side change it may not push: the App has no `workflows`
+# permission), this run goes RED even though the stats commit already landed
+# on `main`: that is deliberate, so the stranded qa is seen the same day. The
+# ::error:: annotation says what to do; qa-drift-check tracks it from the next
+# morning.
 #
 # The commit message carries the GitHub-native skip marker so this run
 # does not retrigger any push-triggered workflow (CI, auto-release,
@@ -27,6 +32,14 @@ on:
     - cron: "17 6 * * *"
   workflow_dispatch:
 
+# Deliberately NOT in the `auto-release` concurrency group (#2058 review). A
+# GitHub concurrency group holds one running and at most ONE pending run, and
+# a newer pending run cancels the older one even with cancel-in-progress
+# false, so sharing the group could silently drop a queued release. The two
+# only race if a manual dispatch overlaps (the crons are 06:17 and 09:00 UTC),
+# and the race is safe: whichever push to `main` loses fails non-fast-forward
+# and goes red with nothing rewritten, and the qa backmerge re-fetches and
+# retries when qa moves under it.
 concurrency:
   group: refresh-user-count
   cancel-in-progress: false

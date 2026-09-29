@@ -180,6 +180,10 @@ jobs:
             --notes-file "${BODY_FILE}"
 
       - name: Reset qa to main
+        # Mutually exclusive with "Backmerge release into qa" above by their
+        # `if:`s (pull_request vs not): keep it that way. This step force-pushes
+        # HEAD, which must be `main`; the backmerge script restores the caller's
+        # HEAD on exit, but the two must still never both run in one job.
         # Only after a `qa -> main` promotion merge. schedule/workflow_dispatch
         # runs leave `qa` untouched — it may hold in-progress batch work.
         # HEAD is `main` including the release commit just pushed (if any), so
@@ -351,7 +355,7 @@ jobs:
           elif [ "$LOSSLESS" = "true" ]; then
             FIX="qa's $AHEAD commit(s) of its own add nothing that main lacks (already-released history), so resetting qa to main loses nothing: \`git push origin +origin/main:refs/heads/qa\` (needs poke-memory-bot or admin bypass on the \`qa-staging\` ruleset)."
           else
-            FIX="qa carries $AHEAD commit(s) main does not have, carrying changes main lacks, so **do not reset or force-push qa**: that would discard un-promoted batch work. Merge main into qa instead: \`git fetch origin && git checkout qa && git merge --no-ff origin/main && git push origin qa\` (resolve any conflict by hand; via a PR into qa if you lack bypass)."
+            FIX="qa carries $AHEAD commit(s) main does not have, carrying changes main lacks, so **do not reset or force-push qa**: that would discard un-promoted batch work. Merge main into qa instead: \`git fetch origin && git checkout -B qa origin/qa && git merge --no-ff origin/main && git push origin qa\` (resolve any conflict by hand; via a PR into qa if you lack bypass)."
           fi
 
           BODY_FILE=$(mktemp)
@@ -365,7 +369,7 @@ jobs:
           $MAIN_ONLY
 
           **Likely causes (match the commits above; see #2058):**
-          - **A backmerge into qa failed.** Every path that lands a commit on main outside a promotion merges main back into qa via \`.github/scripts/backmerge-main-into-qa.sh\`: a hotfix or Dependabot PR merged into main (the \`backmerge-hotfix\` job in \`auto-release.yml\`), a \`chore(release)\` commit from the scheduled or manual release (the "Backmerge release into qa" step), and a \`chore(stats): refresh user count\` commit (\`refresh-user-count.yml\`). The usual failure is a merge conflict, such as \`package.json\` after two same-day Dependabot merges (#2044). Check the latest failed run of \`auto-release.yml\` or \`refresh-user-count.yml\`.
+          - **A backmerge into qa failed.** Every path that lands a commit on main outside a promotion merges main back into qa via \`.github/scripts/backmerge-main-into-qa.sh\`: a hotfix or Dependabot PR merged into main (the \`backmerge-hotfix\` job in \`auto-release.yml\`), a \`chore(release)\` commit from the scheduled or manual release (the "Backmerge release into qa" step), and a \`chore(stats): refresh user count\` commit (\`refresh-user-count.yml\`). The usual failures are a merge conflict, such as \`package.json\` after two same-day Dependabot merges (#2044), and a change to \`.github/workflows/**\`, which the poke-memory-bot App may not push (it has no \`workflows\` permission). Check the latest failed run of \`auto-release.yml\` or \`refresh-user-count.yml\`.
           - **"Reset qa to main" was skipped after a \`qa -> main\` promotion** because an earlier step in the release job failed. Fingerprint: the promotion's \`Merge pull request ... from .../qa\` commit (and usually a \`chore(release)\` commit) in the list above.
           - **A commit was pushed to main by hand** (admin bypass). Nothing backmerges that automatically.
 
