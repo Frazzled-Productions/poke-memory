@@ -52,7 +52,14 @@ function req(body: unknown): Request {
   });
 }
 
-function setup(opts: { gradeLogError?: { code: string; message: string } | "throw"; cardsError?: boolean } = {}) {
+function setup(
+  opts: {
+    gradeLogError?: { code: string; message: string } | "throw";
+    cardsError?: boolean | "structural";
+    /** When set, grade_log upserts wait for this promise. */
+    gradeLogGate?: Promise<void>;
+  } = {},
+) {
   const calls: { table: string; rows: unknown; options: unknown }[] = [];
   const client = {
     auth: {
@@ -61,8 +68,12 @@ function setup(opts: { gradeLogError?: { code: string; message: string } | "thro
     from: vi.fn((table: string) => ({
       upsert: vi.fn(async (rows: unknown, options: unknown) => {
         calls.push({ table, rows, options });
+        if (table === "grade_log" && opts.gradeLogGate) await opts.gradeLogGate;
         if (table === "grade_log" && opts.gradeLogError === "throw") throw new Error("boom");
         if (table === "grade_log" && opts.gradeLogError) return { error: opts.gradeLogError };
+        if (table === "card_reviews" && opts.cardsError === "structural") {
+          return { error: { code: "42P10", message: "no unique constraint matching ON CONFLICT" } };
+        }
         if (table === "card_reviews" && opts.cardsError) return { error: { code: "XX000", message: "down" } };
         return { error: null };
       }),
@@ -201,5 +212,54 @@ describe("POST /api/sync - gradeLog leg (#2052)", () => {
     const res = await POST(req({ cards: [], gradeLog: [ENTRY] }));
     expect(res.status).toBe(401);
     expect(client.from).not.toHaveBeenCalled();
+  });
+  it("S5: the structural-error early return (409) still writes grade_log", async () => {
+    const { calls } = setup({ cardsError: "structural" });
+    const res = await POST(req({ cards: [card()], gradeLog: [ENTRY] }));
+    expect(res.status).toBe(409);
+    expect(calls.some((c) => c.table === "grade_log")).toBe(true);
+  });
+
+  it("S5: the card leg does not wait on grade_log, but the response still settles it", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const { calls } = setup({ gradeLogGate: gate });
+
+    let done = false;
+    const pending = POST(req({ cards: [card()], gradeLog: [ENTRY] })).then((r) => {
+      done = true;
+      return r;
+    });
+    // Cards are upserted while grade_log is still blocked...
+    await vi.waitFor(() => expect(calls.some((c) => c.table === "card_reviews")).toBe(true));
+    expect(done).toBe(false);
+    // ...and the response completes only once grade_log has settled.
+    release();
+    const res = await pending;
+    expect(res.status).toBe(200);
+    expect(calls.some((c) => c.table === "grade_log")).toBe(true);
+  });
+
+  it("rejects out-of-range or malformed field values at the boundary", async () => {
+    const { calls } = setup();
+    await POST(
+      req({
+        cards: [],
+        gradeLog: [
+          { ...ENTRY, occurredAt: 1.5 },
+          { ...ENTRY, occurredAt: Number.MAX_SAFE_INTEGER + 2 },
+          { ...ENTRY, date: "29/09/2026" },
+          { ...ENTRY, locale: "xx" },
+          { ...ENTRY, locale: "e".repeat(500) },
+          { ...ENTRY, learningStep: 1.5 },
+          { ...ENTRY, stepStartedAt: 1.5 },
+          { ...ENTRY, subjectKey: "" },
+          { ...ENTRY, subjectKey: "k".repeat(500) },
+        ],
+      }),
+    );
+    expect(calls).toEqual([]);
   });
 });

@@ -299,6 +299,12 @@ describe("toGradeLogDbRow / isGradeLogEntry (#2052)", () => {
       { ...full, locale: 1 },
       { ...full, learningStep: "0" },
       { ...full, stepStartedAt: "0" },
+      { ...full, occurredAt: 1.5 },
+      { ...full, date: "29/09/2026" },
+      { ...full, locale: "xx" },
+      { ...full, learningStep: 0.5 },
+      { ...full, stepStartedAt: 0.5 },
+      { ...full, subjectKey: "" },
     ]) {
       expect(isGradeLogEntry(bad)).toBe(false);
     }

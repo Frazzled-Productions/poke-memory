@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import { fetchAllPages } from "@/lib/sync/paginatedFetch";
+import { SUPPORTED_LOCALES } from "@/i18n/locales";
 
 // Grade-log sync is best-effort. Failures are surfaced as `false` / `null`
 // and the caller is expected to keep going - analytics history is auxiliary
@@ -58,6 +59,8 @@ const VALID_CARD_TYPES: ReadonlySet<string> = new Set([
   "cry",
 ]);
 const VALID_GRADES: ReadonlySet<number> = new Set([1, 2, 4, 5]);
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_SUBJECT_KEY_LENGTH = 64;
 
 /**
  * Boundary validator for grade-log entries arriving over the network (the
@@ -67,10 +70,14 @@ const VALID_GRADES: ReadonlySet<number> = new Set([1, 2, 4, 5]);
 export function isGradeLogEntry(value: unknown): value is GradeLogEntry {
   if (typeof value !== "object" || value === null) return false;
   const e = value as Record<string, unknown>;
+  const optionalInt = (v: unknown) =>
+    v === undefined || v === null || (typeof v === "number" && Number.isSafeInteger(v));
   return (
+    // occurred_at is a bigint epoch-ms column: reject floats and unsafe ints.
     typeof e.occurredAt === "number" &&
-    Number.isFinite(e.occurredAt) &&
+    Number.isSafeInteger(e.occurredAt) &&
     typeof e.date === "string" &&
+    ISO_DATE.test(e.date) &&
     typeof e.grade === "number" &&
     VALID_GRADES.has(e.grade) &&
     typeof e.cardType === "string" &&
@@ -79,9 +86,12 @@ export function isGradeLogEntry(value: unknown): value is GradeLogEntry {
     // whole batch, so it is required here (legacy pre-#462 entries are dropped
     // rather than poisoning the upsert).
     typeof e.subjectKey === "string" &&
-    (e.locale === undefined || typeof e.locale === "string") &&
-    (e.learningStep === undefined || e.learningStep === null || typeof e.learningStep === "number") &&
-    (e.stepStartedAt === undefined || e.stepStartedAt === null || typeof e.stepStartedAt === "number")
+    e.subjectKey.length > 0 &&
+    e.subjectKey.length <= MAX_SUBJECT_KEY_LENGTH &&
+    (e.locale === undefined ||
+      (typeof e.locale === "string" && (SUPPORTED_LOCALES as readonly string[]).includes(e.locale))) &&
+    optionalInt(e.learningStep) &&
+    optionalInt(e.stepStartedAt)
   );
 }
 

@@ -23,6 +23,6 @@ export async function pushGradeLogEntry(
   if (ok) {
     markPushSucceeded();
   } else {
-    console.warn("[auto-sync] grade log push failed; will retry on next grade");
+    console.warn("[auto-sync] grade log push failed (not retried, see #2117)");
   }
 }

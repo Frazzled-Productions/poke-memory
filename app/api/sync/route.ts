@@ -56,26 +56,46 @@ export async function POST(request: Request) {
   // Grade-log leg (#2052). The pagehide beacon is the only place a committed
   // held grade's grade_log row can leave the device once the page is going
   // away. Best-effort, like every non-card leg ("cards are the primary
-  // contract"): a failure is logged and never changes the response status.
-  // Runs before the card leg so its early returns cannot skip it.
-  if (Array.isArray(payload.gradeLog)) {
-    const entries = payload.gradeLog.filter(isGradeLogEntry).slice(0, MAX_GRADE_LOG_ENTRIES);
-    if (entries.length > 0) {
-      try {
-        const { error } = await supabase.from("grade_log").upsert(
-          entries.map((e) => toGradeLogDbRow(user.id, e)),
-          { onConflict: GRADE_LOG_CONFLICT_COLS, ignoreDuplicates: true },
-        );
-        if (error) {
-          console.warn(`[sync/route] grade_log upsert failed (SQLSTATE ${error.code}): ${error.message}`);
-        }
-      } catch (err) {
-        console.warn("[sync/route] grade_log upsert threw", err);
-      }
-    }
+  // contract"): started first so it runs concurrently, but the card leg never
+  // waits on it; it is awaited only after the card leg has produced its
+  // response (including on every early return, via `finally`). It never
+  // rejects and never changes the response status.
+  const gradeLogDone = upsertGradeLog(supabase, user.id, payload.gradeLog);
+  try {
+    return await syncCards(supabase, user.id, payload.cards);
+  } finally {
+    await gradeLogDone;
   }
+}
 
-  const rows = payload.cards;
+/** Upserts the beacon's grade-log entries. Best-effort: never throws. */
+async function upsertGradeLog(
+  supabase: SupabaseClient,
+  userId: string,
+  raw: unknown,
+): Promise<void> {
+  if (!Array.isArray(raw)) return;
+  const entries = raw.filter(isGradeLogEntry).slice(0, MAX_GRADE_LOG_ENTRIES);
+  if (entries.length === 0) return;
+  try {
+    const { error } = await supabase.from("grade_log").upsert(
+      entries.map((e) => toGradeLogDbRow(userId, e)),
+      { onConflict: GRADE_LOG_CONFLICT_COLS, ignoreDuplicates: true },
+    );
+    if (error) {
+      console.warn(`[sync/route] grade_log upsert failed (SQLSTATE ${error.code}): ${error.message}`);
+    }
+  } catch (err) {
+    console.warn("[sync/route] grade_log upsert threw", err);
+  }
+}
+
+/** The card_reviews leg: the primary contract, with retries and structural-error handling. */
+async function syncCards(
+  supabase: SupabaseClient,
+  userId: string,
+  rows: CloudRow[],
+): Promise<NextResponse> {
   if (rows.length === 0) {
     return NextResponse.json({ ok: true });
   }
@@ -98,8 +118,6 @@ export async function POST(request: Request) {
   const RETRY_DELAY_MS = 100;
   let allOk = true;
   let structuralErrorCode: string | null = null;
-
-  const userId = user.id;
 
   /** Build a single DB row from a CloudRow, ready for upsert. */
   function toDbRow(r: CloudRow) {
