@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 import pkg from "./package.json";
 import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
 
@@ -143,8 +143,9 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 //
 // DEBUG LOGGING: the Sentry SDK's debug-logging code still ships in the
 // bundle. `webpack.treeshake.removeDebugLogging` was removed because it did
-// nothing under Turbopack (#2076), and @sentry/nextjs had no Turbopack
-// equivalent as of 10.65.0 (re-check when upgrading it): Sentry's tree-shaking
+// nothing under Turbopack (#2076), and @sentry/nextjs still has no Turbopack
+// equivalent as of 11.1.0 (`treeshake.removeDebugLogging` is only read by its
+// webpack config; re-check when upgrading it): Sentry's tree-shaking
 // guide says those options are not supported for Turbopack builds. Defining `__SENTRY_DEBUG__` through `compiler.define`
 // is not a proven substitute, because the SDK checks
 // `typeof __SENTRY_DEBUG__`, and it is unconfirmed whether Turbopack rewrites a
