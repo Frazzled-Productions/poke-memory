@@ -25,6 +25,15 @@ name: Auto Release
 # `qa` and opens a tracking issue rather than letting the drift surface as
 # conflicts at the next promotion (#1664).
 #
+# Every other path that lands a commit on `main` is followed by a backmerge
+# into `qa` via .github/scripts/backmerge-main-into-qa.sh (#2058), so `qa` never
+# silently falls behind:
+#   * the release commit on the schedule / workflow_dispatch path (the
+#     "Backmerge release into qa" step; there is no reset on that path)
+#   * a hotfix or Dependabot PR merged into `main` (`backmerge-hotfix` job)
+#   * refresh-user-count.yml's daily stats commit (its own backmerge step)
+# A new push-to-main producer must call the same script.
+#
 # One-time bootstrap: if no `v0.1.0` tag exists when this workflow first runs,
 # the bootstrap step creates the tag at SHA cddb3a8 (the last commit whose
 # CHANGELOG content matched the current `[0.1.0]` section) and a matching
@@ -138,6 +147,26 @@ jobs:
           git push origin main
           git push origin "v${NEW_VERSION}"
 
+      - name: Backmerge release into qa
+        # schedule / workflow_dispatch only: the release commit just pushed to
+        # `main` is not on `qa`, and "Reset qa to main" below is gated to the
+        # promotion path because `qa` may hold un-promoted batch work. Without
+        # this merge, `qa` is left behind `main` by design (#2058). Runs straight
+        # after the push (not after the GitHub Release) so a release-create
+        # failure cannot strand `qa`. Merge, never reset; a conflict fails the
+        # step visibly and the daily qa-drift-check tracks it. The checkout
+        # holds the App token, the `qa-staging` bypass actor.
+        if: >-
+          success() &&
+          github.event_name != 'pull_request' &&
+          steps.cut.outputs.skip != 'true'
+        env:
+          NEW_VERSION: ${{ steps.cut.outputs.version }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/backmerge-main-into-qa.sh \
+            "chore: backmerge main into qa after release v${NEW_VERSION}"
+
       - name: Create GitHub Release
         if: steps.cut.outputs.skip != 'true'
         env:
@@ -180,6 +209,10 @@ jobs:
     # Uses merge (not force-reset) to preserve any in-progress batch work on qa.
     # If the merge has conflicts the job fails visibly, requiring manual resolution.
     # Requires poke-memory-bot to be a bypass actor on the `qa-staging` ruleset.
+    # The merge itself is .github/scripts/backmerge-main-into-qa.sh, shared with
+    # every other push-to-main path (#2058). It checks out main so the script
+    # runs from the same branch as this workflow definition; the script fetches
+    # and merges into qa itself.
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.merged == true &&
@@ -198,7 +231,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           token: ${{ steps.app-token.outputs.token }}
-          ref: qa
+          ref: main
           fetch-depth: 0
 
       - name: Configure git identity
@@ -211,19 +244,19 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-          git fetch origin main
-          git merge --no-ff origin/main -m "chore: backmerge main into qa after hotfix (#${PR_NUMBER})"
-          git push origin qa
-          echo "Merged main ($(git rev-parse --short origin/main)) into qa."
+          bash .github/scripts/backmerge-main-into-qa.sh \
+            "chore: backmerge main into qa after hotfix (#${PR_NUMBER})"
 
   qa-drift-check:
     name: Check qa has not drifted from main
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Daily safety net for the "Reset qa to main" step. If that step is skipped
-    # (a prior step in the release job failed), qa keeps the released commits as
-    # un-reset history and the next qa -> main promotion comes up with merge
-    # conflicts (#1659, #1664). This job detects the drift and opens/updates a
+    # Daily safety net for the "Reset qa to main" step and for every
+    # main -> qa backmerge (#2058). If the reset is skipped (a prior step in the
+    # release job failed), or a backmerge after a push to main fails (usually a
+    # merge conflict), qa is left behind main and the next qa -> main promotion
+    # comes up with merge conflicts (#1659, #1664). This job detects the drift,
+    # lists the main-only commits (which name the cause) and opens/updates a
     # tracking issue. It does NOT auto-reset: qa may carry genuine un-promoted
     # batch work that a blind force-reset would destroy, so reconciliation stays
     # human-in-the-loop (the same channel as the /batch-issues pre-flight).
@@ -293,17 +326,53 @@ jobs:
           AHEAD=$(echo "$COUNTS" | cut -f2)
           echo "DRIFT: main ($MAIN_SHA) is not an ancestor of qa ($QA_SHA); qa is $AHEAD ahead of and $BEHIND behind main."
 
+          # The main-only commits name the cause (#2058): each producer leaves a
+          # recognisable subject. `-n 20` rather than `| head` so SIGPIPE cannot
+          # trip pipefail.
+          MAIN_ONLY=$(git log -n 20 --format='- `%h` %s' origin/qa..origin/main)
+          if [ "$BEHIND" -gt 20 ]; then
+            MAIN_ONLY="${MAIN_ONLY}"$'\n'"- ...and $((BEHIND - 20)) more"
+          fi
+
+          # Only offer the force-reset when it cannot discard work: qa has no
+          # commits of its own, or merging qa into main would change nothing
+          # (the qa-only commits are already-released history, the
+          # reset-skipped shape). Otherwise a reset would throw away
+          # un-promoted batch work, so merge instead. `merge-tree` exits
+          # non-zero on a conflict, which also means "not lossless".
+          MAIN_TREE=$(git rev-parse 'origin/main^{tree}')
+          LOSSLESS=false
+          if MERGED=$(git merge-tree --write-tree origin/main origin/qa 2>/dev/null) \
+            && [ "${MERGED%%$'\n'*}" = "$MAIN_TREE" ]; then
+            LOSSLESS=true
+          fi
+          if [ "$AHEAD" -eq 0 ]; then
+            FIX="qa has no commits of its own, so fast-forwarding it to main loses nothing: \`git push origin origin/main:refs/heads/qa\` (needs poke-memory-bot or admin bypass on the \`qa-staging\` ruleset)."
+          elif [ "$LOSSLESS" = "true" ]; then
+            FIX="qa's $AHEAD commit(s) of its own add nothing that main lacks (already-released history), so resetting qa to main loses nothing: \`git push origin +origin/main:refs/heads/qa\` (needs poke-memory-bot or admin bypass on the \`qa-staging\` ruleset)."
+          else
+            FIX="qa carries $AHEAD commit(s) main does not have, carrying changes main lacks, so **do not reset or force-push qa**: that would discard un-promoted batch work. Merge main into qa instead: \`git fetch origin && git checkout qa && git merge --no-ff origin/main && git push origin qa\` (resolve any conflict by hand; via a PR into qa if you lack bypass)."
+          fi
+
           BODY_FILE=$(mktemp)
           cat >"$BODY_FILE" <<EOF
           $MARKER
           **qa has drifted from main**
 
-          \`main\` (\`$MAIN_SHA\`) is not an ancestor of \`qa\` (\`$QA_SHA\`); qa is $AHEAD commit(s) ahead of and $BEHIND behind main. This usually means the auto-release "Reset qa to main" step was skipped because a prior step in the release job failed, leaving qa with already-released commits as un-reset history. Left unreconciled, the next \`qa -> main\` promotion comes up with merge conflicts (#1659).
+          \`main\` (\`$MAIN_SHA\`) is not an ancestor of \`qa\` (\`$QA_SHA\`): qa is $AHEAD commit(s) ahead of and $BEHIND behind main. Left unreconciled, the next \`qa -> main\` promotion comes up with merge conflicts (#1659).
 
-          **How to reconcile (human-in-the-loop, since this job does not auto-reset, to avoid destroying un-promoted batch work):**
-          1. \`git fetch origin && git merge-base --is-ancestor origin/main origin/qa\` to confirm (a non-zero exit means drifted).
-          2. If qa carries genuine un-promoted batch work: merge main into qa, \`git checkout qa && git merge --no-ff origin/main && git push origin qa\`.
-          3. If qa only has already-released commits: reset qa to main, \`git push origin +origin/main:refs/heads/qa\` (needs poke-memory-bot bypass-actor credentials on the \`qa\` ruleset).
+          **Commits on main that qa lacks:**
+          $MAIN_ONLY
+
+          **Likely causes (match the commits above; see #2058):**
+          - **A backmerge into qa failed.** Every path that lands a commit on main outside a promotion merges main back into qa via \`.github/scripts/backmerge-main-into-qa.sh\`: a hotfix or Dependabot PR merged into main (the \`backmerge-hotfix\` job in \`auto-release.yml\`), a \`chore(release)\` commit from the scheduled or manual release (the "Backmerge release into qa" step), and a \`chore(stats): refresh user count\` commit (\`refresh-user-count.yml\`). The usual failure is a merge conflict, such as \`package.json\` after two same-day Dependabot merges (#2044). Check the latest failed run of \`auto-release.yml\` or \`refresh-user-count.yml\`.
+          - **"Reset qa to main" was skipped after a \`qa -> main\` promotion** because an earlier step in the release job failed. Fingerprint: the promotion's \`Merge pull request ... from .../qa\` commit (and usually a \`chore(release)\` commit) in the list above.
+          - **A commit was pushed to main by hand** (admin bypass). Nothing backmerges that automatically.
+
+          **How to reconcile:**
+          $FIX
+
+          Confirm with \`git fetch origin && git merge-base --is-ancestor origin/main origin/qa\` (exit 0 means back in sync).
 
           Opened by the \`qa-drift-check\` job in \`auto-release.yml\`. It updates in place on each daily run and closes automatically once main is an ancestor of qa again.
           EOF
