@@ -9,7 +9,7 @@ name: Visual Baseline Update
 # Why a dedicated workflow rather than a local `--update-snapshots` run:
 # baselines are platform-sensitive. macOS Core Text and Linux font
 # anti-aliasing differ visibly, so baselines must be generated inside the
-# pinned `mcr.microsoft.com/playwright:v1.60.0-noble` image — the same image
+# pinned `mcr.microsoft.com/playwright:v1.63.0-noble` image, the same image
 # `visual-regression.yml` uses for comparison. The maintainer would otherwise
 # have to run that Docker image locally on a Linux host or extract actuals
 # from a failed CI run; this workflow folds that into a one-click dispatch.
@@ -127,7 +127,7 @@ jobs:
     needs: gate
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    # The Playwright container image (`mcr.microsoft.com/playwright:v1.60.0-noble`)
+    # The Playwright container image (`mcr.microsoft.com/playwright:v1.63.0-noble`)
     # ships dash as /bin/sh, which GitHub Actions picks as the default `run:`
     # shell when a step has no explicit `shell:`. Dash rejects `set -o pipefail`
     # and other bashisms used by the steps below, so pin bash for the whole job.
@@ -143,11 +143,12 @@ jobs:
       # audit clarity, even though the token's scope is independent of this block.
       contents: write
     # Browsers + system deps are baked into the image. The tag MUST track the
-    # `@playwright/test` version resolved in `package-lock.json` (currently
-    # 1.60.0) — the same pin `visual-regression.yml` uses. Baselines
-    # generated here are byte-comparable against that compare job's renders.
+    # `@playwright/test` version resolved in `package-lock.json` (enforced by
+    # `npm run lint:playwright-pin`, #2074), the same pin `visual-regression.yml`
+    # uses. Baselines generated here are byte-comparable against that compare
+    # job's renders.
     container:
-      image: mcr.microsoft.com/playwright:v1.60.0-noble
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     steps:
       - name: Mint App installation token
         id: app-token
@@ -165,7 +166,7 @@ jobs:
 
       - name: Configure git identity
         # `--global` is required because this job runs inside the
-        # `mcr.microsoft.com/playwright:v1.60.0-noble` container, where the
+        # `mcr.microsoft.com/playwright:v1.63.0-noble` container, where the
         # default working directory is not `$GITHUB_WORKSPACE`. A bare
         # `git config` (which defaults to `--local`) fails with
         # `fatal: not in a git directory` because there is no `.git` in cwd.

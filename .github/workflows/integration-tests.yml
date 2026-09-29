@@ -6,7 +6,8 @@ name: Integration Tests
 #
 # Trigger (#611): the suite runs automatically on PRs that touch the
 # cloud-write surface — lib/sync/**, app/api/sync/**, db/migrations/**,
-# lib/gradelog/**, or this workflow file itself.  Path filtering keeps spend
+# lib/gradelog/**, the grade_log divergence monitor script (#2096), or this
+# workflow file itself.  Path filtering keeps spend
 # bounded: only relevant PRs trigger a run.
 #
 # The `integration-tests` PR label remains an explicit opt-in escape hatch for
@@ -62,6 +63,10 @@ jobs:
               - 'app/api/sync/**'
               - 'db/migrations/**'
               - 'lib/gradelog/**'
+              # The divergence monitor's SQL is tested against the migrated
+              # schema by lib/sync/integration/grade-log-divergence.test.ts
+              # (#2096), so a change to the script alone must run the suite.
+              - '.github/scripts/check-grade-log-divergence.mjs'
               - '.github/workflows/integration-tests.yml'
 
       - name: Decide

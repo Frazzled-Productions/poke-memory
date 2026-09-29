@@ -14,7 +14,7 @@
 // --------------------------------------------------
 // `grade_log` records one row per grade event (every Again/Hard/Good/Easy
 // tap, including learning-step replays). `card_reviews` records one row
-// per (user_id, card_type, subject_key) tuple — i.e. one row per *card*,
+// per (user_id, card_type, subject_key, locale) tuple, i.e. one row per *card*,
 // not per grade.
 //
 // There are three distinct failure shapes:
@@ -35,17 +35,42 @@
 //     subsequent per-grade update was silently dropped.
 //
 //   Option C — "graduated orphan, no grace" (#1357)
-//     A subject whose grade_log shows a graduating grade
-//     (MAX(grade) >= 4) has NO matching card_reviews row at all,
+//     A subject whose grade_log shows it graduated (see "Graduation
+//     signal" below) has NO matching card_reviews row at all,
 //     REGARDLESS of the 2-day grace Option A applies. Option A's
 //     persistence window excludes orphans whose grades are <2 days old
 //     even when they have already graduated; the #1344 assessment found
 //     15 of 24 orphaned subjects slipped through exactly this gap. A
 //     graduated card must sync immediately, so a graduated orphan at any
-//     age is a real signal. This arm is intentionally noisier than
-//     Option A (MAX(grade) >= 4 also matches a Good at an intermediate
-//     step) — see the OPTION_C_QUERY comment for the trade-off. Option A
-//     is left untouched; Option C is purely additive.
+//     age is a real signal. Option C is purely additive to Option A.
+//
+// Graduation signal (#2096)
+// -------------------------
+// Options A and C only count a subject that has actually GRADUATED out of
+// its learning steps, because `isSyncSafe()` (`lib/sync/cloud.ts`) withholds
+// the card_reviews upsert until then. The signal is a grade_log row with
+// `learning_step IS NULL`:
+//
+//   * `grade_log.learning_step` records the scheduler's step AFTER the grade
+//     (#1416: ReviewSession passes the post-grade `nextState.learningStep`),
+//     so NULL means the grade left the card graduated, whatever the grade.
+//     A Hard on a graduated card stays graduated (scheduler case A4), so a
+//     grade filter such as `grade >= 4` would hide real orphans.
+//   * Assumption: every row in the look-back windows was written after #1416.
+//     On older rows NULL only means "not recorded", so this signal must not
+//     be used on a window that reaches back before #1416 (migration 033).
+//
+// Any such row in the window counts, not only the latest one. Once a card
+// has graduated its `lastReview` is set, so `isSyncSafe()` stays true even if
+// a later Again drops it into relearning (non-NULL step); a graduated-then-
+// lapsed subject with no card_reviews row is still a real orphan.
+//
+// The previous proxy, `MAX(grade) >= 4`, was wrong: a Good on a brand-new
+// card only enters learning step 0 (scheduler case A1), and a Good at an
+// intermediate step only advances the step. With the default two-step ladder
+// a new card needs Good, Good, Good to graduate, so the proxy flagged cards
+// still inside their steps (the #2094 false positives: every flagged subject
+// was graded `4@0` or `4@1` and never graduated).
 //
 // In-step false positives (#1221)
 // -------------------------------
@@ -84,16 +109,14 @@
 // had previously been flagged twice under the pre-grace monitor
 // (#1213, #1224).
 //
-// We extend Option A's CTE with a grade-distribution check: only count
-// a subject as missing if at least one of its grade_log entries inside
-// the window is Good (4) or Easy (5). If every entry is Again (1) or
-// Hard (2), the card is plausibly still in learning steps no matter
-// how old the latest tap is, so we exclude it. The moment the user
-// grades Good or Easy the card graduates locally, `isSyncSafe()`
-// returns true, and a real #584 break would then become visible on
-// the next qualifying tick. Future maintainers: do not re-tighten
-// this query by dropping the `MAX(grade) >= 4` clause; the
-// false-positive class it suppresses is structural, not transient.
+// Option A therefore only counts a subject that has actually graduated
+// (see "Graduation signal" above). #1253 originally approximated that with
+// `MAX(grade) >= 4`, which also let through cards graded Good but still in
+// their steps (#2096). A card the user keeps failing, or grades once and
+// abandons, never produces a graduated row, so it is excluded no matter how
+// old the latest tap is. Future maintainers: do not drop the graduation
+// clause; the false-positive class it suppresses is structural, not
+// transient.
 //
 // Re-learning false positives on Option B (#1229)
 // -----------------------------------------------
@@ -152,6 +175,13 @@
 // pass through unchanged. Options A, B, and C all apply this
 // normalisation so they share a single join vocabulary.
 //
+// Locale (#1259, #2096)
+// ---------------------
+// card_reviews is keyed by (user_id, card_type, subject_key, locale) and
+// grade_log carries the same `locale` column (migration 029), so every query
+// groups and joins on locale too. Without it, a card_reviews row in one
+// locale would mask a missing row for the same subject in another.
+//
 // Required env vars
 // -----------------
 //   SUPABASE_ACCESS_TOKEN — Management API personal access token (same
@@ -175,9 +205,10 @@
 //   * Hard errors (auth, query failure): exit non-zero so the workflow run
 //     itself is marked failed and we get a "check is broken" signal.
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const DEFAULT_THRESHOLD = 0;
 
@@ -223,7 +254,7 @@ const OPTION_C_LOWER_BOUND_DAYS_AGO = OPTION_A_LOWER_BOUND_DAYS_AGO;
 
 // Option A query — "row never written".
 //
-// Starts from the distinct (user_id, card_type, subject_key) tuples seen
+// Starts from the distinct (user_id, card_type, subject_key, locale) tuples seen
 // in grade_log inside the persistence window, normalises the
 // evolution-stream card_types to the card_reviews vocabulary (#970),
 // then LEFT JOINs to card_reviews on the full identity tuple. A NULL
@@ -236,16 +267,14 @@ const OPTION_C_LOWER_BOUND_DAYS_AGO = OPTION_A_LOWER_BOUND_DAYS_AGO;
 // window. A subject graded today and again 3 days ago should not flag,
 // because the recent grade means the card is still in-step.
 //
-// The `MAX(grade) >= 4` clause is the stuck-in-steps grace from #1253.
-// A subject whose every grade_log entry is Again (1) or Hard (2) has
-// not yet hit a graduation-eligible rating, so the scheduler keeps
-// `lastReview = null` and `isSyncSafe()` keeps blocking the per-grade
-// upsert by design. Cards in that state legitimately accumulate
-// grade_log entries with no card_reviews row over many days. We
-// exclude them here so they do not show up as #584 false positives.
+// The `BOOL_OR(learning_step IS NULL)` clause is the
+// graduation signal (#2096, replacing #1253's `MAX(grade) >= 4` proxy; see
+// "Graduation signal" in the header). A subject that never graduated keeps
+// `lastReview = null`, so `isSyncSafe()` blocks the per-grade upsert by
+// design and the missing card_reviews row is expected, not a #584 break.
 // Grade ratings: 1=Again, 2=Hard, 4=Good, 5=Easy (per
 // `lib/srs/scheduler.ts`).
-const OPTION_A_QUERY = `
+export const OPTION_A_QUERY = `
 WITH gl_distinct AS (
   SELECT
     user_id,
@@ -255,13 +284,13 @@ WITH gl_distinct AS (
       ELSE card_type
     END AS card_type,
     subject_key,
-    MAX(entry_date) AS last_entry_date,
-    MAX(grade) AS max_grade
+    locale,
+    MAX(entry_date) AS last_entry_date
   FROM grade_log
   WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_A_LOWER_BOUND_DAYS_AGO} days')::date
-  GROUP BY user_id, card_type, subject_key
+  GROUP BY user_id, card_type, subject_key, locale
   HAVING MAX(entry_date) <= (CURRENT_DATE - INTERVAL '${OPTION_A_UPPER_BOUND_DAYS_AGO} days')::date
-     AND MAX(grade) >= 4
+     AND BOOL_OR(learning_step IS NULL)
 )
 SELECT
   g.user_id::text AS user_id,
@@ -271,6 +300,7 @@ LEFT JOIN card_reviews cr
   ON cr.user_id = g.user_id
  AND cr.card_type = g.card_type
  AND cr.subject_key = g.subject_key
+ AND cr.locale = g.locale
 WHERE cr.user_id IS NULL
 GROUP BY g.user_id
 HAVING COUNT(*) > 0
@@ -295,7 +325,7 @@ ORDER BY missing_subjects DESC;
 //
 // Aggregating to one row per user keeps the alert compact and matches
 // the Option A shape, so the markdown can render them in parallel.
-const OPTION_B_QUERY = `
+export const OPTION_B_QUERY = `
 WITH recent_grades AS (
   SELECT
     user_id,
@@ -305,10 +335,11 @@ WITH recent_grades AS (
       ELSE card_type
     END AS card_type,
     subject_key,
+    locale,
     COUNT(*) AS grade_count
   FROM grade_log
   WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_B_LOWER_BOUND_DAYS_AGO} days')::date
-  GROUP BY user_id, card_type, subject_key
+  GROUP BY user_id, card_type, subject_key, locale
   HAVING COUNT(*) >= ${OPTION_B_MIN_GRADES}
      AND MAX(entry_date) <= (CURRENT_DATE - INTERVAL '${OPTION_B_UPPER_BOUND_DAYS_AGO} days')::date
 )
@@ -320,6 +351,7 @@ JOIN card_reviews cr
   ON cr.user_id = r.user_id
  AND cr.card_type = r.card_type
  AND cr.subject_key = r.subject_key
+ AND cr.locale = r.locale
 WHERE cr.last_review IS NULL OR cr.reps = 0
 GROUP BY r.user_id
 HAVING COUNT(*) > 0
@@ -346,19 +378,15 @@ ORDER BY stuck_subjects DESC;
 // from Options A/B; dropping it would falsely flag every evolution-stream
 // card.
 //
-// Trade-off — Option C is intentionally noisier than Option A.
-// "Graduated" is approximated from grade_log alone as `MAX(grade) >= 4`,
-// the same proxy Option A already uses. But because Option C drops the
-// recency offset, this proxy is looser here: a single Good (4) at an
-// intermediate learning step also satisfies `MAX(grade) >= 4` even though
-// that card has NOT actually graduated yet, so an in-step card that has
-// been graded Good once but not yet finished its steps can show up in
-// this arm during the leading edge. We accept that false-positive surface
-// deliberately: the cost of a benign Option C hit is one investigation,
-// whereas the cost of the blind spot it closes is a silently un-synced
-// graduated card (the #1344 shape). Do NOT add an upper-bound recency
-// grace to this arm to quieten it — that re-creates the exact blind spot
-// Option A already owns and this arm exists to cover.
+// "Graduated" is the real graduation signal from the header (#2096): a
+// grade_log row with `learning_step IS NULL`. This arm used
+// to approximate it with `MAX(grade) >= 4`, which also matched a Good on a
+// brand-new card (scheduler case A1 only enters step 0) or at an
+// intermediate step, so in-step cards the user never came back to were
+// flagged every day until their grades aged out of the window (#2094). The
+// real signal needs no grace: a graduated card must sync immediately. Do
+// NOT add an upper-bound recency grace to this arm; that re-creates the
+// exact blind spot Option A already owns and this arm exists to cover.
 //
 // Option A is left untouched: its 2-day grace is deliberate and removing
 // it re-introduces the in-step noise that produced #1213 / #1224. Option
@@ -367,7 +395,7 @@ ORDER BY stuck_subjects DESC;
 //
 // Grade ratings: 1=Again, 2=Hard, 4=Good, 5=Easy (per
 // `lib/srs/scheduler.ts`).
-const OPTION_C_QUERY = `
+export const OPTION_C_QUERY = `
 WITH gl_graduated AS (
   SELECT
     user_id,
@@ -377,12 +405,12 @@ WITH gl_graduated AS (
       ELSE card_type
     END AS card_type,
     subject_key,
-    MAX(entry_date) AS last_entry_date,
-    MAX(grade)      AS max_grade
+    locale,
+    MAX(entry_date) AS last_entry_date
   FROM grade_log
   WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_C_LOWER_BOUND_DAYS_AGO} days')::date
-  GROUP BY user_id, card_type, subject_key
-  HAVING MAX(grade) >= 4
+  GROUP BY user_id, card_type, subject_key, locale
+  HAVING BOOL_OR(learning_step IS NULL)
 )
 SELECT
   g.user_id::text AS user_id,
@@ -392,6 +420,7 @@ LEFT JOIN card_reviews cr
   ON cr.user_id = g.user_id
  AND cr.card_type = g.card_type
  AND cr.subject_key = g.subject_key
+ AND cr.locale = g.locale
 WHERE cr.user_id IS NULL
 GROUP BY g.user_id
 HAVING COUNT(*) > 0
@@ -437,6 +466,10 @@ function formatOptionASection(rows) {
   lines.push("This is the same failure shape as #584 — clients grading cards");
   lines.push("but not producing the corresponding `card_reviews` rows, so the");
   lines.push("user's sync state is silently drifting. Investigate immediately.");
+  lines.push("");
+  lines.push("Only subjects that actually graduated count (a grade_log row with");
+  lines.push("`learning_step IS NULL`, #2096); cards still in their");
+  lines.push("learning steps are excluded whatever their grades.");
   lines.push("");
   lines.push("The 2-day offset is the in-step grace period introduced in #1221:");
   lines.push("cards still inside FSRS learning steps intentionally have");
@@ -499,7 +532,7 @@ function formatOptionCSection(rows) {
   lines.push("### Option C — graduated subject with no `card_reviews` row (no grace)");
   lines.push("");
   lines.push(
-    `**${rows.length} user(s)** have a subject whose grade_log shows a graduating grade (\`MAX(grade) >= 4\`) within the last ${OPTION_C_LOWER_BOUND_DAYS_AGO} days but **no matching \`card_reviews\` row at all**, regardless of how recent the grade is.`,
+    `**${rows.length} user(s)** have a subject whose grade_log shows it graduated (a row with \`learning_step IS NULL\`) within the last ${OPTION_C_LOWER_BOUND_DAYS_AGO} days but **no matching \`card_reviews\` row at all**, regardless of how recent the grade is.`,
   );
   lines.push("");
   lines.push("This is the blind spot Option A cannot see (#1357, from the #1344");
@@ -509,11 +542,9 @@ function formatOptionCSection(rows) {
   lines.push("graduation), so a graduated orphan is a real #584-shape signal at any");
   lines.push("age — the in-step grace deliberately does not apply to it.");
   lines.push("");
-  lines.push("Trade-off: this arm is noisier than Option A by design. `MAX(grade)");
-  lines.push(">= 4` is a graduation proxy from grade_log alone, so a single Good at");
-  lines.push("an intermediate learning step can also match. A benign hit here is");
-  lines.push("one investigation; the blind spot it closes is a silently un-synced");
-  lines.push("graduated card. Option A is left untouched — its grace is deliberate.");
+  lines.push("`grade_log.learning_step` records the step after the grade (#1416),");
+  lines.push("so a NULL step means that grade graduated the card. A Good on a new");
+  lines.push("card or at an intermediate step does not match (#2096).");
   lines.push("");
   lines.push("| user_id (prefix) | graduated subjects missing a card_reviews row |");
   lines.push("|---|---:|");
@@ -556,7 +587,7 @@ function formatMarkdownReport(flaggedA, flaggedB, flaggedC, threshold) {
   lines.push("");
   lines.push("`grade_log` records one row per grade event (every tap, including");
   lines.push("learning-step replays). `card_reviews` records one row per");
-  lines.push("`(user_id, card_type, subject_key)` tuple — one row per *card*,");
+  lines.push("`(user_id, card_type, subject_key, locale)` tuple - one row per *card*,");
   lines.push("not per grade. A card's `card_reviews` row, once written, exists");
   lines.push("permanently; sync upserts it and never deletes it.");
   lines.push("");
@@ -686,7 +717,25 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Run only when executed directly (`node check-grade-log-divergence.mjs`), so
+// the integration test can import the query constants without calling the
+// Management API (#2096). A realpath failure (for example an argv[1] that is
+// not a file) means "not invoked directly", never a crash on import.
+function isInvokedDirectly() {
+  try {
+    return (
+      process.argv[1] !== undefined &&
+      realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+}
+const invokedDirectly = isInvokedDirectly();
+
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

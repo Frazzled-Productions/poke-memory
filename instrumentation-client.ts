@@ -9,9 +9,22 @@
  * is a safe no-op: no network connections are opened and no errors are thrown.
  */
 import * as Sentry from "@sentry/nextjs";
+import {
+  SENTRY_DATA_COLLECTION,
+  scrubSentryEvent,
+  sentryEnvironment,
+} from "@/lib/observability/sentryPrivacy";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+
+  // Privacy: v11 collects more than v10 by default, so switch it all off and
+  // scrub events as a backstop (lib/observability/sentryPrivacy.ts).
+  dataCollection: SENTRY_DATA_COLLECTION,
+  beforeSend: scrubSentryEvent,
+
+  // Keep the v10 environment names (vercel-production / vercel-preview).
+  environment: sentryEnvironment(process.env.NEXT_PUBLIC_VERCEL_ENV),
 
   // Capture a small fraction of page-load and navigation transactions.
   // Override at deploy time via NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE env var
