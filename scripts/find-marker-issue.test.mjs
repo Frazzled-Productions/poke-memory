@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import {
   findMarkerIssue,
+  isBotAuthor,
   normaliseLogin,
   parseArgs,
 } from "../.github/scripts/find-marker-issue.mjs";
@@ -118,6 +119,48 @@ describe("findMarkerIssue author filter (#2081 review)", () => {
     expect(() =>
       findMarkerIssue([{ number: 8, body: MARKER }], MARKER, { authors: ["github-actions"] }),
     ).toThrow(/--json number,body,author/);
+  });
+
+  it("ignores a HUMAN account whose bare login equals an allowed bot name", () => {
+    // Real `gh issue list --json author` output carries is_bot; a user
+    // literally named `github-actions` would have is_bot false.
+    const issues = [
+      { number: 2, body: MARKER, author: { login: "github-actions", is_bot: false } },
+      { number: 3, body: MARKER, author: { login: "poke-memory-bot", is_bot: false } },
+    ];
+    expect(
+      findMarkerIssue(issues, MARKER, { authors: ["github-actions", "poke-memory-bot"] }),
+    ).toBeNull();
+  });
+
+  it("without is_bot, requires a bot-only login form, not the bare name", () => {
+    const bare = [
+      { number: 2, body: MARKER, author: { login: "github-actions" } },
+      { number: 3, body: MARKER, author: { login: "poke-memory-bot" } },
+    ];
+    expect(
+      findMarkerIssue(bare, MARKER, { authors: ["github-actions", "poke-memory-bot"] }),
+    ).toBeNull();
+    const botForm = [{ number: 4, body: MARKER, author: { login: "poke-memory-bot[bot]" } }];
+    expect(findMarkerIssue(botForm, MARKER, { authors: ["poke-memory-bot"] })).toBe(4);
+  });
+
+  it("trusts is_bot over the login form when gh reports it", () => {
+    const real = [{ number: 5, body: MARKER, author: { login: "app/github-actions", is_bot: true } }];
+    expect(findMarkerIssue(real, MARKER, { authors: ["github-actions"] })).toBe(5);
+    const liar = [{ number: 6, body: MARKER, author: { login: "app/github-actions", is_bot: false } }];
+    expect(findMarkerIssue(liar, MARKER, { authors: ["github-actions"] })).toBeNull();
+  });
+
+  it("isBotAuthor accepts only bot forms", () => {
+    expect(isBotAuthor({ login: "app/github-actions" })).toBe(true);
+    expect(isBotAuthor({ login: "github-actions[bot]" })).toBe(true);
+    expect(isBotAuthor({ login: "github-actions" })).toBe(false);
+    expect(isBotAuthor({ login: "app/" })).toBe(false);
+    expect(isBotAuthor({ login: "[bot]" })).toBe(false);
+    expect(isBotAuthor({ login: "someone", is_bot: true })).toBe(true);
+    expect(isBotAuthor(null)).toBe(false);
+    expect(isBotAuthor({})).toBe(false);
   });
 
   it("throws on an empty authors list", () => {

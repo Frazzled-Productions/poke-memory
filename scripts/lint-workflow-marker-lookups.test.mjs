@@ -6,6 +6,7 @@
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import { findViolations, lintWorkflowDir } from "./lint-workflow-marker-lookups.mjs";
 
@@ -83,6 +84,16 @@ describe("line rules", () => {
     expect(rules(step(`X=$(gh api u --jq ".[] | select(.body | startswith(\\"$M\\")) | .id")`))).toEqual([]);
     expect(rules(`        if: contains(github.event.comment.body, '<!-- auto-review:')`)).toEqual([]);
   });
+
+  it("does not read `||` in an `if:` expression as a jq pipe", () => {
+    expect(
+      rules(`        if: github.event.comment.body == '' || contains(github.event.comment.body, '/preview')`),
+    ).toEqual([]);
+    // A single jq pipe later in the same expression is still caught.
+    expect(rules(step(`X=$(jq '.[] | select(.body == "" or (.body | contains($m)))' f)`))).toEqual([
+      "unanchored-body-match",
+    ]);
+  });
 });
 
 describe("issue-list-no-helper (positive rule)", () => {
@@ -124,6 +135,29 @@ describe("issue-list-no-helper (positive rule)", () => {
     expect(rules(step('X=$(gh api "repos/$REPO/issues/$N/comments")'))).toEqual([]);
   });
 
+  it("flags the --json= spelling, gh search issues and a gh api graphql issue-body query", () => {
+    expect(rules(step("X=$(gh issue list --json=number,body)"))).toEqual(["issue-list-no-helper"]);
+    expect(rules(step('X=$(gh search issues --repo "$R" --json number,body)'))).toEqual([
+      "issue-list-no-helper",
+    ]);
+    expect(rules(step('X=$(gh search issues --repo "$R" --json=body,number)'))).toEqual([
+      "issue-list-no-helper",
+    ]);
+    expect(
+      rules(
+        step(
+          "X=$(gh api graphql -f query='",
+          '  query { repository(owner: "o", name: "r") {',
+          "    issues(first: 100) { nodes { number body } } } }')",
+        ),
+      ),
+    ).toEqual(["issue-list-no-helper"]);
+    expect(rules(step("X=$(gh search issues --json number,title)"))).toEqual([]);
+    expect(
+      rules(step("X=$(gh api graphql -f query='query { viewer { issues(first: 1) { totalCount } } }')")),
+    ).toEqual([]);
+  });
+
   it("does not flag an issue list that does not request bodies", () => {
     expect(rules(step('X=$(gh issue list --json number,state --jq ".[].number")'))).toEqual([]);
   });
@@ -136,6 +170,20 @@ describe("issue-list-no-helper (positive rule)", () => {
       `  --jq '.[] | select(.body | test("- \\\\[.\\\\] #1")) | .number')`,
     );
     expect(rules(text)).toEqual([]);
+  });
+
+  it("rejects an issue-body-read-exempt on a statement without --label", () => {
+    const text = step(
+      "# issue-body-read-exempt: parses task-list checkboxes, not a marker.",
+      "C=$(gh issue list --state open \\",
+      "  --json number,body \\",
+      `  --jq '.[] | select(.body | test("- \\\\[.\\\\] #1")) | .number')`,
+    );
+    const v = findViolations("w.yml", text);
+    expect(v.map((x) => x.rule).sort()).toEqual(
+      ["exempt-misuse", "issue-list-no-helper", "unanchored-body-match"].sort(),
+    );
+    expect(v.find((x) => x.rule === "exempt-misuse").message).toContain("--label");
   });
 
   it("rejects an issue-body-read-exempt on a statement that mentions a marker", () => {
@@ -231,6 +279,21 @@ describe("exemption scoping", () => {
 describe("the repo's workflows", () => {
   it("contain no body-search, unanchored or helper-less marker lookups", () => {
     expect(lintWorkflowDir(resolve(repoRoot, ".github/workflows"))).toEqual([]);
+  });
+
+  it("pins the number of issue-body-read-exempt uses, so adding one is a visible change", () => {
+    // Today: auto-close-umbrella.yml's label-gated task-list read only. Raise
+    // this deliberately, and say why in the PR, when adding another.
+    const dir = resolve(repoRoot, ".github/workflows");
+    const uses = readdirSync(dir)
+      .filter((name) => /\.ya?ml$/.test(name))
+      .flatMap((name) =>
+        readFileSync(resolve(dir, name), "utf8")
+          .split("\n")
+          .filter((line) => /^\s*#\s*issue-body-read-exempt:/.test(line))
+          .map(() => name),
+      );
+    expect(uses).toEqual(["auto-close-umbrella.yml"]);
   });
 
   it("CLI exits 0 on the current tree", () => {

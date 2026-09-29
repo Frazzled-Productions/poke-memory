@@ -35,6 +35,12 @@
 // opened with the poke-memory-bot App token as `app/poke-memory-bot`. Both
 // sides are normalised by dropping an `app/` prefix and a `[bot]` suffix, so
 // `--author github-actions` matches any of those spellings.
+//
+// The issue's author must also BE a bot, so a human account that happens to
+// be called `github-actions` or `poke-memory-bot` never matches: when gh
+// reports `author.is_bot` (`gh issue list --json author` does) it must be
+// true, and otherwise the login must be in a bot-only form (`app/<name>` or
+// `<name>[bot]`; neither `/` nor `[` is legal in a user login).
 
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -48,12 +54,25 @@ export function normaliseLogin(login) {
     .replace(/\[bot\]$/, "");
 }
 
+const BOT_LOGIN_RE = /^app\/[^/\s]+$|^[^/\s]+\[bot\]$/i;
+
 /**
- * @param {Array<{ number: number, body?: string | null, author?: { login?: string } | null }>} issues
+ * Whether an issue author is a bot (GitHub App) account rather than a user.
+ * @param {{ login?: string, is_bot?: boolean } | null | undefined} author
+ */
+export function isBotAuthor(author) {
+  if (!author || typeof author.login !== "string") return false;
+  if (typeof author.is_bot === "boolean") return author.is_bot;
+  return BOT_LOGIN_RE.test(author.login.trim());
+}
+
+/**
+ * @param {Array<{ number: number, body?: string | null, author?: { login?: string, is_bot?: boolean } | null }>} issues
  * @param {string} marker
  * @param {{ authors?: string[] }} [options] when `authors` is given, only
- *   issues opened by one of them match, and every issue must carry an
- *   `author` field (a caller that forgot `--json ...,author` fails loudly).
+ *   issues opened by a bot account (see isBotAuthor) that is one of them
+ *   match, and every issue must carry an `author` field (a caller that
+ *   forgot `--json ...,author` fails loudly).
  * @returns {number | null} the oldest matching issue number, or null
  */
 export function findMarkerIssue(issues, marker, options = {}) {
@@ -79,8 +98,8 @@ export function findMarkerIssue(issues, marker, options = {}) {
             `issue #${issue?.number} has no author field; list issues with --json number,body,author`,
           );
         }
-        const login = issue.author?.login;
-        if (typeof login !== "string" || !allowed.has(normaliseLogin(login))) return false;
+        const author = issue.author;
+        if (!isBotAuthor(author) || !allowed.has(normaliseLogin(author.login))) return false;
       }
       const body = typeof issue?.body === "string" ? issue.body : "";
       const firstLine = body.split("\n", 1)[0].replace(/\r$/, "");
