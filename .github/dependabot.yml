@@ -9,6 +9,16 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    # TypeScript 7 is blocked until Next.js supports the native compiler (#1921):
+    # `next build` crashes without the removed JS compiler API,
+    # scripts/check-no-em-dash.mjs uses that API, and typescript-eslint refuses
+    # TS 7 outright. Without this rule every `tooling` group PR carries the major
+    # and strands the @types/node bump riding with it (#1916, #1988, #2037).
+    # Remove it as part of the #1921 upgrade; scripts/dependabot-config.test.mjs
+    # fails once package.json moves to typescript 7 while this rule remains.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       next:
         patterns: ["next", "eslint-config-next"]
@@ -24,7 +34,7 @@ updates:
         patterns: ["@vercel/*"]
       tooling:
         patterns: ["typescript", "@types/node"]
-      # Keep this group last — its "*" pattern matches any security PR not
+      # Keep this group last: its "*" pattern matches any security PR not
       # already claimed by a named group above.
       npm-security-other:
         applies-to: security-updates
