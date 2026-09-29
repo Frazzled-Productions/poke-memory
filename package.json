@@ -90,7 +90,7 @@
     "tailwindcss": "^4",
     "typescript": "^6",
     "vitest": "^5.0.2",
-    "wait-on": "^9.0.10",
+    "wait-on": "^9.1.0",
     "wanakana": "^5.3.1"
   }
 }
