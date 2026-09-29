@@ -136,7 +136,7 @@ Canonical reference: **[docs/sprites.md](docs/sprites.md)**. Headline rules:
 - **Default to `next/image`.** The only exemption is the Pokédex grid (`PokedexGrid.tsx`), which keeps a plain lazy `<img>` to avoid per-cell wrapper overhead across ~1025 tiles.
 - **`/_next/image` is NOT used for sprites.** A global custom loader (`lib/sprites/imageLoader.ts`) redirects sprite paths to pre-generated static WebP under `public/sprites/pokemon/webp/`. Run `npm run seed:sprites` after adding a size constant.
 - **Sprite sizes are named constants in `lib/sprites/sizes.ts`** - never inline a pixel literal; it must match the painted CSS size or the wrong WebP variant ships.
-- **`priority` is for the above-the-fold focal sprite only.** Off-screen / list-tile sprites stay lazy.
+- **`preload` (not the deprecated `priority`, lint-banned #2015) is for the above-the-fold focal sprite only.** Off-screen / list-tile sprites stay lazy.
 
 ### Spaced repetition
 

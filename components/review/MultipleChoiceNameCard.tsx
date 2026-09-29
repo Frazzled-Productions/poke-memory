@@ -167,7 +167,7 @@ export function MultipleChoiceNameCard({
         }
         width={PRACTICE_SPRITE_SIZE}
         height={PRACTICE_SPRITE_SIZE}
-        priority
+        preload
         className="max-h-36 w-auto object-contain sm:max-h-80"
       />
 

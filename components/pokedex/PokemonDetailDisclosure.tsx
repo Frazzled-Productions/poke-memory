@@ -447,7 +447,7 @@ export function PokemonDetailDisclosure({
           alt={isLocked ? t("lockedAriaLabel", { number: zeroPad(id) }) : name}
           width={POKEDEX_DETAIL_SPRITE_SIZE}
           height={POKEDEX_DETAIL_SPRITE_SIZE}
-          priority
+          preload
           className={[
             "h-48 w-48 object-contain",
             isLocked ? "brightness-0" : isLearning ? "grayscale opacity-60" : "",

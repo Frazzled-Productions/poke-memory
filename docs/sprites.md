@@ -8,7 +8,7 @@ Canonical reference for how Pokémon sprites are rendered across the app. AGENTS
 
 - **Default to `next/image`.** Every sprite surface uses `next/image` *except* the Pokédex grid, which is a deliberate, documented exemption (see "The Pokédex grid exemption" below).
 - **Sprite sizes live in one place** - `lib/sprites/sizes.ts`. Never hard-code a sprite pixel size at a call site; import the named constant for the surface.
-- **`priority` is for above-the-fold hero sprites only.** Off-screen and below-the-fold sprites use the `next/image` default (lazy) loading; never set `priority` on them.
+- **`preload` is for above-the-fold hero sprites only.** Off-screen and below-the-fold sprites use the `next/image` default (lazy) loading; never set `preload` on them. The old `priority` prop is deprecated in Next 16 and banned by lint (#2015).
 - **Network warming vs. decode warming are two different gaps.** `SpritePreloader` warms the *network* cache ahead of time; `decodeSpriteUrls` / `useSpritePrefetch().decodeAhead` bridges the *fetch → GPU-decode* gap just before a state swap. A surface with a visible transition often needs both.
 - **`/_next/image` is NOT used for sprites.** The global custom loader (`lib/sprites/imageLoader.ts`) redirects sprite paths directly to pre-generated static WebP files; no Vercel Image Optimisation transformations are billed.
 
@@ -44,22 +44,22 @@ Sprite infrastructure is neutral and lives outside `lib/review/` so non-review s
 
 **Use a plain `<img>` only with a documented reason.** Today the single exemption is the Pokédex grid (below). Any future plain-`<img>` surface must carry an inline comment explaining why and the `// eslint-disable-next-line @next/next/no-img-element` directive, and should be recorded here.
 
-## `priority` and `loading`
+## `preload` and `loading`
 
 `next/image` is lazy by default. Choose per surface class:
 
-| Surface class | Example | `priority` / `loading` |
+| Surface class | Example | `preload` / `loading` |
 |---|---|---|
-| Above-the-fold hero sprite | Pokédex detail main sprite | `priority` - it is the focal point of the route and should not lazy-load. |
-| Below-the-fold / off-screen list tile | Pasture tiles, Stats "worst cards" list, Pokédex detail evo-chain nodes | Leave the default (lazy). Never set `priority`. |
-| Hidden preloader entry | `SpritePreloader` internals | `loading="eager"` - deliberately eager (not `priority`) so it warms the cache without contending with the visible card's high-priority fetch. |
+| Above-the-fold hero sprite | Pokédex detail main sprite | `preload` - it is the focal point of the route and should not lazy-load. |
+| Below-the-fold / off-screen list tile | Pasture tiles, Stats "worst cards" list, Pokédex detail evo-chain nodes | Leave the default (lazy). Never set `preload`. |
+| Hidden preloader entry | `SpritePreloader` internals | `loading="eager"` - deliberately eager (not `preload`) so it warms the cache without contending with the visible card's high-priority fetch. |
 | Multiple-choice picker tile | `SpritePicker` 2×2 grid | `loading="eager"` - all four tiles are on screen at once and the user acts on them immediately. |
-| Review flip-card sprite | `PokemonCard` name/cry/evolution sprite | `priority` - the card is the focal point of the review route. |
-| Decorative / background | Theme mascot, theme watermark | Deprioritised - never block content for chrome. `ThemeWatermark` sets `priority={false}` explicitly; `FavouriteMascot` relies on the lazy default. Prefer the explicit `priority={false}` for clarity. |
+| Review flip-card sprite | `PokemonCard` name/cry/evolution sprite | `preload` - the card is the focal point of the review route. |
+| Decorative / background | Theme mascot, theme watermark | Deprioritised - never block content for chrome. `ThemeWatermark` and `FavouriteMascot` rely on the lazy default; do not set `preload`. |
 
-Rule of thumb: `priority` is reserved for the one sprite that *is* the page (or card). Everything else is lazy. Decorative chrome is explicitly `priority={false}`.
+Rule of thumb: `preload` is reserved for the one sprite that *is* the page (or card). Everything else is lazy, including decorative chrome (omit the prop; `preload={false}` is the default).
 
-**Note on `priority` deprecation:** In Next.js 16, `priority` is deprecated in favour of `preload`. A repo-wide migration is tracked as a follow-up - do not migrate call sites in this PR.
+**`priority` is deprecated (#2015):** Next.js 16 replaced `priority` with `preload` (`node_modules/next/dist/docs/01-app/03-api-reference/02-components/image.md`, sections `preload` and `priority`). All call sites are migrated and an ESLint `no-restricted-syntax` rule bans `priority` on `<Image>`. `preload` is a drop-in replacement (eager load plus a `<link rel="preload">` in the head). Never set it together with `loading` or `fetchPriority`; for a sprite that could be the LCP element only depending on viewport, prefer `loading="eager"` or `fetchPriority="high"` as the Next docs advise.
 
 ## Sprite sizes (`lib/sprites/sizes.ts`)
 
@@ -122,7 +122,7 @@ The exemption is recorded inline in `PokedexGrid.tsx` (the comment above the `<i
 2. Add a named size constant to `lib/sprites/sizes.ts`; pass it as both `width` and `height`. Match the painted CSS size.
 3. Add the new size to `GENERATED_SPRITE_WIDTHS` in `lib/sprites/imageLoaderHelpers.ts` (the deduped `Set` handles duplicates automatically - just add the constant).
 4. Run `npm run seed:sprites` to generate the new width folder under `public/sprites/pokemon/webp/`. Commit the generated WebP files.
-5. Set `priority` only if the sprite is the above-the-fold focal point of the route. Decorative chrome gets `priority={false}`. Everything else stays lazy.
+5. Set `preload` only if the sprite is the above-the-fold focal point of the route (never `priority`, deprecated). Everything else, including decorative chrome, stays lazy: omit the prop.
 6. If the surface renders a known, bounded sprite set soon, mount `SpritePreloader` to warm the network cache.
 7. If the surface has a visible state transition, `await decodeAhead([...])` immediately before the swap.
 8. Never inline a sprite pixel literal, and never preload an unbounded set.

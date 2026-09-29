@@ -95,7 +95,6 @@ function KnownPokemonCard({ card, selected, onToggle }: KnownPokemonCardProps) {
           height={POKEDEX_GRID_SPRITE_SIZE}
           className="h-16 w-16 object-contain"
           loading="lazy"
-          priority={false}
         />
         <span className="text-xs font-medium text-foreground">{localeName}</span>
         {selected && (

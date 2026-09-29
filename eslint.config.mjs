@@ -97,6 +97,15 @@ const eslintConfig = defineConfig([
           message:
             "Do not inline-capitalise type ids (or other localised labels) in components/pages. Use getTypeName(type, t) from lib/i18n/typeNames.ts so the active appLocale is respected.",
         },
+        // Deprecated next/image prop ban (#2015): `priority` was deprecated in
+        // Next 16 in favour of `preload` (image.md, "priority"). Most sprites
+        // should not be preloaded at all; see docs/sprites.md.
+        {
+          selector:
+            "JSXOpeningElement[name.name='Image'] > JSXAttribute[name.name='priority']",
+          message:
+            "next/image `priority` is deprecated in Next 16. Use `preload` for the single above-the-fold focal image, or omit the prop (lazy default). See docs/sprites.md (#2015).",
+        },
         // Raw date API ban (#1456): forbid toLocaleDateString and new Intl.DateTimeFormat
         // in components/pages. Route through formatDate / formatShortDate
         // (lib/utils/format-date.ts) instead, so date rendering stays centralised,
