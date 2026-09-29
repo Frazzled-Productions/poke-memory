@@ -44,15 +44,19 @@ const _createTranslator = _createTranslatorRaw as unknown as (
  *   C. Collision guard: skip if the primary reminder's effective UTC hour is
  *      within 3 hours of the nudge's effective UTC hour for this user, so
  *      the two pushes never land close together.
- *   D. Reviewed-today: drop users who already reviewed today (tz-aware,
- *      bucketed the same way send-daily buckets due-card queries), via the
- *      `get_push_reviewed_today` RPC (migration 047).
- *   E. Genuinely-at-risk streak: `get_push_streak_days` (migration 047)
- *      supplies the raw `streak_days` rows; `isEligibleForStreakNudge`
- *      (lib/push/streakNudgePredicate.ts) derives the streak length via the
- *      existing `lib/streak/` primitives and applies the honesty check (a
- *      protection token that would auto-bridge tonight's gap suppresses the
- *      nudge - #1950 ux/privacy sign-off).
+ *   D. Reviewed-today: `get_push_streak_days` (migration 047) supplies the
+ *      raw `streak_days` rows for every remaining candidate in one call. A
+ *      user has reviewed today when their own-timezone `today`
+ *      (`todayInTimezone`, UTC fallback for a null/invalid tz) is in their
+ *      streak days. `streak_days` is written in the user's local day, unlike
+ *      the UTC `card_reviews.last_review` the old RPC matched (#2073), and
+ *      `get_push_reviewed_today` is no longer called.
+ *   E. Genuinely-at-risk streak: `isEligibleForStreakNudge`
+ *      (lib/push/streakNudgePredicate.ts) receives that `reviewedToday`,
+ *      derives the streak length via the existing `lib/streak/` primitives
+ *      and applies the honesty check (a protection token that would
+ *      auto-bridge tonight's gap suppresses the nudge - #1950 ux/privacy
+ *      sign-off).
  *
  * Uses the same `get_push_targets` RPC (migration 046) as send-daily so the
  * cross-user read surface for subscriptions + settings stays a single

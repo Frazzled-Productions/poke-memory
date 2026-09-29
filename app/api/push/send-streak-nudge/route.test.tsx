@@ -5,7 +5,8 @@
  * gates, the RPC-based read surface (get_push_targets / get_push_streak_days,
  * migrations 046/047), the late-hour fan-out, the
  * collision guard against the primary reminder, the opt-in gate, the
- * reviewed-today drop, and the genuinely-at-risk streak filter (including the
+ * reviewed-today drop (derived from local-day `streak_days`, #2073), and the
+ * genuinely-at-risk streak filter (including the
  * honesty case where a protection token would auto-bridge the gap).
  *
  * `web-push` and the Supabase service-role client are mocked at module level
@@ -421,6 +422,38 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(1);
+  });
+
+  it.each([
+    ["null", null],
+    ["invalid", "Not/AZone"],
+  ])("%s timezone falls back to UTC consistently across gate B and gate D", async (_label, tz) => {
+    // System time is 20:00Z, so UTC-fallback local hour is 20 (gate B passes)
+    // and UTC today is 2026-05-20 (gate D).
+    const atRisk = buildAdminMock({
+      targets: [optedInTarget({ timezone: tz })],
+      streakDays: [
+        { user_id: "user-a", review_date: "2026-05-18" },
+        { user_id: "user-a", review_date: "2026-05-19" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(atRisk.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+    const sentBody = (await (await POST(makeRequest())).json()) as { sent: number };
+    expect(sentBody.sent).toBe(1);
+
+    mockSendNotification.mockClear();
+    const reviewed = buildAdminMock({
+      targets: [optedInTarget({ timezone: tz })],
+      streakDays: [
+        { user_id: "user-a", review_date: "2026-05-19" },
+        { user_id: "user-a", review_date: "2026-05-20" },
+      ],
+    });
+    mockCreateClient.mockReturnValue(reviewed.client as unknown as ReturnType<typeof createClient>);
+    const skippedBody = (await (await POST(makeRequest())).json()) as { sent: number };
+    expect(skippedBody.sent).toBe(0);
+    expect(mockSendNotification).not.toHaveBeenCalled();
   });
 
   it("never calls get_push_reviewed_today (the UTC last_review RPC)", async () => {
