@@ -26,10 +26,11 @@ on:
         #   * Option B — card_reviews row exists but `last_review IS NULL`
         #     or `reps = 0` despite ≥3 grade_log entries in the last 48h
         #     (the #584 "row stuck stale" shape).
-        #   * Option C — a graduated subject (grade_log MAX(grade) >= 4)
-        #     with no card_reviews row at all, REGARDLESS of the 2-day
-        #     grace (#1357). Catches fresh graduated orphans that Option
-        #     A's grace window misses; intentionally noisier than A.
+        #   * Option C - a graduated subject (a grade_log row with
+        #     learning_step IS NULL AND grade >= 4, #2096) with no
+        #     card_reviews row at all, REGARDLESS of the 2-day grace
+        #     (#1357). Catches fresh graduated orphans that Option A's
+        #     grace window misses.
         # Every flagged subject is a real signal under any query, so
         # the default threshold is 0 — leave this blank to alert on any
         # non-zero count. The threshold is applied to each query
@@ -107,26 +108,65 @@ jobs:
         # about one problem reads as four problems, and a signal that arrives
         # daily and identically stops being read at all.
         #
-        # An open issue carrying the marker is now updated with a recurrence
-        # comment instead. A NEW issue is opened only when there is no open one,
-        # so a genuinely new occurrence after a fix still gets your attention.
+        # An open issue carrying the marker is now refreshed in place (body and
+        # title) plus a short recurrence comment. A NEW issue is opened only
+        # when there is no open one, so a genuinely new occurrence after a fix
+        # still gets your attention.
+        #
+        # LOOKUP (#2010, #2081). The marker must be the WHOLE first line of the
+        # body, which is where this step writes it. Two lookups are ruled out:
+        #   * `gh issue list --search "$MARKER in:body"` (what #2003 shipped):
+        #     GitHub's search index drops HTML comments and this marker's colon
+        #     parses as a search qualifier, so it silently matches nothing and
+        #     a new issue is opened every day (#1919 hit exactly this).
+        #   * an unanchored `contains($marker)`: any open issue that merely
+        #     QUOTES the marker (a retro, a review, this workflow's own issue
+        #     threads) would be taken over and have its body overwritten, as
+        #     happened to #1997 in auto-release.yml's drift check.
+        # The list call is a plain assignment with no `|| true` and no
+        # `2>/dev/null`, so a gh failure fails the step under `set -e` rather
+        # than reading as "no existing issue" and opening a duplicate.
+        #
+        # No auto-close when the check goes back to OK: Option A and C only look
+        # back 4 days (#1230), so a real break the user never touches again
+        # "clears" by ageing out, not by being fixed. Closing stays a human call.
         run: |
           set -euo pipefail
           MARKER="<!-- monitor:grade-log-divergence -->"
+          TITLE="[monitoring] grade_log divergence detected (${USER_COUNT} users)"
+          LIMIT=100
 
-          EXISTING=$(gh issue list \
-            --state open --label monitoring --limit 50 \
-            --search "$MARKER in:body" \
-            --json number --jq '.[0].number // empty')
+          OPEN_ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --state open --label monitoring --limit "$LIMIT" \
+            --json number,body)
+
+          # Plain assignment so a jq failure (malformed gh output) also fails
+          # the step instead of being swallowed inside the `if` test.
+          OPEN_COUNT=$(jq 'length' <<<"$OPEN_ISSUES")
+          if [ "$OPEN_COUNT" -ge "$LIMIT" ]; then
+            echo "::warning::gh issue list hit the ${LIMIT}-issue limit; an existing tracking issue beyond it would be missed."
+          fi
+
+          # Oldest matching issue wins, so the original thread keeps the history.
+          EXISTING=$(jq -r --arg marker "$MARKER" '
+            [ .[]
+              | select(((.body // "") | split("\n") | .[0] | rtrimstr("\r")) == $marker)
+              | .number ]
+            | sort | .[0] // empty' <<<"$OPEN_ISSUES")
+
+          { printf '%s\n\n' "$MARKER"; cat /tmp/divergence-body.md; } > /tmp/divergence-body-marked.md
 
           if [ -n "$EXISTING" ]; then
-            echo "Divergence still present; issue #${EXISTING} is already open. Commenting rather than opening a duplicate."
-            gh issue comment "$EXISTING" --body \
-              "Still diverging as of $(date -u +'%Y-%m-%d %H:%M UTC') (${USER_COUNT} user(s) affected). This is a recurrence on the existing issue, not a new problem."
+            echo "Divergence still present; updating open tracking issue #${EXISTING} rather than opening a duplicate."
+            gh issue edit "$EXISTING" --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" \
+              --body-file /tmp/divergence-body-marked.md
+            gh issue comment "$EXISTING" --repo "$GITHUB_REPOSITORY" --body \
+              "Still diverging as of $(date -u +'%Y-%m-%d %H:%M UTC') (${USER_COUNT} user(s) affected). The report above has been refreshed; this is a recurrence on the existing issue, not a new problem."
           else
-            { printf '%s\n\n' "$MARKER"; cat /tmp/divergence-body.md; } > /tmp/divergence-body-marked.md
-            gh issue create \
-              --title "[monitoring] grade_log divergence detected (${USER_COUNT} users)" \
+            echo "No open tracking issue carries the marker on line 1; opening a new one."
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" \
               --body-file /tmp/divergence-body-marked.md \
               --label monitoring \
               --label "area:workflow"
