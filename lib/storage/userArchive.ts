@@ -44,6 +44,7 @@ import {
   KEY_MASTERED_COUNT_BY_LOCALE,
   KEY_DUE_COUNT_BY_LOCALE,
   KEY_HAS_HISTORY_BY_LOCALE,
+  KEY_HELD_GRADE_PREFIX,
   userArchiveKey,
 } from "@/lib/storage/keys";
 
@@ -99,10 +100,15 @@ export async function archiveUserData(userId: string): Promise<void> {
       if (val !== null) lsData[key] = val;
     }
 
-    // Snapshot dynamic MT-banner dismissal keys (scan by prefix).
+    // Snapshot dynamic keys (scan by prefix): MT-banner dismissals and held grades.
     for (let i = 0; i < ls.length; i++) {
       const key = ls.key(i);
-      if (key !== null && key.startsWith(MT_BANNER_PREFIX)) {
+      // Also the per-tab held-grade copies (#2052): they belong to this user and
+      // must not stay behind for the next account to inherit.
+      if (
+        key !== null &&
+        (key.startsWith(MT_BANNER_PREFIX) || key.startsWith(KEY_HELD_GRADE_PREFIX))
+      ) {
         const val = ls.getItem(key);
         if (val !== null) lsData[key] = val;
       }

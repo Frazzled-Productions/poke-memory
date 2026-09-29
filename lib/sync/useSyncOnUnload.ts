@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ReviewableCard } from "@/lib/review/session";
+import type { UnsyncedSnapshot } from "@/lib/sync/usePerGradeSync";
 import { buildBeaconPayload } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus, savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
 import { markStructuralSyncError } from "@/lib/sync/structuralError";
@@ -41,7 +41,7 @@ import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 export function useSyncOnUnload(
   client: SupabaseClient | null,
   userId: string | null,
-  getUnsynced: () => ReviewableCard[],
+  getUnsynced: (final: boolean) => UnsyncedSnapshot,
 ): void {
   // useRef so the in-flight guard survives effect re-runs.
   const pushingRef = useRef(false);
@@ -61,10 +61,20 @@ export function useSyncOnUnload(
       // (null) value rather than the stale closed-over prop.
       const uid = userIdRef.current;
       if (!uid) return;
-      if (pushingRef.current) return;
+      // pagehide is final and must never be skipped by the in-flight guard: a
+      // visibilitychange fetch may still be pending when the page goes away, and
+      // skipping would leave the held (undoable) grade uncommitted and Undo
+      // alive after a bfcache restore (#2052). Re-sending the queue in the
+      // beacon is idempotent (upsert). Only the non-final path is guarded.
+      const isPagehide = event.type === "pagehide";
+      if (!isPagehide && pushingRef.current) return;
 
-      const unsynced = getUnsyncedRef.current();
-      if (unsynced.length === 0) return;
+      // pagehide commits the held grade and its grade-log entry rides the
+      // beacon; visibilitychange leaves it to the hidden-grace timer.
+      const snapshot = getUnsyncedRef.current(isPagehide);
+      const unsynced = snapshot.cards;
+      const { gradeLog } = snapshot;
+      if (unsynced.length === 0 && gradeLog.length === 0) return;
 
       pushingRef.current = true;
       const now = new Date().toISOString();
@@ -80,9 +90,12 @@ export function useSyncOnUnload(
       // useOnlineReconnectSync and useRetryPush on the next app open (#1288).
       // Only write when the queue is non-empty - clearPendingQueue is called
       // after a successful push, so we must not overwrite that with stale data.
-      savePendingQueue(unsynced);
+      // A held (undoable) grade is NOT part of this queue and is never written
+      // or cleared here: it has its own key, managed only by usePerGradeSync
+      // from live state (#2052).
+      if (unsynced.length > 0) savePendingQueue(unsynced);
 
-      const payload = buildBeaconPayload(unsynced);
+      const payload = buildBeaconPayload(unsynced, gradeLog);
 
       if (event.type === "pagehide") {
         // Final shutdown: only sendBeacon survives. We can't observe the

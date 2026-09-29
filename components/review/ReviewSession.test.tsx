@@ -15,7 +15,7 @@ import type { NameReviewCard, CryReviewCard, ReverseReviewCard } from "@/lib/rev
 import type { UserSettings } from "@/lib/settings/persistence";
 import { saveSettings } from "@/lib/settings/persistence";
 import { loadSession, saveSession } from "@/lib/review/persistence";
-import { loadGradeLog, appendGradeEntry } from "@/lib/gradelog/persistence";
+import { loadGradeLog, appendGradeEntry, removeGradeEntry } from "@/lib/gradelog/persistence";
 import { STORAGE_KEY as DAILY_SUMMARY_KEY } from "@/lib/review/dailySummaryPersistence";
 import { DEFAULT_LIMITS } from "@/lib/review/session";
 import { CRY_ID_OFFSET } from "@/lib/pokemon/seed";
@@ -221,6 +221,10 @@ vi.mock("@/lib/gradelog/persistence", async (importOriginal) => {
     removeGradeEntry: vi.fn().mockResolvedValue(undefined),
     todayGradeSequence: actual.todayGradeSequence,
     GRADE_LOG_APPENDED_EVENT: "poke-memory:grade-log-appended",
+    // Real hold-set helpers (#2052): usePerGradeSync releases holds through
+    // these, and they are pure in-memory state.
+    isCloudPushHeld: actual.isCloudPushHeld,
+    releaseCloudPushHold: actual.releaseCloudPushHold,
   };
 });
 
@@ -247,8 +251,16 @@ vi.mock("@/lib/streak", () => ({
   effectiveStreakDates: vi.fn((dates: string[]) => dates),
 }));
 
+// Mutable so the #2052 undo-hold tests can sign in with a recording fake client.
+const mockAuthValue = vi.hoisted(() => ({
+  current: { user: null, supabase: null, loading: false } as {
+    user: { id: string } | null;
+    supabase: unknown;
+    loading: boolean;
+  },
+}));
 vi.mock("@/lib/auth/AuthContext", () => ({
-  useAuth: () => ({ user: null, supabase: null, loading: false }),
+  useAuth: () => mockAuthValue.current,
 }));
 
 vi.mock("@/lib/sync/useSyncOnUnload", () => ({
@@ -5954,5 +5966,216 @@ describe("Higher-or-Lower launch-from-summary redesign (#1882)", () => {
       // Japanese "all caught up" text - arbitrary match to confirm screen is present.
       expect(screen.getByText(/ハイ・ロー勝負/)).toBeInTheDocument(),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Undo hold: an undoable grade never leaves the device (#2052)
+// ---------------------------------------------------------------------------
+
+describe("undo hold wiring for signed-in users (#2052)", () => {
+  const nameOnlySettings = {
+    masteryRepetitions: 3,
+    maxNewPerDay: 10,
+    maxReviewsPerDay: 100,
+    maxNewEvolutionPerDay: 0,
+    maxReviewsEvolutionPerDay: 0,
+    maxNewReversePerDay: 0,
+    maxReviewsReversePerDay: 0,
+    cryCardsEnabled: false,
+    maxNewCryPerDay: 0,
+    maxReviewsCryPerDay: 0,
+    evolutionCardsEnabled: false,
+    playCryOnReveal: false,
+    practiceScope: { gens: [] as number[], types: [] as string[], presets: [] as ("starters" | "legendaries")[] },
+    earnedBadges: [] as { id: string; earnedAt: string }[],
+  };
+
+  let upserts: { table: string; rows: Record<string, unknown>[] }[];
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const gradeLogRows = () =>
+    upserts.filter((u) => u.table === "grade_log").flatMap((u) => u.rows);
+
+  function makeLocalStorage(): Storage {
+    const store = new Map<string, string>();
+    return {
+      get length() { return store.size; },
+      clear: () => store.clear(),
+      getItem: (k) => store.get(k) ?? null,
+      key: (i) => Array.from(store.keys())[i] ?? null,
+      removeItem: (k) => { store.delete(k); },
+      setItem: (k, v) => { store.set(k, String(v)); },
+    };
+  }
+
+  beforeEach(() => {
+    Object.defineProperty(window, "localStorage", {
+      value: makeLocalStorage(),
+      configurable: true,
+      writable: true,
+    });
+    upserts = [];
+    // Recording fake Supabase: every cloud write lands in `upserts`.
+    mockAuthValue.current = {
+      user: { id: "user-1" },
+      supabase: {
+        from: (table: string) => ({
+          upsert: async (rows: Record<string, unknown> | Record<string, unknown>[]) => {
+            upserts.push({ table, rows: Array.isArray(rows) ? rows : [rows] });
+            return { error: null };
+          },
+        }),
+      },
+      loading: false,
+    };
+    vi.mocked(saveSession).mockResolvedValue({ ok: true });
+    vi.mocked(removeGradeEntry).mockClear();
+    mockSeedPokemon.mockReturnValue(FIXTURE_CARDS_4);
+    mockLoadSettings.mockReturnValue(nameOnlySettings);
+  });
+
+  afterEach(() => {
+    mockAuthValue.current = { user: null, supabase: null, loading: false };
+    vi.mocked(appendGradeEntry).mockResolvedValue({ occurredAt: Date.now() } as never);
+  });
+
+  async function gradeAgain(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole("button", { name: /reveal/i }));
+    await user.click(screen.getByRole("button", { name: /again/i }));
+  }
+
+  it("grade then Undo: nothing reaches the cloud and the local log entry is removed", async () => {
+    vi.mocked(appendGradeEntry).mockResolvedValue({ occurredAt: 777 } as never);
+    const user = userEvent.setup();
+    renderWithIntl(<ReviewSession />);
+
+    await gradeAgain(user);
+    await user.click(await screen.findByRole("button", { name: /undo last grade/i }));
+    // Well past the 200 ms per-grade debounce that used to push the grade.
+    await act(async () => { await sleep(600); });
+
+    expect(vi.mocked(removeGradeEntry)).toHaveBeenCalledWith(777);
+    expect(upserts).toEqual([]);
+  });
+
+  it("Undo is only offered once the grade-log entry exists, so a fast Undo cannot miss it", async () => {
+    let resolveAppend: (v: { occurredAt: number }) => void = () => {};
+    vi.mocked(appendGradeEntry).mockReturnValue(
+      new Promise((r) => { resolveAppend = r; }) as never,
+    );
+    const user = userEvent.setup();
+    renderWithIntl(<ReviewSession />);
+
+    await gradeAgain(user);
+    await waitFor(() => expect(vi.mocked(appendGradeEntry)).toHaveBeenCalled());
+    // Entry not appended yet: Undo must not be armed (pre-#2052 it was, and
+    // an early click left the entry in the log).
+    expect(screen.queryByRole("button", { name: /undo last grade/i })).not.toBeInTheDocument();
+
+    await act(async () => { resolveAppend({ occurredAt: 888 }); });
+    await user.click(await screen.findByRole("button", { name: /undo last grade/i }));
+
+    expect(vi.mocked(removeGradeEntry)).toHaveBeenCalledWith(888);
+    await act(async () => { await sleep(600); });
+    expect(upserts).toEqual([]);
+  });
+
+  it("the next grade commits the previous one (its grade-log row is pushed) and holds itself", async () => {
+    vi.mocked(appendGradeEntry)
+      .mockResolvedValueOnce({ occurredAt: 1 } as never)
+      .mockResolvedValueOnce({ occurredAt: 2 } as never);
+    const user = userEvent.setup();
+    renderWithIntl(<ReviewSession />);
+
+    await gradeAgain(user);
+    await screen.findByRole("button", { name: /undo last grade/i });
+    await act(async () => { await sleep(400); });
+    // First grade still held: nothing pushed.
+    expect(gradeLogRows()).toEqual([]);
+
+    await gradeAgain(user);
+    await waitFor(() => expect(gradeLogRows().map((r) => r.occurred_at)).toEqual([1]));
+
+    // Undoing the second grade discards only the second.
+    await user.click(await screen.findByRole("button", { name: /undo last grade/i }));
+    await act(async () => { await sleep(600); });
+    expect(gradeLogRows().map((r) => r.occurred_at)).toEqual([1]);
+  });
+
+  it("leaving the practice page (unmount) commits the held grade", async () => {
+    vi.mocked(appendGradeEntry).mockResolvedValue({ occurredAt: 999 } as never);
+    const user = userEvent.setup();
+    const { unmount } = renderWithIntl(<ReviewSession />);
+
+    await gradeAgain(user);
+    await screen.findByRole("button", { name: /undo last grade/i });
+    expect(gradeLogRows()).toEqual([]);
+
+    unmount();
+    await waitFor(() => expect(gradeLogRows().map((r) => r.occurred_at)).toEqual([999]));
+  });
+
+  describe("graduated (sync-safe) card", () => {
+    const dueGraduated = () => ({
+      ...FIXTURE_CARD,
+      state: {
+        stability: 25,
+        difficulty: 5,
+        elapsedDays: 25,
+        scheduledDays: 25,
+        reps: 3,
+        lapses: 0,
+        fsrsState: "review" as const,
+        dueDate: "2020-01-01",
+        lastReview: "2019-12-01",
+        firstSeen: "2019-11-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    });
+
+    it("grade then Undo: the card_reviews row is never pushed", async () => {
+      vi.mocked(loadSession).mockResolvedValueOnce({ cards: [dueGraduated()], limits: DEFAULT_LIMITS });
+      const user = userEvent.setup();
+      renderWithIntl(<ReviewSession />);
+
+      await gradeAgain(user);
+      await user.click(await screen.findByRole("button", { name: /undo last grade/i }));
+      await act(async () => { await sleep(600); });
+
+      expect(upserts.filter((u) => u.table === "card_reviews")).toEqual([]);
+    });
+
+    it("grade with no Undo: the card row is pushed once the hold is committed (unmount)", async () => {
+      vi.mocked(loadSession).mockResolvedValueOnce({ cards: [dueGraduated()], limits: DEFAULT_LIMITS });
+      const user = userEvent.setup();
+      const { unmount } = renderWithIntl(<ReviewSession />);
+
+      await gradeAgain(user);
+      await screen.findByRole("button", { name: /undo last grade/i });
+      await act(async () => { await sleep(400); });
+      expect(upserts.filter((u) => u.table === "card_reviews")).toEqual([]);
+
+      unmount();
+      await waitFor(() =>
+        expect(upserts.filter((u) => u.table === "card_reviews")).toHaveLength(1),
+      );
+    });
+  });
+
+  it("guest (signed out): Undo still works and nothing is sent", async () => {
+    mockAuthValue.current = { user: null, supabase: null, loading: false };
+    vi.mocked(appendGradeEntry).mockResolvedValue({ occurredAt: 555 } as never);
+    const user = userEvent.setup();
+    renderWithIntl(<ReviewSession />);
+
+    await gradeAgain(user);
+    await user.click(await screen.findByRole("button", { name: /undo last grade/i }));
+
+    expect(vi.mocked(removeGradeEntry)).toHaveBeenCalledWith(555);
+    expect(upserts).toEqual([]);
   });
 });

@@ -1107,7 +1107,20 @@ export function ReviewSession() {
   // SignInPull) keep running so local stays consistent with cloud.
   const syncClient = superuserGuarded ? null : supabase;
   const syncUserId = superuserGuarded ? null : user?.id ?? null;
-  const { enqueueGrade, flushPending } = usePerGradeSync(syncClient, syncUserId);
+  // An undoable grade is HELD on the device and only reaches the cloud once
+  // committed (next grade, unmount, page hidden/closed, idle cap); commit
+  // expires the Undo affordance so it never outlives the local-only window
+  // (#2052).
+  const { enqueueGrade, attachHeldGradeLog, discardHeld, flushPending } = usePerGradeSync(
+    syncClient,
+    syncUserId,
+    {
+      onCommitted: () => {
+        undoSnapshotRef.current = null;
+        if (isMountedRef.current) setHasUndoSnap(false);
+      },
+    },
+  );
   useSyncOnUnload(syncClient, syncUserId, flushPending);
 
   // Per-user shuffle salt: authenticated users use their stable Supabase UUID;
@@ -1535,8 +1548,15 @@ export function ReviewSession() {
         // cannot be async itself, so we call void on an immediately-invoked
         // async arrow that awaits saveSession and removeGradeEntry.
         void (async () => {
+          // Drain in-flight persistence first so the grade-log entry exists
+          // (and is attached to the hold) before we remove it (#2052 race).
+          await persistenceChainRef.current;
           const snapshot = undoSnapshotRef.current;
+          // Null here means the grade was committed meanwhile (undo expired).
           if (snapshot === null) return;
+          undoSnapshotRef.current = null;
+          // Drop the held grade so it is never pushed to the cloud (#2052).
+          discardHeld();
           setCards(snapshot.cards);
           setSessionGrades(snapshot.sessionGrades);
           setSessionGradeSeq(snapshot.sessionGradeSeq);
@@ -2733,7 +2753,12 @@ export function ReviewSession() {
     // chain only after saveSession confirms the write succeeded (#1209).
     // This keeps the undo button's enabled state consistent with persisted
     // state: a failed save leaves no snapshot, so undo stays disabled.
-    enqueueGrade({ ...effectiveCard, state: nextState });
+    //
+    // `hold: true` (#2052): the grade is parked on the device while it is still
+    // undoable and pushed only when committed. The token ties the later
+    // grade-log attach to THIS grade's hold (null when nothing is held: guest,
+    // signed out, or a superuser write-guard).
+    const holdToken = enqueueGrade({ ...effectiveCard, state: nextState }, { hold: true });
 
     // Persist the MC-card onboarding flag after the first grade from an MC
     // learning card (#1271). Runs once per user, then never again. Compute
@@ -2862,11 +2887,10 @@ export function ReviewSession() {
     // never race inside appendGradeEntry: the second grade's IDB read waits
     // for the first grade's IDB write to commit, preserving the ordered log.
     //
-    // snapshot.gradeLogOccurredAt is mutated in-place after appendGradeEntry
-    // resolves. Undo reads it from undoSnapshotRef.current at click-time; if
-    // the user undoes before persistence completes the entry is simply left in
-    // the grade log (a minor non-critical omission in an extremely narrow race
-    // window - the same behaviour as if IDB were slow under the old ordering).
+    // snapshot.gradeLogOccurredAt is set after appendGradeEntry resolves, and
+    // the undo snapshot is armed only after that (#2052), while both undo paths
+    // also await this chain first - so Undo always sees the entry and removes
+    // it (previously a fast Undo could leave it in the log).
     persistenceChainRef.current = persistenceChainRef.current.then(async () => {
       if (!isMountedRef.current) return;
       // saveSession resolves with { ok: true } or { ok: false } - it never
@@ -2889,11 +2913,9 @@ export function ReviewSession() {
         // button stays disabled so its enabled state matches persisted state.
         return;
       }
-      // Session persisted successfully - arm the undo snapshot now so the
-      // undo button only becomes active when there is a durable write to
-      // revert (#1209).
-      undoSnapshotRef.current = snapshot;
-      setHasUndoSnap(true);
+      // The undo snapshot is armed at the END of this step, once the grade-log
+      // entry exists and is attached to the hold (#2052), so an early Undo can
+      // never miss the entry.
       const gradeLog = await loadGradeLog();
       // Count and stamp in the user's-timezone day domain (#1853): the streak
       // readers and Stats charts anchor on the tz-local day, so the writer
@@ -2920,8 +2942,20 @@ export function ReviewSession() {
         // Pass the graded card's locale so the grade log row carries the
         // correct locale for per-locale FSRS optimisation (#1562).
         locale: effectiveCard.locale ?? activeLocale,
-      });
+      }, { holdCloudPush: holdToken !== null });
       snapshot.gradeLogOccurredAt = appended?.occurredAt ?? null;
+      // Hand the entry to the hold so commit pushes it. `false` means the hold
+      // was already committed (a rapid next grade), so undo has expired and the
+      // snapshot must not be armed.
+      const stillUndoable =
+        holdToken === null || attachHeldGradeLog(holdToken, appended);
+      if (stillUndoable) {
+        // Session persisted and the entry exists - arm the undo snapshot so
+        // the button is only active when there is a durable write to revert
+        // (#1209).
+        undoSnapshotRef.current = snapshot;
+        setHasUndoSnap(true);
+      }
     });
 
     // Persist the cumulative daily summary so the share button survives a
@@ -2991,8 +3025,16 @@ export function ReviewSession() {
   }
 
   async function handleUndo() {
+    if (undoSnapshotRef.current === null || grading) return;
+    // Drain in-flight persistence first so the grade-log entry exists (and is
+    // attached to the hold) before we remove it (#2052 fast-undo race).
+    await persistenceChainRef.current;
     const snapshot = undoSnapshotRef.current;
-    if (snapshot === null || grading) return;
+    // Null here means the grade was committed meanwhile (undo expired).
+    if (snapshot === null) return;
+    undoSnapshotRef.current = null;
+    // Drop the held grade so it is never pushed to the cloud (#2052).
+    discardHeld();
     // Revert local state to the pre-grade snapshot.
     setCards(snapshot.cards);
     // MULTI-LOCALE: restore the full array and save it; never the filtered view.

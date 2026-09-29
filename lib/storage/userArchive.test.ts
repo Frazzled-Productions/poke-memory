@@ -54,6 +54,7 @@ import {
   KEY_GRADE_LOG,
   KEY_REVIEW_SESSION,
   KEY_PENDING_GRADE_QUEUE,
+  KEY_HELD_GRADE_PREFIX,
   userArchiveKey,
 } from "./keys";
 
@@ -125,6 +126,17 @@ describe("archiveUserData", () => {
     const blob = JSON.parse(storage.getItem(userArchiveKey(USER_A))!) as { ls: Record<string, string> };
     expect(blob.ls[`${MT_PREFIX}:ja`]).toBe("true");
     expect(blob.ls[`${MT_PREFIX}:zh-Hans`]).toBe("true");
+  });
+
+  it("includes the per-tab held-grade copies scanned by prefix (#2052)", async () => {
+    storage.setItem(`${KEY_HELD_GRADE_PREFIX}tab-1`, '{"userId":"a"}');
+    storage.setItem(`${KEY_HELD_GRADE_PREFIX}tab-2`, '{"userId":"a"}');
+
+    await archiveUserData(USER_A);
+
+    const blob = JSON.parse(storage.getItem(userArchiveKey(USER_A))!) as { ls: Record<string, string> };
+    expect(blob.ls[`${KEY_HELD_GRADE_PREFIX}tab-1`]).toBe('{"userId":"a"}');
+    expect(blob.ls[`${KEY_HELD_GRADE_PREFIX}tab-2`]).toBe('{"userId":"a"}');
   });
 
   it("snapshots IDB keys that are present", async () => {

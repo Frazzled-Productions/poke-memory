@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
   isSyncSafe,
+  pullSession,
   pushSession,
   pushSingleCard,
   mergeCloudIntoLocal,
   mergeCloudIntoLocalSilent,
   applyCloudAuthoritative,
   isStructuralError,
+  buildBeaconPayload,
   CARD_REVIEWS_CONFLICT_COLS,
 } from "./cloud";
 import type { ReviewableCard } from "@/lib/review/session";
@@ -1245,5 +1247,77 @@ describe("pushSession structural error handling (#1358)", () => {
     expect(result).toBe(true);
     expect(clearStructuralSyncError).toHaveBeenCalledTimes(1);
     expect(markStructuralSyncError).not.toHaveBeenCalled();
+  });
+});
+
+describe("pullSession pagination order (#2053)", () => {
+  function makeClient(pages: unknown[][], failWith: object | null = null) {
+    const calls: Array<[number, number]> = [];
+    const range = vi.fn().mockImplementation((from: number, to: number) => {
+      calls.push([from, to]);
+      if (failWith) return Promise.resolve({ data: null, error: failWith });
+      return Promise.resolve({ data: pages[calls.length - 1] ?? [], error: null });
+    });
+    const order = vi.fn();
+    order.mockReturnValue({ order, range });
+    const eq = vi.fn().mockReturnValue({ order });
+    const select = vi.fn().mockReturnValue({ eq });
+    const from = vi.fn().mockReturnValue({ select });
+    return {
+      client: { from } as unknown as import("@supabase/supabase-js").SupabaseClient,
+      order,
+      calls,
+    };
+  }
+
+  it("orders by the PK columns before ranging, on every page", async () => {
+    const full = Array.from({ length: 1000 }, (_, i) => ({ subject_key: `k${i}` }));
+    const { client, order, calls } = makeClient([full, [{ subject_key: "last" }]]);
+    const rows = await pullSession(client, "u1");
+    expect(rows).toHaveLength(1001);
+    expect(calls).toEqual([[0, 999], [1000, 1999]]);
+    expect(order.mock.calls.map((c) => c[0])).toEqual([
+      "card_type", "subject_key", "locale",
+      "card_type", "subject_key", "locale",
+    ]);
+    for (const c of order.mock.calls) expect(c[1]).toEqual({ ascending: true });
+  });
+
+  it("filters null subject_key rows", async () => {
+    const { client } = makeClient([[{ subject_key: null }, { subject_key: "a" }]]);
+    expect(await pullSession(client, "u1")).toEqual([{ subject_key: "a" }]);
+  });
+
+  it("returns null on a page error", async () => {
+    const { client } = makeClient([], { message: "boom" });
+    expect(await pullSession(client, "u1")).toBeNull();
+  });
+});
+
+describe("buildBeaconPayload (#2052)", () => {
+  async function body(blob: Blob): Promise<Record<string, unknown>> {
+    return JSON.parse(await blob.text()) as Record<string, unknown>;
+  }
+
+  it("carries the committed held grade's grade-log entries alongside the cards", async () => {
+    const entry = { date: "2026-09-29", grade: 4 as const, cardType: "name" as const, occurredAt: 1, subjectKey: "1" };
+    const payload = await body(
+      buildBeaconPayload([makeCard(1, "2026-05-01", "2026-05-02")], [entry]),
+    );
+    expect((payload.cards as unknown[]).length).toBe(1);
+    expect(payload.gradeLog).toEqual([entry]);
+  });
+
+  it("omits gradeLog entirely when there is none (payload stays compatible with older servers)", async () => {
+    const payload = await body(buildBeaconPayload([makeCard(1, "2026-05-01", "2026-05-02")]));
+    expect(payload).not.toHaveProperty("gradeLog");
+    expect((payload.cards as unknown[]).length).toBe(1);
+  });
+
+  it("still filters in-step cards but keeps the grade-log entry (an in-step grade)", async () => {
+    const entry = { date: "2026-09-29", grade: 1 as const, cardType: "name" as const, occurredAt: 2, subjectKey: "1" };
+    const payload = await body(buildBeaconPayload([makeCard(1, "2026-05-01", null)], [entry]));
+    expect(payload.cards).toEqual([]);
+    expect(payload.gradeLog).toEqual([entry]);
   });
 });

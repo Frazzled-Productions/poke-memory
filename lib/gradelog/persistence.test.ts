@@ -7,6 +7,10 @@ import {
   todayGradeSequence,
   trimToQuota,
   LS_QUOTA_BYTES,
+  GRADE_LOG_APPENDED_EVENT,
+  isCloudPushHeld,
+  releaseCloudPushHold,
+  removeGradeEntry,
   type GradeLogEntry,
 } from "./persistence";
 import { __resetForTests } from "@/lib/idb/db";
@@ -365,5 +369,75 @@ describe("todayGradeSequence", () => {
       { date: "2026-05-09", grade: 4, cardType: "name", occurredAt: 200 },
     ];
     expect(todayGradeSequence(log, "2026-05-09")).toEqual([1, 4, 5]);
+  });
+});
+
+// #2052: an undoable grade's cloud push is HELD until commit. The hold set is
+// what AutoSyncOnChange consults; it must be armed before the event fires and
+// cleared by every exit path (undo removal, commit release).
+describe("cloud-push hold (#2052)", () => {
+  let heldAtDispatch: Record<string, boolean>;
+
+  beforeEach(async () => {
+    await resetIdb();
+    heldAtDispatch = {};
+    vi.stubGlobal("window", {
+      indexedDB: globalThis.indexedDB,
+      localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+      dispatchEvent: (e: Event) => {
+        const detail = (e as unknown as { detail?: GradeLogEntry }).detail;
+        heldAtDispatch[e.type] = detail ? isCloudPushHeld(detail.occurredAt) : false;
+        return true;
+      },
+    });
+    vi.stubGlobal("CustomEvent", class extends Event {
+      detail: unknown;
+      constructor(type: string, init?: { detail?: unknown }) {
+        super(type);
+        this.detail = init?.detail;
+      }
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("marks the entry held BEFORE the append event fires, and still fires it", async () => {
+    const entry = await appendGradeEntry(
+      { date: "2026-05-09", grade: 4, cardType: "name" },
+      { holdCloudPush: true },
+    );
+    expect(isCloudPushHeld(entry!.occurredAt)).toBe(true);
+    expect(heldAtDispatch[GRADE_LOG_APPENDED_EVENT]).toBe(true);
+    // Local readers (sidebar, stats) still see it.
+    expect(await loadGradeLog()).toHaveLength(1);
+  });
+
+  it("does not hold by default (KnownPokemonQuiz, guests keep the immediate push)", async () => {
+    const entry = await appendGradeEntry({ date: "2026-05-09", grade: 4, cardType: "name" });
+    expect(isCloudPushHeld(entry!.occurredAt)).toBe(false);
+    expect(heldAtDispatch[GRADE_LOG_APPENDED_EVENT]).toBe(false);
+  });
+
+  it("removeGradeEntry (undo) clears the hold", async () => {
+    const entry = await appendGradeEntry(
+      { date: "2026-05-09", grade: 4, cardType: "name" },
+      { holdCloudPush: true },
+    );
+    await removeGradeEntry(entry!.occurredAt);
+    expect(isCloudPushHeld(entry!.occurredAt)).toBe(false);
+    expect(await loadGradeLog()).toHaveLength(0);
+  });
+
+  it("releaseCloudPushHold (commit) clears the hold, is idempotent, and keeps the entry", async () => {
+    const entry = await appendGradeEntry(
+      { date: "2026-05-09", grade: 4, cardType: "name" },
+      { holdCloudPush: true },
+    );
+    releaseCloudPushHold(entry!.occurredAt);
+    releaseCloudPushHold(entry!.occurredAt);
+    expect(isCloudPushHeld(entry!.occurredAt)).toBe(false);
+    expect(await loadGradeLog()).toHaveLength(1);
   });
 });

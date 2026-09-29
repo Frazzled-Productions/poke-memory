@@ -42,12 +42,14 @@ export async function pullStreak(
   try {
     // Paginate to avoid the PostgREST 1000-row cap. streak_days grows one
     // row per review day (fuse is ~2.7 years at daily use), so truncation
-    // is a long-horizon risk worth guarding now.
+    // is a long-horizon risk worth guarding now. Ordered by review_date (the
+    // UNIQUE (user_id, review_date) constraint) so offset pages are stable (#2053).
     const data = await fetchAllPages<{ review_date: string }>((from, to) =>
       client
         .from("streak_days")
         .select("review_date")
         .eq("user_id", userId)
+        .order("review_date", { ascending: true })
         .range(from, to),
     );
     if (!data) return null;

@@ -9,10 +9,14 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
+import { buildBeaconPayload } from "@/lib/sync/cloud";
 import type { SyncStatus } from "@/lib/sync/persistence";
 
 vi.mock("@/lib/sync/cloud", () => ({
-  buildBeaconPayload: vi.fn((cards) => new Blob([JSON.stringify({ cards })], { type: "application/json" })),
+  buildBeaconPayload: vi.fn(
+    (cards, gradeLog) =>
+      new Blob([JSON.stringify({ cards, gradeLog })], { type: "application/json" }),
+  ),
 }));
 
 vi.mock("@/lib/sync/persistence", () => ({
@@ -38,6 +42,8 @@ vi.mock("@/lib/sync/structuralError", () => ({
 import { loadSyncStatus, saveSyncStatus, savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 import { markStructuralSyncError } from "@/lib/sync/structuralError";
+import type { UnsyncedSnapshot } from "@/lib/sync/usePerGradeSync";
+import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 
 const FAKE_CLIENT = {} as unknown as SupabaseClient;
 const FAKE_USER = "00000000-0000-0000-0000-000000000000";
@@ -54,9 +60,18 @@ const ZERO_STATUS: SyncStatus = {
   ownerUserId: null,
 };
 
-function mockUnsynced(count: number) {
-  return () =>
-    Array.from({ length: count }, (_, i) => ({ id: i, cardType: "name", subjectKey: String(i) })) as never[];
+function mockUnsynced(
+  count: number,
+  extra: { gradeLog?: GradeLogEntry[] } = {},
+) {
+  return (): UnsyncedSnapshot => ({
+    cards: Array.from({ length: count }, (_, i) => ({
+      id: i,
+      cardType: "name",
+      subjectKey: String(i),
+    })) as never[],
+    gradeLog: extra.gradeLog ?? [],
+  });
 }
 
 function fireVisibilityHidden() {
@@ -538,5 +553,117 @@ describe("useSyncOnUnload - Background Sync registration (#1054)", () => {
     act(() => fireVisibilityHidden());
 
     await waitFor(() => expect(registerBackgroundSync).toHaveBeenCalledOnce());
+  });
+});
+
+// #2052: pagehide closes the undo window, so the just-committed held grade's
+// grade-log entry rides the beacon; visibilitychange leaves the hold to the
+// hidden-grace timer but must never wipe the held card's local durability copy.
+describe("useSyncOnUnload - undo hold (#2052)", () => {
+  let beacon: ReturnType<typeof vi.fn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  const entry: GradeLogEntry = { date: "2026-05-13", grade: 4, cardType: "name", occurredAt: 42 };
+
+  beforeEach(() => {
+    vi.mocked(loadSyncStatus).mockReturnValue(ZERO_STATUS);
+    beacon = vi.fn(() => true);
+    Object.defineProperty(navigator, "sendBeacon", { value: beacon, configurable: true, writable: true });
+    fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "sendBeacon", { value: undefined, configurable: true, writable: true });
+    fetchSpy.mockRestore();
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    vi.clearAllMocks();
+  });
+
+  it("pagehide asks the source to commit (final=true) and puts the held grade-log entry in the beacon", () => {
+    const getUnsynced = vi.fn(() => mockUnsynced(1, { gradeLog: [entry] })());
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, getUnsynced));
+
+    act(() => firePagehide());
+
+    expect(getUnsynced).toHaveBeenCalledWith(true);
+    expect(buildBeaconPayload).toHaveBeenCalledWith(expect.any(Array), [entry]);
+    expect(beacon).toHaveBeenCalledOnce();
+  });
+
+  it("pagehide with ONLY a held grade-log entry (in-step grade, no cards) still sends the beacon", () => {
+    renderHook(() =>
+      useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(0, { gradeLog: [entry] })),
+    );
+
+    act(() => firePagehide());
+
+    expect(beacon).toHaveBeenCalledOnce();
+    expect(buildBeaconPayload).toHaveBeenCalledWith([], [entry]);
+  });
+
+  it("pagehide after an undo (nothing held, nothing queued) sends nothing", () => {
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(0)));
+
+    act(() => firePagehide());
+
+    expect(beacon).not.toHaveBeenCalled();
+  });
+
+  it("visibilitychange asks the source WITHOUT committing (final=false)", async () => {
+    const getUnsynced = vi.fn(() => mockUnsynced(1)());
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, getUnsynced));
+
+    act(() => fireVisibilityHidden());
+
+    expect(getUnsynced).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledOnce());
+  });
+
+  it("visibilitychange never writes the persisted queue for a held grade: it has its own key (#2052)", async () => {
+    // The hook reports only committed cards; a held grade is invisible here.
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(0)));
+
+    act(() => fireVisibilityHidden());
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(savePendingQueue).not.toHaveBeenCalled();
+    expect(clearPendingQueue).not.toHaveBeenCalled();
+  });
+
+  it("pagehide is NOT skipped while a visibilitychange fetch is still in flight (commit + beacon)", async () => {
+    // A fetch that never settles keeps pushingRef true.
+    fetchSpy.mockReturnValue(new Promise(() => {}));
+    const getUnsynced = vi.fn((final: boolean) =>
+      final ? mockUnsynced(1, { gradeLog: [entry] })() : mockUnsynced(1)(),
+    );
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, getUnsynced));
+
+    act(() => fireVisibilityHidden());
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledOnce());
+
+    act(() => firePagehide());
+
+    expect(getUnsynced).toHaveBeenLastCalledWith(true);
+    expect(beacon).toHaveBeenCalledOnce();
+    expect(buildBeaconPayload).toHaveBeenLastCalledWith(expect.any(Array), [entry]);
+  });
+
+  it("a second visibilitychange while a fetch is in flight is still skipped", async () => {
+    fetchSpy.mockReturnValue(new Promise(() => {}));
+    const getUnsynced = vi.fn(() => mockUnsynced(1)());
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, getUnsynced));
+
+    act(() => fireVisibilityHidden());
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledOnce());
+    act(() => fireVisibilityHidden());
+
+    expect(getUnsynced).toHaveBeenCalledTimes(1);
+  });
+
+  it("after a successful visibilitychange push the persisted queue is cleared", async () => {
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(1)));
+
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() => expect(clearPendingQueue).toHaveBeenCalledOnce());
   });
 });

@@ -55,7 +55,7 @@
     "next-intl": "^4.13.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "recharts": "^3.8.1",
+    "recharts": "^3.10.1",
     "serwist": "^9.5.11",
     "ts-fsrs": "^5.4.1",
     "web-push": "^3.6.7"
@@ -81,7 +81,7 @@
     "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^5.0.2",
     "browserslist": "^4.28.8",
-    "esbuild": "^0.28.1",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "fake-indexeddb": "^6.2.5",
@@ -91,7 +91,7 @@
     "tailwindcss": "^4",
     "typescript": "^6",
     "vitest": "^5.0.2",
-    "wait-on": "^9.0.10",
+    "wait-on": "^9.1.0",
     "wanakana": "^5.3.1"
   }
 }

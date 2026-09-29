@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ReviewableCard } from "@/lib/review/session";
 import { pushWithFallback } from "./pushWithFallback";
@@ -9,6 +9,7 @@ import {
   clearPendingQueue,
 } from "@/lib/sync/persistence";
 import { loadSession } from "@/lib/review/persistence";
+import { markCardPushHeld, releaseCardPushHold, cardPushKey } from "@/lib/sync/heldGrade";
 
 vi.mock("@/lib/sync/cloud", () => ({
   pushSingleCard: vi.fn(),
@@ -259,5 +260,61 @@ describe("pushWithFallback - session fallback leg", () => {
     });
 
     expect(outcome).toEqual({ kind: "cancelled" });
+  });
+});
+
+describe("pushWithFallback - undo hold (#2052)", () => {
+  const held = { ...card("species:1", "2026-07-14"), id: 1 } as ReviewableCard;
+  const other = { ...card("species:2", "2026-07-14"), id: 2 } as ReviewableCard;
+
+  afterEach(() => {
+    releaseCardPushHold(cardPushKey(held));
+  });
+
+  it("session fallback skips a card whose grade is still inside its undo window", async () => {
+    vi.mocked(loadSession).mockResolvedValue({ cards: [held, other], limits: LIMITS } as never);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
+    markCardPushHeld(cardPushKey(held));
+
+    const outcome = await pushWithFallback(client, userId, { failedCardCount: 1 });
+
+    expect(outcome).toEqual({ kind: "session", anyFailed: false });
+    expect(vi.mocked(pushSingleCard)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(pushSingleCard)).toHaveBeenCalledWith(client, userId, other);
+  });
+
+  it("session fallback reports session-empty when the only reviewed card is held", async () => {
+    vi.mocked(loadSession).mockResolvedValue({ cards: [held], limits: LIMITS } as never);
+    markCardPushHeld(cardPushKey(held));
+
+    const outcome = await pushWithFallback(client, userId, { failedCardCount: 1 });
+
+    expect(outcome).toEqual({ kind: "session-empty" });
+    expect(vi.mocked(pushSingleCard)).not.toHaveBeenCalled();
+  });
+
+  it("pushes the card again once the hold is released (committed)", async () => {
+    vi.mocked(loadSession).mockResolvedValue({ cards: [held], limits: LIMITS } as never);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
+    markCardPushHeld(cardPushKey(held));
+    releaseCardPushHold(cardPushKey(held));
+
+    const outcome = await pushWithFallback(client, userId, { failedCardCount: 1 });
+
+    expect(outcome).toEqual({ kind: "session", anyFailed: false });
+    expect(vi.mocked(pushSingleCard)).toHaveBeenCalledWith(client, userId, held);
+  });
+
+  it("the hold is keyed by locale: a held en card does not block the ja card of the same species", async () => {
+    const ja = { ...held, locale: "ja" } as ReviewableCard;
+    vi.mocked(loadSession).mockResolvedValue({ cards: [held, ja], limits: LIMITS } as never);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
+    markCardPushHeld(cardPushKey(held)); // "1:en"
+
+    await pushWithFallback(client, userId, { failedCardCount: 1 });
+
+    expect(vi.mocked(pushSingleCard)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(pushSingleCard)).toHaveBeenCalledWith(client, userId, ja);
+    releaseCardPushHold(cardPushKey(ja));
   });
 });
