@@ -261,17 +261,31 @@ jobs:
             DRIFTED=true
           fi
 
-          # Marker-based dedup. The GitHub search index strips HTML comments
-          # (WORKFLOW.md), so we do NOT use `--search`: that pre-filter could
-          # drop the tracking issue unpredictably and, capped at a low limit,
-          # hide it from the jq match entirely. Instead pull the full open-issue
-          # list (capped at 100) and match the marker locally with jq, which is
-          # reliable. No `2>/dev/null` either: a gh failure must surface via
-          # `set -euo pipefail` rather than look like "no existing issue" and
-          # open a duplicate on every run.
-          EXISTING=$(gh issue list --repo "$REPO" --state open \
-            --json number,body --limit 100 \
-            | jq -r --arg m "$MARKER" '[.[] | select(.body | contains($m))] | .[0].number // empty')
+          # Marker-based dedup via the shared helper (#2081). The marker must be
+          # the WHOLE first line of the body, which is where the body below
+          # writes it. Two lookups are ruled out (and `npm run lint` fails on
+          # both, scripts/lint-workflow-marker-lookups.mjs):
+          #   * `--search "... in:body"`: GitHub's search index drops HTML
+          #     comments, so it silently matches nothing (#1919).
+          #   * an unanchored jq `contains($m)`: an unrelated issue that merely
+          #     QUOTED this marker (the 2026-W32 workflow review, #1997) was
+          #     taken over, had its body overwritten daily, then was closed.
+          # Every lookup command is a plain assignment with no `|| true` and no
+          # `2>/dev/null`, so a gh, jq or parse failure fails the step under
+          # `set -euo pipefail` instead of reading as "no existing issue" and
+          # opening a duplicate. Hitting the list limit fails the step too: the
+          # tracking issue could be beyond it. The list is unfiltered (this
+          # issue carries no label), hence the generous limit.
+          LIMIT=500
+          OPEN_ISSUES=$(gh issue list --repo "$REPO" --state open \
+            --limit "$LIMIT" --json number,body)
+          OPEN_COUNT=$(jq 'length' <<<"$OPEN_ISSUES")
+          if [ "$OPEN_COUNT" -ge "$LIMIT" ]; then
+            echo "::error::gh issue list returned ${OPEN_COUNT} open issues (limit ${LIMIT}); the tracking issue could be beyond the limit, so the lookup cannot be trusted. Raise LIMIT."
+            exit 1
+          fi
+          # Marker must be the whole first line; the oldest match wins.
+          EXISTING=$(node .github/scripts/find-marker-issue.mjs "$MARKER" <<<"$OPEN_ISSUES")
 
           if [ "$DRIFTED" = "false" ]; then
             echo "qa is healthy: main is an ancestor of qa."
