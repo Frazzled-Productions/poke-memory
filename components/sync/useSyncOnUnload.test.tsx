@@ -9,10 +9,14 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
+import { buildBeaconPayload } from "@/lib/sync/cloud";
 import type { SyncStatus } from "@/lib/sync/persistence";
 
 vi.mock("@/lib/sync/cloud", () => ({
-  buildBeaconPayload: vi.fn((cards) => new Blob([JSON.stringify({ cards })], { type: "application/json" })),
+  buildBeaconPayload: vi.fn(
+    (cards, gradeLog) =>
+      new Blob([JSON.stringify({ cards, gradeLog })], { type: "application/json" }),
+  ),
 }));
 
 vi.mock("@/lib/sync/persistence", () => ({
@@ -38,6 +42,9 @@ vi.mock("@/lib/sync/structuralError", () => ({
 import { loadSyncStatus, saveSyncStatus, savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 import { markStructuralSyncError } from "@/lib/sync/structuralError";
+import type { UnsyncedSnapshot } from "@/lib/sync/usePerGradeSync";
+import type { GradeLogEntry } from "@/lib/gradelog/persistence";
+import type { ReviewableCard } from "@/lib/review/session";
 
 const FAKE_CLIENT = {} as unknown as SupabaseClient;
 const FAKE_USER = "00000000-0000-0000-0000-000000000000";
@@ -54,9 +61,19 @@ const ZERO_STATUS: SyncStatus = {
   ownerUserId: null,
 };
 
-function mockUnsynced(count: number) {
-  return () =>
-    Array.from({ length: count }, (_, i) => ({ id: i, cardType: "name", subjectKey: String(i) })) as never[];
+function mockUnsynced(
+  count: number,
+  extra: { gradeLog?: GradeLogEntry[]; heldCards?: ReviewableCard[] } = {},
+) {
+  return (): UnsyncedSnapshot => ({
+    cards: Array.from({ length: count }, (_, i) => ({
+      id: i,
+      cardType: "name",
+      subjectKey: String(i),
+    })) as never[],
+    gradeLog: extra.gradeLog ?? [],
+    heldCards: extra.heldCards ?? [],
+  });
 }
 
 function fireVisibilityHidden() {
@@ -538,5 +555,101 @@ describe("useSyncOnUnload - Background Sync registration (#1054)", () => {
     act(() => fireVisibilityHidden());
 
     await waitFor(() => expect(registerBackgroundSync).toHaveBeenCalledOnce());
+  });
+});
+
+// #2052: pagehide closes the undo window, so the just-committed held grade's
+// grade-log entry rides the beacon; visibilitychange leaves the hold to the
+// hidden-grace timer but must never wipe the held card's local durability copy.
+describe("useSyncOnUnload - undo hold (#2052)", () => {
+  let beacon: ReturnType<typeof vi.fn>;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  const entry: GradeLogEntry = { date: "2026-05-13", grade: 4, cardType: "name", occurredAt: 42 };
+  const heldCard = { id: 9, cardType: "name", subjectKey: "9" } as unknown as ReviewableCard;
+
+  beforeEach(() => {
+    vi.mocked(loadSyncStatus).mockReturnValue(ZERO_STATUS);
+    beacon = vi.fn(() => true);
+    Object.defineProperty(navigator, "sendBeacon", { value: beacon, configurable: true, writable: true });
+    fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "sendBeacon", { value: undefined, configurable: true, writable: true });
+    fetchSpy.mockRestore();
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    vi.clearAllMocks();
+  });
+
+  it("pagehide asks the source to commit (final=true) and puts the held grade-log entry in the beacon", () => {
+    const getUnsynced = vi.fn(() => mockUnsynced(1, { gradeLog: [entry] })());
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, getUnsynced));
+
+    act(() => firePagehide());
+
+    expect(getUnsynced).toHaveBeenCalledWith(true);
+    expect(buildBeaconPayload).toHaveBeenCalledWith(expect.any(Array), [entry]);
+    expect(beacon).toHaveBeenCalledOnce();
+  });
+
+  it("pagehide with ONLY a held grade-log entry (in-step grade, no cards) still sends the beacon", () => {
+    renderHook(() =>
+      useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(0, { gradeLog: [entry] })),
+    );
+
+    act(() => firePagehide());
+
+    expect(beacon).toHaveBeenCalledOnce();
+    expect(buildBeaconPayload).toHaveBeenCalledWith([], [entry]);
+  });
+
+  it("pagehide after an undo (nothing held, nothing queued) sends nothing", () => {
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(0)));
+
+    act(() => firePagehide());
+
+    expect(beacon).not.toHaveBeenCalled();
+  });
+
+  it("visibilitychange asks the source WITHOUT committing (final=false)", async () => {
+    const getUnsynced = vi.fn(() => mockUnsynced(1)());
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, getUnsynced));
+
+    act(() => fireVisibilityHidden());
+
+    expect(getUnsynced).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledOnce());
+  });
+
+  it("visibilitychange with only a held card does not push, and does not touch the persisted queue", () => {
+    renderHook(() =>
+      useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(0, { heldCards: [heldCard] })),
+    );
+
+    act(() => fireVisibilityHidden());
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(savePendingQueue).not.toHaveBeenCalled();
+    expect(clearPendingQueue).not.toHaveBeenCalled();
+  });
+
+  it("after a successful visibilitychange push the held card stays in the persisted queue (not cleared)", async () => {
+    renderHook(() =>
+      useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(1, { heldCards: [heldCard] })),
+    );
+
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() => expect(saveSyncStatus).toHaveBeenCalled());
+    expect(clearPendingQueue).not.toHaveBeenCalled();
+    expect(vi.mocked(savePendingQueue).mock.calls.at(-1)![0]).toEqual([heldCard]);
+  });
+
+  it("after a successful visibilitychange push with nothing held the persisted queue is cleared", async () => {
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(1)));
+
+    act(() => fireVisibilityHidden());
+
+    await waitFor(() => expect(clearPendingQueue).toHaveBeenCalledOnce());
   });
 });

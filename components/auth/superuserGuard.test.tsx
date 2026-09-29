@@ -371,7 +371,7 @@ describe("usePerGradeSync - null guard (ReviewSession superuser path)", () => {
 describe("useSyncOnUnload - null guard (ReviewSession superuser path)", () => {
   it("does not register unload listeners when client is null", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
-    const getUnsynced = vi.fn(() => []);
+    const getUnsynced = vi.fn(() => ({ cards: [], gradeLog: [], heldCards: [] }));
 
     renderHook(() => useSyncOnUnload(null, FAKE_USER.id, getUnsynced));
 
@@ -386,7 +386,7 @@ describe("useSyncOnUnload - null guard (ReviewSession superuser path)", () => {
 
   it("does not register unload listeners when userId is null", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
-    const getUnsynced = vi.fn(() => []);
+    const getUnsynced = vi.fn(() => ({ cards: [], gradeLog: [], heldCards: [] }));
 
     renderHook(() => useSyncOnUnload(FAKE_CLIENT, null, getUnsynced));
 
@@ -399,7 +399,7 @@ describe("useSyncOnUnload - null guard (ReviewSession superuser path)", () => {
 
   it("does register unload listeners when both client and userId are non-null", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
-    const getUnsynced = vi.fn(() => []);
+    const getUnsynced = vi.fn(() => ({ cards: [], gradeLog: [], heldCards: [] }));
 
     renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER.id, getUnsynced));
 

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ReviewableCard } from "@/lib/review/session";
+import type { UnsyncedSnapshot } from "@/lib/sync/usePerGradeSync";
 import { buildBeaconPayload } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus, savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
 import { markStructuralSyncError } from "@/lib/sync/structuralError";
@@ -41,7 +41,7 @@ import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 export function useSyncOnUnload(
   client: SupabaseClient | null,
   userId: string | null,
-  getUnsynced: () => ReviewableCard[],
+  getUnsynced: (final: boolean) => UnsyncedSnapshot,
 ): void {
   // useRef so the in-flight guard survives effect re-runs.
   const pushingRef = useRef(false);
@@ -63,8 +63,12 @@ export function useSyncOnUnload(
       if (!uid) return;
       if (pushingRef.current) return;
 
-      const unsynced = getUnsyncedRef.current();
-      if (unsynced.length === 0) return;
+      // pagehide is final: the held (undoable) grade is committed and rides
+      // the beacon (#2052). visibilitychange leaves it to the hidden-grace timer.
+      const snapshot = getUnsyncedRef.current(event.type === "pagehide");
+      const unsynced = snapshot.cards;
+      const { gradeLog, heldCards } = snapshot;
+      if (unsynced.length === 0 && gradeLog.length === 0) return;
 
       pushingRef.current = true;
       const now = new Date().toISOString();
@@ -80,9 +84,17 @@ export function useSyncOnUnload(
       // useOnlineReconnectSync and useRetryPush on the next app open (#1288).
       // Only write when the queue is non-empty - clearPendingQueue is called
       // after a successful push, so we must not overwrite that with stale data.
-      savePendingQueue(unsynced);
+      // Held (undoable) cards are not sent but stay in the persisted queue.
+      if (unsynced.length + heldCards.length > 0) savePendingQueue([...unsynced, ...heldCards]);
 
-      const payload = buildBeaconPayload(unsynced);
+      // Once the queue has been sent, the local key holds only the held cards
+      // (undo window still open) - never wipe their durability copy (#2052).
+      const clearSent = () => {
+        if (heldCards.length > 0) savePendingQueue(heldCards);
+        else clearPendingQueue();
+      };
+
+      const payload = buildBeaconPayload(unsynced, gradeLog);
 
       if (event.type === "pagehide") {
         // Final shutdown: only sendBeacon survives. We can't observe the
@@ -104,7 +116,7 @@ export function useSyncOnUnload(
           // Best-effort: fire and forget. The IDB mirror is only a safety-net for
           // the all-tabs-closed path; the sendBeacon response is not observable,
           // so we trust the browser's "queued" boolean here.
-          clearPendingQueue();
+          clearSent();
         } else {
           // When the beacon could not be queued (offline or SW declined), register
           // a Background Sync tag so the SW can replay the persisted queue after
@@ -162,7 +174,7 @@ export function useSyncOnUnload(
           if (ok) {
             // Successful fetch - clear the IDB mirror so the SW does not
             // re-push grades that are already in the cloud (#1072 concern).
-            clearPendingQueue();
+            clearSent();
           } else {
             // Register Background Sync when the fetch failed so the SW can
             // replay once connectivity is restored (even if the tab is then closed).

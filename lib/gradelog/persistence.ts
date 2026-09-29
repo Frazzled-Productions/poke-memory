@@ -236,10 +236,39 @@ function saveGradeLogLS(log: GradeLog): boolean {
   }
 }
 
+/**
+ * `occurredAt` values of grade-log entries whose cloud push is being HELD
+ * because the grade is still undoable (#2052). `AutoSyncOnChange` skips these
+ * on `GRADE_LOG_APPENDED_EVENT`; `usePerGradeSync` pushes them at commit time
+ * and releases the hold. Module-level (not React state) so the event handler
+ * and the hook see the same set without a render round-trip.
+ */
+const cloudPushHeld = new Set<number>();
+
+/** True while the entry's cloud push is held pending undo expiry (#2052). */
+export function isCloudPushHeld(occurredAt: number): boolean {
+  return cloudPushHeld.has(occurredAt);
+}
+
+/** Releases a cloud-push hold (on commit or discard). Idempotent. */
+export function releaseCloudPushHold(occurredAt: number): void {
+  cloudPushHeld.delete(occurredAt);
+}
+
 export async function appendGradeEntry(
   entry: Omit<GradeLogEntry, "occurredAt">,
+  opts?: {
+    /**
+     * Mark the entry as held BEFORE the append event fires, so the cloud push
+     * waits for the undo window to close (#2052). Local persistence and both
+     * events (`GRADE_LOG_APPENDED_EVENT`, `GRADE_LOG_CHANGED_EVENT`) are
+     * unaffected, so local readers such as the practice sidebar still update.
+     */
+    holdCloudPush?: boolean;
+  },
 ): Promise<GradeLogEntry | null> {
   if (typeof window === "undefined") return null;
+  let heldKey: number | null = null;
   try {
     const stamped: GradeLogEntry = {
       date: entry.date,
@@ -269,12 +298,17 @@ export async function appendGradeEntry(
       if (!ok) return null;
     }
 
+    if (opts?.holdCloudPush) {
+      cloudPushHeld.add(stamped.occurredAt);
+      heldKey = stamped.occurredAt;
+    }
     window.dispatchEvent(
       new CustomEvent(GRADE_LOG_APPENDED_EVENT, { detail: stamped }),
     );
     window.dispatchEvent(new CustomEvent(GRADE_LOG_CHANGED_EVENT));
     return stamped;
   } catch (err) {
+    if (heldKey !== null) cloudPushHeld.delete(heldKey);
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
       console.warn("poke-memory: grade log write failed - localStorage quota exceeded");
     } else {
@@ -292,6 +326,7 @@ export async function appendGradeEntry(
  */
 export async function removeGradeEntry(occurredAt: number): Promise<void> {
   if (typeof window === "undefined") return;
+  cloudPushHeld.delete(occurredAt);
   try {
     const log = (await loadGradeLog()).filter((e) => e.occurredAt !== occurredAt);
     const json = JSON.stringify(log);

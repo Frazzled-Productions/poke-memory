@@ -17,9 +17,49 @@ import {
 } from "@/lib/sync/structuralError";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
+import { releaseCloudPushHold, type GradeLogEntry } from "@/lib/gradelog/persistence";
+import { pushGradeLogEntry } from "@/lib/sync/gradeLogPush";
 
 /** Number of consecutive all-failure drains before the banner is shown. */
 const FAILURE_THRESHOLD = 3;
+
+/**
+ * How long the tab may stay hidden before an undoable grade is committed to
+ * the cloud and its undo expires (#2052). Short enough that a backgrounded
+ * mobile tab still syncs, long enough that a quick app switch keeps undo.
+ */
+export const UNDO_HOLD_HIDDEN_GRACE_MS = 30_000;
+
+/**
+ * Upper bound on how long a grade can be held while the tab stays visible
+ * and idle (#2052). After this the grade is committed and undo expires, so an
+ * abandoned-but-open session cannot hold a grade off the cloud indefinitely.
+ */
+export const UNDO_HOLD_MAX_MS = 300_000;
+
+/**
+ * What the unload safety-net sends: the unsynced cards plus the grade-log
+ * entries of a just-committed held grade (the beacon carries both, #2052).
+ * `heldCards` are cards still inside their undo window: NOT sent, but the
+ * caller must keep them in the local pending queue (durability) rather than
+ * overwrite or clear the persisted copy.
+ */
+export type UnsyncedSnapshot = {
+  cards: ReviewableCard[];
+  gradeLog: GradeLogEntry[];
+  heldCards: ReviewableCard[];
+};
+
+/** Slot for the single grade the user can still undo (#2052). */
+type HeldGrade = {
+  token: number;
+  /** null for an in-step grade (not sync-safe): only its grade-log leg is held. */
+  card: ReviewableCard | null;
+  gradeLog: GradeLogEntry | null;
+};
+
+/** Locale-aware queue key (#1259). */
+const cardLocaleKey = (card: ReviewableCard) => `${card.id}:${card.locale ?? "en"}`;
 
 /** Debounce delay (ms) for writing the pending queue to localStorage (#893). */
 const PERSIST_DEBOUNCE_MS = 500;
@@ -29,16 +69,18 @@ const PERSIST_DEBOUNCE_MS = 500;
 // See structuralError.ts JSDoc for the full rationale (#1358 FIX 3).
 
 /**
- * Debounced per-grade sync hook. Returns { enqueueGrade, flushPending }.
+ * Debounced per-grade sync hook. Returns { enqueueGrade, attachHeldGradeLog,
+ * discardHeld, flushPending }.
  *
  * enqueueGrade(card) - fire-and-forget. Adds the card to the pending queue
  * and arms a 200 ms debounce. When the timer fires, all queued cards are
  * upserted one at a time; successes are drained, failures stay queued for
  * the next grade or the unload safety-net.
  *
- * flushPending() - returns a snapshot of the current unsynced queue; does not
- * modify the queue or cancel any pending timer. Pass this to useSyncOnUnload
- * so it can batch only the cards that failed the per-grade path.
+ * flushPending(final?) - returns a snapshot of the current unsynced queue (see
+ * UnsyncedSnapshot); does not cancel any pending timer. `final: true` (the
+ * pagehide beacon) also commits an undoable held grade first. Pass this to
+ * useSyncOnUnload so it can batch only the cards that failed the per-grade path.
  *
  * Guest-mode guard runs on every enqueueGrade call - safe across sign-in
  * state changes mid-session.
@@ -48,12 +90,50 @@ const PERSIST_DEBOUNCE_MS = 500;
  * is cleared after a fully-successful drain. When client/userId are null (guest
  * or superuser write-guard), the key is cleared rather than written - a QA
  * session must never leave fake state behind.
+ *
+ * Undo hold (#2052): `enqueueGrade(card, { hold: true })` parks the grade in a
+ * SEPARATE single slot instead of the push queue, so the practice-page Undo
+ * can discard it and the cloud never sees it (a queue entry cannot be deleted
+ * without also deleting an earlier unpushed state for the same card, because
+ * the queue coalesces by card). The hold is committed (moved to the queue and
+ * pushed, and undo expires via `onCommitted`) when: the next grade starts, the
+ * component unmounts, the page hides for longer than
+ * UNDO_HOLD_HIDDEN_GRACE_MS, pagehide fires (`flushPending(true)`), or
+ * UNDO_HOLD_MAX_MS elapses. The held card is persisted to the local pending
+ * queue as it is held / when the tab hides, so a force-kill never loses it.
  */
 export function usePerGradeSync(
   client: SupabaseClient | null,
   userId: string | null,
-): { enqueueGrade: (card: ReviewableCard) => void; flushPending: () => ReviewableCard[] } {
+  options?: { onCommitted?: (token: number) => void },
+): {
+  /**
+   * Returns a hold token when the grade was held (`hold: true` and signed in),
+   * otherwise null.
+   */
+  enqueueGrade: (card: ReviewableCard, opts?: { hold?: boolean }) => number | null;
+  /**
+   * Attach the appended grade-log entry to the held grade. Returns true while
+   * the hold is still live (undo still possible). Returns false when the hold
+   * was already committed: the entry is then pushed immediately.
+   */
+  attachHeldGradeLog: (token: number, entry: GradeLogEntry | null) => boolean;
+  /** Drop the held grade so it is never pushed (Undo). */
+  discardHeld: () => void;
+  /**
+   * Snapshot of what the unload safety-net should send. `final: true`
+   * (pagehide) first commits the held grade, handing its grade-log entry to
+   * the caller for the beacon; `final: false` (visibilitychange) leaves the
+   * hold to the hidden-grace timer.
+   */
+  flushPending: (final?: boolean) => UnsyncedSnapshot;
+} {
   const pendingQueueRef = useRef<ReviewableCard[]>([]);
+  const heldRef = useRef<HeldGrade | null>(null);
+  const holdTokenRef = useRef(0);
+  const holdCapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hiddenGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCommittedRef = useLatestRef(options?.onCommitted);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Keep latest client/userId accessible inside the debounce closure without
   // adding them as effect dependencies.
@@ -120,15 +200,26 @@ export function usePerGradeSync(
   // if the tab is then force-killed. The existing push-debounce (timerRef) is
   // left to cancel naturally; it fires async network calls and it is safer to
   // let those complete or abort on their own rather than interrupting mid-flight.
-  useEffect(() => {
-    return () => {
-      if (persistTimerRef.current !== null) {
-        clearTimeout(persistTimerRef.current);
-        persistTimerRef.current = null;
-        // Write the current snapshot synchronously on unmount.
-        savePendingQueue(pendingQueueRef.current);
-      }
-    };
+  //
+  // The effect itself lives below `commitHeld` (#2052): unmount must commit a
+  // held grade BEFORE this flush so the committed card is in the snapshot.
+
+  /**
+   * Writes the local pending queue, INCLUDING the held card (held wins on a
+   * shared key), or clears the key when both are empty (#893, #2052). Every
+   * persist path goes through here so a drain can never wipe the durability
+   * copy of a grade that is held but not yet pushed.
+   */
+  const persistQueue = useCallback(() => {
+    const held = heldRef.current?.card ?? null;
+    const queue = pendingQueueRef.current;
+    if (held === null) {
+      if (queue.length === 0) clearPendingQueue();
+      else savePendingQueue(queue);
+      return;
+    }
+    const heldKey = cardLocaleKey(held);
+    savePendingQueue([...queue.filter((c) => cardLocaleKey(c) !== heldKey), held]);
   }, []);
 
   const drainQueue = useCallback(async () => {
@@ -181,7 +272,7 @@ export function usePerGradeSync(
     // on the structuralSyncError guard above (or attempt a single probe next session).
     if (loadSyncStatus().structuralSyncError !== null && !results.some((r) => r.result === "ok")) {
       // At least one card returned a structural error and nothing succeeded.
-      savePendingQueue(pendingQueueRef.current);
+      persistQueue();
       return;
     }
 
@@ -233,15 +324,12 @@ export function usePerGradeSync(
       // made forward progress - clear the failure signal and persist state.
       consecutiveFailuresRef.current = 0;
       if (anySucceeded) markPushSucceeded();
-      // If the queue is now empty every card made it to the cloud - clear the
-      // persisted queue so stale data does not accumulate (#893).
-      if (pendingQueueRef.current.length === 0) {
-        clearPendingQueue();
-      } else {
-        // Partial success: some cards are still queued. Persist the remaining
-        // set so they survive a force-kill between now and the next drain.
-        savePendingQueue(pendingQueueRef.current);
-      }
+      // If the queue is now empty every card made it to the cloud - the
+      // persisted key is cleared so stale data does not accumulate (#893). On
+      // partial success the remaining set is persisted so it survives a
+      // force-kill. Either way a held (undoable) card is kept in the persisted
+      // copy (#2052) - persistQueue owns that rule.
+      persistQueue();
     } else {
       // All cards failed this drain transiently. Increment the consecutive-failure
       // counter and surface the banner after FAILURE_THRESHOLD attempts (#606). A
@@ -266,12 +354,159 @@ export function usePerGradeSync(
       // This write runs unconditionally on all-failure - the pending-queue
       // persistence debounce in enqueueGrade catches the common hot path;
       // this is the safety-net for the drain's own updated state.
-      savePendingQueue(pendingQueueRef.current);
+      persistQueue();
+    }
+  }, [persistQueue]);
+
+  /** Debounced write of the local pending queue (+ held card), #893 / #2052. */
+  const schedulePersist = useCallback(() => {
+    // A longer window than the push debounce so rapid grading produces at most
+    // one storage write per burst. The drain itself also writes (or clears)
+    // the key after the network result is known; this earlier write ensures
+    // the key is current even if the tab is force-killed before the push
+    // debounce fires.
+    if (persistTimerRef.current !== null) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      persistTimerRef.current = null;
+      persistQueue();
+    }, PERSIST_DEBOUNCE_MS);
+  }, [persistQueue]);
+
+  const scheduleDrain = useCallback(() => {
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      void drainQueue();
+    }, 200);
+  }, [drainQueue]);
+
+  const clearHoldTimers = useCallback(() => {
+    if (holdCapTimerRef.current !== null) {
+      clearTimeout(holdCapTimerRef.current);
+      holdCapTimerRef.current = null;
+    }
+    if (hiddenGraceTimerRef.current !== null) {
+      clearTimeout(hiddenGraceTimerRef.current);
+      hiddenGraceTimerRef.current = null;
     }
   }, []);
 
+  /**
+   * Commits the held grade (#2052): the card joins the push queue (coalescing
+   * by card key like any other grade) and its grade-log entry is pushed, then
+   * undo expires via `onCommitted`. No-op when nothing is held.
+   *
+   * `mode: "beacon"` (pagehide) does not fire the grade-log fetch, since the
+   * page is being torn down; the entry is returned so the caller can carry it
+   * in the beacon payload instead.
+   *
+   * If sync went away mid-hold (sign-out, superuser flag) the slot is cleared
+   * but nothing is pushed or queued: the write-guard must hold.
+   */
+  const commitHeld = useCallback(
+    (mode: "push" | "beacon" = "push"): GradeLogEntry | null => {
+      const held = heldRef.current;
+      if (held === null) return null;
+      heldRef.current = null;
+      clearHoldTimers();
+      if (held.gradeLog !== null) releaseCloudPushHold(held.gradeLog.occurredAt);
+
+      const c = clientRef.current;
+      const uid = userIdRef.current;
+      let forBeacon: GradeLogEntry | null = null;
+      if (c && uid) {
+        if (held.card !== null) {
+          const key = cardLocaleKey(held.card);
+          const queue = pendingQueueRef.current;
+          const idx = queue.findIndex((q) => cardLocaleKey(q) === key);
+          if (idx >= 0) queue[idx] = held.card;
+          else queue.push(held.card);
+          scheduleDrain();
+          schedulePersist();
+        }
+        if (held.gradeLog !== null) {
+          if (mode === "beacon") forBeacon = held.gradeLog;
+          else void pushGradeLogEntry(c, uid, held.gradeLog);
+        }
+      }
+      onCommittedRef.current?.(held.token);
+      return forBeacon;
+    },
+    [clearHoldTimers, scheduleDrain, schedulePersist],
+  );
+
+  const discardHeld = useCallback(() => {
+    const held = heldRef.current;
+    if (held === null) return;
+    heldRef.current = null;
+    clearHoldTimers();
+    if (held.gradeLog !== null) releaseCloudPushHold(held.gradeLog.occurredAt);
+    // Re-save the persisted queue WITHOUT the held card so a reload cannot
+    // push a grade the user undid.
+    persistQueue();
+  }, [clearHoldTimers, persistQueue]);
+
+  const attachHeldGradeLog = useCallback((token: number, entry: GradeLogEntry | null): boolean => {
+    const held = heldRef.current;
+    if (held !== null && held.token === token) {
+      if (entry !== null) held.gradeLog = entry;
+      return true;
+    }
+    // The hold was committed while the entry was still being appended (rapid
+    // next grade): nothing will push it at commit time, so push it now.
+    if (entry !== null) {
+      releaseCloudPushHold(entry.occurredAt);
+      const c = clientRef.current;
+      const uid = userIdRef.current;
+      if (c && uid) void pushGradeLogEntry(c, uid, entry);
+    }
+    return false;
+  }, []);
+
+  // Hidden-tab handling for a held grade (#2052). On hide, persist the held
+  // card locally straight away (a mobile tab can be killed with no further
+  // event) and start the grace timer; if the tab is still hidden when it
+  // fires, commit. Becoming visible again cancels the timer.
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        if (heldRef.current === null) return;
+        persistQueue();
+        if (hiddenGraceTimerRef.current !== null) clearTimeout(hiddenGraceTimerRef.current);
+        hiddenGraceTimerRef.current = setTimeout(() => {
+          hiddenGraceTimerRef.current = null;
+          if (document.visibilityState === "hidden") commitHeld();
+        }, UNDO_HOLD_HIDDEN_GRACE_MS);
+      } else if (hiddenGraceTimerRef.current !== null) {
+        clearTimeout(hiddenGraceTimerRef.current);
+        hiddenGraceTimerRef.current = null;
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [commitHeld, persistQueue]);
+
+  // Unmount: commit a held grade FIRST (SPA navigation ends the undo window),
+  // then flush the persist debounce so the last snapshot is written even if the
+  // component tears down before the 500 ms window elapses (see the note above
+  // `persistQueue`).
+  useEffect(() => {
+    return () => {
+      commitHeld();
+      if (persistTimerRef.current !== null) {
+        clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+        persistQueue();
+      }
+    };
+  }, [commitHeld, persistQueue]);
+
   const enqueueGrade = useCallback(
-    (card: ReviewableCard) => {
+    (card: ReviewableCard, opts?: { hold?: boolean }): number | null => {
+      const hold = opts?.hold === true;
+      // A new grade always closes the previous grade's undo window (#2052).
+      if (hold) commitHeld();
+
       // If the user signs out within the 200 ms debounce window the guard exits
       // early and this grade is not synced. The unload safety-net also bails
       // because client/userId are null by then. Accepted best-effort loss.
@@ -282,49 +517,59 @@ export function usePerGradeSync(
       // card state behind (#893 superuser guard).
       if (!clientRef.current || !userIdRef.current) {
         clearPendingQueue();
-        return;
+        return null;
+      }
+
+      if (hold) {
+        // Park the grade in the separate hold slot (#2052). An in-step card is
+        // not safe to write to the cloud (see below), so only its grade-log leg
+        // is held; the card leg is skipped exactly as on the immediate path.
+        const token = ++holdTokenRef.current;
+        heldRef.current = { token, card: isSyncSafe(card) ? card : null, gradeLog: null };
+        holdCapTimerRef.current = setTimeout(() => {
+          holdCapTimerRef.current = null;
+          commitHeld();
+        }, UNDO_HOLD_MAX_MS);
+        schedulePersist();
+        return token;
       }
 
       // Skip in-step cards entirely - they are not safe to write to the cloud
       // until they graduate (lastReview set). Enqueuing them would cause
       // pushSingleCard to return false and keep them in the retry queue forever.
-      if (!isSyncSafe(card)) return;
+      if (!isSyncSafe(card)) return null;
 
       // Replace existing entry for this card or append.
       // Use a locale-aware key so cards with the same id but different locales
       // are treated as distinct entries (#1259).
-      const cardLocale = card.locale ?? "en";
+      const key = cardLocaleKey(card);
       const queue = pendingQueueRef.current;
-      const idx = queue.findIndex((c) => c.id === card.id && (c.locale ?? "en") === cardLocale);
+      const idx = queue.findIndex((c) => cardLocaleKey(c) === key);
       if (idx >= 0) {
         queue[idx] = card;
       } else {
         queue.push(card);
       }
 
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
-        void drainQueue();
-      }, 200);
-
-      // Debounced localStorage write (#893). A longer window than the push
-      // debounce so rapid grading produces at most one storage write per burst.
-      // The drain itself also writes (or clears) the key after the network
-      // result is known; this earlier write ensures the key is current even if
-      // the tab is force-killed before the push debounce fires.
-      if (persistTimerRef.current !== null) clearTimeout(persistTimerRef.current);
-      persistTimerRef.current = setTimeout(() => {
-        persistTimerRef.current = null;
-        savePendingQueue(pendingQueueRef.current);
-      }, PERSIST_DEBOUNCE_MS);
+      scheduleDrain();
+      schedulePersist();
+      return null;
     },
-    [drainQueue],
+    [commitHeld, scheduleDrain, schedulePersist],
   );
 
-  const flushPending = useCallback((): ReviewableCard[] => {
-    return [...pendingQueueRef.current];
-  }, []);
+  const flushPending = useCallback((final = false): UnsyncedSnapshot => {
+    // pagehide (final) closes the undo window; visibilitychange leaves the
+    // hold to the hidden-grace timer but reports the held card so the caller
+    // keeps it in the local pending queue rather than wiping it.
+    const held = final ? null : heldRef.current?.card ?? null;
+    const gradeLog = final ? commitHeld("beacon") : null;
+    return {
+      cards: [...pendingQueueRef.current],
+      gradeLog: gradeLog === null ? [] : [gradeLog],
+      heldCards: held === null ? [] : [held],
+    };
+  }, [commitHeld]);
 
-  return { enqueueGrade, flushPending };
+  return { enqueueGrade, attachHeldGradeLog, discardHeld, flushPending };
 }

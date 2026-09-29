@@ -88,7 +88,7 @@ Three directions, each its own FSRS stream:
 
 ## Undo
 
-Single-step, session-only. `ReviewSession` captures a pre-grade snapshot of `cards`, session tally, sequence, learning queue, and the `occurredAt` of the just-appended grade-log entry. `handleUndo` (or ⌘/Ctrl+Z) restores them and pops the grade-log entry via `removeGradeEntry(occurredAt)`. Cloud sync rollback is best-effort: the per-grade debounce may already have fired, in which case the cloud retains the post-grade state.
+Single-step, session-only. `ReviewSession` captures a pre-grade snapshot of `cards`, session tally, sequence, learning queue, and the `occurredAt` of the just-appended grade-log entry. `handleUndo` (or ⌘/Ctrl+Z) restores them and pops the grade-log entry via `removeGradeEntry(occurredAt)`. For signed-in users an undoable grade is HELD on the device and never sent to the cloud while it can still be undone (#2052): the cloud sees a grade only once it is committed (next grade, leaving the page, page hidden for 30 s or closed, or a 5 minute idle cap), and Undo expires at that moment. So Undo is a full rollback for the cloud as well; there is nothing to pull back. Details and the commit triggers: [docs/sync.md](sync.md#undo-hold-2052).
 
 ## Mastery
 

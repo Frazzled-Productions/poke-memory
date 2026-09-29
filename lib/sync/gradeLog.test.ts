@@ -1,6 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { mergeGradeLog, pullGradeLog, pushGradeLog, GRADE_LOG_CONFLICT_COLS } from "./gradeLog";
+import {
+  mergeGradeLog,
+  pullGradeLog,
+  pushGradeLog,
+  GRADE_LOG_CONFLICT_COLS,
+  toGradeLogDbRow,
+  isGradeLogEntry,
+} from "./gradeLog";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 
 function makeClientWithUpsert(error: null | object = null) {
@@ -232,5 +239,68 @@ describe("pullGradeLog learning_step / step_started_at (#1416)", () => {
     const result = await pullGradeLog(client, "u");
     expect(result?.[0].learningStep).toBeUndefined();
     expect(result?.[0].stepStartedAt).toBeUndefined();
+  });
+});
+
+describe("toGradeLogDbRow / isGradeLogEntry (#2052)", () => {
+  const full: GradeLogEntry = {
+    occurredAt: 5,
+    date: "2026-09-29",
+    grade: 2,
+    cardType: "cry",
+    subjectKey: "7",
+    locale: "zh-Hans",
+    learningStep: 0,
+    stepStartedAt: 9,
+  };
+
+  it("maps every column, including the non-en locale", () => {
+    expect(toGradeLogDbRow("u", full)).toEqual({
+      user_id: "u",
+      occurred_at: 5,
+      entry_date: "2026-09-29",
+      card_type: "cry",
+      grade: 2,
+      subject_key: "7",
+      locale: "zh-Hans",
+      learning_step: 0,
+      step_started_at: 9,
+    });
+  });
+
+  it("coalesces absent optional fields (locale -> en, steps -> null)", () => {
+    const { locale: _l, learningStep: _s, stepStartedAt: _t, ...bare } = full;
+    expect(toGradeLogDbRow("u", bare)).toMatchObject({
+      locale: "en",
+      learning_step: null,
+      step_started_at: null,
+    });
+  });
+
+  it("accepts every supported locale and null step fields", () => {
+    for (const locale of ["en", "ja", "zh-Hans", "zh-Hant"] as const) {
+      expect(isGradeLogEntry({ ...full, locale, learningStep: null, stepStartedAt: null })).toBe(true);
+    }
+  });
+
+  it("rejects non-objects and each malformed field", () => {
+    for (const bad of [
+      null,
+      undefined,
+      "x",
+      1,
+      { ...full, occurredAt: Number.NaN },
+      { ...full, occurredAt: "5" },
+      { ...full, date: 5 },
+      { ...full, grade: 3 },
+      { ...full, grade: "4" },
+      { ...full, cardType: "nope" },
+      { ...full, subjectKey: undefined },
+      { ...full, locale: 1 },
+      { ...full, learningStep: "0" },
+      { ...full, stepStartedAt: "0" },
+    ]) {
+      expect(isGradeLogEntry(bad)).toBe(false);
+    }
   });
 });
