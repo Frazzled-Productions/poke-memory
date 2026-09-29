@@ -3,13 +3,13 @@
 -- Extends card_reviews_reject_regression() with a one-way guard on
 -- seen_in_pasture (introduced in #350 / migration 008). A client upsert
 -- with seen_in_pasture=false over a row with seen_in_pasture=true is
--- always a sync bug — there is no legitimate user action that
+-- always a sync bug - there is no legitimate user action that
 -- un-acknowledges a pasture entry. See #513.
 --
 -- Also pins the function's search_path to empty so the linter
 -- function_search_path_mutable warning clears for this function.
 -- SET search_path = '' + fully qualified references (none needed in
--- this body — only column refs and RAISE EXCEPTION) follows the
+-- this body - only column refs and RAISE EXCEPTION) follows the
 -- pattern Supabase recommends for SECURITY INVOKER functions.
 
 CREATE OR REPLACE FUNCTION card_reviews_reject_regression()

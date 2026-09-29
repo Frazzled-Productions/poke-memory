@@ -1,4 +1,4 @@
--- Migration 012: Finalise card_reviews — promote (user_id, card_type, subject_key) to PRIMARY KEY,
+-- Migration 012: Finalise card_reviews - promote (user_id, card_type, subject_key) to PRIMARY KEY,
 -- make subject_key NOT NULL, update regression-trigger RAISE strings, drop legacy pokemon_id.
 --
 -- Pre-flight (verified before applying):

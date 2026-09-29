@@ -11,12 +11,30 @@
 import { describe, it, expect } from "vitest";
 import * as gate from "../../scripts/check-no-em-dash.mjs";
 
-const { scanText, isStandaloneNoValueGlyph, commentRanges, run, EM_DASH } = gate as {
-  scanText: (fileName: string, text: string) => { file: string; line: number }[];
+type Violation = { file: string; line: number; column: number };
+
+const {
+  scanText,
+  scanPlainText,
+  isStandaloneNoValueGlyph,
+  commentRanges,
+  classify,
+  isExcluded,
+  looksBinary,
+  run,
+  EM_DASH,
+  EXCLUDED_PATHS,
+} = gate as {
+  scanText: (fileName: string, text: string) => Violation[];
+  scanPlainText: (fileName: string, text: string) => Violation[];
   isStandaloneNoValueGlyph: (text: string) => boolean;
   commentRanges: (text: string) => [number, number][];
+  classify: (relPath: string) => "source" | "text" | "skip";
+  isExcluded: (relPath: string) => boolean;
+  looksBinary: (buf: Uint8Array) => boolean;
   run: () => unknown[];
   EM_DASH: string;
+  EXCLUDED_PATHS: string[];
 };
 
 describe("no-em-dash gate: comment scanning", () => {
@@ -95,11 +113,149 @@ describe("no-em-dash gate: comment-range extraction does not misread strings", (
   });
 });
 
+describe("no-em-dash gate: file routing (#2045)", () => {
+  it.each([
+    ["app/page.tsx"],
+    ["lib/srs/scheduler.ts"],
+    ["eslint.config.mjs"],
+    ["next.config.ts"],
+    [".github/scripts/cut-release.mjs"],
+  ])("parses %s as JS/TS source, wherever it lives", (path) => {
+    expect(classify(path)).toBe("source");
+  });
+
+  it.each([
+    [".github/workflows/ci.yml"],
+    [".github/ISSUE_TEMPLATE/bug.yml"],
+    ["AGENTS.md"],
+    ["WORKFLOW.md"],
+    ["docs/dpia.md"],
+    [".claude/agents/ui-coder.md"],
+    ["changelog.d/unreleased/foo.md"],
+    ["CHANGELOG.md"],
+    ["scripts/vercel-ignored-build.sh"],
+    ["db/migrations/001_initial_sync_schema.sql"],
+    ["app/globals.css"],
+    ["messages/en.json"],
+    ["messages/ja.json"],
+    ["LICENSE"],
+    [".env.local.example"],
+    ["tools/art/generate.py"],
+  ])("line-scans %s as plain text (no docs exemption)", (path) => {
+    expect(classify(path)).toBe("text");
+  });
+
+  it.each([
+    ["public/sprites/pokemon/25.png"],
+    ["public/sprites/pokemon/webp/25/192.webp"],
+    ["public/cries/25.ogg"],
+    ["public/cries/25.mp3"],
+    ["docs/screenshots/practice-cardflip.gif"],
+  ])("skips the known binary %s without reading it", (path) => {
+    expect(classify(path)).toBe("skip");
+  });
+
+  it("skips the detector file itself", () => {
+    expect(classify("scripts/check-no-em-dash.mjs")).toBe("skip");
+  });
+
+  it("sniffs a NUL byte as binary, and plain UTF-8 as text", () => {
+    expect(looksBinary(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01]))).toBe(true);
+    expect(looksBinary(new TextEncoder().encode(`a line ${EM_DASH} of text\n`))).toBe(false);
+  });
+});
+
+describe("no-em-dash gate: exclusions (#2045)", () => {
+  it.each([
+    ["package-lock.json"],
+    ["lib/pokemon/generated.json"],
+    ["lib/pokemon/generated-flavor.json"],
+    ["public/pokemon-data/generated-core.json"],
+    ["messages/xx-pseudo.json"],
+  ])("excludes the generated / third-party file %s", (path) => {
+    expect(isExcluded(path)).toBe(true);
+    expect(classify(path)).toBe("skip");
+  });
+
+  it("does not over-match: authored neighbours of excluded paths are still scanned", () => {
+    for (const path of [
+      "lib/pokemon/generated.ts",
+      "lib/pokemon/seed.json",
+      "public/pokemon-data.md",
+      "messages/en.json",
+      "package.json",
+    ]) {
+      expect(isExcluded(path)).toBe(false);
+    }
+  });
+
+  it("every exclusion entry is an exact path or a directory prefix ending in /", () => {
+    for (const entry of EXCLUDED_PATHS) {
+      expect(entry.startsWith("/")).toBe(false);
+      expect(entry.includes("*")).toBe(false);
+    }
+  });
+});
+
+describe("no-em-dash gate: plain-text line scan (#2045)", () => {
+  it("flags a YAML comment", () => {
+    const v = scanPlainText(".github/workflows/x.yml", `on: push\n# note ${EM_DASH} here\n`);
+    expect(v).toHaveLength(1);
+    expect(v[0].line).toBe(2);
+  });
+
+  it("flags a YAML run string (CI log output)", () => {
+    const src = `jobs:\n  a:\n    steps:\n      - run: echo "skip ${EM_DASH} nothing to do"\n`;
+    expect(scanPlainText("x.yml", src)).toHaveLength(1);
+  });
+
+  it("flags Markdown prose, including in docs and YAML front matter", () => {
+    const src = `---\ndescription: an agent ${EM_DASH} with a dash\n---\n\n# Title\n\nBody ${EM_DASH} text.\n`;
+    const v = scanPlainText("docs/x.md", src);
+    expect(v.map((x) => x.line)).toEqual([2, 7]);
+  });
+
+  it("flags a shell comment and an echo string", () => {
+    const src = `#!/bin/sh\n# why ${EM_DASH} because\necho "done ${EM_DASH} ok"\n`;
+    expect(scanPlainText("x.sh", src)).toHaveLength(2);
+  });
+
+  it("flags SQL and CSS comments", () => {
+    expect(scanPlainText("x.sql", `-- note ${EM_DASH} here\nselect 1;\n`)).toHaveLength(1);
+    expect(scanPlainText("x.css", `/* note ${EM_DASH} here */\n.a { color: red; }\n`)).toHaveLength(1);
+  });
+
+  it("flags UI copy in a JSON message catalogue, in any locale", () => {
+    expect(scanPlainText("messages/en.json", `{ "a": "Done ${EM_DASH} well played" }\n`)).toHaveLength(1);
+    expect(scanPlainText("messages/zh-Hans.json", `{ "a": "完成${EM_DASH}${EM_DASH}好" }\n`)).toHaveLength(1);
+  });
+
+  it("does not flag other dash characters (en dash, horizontal bar, hyphen)", () => {
+    const src = "{ \"a\": \"1\u20132\", \"b\": \"完成\u2015\u2015好\", \"c\": \"a - b\" }\n";
+    expect(scanPlainText("messages/zh-Hant.json", src)).toEqual([]);
+  });
+
+  it("gives no standalone-glyph allowance outside JS/TS", () => {
+    expect(scanPlainText("x.md", `| value | ${EM_DASH} |\n`)).toHaveLength(1);
+  });
+
+  it("reports the 1-based line and column of the first dash", () => {
+    const v = scanPlainText("x.md", `one\ntwo ${EM_DASH} three ${EM_DASH}\n`);
+    expect(v).toHaveLength(1);
+    expect(v[0]).toMatchObject({ line: 2, column: 5 });
+  });
+
+  it("returns nothing for clean text", () => {
+    expect(scanPlainText("x.md", "a spaced - hyphen, a comma, a colon: fine\n")).toEqual([]);
+  });
+});
+
 describe("no-em-dash gate: repo state and self-reference", () => {
   it("the detector file does not flag itself (and the repo is clean)", () => {
-    // `run()` scans the whole repo including the detector file, which holds the
-    // em-dash glyph by necessity. A clean result proves both the self-reference
-    // exclusion and that the repo carries no em dashes in scanned source.
+    // `run()` scans every tracked file including the detector file, which holds
+    // the em-dash glyph by necessity. A clean result proves both the
+    // self-reference exclusion and that no tracked text (source, docs,
+    // workflows, SQL, CSS, catalogues) carries an em dash.
     expect(run()).toEqual([]);
   });
 });

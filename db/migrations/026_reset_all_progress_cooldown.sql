@@ -56,7 +56,7 @@ BEGIN
   DELETE FROM public.streak_days WHERE user_id = uid;
   -- Stamp the tombstone marker. If the user has never written settings,
   -- this insert creates the row; the JSONB column defaults to {} which
-  -- pullSettings treats as "no real cloud settings" — so the row's
+  -- pullSettings treats as "no real cloud settings" - so the row's
   -- existence does not silently overwrite local with empty settings.
   INSERT INTO public.user_settings (user_id, last_reset_at, updated_at)
   VALUES (uid, NOW(), NOW())

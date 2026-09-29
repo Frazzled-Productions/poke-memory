@@ -20,11 +20,14 @@
  *   marker-search         `--search` on the same line as a marker (`<!--` or
  *                         `$MARKER` / `$*_MARKER`). Never exemptible.
  *   unanchored-body-match a jq `.body ... | contains(` / `test(` / `index(`
- *                         (pipes allowed in between). Exemptible.
+ *                         (pipes allowed in between; a `||`, as in an `if:`
+ *                         expression, is not a pipe). Exemptible.
  *   issue-list-no-helper  a `run:` step that lists issues with their bodies
- *                         (`gh issue list --json ...body...`, or `gh api` on an
- *                         `/issues` list endpoint) but never calls
- *                         find-marker-issue.mjs. Exemptible.
+ *                         (`gh issue list` or `gh search issues` with
+ *                         `--json ...body...` / `--json=...body...`, `gh api`
+ *                         on an `/issues` list endpoint, or a `gh api graphql`
+ *                         statement that mentions both `issues` and `body`)
+ *                         but never calls find-marker-issue.mjs. Exemptible.
  *
  * Exemptions are a comment directly above the ONE statement they cover (the
  * next non-comment statement of the same `run:` block; a statement includes
@@ -34,7 +37,10 @@
  *       (`/comments`, `--json comments`) or pulls (`pulls/`).
  *   # issue-body-read-exempt: <reason>
  *       For reading issue bodies for something that is NOT a marker (such as
- *       task-list checkboxes): the statement must not mention a marker.
+ *       task-list checkboxes): the statement must not mention a marker, and
+ *       must narrow the list with `--label`, so the read only ever sees
+ *       issues someone with triage rights has opted in. The number of these
+ *       in the tree is pinned by a test, so adding one is a visible change.
  * A misplaced, reasonless, mis-kinded or unused exemption is itself an error.
  *
  * Run directly: `node scripts/lint-workflow-marker-lookups.mjs` (wired into
@@ -45,12 +51,20 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const EXEMPT_RE = /^\s*#\s*(marker-lookup-exempt|issue-body-read-exempt):\s*(\S.*)?$/;
-const BODY_MATCH_RE = /\.body\b.*?\|\s*(contains|test|index)\s*\(/;
+// A single `|` (a jq pipe) only: `||` in an `if:` expression is not one.
+const BODY_MATCH_RE = /\.body\b.*?(?<!\|)\|(?!\|)\s*(contains|test|index)\s*\(/;
 const IN_BODY_RE = /\bin:body\b/;
 const SEARCH_RE = /--search\b/;
 const MARKER_RE = /<!--|\$\{?MARKER\b|\$\{?[A-Z_]*_MARKER\b/;
 const PR_COMMENT_RE = /\/comments\b|--json\s+["']?comments\b|pulls\//;
-const ISSUE_LIST_RE = /\bgh\s+issue\s+list\b[\s\S]*--json\s+["']?[\w,]*\bbody\b/;
+const ISSUE_LIST_RE =
+  /\bgh\s+(?:issue\s+list|search\s+issues)\b[\s\S]*--json(?:\s+|=)["']?[\w,]*\bbody\b/;
+// A GraphQL query that reads issue bodies (the query must sit in the same
+// statement for the lint to see it).
+const GRAPHQL_RE = /\bgh\s+api\s+graphql\b/;
+const GRAPHQL_ISSUES_RE = /\bissues\b/;
+const GRAPHQL_BODY_RE = /\bbody\b/;
+const LABEL_RE = /--label\b/;
 // `gh api` on an issue LIST endpoint (…/issues, optionally with a query), not
 // a single issue (…/issues/$N) or its comments.
 const API_ISSUES_LIST_RE = /\bgh\s+api\b[\s\S]*?\/issues(?:\?[^\s"']*)?["'\s]/;
@@ -191,9 +205,36 @@ function splitStatements(lines, from, to, inline) {
 }
 
 /**
+ * Whether a statement lists issues together with their bodies.
+ * @param {string} text
+ */
+export function listsIssueBodies(text) {
+  return (
+    ISSUE_LIST_RE.test(text) ||
+    API_ISSUES_LIST_RE.test(`${text}\n`) ||
+    (GRAPHQL_RE.test(text) && GRAPHQL_ISSUES_RE.test(text) && GRAPHQL_BODY_RE.test(text))
+  );
+}
+
+/**
+ * Why an `issue-body-read-exempt` cannot apply to a statement, or null.
+ * @param {string} text
+ */
+function issueBodyReadMisuse(text) {
+  if (MARKER_RE.test(text)) {
+    return "`issue-body-read-exempt` is for non-marker body reads; this statement mentions a marker, so use .github/scripts/find-marker-issue.mjs.";
+  }
+  if (!LABEL_RE.test(text)) {
+    return "`issue-body-read-exempt` needs the statement to narrow the list with `--label`, so it only reads issues someone with triage rights opted in.";
+  }
+  return null;
+}
+
+/**
  * Whether a statement's exemption is valid and may waive `rule`.
  * marker-lookup-exempt: PR-comment lookups, waives unanchored-body-match only.
- * issue-body-read-exempt: non-marker body reads, waives both body rules.
+ * issue-body-read-exempt: non-marker, label-gated body reads, waives both
+ * body rules.
  */
 function exemptionWaives(st, rule) {
   const ex = st.exemption;
@@ -202,7 +243,7 @@ function exemptionWaives(st, rule) {
     return rule === "unanchored-body-match" && PR_COMMENT_RE.test(st.text);
   }
   if (ex.kind === "issue-body-read-exempt") {
-    return !MARKER_RE.test(st.text);
+    return issueBodyReadMisuse(st.text) === null;
   }
   return false;
 }
@@ -273,8 +314,7 @@ export function findViolations(file, text) {
     const callsHelper = HELPER_RE.test(blockText);
     for (const st of block.statements) {
       if (!st.text) continue;
-      const listsBodies = ISSUE_LIST_RE.test(st.text) || API_ISSUES_LIST_RE.test(`${st.text}\n`);
-      if (!listsBodies || callsHelper) continue;
+      if (!listsIssueBodies(st.text) || callsHelper) continue;
       if (exemptionWaives(st, "issue-list-no-helper")) {
         usedExemptions.add(st.exemption);
         continue;
@@ -303,9 +343,12 @@ export function findViolations(file, text) {
         push(ex.line, "exempt-misuse", "`marker-lookup-exempt` is for PR-comment lookups only (the statement must read `/comments`, `--json comments` or `pulls/`). A tracking-issue lookup must use .github/scripts/find-marker-issue.mjs.");
         continue;
       }
-      if (ex.kind === "issue-body-read-exempt" && MARKER_RE.test(st.text)) {
-        push(ex.line, "exempt-misuse", "`issue-body-read-exempt` is for non-marker body reads; this statement mentions a marker, so use .github/scripts/find-marker-issue.mjs.");
-        continue;
+      if (ex.kind === "issue-body-read-exempt") {
+        const misuse = issueBodyReadMisuse(st.text);
+        if (misuse) {
+          push(ex.line, "exempt-misuse", misuse);
+          continue;
+        }
       }
       if (!usedExemptions.has(ex)) {
         push(ex.line, "exempt-unused", "exemption covers a statement that needs none; remove it.");

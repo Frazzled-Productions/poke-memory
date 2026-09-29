@@ -2,28 +2,28 @@ name: Monitor grade_log divergence
 
 # Daily check that flags users whose grade_log shows activity but whose
 # card_reviews table is missing the corresponding rows or has them stuck
-# in a never-updated state — the #584 sync-break signature, split into
+# in a never-updated state - the #584 sync-break signature, split into
 # three independent shapes (Options A/B in #1221, Option C in #1357). See
 # #607, #1047, #1221, #1357, and
 # .github/scripts/check-grade-log-divergence.mjs for the full rationale.
 #
-# Cron-only — does NOT fire on push, so this workflow file landing in a
+# Cron-only - does NOT fire on push, so this workflow file landing in a
 # PR will not trigger an alert on the PR itself. The first real run is the
 # next 08:00 UTC tick after merge.
 
 on:
   schedule:
-    # 08:00 UTC daily — well before users open the app most days, so an
+    # 08:00 UTC daily - well before users open the app most days, so an
     # alert created here is sitting in the inbox by the start of the day.
     - cron: "0 8 * * *"
   workflow_dispatch:
     inputs:
       threshold:
         # The check runs three independent queries (#1221, #1357):
-        #   * Option A — grade_log subject ≥2 days old with no card_reviews
+        #   * Option A - grade_log subject ≥2 days old with no card_reviews
         #     row at all (the #584 "row never written" shape, with an
         #     in-step grace period applied per #1221).
-        #   * Option B — card_reviews row exists but `last_review IS NULL`
+        #   * Option B - card_reviews row exists but `last_review IS NULL`
         #     or `reps = 0` despite ≥3 grade_log entries in the last 48h
         #     (the #584 "row stuck stale" shape).
         #   * Option C - a graduated subject (a grade_log row with
@@ -32,7 +32,7 @@ on:
         #     (#1357). Catches fresh graduated orphans that Option A's
         #     grace window misses.
         # Every flagged subject is a real signal under any query, so
-        # the default threshold is 0 — leave this blank to alert on any
+        # the default threshold is 0 - leave this blank to alert on any
         # non-zero count. The threshold is applied to each query
         # independently. Set it above 0 only to mute a temporarily
         # known-noisy run.

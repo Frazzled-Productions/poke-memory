@@ -20,7 +20,7 @@
 --
 -- No pg_cron change in this migration. The cron schedule remains daily
 -- (0 8 * * *). A separate phase-2 migration (031) will flip it to hourly
--- ONLY after this PR has been promoted to production — see the follow-up issue
+-- ONLY after this PR has been promoted to production - see the follow-up issue
 -- filed alongside #1315.
 
 ALTER TABLE user_settings

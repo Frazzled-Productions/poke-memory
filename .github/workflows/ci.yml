@@ -31,7 +31,7 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           # `code` matches any changed file that isn't in the docs/agents/changelog
-          # ignore list. dorny/paths-filter uses picomatch — a `!`-prefixed pattern
+          # ignore list. dorny/paths-filter uses picomatch - a `!`-prefixed pattern
           # excludes matches from earlier positive patterns, so `**` followed by
           # exclusions yields "any file except these".
           filters: |
@@ -73,7 +73,7 @@ jobs:
     steps:
       - name: Skip notice (docs-only change)
         if: needs.changes.outputs.code != 'true'
-        run: echo "No code changes detected — skipping typecheck/build/vitest."
+        run: echo "No code changes detected - skipping typecheck/build/vitest."
       - uses: actions/checkout@v7
         if: needs.changes.outputs.code == 'true'
         with:
@@ -130,7 +130,7 @@ jobs:
     # deps are baked in, so there is no `playwright install --with-deps` step
     # and therefore no `apt-get` against the flaky azure.archive.ubuntu.com
     # mirror (#644). The image tag MUST track the @playwright/test version
-    # resolved in package-lock.json — the image ships Node 24, matching the
+    # resolved in package-lock.json - the image ships Node 24, matching the
     # test job.
     needs: [changes, test]
     runs-on: ubuntu-latest
@@ -148,7 +148,7 @@ jobs:
     steps:
       - name: Skip notice (no app/lib/components/public/e2e change)
         if: needs.changes.outputs.e2e_relevant != 'true'
-        run: echo "No e2e-relevant changes detected — skipping Playwright suite."
+        run: echo "No e2e-relevant changes detected - skipping Playwright suite."
       - uses: actions/checkout@v7
         if: needs.changes.outputs.e2e_relevant == 'true'
       - name: Cache npm
@@ -239,7 +239,7 @@ jobs:
     steps:
       - name: Skip notice (no e2e-relevant change)
         if: needs.changes.outputs.e2e_relevant != 'true'
-        run: echo "No e2e-relevant changes detected — skipping real-auth Playwright suite."
+        run: echo "No e2e-relevant changes detected - skipping real-auth Playwright suite."
       - uses: actions/checkout@v7
         if: needs.changes.outputs.e2e_relevant == 'true'
       - name: Cache npm
@@ -308,7 +308,7 @@ jobs:
           result="${{ needs.e2e-browser.result }}"
           echo "e2e-browser matrix result: $result"
           # A skipped matrix (docs-only change) is a pass. Anything other than
-          # success or skipped — failure, cancelled — fails the gate.
+          # success or skipped - failure, cancelled - fails the gate.
           if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
             echo "::error::One or more e2e matrix legs did not pass (result: $result)."
             exit 1

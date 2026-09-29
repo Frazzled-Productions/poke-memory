@@ -8,9 +8,9 @@ body:
       value: |
         Fields mirror existing enhancement issues (What → Why → Surface → Acceptance). Filing through this form gets the issue ready for the planner stage without back-and-forth.
 
-        - Don't add the `auto` label — only the repo owner dispatches the auto-implement pipeline.
+        - Don't add the `auto` label; only the repo owner dispatches the auto-implement pipeline.
         - Don't apply a `priority:*` label yourself; suggest one below and the owner will set it.
-        - If this introduces a new vendor, paid service, auth provider, database, or persistence layer, call it out under "Additional context" — it needs an explicit user decision before implementation.
+        - If this introduces a new vendor, paid service, auth provider, database, or persistence layer, call it out under "Additional context", as it needs an explicit user decision before implementation.
 
   - type: textarea
     id: what
@@ -55,11 +55,11 @@ body:
     attributes:
       label: Area
       options:
-        - app — review / practice
-        - app — Pokédex
-        - app — Pasture
-        - app — Stats
-        - app — Settings / superuser
+        - app - review / practice
+        - app - Pokédex
+        - app - Pasture
+        - app - Stats
+        - app - Settings / superuser
         - sync / persistence
         - SRS scheduler
         - PokéAPI / sprites
@@ -77,7 +77,7 @@ body:
       description: If this displays mastery state, completion counts, or per-Pokémon collection state, it must honour `pretendAllMastered`. See AGENTS.md › Superuser mode.
       options:
         - Honours pretendAllMastered (or another existing flag)
-        - Genuinely unaffected — will be called out in the PR
+        - Genuinely unaffected (will be called out in the PR)
         - Not applicable (no mastery / collection state involved)
         - Not sure
     validations:
@@ -89,9 +89,9 @@ body:
       label: Suggested priority
       description: Captured in the body; the repo owner applies the actual `priority:*` label.
       options:
-        - now — pick this up next
-        - next — queued, second priority
-        - later — parking lot
+        - now - pick this up next
+        - next - queued, second priority
+        - later - parking lot
         - no opinion
     validations:
       required: false

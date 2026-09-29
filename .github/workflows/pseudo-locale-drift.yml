@@ -7,7 +7,7 @@ name: Pseudo-locale drift check
 # newly-introduced untranslated strings. Mirrors the scope-lookup-drift.yml pattern.
 #
 # The generator imports only Node built-ins (node:fs, node:path, node:url) and
-# reads messages/en.json, so there is no `npm ci` step — plain `node` suffices
+# reads messages/en.json, so there is no `npm ci` step - plain `node` suffices
 # and keeps the job fast.
 
 on:

@@ -1,4 +1,4 @@
--- Migration 013: Rekey grade_log — replace integer card_id with (card_type, subject_key).
+-- Migration 013: Rekey grade_log - replace integer card_id with (card_type, subject_key).
 --
 -- Pre-flight (verified before applying):
 --   Total grade_log rows: 368
@@ -41,7 +41,7 @@ WHERE card_id BETWEEN 3000001 AND 3999999;
 DELETE FROM grade_log WHERE card_id >= 1500000 AND card_id < 2000000;
 DELETE FROM grade_log WHERE card_id >= 2500000 AND card_id < 3000000;
 
--- 4. Drop rows where card_id IS NULL — pre-migration-009 entries with no card identity.
+-- 4. Drop rows where card_id IS NULL - pre-migration-009 entries with no card identity.
 --    Per pre-flight: 182 rows.
 DELETE FROM grade_log WHERE card_id IS NULL;
 

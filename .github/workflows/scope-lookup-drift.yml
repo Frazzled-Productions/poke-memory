@@ -8,7 +8,7 @@ name: Scope-lookup drift check
 # out-of-date gen/types data. Mirrors migration-check.yml's drift-check pattern.
 #
 # The generator imports only Node built-ins (node:fs/promises, node:path,
-# node:url) and reads generated.json, so there is no `npm ci` step — plain
+# node:url) and reads generated.json, so there is no `npm ci` step - plain
 # `node` is enough and keeps the job fast.
 
 on:

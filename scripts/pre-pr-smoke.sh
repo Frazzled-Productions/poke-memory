@@ -4,7 +4,7 @@
 # Chromium-only Playwright smoke subset, run via the pinned Docker image so
 # the agent and CI use the same Node/browser combo. Intended for PRs that
 # touch high-surface-area files (see AGENTS.md "Pre-PR e2e smoke") where the
-# unit suite cannot see the regression class — typically a global element
+# unit suite cannot see the regression class - typically a global element
 # like an onboarding modal or nav component that affects every page.
 #
 # Usage:
@@ -19,7 +19,7 @@
 #   0   all specs passed.
 #   non-zero  one or more specs failed, or Docker is unavailable.
 #
-# The smoke subset is deliberately narrow — see AGENTS.md for the rationale.
+# The smoke subset is deliberately narrow - see AGENTS.md for the rationale.
 # CI still runs the full chromium + mobile-safari matrix authoritatively.
 
 set -euo pipefail

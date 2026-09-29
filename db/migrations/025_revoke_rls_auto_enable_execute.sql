@@ -6,7 +6,7 @@
 -- helper that auto-enables RLS on newly-created tables; in this project no
 -- event trigger currently uses it (it's leftover from the original setup),
 -- and crucially it operates on `pg_event_trigger_ddl_commands()` which
--- returns nothing outside an event-trigger context — so calling it via REST
+-- returns nothing outside an event-trigger context - so calling it via REST
 -- is a no-op today.
 --
 -- It's still unnecessary attack surface. REVOKE EXECUTE from public, anon,

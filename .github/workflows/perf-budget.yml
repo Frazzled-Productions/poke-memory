@@ -11,7 +11,7 @@ name: Perf budget
 # Status: NON-REQUIRED initially. After one week of stable baseline the
 # `perf-budget` aggregator job (the single stable check-name produced by
 # this workflow) can be added to the `qa-staging` / `main-protection`
-# rulesets' required-checks list — no spec or workflow change needed.
+# rulesets' required-checks list - no spec or workflow change needed.
 # See WORKFLOW.md "Perf budget gate" for budgets, ratchet rules, and the
 # promotion criterion.
 #
@@ -89,7 +89,7 @@ jobs:
     steps:
       - name: Skip notice (no perf-relevant change)
         if: needs.changes.outputs.perf_relevant != 'true'
-        run: echo "No perf-relevant changes detected — skipping perf budget run."
+        run: echo "No perf-relevant changes detected - skipping perf budget run."
 
       - uses: actions/checkout@v7
         if: needs.changes.outputs.perf_relevant == 'true'
@@ -161,7 +161,7 @@ jobs:
           result="${{ needs.perf-budget-browser.result }}"
           echo "perf-budget-browser matrix result: $result"
           # A skipped matrix (docs-only change) is a pass. Anything other
-          # than success or skipped — failure, cancelled — fails the gate.
+          # than success or skipped - failure, cancelled - fails the gate.
           if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
             echo "::error::One or more perf-budget matrix legs did not pass (result: $result)."
             exit 1
