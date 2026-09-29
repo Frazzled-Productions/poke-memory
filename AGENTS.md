@@ -109,7 +109,7 @@ Canonical reference: **[docs/sync.md](docs/sync.md)** - read before touching any
 
 ### Adding a feature that needs to persist data
 
-Decision tree (JSONB on `user_settings` vs. column on `card_reviews` vs. new table) + new-table checklist: **[docs/persistence.md](docs/persistence.md)**. Card-shaped persistence keyed by `(user_id, card_type, subject_key)`: **[docs/card-identity.md](docs/card-identity.md)**. Tables today: `card_reviews`, `streak_days`, `user_settings`, `grade_log`. Two runtime reminders:
+Decision tree (JSONB on `user_settings` vs. column on `card_reviews` vs. new table) + new-table checklist: **[docs/persistence.md](docs/persistence.md)**. Card-shaped persistence keyed by `(user_id, card_type, subject_key)`: **[docs/card-identity.md](docs/card-identity.md)**. Tables today: `card_reviews`, `streak_days`, `user_settings`, `grade_log`, `push_subscriptions`, `feedback`, `usernames`, `rate_limit_buckets` (shapes, precedents and FK exceptions in the doc; a test keeps both lists in step with `db/migrations/`). Two runtime reminders:
 
 - **Apply the migration BEFORE merging the PR**, to **both** Supabase projects (prod `mcp__supabase__apply_migration` and QA `mcp__supabase-qa__apply_migration`; name without the `0NN_` prefix). `migration-check.yml` asserts QA parity on qa-based PRs and prod parity on push to `main` (#1806) - mechanics in [docs/persistence.md](docs/persistence.md#apply-the-migration).
 - **Wire cross-device sync** via `lib/sync/<feature>.ts` exporting `push` / `pull` (+ `merge`); pull as a best-effort leg in `pullAndMerge`, push wherever the data is written.

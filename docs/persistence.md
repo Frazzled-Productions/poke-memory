@@ -2,7 +2,24 @@
 
 Canonical reference for choosing where new persisted data lives - a column on an existing table, a JSONB field on `user_settings`, or a brand-new table. AGENTS.md keeps a short pointer here. See also [docs/sync.md](sync.md) for the rules on pushing/pulling data.
 
-Tables today: `card_reviews`, `streak_days`, `user_settings`, `grade_log`. All RLS-protected, all FK'd to `auth.users(id) ON DELETE CASCADE`. The patterns below cover the common shapes - extend rather than reinvent.
+## Tables today
+
+Every table in `public`, as created by `db/migrations/`. All eight have RLS enabled. `scripts/persistence-tables.test.mjs` fails if this list drifts from the `CREATE TABLE` / `DROP TABLE` statements in the migrations, so add a row here in the same PR as the migration. Before designing a new table, find the closest precedent below and extend its pattern rather than reinventing one.
+
+<!-- persistence-tables:start -->
+| Table | Migration | Shape and precedent |
+|---|---|---|
+| `card_reviews` | 001 | Per-card FSRS scheduling state; client-synced, guarded by the regression trigger (002, 015, 016, 017). |
+| `streak_days` | 001 | One row per day reviewed; append-only, client-synced. |
+| `user_settings` | 001 | One row per user (`user_id` is the PK); `settings` JSONB plus scalar columns such as `timezone` (019). |
+| `grade_log` | 006 | Append-only per-grade event log; `UNIQUE (user_id, occurred_at)` is the cross-device dedup key. |
+| `push_subscriptions` | 028 | One row per (user, browser endpoint); client SELECT / INSERT / DELETE policies, no UPDATE. Precedent for a create-or-delete, never-mutated table. |
+| `feedback` | 034 | Write-once, append-only; written only by the service-role Route Handler (`app/api/feedback`), no client policies. `user_id` is **nullable** (guest feedback), and a pg_cron job purges rows after 12 months. |
+| `usernames` | 035 | Uniqueness-constraint table (`username` is the PK, `UNIQUE (user_id)`); owner-only INSERT policy (the public SELECT policy was dropped in 044). |
+| `rate_limit_buckets` | 041 | Service-role-only internal table with **no `user_id`**: keyed on a salted `ip_hash` because callers are pre-session. No client policies; every write goes through the `check_rate_limit` SECURITY DEFINER RPC, and pg_cron purges rows after 2 hours. |
+<!-- persistence-tables:end -->
+
+**Foreign keys.** Every table with a `user_id` column references `auth.users(id) ON DELETE CASCADE`, so account deletion erases the user's rows. The two exceptions to "every row belongs to a user" are deliberate: `feedback.user_id` is nullable, so the cascade only applies where a user is attached (guest rows rely on the 12-month purge), and `rate_limit_buckets` has no user link at all (041 explains why a FK is inapplicable before a session exists). The new-table checklist below still requires the FK for any per-user table.
 
 ## Decide where the data lives
 
