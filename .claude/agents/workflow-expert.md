@@ -30,7 +30,7 @@ Automations that post a comment or tracking issue dedupe on an HTML-comment mark
 |---|---|---|
 | `<!-- coverage-report -->` | `coverage.yml` | One PR comment, updated in place |
 | `<!-- pr-check-monitor:<sha> -->` | `pr-check-monitor.yml` | One alert per PR per SHA |
-| `<!-- vercel-preview-fired:<sha> -->` | `vercel-preview-on-ready.yml` (disabled) | Skip re-firing the deploy hook at the same SHA |
+| `<!-- vercel-preview-fired:<sha> -->` | `vercel-preview-on-ready.yml` (currently disabled) | Skip re-firing the deploy hook at the same SHA |
 | `<!-- stale-preview-check -->` | `stale-preview-check.yml` | One comment on the promotion PR, replaced each run |
 | `<!-- qa-drift-check -->` | `auto-release.yml` | Tracking issue opened on qa/main drift, closed when healthy |
 | `<!-- cron-health-monitor:<file> -->` | `cron-health-monitor.yml` | One tracking issue per failing scheduled workflow |

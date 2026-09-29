@@ -449,11 +449,12 @@ in-memory fixture.
 
 | | |
 |---|---|
-| **Status** | **Disabled** (`disabled_manually`). Under the qa staging flow, QA happens on the bundled `qa` branch via `qa-preview-deploy.yml`, so per-PR previews are redundant and were retired to stay within Vercel's deploy rate limit (#814). Re-enable with `gh workflow enable "Vercel Preview on Ready"` if per-PR previews are wanted again: since #2020 the gate no longer waits for an auto-review verdict, so re-enabling would fire a preview on every green CI run of a non-`qa` PR. |
+| **Status** | **Disabled** (`disabled_manually`). Under the qa staging flow, QA happens on the bundled `qa` branch via `qa-preview-deploy.yml`, so per-PR previews are redundant and were retired to stay within Vercel's deploy rate limit (#814). **Keep it disabled unless per-PR previews are wanted again**: since #2020 the gate no longer waits for an auto-review verdict, so re-enabling (`gh workflow enable "Vercel Preview on Ready"`) fires a preview on every green CI run of every non-`qa` PR head SHA - the deploy volume that hit Vercel's rate limit (#814). |
 | **Trigger** | `workflow_run` on `CI` (`completed`); `issue_comment: created` (for `/preview` only) |
 | **Gate** | Fires the Vercel Deploy Hook when the `test` check is `success` on the PR's HEAD SHA. The former second condition (a bot-authored `auto-review` LGTM on the same SHA) was removed in #2020: `auto-review.yml` was its only writer, so after 2026-08-16 the gate could never open. Only comments authored by `poke-memory-bot[bot]` count for the idempotency marker (#1859). |
 | **Manual override** | A `/preview` PR comment from OWNER / MEMBER / COLLABORATOR bypasses the CI gate and fires the hook unconditionally - for mid-iteration peeks before CI is green. The association is checked at the job trigger as well as in the override step (#1859). |
-| **Fork guard** | `workflow_run` arm requires `head_repository.fork == false`; the `issue_comment` arm requires OWNER / MEMBER / COLLABORATOR for `/preview` (#1859). |
+| **Fork guard** | `workflow_run` arm requires `head_repository.fork == false`; the `issue_comment` arm requires OWNER / MEMBER / COLLABORATOR for `/preview` (#1859), an exact `/preview` command (not a prefix), and a same-repo PR head (`isCrossRepository == false`). |
+| **Concurrency** | Keyed on the PR number for both arms (head SHA as fallback), so a `/preview` and a CI completion on one PR queue rather than race past the fired-marker dedup. |
 | **Idempotency** | Posts `<!-- vercel-preview-fired:<sha> -->` on the PR after a successful fire; subsequent re-evaluations at the same SHA are no-ops. |
 | **Why two triggers** | `workflow_run` drives the automatic path; `issue_comment` exists only for the `/preview` override. |
 | **qa promotion PRs** | Skipped - a `qa -> main` PR's head branch is `qa`, and its preview is handled by `qa-preview-deploy.yml`. Firing here too would double-deploy `qa`. |
