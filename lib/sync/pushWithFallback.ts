@@ -5,6 +5,7 @@ import {
   savePendingQueue,
   clearPendingQueue,
 } from "@/lib/sync/persistence";
+import { isCardPushHeld, cardPushKey } from "@/lib/sync/heldGrade";
 import { loadSession } from "@/lib/review/persistence";
 import { todayString } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
@@ -131,6 +132,10 @@ export async function pushWithFallback(
   const allReviewed = (session?.cards ?? []).filter(
     (card) =>
       card.state.lastReview !== null &&
+      // A grade still inside its undo window is already in the saved session
+      // (saveSession runs before commit) but must not reach the cloud until it
+      // is committed (#2052).
+      !isCardPushHeld(cardPushKey(card)) &&
       (isCardEligible ? isCardEligible(card) : true),
   );
 

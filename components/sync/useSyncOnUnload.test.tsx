@@ -44,7 +44,6 @@ import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 import { markStructuralSyncError } from "@/lib/sync/structuralError";
 import type { UnsyncedSnapshot } from "@/lib/sync/usePerGradeSync";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
-import type { ReviewableCard } from "@/lib/review/session";
 
 const FAKE_CLIENT = {} as unknown as SupabaseClient;
 const FAKE_USER = "00000000-0000-0000-0000-000000000000";
@@ -63,7 +62,7 @@ const ZERO_STATUS: SyncStatus = {
 
 function mockUnsynced(
   count: number,
-  extra: { gradeLog?: GradeLogEntry[]; heldCards?: ReviewableCard[] } = {},
+  extra: { gradeLog?: GradeLogEntry[] } = {},
 ) {
   return (): UnsyncedSnapshot => ({
     cards: Array.from({ length: count }, (_, i) => ({
@@ -72,7 +71,6 @@ function mockUnsynced(
       subjectKey: String(i),
     })) as never[],
     gradeLog: extra.gradeLog ?? [],
-    heldCards: extra.heldCards ?? [],
   });
 }
 
@@ -565,7 +563,6 @@ describe("useSyncOnUnload - undo hold (#2052)", () => {
   let beacon: ReturnType<typeof vi.fn>;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
   const entry: GradeLogEntry = { date: "2026-05-13", grade: 4, cardType: "name", occurredAt: 42 };
-  const heldCard = { id: 9, cardType: "name", subjectKey: "9" } as unknown as ReviewableCard;
 
   beforeEach(() => {
     vi.mocked(loadSyncStatus).mockReturnValue(ZERO_STATUS);
@@ -621,10 +618,9 @@ describe("useSyncOnUnload - undo hold (#2052)", () => {
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledOnce());
   });
 
-  it("visibilitychange with only a held card does not push, and does not touch the persisted queue", () => {
-    renderHook(() =>
-      useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(0, { heldCards: [heldCard] })),
-    );
+  it("visibilitychange never writes the persisted queue for a held grade: it has its own key (#2052)", async () => {
+    // The hook reports only committed cards; a held grade is invisible here.
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(0)));
 
     act(() => fireVisibilityHidden());
 
@@ -633,19 +629,37 @@ describe("useSyncOnUnload - undo hold (#2052)", () => {
     expect(clearPendingQueue).not.toHaveBeenCalled();
   });
 
-  it("after a successful visibilitychange push the held card stays in the persisted queue (not cleared)", async () => {
-    renderHook(() =>
-      useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(1, { heldCards: [heldCard] })),
+  it("pagehide is NOT skipped while a visibilitychange fetch is still in flight (commit + beacon)", async () => {
+    // A fetch that never settles keeps pushingRef true.
+    fetchSpy.mockReturnValue(new Promise(() => {}));
+    const getUnsynced = vi.fn((final: boolean) =>
+      final ? mockUnsynced(1, { gradeLog: [entry] })() : mockUnsynced(1)(),
     );
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, getUnsynced));
 
     act(() => fireVisibilityHidden());
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledOnce());
 
-    await waitFor(() => expect(saveSyncStatus).toHaveBeenCalled());
-    expect(clearPendingQueue).not.toHaveBeenCalled();
-    expect(vi.mocked(savePendingQueue).mock.calls.at(-1)![0]).toEqual([heldCard]);
+    act(() => firePagehide());
+
+    expect(getUnsynced).toHaveBeenLastCalledWith(true);
+    expect(beacon).toHaveBeenCalledOnce();
+    expect(buildBeaconPayload).toHaveBeenLastCalledWith(expect.any(Array), [entry]);
   });
 
-  it("after a successful visibilitychange push with nothing held the persisted queue is cleared", async () => {
+  it("a second visibilitychange while a fetch is in flight is still skipped", async () => {
+    fetchSpy.mockReturnValue(new Promise(() => {}));
+    const getUnsynced = vi.fn(() => mockUnsynced(1)());
+    renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, getUnsynced));
+
+    act(() => fireVisibilityHidden());
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledOnce());
+    act(() => fireVisibilityHidden());
+
+    expect(getUnsynced).toHaveBeenCalledTimes(1);
+  });
+
+  it("after a successful visibilitychange push the persisted queue is cleared", async () => {
     renderHook(() => useSyncOnUnload(FAKE_CLIENT, FAKE_USER, mockUnsynced(1)));
 
     act(() => fireVisibilityHidden());

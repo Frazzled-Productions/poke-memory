@@ -34,6 +34,9 @@ vi.mock("@/lib/sync/gradeLogPush", () => ({
 import { pushSingleCard, isSyncSafe } from "@/lib/sync/cloud";
 import { savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
 import { pushGradeLogEntry } from "@/lib/sync/gradeLogPush";
+import { loadHeldCard, saveHeldCard, isCardPushHeld, cardPushKey } from "@/lib/sync/heldGrade";
+import { loadPendingQueue } from "@/lib/sync/persistence";
+import { KEY_HELD_GRADE } from "@/lib/storage/keys";
 import {
   usePerGradeSync,
   UNDO_HOLD_HIDDEN_GRACE_MS,
@@ -84,6 +87,8 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(isSyncSafe).mockReturnValue(true);
+    vi.mocked(loadPendingQueue).mockReturnValue([]);
+    window.localStorage.clear();
     vi.useFakeTimers();
   });
 
@@ -126,40 +131,41 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     expect(pushed().map((c) => c.id)).toEqual([1]);
   });
 
-  it("persists the held card locally (durability) but not into the push queue", async () => {
+  it("persists the held card under its OWN key, never in the shared pending queue or its IDB mirror", async () => {
     const { result } = renderHook(() => usePerGradeSync(CLIENT, USER));
+    const held = makeCard(1);
     act(() => {
-      result.current.enqueueGrade(makeCard(1), { hold: true });
+      result.current.enqueueGrade(held, { hold: true });
     });
+    // Written straight away (no debounce), so a kill right after grading is safe.
+    expect(loadHeldCard()).toEqual(held);
+    expect(isCardPushHeld(cardPushKey(held))).toBe(true);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(600);
     });
-    const saved = vi.mocked(savePendingQueue).mock.calls.at(-1)![0] as ReviewableCard[];
-    expect(saved.map((c) => c.id)).toEqual([1]);
+    // The shared queue (read by pushWithFallback and the SW mirror) never sees it.
+    expect(savePendingQueue).not.toHaveBeenCalled();
     expect(pushSingleCard).not.toHaveBeenCalled();
   });
 
-  it("discard: never pushed, and the persisted queue is re-saved without the held card", async () => {
+  it("discard: never pushed, and its persisted copy and in-memory hold are dropped", async () => {
     const { result } = renderHook(() => usePerGradeSync(CLIENT, USER));
+    const held = makeCard(1);
     act(() => {
-      result.current.enqueueGrade(makeCard(1), { hold: true });
+      result.current.enqueueGrade(held, { hold: true });
     });
-    vi.mocked(clearPendingQueue).mockClear();
-    vi.mocked(savePendingQueue).mockClear();
     act(() => {
       result.current.discardHeld();
     });
-    // Empty queue + no held card: the persisted key is cleared, not rewritten.
-    expect(clearPendingQueue).toHaveBeenCalled();
+    expect(loadHeldCard()).toBeNull();
+    expect(window.localStorage.getItem(KEY_HELD_GRADE)).toBeNull();
+    expect(isCardPushHeld(cardPushKey(held))).toBe(false);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(UNDO_HOLD_MAX_MS + 1000);
     });
     expect(pushSingleCard).not.toHaveBeenCalled();
     expect(pushGradeLogEntry).not.toHaveBeenCalled();
-    // The discarded card is never persisted again.
-    for (const call of vi.mocked(savePendingQueue).mock.calls) {
-      expect((call[0] as ReviewableCard[]).length).toBe(0);
-    }
+    expect(savePendingQueue).not.toHaveBeenCalled();
   });
 
   it("an earlier queued state of the same card survives hold-then-discard", async () => {
@@ -176,7 +182,7 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     expect(pushed()).toEqual([earlier]);
   });
 
-  it("discard keeps an earlier queued card in the persisted queue", () => {
+  it("discard leaves an earlier queued card (and its persisted queue) untouched", async () => {
     const { result } = renderHook(() => usePerGradeSync(CLIENT, USER));
     act(() => {
       result.current.enqueueGrade(makeCard(2));
@@ -186,8 +192,11 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     act(() => {
       result.current.discardHeld();
     });
-    const saved = vi.mocked(savePendingQueue).mock.calls.at(-1)![0] as ReviewableCard[];
-    expect(saved.map((c) => c.id)).toEqual([2]);
+    expect(savePendingQueue).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(pushed().map((c) => c.id)).toEqual([2]);
   });
 
   it("the next grade commits the previous hold, then holds itself", async () => {
@@ -245,8 +254,6 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
       const t = result.current.enqueueGrade(makeCard(1), { hold: true });
       result.current.attachHeldGradeLog(t!, entry);
     });
-    const snap = result.current.flushPending(false);
-    expect(snap.heldCards).toEqual([]);
     act(() => {
       result.current.flushPending(true);
     });
@@ -271,7 +278,7 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     expect(pushSingleCard).not.toHaveBeenCalled();
   });
 
-  it("flushPending(false) reports the held card without committing it", () => {
+  it("flushPending(false) reports only committed cards and leaves the hold alone", () => {
     const onCommitted = vi.fn();
     const { result } = renderHook(() => usePerGradeSync(CLIENT, USER, { onCommitted }));
     const held = makeCard(1);
@@ -281,7 +288,7 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     const snap = result.current.flushPending(false);
     expect(snap.cards).toEqual([]);
     expect(snap.gradeLog).toEqual([]);
-    expect(snap.heldCards).toEqual([held]);
+    expect(loadHeldCard()).toEqual(held);
     expect(onCommitted).not.toHaveBeenCalled();
   });
 
@@ -294,16 +301,18 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
       const t = result.current.enqueueGrade(held, { hold: true });
       result.current.attachHeldGradeLog(t!, entry);
     });
-    let snap = { cards: [] as ReviewableCard[], gradeLog: [] as GradeLogEntry[], heldCards: [] as ReviewableCard[] };
+    let snap = { cards: [] as ReviewableCard[], gradeLog: [] as GradeLogEntry[] };
     act(() => {
       snap = result.current.flushPending(true);
     });
     expect(snap.cards).toEqual([held]);
     expect(snap.gradeLog).toEqual([entry]);
-    expect(snap.heldCards).toEqual([]);
     expect(onCommitted).toHaveBeenCalledTimes(1);
     expect(pushGradeLogEntry).not.toHaveBeenCalled();
     expect(isCloudPushHeld(555)).toBe(false);
+    // Final teardown path: no drain or persist is scheduled, and the held copy is gone.
+    expect(loadHeldCard()).toBeNull();
+    expect(savePendingQueue).not.toHaveBeenCalled();
   });
 
   it("hidden for the grace period commits and expires undo", async () => {
@@ -313,9 +322,9 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
       result.current.enqueueGrade(makeCard(1), { hold: true });
     });
     act(() => setVisibility("hidden"));
-    // Held card persisted the moment the tab hides.
-    const saved = vi.mocked(savePendingQueue).mock.calls.at(-1)![0] as ReviewableCard[];
-    expect(saved.map((c) => c.id)).toEqual([1]);
+    // The held copy was written at grade time; hiding must not touch the queue.
+    expect(loadHeldCard()?.id).toBe(1);
+    expect(savePendingQueue).not.toHaveBeenCalled();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(UNDO_HOLD_HIDDEN_GRACE_MS - 1);
     });
@@ -399,7 +408,7 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     });
     expect(token).toBeNull();
     expect(clearPendingQueue).toHaveBeenCalled();
-    expect(result.current.flushPending(true)).toEqual({ cards: [], gradeLog: [], heldCards: [] });
+    expect(result.current.flushPending(true)).toEqual({ cards: [], gradeLog: [] });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(UNDO_HOLD_MAX_MS + 1000);
     });
@@ -428,19 +437,149 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
     expect(isCloudPushHeld(666)).toBe(false);
   });
 
-  it("a drain that empties the queue does not wipe the held card's persisted copy", async () => {
+  it("a drain that empties the queue leaves the held card's own copy alone", async () => {
     const { result } = renderHook(() => usePerGradeSync(CLIENT, USER));
+    const held = makeCard(1);
     act(() => {
       result.current.enqueueGrade(makeCard(2)); // drains to empty
-      result.current.enqueueGrade(makeCard(1), { hold: true });
+      result.current.enqueueGrade(held, { hold: true });
     });
-    vi.mocked(clearPendingQueue).mockClear();
-    vi.mocked(savePendingQueue).mockClear();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(250);
     });
-    expect(clearPendingQueue).not.toHaveBeenCalled();
+    expect(loadHeldCard()).toEqual(held);
+    for (const call of vi.mocked(savePendingQueue).mock.calls) {
+      expect((call[0] as ReviewableCard[]).some((c) => c.id === 1)).toBe(false);
+    }
+  });
+
+  it("commit persists the queue (with the card) before dropping the held copy", () => {
+    const { result } = renderHook(() => usePerGradeSync(CLIENT, USER));
+    act(() => {
+      result.current.enqueueGrade(makeCard(1), { hold: true });
+      result.current.enqueueGrade(makeCard(2), { hold: true }); // commits 1
+    });
     const saved = vi.mocked(savePendingQueue).mock.calls.at(-1)![0] as ReviewableCard[];
     expect(saved.map((c) => c.id)).toEqual([1]);
+    expect(loadHeldCard()?.id).toBe(2);
+  });
+
+  it("commit collapses a same-key queued entry: one entry per primary key", () => {
+    const { result } = renderHook(() => usePerGradeSync(CLIENT, USER));
+    act(() => {
+      result.current.enqueueGrade(makeCard(1, 5)); // queued, undrained
+      result.current.enqueueGrade(makeCard(1, 9), { hold: true });
+      result.current.enqueueGrade(makeCard(2), { hold: true }); // commits the second state of 1
+    });
+    const saved = vi.mocked(savePendingQueue).mock.calls.at(-1)![0] as ReviewableCard[];
+    expect(saved.filter((c) => c.id === 1)).toHaveLength(1);
+    expect(saved.find((c) => c.id === 1)!.state.stability).toBe(9);
+  });
+
+  it("sign-out mid-hold: commit also clears the persisted held copy (no push to another account later)", () => {
+    const { result, rerender } = renderHook(
+      ({ client, uid }: { client: SupabaseClient | null; uid: string | null }) =>
+        usePerGradeSync(client, uid),
+      { initialProps: { client: CLIENT as SupabaseClient | null, uid: USER as string | null } },
+    );
+    act(() => {
+      result.current.enqueueGrade(makeCard(1), { hold: true });
+    });
+    expect(loadHeldCard()).not.toBeNull();
+    rerender({ client: null, uid: null });
+    act(() => {
+      result.current.flushPending(true);
+    });
+    expect(loadHeldCard()).toBeNull();
+  });
+
+  it("a hold created while the tab is already hidden arms the grace timer", async () => {
+    const onCommitted = vi.fn();
+    const { result } = renderHook(() => usePerGradeSync(CLIENT, USER, { onCommitted }));
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    act(() => {
+      result.current.enqueueGrade(makeCard(1), { hold: true });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(UNDO_HOLD_HIDDEN_GRACE_MS);
+    });
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("usePerGradeSync - mount seeding (#2052)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(isSyncSafe).mockReturnValue(true);
+    vi.mocked(loadPendingQueue).mockReturnValue([]);
+    window.localStorage.clear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reload with a persisted held card: seeded as COMMITTED, pushed, and its own key cleared", async () => {
+    saveHeldCard(makeCard(7));
+    renderHook(() => usePerGradeSync(CLIENT, USER));
+    expect(loadHeldCard()).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(pushed().map((c) => c.id)).toEqual([7]);
+  });
+
+  it("a non-empty persisted queue is drained on mount, not left until the next grade (S1)", async () => {
+    vi.mocked(loadPendingQueue).mockReturnValue([makeCard(3)]);
+    renderHook(() => usePerGradeSync(CLIENT, USER));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(pushed().map((c) => c.id)).toEqual([3]);
+  });
+
+  it("an empty persisted queue and no held copy schedule no drain", async () => {
+    renderHook(() => usePerGradeSync(CLIENT, USER));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(pushSingleCard).not.toHaveBeenCalled();
+  });
+
+  it("guest / signed out: nothing is seeded or pushed and the held copy is left alone", async () => {
+    saveHeldCard(makeCard(7));
+    renderHook(() => usePerGradeSync(null, null));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(pushSingleCard).not.toHaveBeenCalled();
+    expect(loadHeldCard()).not.toBeNull();
+  });
+
+  it("dedupes by key: persisted duplicates and a held copy of a queued card collapse to one push each", async () => {
+    vi.mocked(loadPendingQueue).mockReturnValue([makeCard(3, 1), makeCard(3, 2), makeCard(4)]);
+    saveHeldCard(makeCard(4, 8));
+    renderHook(() => usePerGradeSync(CLIENT, USER));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(pushed().map((c) => c.id).sort()).toEqual([3, 4]);
+  });
+
+  it("a live hold's copy is not seeded when the client changes mid-hold", async () => {
+    const { result, rerender } = renderHook(
+      ({ client }: { client: SupabaseClient }) => usePerGradeSync(client, USER),
+      { initialProps: { client: CLIENT } },
+    );
+    act(() => {
+      result.current.enqueueGrade(makeCard(1), { hold: true });
+    });
+    rerender({ client: {} as unknown as SupabaseClient });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(pushSingleCard).not.toHaveBeenCalled();
+    expect(loadHeldCard()?.id).toBe(1);
   });
 });

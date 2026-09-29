@@ -42,6 +42,14 @@ export const KEY_SYNC_STATUS = "poke-memory:sync-status:v1";
 /** Persisted pending-grade queue for resilient per-grade sync (#893). */
 export const KEY_PENDING_GRADE_QUEUE = "poke-memory:pending-grade-queue:v1";
 
+/**
+ * Durability copy of the single grade still inside its undo window (#2052).
+ * localStorage only, and deliberately NOT the pending queue key: the queue is
+ * mirrored to IDB for the service worker and read by pushWithFallback, both of
+ * which would push a grade the user can still undo.
+ */
+export const KEY_HELD_GRADE = "poke-memory:held-grade:v1";
+
 // ─── Streak ───────────────────────────────────────────────────────────────────
 
 /** Sorted list of ISO date strings on which the streak condition was met. */
