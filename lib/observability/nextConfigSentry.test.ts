@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import type { withSentryConfig } from "@sentry/nextjs";
+import type { withSentryConfig } from "@sentry/nextjs/config";
 import pkg from "@/package.json";
 
 type SentryBuildOptions = NonNullable<Parameters<typeof withSentryConfig>[1]>;
@@ -32,7 +32,7 @@ const { mockWithSentryConfig } = vi.hoisted(() => ({
   mockWithSentryConfig: vi.fn((...args: unknown[]) => args[0]),
 }));
 
-vi.mock("@sentry/nextjs", () => ({
+vi.mock("@sentry/nextjs/config", () => ({
   withSentryConfig: mockWithSentryConfig,
 }));
 
