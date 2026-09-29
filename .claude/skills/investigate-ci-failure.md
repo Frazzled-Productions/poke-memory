@@ -39,7 +39,7 @@ A perf-shape failure cannot be diagnosed from the test source alone. The actual 
 
    ```bash
    docker run --rm -v "$PWD":/work -w /work \
-     mcr.microsoft.com/playwright:v1.60.0-noble \
+     mcr.microsoft.com/playwright:v1.63.0-noble \
      bash -c "npm ci && npm run build && (npm start &) && \
               npx wait-on --timeout 60000 http://localhost:3000 && \
               npx playwright test --project=chromium --trace=on <spec>"

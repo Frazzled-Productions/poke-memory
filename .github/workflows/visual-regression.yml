@@ -105,12 +105,13 @@ jobs:
       contents: read
     # Browsers + system deps are baked into the image, so there is no
     # `playwright install --with-deps` step. The tag MUST track the
-    # @playwright/test version resolved in package-lock.json (currently
-    # 1.60.0); the image ships Node 24. Baselines committed under
-    # e2e/__screenshots__/ were generated inside this exact image, so Linux
-    # font rendering matches and the fuzzy comparison stays within tolerance.
+    # @playwright/test version resolved in package-lock.json (enforced by
+    # `npm run lint:playwright-pin`, #2074); the image ships Node 24. Baselines
+    # committed under e2e/__screenshots__/ were generated inside this exact
+    # image, so Linux font rendering matches and the fuzzy comparison stays
+    # within tolerance.
     container:
-      image: mcr.microsoft.com/playwright:v1.60.0-noble
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     steps:
       - uses: actions/checkout@v7
 
