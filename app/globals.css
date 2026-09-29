@@ -14,7 +14,7 @@ html {
 }
 
 :root {
-  /* Brand-default mascot palette (Poké-ball red) — overridden by the inline
+  /* Brand-default mascot palette (Poké-ball red) - overridden by the inline
      <head> script in app/layout.tsx when a favourite is saved. Defined first
      so the surface tokens below can color-mix against it.
 
@@ -59,7 +59,7 @@ html {
   }
 }
 
-/* Intensity: tinted — visible mascot wash. Low percentages of vivid mascot
+/* Intensity: tinted - visible mascot wash. Low percentages of vivid mascot
    primaries (Charizard orange, Pikachu yellow) desaturate into beige/peach
    when blended with off-white. Mid-teen percentages keep the hue identifiable. */
 :root[data-intensity="tinted"] {
@@ -75,14 +75,14 @@ html {
   }
 }
 
-/* Intensity: full — mascot drives the body. Surfaces use a LIGHT base so they
+/* Intensity: full - mascot drives the body. Surfaces use a LIGHT base so they
    remain visibly raised above the (heavily mascot-coloured) body, giving
    interactive controls a backdrop with real contrast.
 
    Note: in dark mode we deliberately do NOT override `--foreground` to
    `--theme-fg-on-primary` (light mode does). The dark body is already
    color-mixed toward black, so the inherited `#ededed` from the dark baseline
-   keeps text readable across every mascot — dark-mascot bodies (Umbreon,
+   keeps text readable across every mascot - dark-mascot bodies (Umbreon,
    Garchomp) would actively fight a black `fgOnPrimary`. */
 :root[data-intensity="full"] {
   --background: var(--theme-primary);
@@ -110,7 +110,7 @@ body {
   /* #1051: Prevent iOS rubber-band / pull-to-refresh when grading cards on the
      practice surface. In-page scrolling on longer surfaces (Stats, Pokédex) is
      unaffected because overscroll-behavior: contain only blocks the scroll
-     chain propagating beyond the body — it does not restrict content scrolling
+     chain propagating beyond the body - it does not restrict content scrolling
      within a child overflow container. */
   overscroll-behavior: contain;
 }

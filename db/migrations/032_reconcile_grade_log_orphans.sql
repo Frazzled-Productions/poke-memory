@@ -13,7 +13,7 @@
 -- WHY CONSERVATIVE (placeholder, not FSRS-replay)
 -- -------------------------------------------------
 -- A replay-correct heal would require in-memory `learningStep` /
--- `stepStartedAt` state that is never written to grade_log — the FSRS
+-- `stepStartedAt` state that is never written to grade_log - the FSRS
 -- scheduler (lib/srs/scheduler.ts) holds it ephemerally. Without those
 -- values, re-deriving FSRS stability/difficulty from raw grades is
 -- unreliable. Instead, this function inserts a PLACEHOLDER row that:

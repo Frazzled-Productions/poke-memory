@@ -33,7 +33,7 @@ jobs:
           languages: javascript-typescript
           queries: security-extended
       # No `autobuild` step: CodeQL v3 traces JS/TS without a build, and we
-      # deliberately skip `next build` here to keep the scan fast — generated
+      # deliberately skip `next build` here to keep the scan fast - generated
       # `.next/` output is not in scope. Add `autobuild` only if a future
       # query needs to see compiled JS that the source-trace path misses.
       - uses: github/codeql-action/analyze@v3

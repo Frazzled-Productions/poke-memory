@@ -3,7 +3,7 @@ name: Cron Health Monitor
 # Watch the repo's cron-driven workflows for staleness or failure. GitHub
 # disables scheduled workflows after 60 days of repo inactivity, and a
 # malformed cron or an expired secret can also silently stop a workflow
-# firing — none of which produces an alert on its own. This workflow runs
+# firing - none of which produces an alert on its own. This workflow runs
 # on its own schedule (independent of the workflows it watches) and, for
 # each monitored workflow, checks that (a) there has been at least one run
 # within the expected interval and (b) the most recent run did not fail.
@@ -55,11 +55,11 @@ jobs:
           set -euo pipefail
 
           # Monitored workflows: "<file>|<human name>|<max-age-hours>".
-          # max-age-hours is the longest acceptable gap between runs — the
+          # max-age-hours is the longest acceptable gap between runs - the
           # cron cadence plus generous headroom for GitHub's cron jitter
           # (which can run hours late under load) and dispatch skew.
           # Daily workflows: 48h. Weekly digests: 240h (10 days).
-          # Monthly workflows: 840h (35 days) — a full month plus headroom.
+          # Monthly workflows: 840h (35 days) - a full month plus headroom.
           # The six Claude-driven digest and audit workflows were removed when the
           # agent automation moved off GitHub to the Mac-local loop. They are not
           # listed here any more: a health monitor watching for a workflow that was
@@ -115,12 +115,12 @@ jobs:
 
             # --- Fetch run history ---------------------------------------
             # Two queries are needed:
-            #  * RUN_ANY  — the latest run across ALL triggers (schedule +
+            #  * RUN_ANY  - the latest run across ALL triggers (schedule +
             #    workflow_dispatch). Its conclusion is what we judge run
             #    health on (Fix 2, #971): a green dispatch run after a fix
             #    should clear the alert even though the last *scheduled*
             #    run predates the fix.
-            #  * RUN_SCHED — the latest *schedule*-triggered run only. Its
+            #  * RUN_SCHED - the latest *schedule*-triggered run only. Its
             #    age is what the staleness check uses, because only a
             #    scheduled run proves the cron itself is still firing; a
             #    manual dispatch says nothing about the schedule.
@@ -128,7 +128,7 @@ jobs:
             # (network blip, rate limit, GitHub outage) is not confused
             # with a genuine empty result. On an API error we skip this
             # workflow rather than treat the error as evidence of
-            # staleness — otherwise a transient outage would spam a
+            # staleness - otherwise a transient outage would spam a
             # tracking issue for every monitored workflow at once.
             DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
 
@@ -141,7 +141,7 @@ jobs:
               --json status,conclusion,createdAt,databaseId,event) || RUN_EXIT=$?
 
             if [ "$RUN_EXIT" -ne 0 ]; then
-              echo "::warning::$FILE: 'gh run list' (all events) failed (exit $RUN_EXIT) — likely a transient GitHub API error. Skipping this workflow; will recheck on the next run."
+              echo "::warning::$FILE: 'gh run list' (all events) failed (exit $RUN_EXIT) - likely a transient GitHub API error. Skipping this workflow; will recheck on the next run."
               echo "::endgroup::"
               continue
             fi
@@ -156,7 +156,7 @@ jobs:
               --json status,conclusion,createdAt,databaseId) || RUN_EXIT=$?
 
             if [ "$RUN_EXIT" -ne 0 ]; then
-              echo "::warning::$FILE: 'gh run list' (schedule) failed (exit $RUN_EXIT) — likely a transient GitHub API error. Skipping this workflow; will recheck on the next run."
+              echo "::warning::$FILE: 'gh run list' (schedule) failed (exit $RUN_EXIT) - likely a transient GitHub API error. Skipping this workflow; will recheck on the next run."
               echo "::endgroup::"
               continue
             fi
@@ -190,9 +190,9 @@ jobs:
               FILE_AGE=$(( NOW - FILE_ADDED_TS ))
               if [ "$FILE_ADDED_TS" -ne 0 ] && [ "$FILE_AGE" -lt "$MAX_AGE" ]; then
                 # The file is newer than the most recent expected cron
-                # tick — it simply has not had a chance to run yet.
+                # tick - it simply has not had a chance to run yet.
                 FILE_AGE_HOURS=$(( FILE_AGE / 3600 ))
-                echo "$FILE: no scheduled run yet, but the file was added only ${FILE_AGE_HOURS}h ago (< ${MAX_AGE_HOURS}h cadence) — too new to have fired, not flagging."
+                echo "$FILE: no scheduled run yet, but the file was added only ${FILE_AGE_HOURS}h ago (< ${MAX_AGE_HOURS}h cadence) - too new to have fired, not flagging."
               else
                 # Either the file is old enough that a scheduled run was
                 # expected, or its add-date could not be determined.
@@ -211,7 +211,7 @@ jobs:
               RUN_ID=$(echo "$RUN_ANY" | jq -r '.[0].databaseId')
 
               # Only completed runs carry a conclusion. Treat an in-flight
-              # run (status != completed) as healthy — it has not failed.
+              # run (status != completed) as healthy - it has not failed.
               # A completed run is unhealthy unless its conclusion is
               # 'success' or 'skipped'; this catches 'failure',
               # 'timed_out', 'startup_failure', and 'cancelled' alike, so a
@@ -269,13 +269,13 @@ jobs:
               if [ -n "$EXISTING" ]; then
                 echo "$FILE: healthy again, closing tracking issue #$EXISTING"
                 gh issue close "$EXISTING" --repo "$REPO" \
-                  --comment "$MARKER"$'\n'"\`$FILE\` is healthy again — closing automatically."
+                  --comment "$MARKER"$'\n'"\`$FILE\` is healthy again - closing automatically."
               fi
               echo "::endgroup::"
               continue
             fi
 
-            echo "$FILE: PROBLEM — $PROBLEM"
+            echo "$FILE: PROBLEM - $PROBLEM"
 
             BODY_FILE=$(mktemp)
             cat >"$BODY_FILE" <<EOF
@@ -297,7 +297,7 @@ jobs:
               echo "$FILE: updating tracking issue #$EXISTING"
               gh issue edit "$EXISTING" --repo "$REPO" --body-file "$BODY_FILE"
               gh issue comment "$EXISTING" --repo "$REPO" \
-                --body "$MARKER"$'\n'"Re-checked on $(date -u '+%Y-%m-%d %H:%M UTC') — still unhealthy. Details above have been refreshed."
+                --body "$MARKER"$'\n'"Re-checked on $(date -u '+%Y-%m-%d %H:%M UTC') - still unhealthy. Details above have been refreshed."
             else
               echo "$FILE: opening new tracking issue"
               gh issue create --repo "$REPO" \

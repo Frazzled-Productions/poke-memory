@@ -6,7 +6,7 @@ name: Version bump gate
 # outcome; anything higher requires explicit user approval.
 #
 # Note: `major-bump` is recognised by the gate but is not yet handled by
-# `cut-release.mjs` — a PR landing a `major-bump` fragment would fail at
+# `cut-release.mjs` - a PR landing a `major-bump` fragment would fail at
 # release time until that script is extended.
 #
 # Closes #371.
@@ -47,7 +47,7 @@ jobs:
           done
 
           if [ ${#NON_PATCH[@]} -eq 0 ]; then
-            echo "No non-patch version-bump fragments present — gate passes."
+            echo "No non-patch version-bump fragments present - gate passes."
             exit 0
           fi
 
@@ -56,7 +56,7 @@ jobs:
 
           # jq -e exits non-zero when no element matches; stdout suppressed.
           if echo "$PR_LABELS" | jq -e '.[] | select(.name == "version-bump:approved")' >/dev/null; then
-            echo "PR has 'version-bump:approved' label — gate passes."
+            echo "PR has 'version-bump:approved' label - gate passes."
             exit 0
           fi
 

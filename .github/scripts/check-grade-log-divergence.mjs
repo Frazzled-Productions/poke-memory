@@ -4,8 +4,8 @@
 //
 // Why this exists
 // ---------------
-// The #584 incident — signed-in users grading cards without producing
-// card_reviews rows — went unnoticed for ~24 hours because the only signal
+// The #584 incident - signed-in users grading cards without producing
+// card_reviews rows - went unnoticed for ~24 hours because the only signal
 // was a client-side `console.warn`. This script catches the same class of
 // failure from the data side, splitting the question into three
 // independent shapes so each can alert on its own.
@@ -19,12 +19,12 @@
 //
 // There are three distinct failure shapes:
 //
-//   Option A — "row never written"
+//   Option A - "row never written"
 //     A subject was graded but has NO matching card_reviews row at all.
 //     This is the original #584 signature: the per-grade upsert never
 //     landed for a card the user demonstrably graded.
 //
-//   Option B — "row stuck stale"
+//   Option B - "row stuck stale"
 //     A card_reviews row exists for the subject, but it looks like the
 //     scheduler never actually processed grades against it
 //     (`last_review IS NULL` or `reps = 0`) despite the same subject
@@ -34,7 +34,7 @@
 //     was written once (e.g. during the initial pull / merge) but every
 //     subsequent per-grade update was silently dropped.
 //
-//   Option C — "graduated orphan, no grace" (#1357)
+//   Option C - "graduated orphan, no grace" (#1357)
 //     A subject whose grade_log shows it graduated (see "Graduation
 //     signal" below) has NO matching card_reviews row at all,
 //     REGARDLESS of the 2-day grace Option A applies. Option A's
@@ -89,7 +89,7 @@
 // grade is between 2 and 4 days ago, we give in-step cards a 2-day grace
 // period to graduate before we count them as missing. Real #584 breaks
 // reappear in the same window the next day and the day after, so the
-// delay does not hide them — it just removes the noise from the leading
+// delay does not hide them - it just removes the noise from the leading
 // edge.
 //
 // Stuck-in-steps false positives on Option A (#1253)
@@ -132,7 +132,7 @@
 // its pre-reset stuck shape (`reps = 0` or `last_review IS NULL`) and
 // the user keeps tapping Again/Hard/Good, producing grade_log entries.
 // Without a grace period, Option B would fire for this user on day one
-// of re-learning even though nothing is broken — the row will be
+// of re-learning even though nothing is broken - the row will be
 // rewritten the moment the card graduates.
 //
 // We apply the same 2-day persistence window to Option B's CTE as Option
@@ -140,7 +140,7 @@
 // ≥2 days old is no longer a re-learning session in progress, it is a
 // genuine stuck row. Real "row stuck stale" breaks reappear in the same
 // window the next day and the day after, so the delay does not hide
-// them — it just removes the leading-edge noise.
+// them - it just removes the leading-edge noise.
 //
 // Option A detection floor (#1230)
 // --------------------------------
@@ -163,7 +163,7 @@
 // ------------------------------
 // grade_log and card_reviews use different card_type conventions for
 // evolution-stream cards. The grade_log write path (lib/sync/gradeLog.ts)
-// stores the raw app type — 'evolution' / 'reverse-evolution' — while the
+// stores the raw app type - 'evolution' / 'reverse-evolution' - while the
 // card_reviews push path runs appTypeToDbType (lib/sync/cloud.ts), which
 // rewrites those to the '-edge' suffixed forms 'evolution-edge' /
 // 'reverse-evolution-edge'. Joining on the raw grade_log card_type would
@@ -184,10 +184,10 @@
 //
 // Required env vars
 // -----------------
-//   SUPABASE_ACCESS_TOKEN — Management API personal access token (same
+//   SUPABASE_ACCESS_TOKEN - Management API personal access token (same
 //     secret already used by refresh-user-count.yml and migration-check).
-//   SUPABASE_PROJECT_REF  — project ref slug.
-//   DIVERGENCE_THRESHOLD  — optional, integer, default 0. Applied to all
+//   SUPABASE_PROJECT_REF  - project ref slug.
+//   DIVERGENCE_THRESHOLD  - optional, integer, default 0. Applied to all
 //     three queries independently: a query whose row count exceeds the threshold
 //     contributes to the alert. With the corrected metrics every flagged
 //     subject is a real signal, so the default is 0. The env var remains
@@ -200,7 +200,7 @@
 //   * If either query produces rows: writes a JSON object to stdout with
 //     metadata for both queries, writes a Markdown body to disk for the
 //     workflow to pick up via `--body-file`, and exit 0. We never exit
-//     non-zero on "found drift" — the workflow needs to continue so it can
+//     non-zero on "found drift" - the workflow needs to continue so it can
 //     open the alert issue.
 //   * Hard errors (auth, query failure): exit non-zero so the workflow run
 //     itself is marked failed and we get a "check is broken" signal.
@@ -247,19 +247,19 @@ const OPTION_B_LOWER_BOUND_DAYS_AGO = 4;
 const OPTION_B_MIN_GRADES = 3;
 
 // Option C look-back floor (#1357). Unlike Option A, Option C has NO
-// upper-bound recency grace — that is the whole point of the arm. The
+// upper-bound recency grace - that is the whole point of the arm. The
 // only reason to bound the look-back at all is query cost, so we reuse
 // Option A's lower-bound floor as the single window edge.
 const OPTION_C_LOWER_BOUND_DAYS_AGO = OPTION_A_LOWER_BOUND_DAYS_AGO;
 
-// Option A query — "row never written".
+// Option A query - "row never written".
 //
 // Starts from the distinct (user_id, card_type, subject_key, locale) tuples seen
 // in grade_log inside the persistence window, normalises the
 // evolution-stream card_types to the card_reviews vocabulary (#970),
 // then LEFT JOINs to card_reviews on the full identity tuple. A NULL
 // right-hand side means no card_reviews row exists for a card the user
-// demonstrably graded at least OPTION_A_UPPER_BOUND_DAYS_AGO days ago —
+// demonstrably graded at least OPTION_A_UPPER_BOUND_DAYS_AGO days ago:
 // the #584 signature, with in-step cards filtered out by the offset.
 //
 // The MAX(entry_date) on the grade_log side determines the subject's
@@ -307,7 +307,7 @@ HAVING COUNT(*) > 0
 ORDER BY missing_subjects DESC;
 `.trim();
 
-// Option B query — "row stuck stale".
+// Option B query - "row stuck stale".
 //
 // Find subjects with ≥OPTION_B_MIN_GRADES grade_log entries inside the
 // persistence window (entry_date between LOWER_BOUND and UPPER_BOUND
@@ -358,7 +358,7 @@ HAVING COUNT(*) > 0
 ORDER BY stuck_subjects DESC;
 `.trim();
 
-// Option C query — "graduated orphan, regardless of grace" (#1357).
+// Option C query - "graduated orphan, regardless of grace" (#1357).
 //
 // This arm exists because Option A's 2-day persistence window
 // (OPTION_A_UPPER_BOUND_DAYS_AGO) has a blind spot: a card that has
@@ -368,12 +368,12 @@ ORDER BY stuck_subjects DESC;
 // flagged for exactly this reason. A graduated card must sync
 // immediately (`isSyncSafe()` returns true the moment it leaves learning
 // steps), so a graduated subject with no card_reviews row is a real
-// signal at ANY age — the in-step grace does not apply to it.
+// signal at ANY age - the in-step grace does not apply to it.
 //
 // The query is Option A's CTE with the upper-bound recency grace
 // REMOVED. We keep only the lower-bound look-back floor
 // (OPTION_C_LOWER_BOUND_DAYS_AGO, reusing Option A's floor) to bound
-// query cost — see the #1230 floor rationale in the header. The
+// query cost - see the #1230 floor rationale in the header. The
 // evolution-stream card_type normalisation (#970) is copied verbatim
 // from Options A/B; dropping it would falsely flag every evolution-stream
 // card.
@@ -390,7 +390,7 @@ ORDER BY stuck_subjects DESC;
 //
 // Option A is left untouched: its 2-day grace is deliberate and removing
 // it re-introduces the in-step noise that produced #1213 / #1224. Option
-// C is purely additive — a third arm alongside A and B, never a
+// C is purely additive - a third arm alongside A and B, never a
 // replacement for A.
 //
 // Grade ratings: 1=Again, 2=Hard, 4=Good, 5=Easy (per
@@ -457,13 +457,13 @@ function maskUserId(id) {
 // a shared header.
 function formatOptionASection(rows) {
   const lines = [];
-  lines.push("### Option A — `card_reviews` row never written");
+  lines.push("### Option A - `card_reviews` row never written");
   lines.push("");
   lines.push(
     `**${rows.length} user(s)** graded a subject between ${OPTION_A_UPPER_BOUND_DAYS_AGO} and ${OPTION_A_LOWER_BOUND_DAYS_AGO} days ago that still has **no matching \`card_reviews\` row at all**.`,
   );
   lines.push("");
-  lines.push("This is the same failure shape as #584 — clients grading cards");
+  lines.push("This is the same failure shape as #584 - clients grading cards");
   lines.push("but not producing the corresponding `card_reviews` rows, so the");
   lines.push("user's sync state is silently drifting. Investigate immediately.");
   lines.push("");
@@ -476,7 +476,7 @@ function formatOptionASection(rows) {
   lines.push("grade_log entries but no card_reviews row (see `isSyncSafe()` in");
   lines.push("`lib/sync/cloud.ts`). A normal learning-step run graduates within");
   lines.push("a session or two, so a subject whose latest grade is ≥2 days old");
-  lines.push("and still has no card_reviews row is no longer in-step — it is a");
+  lines.push("and still has no card_reviews row is no longer in-step - it is a");
   lines.push("genuine #584 break.");
   lines.push("");
   lines.push("| user_id (prefix) | grade_log subjects missing a card_reviews row |");
@@ -494,7 +494,7 @@ function formatOptionASection(rows) {
 
 function formatOptionBSection(rows) {
   const lines = [];
-  lines.push("### Option B — `card_reviews` row exists but is stuck");
+  lines.push("### Option B - `card_reviews` row exists but is stuck");
   lines.push("");
   lines.push(
     `**${rows.length} user(s)** have a \`card_reviews\` row whose \`last_review IS NULL\` or \`reps = 0\` despite the same subject receiving **≥${OPTION_B_MIN_GRADES} grade_log entries between ${OPTION_B_UPPER_BOUND_DAYS_AGO} and ${OPTION_B_LOWER_BOUND_DAYS_AGO} days ago**.`,
@@ -512,7 +512,7 @@ function formatOptionBSection(rows) {
   lines.push("actively re-learning the card, and `isSyncSafe()` blocks the");
   lines.push("per-grade upsert until graduation. A subject whose latest grade");
   lines.push("is ≥2 days old and the row is still stuck is no longer mid");
-  lines.push("re-learning — it is a genuine stuck row.");
+  lines.push("re-learning - it is a genuine stuck row.");
   lines.push("");
   lines.push("| user_id (prefix) | stuck subjects |");
   lines.push("|---|---:|");
@@ -529,7 +529,7 @@ function formatOptionBSection(rows) {
 
 function formatOptionCSection(rows) {
   const lines = [];
-  lines.push("### Option C — graduated subject with no `card_reviews` row (no grace)");
+  lines.push("### Option C - graduated subject with no `card_reviews` row (no grace)");
   lines.push("");
   lines.push(
     `**${rows.length} user(s)** have a subject whose grade_log shows it graduated (a row with \`learning_step IS NULL\`) within the last ${OPTION_C_LOWER_BOUND_DAYS_AGO} days but **no matching \`card_reviews\` row at all**, regardless of how recent the grade is.`,
@@ -540,7 +540,7 @@ function formatOptionCSection(rows) {
   lines.push("grades are <2 days old, even when they have already graduated. A");
   lines.push("graduated card must sync immediately (`isSyncSafe()` returns true on");
   lines.push("graduation), so a graduated orphan is a real #584-shape signal at any");
-  lines.push("age — the in-step grace deliberately does not apply to it.");
+  lines.push("age - the in-step grace deliberately does not apply to it.");
   lines.push("");
   lines.push("`grade_log.learning_step` records the step after the grade (#1416),");
   lines.push("so a NULL step means that grade graduated the card. A Good on a new");
@@ -600,7 +600,7 @@ function formatMarkdownReport(flaggedA, flaggedB, flaggedC, threshold) {
   lines.push("");
   lines.push(`Current threshold: \`> ${threshold}\` subjects (applied to each`);
   lines.push("query independently). With the corrected metrics every flagged");
-  lines.push("subject is a real signal, so the default is `0` — alert on any");
+  lines.push("subject is a real signal, so the default is `0` - alert on any");
   lines.push("non-zero count. The `DIVERGENCE_THRESHOLD` env var on the");
   lines.push("`monitor-grade-log-divergence` workflow can temporarily mute a");
   lines.push("known-noisy run, but it should not normally be set above `0`.");
@@ -660,7 +660,7 @@ async function main() {
 
   // Write the markdown body to disk so the workflow can `--body-file` it.
   // Fall back to a freshly-created, unpredictably-named temp directory rather
-  // than a hardcoded path in the world-writable /tmp — a fixed name there is a
+  // than a hardcoded path in the world-writable /tmp - a fixed name there is a
   // symlink-clobber target (CodeQL js/insecure-temporary-file). mkdtempSync
   // creates the dir mode 0700 with a random suffix.
   const bodyPath =
@@ -668,7 +668,7 @@ async function main() {
     join(mkdtempSync(join(tmpdir(), "divergence-")), "body.md");
   writeFileSync(bodyPath, formatMarkdownReport(flaggedA, flaggedB, flaggedC, threshold), "utf8");
 
-  // Log the masked summary to stdout — the workflow grep / wc -l doesn't
+  // Log the masked summary to stdout - the workflow grep / wc -l doesn't
   // rely on this, but the JSON shape is useful for manual inspection.
   // `user_count` is the union of users flagged by any query, so the
   // workflow's issue title reflects the total breadth of the alert.

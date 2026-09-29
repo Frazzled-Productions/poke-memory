@@ -1,7 +1,7 @@
 # Data Protection Impact Assessment - Poké Memory
 
 **Date:** May 2026  
-**Controller:** Frazzled Productions Ltd (company no. 17258540) — privacy@pokememory.com  
+**Controller:** Frazzled Productions Ltd (company no. 17258540), privacy@pokememory.com  
 **Reference:** Issue #721  
 **Status:** Approved - sole-operator sign-off (see Step 7)
 

@@ -25,7 +25,7 @@ Valid `kind` values (maps to Keep-a-Changelog subsection):
 | `deprecated` | Deprecated |
 | `fixed`      | Fixed |
 | `security`   | Security |
-| `minor-bump` | *(no bullet — requests a minor version bump instead of the default patch)* |
+| `minor-bump` | *(no bullet: requests a minor version bump instead of the default patch)* |
 
 `kind` is the only required front-matter field. Extra keys are permitted and ignored, so an optional `issue:` line for traceability is fine:
 
@@ -49,7 +49,7 @@ kind: minor-bump
 ---
 ```
 
-**Approval required.** Patch is the only fully-automatic bump. PRs that add a `kind: minor-bump` (or future `kind: major-bump`) fragment must also carry the `version-bump:approved` label — the `version-bump-gate.yml` workflow fails otherwise. Only the repo owner applies that label; agents must not add `minor-bump` fragments without explicit user direction.
+**Approval required.** Patch is the only fully-automatic bump. PRs that add a `kind: minor-bump` (or future `kind: major-bump`) fragment must also carry the `version-bump:approved` label; the `version-bump-gate.yml` workflow fails otherwise. Only the repo owner applies that label; agents must not add `minor-bump` fragments without explicit user direction.
 
 ## Rules
 

@@ -7,7 +7,7 @@ import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
 // SECURITY: fail the build loudly if the test-only mock-auth seam (issue #751)
 // is enabled in a production build. The seam is already inert in production
 // (isMockAuthEnabled() short-circuits on NODE_ENV), so this is defence-in-depth
-// — it turns a silent misconfiguration into a hard build failure.
+// - it turns a silent misconfiguration into a hard build failure.
 assertMockAuthNotInProduction();
 
 const nextConfig: NextConfig = {
@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
   // The FSRS optimizer route loads @open-spaced-repetition/binding which
   // ships a native Node.js binary (.node). Mark it (and its platform-specific
   // sub-package) as server-external so Next.js/Turbopack does not attempt to
-  // bundle them — they are loaded at runtime by Node's native addon loader.
+  // bundle them - they are loaded at runtime by Node's native addon loader.
   serverExternalPackages: [
     "@open-spaced-repetition/binding",
     "@open-spaced-repetition/binding-android-arm64",
@@ -34,7 +34,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_VERSION: pkg.version ?? "dev",
   },
   // /whats-new reads CHANGELOG.md via fs at render time. The path is dynamic
-  // (process.cwd() + filename), which @vercel/nft may not statically trace —
+  // (process.cwd() + filename), which @vercel/nft may not statically trace, so
   // include it explicitly so the file ships with the deployment in any
   // output mode.
   //

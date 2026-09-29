@@ -6,7 +6,7 @@
 -- adapter that #263 ships, then drops the SM-2 columns.
 --
 -- The regression trigger from migration 002 references only last_review
--- and first_seen — those persist — so the trigger continues to function
+-- and first_seen - those persist - so the trigger continues to function
 -- unchanged.
 --
 -- ROLLOUT ORDERING (important): apply this migration to the live project

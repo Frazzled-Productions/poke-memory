@@ -3,7 +3,7 @@
 -- Two changes:
 --
 -- 1. Drop client-facing UPDATE/DELETE policies on append-only tables.
---    grade_log and streak_days are immutable audit/history tables — rows should
+--    grade_log and streak_days are immutable audit/history tables - rows should
 --    only ever be inserted or read. Removing UPDATE/DELETE at the RLS layer
 --    prevents a future client bug from silently wiping history.
 --

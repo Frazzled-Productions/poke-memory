@@ -5,7 +5,7 @@
 -- ever monotonically increments these counters; a decrease is always a
 -- sync bug. See issue #511 and the 2026-05-14 near-miss (a corrupted local
 -- IDB session would have written reps=1 over cloud rows with reps=3 had
--- the user re-graded; no production rows were actually clobbered — this
+-- the user re-graded; no production rows were actually clobbered - this
 -- migration closes the window for next time).
 --
 -- The function is re-declared in full so the migration is self-contained

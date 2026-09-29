@@ -5,10 +5,10 @@
 # the issue's createdAt + body, extracts file-path references via regex, and
 # checks two staleness conditions:
 #
-#   1. createdAt > THRESHOLD_DAYS ago (default 3) — the codebase moves fast,
+#   1. createdAt > THRESHOLD_DAYS ago (default 3) - the codebase moves fast,
 #      so an issue that has aged is suspect.
 #   2. `git log --since=<createdAt>` has any commits touching files referenced
-#      in the issue body — the landscape around those files has shifted since
+#      in the issue body - the landscape around those files has shifted since
 #      the issue was filed.
 #
 # If either condition is true, the issue is considered stale and the caller
@@ -32,17 +32,17 @@
 # A human-readable summary follows on stderr.
 #
 # Configurable thresholds (in precedence order):
-#   1. A `stale-check:N` label on the issue (per-issue override) — N is the
+#   1. A `stale-check:N` label on the issue (per-issue override) - N is the
 #      threshold in days. Use `stale-check:off` to disable the age check for
 #      this issue entirely (file-activity check still runs).
 #   2. STALE_THRESHOLD_DAYS env var (run-wide override).
 #   3. Hard-coded default of 3 days.
 #
 # Exit codes:
-#   0 — script ran successfully (regardless of the staleness verdict; check
+#   0 - script ran successfully (regardless of the staleness verdict; check
 #       the `STALE:` line on stdout for the verdict).
-#   1 — script failed (issue not found, gh auth missing, git missing, etc.).
-#   2 — invalid arguments.
+#   1 - script failed (issue not found, gh auth missing, git missing, etc.).
+#   2 - invalid arguments.
 #
 # Required tools: gh (authenticated), git, jq, date (GNU or BSD).
 #
@@ -135,7 +135,7 @@ fi
 
 # Grab backtick-quoted tokens that look like file paths with one of the
 # allowed extensions. Glob-suffixed paths in issue bodies (e.g.
-# `lib/sync/**`) are intentionally not matched here — `git log` accepts
+# `lib/sync/**`) are intentionally not matched here - `git log` accepts
 # pathspecs but the path-existence check below filters them out anyway, so
 # we keep the regex tight to concrete files.
 EXTRACTED=$(printf '%s\n' "$BODY" \
@@ -144,7 +144,7 @@ EXTRACTED=$(printf '%s\n' "$BODY" \
   | sort -u \
   || true)
 
-# Filter to paths that exist in the current tree — broken or moved paths
+# Filter to paths that exist in the current tree - broken or moved paths
 # would generate noise from `git log` on the worktree-relative pathspec.
 # Note: a path whose deletion since `createdAt` is itself a strong "the
 # landscape has shifted" signal would be silently dropped here. Callers

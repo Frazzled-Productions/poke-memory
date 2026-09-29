@@ -3,7 +3,7 @@
 -- Extends card_reviews and grade_log with a `locale` column so each
 -- (user, card_type, subject_key, locale) tuple is an independent FSRS row.
 -- Mastery, Pasture, Stats, and badges all scope to the user's current
--- pokemonNameLocale — switching language presents a fresh progress slate
+-- pokemonNameLocale - switching language presents a fresh progress slate
 -- while preserving prior rows (they are still there when the user switches back).
 --
 -- Backfills existing rows to locale = 'en' via the column DEFAULT.
@@ -27,10 +27,10 @@ ALTER TABLE card_reviews DROP CONSTRAINT card_reviews_pkey;
 ALTER TABLE card_reviews
   ADD PRIMARY KEY (user_id, card_type, subject_key, locale);
 
--- ── Regression trigger — re-declare with locale in identity tuples ───────────
+-- ── Regression trigger - re-declare with locale in identity tuples ───────────
 --
 -- Re-creates the full function body from migration 017 (the latest version).
--- Only the RAISE EXCEPTION format strings change — ", locale=%" is appended to
+-- Only the RAISE EXCEPTION format strings change - ", locale=%" is appended to
 -- every identity tuple so production triage can pinpoint which locale row fired.
 
 CREATE OR REPLACE FUNCTION card_reviews_reject_regression()

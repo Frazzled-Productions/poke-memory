@@ -40,7 +40,7 @@ SAVEPOINT probe_c;
 UPDATE card_reviews SET last_review = '2026-04-01'::date WHERE pokemon_id = :probe_pokemon_id;
 ROLLBACK TO SAVEPOINT probe_c;
 
--- Probe D: legitimate SM-2 "Again" regrade — repetitions drops to 0 and ease decreases,
+-- Probe D: legitimate SM-2 "Again" regrade - repetitions drops to 0 and ease decreases,
 -- but last_review moves forward. Expect: success.
 UPDATE card_reviews
 SET repetitions = 0,

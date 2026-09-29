@@ -53,7 +53,7 @@ CREATE POLICY "<name>_insert" ON <name>
 -- Add them ONLY if the table is genuinely mutable from the client. For
 -- progress-wipe flows (delete account, reset all progress) use a SECURITY
 -- DEFINER RPC like `reset_all_progress` (migration 018) instead of opening
--- a DELETE policy — that keeps the destructive path centralised and auditable.
+-- a DELETE policy, which keeps the destructive path centralised and auditable.
 -- CREATE POLICY "<name>_update" ON <name>
 --   FOR UPDATE USING (auth.uid() = user_id);
 -- CREATE POLICY "<name>_delete" ON <name>

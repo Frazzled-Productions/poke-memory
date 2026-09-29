@@ -8,11 +8,11 @@
 -- stability/difficulty/scheduledDays.
 --
 -- Column semantics:
---   learning_step   smallint NULL  — 0-based step index when the entry was graded;
+--   learning_step   smallint NULL  - 0-based step index when the entry was graded;
 --                                    NULL means the card was graduated at grade time
 --                                    (not in a learning/relearning step). Pre-existing
---                                    rows backfill NULL (intentional — no DEFAULT).
---   step_started_at bigint   NULL  — epoch ms matching the occurred_at type; marks
+--                                    rows backfill NULL (intentional - no DEFAULT).
+--   step_started_at bigint   NULL  - epoch ms matching the occurred_at type; marks
 --                                    when the current step started. NULL for
 --                                    pre-existing rows and for graduated cards.
 --
@@ -26,7 +26,7 @@
 --
 -- No CHECK constraint on learning_step: valid value space is scheduler-governed;
 -- validation happens at the application boundary, consistent with card_type after
--- migration 013. No NOT NULL, no DEFAULT clause — Postgres backfills NULL on
+-- migration 013. No NOT NULL, no DEFAULT clause - Postgres backfills NULL on
 -- existing rows without one.
 
 ALTER TABLE grade_log ADD COLUMN learning_step smallint;
