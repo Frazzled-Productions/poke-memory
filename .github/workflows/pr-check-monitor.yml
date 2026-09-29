@@ -93,11 +93,14 @@ jobs:
             # below writes it, counts; a comment anyone else plants with the
             # marker must not suppress the alert (#2124). REST rather than
             # `gh pr view --json comments`, whose GraphQL login drops `[bot]`.
+            # A failed lookup fails the step rather than reading as "no
+            # comment" and re-posting the alert every 15 minutes (#2131);
+            # `jq -n` + `inputs` + `first` reads every page, so there is no
+            # `head -1` SIGPIPE to tolerate.
             DEDUP_MARKER="<!-- pr-check-monitor:$SHA -->"
-            EXISTING=$(gh api "repos/$REPO/issues/$NUMBER/comments" --paginate 2>/dev/null \
-              | jq -r --arg marker "$DEDUP_MARKER" --arg author "github-actions[bot]" \
-                  '.[] | select(.user.login == $author and (((.body // "") | split("\n")[0] | rtrimstr("\r")) == $marker)) | .id' \
-              | head -1 || echo "")
+            EXISTING=$(gh api "repos/$REPO/issues/$NUMBER/comments" --paginate \
+              | jq -rn --arg marker "$DEDUP_MARKER" --arg author "github-actions[bot]" \
+                  '[inputs[] | select(.user.login == $author and (((.body // "") | split("\n")[0] | rtrimstr("\r")) == $marker)) | .id] | first // empty')
 
             if [ -n "$EXISTING" ]; then
               echo "PR #$NUMBER: dedup marker already exists for SHA ${SHA:0:7}, skipping"

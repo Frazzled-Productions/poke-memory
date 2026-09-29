@@ -151,11 +151,13 @@ jobs:
           set -euo pipefail
           # SHA is a hex commit id - safe to interpolate directly. Only count
           # markers the bot itself posted (#1859), so a third party cannot
-          # suppress legitimate fires with a forged marker comment.
-          # marker-lookup-exempt: PR-comment dedup filtered to poke-memory-bot[bot] authorship and keyed on a per-SHA marker, not a tracking-issue body.
+          # suppress legitimate fires with a forged marker comment. The marker
+          # must be the whole first line, as the "Post idempotency marker"
+          # step writes it (#2131). `jq -n` + `inputs` counts across every
+          # page at once (a per-page `--jq` printed one count per page).
           MATCH=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            --jq "[.[] | select(.user.login == \"poke-memory-bot[bot]\")
-                       | select(.body | contains(\"<!-- vercel-preview-fired:$SHA -->\"))] | length")
+            | jq -n --arg marker "<!-- vercel-preview-fired:$SHA -->" --arg author "poke-memory-bot[bot]" \
+                '[inputs[] | select(.user.login == $author and (((.body // "") | split("\n")[0] | rtrimstr("\r")) == $marker))] | length')
           if [[ "$MATCH" -gt 0 ]]; then
             echo "Already fired at SHA $SHA - skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"

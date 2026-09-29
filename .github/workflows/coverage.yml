@@ -152,10 +152,14 @@ jobs:
           # account can hold) and carrying the marker as its whole first line,
           # as the build step above writes it. A comment anyone else posts with
           # the marker is ignored rather than PATCHed (#2124).
+          # A failed lookup (gh or jq error) fails the step under pipefail
+          # rather than reading as "no comment" and posting a duplicate
+          # (#2131). `jq -n` + `inputs` collects every paginated page and
+          # `first` picks the earliest match, so nothing closes the pipe early
+          # (no `head -1` SIGPIPE to tolerate).
           COMMENT_ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            | jq -r --arg marker "$MARKER" --arg author "github-actions[bot]" \
-                '.[] | select(.user.login == $author and (((.body // "") | split("\n")[0] | rtrimstr("\r")) == $marker)) | .id' \
-            | head -1 || echo "")
+            | jq -rn --arg marker "$MARKER" --arg author "github-actions[bot]" \
+                '[inputs[] | select(.user.login == $author and (((.body // "") | split("\n")[0] | rtrimstr("\r")) == $marker)) | .id] | first // empty')
 
           if [ -n "$COMMENT_ID" ]; then
             echo "Updating existing coverage comment #$COMMENT_ID"
