@@ -3,7 +3,7 @@ name: QA Preview Deploy
 # Fires the Vercel Deploy Hook for the `qa` staging branch, creating a preview
 # deployment the maintainer can test before promoting `qa -> main` (#806).
 #
-# `workflow_dispatch` only — invoked by the `/batch-issues` skill at the end
+# `workflow_dispatch` only - invoked by the `/batch-issues` skill at the end
 # of its queue drain, or manually from the Actions tab. Vercel branch
 # auto-deploy is off for every branch except `main` (`vercel.json`
 # `git.deploymentEnabled`), so this hook is the only path that deploys `qa`.

@@ -47,7 +47,7 @@ if (fs.existsSync(FRAGMENTS_DIR)) {
 }
 
 if (fragmentFiles.length === 0) {
-  console.log('No changelog fragments found — nothing to release.');
+  console.log('No changelog fragments found - nothing to release.');
   setOutput('skip', 'true');
   process.exit(0);
 }
@@ -91,8 +91,8 @@ for (const filename of fragmentFiles) {
 const nonEmptyKinds = Object.keys(bulletsByKind);
 
 if (!hasMinorBump && nonEmptyKinds.length === 0) {
-  // Fragments exist but all have empty bodies and none is minor-bump — skip.
-  console.log('No changelog fragments with content — nothing to release.');
+  // Fragments exist but all have empty bodies and none is minor-bump - skip.
+  console.log('No changelog fragments with content - nothing to release.');
   setOutput('skip', 'true');
   process.exit(0);
 }
@@ -154,7 +154,7 @@ if (refMatch) {
   const newTagLink = `[${newVersion}]: ${baseUrl}/releases/tag/v${newVersion}`;
   newChangelog = newChangelog.replace(refRe, `${newUnreleased}\n${newTagLink}`);
 } else {
-  console.warn('cut-release: no [Unreleased] reference link found — skipping link update.');
+  console.warn('cut-release: no [Unreleased] reference link found - skipping link update.');
 }
 
 fs.writeFileSync(CHANGELOG, newChangelog);

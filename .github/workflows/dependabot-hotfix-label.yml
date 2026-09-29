@@ -12,7 +12,7 @@ name: Dependabot hotfix label
 # to `main` on its next push (confirmed on #1942), so a retarget workflow
 # would just flip-flop the base on every Dependabot commit. This workflow
 # instead applies the `hotfix` label, the bypass main-pr-source-gate.yml
-# already understands — no retargeting, no flip-flopping.
+# already understands - no retargeting, no flip-flopping.
 #
 # main-pr-source-gate.yml listens on `pull_request: [..., labeled, ...]` for
 # `branches: [main]`. GitHub deliberately does NOT fire that event for label
@@ -33,7 +33,7 @@ name: Dependabot hotfix label
 # `pull_request_target` runs with a token scoped to the BASE branch's
 # workflow file, which is required here because a Dependabot PR carries a
 # read-only token under plain `pull_request`. Per pull_request_target's trust
-# boundary: this workflow never checks out or executes PR-head code — it only
+# boundary: this workflow never checks out or executes PR-head code - it only
 # reads `github.event.pull_request` fields and calls `gh pr edit --add-label`.
 #
 # NOTE: because `pull_request_target` resolves the workflow definition from

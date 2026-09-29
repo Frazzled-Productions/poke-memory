@@ -1,5 +1,5 @@
 name: Bug report
-description: A user-facing or system bug — something that does not behave as intended.
+description: A user-facing or system bug, meaning something that does not behave as intended.
 title: "<area>: <one-line symptom>"
 labels: ["bug"]
 body:
@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for filing. The fields below mirror the structure existing bug issues use (Symptom → Steps → Expected/Actual → Environment), so this issue can drop straight into the `priority:*` triage flow.
 
-        - Don't add the `auto` label — only the repo owner dispatches the auto-implement pipeline.
+        - Don't add the `auto` label; only the repo owner dispatches the auto-implement pipeline.
         - Don't apply a `priority:*` label yourself; suggest one below and the owner will set it.
 
   - type: textarea
@@ -87,11 +87,11 @@ body:
       label: Affected area
       description: Best-guess; reviewer will adjust the label.
       options:
-        - app — review / practice
-        - app — Pokédex
-        - app — Pasture
-        - app — Stats
-        - app — Settings / superuser
+        - app - review / practice
+        - app - Pokédex
+        - app - Pasture
+        - app - Stats
+        - app - Settings / superuser
         - sync / persistence
         - SRS scheduler
         - PokéAPI / sprites
@@ -108,9 +108,9 @@ body:
       label: Suggested priority
       description: Captured in the body; the repo owner applies the actual `priority:*` label.
       options:
-        - now — blocks normal use or recent regression
-        - next — should be fixed soon
-        - later — nice to fix eventually
+        - now - blocks normal use or recent regression
+        - next - should be fixed soon
+        - later - nice to fix eventually
         - no opinion
     validations:
       required: false

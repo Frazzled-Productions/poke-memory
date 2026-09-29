@@ -181,7 +181,7 @@ cat > "$FIXTURE_DIR/1003.json" <<EOF
 EOF
 
 # Threshold of 9999 days disables the age branch, so any staleness must
-# come from git activity on README.md since a year ago — extremely likely
+# come from git activity on README.md since a year ago - extremely likely
 # given how active this repo is.
 OUTPUT=$(STALE_THRESHOLD_DAYS=9999 "$SCRIPT_UNDER_TEST" 1003 2>/dev/null || true)
 assert_stale "recent-with-activity (refs README.md, threshold=9999)" "yes" "$OUTPUT"

@@ -4,9 +4,9 @@
 # PR timeline reflects Claude's progress in real time.
 #
 # Required env (set by the workflow before the Claude action runs):
-#   AUTO_STATUS_COMMENT_ID — comment ID to PATCH
-#   AUTO_STATUS_REPO       — owner/repo
-#   GH_TOKEN               — installation token with issues:write
+#   AUTO_STATUS_COMMENT_ID - comment ID to PATCH
+#   AUTO_STATUS_REPO       - owner/repo
+#   GH_TOKEN               - installation token with issues:write
 #
 # When any of those are missing (e.g. running locally outside CI) the hook
 # is a no-op so it's safe to leave registered.

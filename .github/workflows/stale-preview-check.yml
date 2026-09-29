@@ -54,14 +54,14 @@ jobs:
 
           if [ "$QA_SHA" = "$LAST_PREVIEW_SHA" ]; then
             echo "stale=false" >> "$GITHUB_OUTPUT"
-            echo "qa tip ($QA_SHA) matches last preview SHA — no action needed."
+            echo "qa tip ($QA_SHA) matches last preview SHA - no action needed."
           else
             echo "stale=true" >> "$GITHUB_OUTPUT"
             echo "qa tip ($QA_SHA) ahead of last preview ($LAST_PREVIEW_SHA)."
           fi
 
       - name: Find open qa -> main promotion PR
-        # Runs on both stale and not-stale paths — the dismiss step needs
+        # Runs on both stale and not-stale paths - the dismiss step needs
         # this lookup to know which PR to clean a marker comment off of.
         # (Bug fix: the original `if: stale == true` left the dismiss step
         # permanently false, so the comment was never removed when caught up.)
@@ -155,5 +155,5 @@ jobs:
             --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -n1)
           if [ -n "$EXISTING_COMMENT_ID" ]; then
             gh api --method DELETE "/repos/${{ github.repository }}/issues/comments/${EXISTING_COMMENT_ID}"
-            echo "Removed stale-preview comment ${EXISTING_COMMENT_ID} — preview now caught up."
+            echo "Removed stale-preview comment ${EXISTING_COMMENT_ID} - preview now caught up."
           fi

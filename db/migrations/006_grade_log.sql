@@ -4,7 +4,7 @@
 -- localStorage. Feeds analytics (heatmap, rolling accuracy, type-mastery
 -- breakdown) and survives logout / new device.
 --
--- One row per grade event. `occurred_at` (epoch ms — matches the local
+-- One row per grade event. `occurred_at` (epoch ms - matches the local
 -- shape) is the dedup key. `entry_date` is denormalized for fast group-by-
 -- day queries.
 

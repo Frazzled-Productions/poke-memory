@@ -6,7 +6,7 @@ name: Main PR source gate
 # preview deploy, then promoted to `main` in a single `qa -> main` PR.
 #
 # A genuine hotfix or trivial direct change can bypass `qa` by carrying the
-# `hotfix` label — the same approval pattern as `version-bump:approved`. Only
+# `hotfix` label - the same approval pattern as `version-bump:approved`. Only
 # the repo owner applies it.
 #
 # This gate is a required status check on the `main-protection` ruleset, so a
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     # Fork PRs cannot be labelled by the contributor, so running the gate on
-    # them would produce an unresolvable failure — same guard as
+    # them would produce an unresolvable failure - same guard as
     # version-bump-gate.yml. This repo does not take fork PRs into `main`.
     if: github.event.pull_request.head.repo.fork == false
     permissions:

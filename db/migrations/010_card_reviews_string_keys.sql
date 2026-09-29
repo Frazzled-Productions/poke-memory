@@ -1,9 +1,9 @@
--- Migration 010: Card identity refactor — (card_type, subject_key) composite key
+-- Migration 010: Card identity refactor - (card_type, subject_key) composite key
 --
 -- Replaces the integer pokemon_id identity column with a string pair:
---   card_type   text  — DB discriminator: 'name' | 'reverse' | 'cry' |
+--   card_type   text  - DB discriminator: 'name' | 'reverse' | 'cry' |
 --                       'evolution-edge' | 'reverse-evolution-edge'
---   subject_key text  — species ID as plain string ("1", "25"), or
+--   subject_key text  - species ID as plain string ("1", "25"), or
 --                       edge key as "fromId>>>toId" ("1>>>2")
 --
 -- Backfill note:
@@ -45,11 +45,11 @@ WHERE pokemon_id BETWEEN 3000001 AND 3999999;
 
 -- 5. Evolution/reverse-evolution rows in the old integer ranges are empty in
 --    production (migration 009 removed them). card_type and subject_key stay
---    NULL for any orphaned rows — the client pull skips NULL subject_key rows.
+--    NULL for any orphaned rows - the client pull skips NULL subject_key rows.
 
 -- 6. Drop the old (user_id, pokemon_id) primary key. The partial unique index
 --    below becomes the de facto uniqueness check during the dual-read window.
---    We do NOT drop the pokemon_id column yet — migration 011 does that after
+--    We do NOT drop the pokemon_id column yet - migration 011 does that after
 --    all clients have shipped this build.
 --
 --    Why drop the PK now: new INSERTs from the new push code carry no

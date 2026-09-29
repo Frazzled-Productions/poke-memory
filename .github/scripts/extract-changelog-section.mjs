@@ -15,7 +15,7 @@ if (!version) {
 const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
 
 // Find the `## [<version>]` heading by exact string match rather than building
-// a RegExp from `version` — `version` is a command-line argument, so feeding it
+// a RegExp from `version` - `version` is a command-line argument, so feeding it
 // into `new RegExp` would allow regex injection (and the old `.`-only escape
 // missed backslashes and other metacharacters). The heading is anchored to the
 // start of a line and the rest of the line is consumed up to the newline.

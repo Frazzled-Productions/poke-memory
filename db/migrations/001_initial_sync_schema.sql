@@ -32,7 +32,7 @@ CREATE POLICY "card_reviews_update" ON card_reviews
 CREATE POLICY "card_reviews_delete" ON card_reviews
   FOR DELETE USING (auth.uid() = user_id);
 
--- streak_days: schema scaffolding only — no read/write paths exist yet.
+-- streak_days: schema scaffolding only - no read/write paths exist yet.
 -- Deferred to the streak-tracking feature.
 CREATE TABLE IF NOT EXISTS streak_days (
   id          uuid  PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -55,7 +55,7 @@ CREATE POLICY "streak_days_update" ON streak_days
 CREATE POLICY "streak_days_delete" ON streak_days
   FOR DELETE USING (auth.uid() = user_id);
 
--- user_settings: schema scaffolding only — no read/write paths exist yet.
+-- user_settings: schema scaffolding only - no read/write paths exist yet.
 -- Deferred to the settings/daily-limit-override feature.
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id             uuid    PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,

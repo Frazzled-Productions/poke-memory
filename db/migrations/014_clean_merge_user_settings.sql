@@ -1,4 +1,4 @@
--- Migration 014: clean up merge_user_settings — drop the dead WHERE clause on the DO UPDATE branch.
+-- Migration 014: clean up merge_user_settings - drop the dead WHERE clause on the DO UPDATE branch.
 --
 -- The ON CONFLICT (user_id) target already constrains the row being updated,
 -- so the trailing `WHERE user_settings.user_id = p_user_id` clause in 011 was

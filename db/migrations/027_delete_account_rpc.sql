@@ -1,6 +1,6 @@
 -- Migration: 027_delete_account_rpc
 --
--- Adds public.delete_account() — the self-serve full account erasure path
+-- Adds public.delete_account() - the self-serve full account erasure path
 -- (issue #697).
 --
 -- WHY
@@ -10,7 +10,7 @@
 -- This RPC closes that gap: it deletes the auth.users row itself, which
 -- cascades through every FK'd table.
 --
--- APPROACH — SECURITY DEFINER RPC over a service-role server route
+-- APPROACH - SECURITY DEFINER RPC over a service-role server route
 -- The two ways to delete auth.users are (a) a SECURITY DEFINER function owned
 -- by a superuser role, or (b) a server route calling auth.admin.deleteUser
 -- with the service-role key. We pick (a): it mirrors the existing
@@ -28,12 +28,12 @@
 --
 -- REGRESSION TRIGGER
 -- card_reviews_reject_regression_trigger (migrations 002/015/016/017) is a
--- BEFORE UPDATE trigger — it does not fire on DELETE, so the cascade is not
+-- BEFORE UPDATE trigger - it does not fire on DELETE, so the cascade is not
 -- blocked. No interaction with the trigger; no workaround required.
 --
 -- RLS
 -- DELETE on auth.users is not reachable from the browser client regardless of
--- public-schema RLS — auth.users lives in the auth schema and the anon/
+-- public-schema RLS - auth.users lives in the auth schema and the anon/
 -- authenticated roles have no DELETE grant on it. This RPC is the only path.
 -- It is scoped to auth.uid(): a caller can only ever delete their own account.
 

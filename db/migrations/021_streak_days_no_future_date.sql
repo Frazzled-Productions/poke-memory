@@ -1,6 +1,6 @@
 -- Migration 021: block future-date streak rows. Issue #524.
 -- (Migration 020 is reserved for the in-flight card_reviews bounds PR #521.
---  If #521 is abandoned, slot 020 remains permanently empty — this is
+--  If #521 is abandoned, slot 020 remains permanently empty - this is
 --  intentional and does not affect any tooling; check-migrations.mjs matches
 --  by derived name, not sequential number.)
 --
@@ -13,7 +13,7 @@
 -- migration 018 (closing #515). This migration adds the remaining client-side
 -- regression gap surfaced in #524.
 --
--- NOTE: current_date is STABLE (not IMMUTABLE) in PostgreSQL — it evaluates
+-- NOTE: current_date is STABLE (not IMMUTABLE) in PostgreSQL - it evaluates
 -- to the date at the moment of each INSERT/UPDATE, not a stored constant. All
 -- existing rows were validated immediately when this constraint was applied
 -- (no NOT VALID flag was used), so no separate VALIDATE CONSTRAINT step exists.

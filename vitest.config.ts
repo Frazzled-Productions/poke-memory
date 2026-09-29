@@ -13,7 +13,7 @@ const integrationEnabled = process.env.VITEST_INTEGRATION === "1";
 export default defineConfig({
   test: {
     // Coverage tooling (#762, gated in #824). `vitest run --coverage` now
-    // enforces a global floor — see `thresholds` below. The floor is a
+    // enforces a global floor - see `thresholds` below. The floor is a
     // regression guard, not a target; the diff-coverage gate in coverage.yml
     // is what pushes new code higher.
     coverage: {
@@ -25,10 +25,10 @@ export default defineConfig({
       // html  → drillable local report under coverage/
       reporter: ["text", "json-summary", "json", "html"],
       // Global floor (regression guard, #824). Values live in
-      // ./coverage-floor.json — the single source of truth read by this
+      // ./coverage-floor.json - the single source of truth read by this
       // config, by .github/workflows/coverage.yml's PR-comment template, and
       // referenced (no hardcoded numbers) from AGENTS.md and WORKFLOW.md
-      // prose. Ratchet upward as coverage improves — never downward to make
+      // prose. Ratchet upward as coverage improves - never downward to make
       // a red build pass. The /batch-issues skill ratchets the JSON file at
       // the end of every session that touches product code; manual ratchets
       // are also fine.
@@ -43,7 +43,7 @@ export default defineConfig({
       // Measure the application/library source we actually ship and test.
       include: ["app/**", "components/**", "lib/**"],
       exclude: [
-        // Test files — not product code.
+        // Test files - not product code.
         "**/*.test.ts",
         "**/*.test.tsx",
         "lib/sync/integration/**",
@@ -53,7 +53,7 @@ export default defineConfig({
         "e2e/**",
         "scripts/**",
         "db/**",
-        // Generated seed payload — produced by scripts/seed-pokemon.mjs, not
+        // Generated seed payload - produced by scripts/seed-pokemon.mjs, not
         // hand-written, so it carries no meaningful coverage signal.
         "lib/pokemon/generated.json",
         // Service-worker source (#703). Runs in a ServiceWorkerGlobalScope,
@@ -75,9 +75,9 @@ export default defineConfig({
         test: {
           name: "node",
           // lib/ tests must be DOM-free. Any lib/ test that uses React
-          // rendering would silently run without a DOM here — move it to the
+          // rendering would silently run without a DOM here - move it to the
           // jsdom project below instead.
-          // Exclude the integration sub-directory — those tests require a live
+          // Exclude the integration sub-directory - those tests require a live
           // Postgres instance and run only when VITEST_INTEGRATION=1 is set.
           include: [
             "lib/**/*.test.ts",
@@ -102,7 +102,7 @@ export default defineConfig({
           setupFiles: ["./vitest.setup.ts"],
         },
       },
-      // Integration project — opt-in only. Runs against a local Postgres
+      // Integration project - opt-in only. Runs against a local Postgres
       // service container (GHA services: block) or any DATABASE_URL instance.
       // No Supabase API calls or branch quota required.
       ...(integrationEnabled

@@ -13,7 +13,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     // Generated / non-source trees that must never be linted. `.claude/worktrees/`
-    // is background-job scratch space (gitignored) — without this, a nested
+    // is background-job scratch space (gitignored) - without this, a nested
     // worktree linting itself recurses into every other worktree. `coverage/`
     // holds vitest's generated reports.
     ".claude/**",
@@ -39,8 +39,8 @@ const eslintConfig = defineConfig([
   //
   // `react-hooks/purity` stays at `warn` because two genuine render-impurity
   // sites remain beyond this change's scope:
-  //   - components/pasture/PasturePokemon.tsx — `Math.random()` in render
-  //   - components/review/ReviewSession.tsx — `Date.now()` in render
+  //   - components/pasture/PasturePokemon.tsx - `Math.random()` in render
+  //   - components/review/ReviewSession.tsx - `Date.now()` in render
   // Once those are fixed it can be promoted to `error`.
   {
     rules: {
@@ -56,10 +56,10 @@ const eslintConfig = defineConfig([
   // `pokemonNameLocale` setting is respected.
   //
   // Allowlist rationale:
-  //   app/api/**   — server-side API routes; locale is irrelevant, English baseline is correct.
-  //   lib/**       — pure data layer; English baseline is correct (excluded by the files glob).
-  //   scripts/**   — build-time seeders; English baseline is correct (excluded by the files glob).
-  //   e2e/**       — test code (excluded by the files glob).
+  //   app/api/**   - server-side API routes; locale is irrelevant, English baseline is correct.
+  //   lib/**       - pure data layer; English baseline is correct (excluded by the files glob).
+  //   scripts/**   - build-time seeders; English baseline is correct (excluded by the files glob).
+  //   e2e/**       - test code (excluded by the files glob).
   //
   // False positives: `.displayName` passed as the English-fallback argument to
   // `useLocalePokemonName(speciesId, displayName)` is the intended pattern (the
@@ -86,7 +86,7 @@ const eslintConfig = defineConfig([
         // surface that hardcodes the English title-case) fail CI instead of
         // depending on a reviewer noticing.
         //
-        // The selector targets `<expr>.charAt(0).toUpperCase()` — the exact
+        // The selector targets `<expr>.charAt(0).toUpperCase()` - the exact
         // signature #1389 removed. It is deliberately narrow: it fires on the
         // inline title-case idiom (overwhelmingly used here for type ids) and
         // not on arbitrary string transforms. A type label produced any other
@@ -103,7 +103,7 @@ const eslintConfig = defineConfig([
         // locale-stable, and consistently formatted.
         //
         // Allowlist: lib/utils/format-date.ts itself uses Intl.DateTimeFormat internally
-        // (it IS the helper) — that file is in lib/ and outside the files glob here.
+        // (it IS the helper) - that file is in lib/ and outside the files glob here.
         // todayInTimezone in lib/ uses Intl.DateTimeFormat similarly.
         {
           selector: "CallExpression[callee.property.name='toLocaleDateString']",

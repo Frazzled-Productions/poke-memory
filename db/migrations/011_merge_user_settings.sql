@@ -9,7 +9,7 @@
 -- The function executes as the calling authenticated user, so the existing
 -- RLS policies on user_settings continue to guard cross-user access.
 --
--- No SECURITY DEFINER — the call runs with the invoker's role so RLS applies.
+-- No SECURITY DEFINER - the call runs with the invoker's role so RLS applies.
 
 -- Atomically merge a JSONB patch into user_settings.settings.
 -- Executes as the authenticated user so RLS protects against cross-user writes.

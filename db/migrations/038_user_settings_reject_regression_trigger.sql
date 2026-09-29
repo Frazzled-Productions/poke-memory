@@ -5,29 +5,29 @@
 -- up, making it impossible for a stale or buggy client to silently wipe settings.
 --
 -- Predicates:
---   1. streakProtection.spendDates  — no date may be removed.
---   2. streakProtection.balance     — may only decrease when new spend entries are added
+--   1. streakProtection.spendDates  - no date may be removed.
+--   2. streakProtection.balance     - may only decrease when new spend entries are added
 --                                     (i.e. a token was spent); a bare balance drop is rejected.
---   3. earnedBadges                 — no badge id may be removed (id-level check, not length).
---   4. onboarding dismissal flags   — a flag that is true cannot be set to non-true.
+--   3. earnedBadges                 - no badge id may be removed (id-level check, not length).
+--   4. onboarding dismissal flags   - a flag that is true cannot be set to non-true.
 --                                     Exception: if NEW.settings.onboardingResetAt is a
 --                                     non-null string that is strictly lexicographically >
 --                                     OLD.settings.onboardingResetAt (or OLD is absent), the
 --                                     user intentionally clicked "Show onboarding again" and
 --                                     the revert is allowed. The client sets this tombstone in
 --                                     lib/settings/persistence.ts when resetting onboarding.
---   5. Top-level one-shot flags     — typedEntryOnboardingShown, mcCardOnboardingShown:
+--   5. Top-level one-shot flags     - typedEntryOnboardingShown, mcCardOnboardingShown:
 --                                     same true->non-true check. verifiedTypedEntryMode is
---                                     excluded — it is a toggleable preference, not one-shot.
+--                                     excluded - it is a toggleable preference, not one-shot.
 --                                     These flags are NOT reset by "Show onboarding again" and
 --                                     are never bypassed by the onboardingResetAt tombstone.
---   6. onboarding monotonic counters — practiceSessionsCount, slowSpriteLoadCount:
+--   6. onboarding monotonic counters - practiceSessionsCount, slowSpriteLoadCount:
 --                                     new value must be >= old value.
 --                                     Exception: same onboardingResetAt tombstone as predicate 4.
---   7. learningLocales              — no locale may be removed unless it is present in
+--   7. learningLocales              - no locale may be removed unless it is present in
 --                                     removedLocales (tombstone-safe); defaults to ["en"].
 --
--- ERRCODE: 23514 (check_violation) — matches the card_reviews trigger so
+-- ERRCODE: 23514 (check_violation) - matches the card_reviews trigger so
 -- `isStructuralError` in lib/sync/cloud.ts continues to treat it as a
 -- best-effort/warn-and-skip error rather than a structural halt.
 --
@@ -177,7 +177,7 @@ BEGIN
 
   -- ── 5: top-level one-shot flags ───────────────────────────────────────────
   -- typedEntryOnboardingShown and mcCardOnboardingShown: true -> non-true is rejected.
-  -- verifiedTypedEntryMode is excluded — it is a toggleable preference.
+  -- verifiedTypedEntryMode is excluded - it is a toggleable preference.
   -- These top-level flags are NOT reset by "Show onboarding again" and are never
   -- bypassed by the onboardingResetAt tombstone.
   FOR flag IN SELECT unnest(ARRAY[

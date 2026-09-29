@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * Pasture animations — used by PasturePokemon and ArrivalSparkle.
+ * Pasture animations - used by PasturePokemon and ArrivalSparkle.
  * All durations are set here; components apply them via className.
  * --------------------------------------------------------------------------- */
 
@@ -9,13 +9,13 @@
   50%       { transform: translateY(-6px); }
 }
 
-/* Subtle side-to-side sway — layered on top of bob for larger Pokémon */
+/* Subtle side-to-side sway - layered on top of bob for larger Pokémon */
 @keyframes sway {
   0%, 100% { transform: rotate(-2deg); }
   50%       { transform: rotate(2deg); }
 }
 
-/* Quick hop on tap — translateY up then back */
+/* Quick hop on tap - translateY up then back */
 @keyframes hop {
   0%   { transform: translateY(0) scale(1); }
   30%  { transform: translateY(-14px) scale(1.08); }
@@ -83,16 +83,16 @@
 }
 
 /*
- * Wander wrapper — sits inside .spriteAnchor and receives CSS transforms from
+ * Wander wrapper - sits inside .spriteAnchor and receives CSS transforms from
  * useIdleBehaviour. Keeping it separate avoids colliding with:
  *   - The left/top/scale positioning on .spriteAnchor (React-set, static).
  *   - The bob/hop animation on the <img> inside PasturePokemon.
  */
 .spriteWander {
-  /* No positioning — inherits from .spriteAnchor. */
+  /* No positioning - inherits from .spriteAnchor. */
 }
 
-/* Honour OS-level "Reduce Motion" preference — stop the idle bob animation. */
+/* Honour OS-level "Reduce Motion" preference - stop the idle bob animation. */
 @media (prefers-reduced-motion: reduce) {
   .spriteBob {
     animation: none;

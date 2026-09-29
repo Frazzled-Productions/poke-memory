@@ -42,7 +42,7 @@ jobs:
         if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'qa'
         env:
           # A Supabase Management-API token is account-scoped (not per-project),
-          # so the existing prod token also reads the QA project — only the QA
+          # so the existing prod token also reads the QA project - only the QA
           # project ref is a new secret. No separate QA token needed (#1806).
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.QA_SUPABASE_PROJECT_REF }}

@@ -1,6 +1,6 @@
 -- Migration 019: add timezone and date_format columns to user_settings.
 --
--- Both columns are nullable. NULL means "client hasn't set this yet — auto-detect
+-- Both columns are nullable. NULL means "client hasn't set this yet - auto-detect
 -- and write back". This avoids overwriting a user's deliberate choice with a
 -- server-side default if they happen to sign in from a device with a different
 -- locale. The client reads NULL as "run Intl auto-detection on first load".

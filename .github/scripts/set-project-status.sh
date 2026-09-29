@@ -8,10 +8,10 @@
 # Status names: Todo | Planned | In Progress | PR | Ready to merge | Done
 #
 # Required env:
-#   GH_TOKEN       — org-scoped installation token (App installed on
+#   GH_TOKEN       - org-scoped installation token (App installed on
 #                    Frazzled-Productions, with Org Projects: write).
 #                    Used for the GraphQL project mutations.
-#   GH_TOKEN_REPO  — repo-scoped installation token (App installed on the
+#   GH_TOKEN_REPO  - repo-scoped installation token (App installed on the
 #                    repo's owner). Used for the REST node-ID lookup of
 #                    the issue/PR. Required because the org-scoped token
 #                    can't see issues in a user-owned repo.
@@ -39,7 +39,7 @@ case "$STATUS_NAME" in
 esac
 
 # /issues/{N} works for both issues and PRs (PRs are issues in REST).
-# `node_id` is the GraphQL Relay ID — same value GraphQL would return.
+# `node_id` is the GraphQL Relay ID - same value GraphQL would return.
 # Use the repo-scoped token here; the org-scoped one can't see this repo.
 NODE_ID=$(GH_TOKEN="$GH_TOKEN_REPO" gh api "/repos/$GITHUB_REPOSITORY/issues/$NUMBER" --jq '.node_id')
 

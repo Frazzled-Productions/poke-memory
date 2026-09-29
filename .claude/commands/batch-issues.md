@@ -88,7 +88,7 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
    ```bash
    # 6a. Workflows whose LATEST qa run is a failure (genuinely red NOW). Querying
    #     by failure-status alone is blind to later successes, so a long-fixed
-   #     failure burst gets re-surfaced every session (#1510 — the Perf-budget
+   #     failure burst gets re-surfaced every session (#1510 - the Perf-budget
    #     false positive). Take the latest run per workflow across ALL conclusions
    #     and flag only those whose most recent run failed.
    gh run list --branch=qa --limit 60 --json conclusion,createdAt,name \
@@ -98,7 +98,7 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
                   recent_failures:(map(select(.conclusion=="failure"))|length)})
            | map(select(.latest=="failure"))'
 
-   # 6b. Preview-deploy freshness — is the last QA Preview Deploy behind origin/qa?
+   # 6b. Preview-deploy freshness - is the last QA Preview Deploy behind origin/qa?
    gh run list --workflow="QA Preview Deploy" --limit 1 --json headSha --jq '.[0].headSha'
    git rev-parse origin/qa
    ```
@@ -270,7 +270,7 @@ After every batch is merged into `qa` and the queue is drained:
 5. **Coverage ratchet.** Run `npm run test:coverage` against the post-merge `qa` state. Read the printed `Statements / Branches / Functions / Lines` summary, then update **the single source of truth**:
 
    ```bash
-   # Edit the file directly — every consumer (vitest.config.ts,
+   # Edit the file directly - every consumer (vitest.config.ts,
    # .github/workflows/coverage.yml's PR comment, AGENTS.md / WORKFLOW.md
    # references) reads from it, so this one edit propagates everywhere.
    vim coverage-floor.json
@@ -282,7 +282,7 @@ After every batch is merged into `qa` and the queue is drained:
 
    ```bash
    # If anything matches outside coverage-floor.json itself and the
-   # coverage/ output dir, a copy has crept back in — fix it before
+   # coverage/ output dir, a copy has crept back in - fix it before
    # opening the wrap-up PR.
    git grep -nE 'Statements [0-9]+ / Branches [0-9]+ / Functions [0-9]+ / Lines [0-9]+' \
      -- ':!coverage' ':!node_modules'
