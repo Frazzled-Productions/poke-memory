@@ -97,7 +97,9 @@ while :; do
   fi
 
   PUSH_ERR=$(mktemp)
-  if git push origin "HEAD:refs/heads/qa" 2>"$PUSH_ERR"; then
+  # LC_ALL=C: the rejection reasons grepped below are git's English messages,
+  # which a localised runner would translate.
+  if LC_ALL=C git push origin "HEAD:refs/heads/qa" 2>"$PUSH_ERR"; then
     cat "$PUSH_ERR" >&2
     rm -f "$PUSH_ERR"
     echo "Merged main ($(git rev-parse --short origin/main)) into qa: $(git rev-parse --short HEAD)."

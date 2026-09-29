@@ -37,9 +37,11 @@ on:
 # a newer pending run cancels the older one even with cancel-in-progress
 # false, so sharing the group could silently drop a queued release. The two
 # only race if a manual dispatch overlaps (the crons are 06:17 and 09:00 UTC),
-# and the race is safe: whichever push to `main` loses fails non-fast-forward
-# and goes red with nothing rewritten, and the qa backmerge re-fetches and
-# retries when qa moves under it.
+# and the race is self-healing rather than impossible: whichever push to
+# `main` loses fails non-fast-forward and goes red with nothing rewritten, the
+# qa backmerge re-fetches and retries when qa moves under it, and if a
+# promotion's "Reset qa to main" force-push erases a concurrent stats
+# backmerge, the daily qa-drift-check reports qa behind main the next morning.
 concurrency:
   group: refresh-user-count
   cancel-in-progress: false
