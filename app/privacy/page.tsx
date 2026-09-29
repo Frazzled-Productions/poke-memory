@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 11 June 2026
+          Last updated: 29 September 2026
         </p>
       </header>
 
@@ -86,8 +86,10 @@ export default async function PrivacyPage() {
           </h3>
           <p>
             All card progress and review history stays in your browser&rsquo;s
-            local storage. Nothing is transmitted to any server we operate.
-            Pokémon sprites are served as static files from the same Vercel
+            local storage. Nothing about your cards is transmitted to any
+            server we operate. Like every visitor, guests are covered by the
+            technical error and performance diagnostics described in §3, which
+            are sent to Sentry and contain no card progress. Pokémon sprites are served as static files from the same Vercel
             infrastructure that hosts the app; no third-party image CDN is
             involved.
           </p>
@@ -236,6 +238,26 @@ export default async function PrivacyPage() {
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
+            Error and performance diagnostics (all users)
+          </h3>
+          <p>
+            To keep the service working and secure, we use Sentry to detect and
+            fix faults. When the app hits an error, a report is sent
+            containing the type of error, its message, a stack trace, your
+            browser, operating system and device type, and the page route
+            where it happened. For roughly 10% of visits, a performance trace
+            (how long pages and requests take) is also sent. This applies to
+            guests as well as signed-in users, but it never includes your card
+            progress or review history. We configure Sentry not to collect user
+            identifiers, IP addresses, cookies, request headers or bodies, or
+            URL query parameters, and Session Replay (recording of screen
+            activity) is switched off. Reports are sent through a first-party
+            route on our own domain (<code>/monitoring</code>) to Sentry&rsquo;s
+            EU region (Germany) and are kept for 90 days. Sentry is a
+            sub-processor under a data processing agreement (see §6).
+          </p>
+
+          <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
             Authentication cookie (signed-in users only)
           </h3>
           <p>
@@ -302,8 +324,8 @@ export default async function PrivacyPage() {
               <strong>Browser local storage (guest path).</strong> We store
               your card review state, application settings, and temporary
               superuser QA flags in <code>localStorage</code>. This storage
-              never leaves your device; nothing is transmitted to any server
-              we operate. It is strictly necessary for the app to function
+              never leaves your device; your card progress is not transmitted
+              to any server we operate. It is strictly necessary for the app to function
               in guest mode.
             </li>
             <li>
@@ -327,7 +349,10 @@ export default async function PrivacyPage() {
             Web Vitals). They set no cookie and write nothing to{" "}
             <code>localStorage</code> or any other terminal-equipment storage,
             so PECR Regulation 6 is not engaged, and they do not identify
-            individual users.
+            individual users. The same is true of Sentry, our error
+            monitoring service: it sets no cookie and stores nothing on your
+            device, and its reports travel through a first-party route on our
+            own domain (<code>/monitoring</code>).
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
@@ -338,9 +363,9 @@ export default async function PrivacyPage() {
             storage that are not strictly necessary. Every item of client-side
             storage used by this app is strictly necessary for the service to
             function (the auth cookie and SRS state in local storage). Vercel
-            Analytics and Speed Insights are client-side scripts that set no
-            cookie and write nothing to terminal-equipment storage, so PECR
-            Regulation 6 is not engaged by them at all. No consent banner is
+            Analytics, Speed Insights and Sentry set no cookie and write
+            nothing to terminal-equipment storage, so PECR Regulation 6 is
+            not engaged by them at all. No consent banner is
             required. We disclose this position here for transparency.
           </p>
         </section>
@@ -396,6 +421,15 @@ export default async function PrivacyPage() {
                 </tr>
                 <tr>
                   <td className="py-2 pr-4">
+                    Detect and fix errors and monitor performance (Sentry)
+                  </td>
+                  <td className="py-2">
+                    Legitimate interest in keeping the service working and
+                    secure (no cookie, no user identifiers)
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4">
                     Receive and act on feedback you submit voluntarily
                   </td>
                   <td className="py-2">
@@ -447,6 +481,21 @@ export default async function PrivacyPage() {
                   </td>
                   <td className="py-2">
                     Aggregate, anonymous analytics only; no card data
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4 font-medium">
+                    Sentry (Functional Software, Inc.)
+                  </td>
+                  <td className="py-2 pr-4">
+                    Error monitoring and performance tracing
+                  </td>
+                  <td className="py-2">
+                    Error reports (error type, message, stack trace, browser,
+                    operating system and device type, page route) and a
+                    sample of performance traces, from guests and signed-in
+                    users. No card data, user identifiers, IP addresses or
+                    cookies. EU region (Germany); kept for 90 days.
                   </td>
                 </tr>
                 <tr>
@@ -572,14 +621,16 @@ export default async function PrivacyPage() {
             7. International transfers
           </h2>
           <p>
-            The third-party services listed in §6 (Vercel; Supabase if you
+            The third-party services listed in §6 (Vercel; Sentry; Supabase if you
             sign in by any method, including username and password; Discord for
             bug-report triage notifications; and, if you sign in via GitHub or
             Google, those providers) may process data outside the UK / EEA.
             Vercel, Supabase, and Discord (our sub-processors) operate under
             the EU Standard Contractual Clauses (SCCs), providing equivalent
             safeguards via the UK International Data Transfer Agreement (IDTA)
-            addendum. GitHub and Google act as independent controllers under
+            addendum. Sentry stores our data in its EU region (Germany); the
+            transfer from the UK to the EU relies on the UK adequacy
+            regulations for the EEA. GitHub and Google act as independent controllers under
             their own applicable transfer mechanisms, including their own
             published SCCs with end-users.
           </p>
@@ -612,6 +663,10 @@ export default async function PrivacyPage() {
             Feedback submissions are retained for 12 months from the date of
             submission and then automatically deleted, regardless of account
             status.
+          </p>
+          <p className="mt-3">
+            Error reports and performance traces held by Sentry are kept for
+            90 days and then automatically deleted.
           </p>
         </section>
 
