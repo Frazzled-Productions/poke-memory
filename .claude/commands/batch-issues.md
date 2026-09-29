@@ -41,15 +41,9 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
 
    If the result is empty, stop and tell the user there is nothing to do.
 
-2. **Disable Auto Review.** `auto-review.yml` runs on PRs into `qa` as well as `main`. During a batch drain the in-session `code-reviewer` (Implementation step 3) is the review gate, so disable the workflow to avoid a redundant second review on every batch PR:
+2. **Retry a classifier-denied `gh` call bare before escalating.** Auto-mode classifier denials are frequently transient (the denial text often says so outright: "Stage 2 classifier error ... usually transient - retrying often succeeds"), and compound invocations are likelier to trip them than a bare one. So when any `gh` call in this skill (`gh pr list`, `gh pr merge`, `gh workflow run`) is denied, retry it on its own, with no `&&`, no pipe and no `| head`, before deciding it is genuinely blocked and escalating to the maintainer; `gh api` is a legitimate substitute for a denied read-only query. (In the 2026-07-24 drain a compound `gh ... && echo ...` was denied and escalated as a blocker; the bare retry succeeded immediately, costing a needless round-trip.)
 
-   ```bash
-   gh workflow disable "Auto Review"
-   ```
-
-   Deliberate global mutation per the user's standing ask - paired with the re-enable in Wrap-up and the graceful-exit guardrail so a halted run never leaves it disabled.
-
-   `gh workflow disable`/`enable "Auto Review"` are in `.claude/settings.json` `permissions.allow`. **Suspending Auto Review is non-negotiable: the run MUST NOT progress to dispatching any implementer until Auto Review is disabled.** During a batch drain the in-session `code-reviewer` (Implementation step 3) is the SOLE review gate; leaving `auto-review.yml` enabled runs a redundant second review on every PR that (a) wastes tokens and (b) routinely collides with the implementer's own work - the agent self-reviews and fixes findings that `auto-review` is concurrently flagging, and the two have to be reconciled in extra fix-rounds (observed repeatedly in the 2026-06-07 drain: #1770 and #1777 each needed a reconciliation round purely because Auto Review ran alongside the in-session reviewer). If `gh workflow disable "Auto Review"` is blocked by the auto-mode classifier or errors, do **NOT** fall back to proceeding with it enabled. STOP and get it suspended first: retry with explicit authorization, or ask the maintainer to run `! gh workflow disable "Auto Review"` in-session, or fix the permission - then continue. **RETRY THE BARE COMMAND BEFORE ESCALATING TO THE MAINTAINER.** Auto-mode classifier denials are frequently transient (the denial text often says so outright: "Stage 2 classifier error ... usually transient - retrying often succeeds"), and compound invocations are likelier to trip them than a bare one - so retry `gh workflow disable "Auto Review"` on its own, with no `&&`, no pipe and no `| head`, before deciding it is genuinely blocked. In the 2026-07-24 drain the first attempt was `gh workflow disable "Auto Review" && echo ...`, was denied, and was escalated to the maintainer as a blocker; the bare retry succeeded immediately, costing a needless round-trip. The same retry-once rule applies to any classifier-denied `gh` call in this skill (`gh pr list`, `gh pr merge`), and `gh api` is a legitimate substitute for a denied read-only query. Re-enable in Wrap-up (and the graceful-exit guardrail) regardless.
+   There is **no review workflow to suspend.** Earlier versions of this step disabled `auto-review.yml` for the drain; that workflow was removed on 2026-08-16 (#2003 / #2004), so nothing reviews a PR automatically and the in-session `code-reviewer` (Implementation step 3) is the only review gate (#2021).
 
 3. **Confirm a clean working tree.** If `git status` shows uncommitted changes, surface and stop. Do **not** require being on the `main` branch - under parallel jobs `main` is often checked out by another worktree, leaving this session on a detached HEAD, which is fine. Every implementation agent branches off `origin/qa` in its own worktree regardless.
 
@@ -180,7 +174,7 @@ For each batch, in order:
 
 2. **Each agent's prompt must include:**
    - The issue number and **the full body, verbatim** - not paraphrased, not summarised. Include all subsections; the implementer cross-checks against them in the PR body. The orchestrator-side scope drop that landed #1259/#1260 without per-locale FSRS rows happened because the brief paraphrased the issue's "Data model" section instead of pasting it.
-   - **"Echo back any `## Data model` / `## Schema` / `## Acceptance criteria` / `## Acceptance` sections from the issue body verbatim in the PR description before opening the PR."** The implementer's own copy is the cross-check anchor for both the auto-review job (`feedback_consult_specialist_on_brief`) and the in-session reviewer.
+   - **"Echo back any `## Data model` / `## Schema` / `## Acceptance criteria` / `## Acceptance` sections from the issue body verbatim in the PR description before opening the PR."** The implementer's own copy is the cross-check anchor for the in-session reviewer (`feedback_consult_specialist_on_brief`).
    - **Specialist pre-consult (when applicable).** If the work falls in an i18n / SRS / Supabase / PokéAPI / privacy domain (per AGENTS.md "File ownership"), the orchestrator must consult the relevant specialist sub-agent (`i18n-expert`, `srs-expert`, `supabase-expert`, `pokeapi-expert`, `privacy-expert`) on the **brief** before dispatching the implementer - not just on the implemented diff afterwards. The specialist's read on the brief catches scope drops the implementer would miss (the canonical example: i18n-expert would have flagged the missing per-locale FSRS PK in the #1259 brief). **Brief the specialist (and verify its findings) against `origin/qa` - `git show origin/qa:<path>`, `git grep origin/qa` - NOT the session's working-tree checkout, which is often a stale feature branch (2026-06-05 batch: both the i18n and ux consults wrongly concluded an existing helper / catalogue key did not exist because they read the stale checkout; mirrors #1652).** Carry the specialist's notes into the implementer's prompt under a `## Specialist notes` heading.
    - **Multi-site domain-concept audit (when applicable).** If the work touches a domain concept that is rendered or computed at multiple sites - Pokémon names, dates, mastery counts, sprite URLs, locale-aware text, ARIA labels, anything per the `dry-single-source` memory - the prompt must include: "Before implementing, grep the whole repo for every existing call site of this concept and list them as either in-scope or explicitly out-of-scope-with-rationale in the PR body. A fix that only patches the site QA flagged is the failure mode #1259/#1311/#1318/#1329 went through four rounds to escape." (memory: `feedback_agent_fix_full_audit`.)
    - "Branch off the latest `origin/qa` and open the PR against `qa` - batch work lands on the `qa` staging branch, never `main` directly. (memory: `feedback_rebase_before_pr`.)"
@@ -208,7 +202,7 @@ For each batch, in order:
 
    **Applying a review-fix to an already-open PR branch.** After a coder finishes, its branch stays checked out (worktree-locked) in `.claude/worktrees/agent-<id>/`, so a background orchestrator that has not isolated cannot edit it directly (the bg-isolation guard) and a fresh worktree cannot check the branch out (already checked out elsewhere). To land a fix on the SAME PR branch (never open a new PR): **(verified, 2026-05-30)** `git worktree remove --force <that agent's worktree>` to free the branch, then dispatch a fresh coder that runs `git checkout -B <branch> origin/<branch>`, applies the fix, re-runs the build gate, and `git push`es to update the PR in place. **(alternative, per the EnterWorktree tool docs but not exercised this session)** `EnterWorktree(path: <that agent's worktree>)` to switch into it and edit in place. `SendMessage` to continue the original completed agent was not available as a tool. This recurred ~4× in the 2026-05-30 drain (the #1421, #1408 ×2, and #1411 review-fix rounds). Separately, **do not spawn an isolated wrap-up agent that runs `npm ci` in a fresh worktree** - that hung silently twice in the 2026-05-30 drain (no output, no completion notification); do the docs/coverage wrap-up edits in an orchestrator-owned `EnterWorktree`, reusing the main checkout's `node_modules` (`ln -s`) when a deps-unchanged batch needs a coverage measurement.
 
-   `auto-review.yml` *does* run on PRs into `qa`, so Pre-flight disables it for the batch drain - this in-session pass is the review gate instead, and Wrap-up re-enables it.
+   **This in-session pass is the only review gate.** Nothing reviews a PR automatically any more (`auto-review.yml` was removed on 2026-08-16, #2003 / #2004), so never skip it or assume a CI review will catch what it misses (AGENTS.md "Review on PR open").
 
 ## PR queue drain
 
@@ -235,26 +229,24 @@ Once a batch's PRs are all open and reviewed in-session, merge them into `qa`:
 
 After every batch is merged into `qa` and the queue is drained:
 
-1. **Keep Auto Review OFF - do NOT re-enable it here (2026-06-07 directive).** It was disabled in Pre-flight and must stay disabled through ALL of wrap-up: the preview deploy, the mini-batch follow-up loop (step 3), AND any retro / improvement PRs into `qa`. Every one of those opens more PRs into `qa`, and a re-enabled Auto Review re-runs the redundant review on each - the exact token-waste-and-reconcile churn the disable exists to prevent. (Re-enabling at this step while improvement PRs were still landing was the mistake the maintainer caught on 2026-06-07.) Auto Review is re-enabled ONLY as the final action of the session (the last wrap-up step below), once no further PRs will be opened into `qa` and the maintainer is about to promote `qa -> main`. The graceful-exit guardrail still re-enables on any halt.
-
-2. **Fire the `qa` preview deploy:**
+1. **Fire the `qa` preview deploy:**
 
    ```bash
    gh workflow run "QA Preview Deploy" --ref qa
    ```
 
-   **Always pass `--ref qa`.** Without it, `gh workflow run` dispatches against the default branch and deploys a stale SHA - the canonical session shipped a preview on an old release commit and the maintainer would have QA'd the wrong build. Confirm it dispatched AND targets the current tip: `gh run list --workflow="QA Preview Deploy" --limit 1 --json headSha,headBranch` and assert `headSha` equals `git rev-parse origin/qa`. Then poll the deploy to `READY` via `mcp__claude_ai_Vercel__get_deployment` (or the GitHub deployments API) so the URL handed off in step 7 is live, not still building.
+   **Always pass `--ref qa`.** Without it, `gh workflow run` dispatches against the default branch and deploys a stale SHA - the canonical session shipped a preview on an old release commit and the maintainer would have QA'd the wrong build. Confirm it dispatched AND targets the current tip: `gh run list --workflow="QA Preview Deploy" --limit 1 --json headSha,headBranch` and assert `headSha` equals `git rev-parse origin/qa`. Then poll the deploy to `READY` via `mcp__claude_ai_Vercel__get_deployment` (or the GitHub deployments API) so the URL handed off in step 6 is live, not still building.
 
    **Then verify the batch's headline user-facing mechanics on the preview - do not assume green CI means they work (AGENTS.md "Mandatory coverage rules").** For each core user-facing change in the batch, exercise it on the preview *in its relevant state*: switch `appLocale` and `pokemonNameLocale` and check names/labels on **every** surface (grid AND detail, not just one), apply the #1326 QA-seed scenarios to populate data-dependent sections and also check their empty branch, etc. Drive this with Playwright against the preview URL if you can't inspect visually. The #1302/#1327 batch passed all CI and still shipped three broken headline behaviours because nothing exercised them in the broken locale/state - this step is the backstop. (memory: `feedback_verify_core_mechanics_by_running_app`.)
 
-3. **Mini-batch follow-up loop.** Preview QA reliably surfaces 1-3 follow-up issues per session (worked examples: #1270/#1271 after #1234; #1331/#1332 after the multi-locale batch; memory: `feedback_mini_batch_after_qa`). Bake this in:
+2. **Mini-batch follow-up loop.** Preview QA reliably surfaces 1-3 follow-up issues per session (worked examples: #1270/#1271 after #1234; #1331/#1332 after the multi-locale batch; memory: `feedback_mini_batch_after_qa`). Bake this in:
 
    - When the maintainer surfaces a preview-QA gap, file it as a new issue (`priority:later` by default, `priority:next` if clearly higher; never `priority:now` without explicit direction) so it is tracked even if it is not implemented this session.
    - For follow-ups the maintainer wants implemented inline, run them through the per-batch Implementation playbook (one Agent per issue, brief template from step 2, in-session `code-reviewer` pass, merge into `qa`).
-   - **After any mini-batch work lands on `qa`, return to step 2 and re-fire the preview deploy** so the next QA round is against the new `qa` tip, not the pre-mini-batch one. This is the rule the canonical session missed: #1329 + Context refactor landed on `qa` and no fresh preview was dispatched until the maintainer asked.
-   - Loop steps 2-3 zero or more times until the maintainer reports preview QA is clean.
+   - **After any mini-batch work lands on `qa`, return to step 1 and re-fire the preview deploy** so the next QA round is against the new `qa` tip, not the pre-mini-batch one. This is the rule the canonical session missed: #1329 + Context refactor landed on `qa` and no fresh preview was dispatched until the maintainer asked.
+   - Loop steps 1-2 zero or more times until the maintainer reports preview QA is clean.
 
-4. **Open the `qa -> main` promotion PR as a draft.** Only after step 3 reports a clean QA round. A PR merged into `qa` does **not** auto-close its `closes #N` issue - GitHub only auto-closes on the default branch. So the promotion PR must carry every issue number the batch resolved (including any from mini-batch rounds):
+3. **Open the `qa -> main` promotion PR as a draft.** Only after step 2 reports a clean QA round. A PR merged into `qa` does **not** auto-close its `closes #N` issue - GitHub only auto-closes on the default branch. So the promotion PR must carry every issue number the batch resolved (including any from mini-batch rounds):
 
    ```bash
    gh pr create --base main --head qa --draft \
@@ -266,7 +258,7 @@ After every batch is merged into `qa` and the queue is drained:
 
    Leave it as a **draft** - the maintainer marks it ready after QA. Do not merge it yourself.
 
-5. **End-of-session retro (#1333).** Produce a structured retro covering:
+4. **End-of-session retro (#1333).** Produce a structured retro covering:
 
    - **What went well** - patterns worth keeping; honest, not performative.
    - **What went poorly** - named incidents with one-line cost and root-cause attribution. Distinguish "we caught this in the session" from "the user caught it for us". Surface dropped scope, partial-fix loops, symptom-chasing, fire-and-forget async work, silent agent stalls, missed memory consultations, and any moment the orchestrator paraphrased an issue body instead of reading it verbatim.
@@ -275,7 +267,7 @@ After every batch is merged into `qa` and the queue is drained:
 
    Hand the retro back to the user as a punch list. If the user picks improvements to implement, fold them into the same PR (or a separate retro PR if they touch many files); never let a retro lapse silently.
 
-6. **Coverage ratchet.** Run `npm run test:coverage` against the post-merge `qa` state. Read the printed `Statements / Branches / Functions / Lines` summary, then update **the single source of truth**:
+5. **Coverage ratchet.** Run `npm run test:coverage` against the post-merge `qa` state. Read the printed `Statements / Branches / Functions / Lines` summary, then update **the single source of truth**:
 
    ```bash
    # Edit the file directly — every consumer (vitest.config.ts,
@@ -298,7 +290,7 @@ After every batch is merged into `qa` and the queue is drained:
 
    The expected output is empty (or only the PR-comment template's templating string, which substitutes from the JSON at run time). Any hit with literal hardcoded numbers is a drift bug - extract it to `coverage-floor.json` or delete the duplicate. (User ask, this session - #1333 surfaced four divergent copies, two of which were already stale by multiple ratchets. The single-JSON design exists to make a recurrence impossible.)
 
-7. **Hand off to the maintainer.** One summary block:
+6. **Hand off to the maintainer.** One summary block:
    - Issues drained into `qa` (numbers, including any added in mini-batch rounds) and the PRs merged (numbers).
    - The draft `qa -> main` promotion PR number.
    - Mini-batch follow-ups filed but **not** implemented this session, with their numbers and priority labels.
@@ -312,14 +304,6 @@ After every batch is merged into `qa` and the queue is drained:
 
    `/batch-issues` does **not** trigger `Auto Release` itself - merging the `qa -> main` PR does.
 
-8. **Re-enable Auto Review (the FINAL action of the session).** Only after the handoff is delivered, the draft `qa -> main` PR is open, and you are confident NO further PRs will be opened into `qa` this session (mini-batch and retro/improvement rounds all done):
-
-   ```bash
-   gh workflow enable "Auto Review"
-   ```
-
-   This is deliberately the last thing the session does, so Auto Review is off for every in-session PR into `qa` and on again only for the maintainer's eventual `qa -> main` promotion review. If a follow-up round reopens (more PRs into `qa`), disable it again (`gh workflow disable "Auto Review"`) and re-enable only when truly finished.
-
 ## Batch-drain lessons (2026-06-02)
 
 Hard-won rules from the 2026-06-02 drain. Apply them from the start of every run.
@@ -328,7 +312,6 @@ Hard-won rules from the 2026-06-02 drain. Apply them from the start of every run
 - **Coder subagents lack `EnterWorktree`.** `data-coder` / `ui-coder` / `playwright` have no `EnterWorktree` tool, so a brief telling them to "use EnterWorktree to isolate" silently fails and they fall back to the shared main checkout. Brief them to create their own isolate explicitly as the FIRST step: `git fetch origin && git worktree add /private/tmp/<name> -b <branch> origin/qa && cd /private/tmp/<name>` (or pass `isolation:'worktree'` on the Agent call). One mis-briefed agent switched the maintainer's main checkout to its branch.
 - **Only ONE coder live in the shared main checkout at a time (fix/iterate phase) (#1694).** Because coders fall back to the shared main checkout (above), two fix-coders `checkout -B`-ing different PR branches in the same directory concurrently collide: one switches the branch out from under the other, uncommitted edits leak as stray untracked files, and a leftover worktree locks the checkout (observed fixing PRs #1681/#1689, 2026-06-05). When two PR branches both need edits, pick one: (a) **serialise** - dispatch one coder, wait for its push, then the next; (b) the orchestrator does a **`git worktree add` per branch** and points each coder at it by absolute path (`cd <path>` as their first step); or (c) the orchestrator **edits in its own `EnterWorktree`**. Never two coders `checkout -B`-ing the same directory at once. Health-check between dispatches: after a fix-coder pushes, confirm the main checkout is back on the expected branch (`git -C <checkout> rev-parse --abbrev-ref HEAD`) before dispatching the next.
 - **One single-line site, one owner.** When two batched agents could both touch the same line (e.g. agent A splits a file that also contains a class-name literal agent B is sweeping), assign that exact site to exactly ONE agent and tell the other to HARD-SKIP it (and say so in its PR body). Both touching it produces a merge conflict even when the change is identical.
-- **Check for an auto-review autofix before dispatching a manual review-fix.** `auto-review.yml` runs on `qa` PRs and, via the `/fix` loop in `auto-pr.yml`, pushes `claude[bot]` "address auto-review findings" commits. Before dispatching your own fix agent for a review finding, `git fetch` and check the branch tip for a bot autofix commit - it may already be done (it pre-empted two manual fixes this drain).
 - **Read the failing e2e assertion before re-running.** A red `e2e-browser` leg is often the Microsoft container registry being blocked ("pull access denied" / "request is blocked") or a per-test async-fetch race, not a real failure. But always read the actual assertion first: a chromium-only failure on a non-UI change was once a genuine app bug (a detail panel that never re-rendered on async data), which a test-side cache-warming workaround had masked. Fix the app, not the test.
 
 ## Guardrails
@@ -339,7 +322,6 @@ Hard-won rules from the 2026-06-02 drain. Apply them from the start of every run
 - **Don't rationalize** sub-agent decisions if the user pushes back mid-run; evaluate honestly. (memory: `feedback_dont_rationalize_downstream`.)
 - **Never merge the `qa -> main` PR yourself.** The maintainer's QA of the preview deploy is the gate between batch work and production. Open it as a draft and stop.
 - **Graceful-exit on halt.** If the run halts for any reason - CI failures, user interruption, an unfixable conflict - before reaching Wrap-up:
-  1. Run `gh workflow enable "Auto Review"` so the Pre-flight disable is reversed. Unconditional - even if the disable itself failed, run the enable defensively.
-  2. Commit any in-progress work as `WIP: halted run on #N` and push, per AGENTS.md "Graceful exit on halt".
-  3. Do not skip hooks (`--no-verify`) or `--force` past failures.
-  4. Any PRs already merged into `qa` stay there - a later `/batch-issues` run's pre-flight step 4 will detect the un-promoted `qa` and ask how to handle it.
+  1. Commit any in-progress work as `WIP: halted run on #N` and push, per AGENTS.md "Graceful exit on halt".
+  2. Do not skip hooks (`--no-verify`) or `--force` past failures.
+  3. Any PRs already merged into `qa` stay there - a later `/batch-issues` run's pre-flight step 4 will detect the un-promoted `qa` and ask how to handle it.
