@@ -19,9 +19,36 @@ import { HELD_COPY_STALE_MS } from "@/lib/sync/heldGrade";
 /** Max rows per upsert request, bounding the payload for large local logs. */
 export const GRADE_LOG_REPUSH_BATCH_SIZE = 200;
 
+/** Max rows re-pushed per `pullAndMerge` cycle; the remainder drains on later cycles. */
+export const GRADE_LOG_REPUSH_MAX_ROWS_PER_CYCLE = 1000;
+
+/** Max upsert requests per cycle, including bisection retries. */
+export const GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE = 25;
+
+/** With no request having succeeded yet, give up after this many (network is likely down). */
+const ABORT_AFTER_FAILURES_WITHOUT_SUCCESS = 4;
+
+/**
+ * `occurredAt` values the server rejected as single-row requests, kept for
+ * this page load only so a poisoned row is not retried every cycle. A reload
+ * clears it, so a row fixed server-side is retried then.
+ */
+const rejectedThisSession = new Set<number>();
+
+/** Test helper: clears the per-session rejected set. */
+export function resetRejectedGradeLogRepush(): void {
+  rejectedThisSession.clear();
+}
+
 /**
  * UTC calendar date (`YYYY-MM-DD`) of a `last_reset_at` timestamptz, or null
- * when absent / unparseable. Mirrors the DB trigger's `reset_at::date`.
+ * when absent / unparseable.
+ *
+ * This mirrors the DB trigger EXACTLY, on purpose: the trigger rejects when
+ * `entry_date < reset_at::date`, i.e. the entry's own (user-local-day) date
+ * against the UTC date of the reset (PostgREST sessions run in UTC). Do not
+ * "fix" this into a timezone-aware comparison: it would then disagree with
+ * the trigger and either drop rows the DB accepts or send rows it rejects.
  */
 function resetCutoffDate(lastResetAt: string | null): string | null {
   if (!lastResetAt) return null;
@@ -70,14 +97,19 @@ export function selectRepushEntries(
 }
 
 /**
- * Pushes the local-only entries in batches. Never throws. A failed batch is
- * warned about and skipped (the rest still go, and the entries are retried on
- * the next cycle since they remain local-only). Returns the number of entries
- * in batches that succeeded.
+ * Pushes the local-only entries, oldest first, capped per cycle. Never throws.
  *
- * `lastResetAt` may be null either because the user never reset or because the
- * settings pull failed. In the latter case a pre-reset row can reach the DB
- * trigger, which is why the push is batched: it sinks one batch, not the leg.
+ * A failed batch is bisected (retried in halves down to single rows) so one
+ * server-rejected row cannot block the valid rows beside it. A row that fails
+ * alone is remembered for this session (only once some request in the cycle
+ * has succeeded, so an offline cycle never blacklists good rows). Total rows
+ * and requests per cycle are bounded; the rest drains on later cycles.
+ * Returns the number of entries pushed.
+ *
+ * `lastResetAt` may be null because the user never reset OR because the
+ * settings pull failed (a null settings row also skips the tombstone wipe). In
+ * the latter case a pre-reset row can reach the DB trigger, which is why
+ * bisection matters.
  */
 export async function repushLocalGradeLog(
   client: SupabaseClient,
@@ -86,18 +118,51 @@ export async function repushLocalGradeLog(
   cloud: readonly GradeLogEntry[],
   opts: { lastResetAt: string | null; now?: number },
 ): Promise<number> {
-  const pending = selectRepushEntries(local, cloud, opts);
+  const pending = selectRepushEntries(local, cloud, opts)
+    .filter((e) => !rejectedThisSession.has(e.occurredAt))
+    .sort((a, b) => a.occurredAt - b.occurredAt)
+    .slice(0, GRADE_LOG_REPUSH_MAX_ROWS_PER_CYCLE);
+
   let pushed = 0;
-  for (let i = 0; i < pending.length; i += GRADE_LOG_REPUSH_BATCH_SIZE) {
-    const batch = pending.slice(i, i + GRADE_LOG_REPUSH_BATCH_SIZE);
-    const ok = await pushGradeLog(client, userId, batch);
-    if (ok) {
-      pushed += batch.length;
-    } else {
-      console.warn(
-        `[pullAndMerge] grade-log re-push failed for ${batch.length} entries (non-fatal, retried next cycle)`,
-      );
+  let requests = 0;
+  let failuresWithoutSuccess = 0;
+  let anySucceeded = false;
+  const failedSingles: number[] = [];
+  let aborted = false;
+
+  const attempt = async (rows: GradeLogEntry[]): Promise<void> => {
+    if (aborted) return;
+    if (requests >= GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE) return;
+    requests++;
+    if (await pushGradeLog(client, userId, rows)) {
+      pushed += rows.length;
+      anySucceeded = true;
+      return;
     }
+    if (!anySucceeded && ++failuresWithoutSuccess >= ABORT_AFTER_FAILURES_WITHOUT_SUCCESS) {
+      aborted = true;
+      return;
+    }
+    if (rows.length === 1) {
+      failedSingles.push(rows[0].occurredAt);
+      return;
+    }
+    const mid = Math.ceil(rows.length / 2);
+    await attempt(rows.slice(0, mid));
+    await attempt(rows.slice(mid));
+  };
+
+  for (let i = 0; i < pending.length; i += GRADE_LOG_REPUSH_BATCH_SIZE) {
+    await attempt(pending.slice(i, i + GRADE_LOG_REPUSH_BATCH_SIZE));
+  }
+
+  if (anySucceeded) {
+    for (const t of failedSingles) rejectedThisSession.add(t);
+  }
+  if (failedSingles.length > 0 || aborted) {
+    console.warn(
+      `[pullAndMerge] grade-log re-push incomplete (${failedSingles.length} rejected rows, ${aborted ? "aborted, likely offline, " : ""}non-fatal, retried on a later cycle)`,
+    );
   }
   return pushed;
 }

@@ -3,6 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import {
   GRADE_LOG_REPUSH_BATCH_SIZE,
+  GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE,
+  GRADE_LOG_REPUSH_MAX_ROWS_PER_CYCLE,
+  resetRejectedGradeLogRepush,
   repushLocalGradeLog,
   selectRepushEntries,
 } from "./gradeLogRepush";
@@ -29,6 +32,7 @@ function entry(occurredAt: number, over: Partial<GradeLogEntry> = {}): GradeLogE
 const client = {} as SupabaseClient;
 
 beforeEach(() => {
+  resetRejectedGradeLogRepush();
   isHeld.mockReturnValue(false);
   mockPush.mockResolvedValue(true);
 });
@@ -115,15 +119,69 @@ describe("repushLocalGradeLog", () => {
     ]);
   });
 
-  it("warns and continues with later batches when one fails", async () => {
+  it("bisects a failed batch so one poisoned row does not block the others", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    mockPush.mockResolvedValueOnce(false).mockResolvedValue(true);
-    const n = GRADE_LOG_REPUSH_BATCH_SIZE + 1;
-    const local = Array.from({ length: n }, (_, i) => entry(OLD - i));
+    const poison = OLD - 3;
+    const local = Array.from({ length: 8 }, (_, i) => entry(OLD - i));
+    const landed: number[] = [];
+    mockPush.mockImplementation(async (_c, _u, rows) => {
+      if (rows.some((r) => r.occurredAt === poison)) return false;
+      landed.push(...rows.map((r) => r.occurredAt));
+      return true;
+    });
     const pushed = await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
-    expect(pushed).toBe(1);
-    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(pushed).toBe(7);
+    expect(landed.sort()).toEqual(local.map((e) => e.occurredAt).filter((t) => t !== poison).sort());
     expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it("skips a row rejected as a single request on the next cycle in the same session", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const poison = OLD - 1;
+    const local = [entry(OLD), entry(poison), entry(OLD - 2)];
+    mockPush.mockImplementation(async (_c, _u, rows) => !rows.some((r) => r.occurredAt === poison));
+    await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
+    mockPush.mockClear();
+    mockPush.mockResolvedValue(true);
+    const pushed = await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
+    expect(pushed).toBe(2);
+    expect(mockPush.mock.calls.flatMap((c) => c[2].map((r) => r.occurredAt))).not.toContain(poison);
+    warn.mockRestore();
+  });
+
+  it("does not blacklist rows when every request fails (offline) and stops early", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockPush.mockResolvedValue(false);
+    const local = Array.from({ length: 50 }, (_, i) => entry(OLD - i));
+    expect(await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW })).toBe(0);
+    expect(mockPush.mock.calls.length).toBeLessThan(GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE);
+    mockPush.mockClear();
+    mockPush.mockResolvedValue(true);
+    expect(await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW })).toBe(50);
+    warn.mockRestore();
+  });
+
+  it("caps rows per cycle, oldest first, and drains the rest on the next cycle", async () => {
+    const n = GRADE_LOG_REPUSH_MAX_ROWS_PER_CYCLE + 30;
+    const local = Array.from({ length: n }, (_, i) => entry(OLD - i));
+    const first = await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
+    expect(first).toBe(GRADE_LOG_REPUSH_MAX_ROWS_PER_CYCLE);
+    const sent = mockPush.mock.calls.flatMap((c) => c[2].map((r) => r.occurredAt));
+    expect(Math.min(...sent)).toBe(OLD - (GRADE_LOG_REPUSH_MAX_ROWS_PER_CYCLE - 1) - 30);
+    // Second cycle: cloud now has those; the remainder (the newest 30) goes.
+    const cloud = local.filter((e) => sent.includes(e.occurredAt));
+    mockPush.mockClear();
+    expect(await repushLocalGradeLog(client, "u", local, cloud, { lastResetAt: null, now: NOW })).toBe(30);
+  });
+
+  it("bounds requests per cycle including bisection retries", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // First request succeeds (so bisection is allowed), everything after fails.
+    mockPush.mockResolvedValueOnce(true).mockResolvedValue(false);
+    const local = Array.from({ length: 600 }, (_, i) => entry(OLD - i));
+    await repushLocalGradeLog(client, "u", local, [], { lastResetAt: null, now: NOW });
+    expect(mockPush.mock.calls.length).toBeLessThanOrEqual(GRADE_LOG_REPUSH_MAX_REQUESTS_PER_CYCLE);
     warn.mockRestore();
   });
 });

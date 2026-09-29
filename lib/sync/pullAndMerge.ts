@@ -566,6 +566,10 @@ export async function pullAndMerge(
         // cloud otherwise. Runs only here, after a successful pull, so
         // pull-before-push holds; skipped under the superuser write-guard.
         // Best-effort: a failure is warned inside and never affects the result.
+        // Note: a null settings row (pull failed OR never written) makes the
+        // reset cutoff null, and the tombstone wipe above is skipped too, so a
+        // pre-reset row can reach the DB trigger. The leg bisects failed
+        // batches, and caps rows/requests per cycle, for exactly that reason.
         if (!superuserPaused) {
           await repushLocalGradeLog(client, userId, localLog, cloudLog, {
             lastResetAt: pulledRow?.lastResetAt ?? null,

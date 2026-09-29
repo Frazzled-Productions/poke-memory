@@ -119,4 +119,21 @@ describe("grade-log re-push against the real table (#2117)", () => {
     const { rows } = await pool.query(`SELECT count(*)::int AS n FROM grade_log WHERE user_id = $1`, [USER_ID]);
     expect(rows[0].n).toBe(2);
   });
+
+  it("a reset just before UTC midnight: the boundary-day entry lands, the day before is filtered", async () => {
+    // Assumption: PostgREST sessions run in UTC, so the trigger's `reset_at::date`
+    // is the UTC date, and the client mirrors it with a UTC slice of the same
+    // timestamp compared against the entry's own `entry_date`.
+    const resetAt = "2026-09-28T23:59:59+00:00";
+    await pool.query(`UPDATE user_settings SET last_reset_at = $2 WHERE user_id = $1`, [USER_ID, resetAt]);
+    const dayBefore = entry(LONG_AGO + 10, "2026-09-27");
+    const boundaryDay = entry(LONG_AGO + 11, "2026-09-28");
+    const toPush = selectRepushEntries([dayBefore, boundaryDay], [], { lastResetAt: resetAt, now: NOW });
+    expect(toPush).toEqual([boundaryDay]);
+    await upsertBatch(toPush);
+    // And the DB agrees on both sides of the boundary.
+    await expect(upsertBatch([dayBefore])).rejects.toThrow(/before last_reset_at/);
+    const { rows } = await pool.query(`SELECT count(*)::int AS n FROM grade_log WHERE user_id = $1`, [USER_ID]);
+    expect(rows[0].n).toBe(1);
+  });
 });
