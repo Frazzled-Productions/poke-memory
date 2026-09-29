@@ -9,14 +9,15 @@ function makeClientWithUpsert(error: null | object = null) {
 }
 
 function makeClientWithSelect(data: unknown, error: null | object = null) {
-  // The chain is: select → eq → range(from, to)
+  // The chain is: select → eq → order → range(from, to)
   // fetchAllPages calls .range(from, to) as the terminal method.
   // Return data with length < pageSize (1000) so fetchAllPages stops after one call.
   const range = vi.fn().mockResolvedValue({ data, error });
-  const eq = vi.fn().mockReturnValue({ range });
+  const order = vi.fn().mockReturnValue({ range });
+  const eq = vi.fn().mockReturnValue({ order });
   const select = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ select });
-  return { client: { from } as unknown as SupabaseClient, eq, select, from, range };
+  return { client: { from } as unknown as SupabaseClient, eq, order, select, from, range };
 }
 
 describe("mergeStreak", () => {
@@ -77,6 +78,13 @@ describe("pullStreak", () => {
       "2026-05-10",
       "2026-05-11",
     ]);
+  });
+
+  it("orders by review_date ascending before ranging (#2053)", async () => {
+    const { client, order, range } = makeClientWithSelect([]);
+    await pullStreak(client, "user-1");
+    expect(order).toHaveBeenCalledWith("review_date", { ascending: true });
+    expect(range).toHaveBeenCalledWith(0, 999);
   });
 
   it("returns null when supabase returns an error", async () => {

@@ -15,6 +15,7 @@ import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
 // does not force the seed JSON into the boot chunk.
 import { reverseEdgeIdFor, REVERSE_ID_OFFSET, CRY_ID_OFFSET } from "@/lib/pokemon/seed-builder";
 import { Subject, appTypeToDbType, dbTypeToAppType } from "@/lib/cards/subjectKey";
+import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 import { markStructuralSyncError, clearStructuralSyncError } from "@/lib/sync/structuralError";
 import type { AppLocale } from "@/i18n/locales";
 
@@ -365,27 +366,27 @@ export async function pullSession(
   client: SupabaseClient,
   userId: string,
 ): Promise<CloudRow[] | null> {
-  const PAGE = 1000;
-  const allRows: CloudRow[] = [];
-  let offset = 0;
   try {
-    while (true) {
-      const { data, error } = await client
+    // Offset pagination needs a total order or a concurrent UPDATE (rows move
+    // physically) can push a row out of every page: silently dropped from the
+    // pull (#2053). The order covers the full PK (minus user_id, fixed by the
+    // filter), so it can be served from the PK index.
+    const data = await fetchAllPages<CloudRow>((from, to) =>
+      client
         .from("card_reviews")
         .select(
           "card_type,subject_key,locale,stability,difficulty,elapsed_days,scheduled_days,reps,lapses,fsrs_state,due_date,last_review,first_seen,hidden_since,seen_in_pasture,updated_at"
         )
         .eq("user_id", userId)
-        .range(offset, offset + PAGE - 1);
-      if (error || !data) return null;
-      // Skip rows with null subject_key - these are unmigrated edge rows that
-      // will be re-pushed on the next sync after the app-side backfill runs.
-      const rows = (data as CloudRow[]).filter((r) => r.subject_key !== null);
-      allRows.push(...rows);
-      if (data.length < PAGE) break;
-      offset += PAGE;
-    }
-    return allRows;
+        .order("card_type", { ascending: true })
+        .order("subject_key", { ascending: true })
+        .order("locale", { ascending: true })
+        .range(from, to),
+    );
+    if (!data) return null;
+    // Skip rows with null subject_key - these are unmigrated edge rows that
+    // will be re-pushed on the next sync after the app-side backfill runs.
+    return data.filter((r) => r.subject_key !== null);
   } catch {
     return null;
   }
