@@ -41,7 +41,6 @@ function ArrivalTile({ arrival }: ArrivalTileProps) {
           height={PASTURE_SPRITE_SIZE}
           className="h-14 w-14 object-contain opacity-60 grayscale"
           loading="lazy"
-          priority={false}
         />
         {/* Reps badge */}
         <span
