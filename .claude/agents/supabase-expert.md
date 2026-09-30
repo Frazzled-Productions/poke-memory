@@ -47,9 +47,9 @@ Supabase Auth (GitHub OAuth), per-user RLS policies, `@supabase/ssr` client spli
 
 The table inventory lives in **`docs/persistence.md` → Tables today** (every table, its migration, its shape, and the deliberate FK exceptions: `feedback.user_id` is nullable, `rate_limit_buckets` has no user link). `scripts/persistence-tables.test.mjs` fails when that list drifts from `db/migrations/`, so read it (and the migrations themselves) rather than keeping a copy here. Facts it does not spell out:
 
-- **`card_reviews` key**: PK `(user_id, card_type, subject_key, locale)` since migration 029 (010/012 replaced the old integer `pokemon_id` identity). Client upserts name exactly these columns (`CARD_REVIEWS_CONFLICT_COLS` in `lib/sync/cloud.ts`); identity model in `docs/card-identity.md`. Changing a PK or any `onConflict` target needs the three-migration rollout in `docs/persistence.md` → Constraint-affecting migrations (#1344).
+- **`card_reviews` key**: PK `(user_id, card_type, subject_key, locale)` since migration 029. Before that, 010 added the `(card_type, subject_key)` string identity alongside the old integer `pokemon_id` (dropping the old PK), and 012 promoted it to the PK and dropped `pokemon_id`. Client upserts name exactly these columns (`CARD_REVIEWS_CONFLICT_COLS` in `lib/sync/cloud.ts`); identity model in `docs/card-identity.md`. Changing a PK or any `onConflict` target needs the three-migration rollout in `docs/persistence.md` → Constraint-affecting migrations (#1344).
 - **`card_reviews.updated_at` is server-stamped** by a `BEFORE UPDATE` trigger (043); clients do not send it.
-- **`user_settings.settings` is written through the `merge_user_settings` RPC** (a JSONB deep merge since 037, not a whole-object overwrite) and has its own regression trigger (038).
+- **`user_settings.settings` is written through the `merge_user_settings` RPC** (a JSONB deep merge since 037, not a whole-object overwrite) and has its own regression trigger (038), which raises `23514`; the client treats a failed settings push as warn-and-retry-on-next-save (`AutoSyncOnChange`), never a sync error.
 - **Scheduling dates are `date` columns** (`due_date`, `last_review`, `first_seen`), matching the app's `"YYYY-MM-DD"` UTC string convention.
 
 ### Destructive-write protection (read before designing any change)
