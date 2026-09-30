@@ -2,8 +2,9 @@
 // Regression guard for the no-em-dash rule (`ops/standards/conventions.md` ->
 // Writing; house directive 2026-06-03: no em dashes anywhere). An em dash
 // (U+2014) must not appear in any text the project authors. This script is
-// wired into CI (the `lint` job) so the rule is enforced on every PR rather
-// than relying on review alone.
+// wired into CI (`npm run lint` in the `test` job, plus ci.yml's always-run
+// `em-dash` job so docs-only PRs are gated too, #2134) so the rule is enforced
+// on every PR rather than relying on review alone.
 //
 // SCOPE: every git-tracked file (`git ls-files`), so node_modules, .next,
 // build output and anything gitignored are never considered. Files are routed

@@ -175,7 +175,7 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 | | |
 |---|---|
 | **Trigger** | `pull_request` (any), push to `main` |
-| **Jobs** | `changes` (path classification), `test` (`typecheck && build && test`), `e2e-browser` (Playwright matrix - `chromium` + `mobile-safari` legs run in parallel inside the official Playwright container), `e2e` (aggregator over the matrix legs) |
+| **Jobs** | `changes` (path classification), `test` (`typecheck && build && test`), `e2e-browser` (Playwright matrix - `chromium` + `mobile-safari` legs run in parallel inside the official Playwright container), `e2e` (aggregator over the matrix legs), `em-dash` (`npm run lint:em-dash` on every PR, independent of `changes`, so docs-only PRs are gated too; #2134) |
 | **What it does** | `test` runs `npm ci && npm run typecheck && npm run build && npm test`. `e2e-browser` runs the Playwright smoke suite split by browser project so the two projects run as parallel matrix legs (#643). The `changes` job classifies the PR so `test`/`e2e` inner steps no-op on docs-only changes. |
 | **Required checks** | `test` and `e2e` are `ci.yml`'s two required status checks (not the workflow name `CI`); `main`'s full required set also includes `Check version bump approval` and `Restrict main PR source` (see Branching model). `e2e` is a thin aggregator over the `e2e-browser` matrix, so the required-check name stays stable when matrix legs are added or renamed. The `qa` ruleset requires only `test` + `e2e`. `main-protection` enforces strict-up-to-date; the bot app bypasses for auto-merges. |
 | **Concurrency** | Cancels concurrent runs on the same ref - only the latest push on a branch completes. |
