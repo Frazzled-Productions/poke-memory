@@ -93,14 +93,19 @@ jobs:
             # below writes it, counts; a comment anyone else plants with the
             # marker must not suppress the alert (#2124). REST rather than
             # `gh pr view --json comments`, whose GraphQL login drops `[bot]`.
-            # A failed lookup fails the step rather than reading as "no
-            # comment" and re-posting the alert every 15 minutes (#2131);
-            # `jq -n` + `inputs` + `first` reads every page, so there is no
-            # `head -1` SIGPIPE to tolerate.
+            # A failed lookup must not read as "no comment" and re-post the
+            # alert every 15 minutes (#2131): skip this PR, keep scanning the
+            # rest, and fail the run after the loop. `jq -n` + `inputs` +
+            # `first` reads every page, so there is no `head -1` SIGPIPE.
             DEDUP_MARKER="<!-- pr-check-monitor:$SHA -->"
             EXISTING=$(gh api "repos/$REPO/issues/$NUMBER/comments" --paginate \
               | jq -rn --arg marker "$DEDUP_MARKER" --arg author "github-actions[bot]" \
-                  '[inputs[] | select(.user.login == $author and (((.body // "") | split("\n")[0] | rtrimstr("\r")) == $marker)) | .id] | first // empty')
+                  '[inputs[] | select(.user.login == $author and (((.body // "") | split("\n")[0] | rtrimstr("\r")) == $marker)) | .id] | first // empty') \
+              || {
+                echo "::warning::PR #$NUMBER comment lookup failed; skipping"
+                FAILED=1
+                continue
+              }
 
             if [ -n "$EXISTING" ]; then
               echo "PR #$NUMBER: dedup marker already exists for SHA ${SHA:0:7}, skipping"
@@ -108,6 +113,8 @@ jobs:
             fi
 
             echo "PR #$NUMBER: posting monitor alert comment..."
+            # Marker writer: posts with GITHUB_TOKEN, so the author is
+            # `github-actions[bot]`, the identity the dedup lookup above pins.
             # Build the body via a temp file rather than $(cat <<EOF). A
             # heredoc inside a YAML `run: |` block requires the closing line
             # of the $(...) substitution to be at >= block-indent - easy to
@@ -139,3 +146,6 @@ jobs:
             rm -f "$BODY_FILE"
             echo "PR #$NUMBER: alert comment posted"
           done < <(echo "$PRS" | jq -c '.[]')
+
+          # Any skipped lookup turns the run red, after every PR was scanned.
+          exit "${FAILED:-0}"

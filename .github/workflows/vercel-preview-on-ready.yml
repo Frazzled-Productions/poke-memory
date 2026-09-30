@@ -250,4 +250,6 @@ jobs:
           fi
           printf '<!-- vercel-preview-fired:%s -->\nFired Vercel preview deploy hook (%s).\n' \
             "$SHA" "$REASON" > /tmp/marker.md
+          # Marker writer: GH_TOKEN is the app token, so the author is
+          # `poke-memory-bot[bot]`, the identity the idempotency lookup pins.
           gh pr comment "$PR" --body-file /tmp/marker.md

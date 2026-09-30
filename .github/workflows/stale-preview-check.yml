@@ -145,6 +145,8 @@ jobs:
               -f body="$BODY"
             echo "Updated existing stale-preview comment ${EXISTING_COMMENT_ID} on PR #${PR_NUMBER}."
           else
+            # Marker writer: GH_TOKEN is GITHUB_TOKEN, so the author is
+            # `github-actions[bot]`, the identity both lookups pin.
             gh api --method POST "/repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
               -f body="$BODY"
             echo "Posted stale-preview comment on PR #${PR_NUMBER}."
