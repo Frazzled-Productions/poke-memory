@@ -75,7 +75,6 @@ export function ThemeWatermark() {
           width={THEME_WATERMARK_SPRITE_SIZE}
           height={THEME_WATERMARK_SPRITE_SIZE}
           className="object-contain" style={{ width: THEME_WATERMARK_SPRITE_SIZE, height: THEME_WATERMARK_SPRITE_SIZE }}
-          priority={false}
         />
       ) : (
         <PokeBallSVG />

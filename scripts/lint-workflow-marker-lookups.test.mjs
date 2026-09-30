@@ -27,8 +27,13 @@ describe("line rules", () => {
       "  | jq -r --arg m \"$MARKER\" '[.[] | select(.body | contains($m))] | .[0].number // empty')",
     );
     const v = findViolations("w.yml", text);
-    expect(v).toHaveLength(1);
-    expect(v[0]).toMatchObject({ file: "w.yml", line: 4, rule: "unanchored-body-match" });
+    // A PR-comment lookup, so the #2131 rules fire on the statement too.
+    expect(v.map(({ line, rule }) => ({ line, rule }))).toEqual([
+      { line: 3, rule: "pr-comment-no-author" },
+      { line: 3, rule: "pr-comment-unanchored" },
+      { line: 4, rule: "unanchored-body-match" },
+    ]);
+    expect(v[2]).toMatchObject({ file: "w.yml" });
   });
 
   it("flags the no-space, escaped --jq and parenthesised forms", () => {
@@ -200,7 +205,7 @@ describe("exemption scoping", () => {
     const text = step(
       "# marker-lookup-exempt: PR-comment dedup keyed on a per-SHA marker.",
       'FOUND=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \\',
-      "  | jq --arg m \"$MARKER\" '[.[] | select(.body | contains($m))] | length')",
+      "  | jq --arg m \"$MARKER\" '[.[] | select(.user.login == \"bot\" and (.body | contains($m)))] | length')",
     );
     expect(rules(text)).toEqual([]);
   });
@@ -276,6 +281,98 @@ describe("exemption scoping", () => {
   });
 });
 
+describe("PR-comment marker lookups (#2131)", () => {
+  const ANCHORED =
+    '(((.body // "") | split("\\n")[0] | rtrimstr("\\r")) == $marker)';
+
+  it("accepts the REST author-filtered, first-line-anchored lookup", () => {
+    const text = step(
+      'ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \\',
+      '  | jq -rn --arg marker "$MARKER" --arg author "github-actions[bot]" \\',
+      `      '[inputs[] | select(.user.login == $author and ${ANCHORED}) | .id] | first // empty')`,
+    );
+    expect(rules(text)).toEqual([]);
+  });
+
+  it("accepts the escaped split form inside a double-quoted --jq", () => {
+    const text = step(
+      'N=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \\',
+      '  --jq "[.[] | select(.user.login == \\"bot[bot]\\" and ((.body | split(\\"\\\\n\\")[0]) == \\"<!-- x:$SHA -->\\"))] | length")',
+    );
+    expect(rules(text)).toEqual([]);
+  });
+
+  it("accepts a startswith anchor", () => {
+    const text = step(
+      'ID=$(gh api "repos/$R/issues/$P/comments" | jq -r --arg m "$MARKER" \'.[] | select(.user.login == "github-actions[bot]" and (.body | startswith($m))) | .id\')',
+    );
+    expect(rules(text)).toEqual([]);
+  });
+
+  it("flags an anchored lookup with no author filter (the #2124 shape)", () => {
+    const text = step(
+      'ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \\',
+      `  | jq -rn --arg marker "$MARKER" '[inputs[] | select(${ANCHORED}) | .id] | first // empty')`,
+    );
+    expect(rules(text)).toEqual(["pr-comment-no-author"]);
+  });
+
+  it("flags an author-filtered lookup that is not anchored to the first line", () => {
+    const text = step(
+      'N=$(gh api "repos/$R/issues/$P/comments" --jq \'[.[] | select(.user.login == "b" and (.body == "<!-- x -->"))] | length\')',
+    );
+    expect(rules(text)).toEqual(["pr-comment-unanchored"]);
+  });
+
+  it("flags every PR-comment read form: --json comments, pulls/, and a grep", () => {
+    expect(rules(step(`gh pr view "$PR" --json comments --jq '.comments[] | select(.body == "$MARKER")'`))).toEqual([
+      "pr-comment-no-author",
+      "pr-comment-unanchored",
+    ]);
+    expect(rules(step(`gh api "repos/$R/pulls/$P/comments" | grep -q "<!-- x -->"`))).toEqual([
+      "pr-comment-no-author",
+      "pr-comment-unanchored",
+    ]);
+  });
+
+  it("needs a bot check alongside a GraphQL .author.login", () => {
+    const lookup = (filter) =>
+      step(
+        `gh pr view "$PR" --json comments --jq '.comments[] | select(${filter} and (.body | startswith("$MARKER"))) | .id'`,
+      );
+    expect(rules(lookup('.author.login == "github-actions"'))).toEqual(["pr-comment-no-author"]);
+    expect(rules(lookup('.author.login == "github-actions" and .author.is_bot'))).toEqual([]);
+  });
+
+  it("ignores reads with no marker and pure writes that act on a found id", () => {
+    expect(rules(step('gh api "repos/$R/issues/$P/comments" --jq length'))).toEqual([]);
+    expect(
+      rules(step('gh api --method PATCH "repos/$R/issues/comments/$ID" -f body="$MARKER"'))
+    ).toEqual([]);
+    expect(rules(step('gh api -X POST "repos/$R/issues/$P/comments" -f body="<!-- x -->"'))).toEqual([]);
+  });
+
+  it("still treats a write-method statement with a select( filter as a lookup", () => {
+    const text = step(
+      'gh api -X DELETE "repos/$R/issues/comments/$(gh api "repos/$R/issues/$P/comments" --jq \'.[] | select(.body == "<!-- x -->") | .id\')"',
+    );
+    expect(rules(text)).toEqual(["pr-comment-no-author", "pr-comment-unanchored"]);
+  });
+
+  it("lets marker-lookup-exempt waive the anchor but never the author filter", () => {
+    const text = step(
+      "# marker-lookup-exempt: marker sits below a heading by design.",
+      'N=$(gh api "repos/$R/issues/$P/comments" --jq \'[.[] | select(.body == "<!-- x -->")] | length\')',
+    );
+    expect(rules(text)).toEqual(["pr-comment-no-author"]);
+    const withAuthor = step(
+      "# marker-lookup-exempt: marker sits below a heading by design.",
+      'N=$(gh api "repos/$R/issues/$P/comments" --jq \'[.[] | select(.user.login == "b" and .body == "<!-- x -->")] | length\')',
+    );
+    expect(rules(withAuthor)).toEqual([]);
+  });
+});
+
 describe("the repo's workflows", () => {
   it("contain no body-search, unanchored or helper-less marker lookups", () => {
     expect(lintWorkflowDir(resolve(repoRoot, ".github/workflows"))).toEqual([]);
@@ -294,6 +391,21 @@ describe("the repo's workflows", () => {
           .map(() => name),
       );
     expect(uses).toEqual(["auto-close-umbrella.yml"]);
+  });
+
+  it("pins the number of marker-lookup-exempt uses, so adding one is a visible change", () => {
+    // Today: none. vercel-preview-on-ready.yml's fired-marker dedup was made
+    // to comply with the #2131 rules instead of keeping its exemption.
+    const dir = resolve(repoRoot, ".github/workflows");
+    const uses = readdirSync(dir)
+      .filter((name) => /\.ya?ml$/.test(name))
+      .flatMap((name) =>
+        readFileSync(resolve(dir, name), "utf8")
+          .split("\n")
+          .filter((line) => /^\s*#\s*marker-lookup-exempt:/.test(line))
+          .map(() => name),
+      );
+    expect(uses).toEqual([]);
   });
 
   it("CLI exits 0 on the current tree", () => {

@@ -64,6 +64,30 @@ jobs:
             echo "e2e_relevant=${{ steps.filter.outputs.e2e_relevant }}" >> "$GITHUB_OUTPUT"
           fi
 
+  # The no-em-dash gate on EVERY PR (#2134). `test` runs `npm run lint` (which
+  # includes lint:em-dash) only when `changes.code` is true, but the docs-only
+  # paths that filter excludes (**/*.md, docs/**, changelog.d/**,
+  # .claude/agents/**) are exactly what the gate scans, so a docs-only PR could
+  # otherwise merge an em dash. Independent of `changes` so it always reports.
+  # The script needs the `typescript` package (it parses JS/TS comments and
+  # literals), hence `npm ci`; `--ignore-scripts` skips lifecycle scripts since
+  # nothing here builds. Not a required check unless the rulesets add it.
+  em-dash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: 'npm'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run lint:em-dash
+
   test:
     needs: changes
     runs-on: ubuntu-latest

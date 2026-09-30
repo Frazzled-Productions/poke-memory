@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { isAuthorized } from "@/lib/auth/bearerAuth";
+import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 import webpush from "web-push";
 import { createTranslator as _createTranslatorRaw } from "use-intl/core";
 import { todayInTimezone } from "@/lib/utils/format-date";
@@ -276,23 +277,36 @@ export async function POST(request: Request) {
   // UTC and blind to learning-step practice. `streak_days.review_date` is
   // written in the user's own local day (`recordReview(localToday, ...)`), the
   // same calendar as `todayInTimezone(tz)` below, so membership is exact.
-  // Fetch every streak_days row for the candidates in one call and group by user.
-  const { data: streakDaysData, error: streakDaysError } = await admin.rpc(
-    "get_push_streak_days",
-    { user_ids: activeUserIds },
+  // Fetch every streak_days row for the candidates and group by user. The
+  // read is paginated (#2115): PostgREST caps a single response at 1000 rows
+  // and that cap is shared across ALL candidate users, so an unpaginated read
+  // would silently drop the last users' (and their latest) dates and cause
+  // false "streak at risk" nudges. The full history is genuinely needed (the
+  // streak length and protection maths walk it), so a since-date window is not
+  // a correct fix. `ORDER BY user_id, review_date` is applied on the RPC result
+  // (the unique key, a total order) so offset pages never skip or repeat rows.
+  const streakDaysData = await fetchAllPages<StreakDayRow>((from, to) =>
+    admin
+      .rpc("get_push_streak_days", { user_ids: activeUserIds })
+      .order("user_id", { ascending: true })
+      .order("review_date", { ascending: true })
+      .range(from, to),
   );
-  if (streakDaysError || streakDaysData === null) {
+  if (streakDaysData === null) {
     return NextResponse.json(
       { ok: false, error: "streak_days_query_failed" },
       { status: 502 },
     );
   }
 
-  const streakDaysByUser = new Map<string, string[]>();
-  for (const row of streakDaysData as StreakDayRow[]) {
-    const bucket = streakDaysByUser.get(row.user_id);
-    if (bucket) bucket.push(row.review_date);
-    else streakDaysByUser.set(row.user_id, [row.review_date]);
+  // Each page is its own request/snapshot, so a concurrent streak_days write at
+  // a page boundary can duplicate or skip a row. Accepted non-atomic race: a
+  // duplicate is neutralised by the Set; a skip could at worst cause one false nudge.
+  const streakDaySetsByUser = new Map<string, Set<string>>();
+  for (const row of streakDaysData) {
+    const bucket = streakDaySetsByUser.get(row.user_id);
+    if (bucket) bucket.add(row.review_date);
+    else streakDaySetsByUser.set(row.user_id, new Set([row.review_date]));
   }
 
   // Gate E: genuinely-at-risk streak, evaluated per user against their own
@@ -300,7 +314,7 @@ export async function POST(request: Request) {
   const eligibleUserIds = new Set<string>();
   const streakLengthByUser = new Map<string, number>();
   for (const userId of activeUserIds) {
-    const streakDays = streakDaysByUser.get(userId) ?? [];
+    const streakDays = Array.from(streakDaySetsByUser.get(userId) ?? []);
     const streakProtection = streakProtectionByUser.get(userId) ?? validateStreakProtection(null);
     const today = todayInTimezone(timezoneByUser.get(userId) ?? "UTC", now);
     const reviewedToday = streakDays.includes(today);

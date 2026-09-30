@@ -62,7 +62,7 @@ type Props = {
  *   - The direction badge (`direction`).
  *   - Which side of the arrow holds the hidden/revealed sprite (`hiddenSide`).
  *
- * The always-visible sprite gets the `priority` attribute; the hidden/revealed
+ * The always-visible sprite gets the `preload` prop; the hidden/revealed
  * sprite does not, matching the original per-card behaviour.
  *
  * Locale-aware names are resolved internally via `useLocalePokemonName` so
@@ -106,7 +106,7 @@ export function EvolutionCardLayout({
         ? resolvedPostEvoName
         : answerName;
 
-  // The always-visible sprite gets `priority` for LCP; the hidden/revealed
+  // The always-visible sprite gets `preload` for LCP; the hidden/revealed
   // sprite does not - preserving the original per-card behaviour.
   const preEvoImg = (
     <Image
@@ -114,7 +114,7 @@ export function EvolutionCardLayout({
       alt={resolvedPreEvoName}
       width={PRACTICE_SPRITE_SIZE}
       height={PRACTICE_SPRITE_SIZE}
-      priority={hiddenSide !== "pre"}
+      preload={hiddenSide !== "pre"}
       className={SPRITE_CLASS}
     />
   );
@@ -125,7 +125,7 @@ export function EvolutionCardLayout({
       alt={resolvedPostEvoName}
       width={PRACTICE_SPRITE_SIZE}
       height={PRACTICE_SPRITE_SIZE}
-      priority={hiddenSide !== "post"}
+      preload={hiddenSide !== "post"}
       className={SPRITE_CLASS}
     />
   );

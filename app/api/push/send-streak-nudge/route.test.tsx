@@ -62,6 +62,9 @@ type TargetRow = {
 
 type StreakDayRow = { user_id: string; review_date: string };
 
+/** PostgREST's default per-response row cap (the `max_rows` setting). */
+const POSTGREST_MAX_ROWS = 1000;
+
 /**
  * Builds a Supabase admin-client mock covering the two RPCs the route
  * calls (get_push_targets, get_push_streak_days)
@@ -72,6 +75,8 @@ function buildAdminMock(opts: {
   targetsError?: unknown;
   streakDays?: StreakDayRow[];
   streakDaysError?: unknown;
+  /** Fail any page whose start offset is >= this (simulates a later-page error). */
+  streakDaysErrorFromOffset?: number;
   deleteError?: unknown;
   deleteCount?: number;
 }) {
@@ -79,6 +84,11 @@ function buildAdminMock(opts: {
   const streakDays = opts.streakDays ?? [];
   const deleteCount = opts.deleteCount ?? 0;
   const deleteCalls: Array<{ ids: unknown[] }> = [];
+  const streakDayPages: Array<{
+    from: number;
+    to: number;
+    orders: Array<{ column: string; ascending: boolean }>;
+  }> = [];
 
   const rpc = vi.fn((fn: string, _args?: Record<string, unknown>) => {
     if (fn === "get_push_targets") {
@@ -92,10 +102,41 @@ function buildAdminMock(opts: {
       throw new Error("get_push_reviewed_today must not be called (#2073)");
     }
     if (fn === "get_push_streak_days") {
-      return Promise.resolve({
-        data: opts.streakDaysError ? null : streakDays,
-        error: opts.streakDaysError ?? null,
-      });
+      // Emulates PostgREST on a set-returning RPC: `.order()` is chainable and
+      // `.range(from, to)` resolves one inclusive page. Like PostgREST, a
+      // request is capped at POSTGREST_MAX_ROWS regardless of the range asked
+      // for, so an unpaginated read would silently truncate (#2115).
+      const orders: Array<{ column: string; ascending: boolean }> = [];
+      type Builder = {
+        order: (column: string, o?: { ascending?: boolean }) => Builder;
+        range: (from: number, to: number) => Promise<unknown>;
+      };
+      const builder: Builder = {
+        order: (column, o) => {
+          orders.push({ column, ascending: o?.ascending ?? true });
+          return builder;
+        },
+        range: (from: number, to: number) => {
+          streakDayPages.push({ from, to, orders: [...orders] });
+          if (
+            opts.streakDaysError ||
+            (opts.streakDaysErrorFromOffset !== undefined && from >= opts.streakDaysErrorFromOffset)
+          ) {
+            return Promise.resolve({
+              data: null,
+              error: opts.streakDaysError ?? { message: "page failed" },
+            });
+          }
+          const sorted = [...streakDays].sort(
+            (a, b) =>
+              a.user_id.localeCompare(b.user_id) ||
+              a.review_date.localeCompare(b.review_date),
+          );
+          const end = Math.min(to, from + POSTGREST_MAX_ROWS - 1);
+          return Promise.resolve({ data: sorted.slice(from, end + 1), error: null });
+        },
+      };
+      return builder;
     }
     throw new Error(`Unexpected RPC call: ${fn}`);
   });
@@ -109,7 +150,15 @@ function buildAdminMock(opts: {
     })),
   }));
 
-  return { client: { rpc, from }, deleteCalls };
+  return { client: { rpc, from }, deleteCalls, streakDayPages };
+}
+
+/** `count` consecutive "YYYY-MM-DD" dates ending on `endDate` (inclusive). */
+function consecutiveDatesEnding(endDate: string, count: number): string[] {
+  const end = Date.parse(`${endDate}T00:00:00Z`);
+  return Array.from({ length: count }, (_, i) =>
+    new Date(end - (count - 1 - i) * 86_400_000).toISOString().slice(0, 10),
+  );
 }
 
 /** A target row with the opt-in on, UTC timezone, no daily-hour preference. */
@@ -510,6 +559,114 @@ describe("POST /api/push/send-streak-nudge - at-risk streak gate", () => {
     expect(res.status).toBe(502);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("streak_days_query_failed");
+  });
+});
+
+// ─── streak_days pagination (#2115) ──────────────────────────────────────────
+
+describe("POST /api/push/send-streak-nudge - streak_days pagination (#2115)", () => {
+  it("pages past the PostgREST cap so the last user's latest dates are not truncated", async () => {
+    // user-a alone fills the whole first page (exactly the cap). user-b sorts
+    // after it, so its rows only arrive on page two. Without pagination user-b
+    // would look as if it had NOT reviewed today and get a false nudge.
+    const streakDays: StreakDayRow[] = [
+      ...consecutiveDatesEnding("2026-05-19", POSTGREST_MAX_ROWS).map((review_date) => ({
+        user_id: "user-a",
+        review_date,
+      })),
+      { user_id: "user-b", review_date: "2026-05-19" },
+      { user_id: "user-b", review_date: "2026-05-20" },
+    ];
+    const admin = buildAdminMock({
+      targets: [
+        optedInTarget(),
+        optedInTarget({
+          subscription_id: "sub-2",
+          user_id: "user-b",
+          endpoint: "https://push.example/b",
+        }),
+      ],
+      streakDays,
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sent: number };
+
+    // user-a (streak at risk, not reviewed today) is nudged; user-b reviewed
+    // today (only visible on page two) is not.
+    expect(body.sent).toBe(1);
+    expect(mockSendNotification).toHaveBeenCalledTimes(1);
+    expect(mockSendNotification.mock.calls[0][0].endpoint).toBe("https://push.example/a");
+
+    expect(admin.streakDayPages.map((p) => [p.from, p.to])).toEqual([
+      [0, 999],
+      [1000, 1999],
+    ]);
+  });
+
+  it("orders every page by the unique key (user_id, review_date) so offset pages are stable", async () => {
+    const admin = buildAdminMock({
+      targets: [optedInTarget()],
+      streakDays: [{ user_id: "user-a", review_date: "2026-05-19" }],
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    await POST(makeRequest());
+    expect(admin.streakDayPages).toHaveLength(1);
+    expect(admin.streakDayPages[0].orders).toEqual([
+      { column: "user_id", ascending: true },
+      { column: "review_date", ascending: true },
+    ]);
+  });
+
+  it("returns 502 when a later page errors rather than acting on partial data", async () => {
+    // First page succeeds (full), second errors: must not fall through with a
+    // truncated history.
+    const full: StreakDayRow[] = consecutiveDatesEnding("2026-05-19", POSTGREST_MAX_ROWS).map(
+      (review_date) => ({ user_id: "user-a", review_date }),
+    );
+    const admin = buildAdminMock({
+      targets: [optedInTarget()],
+      streakDays: full,
+      streakDaysErrorFromOffset: POSTGREST_MAX_ROWS,
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("streak_days_query_failed");
+    expect(mockSendNotification).not.toHaveBeenCalled();
+    // Page 1 succeeded (full), page 2 was requested and failed.
+    expect(admin.streakDayPages.map((p) => [p.from, p.to])).toEqual([
+      [0, 999],
+      [1000, 1999],
+    ]);
+  });
+
+  it("tolerates a row duplicated across a page boundary (non-atomic pages)", async () => {
+    // 1000 days ending yesterday fill page one; a second copy of the last date
+    // lands on page two, as if a concurrent write shifted the boundary.
+    const dates = consecutiveDatesEnding("2026-05-19", POSTGREST_MAX_ROWS);
+    const streakDays: StreakDayRow[] = [
+      ...dates.map((review_date) => ({ user_id: "user-a", review_date })),
+      { user_id: "user-a", review_date: "2026-05-19" },
+    ];
+    const admin = buildAdminMock({ targets: [optedInTarget()], streakDays });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(admin.streakDayPages).toHaveLength(2);
+    expect(mockSendNotification).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(mockSendNotification.mock.calls[0][1] as string) as { body: string };
+    // Streak length is 1000 (localised as "1,000"), not inflated by the duplicate.
+    expect(payload.body).toContain("1,000 days");
   });
 });
 
