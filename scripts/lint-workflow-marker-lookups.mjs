@@ -28,13 +28,31 @@
  *                         on an `/issues` list endpoint, or a `gh api graphql`
  *                         statement that mentions both `issues` and `body`)
  *                         but never calls find-marker-issue.mjs. Exemptible.
+ *   pr-comment-no-author  a statement that reads PR comments (`/comments`,
+ *                         `--json comments`, `pulls/`) and mentions a marker,
+ *                         but never filters on the comment author: REST
+ *                         `.user.login`, or GraphQL `.author.login` together
+ *                         with a bot check (`is_bot` / `__typename`), since
+ *                         the GraphQL login drops the `[bot]` suffix that no
+ *                         human account can hold. Anyone can post a comment
+ *                         that quotes the marker (#2124). Never exemptible.
+ *   pr-comment-unanchored the same kind of statement without a first-line
+ *                         anchor for the marker (`split("\n")[0]`, or
+ *                         `startswith(`), so a comment that merely quotes the
+ *                         marker further down would match (#2124). Exemptible.
+ *                         A statement that only writes (`--method` / `-X`
+ *                         POST, PATCH, PUT or DELETE, with no `select(`) is
+ *                         not a lookup and is skipped by both rules.
  *
  * Exemptions are a comment directly above the ONE statement they cover (the
  * next non-comment statement of the same `run:` block; a statement includes
  * its `\` continuations, pipes and multi-line quotes). The reason is mandatory:
  *   # marker-lookup-exempt: <reason>
  *       For a PR-comment lookup only: the statement must read comments
- *       (`/comments`, `--json comments`) or pulls (`pulls/`).
+ *       (`/comments`, `--json comments`) or pulls (`pulls/`). Waives
+ *       unanchored-body-match and pr-comment-unanchored, never
+ *       pr-comment-no-author. The number of these in the tree is pinned by a
+ *       test (none today), so adding one is a visible change.
  *   # issue-body-read-exempt: <reason>
  *       For reading issue bodies for something that is NOT a marker (such as
  *       task-list checkboxes): the statement must not mention a marker, and
@@ -69,6 +87,17 @@ const LABEL_RE = /--label\b/;
 // a single issue (…/issues/$N) or its comments.
 const API_ISSUES_LIST_RE = /\bgh\s+api\b[\s\S]*?\/issues(?:\?[^\s"']*)?["'\s]/;
 const HELPER_RE = /find-marker-issue\.mjs/;
+// PR-comment marker lookups (#2131): who wrote the comment, and where the
+// marker sits in it.
+const REST_AUTHOR_RE = /\.user\.login\b/;
+const GRAPHQL_AUTHOR_RE = /\.author\.login\b/;
+const BOT_CHECK_RE = /\bis_bot\b|__typename\b/;
+// `split("\n")[0]` as written in a single-quoted jq program, or with the
+// quotes and backslash escaped inside a double-quoted `--jq "..."`.
+const FIRST_LINE_RE = /split\(\s*\\?"\\{1,2}n\\?"\s*\)\s*\[\s*0\s*\]/;
+const STARTSWITH_RE = /\bstartswith\s*\(/;
+const WRITE_METHOD_RE = /(?:--method|-X)\s+["']?(?:POST|PATCH|PUT|DELETE)\b/;
+const SELECT_RE = /\bselect\s*\(/;
 
 const isCommentLine = (line) => /^\s*#/.test(line);
 const indentOf = (line) => line.length - line.trimStart().length;
@@ -217,6 +246,33 @@ export function listsIssueBodies(text) {
 }
 
 /**
+ * Whether a statement looks up PR comments by a marker: it reads PR comments,
+ * mentions a marker, and is not a pure write (a write-method call with no
+ * `select(` filter, such as the PATCH / POST / DELETE that acts on the id).
+ * @param {string} text
+ */
+export function isPrCommentMarkerLookup(text) {
+  if (!PR_COMMENT_RE.test(text) || !MARKER_RE.test(text)) return false;
+  return !(WRITE_METHOD_RE.test(text) && !SELECT_RE.test(text));
+}
+
+/**
+ * Whether a PR-comment lookup filters on the comment author.
+ * @param {string} text
+ */
+export function filtersOnAuthor(text) {
+  return REST_AUTHOR_RE.test(text) || (GRAPHQL_AUTHOR_RE.test(text) && BOT_CHECK_RE.test(text));
+}
+
+/**
+ * Whether a PR-comment lookup anchors the marker to the start of the body.
+ * @param {string} text
+ */
+export function anchorsToFirstLine(text) {
+  return FIRST_LINE_RE.test(text) || STARTSWITH_RE.test(text);
+}
+
+/**
  * Why an `issue-body-read-exempt` cannot apply to a statement, or null.
  * @param {string} text
  */
@@ -232,7 +288,8 @@ function issueBodyReadMisuse(text) {
 
 /**
  * Whether a statement's exemption is valid and may waive `rule`.
- * marker-lookup-exempt: PR-comment lookups, waives unanchored-body-match only.
+ * marker-lookup-exempt: PR-comment lookups, waives unanchored-body-match and
+ * pr-comment-unanchored (never pr-comment-no-author).
  * issue-body-read-exempt: non-marker, label-gated body reads, waives both
  * body rules.
  */
@@ -240,7 +297,10 @@ function exemptionWaives(st, rule) {
   const ex = st.exemption;
   if (!ex || !ex.reason || !st.text) return false;
   if (ex.kind === "marker-lookup-exempt") {
-    return rule === "unanchored-body-match" && PR_COMMENT_RE.test(st.text);
+    return (
+      (rule === "unanchored-body-match" || rule === "pr-comment-unanchored") &&
+      PR_COMMENT_RE.test(st.text)
+    );
   }
   if (ex.kind === "issue-body-read-exempt") {
     return issueBodyReadMisuse(st.text) === null;
@@ -323,6 +383,30 @@ export function findViolations(file, text) {
         st.start,
         "issue-list-no-helper",
         "this step lists issues with their bodies but never calls .github/scripts/find-marker-issue.mjs. A marker lookup must go through the helper (marker on line 1, allowed author); a non-marker body read needs `# issue-body-read-exempt: <reason>` directly above the statement.",
+      );
+    }
+  }
+
+  // PR-comment marker lookups (#2131): author filter and first-line anchor.
+  for (const block of blocks) {
+    for (const st of block.statements) {
+      if (!st.text || !isPrCommentMarkerLookup(st.text)) continue;
+      if (!filtersOnAuthor(st.text)) {
+        push(
+          st.start,
+          "pr-comment-no-author",
+          "this PR-comment lookup matches a marker without filtering on the comment author, so anyone can plant or quote the marker and hijack the dedup (#2124). Select on `.user.login` (REST; `github-actions[bot]` for GITHUB_TOKEN posts), or `.author.login` plus an `is_bot` / `__typename` check (GraphQL drops `[bot]`). Not exemptible.",
+        );
+      }
+      if (anchorsToFirstLine(st.text)) continue;
+      if (exemptionWaives(st, "pr-comment-unanchored")) {
+        usedExemptions.add(st.exemption);
+        continue;
+      }
+      push(
+        st.start,
+        "pr-comment-unanchored",
+        'this PR-comment lookup does not anchor the marker to the first line, so a comment that merely quotes it matches (#2124). Compare `((.body // "") | split("\\n")[0] | rtrimstr("\\r")) == $marker`, or add `# marker-lookup-exempt: <reason>` directly above the statement.',
       );
     }
   }
