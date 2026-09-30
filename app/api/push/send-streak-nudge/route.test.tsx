@@ -62,6 +62,9 @@ type TargetRow = {
 
 type StreakDayRow = { user_id: string; review_date: string };
 
+/** PostgREST's default per-response row cap (the `max_rows` setting). */
+const POSTGREST_MAX_ROWS = 1000;
+
 /**
  * Builds a Supabase admin-client mock covering the two RPCs the route
  * calls (get_push_targets, get_push_streak_days)
@@ -149,9 +152,6 @@ function buildAdminMock(opts: {
 
   return { client: { rpc, from }, deleteCalls, streakDayPages };
 }
-
-/** PostgREST's default per-response row cap (the `max_rows` setting). */
-const POSTGREST_MAX_ROWS = 1000;
 
 /** `count` consecutive "YYYY-MM-DD" dates ending on `endDate` (inclusive). */
 function consecutiveDatesEnding(endDate: string, count: number): string[] {
@@ -641,6 +641,32 @@ describe("POST /api/push/send-streak-nudge - streak_days pagination (#2115)", ()
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("streak_days_query_failed");
     expect(mockSendNotification).not.toHaveBeenCalled();
+    // Page 1 succeeded (full), page 2 was requested and failed.
+    expect(admin.streakDayPages.map((p) => [p.from, p.to])).toEqual([
+      [0, 999],
+      [1000, 1999],
+    ]);
+  });
+
+  it("tolerates a row duplicated across a page boundary (non-atomic pages)", async () => {
+    // 1000 days ending yesterday fill page one; a second copy of the last date
+    // lands on page two, as if a concurrent write shifted the boundary.
+    const dates = consecutiveDatesEnding("2026-05-19", POSTGREST_MAX_ROWS);
+    const streakDays: StreakDayRow[] = [
+      ...dates.map((review_date) => ({ user_id: "user-a", review_date })),
+      { user_id: "user-a", review_date: "2026-05-19" },
+    ];
+    const admin = buildAdminMock({ targets: [optedInTarget()], streakDays });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(admin.streakDayPages).toHaveLength(2);
+    expect(mockSendNotification).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(mockSendNotification.mock.calls[0][1] as string) as { body: string };
+    // Streak length is 1000 (localised as "1,000"), not inflated by the duplicate.
+    expect(payload.body).toContain("1,000 days");
   });
 });
 

@@ -299,11 +299,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const streakDaysByUser = new Map<string, string[]>();
+  // Each page is its own request/snapshot, so a concurrent streak_days write at
+  // a page boundary can duplicate or skip a row. Accepted non-atomic race: a
+  // duplicate is neutralised by the Set; a skip could at worst cause one false nudge.
+  const streakDaySetsByUser = new Map<string, Set<string>>();
   for (const row of streakDaysData) {
-    const bucket = streakDaysByUser.get(row.user_id);
-    if (bucket) bucket.push(row.review_date);
-    else streakDaysByUser.set(row.user_id, [row.review_date]);
+    const bucket = streakDaySetsByUser.get(row.user_id);
+    if (bucket) bucket.add(row.review_date);
+    else streakDaySetsByUser.set(row.user_id, new Set([row.review_date]));
   }
 
   // Gate E: genuinely-at-risk streak, evaluated per user against their own
@@ -311,7 +314,7 @@ export async function POST(request: Request) {
   const eligibleUserIds = new Set<string>();
   const streakLengthByUser = new Map<string, number>();
   for (const userId of activeUserIds) {
-    const streakDays = streakDaysByUser.get(userId) ?? [];
+    const streakDays = Array.from(streakDaySetsByUser.get(userId) ?? []);
     const streakProtection = streakProtectionByUser.get(userId) ?? validateStreakProtection(null);
     const today = todayInTimezone(timezoneByUser.get(userId) ?? "UTC", now);
     const reviewedToday = streakDays.includes(today);
