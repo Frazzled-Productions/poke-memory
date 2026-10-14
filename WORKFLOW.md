@@ -9,9 +9,9 @@
 > `issue-overlap-scan`, `settings-coverage-audit`, and `auto-digest-fanout`
 > (whose four digest producers had all gone).
 >
-> Agent automation is moving to a **Mac-local loop**, because koinori is a native
-> iOS app whose builds need macOS and GitHub-hosted macOS minutes are too
-> expensive. See `Frazzled-Productions/frazzled-loop`.
+> Agent automation then moved to a Mac-local loop (Porter, `Frazzled-Productions/frazzled-loop`).
+> Porter was retired in September 2026 and its repo archived on 2026-10-14 (ops decision 0010
+> update); agent work now runs from interactive Claude Code sessions.
 >
 > **What this means for this document.** Everything below describing genuine CI
 > (`ci`, `coverage`, `e2e`, `codeql`, `visual-regression`, the policy and drift
