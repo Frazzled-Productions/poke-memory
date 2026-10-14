@@ -34,6 +34,12 @@ jobs:
     name: Compare qa tip to last preview SHA
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # There is no checkout in this job, so `gh` cannot infer the repo from a
+    # .git directory. Without GH_REPO, `gh run list` fails with "failed to
+    # determine base repo: ... not a git repository" and the job dies on its
+    # first step every day.
+    env:
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Compute qa SHA and last-preview SHA
         id: shas
