@@ -30,26 +30,11 @@ Issue-first, acceptance-criteria cross-check, and skip-the-ceremony: `ops/standa
 
 ## File ownership
 
-| Path | Owner |
-|---|---|
-| `app/**/page.tsx`, `app/**/layout.tsx`, `app/**/loading.tsx`, `app/**/error.tsx` | ui-coder |
-| `components/**` | ui-coder |
-| `app/api/**` | data-coder |
-| `lib/**` | data-coder |
-| `db/**` | data-coder |
-| Server Actions | data-coder (implementation), ui-coder (call sites) |
-| SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
-| PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
-| Supabase schema / RLS | supabase-expert designs; data-coder implements |
-| Privacy notice / Terms / `docs/` compliance files (`dpia.md`, `childrens-code-assessment.md`, `cookies-pecr.md`); any third-party SDK/service install that could collect, transmit, or log personal data (analytics, error monitoring, messaging, A/B testing) | privacy-expert advises (read-only); ui-coder edits the `/privacy` and `/terms` pages, orchestrator edits the `docs/` compliance files |
-| Multi-locale work (`pokemonNameLocale`, `appLocale`, transliteration, message catalogs, locale routing, locale-aware sync, adding a new locale) | i18n-expert advises (read-only); data-coder implements settings/sync/seed changes, ui-coder implements rendering, catalogs, and `<lang>` placement |
-| Onboarding / discoverability surfaces (`components/onboarding/**`, empty states, locked-state UI, first-contact flows, nav affordances) | ux-advisor advises (read-only); ui-coder implements |
-| `README.md`, `CHANGELOG.md` | orchestrator - updated inline as part of each commit, no specialist agent |
-| `e2e/**` | playwright |
-| `.github/workflows/**` | workflow-expert review on EVERY change, no mechanical-change exception (complexity is not the gate, YAML's silent-failure mode is - #1859/#1815/#1806); orchestrator (edits) |
-| `.claude/agents/**` | workflow-expert (review); orchestrator (edits) |
-
-**Cross-layer fixes.** Default routing, not a hard wall: `ops/standards/process.md` → File-ownership pattern (#1125). Worked example: a `ui-coder` finding the root cause in `lib/` touches the helper in the same change (#1117 / #1121).
+Each path has an owning agent (`ui-coder` for pages and components, `data-coder` for `app/api`, `lib`,
+`db`; experts design, coders implement; orchestrator for README/CHANGELOG and `.claude/agents/**`;
+`playwright` for `e2e/**`). Every `.github/workflows/**` change gets a `workflow-expert` review, no
+exceptions. Full table: [WORKFLOW.md](WORKFLOW.md#file-ownership). Cross-layer fixes are default
+routing, not a hard wall: `ops/standards/process.md` → File-ownership pattern (#1125).
 
 ## Conventions
 
@@ -59,16 +44,8 @@ The sections below state only what is specific to poke-memory or extends a stand
 
 Principle + forcing-function requirement: `ops/standards/conventions.md` → Single source of truth. Poke-memory wiring: `code-reviewer` raises any new direct field access on a domain object (`p.displayName`, `card.name`, `pokemon.sprite`) as a **Blocker** tagged "fragmentation" (#1259 / #1311 → #1318). Local forcing-function models: a lint rule (#1327's `no-restricted-syntax` ban on raw `.displayName`), a fitness/contract test (#1356 onConflict↔PK parity test), and type-system forcing (`computeStats(…, forceAllMastered)`); enforcement-gap candidates in #1405 / #1406.
 
-**Existing helpers - use these, do not re-derive.**
-
-- `useLocalePokemonName(id, fallback)` from `lib/i18n/useLocalePokemonName.ts` - Pokémon name rendering (locale-aware).
-- `formatDate(iso, fmt, tz)` / `formatShortDate(iso, fmt)` from `lib/utils/format-date.ts` - user-facing date display. `todayInTimezone(tz)` for the current day boundary; `isoDate(d)` for the scheduling-internal `"YYYY-MM-DD"` form.
-- `isMastered(state)` from `lib/stats/derive.ts` - single mastery check.
-- `filterMastered(cards, …)` from `lib/pasture/arrivals.ts` - mastery filter honouring the superuser `forceAllMastered` axis.
-- `computeStats(…)` from `lib/stats/derive.ts` - aggregate stats with the same superuser axis.
-- `masteredSpeciesIds(…)` from `lib/badges/derive.ts` - mastered species set.
-- `useCardClass(…)` from `lib/review/useCardClass.ts` - card-class derivation.
-- Class-name constants in `lib/utils/class-names.ts` (`cardPanel`, `cardPanelPadded`, `colStack`, `colStackLg`, `sectionLabel`, `dialogPanel`, `statValue`, `chartTickText`, `mutedText`, `inlineLink`, `mutedTextXs`, `chartTooltipCard`) - never inline the underlying Tailwind literal.
+**Existing helpers - use these, do not re-derive** (names, mastery, dates, stats, class names):
+[docs/shared-helpers.md](docs/shared-helpers.md).
 
 ### Multi-locale rendering and message catalogues
 
@@ -81,13 +58,10 @@ Canonical reference: **[docs/i18n.md](docs/i18n.md)**. Headline rules:
 
 Declare-a-discovery-path, reach-existing-users, and mock-up-on-visual-surface-proposals: `ops/standards/conventions.md` → Discoverability. Poke-memory wiring (review ownership, one-shot hint mechanics via a new `OnboardingFlags` key, `WhatsNewIndicator` usage, verify-in-a-populated-state): **[docs/discoverability.md](docs/discoverability.md)**.
 
-### Caching
+### Next.js caching and page params
 
-- **Cache Components is enabled** (`cacheComponents: true` in `next.config.ts`). All cache APIs assume this model.
-- Read-your-own-writes after a Server Action mutation: `updateTag(tag)` (Server Actions only).
-- Background SWR-style invalidation from Route Handlers: `revalidateTag(tag, 'max')` (the single-arg form is deprecated and a TS error).
-- `revalidatePath('/path')` only for path-level data, not specific tags.
-- Tag underlying cached fetches with `cacheTag(...)` inside `'use cache'` functions - without that, `updateTag` has nothing to invalidate.
+Cache Components is on; `params`/`searchParams` are Promises. Settled rules (`updateTag` vs
+`revalidateTag(tag, 'max')`, `cacheTag`, `PageProps`): **[docs/nextjs.md](docs/nextjs.md)**.
 
 ### Superuser mode (READ when adding user-facing features)
 
@@ -114,39 +88,24 @@ Decision tree (JSONB on `user_settings` vs. column on `card_reviews` vs. new tab
 - **Apply the migration BEFORE merging the PR**, to **both** Supabase projects (prod `mcp__supabase__apply_migration` and QA `mcp__supabase-qa__apply_migration`; name without the `0NN_` prefix). `migration-check.yml` asserts QA parity on qa-based PRs and prod parity on push to `main` (#1806) - mechanics in [docs/persistence.md](docs/persistence.md#apply-the-migration).
 - **Wire cross-device sync** via `lib/sync/<feature>.ts` exporting `push` / `pull` (+ `merge`); pull as a best-effort leg in `pullAndMerge`, push wherever the data is written.
 
-### Page params
-
-- `params` and `searchParams` are `Promise` - always `await` them. Synchronous access is fully removed.
-- Prefer the generated `PageProps<'/path/[seg]'>` helper after `next typegen` / first dev / first build. The manual inline `params: Promise<{ slug: string }>` always works without that step.
 
 ### PokéAPI integration
 
-- **Seed at build time, not request time.** A one-off seed script fetches `/pokemon-species` (master list) → `/pokemon/{id}` (sprites) → `/pokemon-species/{id}` (display name + chain URL) → `/evolution-chain/{id}` (deduped) into a local store. The Pokédex never hits PokéAPI at runtime.
-- **Canonical set is `/pokemon-species`** (~1025 species), not `/pokemon` (~1300+ incl. Megas/regional/Gigantamax at IDs 10001+). Resolve each species to `varieties[0]`.
-- **Display name** is `pokemon-species.names[]` filtered to `language.name === "en"`. The `/pokemon` `name` field is a kebab-case slug.
-- **Default sprite**: `sprites.other["official-artwork"].front_default`, falling back to `sprites.front_default`. Sprites self-hosted under `public/sprites/pokemon/`.
-- **Evolution chains are trees** - `evolves_to[]` may branch (Eevee → 8). Walk recursively.
-- **Rate limit** ~100/min: cap concurrency at ~20–30, don't aggressively retry on 429.
-- **Re-seeding a new generation**: `npm run seed:all` (additive default). Full runbook in **[docs/reseed.md](docs/reseed.md)**.
+Seed at build time, never at request time; the canonical set is `/pokemon-species`. Endpoint, name,
+sprite, evolution-tree and rate-limit rules: **[docs/pokeapi.md](docs/pokeapi.md)**; re-seeding:
+**[docs/reseed.md](docs/reseed.md)**.
 
 ### Sprite rendering
 
-Canonical reference: **[docs/sprites.md](docs/sprites.md)**. Headline rules:
-
-- **Default to `next/image`.** The only exemption is the Pokédex grid (`PokedexGrid.tsx`), which keeps a plain lazy `<img>` to avoid per-cell wrapper overhead across ~1025 tiles.
-- **`/_next/image` is NOT used for sprites.** A global custom loader (`lib/sprites/imageLoader.ts`) redirects sprite paths to pre-generated static WebP under `public/sprites/pokemon/webp/`. Run `npm run seed:sprites` after adding a size constant.
-- **Sprite sizes are named constants in `lib/sprites/sizes.ts`** - never inline a pixel literal; it must match the painted CSS size or the wrong WebP variant ships.
-- **`preload` (not the deprecated `priority`, lint-banned #2015) is for the above-the-fold focal sprite only.** Off-screen / list-tile sprites stay lazy.
+Canonical reference and full rules: **[docs/sprites.md](docs/sprites.md)**. Default to `next/image`
+(only `PokedexGrid.tsx` keeps a plain lazy `<img>`); sizes come from `lib/sprites/sizes.ts`, never a
+pixel literal; `preload` only on the above-the-fold focal sprite (`priority` is lint-banned, #2015).
 
 ### Spaced repetition
 
-Canonical reference: **[docs/srs.md](docs/srs.md)**. Headline facts:
-
-- **Grading**: `Again` (1) / `Hard` (2) / `Good` (4) / `Easy` (5), mapped to FSRS's `Rating` enum at the boundary in `lib/srs/scheduler.ts`.
-- **Mastery**: `stability >= MASTERY_STABILITY_DAYS` (21). The old `reps >= 3` sub-gate was removed in #1765 - `MASTERY_REPETITIONS` still exists for test fixtures and QA-seed descriptions, but must NOT be used in any new mastery-checking code path. A lapse that drops stability below 21 reverts a species to learning; gym badges are latched separately and stay earned.
-- **Dates**: scheduling-internal dates are `"YYYY-MM-DD"` UTC strings; user-facing day boundaries (today / streak / daily cap) are timezone-aware via `todayInTimezone(tz)` + `user_settings.timezone` (migration 019). Pass the user's tz through display/daily-cap code; stay UTC inside the scheduler.
-- **Scheduler is pure**, in `lib/srs/`. `nextReview(state, grade, now, options?)` is the single chokepoint reading `retentionTarget`.
-- **Grade-log retention - the cloud log is NOT trimmed.** For authenticated users the Supabase `grade_log` is unbounded; only the LOCAL log is pruned, to 365 days (`pruneGradeLog`), plus a size valve that applies to the localStorage fallback path only (IndexedDB is not size-trimmed). So a historical FSRS replay is complete for signed-in users and lossy only for guests past a year. `lib/timeline/reconstruct.ts` already replays the log to derive first/last mastery-crossing dates - prefer deriving history over persisting a new column, but note its srs-expert verdict (#853) blesses it at week-level granularity only, since it replays through current default weights. Assuming the log is trimmed sent #1956 down a migration-plus-trigger design that was not needed.
+Canonical reference: **[docs/srs.md](docs/srs.md)** (headline facts at the end). Never use
+`MASTERY_REPETITIONS` in new mastery code (mastery is `stability >= 21`, #1765); the scheduler in
+`lib/srs/` is pure and stays UTC; the cloud `grade_log` is not trimmed (#1956).
 
 ### Testing
 
@@ -161,34 +120,23 @@ Generic discipline: `ops/standards/conventions.md` → Testing discipline. Full 
 
 ### Local development gotchas
 
-- `localhost:3000` and `pokememory.com` are different origins → independent `localStorage`. When local dev and deployed behaviour differ, suspect localStorage drift first - clear the `poke-memory:*` keys and reload, or QA against the latest preview URL.
-- **Build needs the pinned Node major** (`.nvmrc`; `.npmrc` `engine-strict` + a `prebuild` guard fail-fast, #1493). Node 26 breaks the esbuild-wasm/Turbopack build - `nvm use` or a Homebrew `node@24` on `PATH`, and brief sub-agents the same (they inherit the machine default).
-- **"Unlimited reviews" on a fresh session isn't a bug**: `buildSessionQueues` (`lib/review/session.ts`) only counts a review toward `reviewsDoneToday` when `lastReview === today && firstSeen !== today`, so the 100/day soft wall can't fire until prior-day cards come due; totals are bounded by the new-card caps × learning-step replays.
-- **Evolution cards inherit the pre-evo's types for scope matching (#426)**: `cardMatchesScope` (`lib/review/scope.ts`) resolves `card.preEvoId` to its `SeedPokemon.types` - a Fire scope includes `Charmander → Charmeleon` but excludes `Eevee → Flareon`. Forward and reverse evo cards anchor all three axes on the pre-evo.
+localStorage drift between `localhost` and production, the pinned Node major (`.nvmrc`), "unlimited
+reviews" on a fresh session, evolution-card scope matching: **[docs/local-dev.md](docs/local-dev.md)**.
 
 ### Documentation
 
-Roles + update-inline-in-the-landing-commit: `ops/standards/conventions.md` → Documentation. Canonical references here: **[WORKFLOW.md](WORKFLOW.md)** (process map: roster, playbook, Actions catalog, issue lifecycle, branching, release, build gates, retrospectives) and **`docs/*.md`** ([sync](docs/sync.md), [persistence](docs/persistence.md), [card-identity](docs/card-identity.md), [srs](docs/srs.md), [sprites](docs/sprites.md), [i18n](docs/i18n.md), [testing](docs/testing.md), [superuser](docs/superuser.md), [screenshots](docs/screenshots.md), [discoverability](docs/discoverability.md)).
-
-### Writing
-
-British English + no em dashes: `ops/standards/conventions.md` → Writing. Poké-specific out-of-scope identifiers to leave alone: PokéAPI fields, FSRS (`optimizer`), shipped Supabase column names.
+Roles + update-inline-in-the-landing-commit: `ops/standards/conventions.md` → Documentation. Canonical references here: **[WORKFLOW.md](WORKFLOW.md)** (process map: roster, playbook, Actions catalog, issue lifecycle, branching, release, build gates, retrospectives) and **`docs/*.md`** ([sync](docs/sync.md), [persistence](docs/persistence.md), [card-identity](docs/card-identity.md), [srs](docs/srs.md), [sprites](docs/sprites.md), [i18n](docs/i18n.md), [testing](docs/testing.md), [superuser](docs/superuser.md), [screenshots](docs/screenshots.md), [discoverability](docs/discoverability.md), [shared-helpers](docs/shared-helpers.md), [nextjs](docs/nextjs.md), [pokeapi](docs/pokeapi.md), [local-dev](docs/local-dev.md)).
 
 ### Screenshots
 
 When a change visibly affects any of the six README screenshot surfaces (`app/page.tsx`, `app/pokedex/**`, `app/pasture/**`, `app/stats/**`, `app/journey/**`, or a rendered `components/**`), regenerate the affected screenshot(s) with `npm run screenshots` (macOS only) and commit them in the same PR. Full runbook (viewport, seed, animations, size caps): **[docs/screenshots.md](docs/screenshots.md)**.
 
-### Versioning
+### Writing, versioning, branching, stack
 
-SemVer, `package.json`-as-single-source, changelog fragments, owner approval for a non-patch bump: `ops/standards/process.md` → Versioning & release. Poke-memory wiring: the daily `auto-release.yml` cron assembles `changelog.d/unreleased/*.md` fragments (`kind: minor-bump` → minor; otherwise patch) and tags; a `minor-bump` fragment needs the owner-applied `version-bump:approved` label (`version-bump-gate.yml`). Fragment format and the release pipeline live in [WORKFLOW.md](WORKFLOW.md) and `changelog.d/README.md`.
-
-### Branching model
-
-Two-long-lived-branch model (#806): `ops/standards/process.md` → Branching model; diagram and rulesets in [WORKFLOW.md](WORKFLOW.md). Poke-memory specifics: the source-gate check is named `Restrict main PR source` (overridden by the owner-applied `hotfix` label); `qa`'s required checks are `test` + `e2e` (no strict-up-to-date); every PR-producing path targets `qa`.
-
-### Stack decisions
-
-Vendor screening (`[USER-DECISION]`, default-to-blocker, no-beta, single-vendor): `ops/standards/conventions.md` → Stack / vendor screening. Poké-specific: plan persistence shape for plausible future scope (per-card analytics, friends/social).
+- **Writing:** British English + no em dashes: `ops/standards/conventions.md` → Writing. Poké-specific out-of-scope identifiers to leave alone: PokéAPI fields, FSRS (`optimizer`), shipped Supabase column names.
+- **Versioning:** SemVer, `package.json`-as-single-source, changelog fragments, owner approval for a non-patch bump: `ops/standards/process.md` → Versioning & release. Poke-memory wiring: the daily `auto-release.yml` cron assembles `changelog.d/unreleased/*.md` fragments (`kind: minor-bump` → minor; otherwise patch) and tags; a `minor-bump` fragment needs the owner-applied `version-bump:approved` label (`version-bump-gate.yml`). Fragment format and the release pipeline live in [WORKFLOW.md](WORKFLOW.md) and `changelog.d/README.md`.
+- **Branching:** Two-long-lived-branch model (#806): `ops/standards/process.md` → Branching model; diagram and rulesets in [WORKFLOW.md](WORKFLOW.md). Poke-memory specifics: the source-gate check is named `Restrict main PR source` (overridden by the owner-applied `hotfix` label); `qa`'s required checks are `test` + `e2e` (no strict-up-to-date); every PR-producing path targets `qa`.
+- **Stack decisions:** Vendor screening (`[USER-DECISION]`, default-to-blocker, no-beta, single-vendor): `ops/standards/conventions.md` → Stack / vendor screening. Poké-specific: plan persistence shape for plausible future scope (per-card analytics, friends/social).
 
 ### Backlog / process
 

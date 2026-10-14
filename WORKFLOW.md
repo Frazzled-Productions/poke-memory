@@ -59,6 +59,33 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 
 ---
 
+## File ownership
+
+Moved out of `AGENTS.md` (2026-10-14). Default routing for which agent edits what.
+
+| Path | Owner |
+|---|---|
+| `app/**/page.tsx`, `app/**/layout.tsx`, `app/**/loading.tsx`, `app/**/error.tsx` | ui-coder |
+| `components/**` | ui-coder |
+| `app/api/**` | data-coder |
+| `lib/**` | data-coder |
+| `db/**` | data-coder |
+| Server Actions | data-coder (implementation), ui-coder (call sites) |
+| SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
+| PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
+| Supabase schema / RLS | supabase-expert designs; data-coder implements |
+| Privacy notice / Terms / `docs/` compliance files (`dpia.md`, `childrens-code-assessment.md`, `cookies-pecr.md`); any third-party SDK/service install that could collect, transmit, or log personal data (analytics, error monitoring, messaging, A/B testing) | privacy-expert advises (read-only); ui-coder edits the `/privacy` and `/terms` pages, orchestrator edits the `docs/` compliance files |
+| Multi-locale work (`pokemonNameLocale`, `appLocale`, transliteration, message catalogs, locale routing, locale-aware sync, adding a new locale) | i18n-expert advises (read-only); data-coder implements settings/sync/seed changes, ui-coder implements rendering, catalogs, and `<lang>` placement |
+| Onboarding / discoverability surfaces (`components/onboarding/**`, empty states, locked-state UI, first-contact flows, nav affordances) | ux-advisor advises (read-only); ui-coder implements |
+| `README.md`, `CHANGELOG.md` | orchestrator - updated inline as part of each commit, no specialist agent |
+| `e2e/**` | playwright |
+| `.github/workflows/**` | workflow-expert review on EVERY change, no mechanical-change exception (complexity is not the gate, YAML's silent-failure mode is - #1859/#1815/#1806); orchestrator (edits) |
+| `.claude/agents/**` | workflow-expert (review); orchestrator (edits) |
+
+**Cross-layer fixes.** Default routing, not a hard wall: `ops/standards/process.md` → File-ownership pattern (#1125). Worked example: a `ui-coder` finding the root cause in `lib/` touches the helper in the same change (#1117 / #1121).
+
+---
+
 ## Orchestration playbook
 
 The main agent (Claude in the user's session) orchestrates. Coder agents do not call other agents directly - they receive research findings via the prompt.
