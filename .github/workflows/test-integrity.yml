@@ -21,6 +21,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: Frazzled-Productions/.github/.github/workflows/test-integrity.yml@ci/harden-and-test-integrity
+    uses: Frazzled-Productions/.github/.github/workflows/test-integrity.yml@main
     with:
       warn-only: true
