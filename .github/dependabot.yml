@@ -9,6 +9,10 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    # A new release waits 7 days before a PR is opened; security updates bypass this
+    # (org reference: Frazzled-Productions/.github templates/dependabot.yml, ops A10).
+    cooldown:
+      default-days: 7
     # TypeScript 7 is blocked until Next.js supports the native compiler (#1921):
     # `next build` crashes without the removed JS compiler API,
     # scripts/check-no-em-dash.mjs uses that API, and typescript-eslint refuses
@@ -46,3 +50,9 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    groups:
+      actions-minor-patch:
+        applies-to: version-updates
+        update-types: ["minor", "patch"]
