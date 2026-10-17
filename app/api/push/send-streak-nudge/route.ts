@@ -9,6 +9,7 @@ import { localHourToUtcHour, currentUtcHour, PUSH_DEFAULT_HOUR_UTC } from "@/lib
 import { isEligibleForStreakNudge } from "@/lib/push/streakNudgePredicate";
 import { validateStreakProtection, effectiveStreakDates, type StreakProtection } from "@/lib/streak/tokens";
 import { computeStreak } from "@/lib/streak/compute";
+import { supabaseSecretKey } from "@/lib/supabase/keys";
 
 // use-intl's createTranslator has deeply generic types that conflict with the
 // simple Record<string, unknown> messages shape used here; cast to a plain
@@ -170,7 +171,7 @@ export async function POST(request: Request) {
   const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
   const vapidSubject = process.env.VAPID_SUBJECT;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = supabaseSecretKey();
 
   if (
     !sharedSecret ||

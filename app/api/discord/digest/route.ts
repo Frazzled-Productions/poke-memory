@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { isAuthorized } from "@/lib/auth/bearerAuth";
+import { supabaseSecretKey } from "@/lib/supabase/keys";
 
 /**
  * POST /api/discord/digest (#1653)
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
   const sharedSecret = process.env.CRON_SHARED_SECRET;
   const webhookUrl = process.env.DISCORD_DIGEST_WEBHOOK_URL;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = supabaseSecretKey();
 
   if (!sharedSecret || !webhookUrl || !supabaseUrl || !serviceRoleKey) {
     return NextResponse.json(
