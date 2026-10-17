@@ -1,0 +1,26 @@
+# Flags deleted tests, new skips, changed snapshot baselines and changed thresholds, and fails
+# unless the PR body has a "## Test changes" section naming each flagged file. The check lives in
+# the org's reusable workflow (Frazzled-Productions/.github, test-integrity.yml).
+# Warn-only for a trial period: it reports but does not fail yet.
+name: Test integrity
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-integrity:
+    name: Test integrity
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: Frazzled-Productions/.github/.github/workflows/test-integrity.yml@ci/harden-and-test-integrity
+    with:
+      warn-only: true
