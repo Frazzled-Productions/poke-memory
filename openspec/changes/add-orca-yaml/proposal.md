@@ -1,7 +1,7 @@
 ## Why
 
-Starting work from a Poké Memory issue on Orca's Tasks page should make a worktree and run
-`claude "/start {{artifact_url}}"` in it. Poké Memory has no `orca.yaml`, so Orca opens its built-in
+Starting work from a Poké Memory issue on Orca's Tasks page should make a worktree and run `/start`
+on that issue in it. Poké Memory has no `orca.yaml`, so Orca opens its built-in
 prompt instead. The ops `orca-shell` requirement "Repo config in a checked-in orca.yaml" (ops change
 `orca-yaml-in-app-repos`, ops#79) says ops, koinori, roast-conductor, loop-year and poke-memory each
 carry the same file. Fraser ruled on 23 October 2026 that each app repo adopts OpenSpec first and then
@@ -9,13 +9,19 @@ carries the file in its own `add-orca-yaml` change; Poké Memory adopted in `ado
 
 ## What Changes
 
-- A root `orca.yaml`, exactly the keys `issueCommand` and `defaultTabs`:
+- A root `orca.yaml` (one tab, one pane: Fraser, 23 October 2026, after the ops#36 task 6.6 live
+  check), exactly:
   ```yaml
-  issueCommand: claude "/start {{artifact_url}}"
   defaultTabs:
     - title: Agent
+      command: claude "/start"
   ```
-  No `scripts` block (no setup or archive script).
+  No `issueCommand` (in Orca 1.4.237 it is both the composer agent's prompt and a command run in a
+  split of the first tab, which gave two panes in the live check), no other tab, no `scripts` block.
+  "Start workspace from issue", with "Blank Terminal" as the composer's agent and setup on, opens one
+  tab running `claude "/start"`; `/start` finds the issue Orca linked to the worktree and makes it
+  option 1 (ops `session-status`, ops#79). With an agent selected instead, Orca runs its own agent in
+  that tab; one session either way.
 - Orca reads `orca.yaml` from the primary checkout, which is on `main`, so the file takes effect
   after the next qa-to-main promotion (`git-sync.sh` fast-forwards the checkout within 15 minutes).
 
@@ -50,6 +56,7 @@ Nothing, because Poké Memory has no Orca config today.
 
 - 23 October 2026: Orca as the shell, a checked-in `orca.yaml` per repo, `issueCommand` running `/start` with the issue (ops#32).
 - 23 October 2026: no setup script; only `issueCommand` and the default tabs (ops#46).
+- 23 October 2026, after ops#36 task 6.6: one tab, one pane; one "Agent" tab running `claude "/start"`, no `issueCommand` (ops#79).
 - 23 October 2026, on ops#79: adopt OpenSpec first, then a new `add-orca-yaml` change into `qa` for Poké Memory; run ops#36's live check (task 6.6) before any `orca.yaml` PR merges.
 
 ## Clarifications
@@ -57,3 +64,5 @@ Nothing, because Poké Memory has no Orca config today.
 - 2026-10-23 Q: Setup script in `orca.yaml`? A: No; only `issueCommand` and the default tabs (Fraser).
 - 2026-10-23 Q: Poké Memory gets an `orca.yaml`? A: Yes (Fraser, ops#79).
 - 2026-10-23 Q: Merge before ops#36 task 6.6 proves `{{artifact_url}}` live? A: No; leave this PR green and unmerged until it passes (Fraser).
+- 2026-10-23 Q: Did the live check (ops#36 task 6.6) pass? A: Partly: the issue command ran, but as a split beside Orca's agent pane, plus a Ledger tab (Fraser).
+- 2026-10-23 Q: Keep that layout? A: No: one tab, one pane. `orca.yaml` is one "Agent" tab running `claude "/start"`, no `issueCommand`; `/start` finds the worktree's linked issue (Fraser, ops#79). Merge only after ops#79 task 1.3, the live recheck, passes.
