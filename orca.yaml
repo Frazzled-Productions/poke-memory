@@ -1,0 +1,3 @@
+defaultTabs:
+  - title: Agent
+    command: claude "/start"
