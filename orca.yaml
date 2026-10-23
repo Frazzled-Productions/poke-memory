@@ -1,0 +1,7 @@
+# Orca's repo config for Poké Memory (ops orca-shell requirement "Repo config in a checked-in
+# orca.yaml"; ops/orca.md). Inert without Orca. Starting work from an issue on Orca's Tasks page runs
+# /start with that issue in the new worktree; the first tab is left for the agent Orca starts. Orca
+# reads this file from the primary checkout (on main), so it takes effect after the next promotion.
+issueCommand: claude "/start {{artifact_url}}"
+defaultTabs:
+  - title: Agent
