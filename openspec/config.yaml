@@ -1,0 +1,67 @@
+schema: spec-driven
+
+# Poké Memory's OpenSpec house rules, from ops/standards/openspec-adoption/config.yaml (copied from
+# Roast Conductor's; owner decision 21 October 2026, ops/research/openspec-trial-2026-10-21.md; every
+# repo adopts, owner decision 23 October 2026). Every change goes through OpenSpec, bug fixes included.
+context: |
+  Write in British English, with no em dashes anywhere (use a comma, colon, parentheses or a spaced hyphen).
+  The display name is "Poké Memory"; the repo, package and domain stay `poke-memory`. Leave PokéAPI field
+  names, FSRS terms (`optimizer`) and shipped Supabase column names as they are.
+  The owner reviews proposals in the terminal, so keep them readable: plain words, short requirements.
+  Spec on touch: when a change modifies an existing capability that has no spec yet, first write that
+  capability's current behaviour as a baseline spec from the code and tests (marked as the baseline),
+  then express the change as a delta against it.
+  Capabilities in use: see openspec/specs/.
+  Work lands on `qa`; `main` only takes qa-to-main promotions.
+  Put every decision to the owner in AskUserQuestion (options, one recommended), never in prose.
+
+rules:
+  proposal:
+    - >-
+      Include an "Also touches" section listing each of these with what changes or "no change, because...":
+      review and quiz screens (home), Pokédex, Pasture, Stats, Journey, Settings, What's new, guest mode
+      (localStorage), cloud sync and Supabase migrations (both projects), superuser mode and QA-seed
+      scenarios, locales (en, ja, zh-Hans, zh-Hant, pseudo-locale), push notifications and the service
+      worker (offline), sign-in, privacy notice and sub-processors, accessibility (keyboard, screen
+      reader, reduced motion), README screenshots, changelog fragments and the release, and CI and
+      GitHub Actions.
+    - State what is out of scope.
+    - List the owner's decisions the change relies on, with dates.
+    - >-
+      Include "Removes": code, settings, copy or requirements this change makes unnecessary, or
+      "Nothing, because...".
+    - >-
+      A change that alters no behaviour (a refactor, a docs-only change, or a tooling change whose
+      behaviour stays the same) sets "skip_specs: true" in its .openspec.yaml and has no specs/ folder,
+      instead of an empty or invented delta. Any behaviour change, tooling included, follows spec on
+      touch; a change to the OpenSpec tooling modifies openspec-tooling (owner decision 23 October 2026).
+    - >-
+      End with "Clarifications": each grilling question and the owner's answer, dated, one line each.
+  specs:
+    - >-
+      Every requirement has at least one WHEN/THEN scenario, including the awkward orderings (offline,
+      app closed, guest then sign-in, two devices syncing, superuser flag on, a non-English locale)
+      where they apply.
+    - >-
+      When a change makes an existing requirement wrong, MODIFY or REMOVE it in the delta; never leave
+      it for the archive. Use RENAMED when a requirement's meaning changes so its title stays true.
+    - >-
+      A delta that creates a new capability starts with a "## Purpose" section (one short paragraph);
+      the archive copies it into the new spec. Without it the archive writes a "TBD - created"
+      placeholder and the archive bot fails.
+    - >-
+      Write the delta in the feature PR. Never archive by hand: the "OpenSpec archive" workflow archives
+      every change on qa after its PR merges (AGENTS.md, "OpenSpec").
+  tasks:
+    - Each task says how it is verified (a named test, a debug scenario or a screenshot).
+    - Tests are written failing first for behaviour changes.
+    - >-
+      Before asking for approval, run a read-only consistency pass over proposal, specs and tasks and
+      put the result at the top of the review message: requirements with no task, tasks with no
+      requirement, "Also touches" surfaces marked as changing with no requirement, terms used two
+      ways, vague words with no number ("fast", "robust"), and anything contradicting an owner
+      decision listed in the proposal (always critical: change the documents, never the decision).
+      Fix what is mechanical; list the rest as open calls.
+    - >-
+      After the build, run /opsx:verify <change> before the final review; fix what it finds or list it
+      in the PR.

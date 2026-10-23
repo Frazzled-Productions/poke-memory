@@ -4,6 +4,7 @@ import { createClient as createServerSupabaseClient } from "@/lib/supabase/serve
 import { hashIp } from "@/lib/auth/rateLimitIp";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import type { RateLimitAction } from "@/lib/auth/rateLimitIp";
+import { supabaseSecretKey } from "@/lib/supabase/keys";
 
 /**
  * POST /api/feedback (#1621)
@@ -39,7 +40,7 @@ type FeedbackBody = {
 export async function POST(request: Request) {
   // --- Env guard ---
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = supabaseSecretKey();
   if (!supabaseUrl || !serviceRoleKey) {
     return NextResponse.json({ ok: false, error: "misconfigured" }, { status: 500 });
   }

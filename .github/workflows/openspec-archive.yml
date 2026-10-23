@@ -1,0 +1,41 @@
+# Archives every OpenSpec change on qa once its PR has merged (ops/standards/openspec-adoption,
+# GitHub-hosted variant: the repo is public, so the minutes are free). Work lands on qa; main only
+# takes promotions, so the bot archives on qa and its PR targets qa.
+# required-contexts must list exactly what the qa-staging ruleset requires, the two OpenSpec checks
+# included (ops/standards/openspec-adoption/README.md).
+name: OpenSpec archive
+
+on:
+  push:
+    branches: [qa]
+    paths: ['openspec/changes/**']
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  openspec-archive:
+    name: OpenSpec archive
+    permissions:
+      actions: write # approve the archive PR's own held checks
+      contents: write # push the archive branch
+      pull-requests: write
+      issues: write
+      checks: read # the stuck job lists the archive PR's checks
+    uses: Frazzled-Productions/.github/.github/workflows/openspec-archive.yml@v1
+    with:
+      runs-on: '"ubuntu-latest"'
+      install-openspec: true
+      base-branch: qa
+      required-contexts: |-
+        test
+        e2e
+        Test coverage report
+        integration-gate
+        changelog-gate
+        i18n-leak
+        OpenSpec required / OpenSpec required
+        Context budget / Context budget

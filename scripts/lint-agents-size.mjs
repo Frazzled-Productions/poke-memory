@@ -20,13 +20,19 @@ const FILE = "AGENTS.md";
 
 // Ceilings, with headroom above the current size so ordinary edits don't trip
 // them but a section-sized re-bloat does. After the #1912 slimming pass the
-// file is ~205 lines / ~23 KiB; 240 lines allows a section or two of genuine
-// new runtime convention before the gate asks you to relocate detail instead.
+// file was ~205 lines / ~23 KiB; the 2026-10-14 pass (reference sections moved
+// to docs/*.md and WORKFLOW.md) took it to ~155 lines / ~18 KiB, so the
+// ceilings were ratcheted down to keep that gain. 190 lines still allows a
+// section or two of genuine new runtime convention. Raised to 240 on
+// 2026-10-23 for the company-required "OpenSpec" and "Delegated work and the
+// stall watcher" sections (OpenSpec adoption, #2167; ~229 lines with them).
 const MAX_LINES = 240;
 
 // Byte ceiling (#1912): some agent tools silently truncate instruction files
 // at 32 KiB, and the line budget alone missed a ~40 KB file made of long
-// lines. 26 KiB keeps a hard margin below the truncation point.
+// lines. 26 KiB kept a hard margin below the truncation point; ratcheted to
+// 22 KiB on 2026-10-14 with the slimmer file; back to 26 KiB on 2026-10-23
+// for the two OpenSpec adoption sections (#2167; ~24 KiB with them).
 const MAX_BYTES = 26 * 1024;
 
 const text = readFileSync(resolve(ROOT, FILE), "utf8");

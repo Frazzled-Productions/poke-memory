@@ -126,3 +126,10 @@ The exemption is recorded inline in `PokedexGrid.tsx` (the comment above the `<i
 6. If the surface renders a known, bounded sprite set soon, mount `SpritePreloader` to warm the network cache.
 7. If the surface has a visible state transition, `await decodeAhead([...])` immediately before the swap.
 8. Never inline a sprite pixel literal, and never preload an unbounded set.
+
+## Headline rules (moved from AGENTS.md, 2026-10-14)
+
+- **Default to `next/image`.** The only exemption is the Pokédex grid (`PokedexGrid.tsx`), which keeps a plain lazy `<img>` to avoid per-cell wrapper overhead across ~1025 tiles.
+- **`/_next/image` is NOT used for sprites.** A global custom loader (`lib/sprites/imageLoader.ts`) redirects sprite paths to pre-generated static WebP under `public/sprites/pokemon/webp/`. Run `npm run seed:sprites` after adding a size constant.
+- **Sprite sizes are named constants in `lib/sprites/sizes.ts`** - never inline a pixel literal; it must match the painted CSS size or the wrong WebP variant ships.
+- **`preload` (not the deprecated `priority`, lint-banned #2015) is for the above-the-fold focal sprite only.** Off-screen / list-tile sprites stay lazy.

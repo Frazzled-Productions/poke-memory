@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "./types";
+import { supabasePublishableKey } from "./keys";
 
 // Returns a Supabase client for use in Server Components, Server Actions,
 // and Route Handlers. cookies() MUST be awaited in Next.js 16.2.5+.
@@ -8,7 +9,7 @@ export async function createClient() {
   const cookieStore = await cookies(); // MUST await in Next.js 16
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabasePublishableKey()!,
     {
       cookies: {
         getAll() {

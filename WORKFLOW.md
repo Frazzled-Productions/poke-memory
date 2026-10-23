@@ -9,9 +9,9 @@
 > `issue-overlap-scan`, `settings-coverage-audit`, and `auto-digest-fanout`
 > (whose four digest producers had all gone).
 >
-> Agent automation is moving to a **Mac-local loop**, because koinori is a native
-> iOS app whose builds need macOS and GitHub-hosted macOS minutes are too
-> expensive. See `Frazzled-Productions/frazzled-loop`.
+> Agent automation then moved to a Mac-local loop (Porter, `Frazzled-Productions/frazzled-loop`).
+> Porter was retired in September 2026 and its repo archived on 2026-10-14 (ops decision 0010
+> update); agent work now runs from interactive Claude Code sessions.
 >
 > **What this means for this document.** Everything below describing genuine CI
 > (`ci`, `coverage`, `e2e`, `codeql`, `visual-regression`, the policy and drift
@@ -56,6 +56,33 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [i18n-expert](.claude/agents/i18n-expert.md) | Multi-locale design - `pokemonNameLocale` vs. `appLocale`, transliteration sources (rōmaji, pinyin), message catalogs, `next-intl` routing, locale-aware sync, `<lang>` placement, adding a new locale | Yes |
 | [ux-advisor](.claude/agents/ux-advisor.md) | Information architecture, feature discoverability, onboarding patterns, empty/locked-state design, accessibility - invoked on the brief for any change adding a user-facing feature or changing how something is displayed/discovered; advises, `ui-coder` implements | Yes |
 | [workflow-expert](.claude/agents/workflow-expert.md) | Mandatory review on EVERY GitHub Actions / orchestration change - idempotency markers, fork-PR and author guards, required-check names | Yes |
+
+---
+
+## File ownership
+
+Moved out of `AGENTS.md` (2026-10-14). Default routing for which agent edits what.
+
+| Path | Owner |
+|---|---|
+| `app/**/page.tsx`, `app/**/layout.tsx`, `app/**/loading.tsx`, `app/**/error.tsx` | ui-coder |
+| `components/**` | ui-coder |
+| `app/api/**` | data-coder |
+| `lib/**` | data-coder |
+| `db/**` | data-coder |
+| Server Actions | data-coder (implementation), ui-coder (call sites) |
+| SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
+| PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
+| Supabase schema / RLS | supabase-expert designs; data-coder implements |
+| Privacy notice / Terms / `docs/` compliance files (`dpia.md`, `childrens-code-assessment.md`, `cookies-pecr.md`); any third-party SDK/service install that could collect, transmit, or log personal data (analytics, error monitoring, messaging, A/B testing) | privacy-expert advises (read-only); ui-coder edits the `/privacy` and `/terms` pages, orchestrator edits the `docs/` compliance files |
+| Multi-locale work (`pokemonNameLocale`, `appLocale`, transliteration, message catalogs, locale routing, locale-aware sync, adding a new locale) | i18n-expert advises (read-only); data-coder implements settings/sync/seed changes, ui-coder implements rendering, catalogs, and `<lang>` placement |
+| Onboarding / discoverability surfaces (`components/onboarding/**`, empty states, locked-state UI, first-contact flows, nav affordances) | ux-advisor advises (read-only); ui-coder implements |
+| `README.md`, `CHANGELOG.md` | orchestrator - updated inline as part of each commit, no specialist agent |
+| `e2e/**` | playwright |
+| `.github/workflows/**` | workflow-expert review on EVERY change, no mechanical-change exception (complexity is not the gate, YAML's silent-failure mode is - #1859/#1815/#1806); orchestrator (edits) |
+| `.claude/agents/**` | workflow-expert (review); orchestrator (edits) |
+
+**Cross-layer fixes.** Default routing, not a hard wall: `ops/standards/process.md` → File-ownership pattern (#1125). Worked example: a `ui-coder` finding the root cause in `lib/` touches the helper in the same change (#1117 / #1121).
 
 ---
 
