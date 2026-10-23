@@ -1,0 +1,22 @@
+# Fails a PR whose OpenSpec delta clashes with another open PR's, or targets a requirement no longer
+# on qa (ops/standards/openspec-adoption, GitHub-hosted variant).
+name: OpenSpec overlap
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  overlap:
+    name: OpenSpec overlap
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: Frazzled-Productions/.github/.github/workflows/openspec-overlap.yml@v1
+    with:
+      runs-on: '"ubuntu-latest"'
+      install-openspec: true
+      base-branch: qa

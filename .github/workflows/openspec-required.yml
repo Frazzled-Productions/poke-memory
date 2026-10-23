@@ -1,0 +1,24 @@
+# "OpenSpec required": a PR into qa that changes more than docs must carry an OpenSpec change; the
+# only exception is Fraser's no-spec label with a "## No spec" reason in the PR body
+# (ops/standards/openspec-adoption, GitHub-hosted variant). Required on qa only: main takes
+# promotions. No `if:` anywhere: a skipped job counts as passing.
+name: OpenSpec required
+
+on:
+  pull_request:
+    branches: [qa]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  required:
+    name: OpenSpec required
+    permissions:
+      contents: read
+      pull-requests: write # the one exemption comment
+      issues: read # who added the no-spec label
+    uses: Frazzled-Productions/.github/.github/workflows/openspec-required.yml@v1
+    with:
+      runs-on: '"ubuntu-latest"'

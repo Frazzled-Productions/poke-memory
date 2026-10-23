@@ -33,7 +33,10 @@ jobs:
           # `code` matches any changed file that isn't in the docs/agents/changelog
           # ignore list. dorny/paths-filter uses picomatch - a `!`-prefixed pattern
           # excludes matches from earlier positive patterns, so `**` followed by
-          # exclusions yields "any file except these".
+          # exclusions yields "any file except these". `openspec/` is the OpenSpec
+          # docs fast path (ops/standards/openspec-adoption): a change folder or the
+          # archive bot's PR is checked by OpenSpec overlap and the archive bot's
+          # own strict validation, not the build.
           filters: |
             code:
               - '**'
@@ -41,6 +44,7 @@ jobs:
               - '!changelog.d/**'
               - '!docs/**'
               - '!.claude/agents/**'
+              - '!openspec/**'
               - 'changelog.d/unreleased/**'
             e2e_relevant:
               - 'app/**'
