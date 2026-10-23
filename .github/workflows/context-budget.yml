@@ -1,0 +1,19 @@
+# "Context budget": every entry in .github/context-budget.txt stays within its number of lines, and a
+# raise says why (ops/standards/openspec-adoption, GitHub-hosted variant). Required on qa only.
+# No `if:` anywhere.
+name: Context budget
+
+on:
+  pull_request:
+    branches: [qa]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  budget:
+    name: Context budget
+    uses: Frazzled-Productions/.github/.github/workflows/context-budget.yml@v1
+    with:
+      runs-on: '"ubuntu-latest"'
