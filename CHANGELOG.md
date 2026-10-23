@@ -6,6 +6,16 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.11.15] - 2026-10-23
+
+### Changed
+
+- Privacy notice: you can now complain to us first at privacy@pokememory.com, and we will acknowledge your complaint within 30 days, before going to the ICO.
+
+### Security
+
+- Server routes and Supabase clients can now use Supabase's new publishable and secret keys, ahead of the legacy keys being removed.
+
 ## [0.11.14] - 2026-09-30
 
 ### Changed
@@ -1907,7 +1917,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.14...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.15...HEAD
+[0.11.15]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.15
 [0.11.14]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.14
 [0.11.13]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.13
 [0.11.12]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.12
