@@ -179,9 +179,19 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 29 September 2026 (#2103)", async () => {
+    it("shows the last updated date as 17 October 2026", async () => {
       await renderPage();
-      expect(screen.getByText(/29 september 2026/i)).toBeTruthy();
+      expect(screen.getByText(/17 october 2026/i)).toBeTruthy();
+    });
+
+    it("offers a complaints route to us before the ICO, with a 30-day acknowledgement", async () => {
+      await renderPage();
+      const section = document.getElementById("section-ico")?.closest("section");
+      expect(section).toBeTruthy();
+      const text = section?.textContent ?? "";
+      expect(text).toMatch(/If you are unhappy with how we use your data, email privacy@pokememory\.com\./);
+      expect(text).toMatch(/We will acknowledge your complaint within 30 days and try to resolve it\./);
+      expect(text.indexOf("privacy@pokememory.com")).toBeLessThan(text.indexOf("ico.org.uk"));
     });
 
     it("lists Sentry as a sub-processor and discloses it applies to guests (#2103)", async () => {

@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 29 September 2026
+          Last updated: 17 October 2026
         </p>
       </header>
 
@@ -759,17 +759,21 @@ export default async function PrivacyPage() {
           </p>
         </section>
 
-        {/* 10. ICO complaint route */}
+        {/* 10. Complaint route: us first, then the ICO */}
         <section aria-labelledby="section-ico">
           <h2
             id="section-ico"
             className="mb-3 text-base font-semibold"
           >
-            10. Right to complain to the ICO
+            10. Right to complain
           </h2>
           <p>
-            If you are in the UK and are unhappy with how we handle your
-            personal data, you have the right to lodge a complaint with the
+            If you are unhappy with how we use your data, email{" "}
+            <a href="mailto:privacy@pokememory.com" className={inlineLink}>
+              privacy@pokememory.com
+            </a>
+            . We will acknowledge your complaint within 30 days and try to
+            resolve it. If you are in the UK, you can also complain to the
             Information Commissioner&rsquo;s Office (ICO):{" "}
             <a
               href="https://ico.org.uk/make-a-complaint"
