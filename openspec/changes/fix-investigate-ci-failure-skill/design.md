@@ -63,7 +63,7 @@ repo).
 - Playwright pin check, run in the worktree with the file moved:
   `node scripts/check-playwright-pin.mjs` printed "OK" before and after the move (exit 0). With the
   tag in the moved file changed to `v1.62.0` it failed with
-  `.claude/skills/investigate-ci-failure/SKILL.md:42 pins playwright:v1.62.0, but package-lock.json locks @playwright/test 1.63.0`
+  `.claude/skills/investigate-ci-failure/SKILL.md:42 pins (image tag v1.62.0), but package-lock.json locks @playwright/test 1.63.0`
   (exit 1), so the check still covers the skill.
 - Discovery, run in this repo with the file moved:
   `claude -p "/investigate-ci-failure" --max-turns 1 --tools ""` (session
