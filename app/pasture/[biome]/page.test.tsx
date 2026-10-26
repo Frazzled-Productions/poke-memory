@@ -7,7 +7,7 @@
 
 import { act } from "@testing-library/react";
 import { renderWithIntl, screen } from "@/components/test-utils/renderWithIntl";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks - declared before the component import.
@@ -168,9 +168,21 @@ vi.mock("@/lib/srs/scheduler", () => ({
 }));
 
 // Stub heavy child component.
-vi.mock("@/components/pasture/PastureZone", () => ({
-  PastureZone: () => <div data-testid="pasture-zone" />,
+const { realZone } = vi.hoisted(() => ({
+  // When true the PastureZone stub renders the real component (#2187).
+  realZone: { value: false },
 }));
+// The real PastureZone's idle animation needs layout APIs jsdom lacks.
+vi.mock("@/components/pasture/useIdleBehaviour", () => ({
+  useIdleBehaviour: () => undefined,
+}));
+vi.mock("@/components/pasture/PastureZone", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/pasture/PastureZone")>();
+  return {
+    PastureZone: (props: Parameters<typeof actual.PastureZone>[0]) =>
+      realZone.value ? <actual.PastureZone {...props} /> : <div data-testid="pasture-zone" />,
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Subject under test
@@ -179,6 +191,11 @@ vi.mock("@/components/pasture/PastureZone", () => ({
 import BiomeLandscapePage from "@/app/pasture/[biome]/page";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { biomeStats } from "@/lib/pasture/stats";
+import { assignAnchors } from "@/lib/pasture/assign";
+import { filterMastered } from "@/lib/pasture/arrivals";
+import { hydrateSession, type ReviewableCard } from "@/lib/review/session";
+import { loadSettings } from "@/lib/settings/persistence";
+import { HABITAT_ZONES } from "@/lib/pasture/zones";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -321,5 +338,50 @@ describe("BiomeLandscapePage", () => {
       // Even with an empty biome the h1 must be present.
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Grassland");
     });
+  });
+});
+
+describe("BiomeLandscapePage - the favourite's spot (#2187)", () => {
+  afterEach(() => {
+    realZone.value = false;
+    HABITAT_ZONES[0].subRegions.length = 0;
+    vi.mocked(assignAnchors).mockImplementation(() => []);
+    vi.mocked(filterMastered).mockImplementation(() => []);
+  });
+
+  it("a mastered favourite renders in its labelled spot", async () => {
+    const zones = await vi.importActual<typeof import("@/lib/pasture/zones")>("@/lib/pasture/zones");
+    const assign = await vi.importActual<typeof import("@/lib/pasture/assign")>("@/lib/pasture/assign");
+    realZone.value = true;
+    mockPokemonLocale = "en";
+    HABITAT_ZONES[0].subRegions.push(...zones.HABITAT_ZONES.find((z) => z.habitat === "grassland")!.subRegions);
+    vi.mocked(assignAnchors).mockImplementation(assign.assignAnchors);
+    vi.mocked(loadSettings).mockReturnValue({
+      ...loadSettings(),
+      favouritePokemonId: 25,
+    } as ReturnType<typeof loadSettings>);
+    const card = {
+      id: 25,
+      cardType: "name",
+      speciesId: 25,
+      displayName: "Pikachu",
+      name: "pikachu",
+      spriteUrl: "/sprites/pokemon/25.png",
+      types: ["electric"],
+      habitat: "grassland",
+      locale: "en",
+      state: { stability: 30, dueDate: "2099-01-01", lastReview: "2026-04-30", firstSeen: "2026-03-01", seenInPasture: true },
+    };
+    mockLoadSession.mockResolvedValue({ cards: [card] });
+    vi.mocked(hydrateSession).mockReturnValue({ cards: [card] as unknown as ReviewableCard[], anyHealed: false });
+    vi.mocked(filterMastered).mockImplementation(() => [card] as unknown as ReturnType<typeof filterMastered>);
+    const params = Promise.resolve({ biome: "grassland" });
+
+    await act(async () => {
+      renderWithIntl(<BiomeLandscapePage params={params} />);
+      await params;
+    });
+
+    expect(await screen.findByRole("img", { name: "Pikachu, your favourite" })).toBeInTheDocument();
   });
 });

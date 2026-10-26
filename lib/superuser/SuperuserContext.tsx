@@ -30,6 +30,7 @@ import {
   isFavouriteEarned,
 } from "@/lib/theme/persistence";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { keepDeviceFavouriteKeys } from "@/lib/settings/lastPushedSnapshot";
 import { saveStreakData } from "@/lib/streak/persistence";
 import { saveGradeLog } from "@/lib/gradelog/persistence";
 import { loadSeed } from "@/lib/pokemon/seed-async";
@@ -141,7 +142,13 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
             // mobileNav) would store an incomplete object and trigger a two-load
             // inconsistency until the next loadSettings() call. Spreading over
             // DEFAULT_SETTINGS ensures the stored blob is always complete.
-            saveSettings({ ...DEFAULT_SETTINGS, ...pulledSettings.settings });
+            // keepDeviceFavouriteKeys (#2187): a cloud row older than the
+            // favourite keys must not wipe them.
+            saveSettings(keepDeviceFavouriteKeys(
+              { ...DEFAULT_SETTINGS, ...pulledSettings.settings },
+              pulledSettings.settings,
+              loadSettings(),
+            ).settings);
           }
           // Regional prefs overlay runs ONLY if the JSONB pull succeeded -
           // otherwise the loadSettings() base is the QA-dirty local snapshot,

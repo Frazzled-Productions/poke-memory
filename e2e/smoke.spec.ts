@@ -1084,9 +1084,11 @@ test.describe("Settings page", () => {
     // Expand the Appearance section - App Theme lives inside it.
     await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
-    // App Theme heading and Charizard card should be visible.
+    // App Theme heading and the theme search's Charizard row should be visible
+    // (#2187: Charizard also appears in the favourite search above it).
     await expect(page.getByRole("heading", { name: "App Theme" })).toBeVisible();
-    await expect(page.getByText("Charizard")).toBeVisible();
+    const setCharizard = page.getByRole("button", { name: "Use Charizard as your app theme" });
+    await expect(setCharizard).toBeVisible();
 
     // Record nav header background before selecting theme
     const navHeader = page.locator("header").first();
@@ -1095,7 +1097,7 @@ test.describe("Settings page", () => {
     );
 
     // Select Charizard as the app theme
-    await page.getByRole("button", { name: "Set as theme" }).click();
+    await setCharizard.click();
 
     // Nav header background should have changed to Charizard's primary colour.
     // Poll until React re-renders and applyTheme writes the new CSS variable.
@@ -1106,8 +1108,8 @@ test.describe("Settings page", () => {
       expect(bgAfter).not.toBe(bgBefore);
     }).toPass({ timeout: 5000 });
 
-    // "Selected ✓" indicator and Remove button should appear
-    await expect(page.getByText("Selected ✓")).toBeVisible();
+    // The current theme and its Remove button should appear
+    await expect(page.getByText("Current theme: Charizard")).toBeVisible();
     await expect(page.getByRole("button", { name: "Remove" })).toBeVisible();
   });
 });

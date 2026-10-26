@@ -67,22 +67,22 @@ Open the live demo in Safari, tap **Share → Add to Home Screen**. Tapping the 
 ## Features
 
 ### Practice
-The daily review loop. Live **Again / Hard / Good / Easy** tally for the current session, with a streak badge that ticks up each day you review. Misclick on a grade? Hit **Undo** (or ⌘/Ctrl+Z) to roll the most recent grade back. Optional **Scope** control narrows the session to specific generations, types, or preset groups (Starters, Legendaries). **Audio mode** keeps the screen awake and plays the cry on every reveal. When the day is done, a **Share today** button generates a Wordle-style summary you can paste anywhere.
+The daily review loop. Live **Again / Hard / Good / Easy** tally for the current session, with a streak badge that ticks up each day you review. Misclick on a grade? Hit **Undo** (or ⌘/Ctrl+Z) to roll the most recent grade back. Optional **Scope** control narrows the session to specific generations, types, or preset groups (Starters, Legendaries, and your hearted Favourites). **Audio mode** keeps the screen awake and plays the cry on every reveal. When the day is done, a **Share today** button generates a Wordle-style summary you can paste anywhere, and your favourite Pokémon waits beside the Pokémon of the day (tap it to hear its cry).
 
 ### Stats
 The analytical dashboard: a 30-day **accuracy sparkline** with a 7-day rolling headline, all-time grade breakdown, grade distribution and weekly trend, retention-vs-target indicator, per-direction accuracy breakdown, difficulty histogram, a GitHub-style **365-day review heatmap**, daily activity chart, mastery-over-time chart, a 14-day **due-forecast bar chart**, and a struggling-card list.
 
 ### Journey
-The celebratory home: trainer-card hero strip (level + generation badges), gym badge gallery, current streak, a four-cell **Records** card (longest streak, best review day, avg days to mastery, most-mastered week), mastery distribution rings, species-introduced ring, and mastered-by-type and per-generation breakdowns (each gen row deep-links into the Pokédex).
+The celebratory home: trainer-card hero strip (your partner Pokémon, level + generation badges), gym badge gallery, current streak, a four-cell **Records** card (longest streak, best review day, avg days to mastery, most-mastered week), mastery distribution rings, species-introduced ring, and mastered-by-type and per-generation breakdowns (each gen row deep-links into the Pokédex).
 
 ### Pokédex
-1025-cell grid with progressive disclosure - unlearned Pokémon appear as silhouettes, reviewed Pokémon greyscale, mastered ones in full colour. Tap any cell to open a detail page that reveals more as you progress: types and flavour text unlock when you start learning; base stats, facts, and the evolution chain unlock once mastered.
+1025-cell grid with progressive disclosure - unlearned Pokémon appear as silhouettes, reviewed Pokémon greyscale, mastered ones in full colour. Tap any cell to open a detail page that reveals more as you progress: types and flavour text unlock when you start learning; base stats, facts, and the evolution chain unlock once mastered. Any Pokémon, even a silhouette, can be made your **favourite** (your partner across the app) or given a **heart** to build a shortlist.
 
 ### Pasture
-A nav link that unlocks the moment you master your first Pokémon. Mastered Pokémon are placed into habitat-themed zones (grasslands, forest, mountain, open sea, cave, urban, and more), with newly arrived ones drawing a sparkle until you've seen them once. A miniature collection wall that grows as your mastery does.
+A nav link that unlocks the moment you master your first Pokémon. Mastered Pokémon are placed into habitat-themed zones (grasslands, forest, mountain, open sea, cave, urban, and more), with newly arrived ones drawing a sparkle until you've seen them once. A miniature collection wall that grows as your mastery does. Once mastered, your favourite gets its own highlighted spot.
 
 ### Settings
-Mastery threshold, new/review caps per direction, reverse-card and cry-card toggles, and an **FSRS recall-target slider** (80% – 97%) that trades off review frequency against retention.
+Your favourite Pokémon (search all 1025), an app colour theme from any Pokémon you have mastered, mastery threshold, new/review caps per direction, reverse-card and cry-card toggles, and an **FSRS recall-target slider** (80% – 97%) that trades off review frequency against retention.
 
 ### Under the hood
 

@@ -107,12 +107,15 @@
       "theme": {
         "heading": "应用主题",
         "description": "掌握一只 Pokémon 后，可将其解锁为应用配色主题。",
-        "selected": "已选择",
         "setAsTheme": "设为主题",
         "remove": "移除",
         "lockedHeading": "应用主题",
         "lockedBody": "掌握第一只宝可梦后即可解锁主题。",
-        "practiceLink": "前往练习"
+        "practiceLink": "前往练习",
+        "searchLabel": "搜索已掌握的宝可梦",
+        "matchFavourite": "用我最爱的配色",
+        "current": "当前主题：{name}",
+        "setAsThemeAria": "把{name}设为应用主题"
       },
       "intensityPicker": {
         "heading": "主题强度",
@@ -122,6 +125,16 @@
         "tintedDescription": "主题色以淡淡的色调覆盖页面背景。",
         "fullLabel": "完整主题",
         "fullDescription": "主题色覆盖所有背景，个性鲜明。"
+      },
+      "favourite": {
+        "heading": "最爱的宝可梦",
+        "description": "你的最爱会作为伙伴出现在旅程、牧场和完成页面中。任何宝可梦都可以成为你的最爱。",
+        "current": "你的最爱：{name}",
+        "none": "还没有选择最爱。",
+        "searchLabel": "搜索全部宝可梦",
+        "searchPlaceholder": "输入名字",
+        "clear": "取消最爱",
+        "noResults": "没有与该名字匹配的宝可梦。"
       }
     },
     "practice": {
@@ -573,7 +586,8 @@
       "formCategoryPrimal": "原始回归",
       "noAlternateForms": "当前种子中没有异形态。",
       "matchCount": "{total} 只中有 {match} 只匹配",
-      "hiddenCardsPaused": "隐藏的卡片已暂停：它们的复习日期会向后推移，因此删除范围不会让过期卡片涌入队列。"
+      "hiddenCardsPaused": "隐藏的卡片已暂停：它们的复习日期会向后推移，因此删除范围不会让过期卡片涌入队列。",
+      "presetFavourites": "最爱"
     },
     "direction": {
       "name": "这是哪只 Pokémon？",
@@ -723,7 +737,8 @@
     "generationPokemonAriaLabel": "{name}的宝可梦",
     "firstReviewed": "首次学习: {date}",
     "mastered": "已掌握",
-    "masteredAround": "约 {date} 掌握"
+    "masteredAround": "约 {date} 掌握",
+    "heartedBadge": "已点亮爱心"
   },
   "pasture": {
     "title": "牧场",
@@ -1266,5 +1281,31 @@
   "pushStreak": {
     "title": "继续保持连胜",
     "body": "{days, plural, other {你已经连续练习了#天。今天再练一会儿，就能继续保持。}}"
+  },
+  "favourite": {
+    "makeFavourite": "设为最爱",
+    "isFavourite": "你的最爱",
+    "makeFavouriteAria": "把{name}设为你的最爱",
+    "heartAria": "给{name}点亮爱心",
+    "heartFavouriteAria": "{name}是你的最爱，爱心会一直保留",
+    "learnFirst": {
+      "question": "接下来学习{name}的进化链吗？",
+      "body": "在每日新卡片上限内，这些宝可梦会成为你接下来的新卡片。",
+      "yes": "好的",
+      "no": "不用了"
+    },
+    "partner": {
+      "heading": "你的伙伴",
+      "playCry": "播放{name}的叫声",
+      "chooseFavourite": "选择你的最爱",
+      "chooseFavouriteBody": "在图鉴中挑选任意一只宝可梦作为你的伙伴。"
+    },
+    "themeOffer": {
+      "question": "切换为{name}的配色吗？",
+      "body": "你已掌握{name}，可以把它的配色用作应用主题。",
+      "yes": "切换配色",
+      "no": "保留当前配色"
+    },
+    "pastureSpotAria": "{name}，你的最爱"
   }
 }
