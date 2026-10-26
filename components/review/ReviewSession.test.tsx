@@ -228,8 +228,12 @@ vi.mock("@/lib/gradelog/persistence", async (importOriginal) => {
   };
 });
 
-// The partner (#2187) has its own tests; here there is no favourite.
-vi.mock("@/components/favourite/usePartner", () => ({ usePartner: () => null }));
+// The partner (#2187) has its own tests; here there is no favourite unless a
+// test sets one.
+const { mockPartner } = vi.hoisted(() => ({
+  mockPartner: { value: null as { speciesId: number; mastered: boolean } | null },
+}));
+vi.mock("@/components/favourite/usePartner", () => ({ usePartner: () => mockPartner.value }));
 
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: () => mockLoadSettings(),
@@ -5544,6 +5548,44 @@ describe("ReviewSession Phase 2 - multi-locale crown-jewel invariant (#1562)", (
     }, { timeout: 3000 });
     // Must NOT include a language endonym for single-locale users.
     expect(screen.queryByText(/all caught up in/i)).not.toBeInTheDocument();
+  });
+
+  it("all-caught-up screen shows the partner and the once-only colours offer (#2187)", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const masteredState = {
+      fsrsState: "review" as const,
+      stability: 10, difficulty: 5, elapsedDays: 25, scheduledDays: 25, reps: 3,
+      dueDate: "2099-01-01", lastReview: today, firstSeen: "2025-01-01",
+      lapses: 0, learningStep: null, stepStartedAt: null, hiddenSince: null, seenInPasture: false,
+    };
+    const enName: NameReviewCard = { ...enCard, state: masteredState };
+    const enReverse = { ...enCard, id: 2_000_001, locale: "en" as const, cardType: "reverse" as const, pokemonId: 1, subjectKey: "1", state: masteredState };
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      cards: [enName, enReverse as any],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "en",
+      learningLocales: ["en"],
+      favouritePokemonId: 1,
+      favouriteTheme: null,
+      favouriteThemeOfferedForId: null,
+    });
+    mockPartner.value = { speciesId: 1, mastered: true };
+
+    try {
+      renderWithIntl(<ReviewSession />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/all caught up!/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
+      expect(screen.getByText("Your partner")).toBeInTheDocument();
+      expect(await screen.findByRole("group", { name: "Switch to Bulbasaur's colours?" })).toBeInTheDocument();
+    } finally {
+      mockPartner.value = null;
+    }
   });
 });
 
