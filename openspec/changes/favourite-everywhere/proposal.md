@@ -169,3 +169,5 @@ All from Fraser on 2026-10-26 (grilling recorded on #2187):
 - 2026-10-26 Q: Reset progress and the favourite? A: Keep the favourite and hearts; clear the theme, learn-first list and offer marker.
 - 2026-10-26 Q: Favourite mastered with no theme set? A: Still ask once; never recolour without a yes.
 - 2026-10-26 Q: Learn-first against a narrow scope? A: Respect the scope; priority cards wait until it includes them.
+- 2026-10-26 Q: Only 261 of 1025 extracted palettes passed contrast; what now? A: Smarter extraction first (up to 3 hues, bounded lightness steps), type palette as the last resort.
+- 2026-10-26 Q: Curated palettes fail the new checks; exempt them? A: Yes, exempt and unchanged.

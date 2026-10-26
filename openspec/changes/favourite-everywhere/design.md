@@ -27,11 +27,12 @@ whole. `favouriteThemeOfferedForId` is a scalar (the last species offered).
 Next.js transitive dependency `seed:sprites` already uses, not added to `package.json`), drops
 transparent and near-white or near-black pixels, buckets the rest into a coarse colour histogram and
 takes the most common hue as `primary`, the next distinct hue as `accent`, a lighter tint of `primary`
-as `secondary`, and black or white for `fgOnPrimary`, whichever contrasts more. A palette that fails
-either check uses the species' primary-type palette from `lib/theme/type-palettes.ts`. Output:
+as `secondary`, and black or white for `fgOnPrimary`, whichever contrasts more. If that fails, it tries
+the next two distinct hues as `primary`, and for each of the three hues steps HSL lightness by up to
+15 points either way (hue and saturation kept). Only when every candidate fails does the species use the species' primary-type palette from `lib/theme/type-palettes.ts`. Output:
 `lib/theme/generated-palettes.json` (about 1025 × 4 hex strings, roughly 40 KB uncompressed),
 imported only by `lib/theme/palette.ts` (`paletteFor(id)`), which applies curated, then generated,
-then type. Light and dark page backgrounds for the check come from `app/globals.css`.
+then type. Curated palettes are exempt from the checks (Fraser, 2026-10-26). Light and dark page backgrounds for the check come from `app/globals.css`.
 
 ### Preset ids live in one list
 
