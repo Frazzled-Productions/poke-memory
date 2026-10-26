@@ -8,6 +8,8 @@ import type { ReviewableCard } from "@/lib/review/session";
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-constants";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
+import { loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { setFavouritePokemon } from "@/lib/favourite/favourite";
 
 function makeMockStorage() {
   const store: Record<string, string> = {};
@@ -411,5 +413,47 @@ describe("Pasture / Stats / theme-picker mastery contract (#1865 AC4)", () => {
 
     const themeIds = masteredSpeciesUnion(cards, true, ["en"]);
     expect(themeIds.has(SPECIES_A)).toBe(true);
+  });
+});
+
+describe("carry-over of an existing theme to the favourite (#2187)", () => {
+  let storage: ReturnType<typeof makeMockStorage>;
+  const UMBREON = CURATED_POKEMON.find((p) => p.id === 197)!;
+  const UMBREON_THEME = {
+    id: UMBREON.id,
+    name: UMBREON.name,
+    colors: UMBREON.colors,
+    spriteUrl: "/sprites/pokemon/197.png",
+  };
+
+  beforeEach(() => {
+    storage = makeMockStorage();
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
+    vi.stubGlobal("localStorage", storage);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("Upgrade: a player with Umbreon as their theme gets Umbreon as favourite and hearted, palette unchanged", () => {
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ favouriteTheme: UMBREON_THEME, heartedSpeciesIds: [25] }));
+    const settings = loadSettings();
+    expect(settings.favouritePokemonId).toBe(197);
+    expect(settings.heartedSpeciesIds).toEqual([197, 25]);
+    expect(loadFavourite()).toEqual(UMBREON_THEME);
+  });
+
+  it("Cleared favourite is not refilled: a stored null favourite stays null on the next load", () => {
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ favouriteTheme: UMBREON_THEME }));
+    saveSettings(setFavouritePokemon(loadSettings(), null));
+    expect(loadSettings().favouritePokemonId).toBeNull();
+    expect(JSON.parse(storage.getItem(SETTINGS_KEY)!).favouritePokemonId).toBeNull();
+  });
+
+  it("does not carry over a theme that fails validation", () => {
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ favouriteTheme: { ...UMBREON_THEME, id: 999999 } }));
+    expect(loadSettings().favouritePokemonId).toBeNull();
+    expect(loadSettings().heartedSpeciesIds).toEqual([]);
   });
 });

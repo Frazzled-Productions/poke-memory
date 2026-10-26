@@ -184,6 +184,10 @@ describe('loadSettings migration', () => {
       dismissedMtBannerLocales: ['ja', 'zh-Hans'],
       removedLocales: ['zh-Hant' as const],
       streakNudgeEnabled: true,
+      favouritePokemonId: 94,
+      heartedSpeciesIds: [94, 25],
+      priorityNewSpeciesIds: [92, 93],
+      favouriteThemeOfferedForId: 94,
     };
     saveSettings(custom);
     const loaded = loadSettings();
@@ -1338,5 +1342,54 @@ describe('hasStoredSettings', () => {
     // Restore the shared mock for subsequent tests in this file.
     vi.stubGlobal('window', { localStorage: mockLocalStorage, dispatchEvent: vi.fn() });
     vi.stubGlobal('localStorage', mockLocalStorage);
+  });
+});
+
+describe('favourite, hearts and learn-first keys (#2187)', () => {
+  it('defaults to no favourite, no hearts, no priority species and no offer', () => {
+    const settings = loadSettings();
+    expect(settings.favouritePokemonId).toBeNull();
+    expect(settings.heartedSpeciesIds).toEqual([]);
+    expect(settings.priorityNewSpeciesIds).toEqual([]);
+    expect(settings.favouriteThemeOfferedForId).toBeNull();
+  });
+
+  it('round-trips valid values through save and load', () => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      favouritePokemonId: 94,
+      heartedSpeciesIds: [94, 143, 25],
+      priorityNewSpeciesIds: [92, 93, 94],
+      favouriteThemeOfferedForId: 94,
+    });
+    const settings = loadSettings();
+    expect(settings.favouritePokemonId).toBe(94);
+    expect(settings.heartedSpeciesIds).toEqual([94, 143, 25]);
+    expect(settings.priorityNewSpeciesIds).toEqual([92, 93, 94]);
+    expect(settings.favouriteThemeOfferedForId).toBe(94);
+  });
+
+  it('drops ids that are not species in the seed and removes repeats, keeping first order', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({
+      favouritePokemonId: 999999,
+      heartedSpeciesIds: [25, 'x', 0, 25, 1.5, 10100, 1025, 143],
+      priorityNewSpeciesIds: [93, 93, -1, 92],
+      favouriteThemeOfferedForId: 1026,
+    }));
+    const settings = loadSettings();
+    expect(settings.favouritePokemonId).toBeNull();
+    expect(settings.heartedSpeciesIds).toEqual([25, 1025, 143]);
+    expect(settings.priorityNewSpeciesIds).toEqual([93, 92]);
+    expect(settings.favouriteThemeOfferedForId).toBeNull();
+  });
+
+  it('treats a non-array list as empty', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({
+      heartedSpeciesIds: { 0: 25 },
+      priorityNewSpeciesIds: '92',
+    }));
+    const settings = loadSettings();
+    expect(settings.heartedSpeciesIds).toEqual([]);
+    expect(settings.priorityNewSpeciesIds).toEqual([]);
   });
 });

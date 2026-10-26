@@ -24,6 +24,8 @@ import {
 } from "@/lib/labs/flags";
 import { DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
 import type { TypedEntryStrictness } from "@/lib/srs/typedEntryGradeLocale";
+import { parseSpeciesId, parseSpeciesIdList } from "@/lib/favourite/favourite";
+import { validateRawFavourite } from "@/lib/theme/stored-theme";
 
 // localStorage key for all user-configurable settings
 export const STORAGE_KEY = KEY_SETTINGS;
@@ -546,6 +548,29 @@ export type UserSettings = {
    * pre-#1950 records - the bool parser back-fills to false on read.
    */
   streakNudgeEnabled: boolean;
+  /**
+   * The player's favourite Pokémon (#2187): a species id, or null. Separate
+   * from `favouriteTheme` (the colours on screen). Any species can be the
+   * favourite, mastered or not.
+   */
+  favouritePokemonId: number | null;
+  /**
+   * Hearted species ids, newest first, no repeats (#2187). The favourite is
+   * always hearted. An array, not an object, so removing a heart reaches the
+   * cloud through `merge_user_settings` (the deep merge replaces arrays whole).
+   */
+  heartedSpeciesIds: number[];
+  /**
+   * Species to introduce first as new cards, in order (#2187, "learn your
+   * favourite's evolution line next"). A species leaves the list once all its
+   * enabled-direction cards in the active locale have been introduced.
+   */
+  priorityNewSpeciesIds: number[];
+  /**
+   * The last favourite species the "Switch to its colours?" offer was shown
+   * for (#2187), so the offer is made once per favourite. Null = never offered.
+   */
+  favouriteThemeOfferedForId: number | null;
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -612,6 +637,10 @@ export const DEFAULT_SETTINGS: UserSettings = {
   removedLocales: [],
   // Default false: opt-in, not inherited from push-subscription presence (#1950).
   streakNudgeEnabled: false,
+  favouritePokemonId: null,
+  heartedSpeciesIds: [],
+  priorityNewSpeciesIds: [],
+  favouriteThemeOfferedForId: null,
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -764,6 +793,19 @@ function parseStoredSettings(raw: string | null): UserSettings {
     legacyPokemonLocale,
     learningLocales,
   );
+  // Favourite carry-over (#2187): a blob that has never held
+  // `favouritePokemonId` (written before the key existed) takes its valid
+  // theme's species as the favourite, hearted. Once any save writes the key
+  // (null included) this never fires again, so a cleared favourite stays
+  // cleared. The theme itself is left exactly as stored.
+  const carriedTheme = "favouritePokemonId" in obj ? null : validateRawFavourite(obj.favouriteTheme);
+  const storedHearts = parseSpeciesIdList(obj.heartedSpeciesIds);
+  const favouritePokemonId = carriedTheme !== null
+    ? parseSpeciesId(carriedTheme.id)
+    : parseSpeciesId(obj.favouritePokemonId);
+  const heartedSpeciesIds = carriedTheme !== null && favouritePokemonId !== null
+    ? [favouritePokemonId, ...storedHearts.filter((id) => id !== favouritePokemonId)]
+    : storedHearts;
   return {
     masteryRepetitions:        num(obj, "masteryRepetitions"),
     maxNewPerDay:              num(obj, "maxNewPerDay"),
@@ -891,6 +933,11 @@ function parseStoredSettings(raw: string | null): UserSettings {
     onboardingResetAt: typeof obj.onboardingResetAt === 'string' ? obj.onboardingResetAt : undefined,
     // Default false: absent in pre-#1950 records (#1950).
     streakNudgeEnabled: bool(obj, "streakNudgeEnabled"),
+    // #2187: species ids from the seed only; lists drop repeats and bad entries.
+    favouritePokemonId,
+    heartedSpeciesIds,
+    priorityNewSpeciesIds: parseSpeciesIdList(obj.priorityNewSpeciesIds),
+    favouriteThemeOfferedForId: parseSpeciesId(obj.favouriteThemeOfferedForId),
   };
 }
 

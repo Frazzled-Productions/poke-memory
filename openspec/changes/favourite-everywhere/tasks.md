@@ -1,8 +1,8 @@
 ## 1. Settings and carry-over
 
-- [ ] 1.1 Add `favouritePokemonId`, `heartedSpeciesIds`, `priorityNewSpeciesIds` and `favouriteThemeOfferedForId` to `UserSettings`, defaults and `parseStoredSettings` (arrays of valid seed ids, no repeats). Verify: `lib/settings/persistence.test.ts` new cases, written failing first.
-- [ ] 1.2 One-time carry-over of an existing theme to the favourite (and heart), never refilling a cleared favourite. Verify: `lib/theme/persistence.test.ts` "Upgrade" and "Cleared favourite is not refilled".
-- [ ] 1.3 Favourite always hearted; heart toggle cannot remove the favourite. Verify: unit test on the hearts helpers.
+- [x] 1.1 Add `favouritePokemonId`, `heartedSpeciesIds`, `priorityNewSpeciesIds` and `favouriteThemeOfferedForId` to `UserSettings`, defaults and `parseStoredSettings` (arrays of valid seed ids, no repeats). Verify: `lib/settings/persistence.test.ts` new cases, written failing first. Verified: "favourite, hearts and learn-first keys (#2187)" (4 cases, red then green) and `lib/pokemon/seed.test.ts` "MAX_SPECIES_ID (#2187)".
+- [x] 1.2 One-time carry-over of an existing theme to the favourite (and heart), never refilling a cleared favourite. Verify: `lib/theme/persistence.test.ts` "Upgrade" and "Cleared favourite is not refilled". Verified: both pass, plus "does not carry over a theme that fails validation" (Upgrade red then green).
+- [x] 1.3 Favourite always hearted; heart toggle cannot remove the favourite. Verify: unit test on the hearts helpers. Verified: `lib/favourite/favourite.test.ts` (9 cases, "The favourite's heart" red without the guard).
 
 ## 2. Palettes
 
