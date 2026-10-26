@@ -71,8 +71,10 @@ const FAVOURITE_KEYS = [
  * For each favourite key the pulled `cloud` blob lacks, keeps the device's
  * pre-pull value in `merged`. When neither side has a favourite, the key is
  * left out so loadSettings' carry-over takes the favourite from the theme.
- * `lastPushed` also leaves out every key the cloud lacks, so the next diff
- * pushes the device's values up.
+ * `lastPushed` is `merged` as pulled, so a key the cloud lacks holds its
+ * default there: the next diff pushes the device's non-default values up and
+ * never pushes a default (an explicit [] or null in the cloud would then win
+ * over another device's unsynced values).
  */
 export function keepDeviceFavouriteKeys(
   merged: UserSettings,
@@ -80,16 +82,14 @@ export function keepDeviceFavouriteKeys(
   local: UserSettings,
 ): { settings: UserSettings; lastPushed: UserSettings } {
   const settings: Record<string, unknown> = { ...merged };
-  const lastPushed: Record<string, unknown> = { ...merged };
   for (const key of FAVOURITE_KEYS) {
     if (key in cloud) continue;
     settings[key] = local[key];
-    delete lastPushed[key];
   }
   if (!("favouritePokemonId" in cloud) && local.favouritePokemonId === null) {
     delete settings.favouritePokemonId;
   }
-  return { settings: settings as UserSettings, lastPushed: lastPushed as UserSettings };
+  return { settings: settings as UserSettings, lastPushed: merged };
 }
 
 /**

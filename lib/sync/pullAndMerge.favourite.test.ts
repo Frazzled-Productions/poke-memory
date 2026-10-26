@@ -106,6 +106,26 @@ describe("pullAndMerge: favourite keys absent from the cloud (#2187)", () => {
     const patch = diffSettings(loadLastPushedSettings(), settings);
     expect(patch.favouritePokemonId).toBe(25);
     expect(patch.heartedSpeciesIds).toEqual([25]);
+    // Keys still at their defaults are not pushed: an explicit [] or null in
+    // the cloud would make the cloud win over another device's unsynced values.
+    expect(patch).not.toHaveProperty("priorityNewSpeciesIds");
+    expect(patch).not.toHaveProperty("favouriteThemeOfferedForId");
+    expect(patch).not.toHaveProperty("learnFirstAskedSpeciesIds");
+  });
+
+  it("pushes none of the favourite keys when the device holds only defaults and the cloud has no theme", async () => {
+    vi.mocked(pullUserSettingsRow).mockResolvedValue({
+      settings: { masteryRepetitions: 3 } as never,
+      updatedAt: "2026-10-01T00:00:00.000Z",
+      lastResetAt: null,
+    });
+
+    await pullAndMerge(client, "user-1");
+
+    const patch = diffSettings(loadLastPushedSettings(), loadSettings());
+    for (const key of ["favouritePokemonId", "heartedSpeciesIds", "priorityNewSpeciesIds", "favouriteThemeOfferedForId", "learnFirstAskedSpeciesIds"]) {
+      expect(patch).not.toHaveProperty(key);
+    }
   });
 
   it("keeps the device's favourite keys when the cloud lacks them, and pushes them up", async () => {
