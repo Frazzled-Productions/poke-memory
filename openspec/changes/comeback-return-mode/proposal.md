@@ -146,3 +146,5 @@ All from Fraser on 2026-10-26 (grilling recorded on #2191):
 - 2026-10-26 Q: Lapse again mid-ramp? A: Restart the ramp.
 - 2026-10-26 Q: Comeback or finder next? A: Comeback first.
 - 2026-10-26 Q: Shared understanding? A: Yes; write the proposal now.
+- 2026-10-26 Q: Backlog total on Stats in return mode? A: Shown nowhere (Stats has no raw total today).
+- 2026-10-26 Q: Approve the proposal? A: Yes; push and open a draft PR, build after #2189 merges.
