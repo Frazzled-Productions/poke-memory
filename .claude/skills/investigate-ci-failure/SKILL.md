@@ -1,7 +1,7 @@
 ---
 name: investigate-ci-failure
 description: Root-cause CI failure investigation protocol. Use when a fix-round of CI failures fails to converge - replaces the reflex to dispatch a second sweep agent with a structured triage + evidence-gathering pass.
-allowed-tools: [Bash, Read, Edit, Grep, Glob, Agent, TaskCreate, TaskUpdate, TaskList]
+allowed-tools: [Bash(gh *), Bash(git *), Bash(npx playwright *), Bash(npm run *), Read, Grep, Glob]
 ---
 
 # Investigate CI Failure
