@@ -1387,6 +1387,50 @@ describe("Practice scope (#333)", () => {
     expect(screen.getByRole("button", { name: /clear scope/i })).toBeInTheDocument();
   });
 
+  it("Practise your hearts: a Favourites scope keeps a hearted species (#2187)", async () => {
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 100,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: ["favourites"] },
+      heartedSpeciesIds: [1],
+      earnedBadges: [],
+    });
+    renderWithIntl(<ReviewSession />);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/no Pok[ée]mon match your scope/i)).not.toBeInTheDocument();
+  });
+
+  it("Un-heart everything: a Favourites scope with no hearts shows the no-match state (#2187)", async () => {
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 100,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: ["favourites"] },
+      heartedSpeciesIds: [],
+      earnedBadges: [],
+    });
+    renderWithIntl(<ReviewSession />);
+    await waitFor(() => {
+      expect(screen.getByText(/no Pok[ée]mon match your scope/i)).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: /clear scope/i })).toBeInTheDocument();
+  });
+
   it("persists hiddenSince via saveSession when a graduated card is out of scope", async () => {
     // Graduated card (firstSeen + lastReview set, learningStep null). The
     // active scope excludes its species → reconcileHiddenState stamps

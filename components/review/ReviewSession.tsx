@@ -826,6 +826,8 @@ export function ReviewSession() {
   // Read from settings at load; every buildSessionQueues call passes it, and
   // handleGrade drops a species once it is fully introduced.
   const [priorityNewSpeciesIds, setPriorityNewSpeciesIds] = useState<readonly number[]>([]);
+  // Hearted species for the Favourites scope preset (#2187), read at mount.
+  const [heartedSpeciesIds, setHeartedSpeciesIds] = useState<ReadonlySet<number>>(new Set());
   // Verified typed-entry mode (#1251). Read into state on session load via the
   // session-load effect. Same-tab toggles take effect on the next session via the
   // storage event; the in-flight card always uses the value captured at load time.
@@ -983,7 +985,7 @@ export function ReviewSession() {
       // of whether reconcile modified any card state. Pass the current
       // incompleteChains context so the "Incomplete evolution chains" scope
       // correctly identifies in-scope species during snooze reconciliation.
-      reconcileHiddenState(cards, next, today, { incompleteChainSpeciesIds: incompleteChains, masteryBlockingSpeciesIds });
+      reconcileHiddenState(cards, next, today, { incompleteChainSpeciesIds: incompleteChains, masteryBlockingSpeciesIds, heartedSpeciesIds });
       // `alternateFormsEnabled` and the card-type flags are captured from
       // component state set at mount. The Settings page triggers a full page
       // reload when toggling card-type gates, so the state is always current.
@@ -999,7 +1001,7 @@ export function ReviewSession() {
           alternateFormsEnabled,
           practiceScope: next,
         },
-        { incompleteChainSpeciesIds: incompleteChains, masteryBlockingSpeciesIds },
+        { incompleteChainSpeciesIds: incompleteChains, masteryBlockingSpeciesIds, heartedSpeciesIds },
       );
       setEligibleCardIds(eligibleIds);
       // Clear the displayed-card render lock (#1088). The lock pins the
@@ -1217,9 +1219,10 @@ export function ReviewSession() {
         ? getSeenPokemon(cards, seedPokemon, alternateFormsEnabled, scope, {
             incompleteChainSpeciesIds: incompleteChains,
             masteryBlockingSpeciesIds,
+            heartedSpeciesIds,
           })
         : [],
-    [cards, alternateFormsEnabled, scope, incompleteChains, masteryBlockingSpeciesIds],
+    [cards, alternateFormsEnabled, scope, incompleteChains, masteryBlockingSpeciesIds, heartedSpeciesIds],
   );
 
   // Higher-or-Lower signpost nudge (#1573): one-shot hint teasing the
@@ -1372,6 +1375,7 @@ export function ReviewSession() {
           superuserFlags.pretendAllMastered,
         ),
         masteryBlockingSpeciesIds: loadMasteryBlockingSpeciesIds,
+        heartedSpeciesIds: new Set(settings.heartedSpeciesIds ?? []),
       };
       const { changed: reconcileChanged } = reconcileHiddenState(sessionCards, persistedScope, today, loadScopeContext);
       const eligibleIds = computeEligibleCardIds(
@@ -1418,6 +1422,7 @@ export function ReviewSession() {
       setActiveLocale(sessionLocale);
       setLearningLocales(sessionLearningLocales);
       setPriorityNewSpeciesIds(settings.priorityNewSpeciesIds ?? []);
+      setHeartedSpeciesIds(new Set(settings.heartedSpeciesIds ?? []));
       setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
       setTypedEntryStrictness(settings.typedEntryStrictness ?? "lenient");
       setMcCardOnboardingShown(settings.mcCardOnboardingShown ?? false);
@@ -2341,6 +2346,7 @@ export function ReviewSession() {
                 alternateFormsEnabled={alternateFormsEnabled}
                 incompleteChainSpeciesIds={incompleteChains}
                 masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+                heartedSpeciesIds={heartedSpeciesIds}
               />
             </div>
           )}
@@ -3150,6 +3156,7 @@ export function ReviewSession() {
                 alternateFormsEnabled={alternateFormsEnabled}
                 incompleteChainSpeciesIds={incompleteChains}
                 masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+                heartedSpeciesIds={heartedSpeciesIds}
               />
             </div>
           </>
@@ -3279,6 +3286,7 @@ export function ReviewSession() {
               alternateFormsEnabled={alternateFormsEnabled}
               incompleteChainSpeciesIds={incompleteChains}
               masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+                heartedSpeciesIds={heartedSpeciesIds}
             />
           </>
         }
@@ -3393,6 +3401,7 @@ export function ReviewSession() {
             alternateFormsEnabled={alternateFormsEnabled}
             incompleteChainSpeciesIds={incompleteChains}
             masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+                heartedSpeciesIds={heartedSpeciesIds}
           />
         </>
       }
