@@ -55,8 +55,8 @@ app. Change 2 (the favourite finder: knockout bracket and daily duels) follows i
   `practice-scope`). Review grading and FSRS are unchanged.
 - **Pokédex:** detail page gains "Make favourite" and heart buttons; the grid shows a heart badge on
   hearted species. Silhouette and disclosure rules for everything else are unchanged.
-- **Pasture:** a mastered favourite gets a highlighted spot (`lib/pasture/assign.ts`); every other
-  placement is unchanged.
+- **Pasture:** a mastered favourite gets a highlighted spot (`lib/pasture/assign.ts`); the other
+  placements in the favourite's zone shift by one slot, and other zones are unchanged.
 - **Stats:** `components/stats/TrainerCard.tsx` (rendered on Journey) shows the partner. Stats charts
   are unchanged.
 - **Journey:** the trainer card hero shows the partner, or a "Choose your favourite" link to the
@@ -64,16 +64,18 @@ app. Change 2 (the favourite finder: knockout bracket and daily duels) follows i
 - **Settings:** the 11-species grid is replaced by two searches (favourite: all 1025; theme: your
   mastered species plus "Match my favourite"). Intensity is unchanged.
 - **What's new:** one entry pointing at the Pokédex "Make favourite" button.
-- **Guest mode (localStorage):** the three new keys live in `poke-memory:settings:v1` like every other
-  setting.
-- **Cloud sync and Supabase migrations (both projects):** no migration. The three new top-level keys
-  ride the existing `merge_user_settings` deep merge. Proven safe for older versions (see the safety
+- **Guest mode (localStorage):** the five new keys (`favouritePokemonId`, `heartedSpeciesIds`,
+  `priorityNewSpeciesIds`, `favouriteThemeOfferedForId`, `learnFirstAskedSpeciesIds`) live in
+  `poke-memory:settings:v1` like every other setting.
+- **Cloud sync and Supabase migrations (both projects):** no migration. The five new top-level keys
+  (`favouritePokemonId`, `heartedSpeciesIds`, `priorityNewSpeciesIds`, `favouriteThemeOfferedForId`,
+  `learnFirstAskedSpeciesIds`) ride the existing `merge_user_settings` deep merge. Proven safe for older versions (see the safety
   fact below). `user_settings_reject_regression_trigger` (migration 038) does not guard these keys, so
   removing a heart is allowed.
 - **Superuser mode and QA-seed scenarios:** `pretendAllMastered` counts the favourite as mastered
   (full sprite, theme unlocked, Pasture spot). Exit cleanup keeps clearing an unearned theme, as
   today, and never clears the favourite or hearts. Two new QA-seed scenarios.
-- **Locales (en, ja, zh-Hans, zh-Hant, pseudo-locale):** about 20 new catalogue keys in all four,
+- **Locales (en, ja, zh-Hans, zh-Hant, pseudo-locale):** 32 new catalogue keys (and one removed) in all four,
   plus a regenerated pseudo-locale; every Pokémon name through `useLocalePokemonName`.
 - **Push notifications and the service worker (offline):** no change to push. The palettes file
   ships in the bundle and works offline.

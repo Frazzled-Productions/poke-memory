@@ -107,9 +107,9 @@ Conclusion: **Met**, with the five constraints above recorded as implementation 
 
 **Re-check for #2187 (favourite Pokémon).** Two one-off questions were assessed against Standard 13 and found acceptable under these recorded constraints:
 
-1. **"Learn <name>'s evolution line next?"** is asked once, only when the player has just chosen an unmastered favourite, and never again for that species on that device. It is opt-in: Yes adds that line's Pokémon to the front of the normal new-card order, within the usual daily new-card cap and the current scope, so it never adds work or extends a session; No or ignoring it changes nothing.
+1. **"Learn <name>'s evolution line next?"** is asked once, only when the player has just chosen an unmastered favourite, and never again for that species on that account: the asked marker (`learnFirstAskedSpeciesIds`) is synced, so another device does not ask again, and only Reset progress clears it. It is opt-in: Yes adds that line's Pokémon to the front of the normal new-card order, within the usual daily new-card cap and the current scope, so it never adds work or extends a session; No or ignoring it changes nothing.
 2. **"Switch to <name>'s colours?"** is asked once per favourite, after it is mastered. Either answer is recorded and the question is not repeated; No keeps the current colours.
-3. **Neutral copy.** Neither question uses urgency, loss framing or reward pressure, and both offer a plainly worded No of equal prominence. The partner's cry plays only on a tap, never by itself.
+3. **Neutral copy.** Neither question uses urgency, loss framing or reward pressure, and both offer a plainly worded No: Yes is a filled button and No an outlined one, clearly labelled ("No, thanks", "Keep my colours") and the same size. The partner's cry plays only on a tap, never by itself.
 
 Conclusion: **Met**, with the three constraints above recorded as implementation conditions.
 

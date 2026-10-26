@@ -30,7 +30,7 @@ takes the most common hue as `primary`, the next distinct hue as `accent`, a lig
 as `secondary`, and black or white for `fgOnPrimary`, whichever contrasts more. If that fails, it tries
 the next two distinct hues as `primary`, and for each of the three hues steps HSL lightness by up to
 15 points either way (hue and saturation kept). Only when every candidate fails does the species use the species' primary-type palette from `lib/theme/type-palettes.ts`. Output:
-`lib/theme/generated-palettes.json` (about 1025 × 4 hex strings, roughly 40 KB uncompressed),
+`lib/theme/generated-palettes.json` (1025 species: 966 with four extracted hex colours, 59 naming their type palette; 51,229 bytes uncompressed),
 imported only by `lib/theme/palette.ts` (`paletteFor(id)`), which applies curated, then generated,
 then type. Curated palettes are exempt from the checks (Fraser, 2026-10-26). Light and dark page backgrounds for the check come from `app/globals.css`.
 
@@ -73,7 +73,7 @@ silhouette }`. Pasture's spot is a fixed slot in the favourite's habitat zone
 - **Palette quality:** some generated palettes may pass the numbers and still look wrong. Mitigation:
   `app/audit-themes` (existing page) shows every palette for a visual pass, and any species can be
   added to `CURATED_POKEMON` by hand.
-- **Bundle size:** about 40 KB of JSON. Mitigation: imported only by the theme code and the settings
+- **Bundle size:** about 51 KB of JSON (51,229 bytes). Mitigation: imported only by the theme code and the settings
   page, not the review screen; checked in the build output (task 7.3).
 - **Older versions:** covered by the safety fact in the proposal and the integration test in task
   6.2.
