@@ -2749,6 +2749,39 @@ describe('buildSessionQueues - priority new species (#2187)', () => {
     expect(isPriority.slice(6).every((p) => !p)).toBe(true);
   });
 
+  it.each([1, 2])('A cap of %i, smaller than the line: the line is admitted in list order (Gastly, then Haunter, then Gengar)', (cap) => {
+    const capped: DailyLimits = {
+      ...limits,
+      name:    { maxNewPerDay: cap, maxReviewsPerDay: 100 },
+      reverse: { maxNewPerDay: cap, maxReviewsPerDay: 100 },
+    };
+    for (const [day, salt] of COMBOS) {
+      const { newQueue } = buildSessionQueues(freshCards(), capped, day, undefined, salt, 'en', GASTLY_LINE);
+      const admitted = (reverse: boolean) =>
+        newQueue.filter((id) => (id > REVERSE_ID_OFFSET) === reverse).map(speciesOf).sort((a, b) => a - b);
+      expect(admitted(false)).toEqual(GASTLY_LINE.slice(0, cap));
+      expect(admitted(true)).toEqual(GASTLY_LINE.slice(0, cap));
+    }
+  });
+
+  it('cry cards take part: a priority species is introduced first under the cry cap', () => {
+    function cryCard(pokemonId: number): CryReviewCard {
+      return {
+        ...makeSeedPokemon(pokemonId, { cryUrl: `https://example.com/${pokemonId}.ogg` }),
+        id: CRY_ID_OFFSET + pokemonId,
+        pokemonId,
+        cardType: 'cry',
+        subjectKey: String(pokemonId),
+        state: initialReviewState(NOW),
+      };
+    }
+    const cryLimits: DailyLimits = { ...limits, cry: { maxNewPerDay: 1, maxReviewsPerDay: 100 } };
+    for (const [day, salt] of COMBOS) {
+      const { newQueue } = buildSessionQueues(SPECIES.map(cryCard), cryLimits, day, undefined, salt, 'en', GASTLY_LINE);
+      expect(newQueue).toEqual([CRY_ID_OFFSET + 92]);
+    }
+  });
+
   it('an empty list leaves the queue exactly as before', () => {
     const cards = freshCards();
     expect(buildSessionQueues(cards, limits, '2026-05-09', undefined, 'user-a', 'en', [])).toEqual(
