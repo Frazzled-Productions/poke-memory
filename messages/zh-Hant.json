@@ -115,7 +115,8 @@
         "practiceLink": "前往練習",
         "searchLabel": "搜尋已掌握的寶可夢",
         "matchFavourite": "與我的最愛一致",
-        "current": "目前主題：{name}"
+        "current": "目前主題：{name}",
+        "setAsThemeAria": "把{name}設為應用程式主題"
       },
       "intensityPicker": {
         "heading": "主題強度",

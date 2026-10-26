@@ -115,7 +115,8 @@
         "practiceLink": "[Go to Practice]",
         "searchLabel": "[Search your mastered Pokémon]",
         "matchFavourite": "[Match my favourite]",
-        "current": "[Current theme: {name}]"
+        "current": "[Current theme: {name}]",
+        "setAsThemeAria": "[Use {name} as your app theme]"
       },
       "intensityPicker": {
         "heading": "[Theme intensity]",

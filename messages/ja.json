@@ -115,7 +115,8 @@
         "practiceLink": "練習へ",
         "searchLabel": "習得したポケモンを検索",
         "matchFavourite": "お気に入りに合わせる",
-        "current": "現在のテーマ：{name}"
+        "current": "現在のテーマ：{name}",
+        "setAsThemeAria": "{name}をアプリのテーマにする"
       },
       "intensityPicker": {
         "heading": "テーマの強度",

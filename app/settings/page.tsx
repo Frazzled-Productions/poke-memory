@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -25,11 +24,8 @@ import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 import { ReenableCardTypeDialog, type ReenableChoice } from "@/components/settings/ReenableCardTypeDialog";
 import { deleteAccountEverywhere } from "@/lib/sync/deleteAccount";
 import { signOut } from "@/lib/auth/actions";
-import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
-import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
-import { loadFavourite, saveFavourite, masteredSpeciesUnion } from "@/lib/theme/persistence";
+import { FavouritePokemonSection, ThemeSection } from "@/components/favourite/FavouriteSettings";
 import { useFavourite } from "@/components/theme/FavouriteThemeProvider";
-import type { ReviewableCard } from "@/lib/review/session";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
@@ -68,7 +64,6 @@ import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, pageTitl
 import { CompanyDisclosure } from "@/components/CompanyDisclosure";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
-import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { readMasteredCountCache } from "@/lib/profile/masteredCountCache";
 
 /**
@@ -179,135 +174,6 @@ function LoadingSkeleton() {
     </div>
   );
 }
-
-function FavouritePicker({
-  settings,
-  favouriteId,
-  onSelect,
-}: {
-  settings: UserSettings;
-  favouriteId: number | null;
-  onSelect: (entry: CuratedPokemon | null, spriteUrl: string | null) => void;
-}) {
-  const t = useTranslations();
-  const { flags } = useSuperuser();
-  const { seed } = useSeed();
-  // Loaded once at mount. Nothing on this page writes to the session so a
-  // snapshot is safe and avoids re-reading on every render. Stored as the
-  // set of mastered species ids rather than a Map keyed by id: a multi-locale
-  // session holds several name cards per numeric id, and the Map's
-  // Load the full ReviewableCard[] so both name AND reverse legs are available
-  // for species-level mastery (#1865). masteredSpeciesUnion unions across all
-  // enrolled locales so a species mastered in any locale earns the theme.
-  const [sessionCards, setSessionCards] = useState<readonly ReviewableCard[]>([]);
-  useEffect(() => {
-    async function load() {
-      const session = await loadSession();
-      setSessionCards(session?.cards ?? []);
-    }
-    void load();
-  }, []);
-
-  // Compute the mastered set once (not per-iteration) then filter.
-  const masteredIds = flags.pretendAllMastered
-    ? null
-    : masteredSpeciesUnion(sessionCards, false, settings.learningLocales);
-  const unlockedEntries = CURATED_POKEMON.filter((entry) =>
-    masteredIds === null || masteredIds.has(entry.id),
-  );
-
-  if (unlockedEntries.length === 0) {
-    return (
-      <div className="rounded-lg border border-zinc-200 bg-background px-4 py-5 dark:border-zinc-800">
-        <h3
-          id="theme-heading"
-          className="text-sm font-semibold text-foreground"
-        >
-          {t("settings.appearance.theme.lockedHeading")}
-        </h3>
-        <p className={`mt-1 ${mutedText}`}>
-          {t("settings.appearance.theme.lockedBody")}
-        </p>
-        <Link
-          href="/"
-          className="mt-3 inline-block text-sm font-medium text-foreground underline underline-offset-2 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-        >
-          {t("settings.appearance.theme.practiceLink")}
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <h3
-        id="theme-heading"
-        className="text-sm font-semibold text-foreground"
-      >
-        {t("settings.appearance.theme.heading")}
-      </h3>
-      <p className={mutedTextXs}>
-        {t("settings.appearance.theme.description")}
-      </p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {unlockedEntries.map((entry) => {
-          const pokemon = seed?.seedPokemon.find((p) => p.id === entry.id);
-          const selected = favouriteId === entry.id;
-
-          return (
-            <div
-              key={entry.id}
-              className="relative rounded-xl border border-zinc-200 bg-background px-4 py-3 flex flex-col items-center gap-2 transition-colors dark:border-zinc-800"
-            >
-              <div
-                className="h-2 w-full rounded-full mb-1"
-                style={{ backgroundColor: entry.colors.primary }}
-                aria-hidden="true"
-              />
-              {pokemon?.spriteUrl ? (
-                <Image
-                  src={pokemon.spriteUrl}
-                  alt={entry.name}
-                  width={POKEDEX_GRID_SPRITE_SIZE}
-                  height={POKEDEX_GRID_SPRITE_SIZE}
-                  className="h-16 w-16 object-contain"
-                />
-              ) : (
-                <div className="h-16 w-16" />
-              )}
-              <p className="text-sm font-medium text-foreground text-center">
-                {entry.name}
-              </p>
-              {selected ? (
-                <div className="flex flex-col items-center gap-1 w-full">
-                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    {t("settings.appearance.theme.selected")} ✓
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(null, null)}
-                    className="w-full min-h-[36px] rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-400"
-                  >
-                    {t("settings.appearance.theme.remove")}
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onSelect(entry, pokemon?.spriteUrl ?? null)}
-                  className="w-full min-h-[36px] rounded-lg bg-foreground px-3 py-1 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-                >
-                  {t("settings.appearance.theme.setAsTheme")}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
 
 type FieldConfig = {
   key: keyof UserSettings;
@@ -572,7 +438,6 @@ export default function SettingsPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [toggleErrorKey, setToggleErrorKey] = useState<keyof UserSettings | null>(null);
-  const [favouriteId, setFavouriteId] = useState<number | null>(null);
   // Pending unenrol confirmation: the locale the user wants to remove when it
   // is the currently-active language. An inline confirm block is shown instead
   // of applying immediately, to avoid accidentally switching practice to English.
@@ -686,7 +551,6 @@ export default function SettingsPage() {
     }
 
     setSettings(loaded);
-    setFavouriteId(loadFavourite()?.id ?? null);
     setEnrolmentMasteredCounts(readMasteredCountCache());
     void loadGradeLog().then((log) => setOptimizableReviewCount(countOptimizableReviews(log)));
 
@@ -820,7 +684,6 @@ export default function SettingsPage() {
       await clearLocalProgress();
     }
     saveSettings(settingsAfterProgressReset(loadSettings()));
-    setFavouriteId(null);
     updateFavourite(null);
     router.replace("/");
   }
@@ -834,7 +697,6 @@ export default function SettingsPage() {
         "Could not delete your account. Check your connection and try again.",
       );
     }
-    setFavouriteId(null);
     updateFavourite(null);
     await signOut();
   }
@@ -1791,21 +1653,9 @@ export default function SettingsPage() {
                 forceOpen={targetCategoryId === "appearance-heading"}
                 transientOpen={isFiltering}
               >
-                <div>
-                  <FavouritePicker
-                    settings={settings}
-                    favouriteId={favouriteId}
-                    onSelect={(entry, spriteUrl) => {
-                      saveFavourite(entry, spriteUrl);
-                      setFavouriteId(entry?.id ?? null);
-                      updateFavourite(
-                        entry
-                          ? { id: entry.id, name: entry.name, colors: entry.colors, spriteUrl: spriteUrl ?? null }
-                          : null
-                      );
-                    }}
-                  />
-                </div>
+                <FavouritePokemonSection />
+
+                <ThemeSection />
 
                 <IntensityPicker
                   value={settings.themeIntensity}

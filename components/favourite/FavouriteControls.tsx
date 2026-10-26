@@ -4,10 +4,8 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { isHearted, setFavouritePokemon, toggleHeart } from "@/lib/favourite/favourite";
-import { learnFirstSpeciesIds, markLearnFirstAsked, wasLearnFirstAsked } from "@/lib/favourite/learnFirst";
-import { loadSession } from "@/lib/review/persistence";
-import type { AppLocale } from "@/i18n/locales";
 import { useStoredSettings } from "./useStoredSettings";
+import { LearnFirstQuestion, makeFavourite } from "./LearnFirstQuestion";
 
 const TOGGLE_BASE =
   "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2";
@@ -40,28 +38,12 @@ export function FavouriteControls({
   const hearted = isHearted(settings, speciesId);
 
   function handleFavourite() {
-    const current = loadSettings();
-    if (current.favouritePokemonId === speciesId) {
-      saveSettings(setFavouritePokemon(current, null));
+    if (loadSettings().favouritePokemonId === speciesId) {
+      saveSettings(setFavouritePokemon(loadSettings(), null));
       setAskingLearnFirst(false);
       return;
     }
-    saveSettings(setFavouritePokemon(current, speciesId));
-    if (!mastered && !wasLearnFirstAsked(speciesId)) {
-      markLearnFirstAsked(speciesId);
-      setAskingLearnFirst(true);
-    }
-  }
-
-  async function handleLearnFirstYes() {
-    setAskingLearnFirst(false);
-    const session = await loadSession();
-    const current = loadSettings();
-    const activeLocale = (current.activePokemonNameLocale ?? "en") as AppLocale;
-    saveSettings({
-      ...current,
-      priorityNewSpeciesIds: learnFirstSpeciesIds(speciesId, session?.cards ?? [], activeLocale),
-    });
+    setAskingLearnFirst(makeFavourite(speciesId, mastered));
   }
 
   return (
@@ -88,32 +70,7 @@ export function FavouriteControls({
         </button>
       </div>
       {askingLearnFirst && (
-        <div
-          role="group"
-          aria-labelledby="learn-first-question"
-          className="flex w-full max-w-xs flex-col items-center gap-2 rounded-lg border border-zinc-200 px-4 py-3 text-center dark:border-zinc-800"
-        >
-          <p id="learn-first-question" className="text-sm font-semibold text-foreground">
-            {t("learnFirst.question", { name })}
-          </p>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">{t("learnFirst.body")}</p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => void handleLearnFirstYes()}
-              className="min-h-[44px] rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-            >
-              {t("learnFirst.yes")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setAskingLearnFirst(false)}
-              className="min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
-            >
-              {t("learnFirst.no")}
-            </button>
-          </div>
-        </div>
+        <LearnFirstQuestion speciesId={speciesId} name={name} onDone={() => setAskingLearnFirst(false)} />
       )}
     </div>
   );

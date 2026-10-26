@@ -511,7 +511,9 @@ describe("share images with the partner (#2187)", () => {
     }
   }
 
-  const DAILY = { date: "2026-05-12", streak: 7, reviewed: 24, newCards: 6, mastered: 2, gradeSequence: [4] };
+  const DAILY: Parameters<typeof generateDailyShareImage>[0] = {
+    date: "2026-05-12", streak: 7, reviewed: 24, newCards: 6, mastered: 2, gradeSequence: [4],
+  };
 
   it("Unmastered partner on a share image: silhouette and name", async () => {
     vi.stubGlobal("Image", LoadingImage);

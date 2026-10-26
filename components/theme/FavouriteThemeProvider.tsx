@@ -11,7 +11,7 @@ import type { StoredFavourite } from "@/lib/theme/persistence";
 import { KEY_SETTINGS, KEY_LEGACY_FAVOURITE_THEME } from "@/lib/storage/keys";
 
 // Grandfathering decision (#1865): an already-applied favourite is kept as-is
-// on load. The picker gate (FavouritePicker in app/settings/page.tsx) tightens
+// on load. The picker gate (ThemeSection in components/favourite/FavouriteSettings.tsx) tightens
 // to species-level mastery (BOTH name + reverse legs) for NEW picks only.
 // The superuser exit-cleanup path (SuperuserContext) still validates mastery
 // strictly via isFavouriteEarned and wipes a cheat-selected favourite on
