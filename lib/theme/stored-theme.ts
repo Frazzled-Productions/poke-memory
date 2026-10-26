@@ -1,5 +1,6 @@
 import { CURATED_POKEMON } from "./curated-pokemon";
 import type { StoredFavouriteTheme } from "@/lib/settings/persistence";
+import { isSpeciesId } from "@/lib/pokemon/seed-constants";
 
 // Structural validation of a stored theme, kept apart from
 // lib/theme/persistence.ts so the settings parser can use it for the
@@ -22,16 +23,20 @@ function isRawGithubUserContentUrl(value: string): boolean {
 }
 
 // Validate a raw shape against the StoredFavourite schema. Returns the
-// validated object (with the canonical name from CURATED_POKEMON) or null if
-// validation fails. Pure - takes a value, returns a value. Used for both
-// the cloud-pulled shape (loadSettings().favouriteTheme) and the legacy
-// localStorage shape during one-time migration.
+// validated object or null if validation fails. Any species id in the seed is
+// accepted (#2187); a curated species gets its canonical name from
+// CURATED_POKEMON, any other keeps its stored (English seed) name. The stored
+// colours are only checked for shape here: the colours applied come from
+// `paletteFor` (FavouriteThemeProvider), so palette fixes reach old picks.
+// Pure - takes a value, returns a value. Used for both the cloud-pulled shape
+// (loadSettings().favouriteTheme) and the legacy localStorage shape during
+// one-time migration.
 export function validateRawFavourite(value: unknown): StoredFavouriteTheme | null {
   if (typeof value !== "object" || value === null) return null;
   const obj = value as Record<string, unknown>;
-  if (typeof obj.id !== "number") return null;
+  if (!isSpeciesId(obj.id)) return null;
   const curated = CURATED_POKEMON.find((p) => p.id === obj.id);
-  if (!curated) return null;
+  const name = curated?.name ?? (typeof obj.name === "string" ? obj.name : "");
   if (typeof obj.colors !== "object" || obj.colors === null) return null;
   const c = obj.colors as Record<string, unknown>;
   if (
@@ -60,7 +65,7 @@ export function validateRawFavourite(value: unknown): StoredFavouriteTheme | nul
   const spriteUrl = needsRemoteMigration ? `/sprites/pokemon/${obj.id}.png` : rawSpriteUrl;
   return {
     id: obj.id,
-    name: curated.name,
+    name,
     colors: {
       primary: c.primary,
       secondary: c.secondary,

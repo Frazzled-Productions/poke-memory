@@ -19,11 +19,16 @@ import { KEY_SETTINGS, KEY_LEGACY_FAVOURITE_THEME } from "@/lib/storage/keys";
 //
 // Conservative on `session === null`: a new sign-in pull may restore
 // settings before cards, so abstain rather than wipe a legitimate favourite.
+//
+// The colours applied are the species' current palette, not the stored ones,
+// so palette fixes reach existing players (#2187). The palettes module is
+// loaded on demand so its JSON stays out of the shared layout chunk.
 async function resolveFavourite(): Promise<StoredFavourite | null> {
   const stored = loadFavourite();
   if (stored === null) return null;
-  // Return the stored favourite as-is (grandfather: no auto-wipe on load).
-  return stored;
+  // Keep the stored favourite (grandfather: no auto-wipe on load).
+  const { paletteFor } = await import("@/lib/theme/palette");
+  return { ...stored, colors: paletteFor(stored.id) ?? stored.colors };
 }
 
 type FavouriteContextValue = {

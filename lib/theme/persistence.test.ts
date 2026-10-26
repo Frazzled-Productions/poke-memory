@@ -92,6 +92,17 @@ describe("loadFavourite", () => {
     expect(loadFavourite()).toBeNull();
   });
 
+  it("A non-curated theme: accepts any species id in the seed (Bulbasaur, id 1)", () => {
+    const bulbasaur = { ...SAMPLE_FAV, id: 1, name: "Bulbasaur", spriteUrl: "/sprites/pokemon/1.png" };
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ favouriteTheme: bulbasaur }));
+    expect(loadFavourite()?.id).toBe(1);
+  });
+
+  it("Unknown id: an alternate-form id is not a theme species", () => {
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ favouriteTheme: { ...SAMPLE_FAV, id: 10100 } }));
+    expect(loadFavourite()).toBeNull();
+  });
+
   it("rejects a favourite with malformed colours", () => {
     storage.setItem(
       SETTINGS_KEY,

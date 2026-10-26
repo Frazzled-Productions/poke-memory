@@ -6,9 +6,9 @@
 
 ## 2. Palettes
 
-- [ ] 2.1 `lib/theme/type-palettes.ts` (18 palettes) and `lib/theme/palette.ts` `paletteFor(id)` (curated, then generated, then type). Verify: `lib/theme/palette.test.ts` order cases.
-- [ ] 2.2 `scripts/seed-palettes.mjs` and `npm run seed:palettes`; commit `lib/theme/generated-palettes.json`. Verify: the coverage and contrast test fails on a missing species or a failing palette (red run on a fixture first), then passes on the committed file.
-- [ ] 2.3 Read-time validation: any seed id; colours from `paletteFor`, not storage. Verify: "Palette fix reaches an old pick" and "Unknown id" tests.
+- [x] 2.1 `lib/theme/type-palettes.ts` (18 palettes) and `lib/theme/palette.ts` `paletteFor(id)` (curated, then generated, then type). Verify: `lib/theme/palette.test.ts` order cases. Verified: `lib/theme/palette.test.ts` (4 order cases; curated case red with the override removed) and `generated-palettes.test.ts` "Type palettes pass".
+- [x] 2.2 `scripts/seed-palettes.mjs` and `npm run seed:palettes`; commit `lib/theme/generated-palettes.json`. Verify: the coverage and contrast test fails on a missing species or a failing palette (red run on a fixture first), then passes on the committed file. Verified: `lib/theme/generated-palettes.test.ts` red on an empty and a failing fixture, green on the committed file (1025 species: 261 extracted, 764 type palettes).
+- [x] 2.3 Read-time validation: any seed id; colours from `paletteFor`, not storage. Verify: "Palette fix reaches an old pick" and "Unknown id" tests. Verified: `components/theme/FavouriteThemeProvider.test.tsx` "Palette fix reaches an old pick" (red then green); `lib/theme/persistence.test.ts` "A non-curated theme" (red then green), "Unknown id" and "rejects a favourite with an unknown Pokémon id".
 
 ## 3. Favourite, hearts and theme UI
 
