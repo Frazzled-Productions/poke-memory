@@ -39,17 +39,24 @@ The delta spec records the first three as baseline requirements and adds the fix
 
 ## Decisions
 
+- **Move, not a command.** The issue (#1992) gives the move as the fix, and the name, the
+  `allowed-tools` frontmatter and every reference already treat it as a skill. (Was an open call;
+  dropped 2026-10-26 as settled.)
 - **Move, do not rewrite.** `git mv` keeps the file's history (`git log --follow`) and leaves its
-  content untouched, so nothing about how the skill behaves changes except that it now loads.
+  body untouched, so nothing about what the skill says changes. The only frontmatter edit is the
+  `allowed-tools` line, and only if Fraser takes the recommendation to narrow it (open call).
 - **Reference by slash name.** `batch-issues.md:224` becomes `/investigate-ci-failure`, matching
   `AGENTS.md:148` and `batch-issues.md:201`, so a future move cannot leave a stale path.
 - **Layout lint, no model call.** `scripts/lib/skills-layout.mjs` exports a pure function that takes
   the entries of `.claude/skills/` and returns the offending paths (a top-level file, or a folder
-  with no `SKILL.md`). `scripts/check-skills-layout.mjs` reads the folder and fails with each path
-  named. Same shape as the Playwright pin check (`scripts/check-playwright-pin.mjs` with
+  with no `SKILL.md`). `scripts/check-skills-layout.mjs` lists the tracked files with
+  `git ls-files -z .claude/skills` (as `scripts/check-playwright-pin.mjs` does in `listTracked`), so
+  a Finder `.DS_Store` or an untracked scratch file cannot fail `npm run lint` on a Mac while CI
+  stays green, and fails with each path named. Same shape as the Playwright pin check (`scripts/check-playwright-pin.mjs` with
   `scripts/lib/playwright-pin.mjs`), so it is picked up by the existing `scripts/**/*.test.mjs`
-  Vitest project. Recommended placement (open call in the proposal): the `lint` chain plus one step
-  in `ci.yml`'s always-run `em-dash` job.
+  Vitest project. Placement: the `lint` chain, which the required `test` job runs. Recommended (open
+  call): also re-include `'.claude/skills/**'` in `ci.yml`'s `code` filter; no `em-dash` job step,
+  because `em-dash` is not a required check on `qa`.
 
 ## Blast radius (25 October 2026)
 
@@ -62,9 +69,10 @@ repo).
 
 - Playwright pin check, run in the worktree with the file moved:
   `node scripts/check-playwright-pin.mjs` printed "OK" before and after the move (exit 0). With the
-  tag in the moved file changed to `v1.62.0` it failed with
-  `.claude/skills/investigate-ci-failure/SKILL.md:42 pins (image tag v1.62.0), but package-lock.json locks @playwright/test 1.63.0`
-  (exit 1), so the check still covers the skill.
+  tag in the moved file changed to one minor behind the lock, it failed naming
+  `.claude/skills/investigate-ci-failure/SKILL.md:42` as a drifted pin (exit 1), so the check still
+  covers the skill. (The exact error text is not quoted here, because this file is tracked and the
+  same check would flag the quote.)
 - Discovery, run in this repo with the file moved:
   `claude -p "/investigate-ci-failure" --max-turns 1 --tools ""` (session
   `32158e6f-76d2-49e1-b585-3951a5ad9bfb`) recorded `<command-name>/investigate-ci-failure</command-name>`
@@ -79,8 +87,17 @@ Cleared:
 - Context budget covers `AGENTS.md`, `CLAUDE.md` and `GLOB:.claude/agents/*.md` only
   (`.github/context-budget.txt`).
 - Em-dash lint scans the file by content wherever it is; the skill already passes it on `qa`.
-- CI `code` filter (`ci.yml:41-48`): a Markdown move alone skips the `test` job; the new script and
-  `package.json` edit make the build PR a code PR, so the full lint chain runs on it.
+- CI `code` filter (`ci.yml:41-48`): corrected 2026-10-26. The comment above the filter says `'**'`
+  plus `!` exclusions means "any file except these", but `ci.yml` sets no `predicate-quantifier`,
+  and `dorny/paths-filter` defaults to `some`, where a file counts if any one pattern matches, so
+  `'**'` matches every file. This PR's own `changes` job (run 40229453529) reported
+  `Filter code = true` for its five `.md` files. So today every PR runs `test` and the `lint` chain,
+  and the build PR does too. The broken fast path is an existing bug, not fixed here (open call).
+- The build PR edits `ci.yml` only if the `code` filter re-include is kept; `ci.yml` is in
+  `e2e_relevant`, so `e2e` then runs on the build PR (CI time only).
+- Required checks on `qa` (ruleset qa-staging): `test`, `e2e`, `Test coverage report`,
+  `integration-gate`, `changelog-gate`, `i18n-leak`, `OpenSpec required`, `Context budget`.
+  `em-dash` is not among them, so a step there is advisory.
 - Changelog gate: only `app/**`, `components/**`, `lib/**` need a fragment.
 - Vercel: `scripts/vercel-ignored-build.sh:39` skips `.claude/` changes.
 - `openspec update` regenerates only the `openspec-*` skill folders and `opsx` commands; it does not
@@ -90,10 +107,15 @@ Risks:
 
 - The skill now runs for real, and its procedure has never been exercised (the issue's own warning).
   Where: `.claude/skills/investigate-ci-failure/SKILL.md`. Likelihood: medium that some step is
-  stale; cost: low, it is guidance for an agent, and its `allowed-tools` are the same as any agent's.
+  stale; cost: low, it is guidance for an agent.
   Cheapest check: one live run on the next non-converging CI failure (task 4.1, moved to an issue).
-- A later skill PR that is Markdown-only skips the `lint` chain. Covered only if the check also runs
-  in the always-run `em-dash` job (open call).
+- The skill's `allowed-tools` (unscoped `Bash`, `Edit`, `Agent` and others) are approved without a
+  prompt while the skill is active (Claude Code skills docs; cited, not run here), which is wider
+  than `.claude/settings.json`'s allow-list. Where: the skill's frontmatter. Likelihood: certain
+  once it loads; cost: an agent in the skill can run any shell command or edit unprompted. Cheapest
+  fix: narrow the list in this change (open call).
+- Once the docs fast path is fixed, a skill-only PR would skip the `lint` chain. Covered if
+  `'.claude/skills/**'` is re-included in the `code` filter (open call).
 
 Before merge, the cheapest test that would catch the real bug: `scripts/lib/skills-layout.test.mjs`
-fed today's `.claude/skills/` entries must report `investigate-ci-failure.md` (task 2.1, red first).
+fed today's `.claude/skills/` entries must report `investigate-ci-failure.md` (task 1.1, red first).
