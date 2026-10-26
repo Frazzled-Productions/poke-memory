@@ -127,19 +127,20 @@ describe("saveFavourite", () => {
     vi.unstubAllGlobals();
   });
 
-  it("writes the entry into settings.favouriteTheme", () => {
-    saveFavourite(SAMPLE, "/sprites/pokemon/1.png");
-    const settings = JSON.parse(storage.getItem(SETTINGS_KEY)!);
-    expect(settings.favouriteTheme).toEqual({
-      id: SAMPLE.id,
-      name: SAMPLE.name,
+  it("writes the theme into settings.favouriteTheme, any species (#2187)", () => {
+    const bulbasaur = {
+      id: 1,
+      name: "Bulbasaur",
       colors: SAMPLE.colors,
       spriteUrl: "/sprites/pokemon/1.png",
-    });
+    };
+    saveFavourite(bulbasaur);
+    const settings = JSON.parse(storage.getItem(SETTINGS_KEY)!);
+    expect(settings.favouriteTheme).toEqual(bulbasaur);
   });
 
   it("clears settings.favouriteTheme when passed null", () => {
-    saveFavourite(SAMPLE);
+    saveFavourite({ id: SAMPLE.id, name: SAMPLE.name, colors: SAMPLE.colors, spriteUrl: null });
     saveFavourite(null);
     const settings = JSON.parse(storage.getItem(SETTINGS_KEY)!);
     expect(settings.favouriteTheme).toBeNull();

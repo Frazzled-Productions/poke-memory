@@ -5,6 +5,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslations } from "next-intl";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { DailySpotlight } from "@/components/review/DailySpotlight";
+import { AllDonePartner } from "@/components/favourite/AllDonePartner";
+import { FavouriteThemeOffer } from "@/components/favourite/FavouriteThemeOffer";
 import { TypedEntryNameCard } from "@/components/review/TypedEntryNameCard";
 import type { TypedEntryStrictness } from "@/lib/srs/typedEntryGradeLocale";
 import { MultipleChoiceNameCard } from "@/components/review/MultipleChoiceNameCard";
@@ -621,7 +623,12 @@ function EndOfSessionScreen({
           <p className="text-zinc-500 dark:text-zinc-400">
             {t("nothingDueBody")}
           </p>
-          <DailySpotlight timezone={timezone} />
+          {/* The partner sits beside the Pokémon of the day (#2187). */}
+          <div className="flex flex-wrap items-start justify-center gap-4">
+            <DailySpotlight timezone={timezone} />
+            <AllDonePartner />
+          </div>
+          <FavouriteThemeOffer />
           {onClearScope !== undefined && (
             <button
               type="button"

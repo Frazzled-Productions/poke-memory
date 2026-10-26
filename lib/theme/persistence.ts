@@ -1,4 +1,3 @@
-import type { CuratedPokemon } from "./curated-pokemon";
 import {
   loadSettings,
   saveSettings,
@@ -100,18 +99,13 @@ export function isFavouriteEarned(
   return mastered.has(favourite.id);
 }
 
-export function saveFavourite(
-  entry: CuratedPokemon | null,
-  spriteUrl: string | null = null,
-): void {
+// Saves the theme (the colours on screen). Build it with `themeForSpecies`
+// (English seed name, `paletteFor` colours), or pass null to remove it.
+export function saveFavourite(theme: StoredFavourite | null): void {
   if (typeof window === "undefined") return;
   try {
     const settings = loadSettings();
-    const next: StoredFavourite | null =
-      entry === null
-        ? null
-        : { id: entry.id, name: entry.name, colors: entry.colors, spriteUrl };
-    saveSettings({ ...settings, favouriteTheme: next });
+    saveSettings({ ...settings, favouriteTheme: theme });
   } catch {
     // private browsing or storage full - silently ignore
   }
