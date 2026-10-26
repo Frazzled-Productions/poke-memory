@@ -205,7 +205,10 @@ Every change goes through OpenSpec (`openspec/config.yaml` holds the house rules
   overwrite the first) or a target is no longer on `qa`. Fix by landing one PR first, then
   rebasing the other and rewriting its delta against the result. Local run:
   `python3 <.github checkout>/tools/openspec/overlap.py --this-files <delta spec.md files>`, run from
-  this repo's root.
+  this repo's root. Its last step, "Simulated archive", archives every active change on a copy and
+  fails if the merged specs fail `openspec validate --specs --strict` (for example a MODIFIED
+  requirement over 500 characters), naming each change "from this PR" or "already on main". Local
+  run: `python3 <.github checkout>/tools/openspec/archive.py simulate` from this repo's root.
 - **If the bot opens an issue** (label `openspec`, "OpenSpec archive failed: <name>"), nothing
   landed and the change is still active on `qa`. The issue opens with the real error ("Why it
   failed"), and the failing run's log ends with the same lines; the script Actions prints at the start
