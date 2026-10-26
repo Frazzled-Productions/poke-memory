@@ -132,9 +132,9 @@ and cut to the evolution budget separately, with no species grouping.
 
 Before admission, species groups SHALL be split into two tiers, each in stable-shuffle order:
 tier 1 holds species where exactly one of name or reverse is a new candidate and the other leg
-has already been graded; tier 2 holds the rest. Groups SHALL be considered tier 1 first. This is
-the only existing rule that ranks particular species, and it SHALL NOT change counters, FSRS
-state or the review queue. There SHALL be no setting or input that ranks chosen species ids.
+has already been graded; tier 2 holds the rest. Groups SHALL be considered tier 1 first. Apart
+from `priorityNewSpeciesIds` (below), this is the only rule that ranks particular species, and it
+SHALL NOT change counters, FSRS state or the review queue.
 
 #### Scenario: One leg already graded
 

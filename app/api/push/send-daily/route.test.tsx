@@ -1353,6 +1353,48 @@ describe("POST /api/push/send-daily - practice scope filtering (#1159)", () => {
     expect(parsed.body).not.toContain("6");
   });
 
+  it("an Almost mastered-only scope counts like Incomplete chains: no matched cards on the server (#2187)", async () => {
+    const bodyFor = async (preset: string) => {
+      mockSendNotification.mockReset();
+      const admin = buildAdminMock({
+        subscriptions: [SUB],
+        settings: [{
+          user_id: "user-a",
+          timezone: "UTC",
+          settings: {
+            evolutionCardsEnabled: false,
+            reverseEvolutionCardsEnabled: false,
+            cryCardsEnabled: false,
+            alternateFormsEnabled: true,
+            maxNewPerDay: 10,
+            maxNewEvolutionPerDay: 5,
+            maxNewReversePerDay: 10,
+            maxNewCryPerDay: 10,
+            learningLocales: ["en"],
+            practiceScope: {
+              gens: [],
+              types: [],
+              presets: [preset],
+              formCategories: { mode: "all" },
+              games: [],
+            },
+          },
+        }],
+        due: [
+          { user_id: "user-a", card_type: "name", subject_key: "25", first_seen: "2026-01-01", locale: "en" },
+          { user_id: "user-a", card_type: "name", subject_key: "94", first_seen: "2026-01-01", locale: "en" },
+        ],
+      });
+      mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+      mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+      await POST(makeRequest());
+      return mockSendNotification.mock.calls.map((c) => c[1]);
+    };
+    // Before #2187 the route dropped "mastery-blockers", so the scope parsed as
+    // empty and both due cards were counted.
+    expect(await bodyFor("mastery-blockers")).toEqual(await bodyFor("incomplete-chains"));
+  });
+
   it("filters out cards outside the user's types scope", async () => {
     const admin = buildAdminMock({
       subscriptions: [SUB],

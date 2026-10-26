@@ -223,10 +223,9 @@ SHALL be counted rather than dropped.
 ### Requirement: A "Favourites" preset matches hearted species
 
 The Scope control SHALL offer a "Favourites" preset whenever `heartedSpeciesIds` holds at least one
-species. The preset SHALL match a card whose anchor species is in `heartedSpeciesIds` at the time of
-matching, so hearting or un-hearting a species changes the match without editing the scope. With no
-hearts the preset SHALL be hidden from the control, and a saved scope that still contains it SHALL
-match nothing on that axis (as the progress presets do with no data).
+species. The preset SHALL match a card whose anchor species is in `heartedSpeciesIds` as read when the
+Practice session loads, so hearting or un-hearting a species (on the Pokédex) changes the match on
+the next session without editing the scope.
 
 #### Scenario: Practise your hearts
 
@@ -237,6 +236,16 @@ match nothing on that axis (as the progress presets do with no data).
 
 - **WHEN** the scope is Favourites and the player removes their last heart
 - **THEN** the preset disappears from the control and the Practice page shows "No Pokémon match your scope" with Clear scope
+
+### Requirement: With no hearts the preset is hidden and matches nothing
+
+With no hearts the Favourites preset SHALL be hidden from the Scope control, and a saved scope that
+still contains it SHALL match nothing on that axis (as the progress presets do with no data).
+
+#### Scenario: Saved preset, no hearts
+
+- **WHEN** the saved scope is Favourites only and `heartedSpeciesIds` is empty
+- **THEN** no card matches and the control does not offer the preset
 
 #### Scenario: Japanese interface
 

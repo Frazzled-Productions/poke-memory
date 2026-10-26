@@ -119,8 +119,8 @@ the deep merge would keep stale `colors` under a new `id` if the shape shrank.
 - A personality quiz (dropped in the research).
 - The baseline oddities this change does not need. Theme 4 to 10: pre-paint id check, invalid
   stored values never cleared, `BRAND_DEFAULT_COLORS` duplication, superuser exit on any flag, stale
-  comments, picker snapshot, sprite rewrite test. Scope 2, 4 and 5: server push treats "Almost
-  mastered" as empty, English scope chip, wrong doc comment. New-card 1 to 4: species grouping
+  comments, picker snapshot, sprite rewrite test. Scope 4 and 5: English scope chip, wrong doc comment (scope 2, the server push treating "Almost
+  mastered" as empty, is fixed here as a side effect of the shared list, with a route test). New-card 1 to 4: species grouping
   (#928) rarely applies, the #1764 tier has no visible effect, the "I already know these" quiz uses
   up the day's budget, UTC against local day. All are in #2188.
 - Multiple favourites or a fixed team (hearts cover the shortlist).

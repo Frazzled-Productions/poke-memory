@@ -6,7 +6,7 @@ The player's favourite Pokémon and the app theme. A favourite can be any specie
 
 ### Requirement: Locked state when nothing is unlocked (baseline, current behaviour)
 
-When no curated species is unlocked, the appearance section SHALL show the locked heading, the
+When no species is mastered, the appearance section SHALL show the locked heading, the
 "Master your first Pokémon to unlock themes." body and a practice link to `/`, and SHALL NOT render
 any "Set as theme" button.
 
@@ -294,8 +294,8 @@ SHALL never recolour the app.
 When the favourite becomes mastered (or is set while already mastered) and the theme is not already
 that species, the app SHALL offer once "Switch to <name>'s colours?" on the next all-done screen or
 Settings visit. Accepting SHALL make the theme the favourite; declining SHALL leave the theme alone.
-The offer SHALL be recorded per species id (`favouriteThemeOfferedForId`), so it is not repeated for
-the same favourite, and SHALL use neutral wording with no urgency (Children's Code Standard 13).
+The offer SHALL be recorded as the last species offered (`favouriteThemeOfferedForId`), so it is not
+repeated while that species stays the favourite. The wording SHALL be neutral, with no urgency.
 
 #### Scenario: Gengar mastered
 

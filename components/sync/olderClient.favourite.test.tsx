@@ -100,6 +100,29 @@ describe("an older app version never pushes the favourite keys (#2187)", () => {
     expect(pushedPatches()).toEqual([{ maxNewPerDay: 15 }]);
   });
 
+  it("An older app version on another device: a dropped Favourites preset is not pushed unless the scope is edited", () => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      ...CLOUD_BLOB,
+      practiceScope: { gens: [], types: [], presets: ["starters", "favourites"], formCategories: { mode: "all" }, games: [] },
+    }));
+    const loaded = asOlderClient(loadSettings());
+    // The previous release's validator keeps only the presets it knows.
+    const older = {
+      ...loaded,
+      practiceScope: { ...loaded.practiceScope, presets: loaded.practiceScope.presets.filter((p) => p !== "favourites") },
+    } as OlderSettings;
+    saveLastPushedSettings(older as UserSettings);
+    render(<AutoSyncOnChange />);
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(SETTINGS_SAVED_EVENT, { detail: { ...older, maxNewPerDay: 15 } }),
+      );
+    });
+
+    expect(pushedPatches()).toEqual([{ maxNewPerDay: 15 }]);
+  });
+
   it("a first push from an older device carries none of the new keys and leaves the theme alone", () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(CLOUD_BLOB));
     const older = asOlderClient(loadSettings());

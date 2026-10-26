@@ -36,7 +36,8 @@ then type. Curated palettes are exempt from the checks (Fraser, 2026-10-26). Lig
 
 ### Preset ids live in one list
 
-`PRESET_IDS` is exported from `lib/review/scope.ts` and used by `parseScopeShape`,
+`PRESET_IDS` is defined in `lib/eligibility/scopeConstants.ts` (keeping the seed out of the
+server bundle) and re-exported from `lib/review/scope.ts` and used by `parseScopeShape`,
 `validatePracticeScope`, the push route, `ScopeControl` and `scopeLabel`. A test greps the seven
 known sites for a preset string literal that is not on the list. This also stops "Almost mastered"
 being dropped on reload (baseline oddity 1), whose root cause is the three-entry allow-list at

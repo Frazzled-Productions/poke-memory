@@ -89,8 +89,6 @@ export const KEY_SUPERUSER_CLEANUP_PENDING =
 /** Last app version the user was shown a "what's new" notice for. */
 export const KEY_LAST_SEEN_VERSION = "poke-memory:last-seen-version:v1";
 
-// ─── Favourite ────────────────────────────────────────────────────────────────
-
 // ─── Legacy / superseded keys (kept for migration reads + clears only) ────────
 
 /**
