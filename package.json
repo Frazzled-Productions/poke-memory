@@ -25,6 +25,7 @@
     "seed:split": "node scripts/split-seed.mjs",
     "seed:locale-names": "node scripts/seed-locale-names.mjs",
     "seed:sprites": "node scripts/optimise-sprites.mjs",
+    "seed:palettes": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-palettes.mjs",
     "generate:scope-lookup": "node scripts/generate-scope-lookup.mjs",
     "generate:pseudo-locale": "node scripts/generate-pseudo-locale.mjs",
     "test:i18n-leak": "vitest run --project jsdom --reporter=verbose components/**/*.i18n-leak.test.tsx",

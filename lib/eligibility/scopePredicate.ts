@@ -54,10 +54,15 @@ import { STARTER_IDS } from "@/lib/pokemon/starterIds";
  *
  * `incomplete-chains` preset: skipped (treated as "no match") because the
  * server does not have access to the user's per-chain mastery state.
+ *
+ * `favourites` preset: matches species in `heartedSpeciesIds`, read by the
+ * caller from the same settings row (#2187).
  */
 export function scopeMatchesEntry(
   entry: ScopeLookupEntry,
   scope: PracticeScope,
+  /** The user's hearted species, for the `favourites` preset (#2187). */
+  heartedSpeciesIds: ReadonlySet<number> = new Set(),
 ): boolean {
   // ── formCategories gate (hard filter) ───────────────────────────────────
   const fc: FormCategoryFilter = scope.formCategories ?? { mode: "all" };
@@ -98,7 +103,12 @@ export function scopeMatchesEntry(
     return true;
   }
 
-  // "incomplete-chains" preset skipped server-side - requires runtime state.
+  if (scope.presets.includes("favourites") && heartedSpeciesIds.has(entry.speciesId)) {
+    return true;
+  }
+
+  // The incomplete-chains and mastery-blockers presets are skipped
+  // server-side: they require runtime review state.
 
   if (gamesActive) {
     const gamesSet = new Set(scope.games!);

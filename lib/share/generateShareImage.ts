@@ -1,11 +1,12 @@
 /**
  * Client-side canvas image generator for share cards.
  *
- * All rendering is spoiler-safe - no Pokémon names or sprites appear.
- * The card shows: a wordmark and date in the top row; a centred disc
- * containing a hero number (streak, reviewed count, or milestone) with a
- * label below it; and an optional three-column stat row (reviewed / new /
- * mastered) separated by a divider at the bottom.
+ * Spoiler-safe: the only Pokémon that can appear is the player's own
+ * favourite (#2187), as a silhouette until mastered. The card shows: a
+ * wordmark and date in the top row; a centred disc containing a hero number
+ * (streak, reviewed count, or milestone) with a label below it; the optional
+ * partner beside the disc; and an optional three-column stat row (reviewed /
+ * new / mastered) separated by a divider at the bottom.
  *
  * Runs only in a browser context (needs `document.createElement`).
  */
@@ -25,6 +26,16 @@ export type MilestoneShareData = {
    * to "MILESTONE" when longer than the disc can fit.
    */
   heroLabel: string;
+};
+
+/**
+ * The player's favourite on a share card (#2187). The caller resolves the
+ * localised name and whether it is still unmastered (`silhouette`).
+ */
+export type SharePartner = {
+  spriteUrl: string;
+  name: string;
+  silhouette: boolean;
 };
 
 // Re-export DailySummaryParts so callers can use a single import path.
@@ -424,6 +435,69 @@ function paintStatRow(
 }
 
 // ---------------------------------------------------------------------------
+// Partner (#2187)
+// ---------------------------------------------------------------------------
+
+const PARTNER_SIZE = 112;
+// Resolve with null rather than hang when a sprite never loads.
+const PARTNER_LOAD_TIMEOUT_MS = 3000;
+
+function loadPartnerImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const timer = setTimeout(() => resolve(null), PARTNER_LOAD_TIMEOUT_MS);
+    img.onload = () => {
+      clearTimeout(timer);
+      resolve(img);
+    };
+    img.onerror = () => {
+      clearTimeout(timer);
+      resolve(null);
+    };
+    img.src = src;
+  });
+}
+
+/** The sprite filled with one colour, so an unmastered partner shows as a silhouette. */
+function silhouetteOf(img: HTMLImageElement): HTMLCanvasElement | null {
+  const off = document.createElement("canvas");
+  off.width = PARTNER_SIZE * SCALE;
+  off.height = PARTNER_SIZE * SCALE;
+  const octx = off.getContext("2d");
+  if (!octx) return null;
+  octx.drawImage(img, 0, 0, off.width, off.height);
+  octx.globalCompositeOperation = "source-in";
+  octx.fillStyle = DISC_FILL;
+  octx.fillRect(0, 0, off.width, off.height);
+  return off;
+}
+
+/** Paint the partner at the lower right of the hero area, its name beneath. */
+function paintPartner(
+  ctx: CanvasRenderingContext2D,
+  tokens: ThemeTokens,
+  partner: SharePartner,
+  img: HTMLImageElement | null,
+  bottomY: number,
+  w: number,
+): void {
+  const cx = w - PAD - PARTNER_SIZE / 2;
+  const nameY = bottomY - 24;
+  const top = nameY - 6 - PARTNER_SIZE;
+  if (img !== null) {
+    const source = partner.silhouette ? silhouetteOf(img) : img;
+    if (source !== null) {
+      ctx.drawImage(source, cx - PARTNER_SIZE / 2, top, PARTNER_SIZE, PARTNER_SIZE);
+    }
+  }
+  ctx.fillStyle = tokens.fgOnPrimary;
+  ctx.font = `700 20px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+  ctx.textBaseline = "top";
+  ctx.textAlign = "center";
+  ctx.fillText(partner.name, cx, nameY);
+}
+
+// ---------------------------------------------------------------------------
 // Core card painter
 // ---------------------------------------------------------------------------
 
@@ -438,10 +512,12 @@ type CardPaintOptions = {
   dateStr: string;
   /** When provided, draws divider + three-column stat row at the bottom. */
   stats?: { reviewed: number; newCards: number; mastered: number };
+  /** The favourite and its loaded sprite (null when it failed to load), #2187. */
+  partner?: { partner: SharePartner; img: HTMLImageElement | null };
 };
 
 function paintCardInternal(opts: CardPaintOptions): void {
-  const { ctx, tokens, heroNumber, heroLabel, dateStr, stats } = opts;
+  const { ctx, tokens, heroNumber, heroLabel, dateStr, stats, partner } = opts;
 
   const w = CARD_W;
   const h = CARD_H;
@@ -466,6 +542,10 @@ function paintCardInternal(opts: CardPaintOptions): void {
   const discCx = w / 2;
 
   paintDisc(ctx, tokens, heroNumber, heroLabel, discCx, discCy);
+
+  if (partner) {
+    paintPartner(ctx, tokens, partner.partner, partner.img, heroAreaBottom, w);
+  }
 
   // Divider + stat row (daily card only)
   if (stats) {
@@ -521,6 +601,7 @@ function todayDisplay(): string {
  */
 export async function generateDailyShareImage(
   data: DailySummaryParts,
+  partner?: SharePartner,
 ): Promise<Blob | null> {
   if (typeof document === "undefined") return null;
 
@@ -554,6 +635,7 @@ export async function generateDailyShareImage(
       newCards: data.newCards,
       mastered: data.mastered,
     },
+    partner: partner && { partner, img: await loadPartnerImage(partner.spriteUrl) },
   });
 
   return new Promise<Blob | null>((resolve) => {
@@ -570,6 +652,7 @@ export async function generateDailyShareImage(
  */
 export async function generateMilestoneShareImage(
   data: MilestoneShareData,
+  partner?: SharePartner,
 ): Promise<Blob | null> {
   if (typeof document === "undefined") return null;
 
@@ -603,6 +686,7 @@ export async function generateMilestoneShareImage(
     dateStr: todayDisplay(),
     // No stat row for milestone cards.
     stats: undefined,
+    partner: partner && { partner, img: await loadPartnerImage(partner.spriteUrl) },
   });
 
   return new Promise<Blob | null>((resolve) => {

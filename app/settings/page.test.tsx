@@ -331,7 +331,14 @@ const { mockT } = vi.hoisted(() => {
 });
 
 vi.mock("next-intl", () => ({
-  useTranslations: () => mockT,
+  // Namespaced calls (the favourite sections, #2187) prefix the key.
+  useTranslations: (ns?: string) =>
+    ns === undefined
+      ? mockT
+      : Object.assign(
+          (key: string, params?: Record<string, string | number>) => mockT(`${ns}.${key}`, params),
+          { rich: (key: string, tags: never) => (mockT as unknown as { rich: (k: string, t: never) => unknown }).rich(`${ns}.${key}`, tags) },
+        ),
 }));
 
 vi.mock("@/i18n/locales", () => ({
@@ -1235,7 +1242,7 @@ describe("SettingsPage - language section is always visible (GA, #1723)", () => 
 // ---------------------------------------------------------------------------
 // Theme picker locked state (#1440)
 //
-// FavouritePicker renders a locked-state message when no Pokémon are mastered.
+// ThemeSection renders a locked-state message when no Pokémon are mastered.
 // When pretendAllMastered is on (or mastered entries exist), the picker renders.
 // ---------------------------------------------------------------------------
 
@@ -1274,16 +1281,18 @@ describe("SettingsPage - theme picker locked state (#1440)", () => {
 
     await renderAndWait();
 
-    expect(screen.queryByRole("button", { name: /Set as theme/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /as your app theme/i })).not.toBeInTheDocument();
   });
 
   it("pretendAllMastered on: picker grid renders, locked message absent", async () => {
-    // The superuser flag forces unlockedEntries to include every CURATED_POKEMON
-    // entry (the real, non-empty curated list), so the locked branch is skipped.
-    // This exercises the actual `flags.pretendAllMastered` short-circuit in the
-    // component's masteredSpeciesUnion call, not just catalogue-key presence.
+    // The superuser flag counts every seed species as mastered (#2187), so
+    // with an empty session the locked branch is still skipped and the theme
+    // search offers the seed's species.
     mockLoadSession.mockResolvedValue(null);
     mockSuperuserFlags.pretendAllMastered = true;
+    STABLE_SEED.seedPokemon = [
+      { id: 25, speciesId: 25, name: "Pikachu", displayName: "Pikachu", isDefaultForm: true, spriteUrl: "/sprites/pokemon/25.png" },
+    ];
     try {
       await renderAndWait();
 
@@ -1294,11 +1303,12 @@ describe("SettingsPage - theme picker locked state (#1440)", () => {
       // The picker grid renders at least one selectable theme.
       await waitFor(() => {
         expect(
-          screen.getAllByRole("button", { name: /Set as theme/i }).length,
+          screen.getAllByRole("button", { name: /as your app theme/i }).length,
         ).toBeGreaterThan(0);
       });
     } finally {
       mockSuperuserFlags.pretendAllMastered = false;
+      STABLE_SEED.seedPokemon = [];
     }
   });
 });
@@ -2107,6 +2117,43 @@ describe("SettingsPage - lifted feedback row (#1847 / #1849)", () => {
     // modal opened and the FeedbackModal form is mounted.
     await waitFor(() => {
       expect(document.getElementById("feedback-category")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("SettingsPage - reset progress keeps the favourite (#2187)", () => {
+  it("Guest resets: theme, learn-first list and offer marker are cleared; favourite and hearts kept", async () => {
+    const gengarTheme = {
+      id: 94,
+      name: "Gengar",
+      colors: { primary: "#5A3E78", secondary: "#8B6EAE", accent: "#E23B3B", fgOnPrimary: "#FFFFFF" },
+      spriteUrl: "/sprites/pokemon/94.png",
+    };
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      favouriteTheme: gengarTheme,
+      favouritePokemonId: 94,
+      heartedSpeciesIds: [94, 25],
+      priorityNewSpeciesIds: [92, 93],
+      favouriteThemeOfferedForId: 94,
+    });
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Reset all progress" }));
+    await user.type(screen.getByPlaceholderText("Type RESET to confirm"), "RESET");
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+
+    await waitFor(() => {
+      expect(mockSaveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          favouriteTheme: null,
+          priorityNewSpeciesIds: [],
+          favouriteThemeOfferedForId: null,
+          favouritePokemonId: 94,
+          heartedSpeciesIds: [94, 25],
+        }),
+      );
     });
   });
 });

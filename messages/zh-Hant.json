@@ -107,12 +107,15 @@
       "theme": {
         "heading": "應用程式主題",
         "description": "掌握一隻寶可夢後，可將其解鎖為應用程式的配色主題。",
-        "selected": "已選擇",
         "setAsTheme": "設為主題",
         "remove": "移除",
         "lockedHeading": "應用程式主題",
         "lockedBody": "掌握第一隻寶可夢後即可解鎖主題。",
-        "practiceLink": "前往練習"
+        "practiceLink": "前往練習",
+        "searchLabel": "搜尋已掌握的寶可夢",
+        "matchFavourite": "用我最愛的配色",
+        "current": "目前主題：{name}",
+        "setAsThemeAria": "把{name}設為應用程式主題"
       },
       "intensityPicker": {
         "heading": "主題強度",
@@ -122,6 +125,16 @@
         "tintedDescription": "主題色以淡淡的色調覆蓋頁面背景。",
         "fullLabel": "完整主題",
         "fullDescription": "主題色覆蓋所有背景，個性鮮明。"
+      },
+      "favourite": {
+        "heading": "最愛的寶可夢",
+        "description": "你的最愛會作為夥伴出現在旅程、牧場和完成頁面中。任何寶可夢都可以成為你的最愛。",
+        "current": "你的最愛：{name}",
+        "none": "還沒有選擇最愛。",
+        "searchLabel": "搜尋全部寶可夢",
+        "searchPlaceholder": "輸入名字",
+        "clear": "取消最愛",
+        "noResults": "沒有與該名字相符的寶可夢。"
       }
     },
     "practice": {
@@ -573,7 +586,8 @@
       "formCategoryPrimal": "原始回歸",
       "noAlternateForms": "當前種子中沒有異形態。",
       "matchCount": "{total} 隻中有 {match} 隻符合",
-      "hiddenCardsPaused": "隱藏的卡片已暫停：它們的複習日期會向後推移，因此刪除範圍不會讓過期卡片湧入佇列。"
+      "hiddenCardsPaused": "隱藏的卡片已暫停：它們的複習日期會向後推移，因此刪除範圍不會讓過期卡片湧入佇列。",
+      "presetFavourites": "最愛"
     },
     "direction": {
       "name": "這是哪隻寶可夢？",
@@ -723,7 +737,8 @@
     "generationPokemonAriaLabel": "{name}的寶可夢",
     "firstReviewed": "首次學習: {date}",
     "mastered": "已掌握",
-    "masteredAround": "約 {date} 掌握"
+    "masteredAround": "約 {date} 掌握",
+    "heartedBadge": "已點亮愛心"
   },
   "pasture": {
     "title": "牧場",
@@ -1266,5 +1281,31 @@
   "pushStreak": {
     "title": "繼續保持連勝",
     "body": "{days, plural, other {你已經連續練習了#天。今天再練一會兒，就能繼續保持。}}"
+  },
+  "favourite": {
+    "makeFavourite": "設為最愛",
+    "isFavourite": "你的最愛",
+    "makeFavouriteAria": "把{name}設為你的最愛",
+    "heartAria": "為{name}點亮愛心",
+    "heartFavouriteAria": "{name}是你的最愛，愛心會一直保留",
+    "learnFirst": {
+      "question": "接下來學習{name}的進化鏈嗎？",
+      "body": "在每日新卡片上限內，這些寶可夢會成為你接下來的新卡片。",
+      "yes": "好的",
+      "no": "不用了"
+    },
+    "partner": {
+      "heading": "你的夥伴",
+      "playCry": "播放{name}的叫聲",
+      "chooseFavourite": "選擇你的最愛",
+      "chooseFavouriteBody": "在圖鑑中挑選任意一隻寶可夢作為你的夥伴。"
+    },
+    "themeOffer": {
+      "question": "切換為{name}的配色嗎？",
+      "body": "你已掌握{name}，可以把它的配色用作應用程式主題。",
+      "yes": "切換配色",
+      "no": "保留目前配色"
+    },
+    "pastureSpotAria": "{name}，你的最愛"
   }
 }

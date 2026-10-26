@@ -42,6 +42,9 @@ vi.mock("@/lib/hooks/useLocalStorageKey", () => ({
   useLocalStorageKey: vi.fn(() => 0),
 }));
 
+// The partner has its own tests (TrainerCard, usePartner); here it is absent (#2187).
+vi.mock("@/components/favourite/usePartner", () => ({ usePartner: () => null }));
+
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: vi.fn(() => ({
     masteryRepetitions: 3,
