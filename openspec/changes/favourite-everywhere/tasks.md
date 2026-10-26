@@ -34,7 +34,7 @@
 
 ## 6. Sync and safety
 
-- [ ] 6.1 Reset progress clears theme, priority list and offer marker, keeps favourite and hearts; superuser exit leaves favourite and hearts alone. Verify: "Guest resets" and "Cheat theme, flag off" tests.
+- [x] 6.1 Reset progress clears theme, priority list and offer marker, keeps favourite and hearts; superuser exit leaves favourite and hearts alone. Verify: "Guest resets" and "Cheat theme, flag off" tests. Verified: `app/settings/page.test.tsx` "Guest resets" (red then green) and `lib/favourite/favourite.test.ts` "settingsAfterProgressReset"; `lib/theme/persistence.test.ts` "Cheat theme, flag off" (passes on first run: exit cleanup already only clears `favouriteTheme`).
 - [ ] 6.2 Integration test: a patch without `heartedSpeciesIds` leaves it in the cloud row; an array patch with one item removed removes it. Verify: `VITEST_INTEGRATION=1 npm run test:integration` against the local `postgres:15` container.
 - [ ] 6.3 Older-client test: shipped-shape settings parse drops the new keys and pushes no patch for them. Verify: a component-project test like the blast-radius proof (2026-10-26).
 

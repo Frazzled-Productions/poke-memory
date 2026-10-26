@@ -5,6 +5,7 @@ import {
   parseSpeciesId,
   parseSpeciesIdList,
   setFavouritePokemon,
+  settingsAfterProgressReset,
   toggleHeart,
 } from "./favourite";
 
@@ -80,3 +81,22 @@ describe("parseSpeciesId / parseSpeciesIdList", () => {
     expect(parseSpeciesIdList(null)).toEqual([]);
   });
 });
+
+describe("settingsAfterProgressReset", () => {
+  it("clears the theme, learn-first list and offer marker, keeps the favourite and hearts", () => {
+    const theme = { id: 94, name: "Gengar", colors: { primary: "#5A3E78", secondary: "#8B6EAE", accent: "#E23B3B", fgOnPrimary: "#FFFFFF" }, spriteUrl: null };
+    const next = settingsAfterProgressReset(settingsWith({
+      favouriteTheme: theme,
+      favouritePokemonId: 94,
+      heartedSpeciesIds: [94, 25],
+      priorityNewSpeciesIds: [92, 93],
+      favouriteThemeOfferedForId: 94,
+    }));
+    expect(next.favouriteTheme).toBeNull();
+    expect(next.priorityNewSpeciesIds).toEqual([]);
+    expect(next.favouriteThemeOfferedForId).toBeNull();
+    expect(next.favouritePokemonId).toBe(94);
+    expect(next.heartedSpeciesIds).toEqual([94, 25]);
+  });
+});
+

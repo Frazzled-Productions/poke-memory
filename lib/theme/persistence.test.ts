@@ -468,3 +468,37 @@ describe("carry-over of an existing theme to the favourite (#2187)", () => {
     expect(loadSettings().heartedSpeciesIds).toEqual([]);
   });
 });
+
+describe("superuser exit cleanup and the favourite (#2187)", () => {
+  let storage: ReturnType<typeof makeMockStorage>;
+
+  beforeEach(() => {
+    storage = makeMockStorage();
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
+    vi.stubGlobal("localStorage", storage);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("Cheat theme, flag off: the unearned theme is cleared and the favourite is whatever the cloud holds", () => {
+    const charizard = CURATED_POKEMON.find((p) => p.id === 6)!;
+    // After the force-pull, local settings hold the cloud's favourite and
+    // hearts (Pikachu) plus the cheat-selected Charizard theme.
+    storage.setItem(SETTINGS_KEY, JSON.stringify({
+      favouriteTheme: { id: 6, name: charizard.name, colors: charizard.colors, spriteUrl: null },
+      favouritePokemonId: 25,
+      heartedSpeciesIds: [25, 6],
+    }));
+    // The exit-cleanup step: no cards, flag off, so Charizard is not earned.
+    const favourite = loadFavourite();
+    expect(isFavouriteEarned(favourite, [], false, ["en"])).toBe(false);
+    saveFavourite(null);
+
+    const after = loadSettings();
+    expect(after.favouriteTheme).toBeNull();
+    expect(after.favouritePokemonId).toBe(25);
+    expect(after.heartedSpeciesIds).toEqual([25, 6]);
+  });
+});

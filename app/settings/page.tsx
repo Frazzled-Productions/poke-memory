@@ -13,6 +13,7 @@ import {
   DEFAULT_ONBOARDING,
 } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
+import { settingsAfterProgressReset } from "@/lib/favourite/favourite";
 import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -818,7 +819,7 @@ export default function SettingsPage() {
     } else {
       await clearLocalProgress();
     }
-    saveFavourite(null);
+    saveSettings(settingsAfterProgressReset(loadSettings()));
     setFavouriteId(null);
     updateFavourite(null);
     router.replace("/");

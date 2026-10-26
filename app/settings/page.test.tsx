@@ -2110,3 +2110,40 @@ describe("SettingsPage - lifted feedback row (#1847 / #1849)", () => {
     });
   });
 });
+
+describe("SettingsPage - reset progress keeps the favourite (#2187)", () => {
+  it("Guest resets: theme, learn-first list and offer marker are cleared; favourite and hearts kept", async () => {
+    const gengarTheme = {
+      id: 94,
+      name: "Gengar",
+      colors: { primary: "#5A3E78", secondary: "#8B6EAE", accent: "#E23B3B", fgOnPrimary: "#FFFFFF" },
+      spriteUrl: "/sprites/pokemon/94.png",
+    };
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      favouriteTheme: gengarTheme,
+      favouritePokemonId: 94,
+      heartedSpeciesIds: [94, 25],
+      priorityNewSpeciesIds: [92, 93],
+      favouriteThemeOfferedForId: 94,
+    });
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Reset all progress" }));
+    await user.type(screen.getByPlaceholderText("Type RESET to confirm"), "RESET");
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+
+    await waitFor(() => {
+      expect(mockSaveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          favouriteTheme: null,
+          priorityNewSpeciesIds: [],
+          favouriteThemeOfferedForId: null,
+          favouritePokemonId: 94,
+          heartedSpeciesIds: [94, 25],
+        }),
+      );
+    });
+  });
+});
