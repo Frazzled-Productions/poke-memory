@@ -218,7 +218,7 @@ chosen in this order: its `CURATED_POKEMON` entry; else the palette extracted fr
 
 #### Scenario: Extraction fails the check
 
-- **WHEN** the colours extracted from a pale sprite give `primary` below 3:1 against the light background
+- **WHEN** none of a sprite's candidate primaries (three hues, each with its lightness steps) passes the checks
 - **THEN** that species uses its primary type's palette
 
 #### Scenario: Coverage test
@@ -230,13 +230,31 @@ chosen in this order: its `CURATED_POKEMON` entry; else the palette extracted fr
 
 The checks SHALL be: `fgOnPrimary` against `primary` at a contrast ratio of at
 least 4.5:1, and `primary` against both the light page background and the dark page background at
-least 3:1. Every type palette SHALL pass the same checks. The palettes SHALL be committed in
+least 3:1. Every generated and type palette SHALL pass them; curated palettes are hand-tuned
+overrides and SHALL be exempt. The palettes SHALL be committed in
 `lib/theme/generated-palettes.json`, covering every species in the seed.
 
 #### Scenario: Type palettes pass
 
 - **WHEN** the unit tests run
 - **THEN** every one of the 18 type palettes passes both checks
+
+#### Scenario: Curated palette below the bar
+
+- **WHEN** Pikachu's curated primary `#D4A800` is 2.1:1 on the light background
+- **THEN** Pikachu still uses its curated palette
+
+### Requirement: Extraction tries several hues before falling back
+
+Before a species falls back to its type palette, `npm run seed:palettes` SHALL try up to three of the
+sprite's most common distinct hues as `primary`, each at its extracted lightness and then stepped by
+at most 15 percentage points of HSL lightness either way (hue and saturation unchanged), and SHALL
+keep the first candidate that passes the checks.
+
+#### Scenario: Pale yellow sprite
+
+- **WHEN** a sprite's dominant yellow is 2:1 on the light background but passes once darkened by 12 points
+- **THEN** that species gets the darkened yellow as `primary`, not its type palette
 
 ### Requirement: The theme comes from a mastered species (MODIFIED from the baseline curated rule)
 
