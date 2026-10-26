@@ -82,6 +82,7 @@ export function FavouritePokemonSection() {
       )}
       <SpeciesSearch
         speciesIds={allSpecies}
+        revealedIds={mastered}
         label={t("searchLabel")}
         placeholder={t("searchPlaceholder")}
         noResults={t("noResults")}

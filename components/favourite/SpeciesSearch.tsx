@@ -10,6 +10,7 @@ import { getLocaleName, getTransliteration, loadLocaleNames } from "@/lib/pokemo
 import type { TransliterationLocale } from "@/lib/pokemon/seed";
 import { STATS_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { colStack, mutedTextXs } from "@/lib/utils/class-names";
+import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 
 /** How many matches the search lists at once. */
 const MAX_RESULTS = 12;
@@ -18,6 +19,7 @@ function SpeciesSearchRow({
   speciesId,
   englishName,
   spriteUrl,
+  revealed,
   actionLabel,
   actionAria,
   onChoose,
@@ -25,6 +27,7 @@ function SpeciesSearchRow({
   speciesId: number;
   englishName: string;
   spriteUrl: string;
+  revealed: boolean;
   actionLabel: string;
   actionAria: (name: string) => string;
   onChoose: (speciesId: number) => void;
@@ -37,7 +40,7 @@ function SpeciesSearchRow({
         alt=""
         width={STATS_SPRITE_SIZE}
         height={STATS_SPRITE_SIZE}
-        className="h-12 w-12 object-contain"
+        className={revealed ? "h-12 w-12 object-contain" : "h-12 w-12 object-contain brightness-0"}
       />
       <span className="flex-1 text-sm font-medium text-foreground">{name}</span>
       <button
@@ -55,10 +58,12 @@ function SpeciesSearchRow({
 /**
  * A name search over a set of species (#2187), matching the English name and
  * the name (and transliteration) in the active learning locale. Lists the
- * first matches, each with one action button.
+ * first matches, each with one action button. Species outside `revealedIds`
+ * (when given) show as silhouettes, as the partner does until mastered.
  */
 export function SpeciesSearch({
   speciesIds,
+  revealedIds,
   label,
   placeholder,
   noResults,
@@ -67,6 +72,7 @@ export function SpeciesSearch({
   onChoose,
 }: {
   speciesIds: ReadonlySet<number>;
+  revealedIds?: ReadonlySet<number> | null;
   label: string;
   placeholder: string;
   noResults: string;
@@ -76,6 +82,7 @@ export function SpeciesSearch({
 }) {
   const seed = useSeed().seed ?? getSeedIfLoaded();
   const { locale } = usePokemonLocaleContext();
+  const { flags } = useSuperuser();
   const [query, setQuery] = useState("");
   // Re-render once the locale-names sidecar has loaded so locale matches work.
   const [, setNamesLoaded] = useState(false);
@@ -124,6 +131,7 @@ export function SpeciesSearch({
               speciesId={p.id}
               englishName={p.name}
               spriteUrl={p.spriteUrl}
+              revealed={revealedIds === undefined || flags.pretendAllMastered || (revealedIds?.has(p.id) ?? false)}
               actionLabel={actionLabel}
               actionAria={actionAria}
               onChoose={onChoose}

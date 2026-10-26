@@ -161,6 +161,11 @@ matches names in the active learning locale. Setting a favourite SHALL also hear
 - **WHEN** a new player opens Bulbasaur's (silhouette) detail page and taps "Make favourite"
 - **THEN** `favouritePokemonId` is 1, Bulbasaur is hearted, and the colours on screen do not change
 
+#### Scenario: Unlearned species in the search
+
+- **WHEN** the player searches "gengar" in Settings and Gengar is not mastered (and `pretendAllMastered` is off)
+- **THEN** Gengar's row shows its silhouette with its name, while mastered species show their full sprite
+
 #### Scenario: Search in Japanese
 
 - **WHEN** the active learning locale is `ja` and the player types "ゲンガー" in the Settings favourite search

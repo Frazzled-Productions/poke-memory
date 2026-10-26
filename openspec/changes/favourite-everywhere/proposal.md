@@ -174,3 +174,4 @@ All from Fraser on 2026-10-26 (grilling recorded on #2187):
 - 2026-10-26 Q: Only 261 of 1025 extracted palettes passed contrast; what now? A: Smarter extraction first (up to 3 hues, bounded lightness steps), type palette as the last resort.
 - 2026-10-26 Q: Curated palettes fail the new checks; exempt them? A: Yes, exempt and unchanged.
 - 2026-10-26 Q: The learn-first 'already asked' marker was device-local; sync it? A: Yes, as a fifth synced key (built as the list `learnFirstAskedSpeciesIds`).
+- 2026-10-26 Q: Should the Settings favourite search show unlearned species in full? A: No: silhouette with the name, as the partner shows until mastered.

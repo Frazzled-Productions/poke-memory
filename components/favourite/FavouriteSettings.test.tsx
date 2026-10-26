@@ -58,6 +58,27 @@ beforeEach(() => {
 });
 
 describe("Settings: favourite Pokémon (#2187)", () => {
+  it("Unlearned species show as silhouettes in the favourite search; mastered ones in full", async () => {
+    mockMastered.value = new Set([25]);
+    renderWithIntl(<FavouritePokemonSection />);
+    const search = await screen.findByLabelText("Search all Pokémon");
+    await userEvent.type(search, "pikachu");
+    const pikachuRow = (await screen.findByRole("button", { name: "Make Pikachu your favourite" })).closest("li")!;
+    expect(pikachuRow.querySelector("img")!.className).not.toContain("brightness-0");
+    await userEvent.clear(search);
+    await userEvent.type(search, "gengar");
+    const gengarRow = (await screen.findByRole("button", { name: "Make Gengar your favourite" })).closest("li")!;
+    expect(gengarRow.querySelector("img")!.className).toContain("brightness-0");
+  });
+
+  it("pretendAllMastered reveals every species in the favourite search", async () => {
+    mockPretend.value = true;
+    renderWithIntl(<FavouritePokemonSection />);
+    await userEvent.type(await screen.findByLabelText("Search all Pokémon"), "gengar");
+    const row = (await screen.findByRole("button", { name: "Make Gengar your favourite" })).closest("li")!;
+    expect(row.querySelector("img")!.className).not.toContain("brightness-0");
+  });
+
   it("Search in Japanese: ゲンガー finds Gengar, which can be made the favourite", async () => {
     mockLocale.value = "ja";
     renderWithIntl(<FavouritePokemonSection />, { locale: "ja" });
