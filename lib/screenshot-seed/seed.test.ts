@@ -145,6 +145,19 @@ describe("buildScreenshotSeed()", () => {
     });
   });
 
+  describe("favourite (#2187)", () => {
+    it("sets a mastered favourite (Charmander), hearted, with the colours offer already answered", () => {
+      const seed = buildScreenshotSeed();
+      expect(seed.favourite).toEqual({
+        favouritePokemonId: 4,
+        heartedSpeciesIds: [4, 1, 7],
+        favouriteThemeOfferedForId: 4,
+      });
+      const name = seed.session.cards.find((c: { id: number; cardType: string }) => c.id === 4 && c.cardType === "name");
+      expect(name?.state.scheduledDays).toBeGreaterThanOrEqual(21);
+    });
+  });
+
   describe("gradeLog", () => {
     it("contains at least 300 entries (covering ~30 days)", () => {
       const { gradeLog } = buildScreenshotSeed() as Seed;

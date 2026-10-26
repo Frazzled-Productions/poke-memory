@@ -123,6 +123,7 @@ async function writeSeedToPage(page, seed) {
       gradeLog,
       streakDates,
       masteredCountByLocale,
+      favourite,
       keys,
       pikachuStepStartedAt,
     } = payload;
@@ -161,6 +162,8 @@ async function writeSeedToPage(page, seed) {
     })();
     localStorage.setItem(keys.KEY_SETTINGS, JSON.stringify({
       ...existingSettings,
+      // The seed's favourite and hearts (#2187).
+      ...favourite,
       // Zero new-card budgets: prevents the ~932 un-seeded species from
       // being introduced as new cards by hydrateSession.
       maxNewPerDay: 0,
@@ -248,6 +251,7 @@ async function writeSeedToPage(page, seed) {
     gradeLog: seed.gradeLog,
     streakDates: seed.streakDates,
     masteredCountByLocale: seed.masteredCountByLocale,
+    favourite: seed.favourite,
     keys: seed.keys,
     // Compute the live timestamp in Node context (before passing to the page)
     // so the page's evaluate receives a plain number and does not call Date.now()
