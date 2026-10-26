@@ -8,7 +8,7 @@ import { join } from "node:path";
 describe("ReviewSession passes priorityNewSpeciesIds to every buildSessionQueues call", () => {
   it("each of the four calls passes the list", () => {
     const text = readFileSync(join(process.cwd(), "components/review/ReviewSession.tsx"), "utf8");
-    const calls = [...text.matchAll(/buildSessionQueues\(([^;]*?)\);/gs)].map((m) => m[1]);
+    const calls = [...text.matchAll(/buildSessionQueues\(([\s\S]*?)\);/g)].map((m) => m[1]);
     expect(calls).toHaveLength(4);
     const missing = calls.filter((args) => !/priorityNewSpeciesIds\s*,?\s*$/.test(args.trim()));
     expect(missing).toEqual([]);
