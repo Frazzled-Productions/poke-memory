@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   loadFavourite,
 } from "@/lib/theme/persistence";
@@ -22,13 +22,14 @@ import { KEY_SETTINGS, KEY_LEGACY_FAVOURITE_THEME } from "@/lib/storage/keys";
 //
 // The colours applied are the species' current palette, not the stored ones,
 // so palette fixes reach existing players (#2187). The palettes module is
-// loaded on demand so its JSON stays out of the shared layout chunk.
+// loaded on demand so its JSON stays out of the shared layout chunk; if that
+// load fails, the stored colours are used.
 async function resolveFavourite(): Promise<StoredFavourite | null> {
   const stored = loadFavourite();
   if (stored === null) return null;
   // Keep the stored favourite (grandfather: no auto-wipe on load).
-  const { paletteFor } = await import("@/lib/theme/palette");
-  return { ...stored, colors: paletteFor(stored.id) ?? stored.colors };
+  const palette = await import("@/lib/theme/palette").catch(() => null);
+  return { ...stored, colors: palette?.paletteFor(stored.id) ?? stored.colors };
 }
 
 type FavouriteContextValue = {
@@ -51,8 +52,12 @@ export function FavouriteThemeProvider({
   children: React.ReactNode;
 }) {
   const [favourite, setFavourite] = useState<StoredFavourite | null>(null);
+  // Bumped on every resolve and update, so a slow resolve that finishes after
+  // a newer one (or an explicit update) is ignored.
+  const latest = useRef(0);
 
   const updateFavourite = (f: StoredFavourite | null) => {
+    latest.current += 1;
     setFavourite(f);
     applyTheme(f?.colors ?? null);
   };
@@ -64,7 +69,14 @@ export function FavouriteThemeProvider({
     // re-applies it once the IDB favourite lookup resolves.
     applyIntensity(loadSettings().themeIntensity);
 
-    void resolveFavourite().then((stored) => {
+    function resolveLatest(apply: (f: StoredFavourite | null) => void) {
+      const call = (latest.current += 1);
+      void resolveFavourite().then((f) => {
+        if (call === latest.current) apply(f);
+      });
+    }
+
+    resolveLatest((stored) => {
       setFavourite(stored);
       applyTheme(stored?.colors ?? null);
       applyIntensity(loadSettings().themeIntensity);
@@ -77,7 +89,7 @@ export function FavouriteThemeProvider({
       if (e.key !== KEY_SETTINGS && e.key !== KEY_LEGACY_FAVOURITE_THEME) {
         return;
       }
-      void resolveFavourite().then((updated) => {
+      resolveLatest((updated) => {
         setFavourite(updated);
         applyTheme(updated?.colors ?? null);
         applyIntensity(loadSettings().themeIntensity);
@@ -88,7 +100,7 @@ export function FavouriteThemeProvider({
       // Same-tab updates dispatched by saveSettings - cross-tab updates come
       // via the native StorageEvent above.
       applyIntensity(loadSettings().themeIntensity);
-      void resolveFavourite().then((updated) => {
+      resolveLatest((updated) => {
         setFavourite(updated);
         applyTheme(updated?.colors ?? null);
       });
