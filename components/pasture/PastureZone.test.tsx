@@ -256,3 +256,34 @@ describe("PastureZone - biomeHref prop (optional link)", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });
+
+describe("PastureZone - the favourite's spot (#2187)", () => {
+  const LABEL = {
+    en: "Bulbasaur, your favourite",
+    ja: "お気に入りのBulbasaur",
+    "zh-Hans": "Bulbasaur，你的最爱",
+    "zh-Hant": "Bulbasaur，你的最愛",
+  } as const;
+
+  for (const locale of Object.keys(LABEL) as (keyof typeof LABEL)[]) {
+    it(`Mastered partner: the favourite is highlighted and labelled (${locale})`, () => {
+      const card = makeCard();
+      renderWithIntl(
+        <PastureZone
+          zone={GRASSLAND_ZONE}
+          placements={[{ ...makePlacement(card), favourite: true }]}
+          onMarkSeen={vi.fn()}
+        />,
+        { locale },
+      );
+      expect(screen.getByRole("img", { name: LABEL[locale] })).toBeInTheDocument();
+    });
+  }
+
+  it("other Pokémon get no highlight", () => {
+    renderWithIntl(
+      <PastureZone zone={GRASSLAND_ZONE} placements={[makePlacement(makeCard())]} onMarkSeen={vi.fn()} />,
+    );
+    expect(screen.queryByRole("img", { name: LABEL.en })).not.toBeInTheDocument();
+  });
+});
