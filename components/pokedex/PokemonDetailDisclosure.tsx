@@ -503,7 +503,6 @@ export function PokemonDetailDisclosure({
         <FavouriteControls
           speciesId={pokemon.speciesId}
           name={isLocked ? t("lockedAriaLabel", { number: zeroPad(id) }) : pokemonLocaleName}
-          mastered={isMasteredCard}
         />
       </div>
 

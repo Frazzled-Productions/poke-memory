@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { isHearted, setFavouritePokemon, toggleHeart } from "@/lib/favourite/favourite";
 import { useStoredSettings } from "./useStoredSettings";
+import { useMasteredSpecies } from "./useMasteredSpecies";
 import { LearnFirstQuestion, makeFavourite } from "./LearnFirstQuestion";
 
 const TOGGLE_BASE =
@@ -16,26 +17,27 @@ const TOGGLE_ON = "border-rose-500 bg-rose-500 text-white";
 /**
  * "Make favourite" and heart toggles on a Pokédex detail page (#2187),
  * silhouettes included. `name` labels the buttons: the localised name, or
- * the locked number label on a silhouette page. Setting an unmastered
- * favourite asks once, per species, whether to learn its evolution line next.
+ * the locked number label on a silhouette page. Setting a favourite not
+ * mastered at species level (both legs in any enrolled locale, or
+ * `pretendAllMastered`) asks once, per species, whether to learn its
+ * evolution line next.
  */
 export function FavouriteControls({
   speciesId,
   name,
-  mastered,
 }: {
   speciesId: number;
   name: string;
-  /** Mastered at species level (or `pretendAllMastered`): no learn-first question. */
-  mastered: boolean;
 }) {
   const t = useTranslations("favourite");
   const settings = useStoredSettings();
+  const masteredSpecies = useMasteredSpecies();
   const [askingLearnFirst, setAskingLearnFirst] = useState(false);
-  if (settings === null) return null;
+  if (settings === null || masteredSpecies === null) return null;
 
   const isFavourite = settings.favouritePokemonId === speciesId;
   const hearted = isHearted(settings, speciesId);
+  const mastered = masteredSpecies.has(speciesId);
 
   function handleFavourite() {
     if (loadSettings().favouritePokemonId === speciesId) {

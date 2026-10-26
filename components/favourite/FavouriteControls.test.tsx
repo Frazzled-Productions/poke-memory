@@ -5,12 +5,14 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/lib/settings/per
 import type { AppLocale } from "@/i18n/locales";
 import { FavouriteControls } from "./FavouriteControls";
 
+const { mockCards } = vi.hoisted(() => ({ mockCards: { value: [] as unknown[] } }));
 vi.mock("@/lib/review/persistence", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/review/persistence")>()),
-  loadSession: () => Promise.resolve(null),
+  loadSession: () => Promise.resolve({ cards: mockCards.value }),
 }));
 
 beforeEach(() => {
+  mockCards.value = [];
   window.localStorage.clear();
   saveSettings({ ...DEFAULT_SETTINGS });
 });
@@ -45,7 +47,7 @@ const LABELS: Record<AppLocale, { make: string; heart: string; favouriteHeart: s
 describe("FavouriteControls (#2187)", () => {
   for (const locale of Object.keys(LABELS) as AppLocale[]) {
     it(`Screen reader: toggle buttons with localised labels (${locale})`, async () => {
-      renderWithIntl(<FavouriteControls speciesId={94} name="Gengar" mastered={false} />, { locale });
+      renderWithIntl(<FavouriteControls speciesId={94} name="Gengar" />, { locale });
       const make = await screen.findByRole("button", { name: LABELS[locale].make });
       const heart = screen.getByRole("button", { name: LABELS[locale].heart });
       expect(make).toHaveAttribute("aria-pressed", "false");
@@ -59,7 +61,7 @@ describe("FavouriteControls (#2187)", () => {
   }
 
   it("Favourite before learning it: sets the favourite and hearts it, theme untouched", async () => {
-    renderWithIntl(<FavouriteControls speciesId={1} name="#001" mastered={false} />);
+    renderWithIntl(<FavouriteControls speciesId={1} name="#001" />);
     await userEvent.click(await screen.findByRole("button", { name: "Make #001 your favourite" }));
     const s = loadSettings();
     expect(s.favouritePokemonId).toBe(1);
@@ -69,7 +71,7 @@ describe("FavouriteControls (#2187)", () => {
 
   it("Heart and un-heart: newest first, then removed", async () => {
     saveSettings({ ...loadSettings(), heartedSpeciesIds: [25] });
-    renderWithIntl(<FavouriteControls speciesId={143} name="Snorlax" mastered />);
+    renderWithIntl(<FavouriteControls speciesId={143} name="Snorlax" />);
     const heart = await screen.findByRole("button", { name: "Heart Snorlax" });
     await waitFor(() => expect(heart).toHaveAttribute("aria-pressed", "false"));
     await userEvent.click(heart);
@@ -81,7 +83,7 @@ describe("FavouriteControls (#2187)", () => {
 
   it("The favourite's heart: tapping it keeps it hearted", async () => {
     saveSettings({ ...loadSettings(), favouritePokemonId: 94, heartedSpeciesIds: [94] });
-    renderWithIntl(<FavouriteControls speciesId={94} name="Gengar" mastered />);
+    renderWithIntl(<FavouriteControls speciesId={94} name="Gengar" />);
     const heart = await screen.findByRole("button", { name: "Gengar is your favourite, so it stays hearted" });
     await userEvent.click(heart);
     expect(loadSettings().heartedSpeciesIds).toEqual([94]);
@@ -90,7 +92,7 @@ describe("FavouriteControls (#2187)", () => {
 
   it("Clear from the Pokédex: tapping Make favourite again clears it, hearts kept", async () => {
     saveSettings({ ...loadSettings(), favouritePokemonId: 94, heartedSpeciesIds: [94] });
-    renderWithIntl(<FavouriteControls speciesId={94} name="Gengar" mastered />);
+    renderWithIntl(<FavouriteControls speciesId={94} name="Gengar" />);
     const make = await screen.findByRole("button", { name: "Make Gengar your favourite" });
     await waitFor(() => expect(make).toHaveAttribute("aria-pressed", "true"));
     await userEvent.click(make);
@@ -99,7 +101,7 @@ describe("FavouriteControls (#2187)", () => {
   });
 
   it("Yes: puts Haunter's line in the learn-first list", async () => {
-    renderWithIntl(<FavouriteControls speciesId={93} name="Haunter" mastered={false} />);
+    renderWithIntl(<FavouriteControls speciesId={93} name="Haunter" />);
     await userEvent.click(await screen.findByRole("button", { name: "Make Haunter your favourite" }));
     await userEvent.click(screen.getByRole("button", { name: "Yes" }));
     await waitFor(() => expect(loadSettings().priorityNewSpeciesIds).toEqual([92, 93, 94]));
@@ -107,7 +109,7 @@ describe("FavouriteControls (#2187)", () => {
   });
 
   it("No: changes nothing and the question is not asked again for that species", async () => {
-    const { unmount } = renderWithIntl(<FavouriteControls speciesId={93} name="Haunter" mastered={false} />);
+    const { unmount } = renderWithIntl(<FavouriteControls speciesId={93} name="Haunter" />);
     const make = await screen.findByRole("button", { name: "Make Haunter your favourite" });
     await userEvent.click(make);
     await userEvent.click(screen.getByRole("button", { name: "No, thanks" }));
@@ -122,13 +124,18 @@ describe("FavouriteControls (#2187)", () => {
 
   it("Second device: a question already asked on another device is not asked again", async () => {
     saveSettings({ ...loadSettings(), learnFirstAskedSpeciesIds: [93] });
-    renderWithIntl(<FavouriteControls speciesId={93} name="Haunter" mastered={false} />);
+    renderWithIntl(<FavouriteControls speciesId={93} name="Haunter" />);
     await userEvent.click(await screen.findByRole("button", { name: "Make Haunter your favourite" }));
     expect(screen.queryByText("Learn Haunter's evolution line next?")).not.toBeInTheDocument();
   });
 
   it("Already mastered: no question is asked", async () => {
-    renderWithIntl(<FavouriteControls speciesId={94} name="Gengar" mastered />);
+    const mastered = { stability: 30, firstSeen: "2026-01-01", lastReview: "2026-02-01", dueDate: "2026-03-01" };
+    mockCards.value = [
+      { cardType: "name", id: 94, locale: "en", state: mastered },
+      { cardType: "reverse", id: 2_000_094, locale: "en", state: mastered },
+    ];
+    renderWithIntl(<FavouriteControls speciesId={94} name="Gengar" />);
     await userEvent.click(await screen.findByRole("button", { name: "Make Gengar your favourite" }));
     expect(loadSettings().favouritePokemonId).toBe(94);
     expect(screen.queryByText("Learn Gengar's evolution line next?")).not.toBeInTheDocument();
