@@ -228,6 +228,9 @@ vi.mock("@/lib/gradelog/persistence", async (importOriginal) => {
   };
 });
 
+// The partner (#2187) has its own tests; here there is no favourite.
+vi.mock("@/components/favourite/usePartner", () => ({ usePartner: () => null }));
+
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: () => mockLoadSettings(),
   saveSettings: vi.fn(),

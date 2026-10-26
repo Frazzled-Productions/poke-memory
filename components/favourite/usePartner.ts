@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadSession, STORAGE_KEY as SESSION_STORAGE_KEY } from "@/lib/review/persistence";
+import { loadSession } from "@/lib/review/persistence";
+import { KEY_REVIEW_SESSION } from "@/lib/storage/keys";
 import type { ReviewableCard } from "@/lib/review/session";
 import { masteredSpeciesUnion } from "@/lib/theme/persistence";
 import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
@@ -23,7 +24,7 @@ export type Partner = {
 export function usePartner(): Partner | null | undefined {
   const settings = useStoredSettings();
   const { flags } = useSuperuser();
-  const sessionVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
+  const sessionVersion = useLocalStorageKey(KEY_REVIEW_SESSION);
   const [cards, setCards] = useState<readonly ReviewableCard[] | null>(null);
 
   useEffect(() => {

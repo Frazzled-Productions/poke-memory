@@ -465,3 +465,101 @@ describe("generateMilestoneShareImage", () => {
     expect(textArgs).toContain("MILESTONE");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Partner (#2187)
+// ---------------------------------------------------------------------------
+
+describe("share images with the partner (#2187)", () => {
+  type Stub = ReturnType<typeof makeCtxStub> & {
+    drawImage: ReturnType<typeof vi.fn>;
+    globalCompositeOperation: string;
+    compositeOps: string[];
+  };
+
+  /** Every canvas gets its own stub; all stubs are returned for assertions. */
+  function mockCanvases(): Stub[] {
+    const stubs: Stub[] = [];
+    const originalCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag !== "canvas") return originalCreate(tag);
+      const canvas = originalCreate("canvas") as HTMLCanvasElement;
+      const compositeOps: string[] = [];
+      const stub = Object.assign(makeCtxStub(), { drawImage: vi.fn(), compositeOps }) as unknown as Stub;
+      Object.defineProperty(stub, "globalCompositeOperation", {
+        get: () => compositeOps[compositeOps.length - 1] ?? "source-over",
+        set: (v: string) => compositeOps.push(v),
+      });
+      stubs.push(stub);
+      canvas.getContext = (() => stub) as unknown as typeof canvas.getContext;
+      canvas.toBlob = (cb: (b: Blob | null) => void) => {
+        Promise.resolve().then(() => cb(new Blob(["png"], { type: "image/png" })));
+      };
+      return canvas;
+    });
+    return stubs;
+  }
+
+  /** An Image that "loads" as soon as its src is set. */
+  class LoadingImage {
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    width = 96;
+    height = 96;
+    set src(_v: string) {
+      Promise.resolve().then(() => this.onload?.());
+    }
+  }
+
+  const DAILY = { date: "2026-05-12", streak: 7, reviewed: 24, newCards: 6, mastered: 2, gradeSequence: [4] };
+
+  it("Unmastered partner on a share image: silhouette and name", async () => {
+    vi.stubGlobal("Image", LoadingImage);
+    const stubs = mockCanvases();
+    const blob = await generateDailyShareImage(DAILY, {
+      spriteUrl: "/sprites/pokemon/94.png",
+      name: "Gengar",
+      silhouette: true,
+    });
+    expect(blob).not.toBeNull();
+    const all = stubs.flatMap((s) => s.fillText.mock.calls.map((c) => c[0]));
+    expect(all).toContain("Gengar");
+    expect(stubs.some((s) => s.compositeOps.includes("source-in"))).toBe(true);
+    expect(stubs.some((s) => s.drawImage.mock.calls.length > 0)).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("Mastered partner on the milestone image: full sprite, no silhouette", async () => {
+    vi.stubGlobal("Image", LoadingImage);
+    const stubs = mockCanvases();
+    await generateMilestoneShareImage(
+      { heroNumber: "100", heroLabel: "Pokémon mastered" },
+      { spriteUrl: "/sprites/pokemon/94.png", name: "Gengar", silhouette: false },
+    );
+    const all = stubs.flatMap((s) => s.fillText.mock.calls.map((c) => c[0]));
+    expect(all).toContain("Gengar");
+    expect(stubs.some((s) => s.compositeOps.includes("source-in"))).toBe(false);
+    expect(stubs.some((s) => s.drawImage.mock.calls.length > 0)).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("No partner: nothing is drawn beyond the card", async () => {
+    const stubs = mockCanvases();
+    await generateDailyShareImage(DAILY);
+    expect(stubs.every((s) => s.drawImage.mock.calls.length === 0)).toBe(true);
+  });
+
+  it("a sprite that fails to load still produces the card, with the name", async () => {
+    class FailingImage extends LoadingImage {
+      set src(_v: string) {
+        Promise.resolve().then(() => this.onerror?.());
+      }
+    }
+    vi.stubGlobal("Image", FailingImage);
+    const stubs = mockCanvases();
+    const blob = await generateDailyShareImage(DAILY, { spriteUrl: "/x.png", name: "Gengar", silhouette: true });
+    expect(blob).not.toBeNull();
+    expect(stubs.flatMap((s) => s.fillText.mock.calls.map((c) => c[0]))).toContain("Gengar");
+    vi.unstubAllGlobals();
+  });
+});
