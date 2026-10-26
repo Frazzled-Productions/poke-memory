@@ -112,7 +112,10 @@
         "remove": "Remove",
         "lockedHeading": "App Theme",
         "lockedBody": "Master your first Pokémon to unlock themes.",
-        "practiceLink": "Go to Practice"
+        "practiceLink": "Go to Practice",
+        "searchLabel": "Search your mastered Pokémon",
+        "matchFavourite": "Match my favourite",
+        "current": "Current theme: {name}"
       },
       "intensityPicker": {
         "heading": "Theme intensity",
@@ -122,6 +125,16 @@
         "tintedDescription": "A light wash of your mascot colour tints the page background.",
         "fullLabel": "Full mascot theme",
         "fullDescription": "Your mascot colour drives all backgrounds: loud by design."
+      },
+      "favourite": {
+        "heading": "Favourite Pokémon",
+        "description": "Your favourite is your partner on Journey, in Pasture and on the all-done screen. Any Pokémon can be your favourite.",
+        "current": "Your favourite: {name}",
+        "none": "No favourite chosen yet.",
+        "searchLabel": "Search all Pokémon",
+        "searchPlaceholder": "Type a name",
+        "clear": "Clear favourite",
+        "noResults": "No Pokémon match that name."
       }
     },
     "practice": {
@@ -573,7 +586,8 @@
       "formCategoryPrimal": "Primal Reversion",
       "noAlternateForms": "No alternate forms in the current seed.",
       "matchCount": "{match} of {total} Pokémon match",
-      "hiddenCardsPaused": "Hidden cards are paused: their review dates shift forward by the time they're hidden, so removing the scope won't flood your queue with overdue reviews."
+      "hiddenCardsPaused": "Hidden cards are paused: their review dates shift forward by the time they're hidden, so removing the scope won't flood your queue with overdue reviews.",
+      "presetFavourites": "Favourites"
     },
     "direction": {
       "name": "Name this Pokémon",
@@ -723,7 +737,8 @@
     "generationPokemonAriaLabel": "{name} Pokémon",
     "firstReviewed": "First reviewed {date}",
     "mastered": "Mastered",
-    "masteredAround": "Mastered around {date}"
+    "masteredAround": "Mastered around {date}",
+    "heartedBadge": "Hearted"
   },
   "pasture": {
     "title": "Pasture",
@@ -1266,5 +1281,31 @@
   "pushStreak": {
     "title": "Keep your streak going",
     "body": "You're on a {days, plural, one {# day} other {# days}} streak. A few minutes today keeps it going."
+  },
+  "favourite": {
+    "makeFavourite": "Make favourite",
+    "isFavourite": "Your favourite",
+    "makeFavouriteAria": "Make {name} your favourite",
+    "heartAria": "Heart {name}",
+    "heartFavouriteAria": "{name} is your favourite, so it stays hearted",
+    "learnFirst": {
+      "question": "Learn {name}'s evolution line next?",
+      "body": "Its Pokémon would be your next new cards, within your usual daily limit.",
+      "yes": "Yes",
+      "no": "No, thanks"
+    },
+    "partner": {
+      "heading": "Your partner",
+      "playCry": "Play {name}'s cry",
+      "chooseFavourite": "Choose your favourite",
+      "chooseFavouriteBody": "Pick any Pokémon in the Pokédex to be your partner."
+    },
+    "themeOffer": {
+      "question": "Switch to {name}'s colours?",
+      "body": "You have mastered {name}, so its colours can be your app theme.",
+      "yes": "Switch colours",
+      "no": "Keep my colours"
+    },
+    "pastureSpotAria": "{name}, your favourite"
   }
 }

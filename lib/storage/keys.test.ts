@@ -26,6 +26,7 @@ import {
   KEY_LEGACY_FAVOURITE_THEME,
   KEY_LEGACY_PRACTICE_SCOPE,
   KEY_CLIENT_SALT,
+  KEY_LEARN_FIRST_ASKED,
 } from "./keys";
 
 describe("localStorage key registry - byte-exact strings", () => {
@@ -70,4 +71,7 @@ describe("localStorage key registry - byte-exact strings", () => {
 
   it("KEY_CLIENT_SALT", () =>
     expect(KEY_CLIENT_SALT).toBe("poke-memory:client-salt:v1"));
+
+  it("KEY_LEARN_FIRST_ASKED", () =>
+    expect(KEY_LEARN_FIRST_ASKED).toBe("poke-memory:learn-first-asked:v1"));
 });

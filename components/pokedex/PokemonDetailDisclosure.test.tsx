@@ -115,17 +115,23 @@ vi.mock("@/lib/stats/legStatus", async (importOriginal) => ({
 
 // loadSettings (#1948) - fixed dateFormat/timezone so the first-reviewed date
 // assertions are deterministic regardless of the CI machine's locale/tz.
+// The rest of the settings are the defaults, for the favourite controls (#2187).
 const { mockLoadSettings } = vi.hoisted(() => ({
   mockLoadSettings: vi.fn(() => ({
     dateFormat: "dmy" as const,
     timezone: "UTC",
   })),
 }));
-vi.mock("@/lib/settings/persistence", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/settings/persistence")>()),
-  loadSettings: (() =>
-    mockLoadSettings()) as typeof import("@/lib/settings/persistence").loadSettings,
-}));
+vi.mock("@/lib/settings/persistence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/settings/persistence")>();
+  return {
+    ...actual,
+    loadSettings: (() => ({
+      ...actual.DEFAULT_SETTINGS,
+      ...mockLoadSettings(),
+    })) as typeof import("@/lib/settings/persistence").loadSettings,
+  };
+});
 
 // useSpeciesMasteryDate (#1956) - default to null so existing tests (which
 // predate the derived mastery date) are unaffected; the dedicated describe

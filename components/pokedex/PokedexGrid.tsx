@@ -8,6 +8,7 @@ import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { mutedText } from "@/lib/utils/class-names";
 import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { spriteVariantUrl, spriteGridSrcSet } from "@/lib/sprites/url";
+import { useStoredSettings } from "@/components/favourite/useStoredSettings";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,10 +39,14 @@ function zeroPad(id: number): string {
 function PokemonCell({
   pokemon,
   localeOverride,
+  hearted = false,
 }: {
   pokemon: PokemonCellData;
   localeOverride?: LocaleNameOverride;
+  /** Hearted (or the favourite, #2187): shows a small heart badge. */
+  hearted?: boolean;
 }) {
+  const t = useTranslations("pokedex");
   const { flags } = useSuperuser();
   const { id, name, cardClass: rawCardClass } = pokemon;
   // PokemonCellData.cardClass is CardClass (never "pending"), so no pending guard needed.
@@ -93,6 +98,17 @@ function PokemonCell({
                   strokeLinejoin="round"
                 />
               </svg>
+            </span>
+          )}
+
+          {/* Heart badge (#2187) */}
+          {hearted && (
+            <span
+              role="img"
+              aria-label={t("heartedBadge")}
+              className="absolute left-1.5 top-1 text-xs leading-none text-rose-500"
+            >
+              ♥
             </span>
           )}
 
@@ -163,11 +179,13 @@ function GenerationSection({
   name,
   pokemon,
   localeNames,
+  heartedIds,
 }: {
   gen: number;
   name: string;
   pokemon: PokemonCellData[];
   localeNames?: ReadonlyMap<number, LocaleNameOverride>;
+  heartedIds: ReadonlySet<number>;
 }) {
   const t = useTranslations("pokedex");
   const { flags } = useSuperuser();
@@ -197,6 +215,7 @@ function GenerationSection({
             key={p.id}
             pokemon={p}
             localeOverride={localeNames?.get(p.speciesId ?? p.id)}
+            hearted={heartedIds.has(p.id)}
           />
         ))}
       </ul>
@@ -271,6 +290,13 @@ type PokedexGridProps = {
 
 export default function PokedexGrid({ pokemon, activeGen, flatList = false, localeNames }: PokedexGridProps) {
   const t = useTranslations("pokedex");
+  // Hearted species and the favourite (always hearted) get a heart badge (#2187).
+  const settings = useStoredSettings();
+  const heartedIds: ReadonlySet<number> = new Set(
+    settings === null
+      ? []
+      : [...settings.heartedSpeciesIds, ...(settings.favouritePokemonId === null ? [] : [settings.favouritePokemonId])],
+  );
   if (pokemon.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
@@ -300,6 +326,7 @@ export default function PokedexGrid({ pokemon, activeGen, flatList = false, loca
             key={p.id}
             pokemon={p}
             localeOverride={localeNames?.get(p.speciesId ?? p.id)}
+            hearted={heartedIds.has(p.id)}
           />
         ))}
       </ul>
@@ -317,6 +344,7 @@ export default function PokedexGrid({ pokemon, activeGen, flatList = false, loca
           name={genName}
           pokemon={pokemon}
           localeNames={localeNames}
+          heartedIds={heartedIds}
         />
       </div>
     );
@@ -337,6 +365,7 @@ export default function PokedexGrid({ pokemon, activeGen, flatList = false, loca
             name={range.name}
             pokemon={genPokemon}
             localeNames={localeNames}
+            heartedIds={heartedIds}
           />
         );
       })}

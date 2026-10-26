@@ -112,7 +112,10 @@
         "remove": "削除",
         "lockedHeading": "アプリテーマ",
         "lockedBody": "最初の Pokémon を習得するとテーマが解放されます。",
-        "practiceLink": "練習へ"
+        "practiceLink": "練習へ",
+        "searchLabel": "習得したポケモンを検索",
+        "matchFavourite": "お気に入りに合わせる",
+        "current": "現在のテーマ：{name}"
       },
       "intensityPicker": {
         "heading": "テーマの強度",
@@ -122,6 +125,16 @@
         "tintedDescription": "マスコットカラーが薄く背景に重なります。",
         "fullLabel": "フルマスコットテーマ",
         "fullDescription": "マスコットカラーがすべての背景を彩ります。鮮やかなデザインです。"
+      },
+      "favourite": {
+        "heading": "お気に入りのポケモン",
+        "description": "お気に入りは、旅、牧場、完了画面であなたのパートナーとして登場します。どのポケモンでもお気に入りにできます。",
+        "current": "お気に入り：{name}",
+        "none": "まだお気に入りが選ばれていません。",
+        "searchLabel": "すべてのポケモンを検索",
+        "searchPlaceholder": "名前を入力",
+        "clear": "お気に入りを解除",
+        "noResults": "その名前に一致するポケモンはいません。"
       }
     },
     "practice": {
@@ -573,7 +586,8 @@
       "formCategoryPrimal": "ゲンシカイキ",
       "noAlternateForms": "現在のシードに異なるフォルムはありません。",
       "matchCount": "{total} 匹中 {match} 匹が一致",
-      "hiddenCardsPaused": "非表示のカードは一時停止されています。スコープを削除してもレビュー期限切れのカードが溢れることはありません。"
+      "hiddenCardsPaused": "非表示のカードは一時停止されています。スコープを削除してもレビュー期限切れのカードが溢れることはありません。",
+      "presetFavourites": "お気に入り"
     },
     "direction": {
       "name": "この Pokémon の名前は？",
@@ -723,7 +737,8 @@
     "generationPokemonAriaLabel": "{name} のポケモン",
     "firstReviewed": "初回学習: {date}",
     "mastered": "習得済み",
-    "masteredAround": "{date}頃に習得"
+    "masteredAround": "{date}頃に習得",
+    "heartedBadge": "ハートつき"
   },
   "pasture": {
     "title": "牧場",
@@ -1266,5 +1281,31 @@
   "pushStreak": {
     "title": "ストリークを続けよう",
     "body": "{days, plural, other {#日連続で練習中です。今日も少し練習すれば、続けられます。}}"
+  },
+  "favourite": {
+    "makeFavourite": "お気に入りにする",
+    "isFavourite": "お気に入り",
+    "makeFavouriteAria": "{name}をお気に入りにする",
+    "heartAria": "{name}にハートをつける",
+    "heartFavouriteAria": "{name}はお気に入りなので、ハートはついたままです",
+    "learnFirst": {
+      "question": "{name}の進化系統を次に覚えますか？",
+      "body": "毎日の新しいカードの上限の範囲で、これらのポケモンが次の新しいカードになります。",
+      "yes": "はい",
+      "no": "いいえ"
+    },
+    "partner": {
+      "heading": "あなたのパートナー",
+      "playCry": "{name}の鳴き声を再生",
+      "chooseFavourite": "お気に入りを選ぶ",
+      "chooseFavouriteBody": "図鑑から好きなポケモンを選んで、パートナーにしましょう。"
+    },
+    "themeOffer": {
+      "question": "{name}のカラーに切り替えますか？",
+      "body": "{name}を習得したので、そのカラーをアプリのテーマに使えます。",
+      "yes": "カラーを切り替える",
+      "no": "今のカラーのままにする"
+    },
+    "pastureSpotAria": "お気に入りの{name}"
   }
 }
