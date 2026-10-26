@@ -12,6 +12,7 @@ import {
   countMatchingSpecies,
   isScopeEmpty,
   scopeLabel,
+  PRESET_IDS,
   type FormCategoryFilter,
   type PracticeScope,
   type PracticeScopePreset,
@@ -51,7 +52,9 @@ const ROMAN: Record<number, string> = {
   6: "VI", 7: "VII", 8: "VIII", 9: "IX",
 };
 // Keys only - labels are resolved via t() at render time to support locale switching.
-const PRESET_KEYS: PracticeScopePreset[] = ["starters", "legendaries", "incomplete-chains", "mastery-blockers"];
+// Favourites is left out until the control shows it while there are hearts,
+// with its catalogue label (#2187).
+const PRESET_KEYS: PracticeScopePreset[] = PRESET_IDS.filter((id) => id !== "favourites");
 
 function toggleNum(arr: number[], v: number): number[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];

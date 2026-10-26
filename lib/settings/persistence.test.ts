@@ -1393,3 +1393,21 @@ describe('favourite, hearts and learn-first keys (#2187)', () => {
     expect(settings.priorityNewSpeciesIds).toEqual([]);
   });
 });
+
+describe('Reload keeps the preset (#2187)', () => {
+  it.each([['favourites'], ['mastery-blockers']] as const)('keeps a saved %s preset across a reload', (preset) => {
+    saveSettings({
+      ...DEFAULT_SETTINGS,
+      practiceScope: { gens: [], types: [], presets: [preset] },
+    });
+    expect(loadSettings().practiceScope.presets).toEqual([preset]);
+  });
+
+  it('keeps it when a cloud pull writes the raw blob', () => {
+    mockLocalStorage.setItem(STORAGE_KEY, JSON.stringify({
+      practiceScope: { gens: [], types: [], presets: ['starters', 'favourites', 'mastery-blockers'] },
+    }));
+    expect(loadSettings().practiceScope.presets).toEqual(['starters', 'favourites', 'mastery-blockers']);
+  });
+});
+

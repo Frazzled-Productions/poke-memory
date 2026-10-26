@@ -27,9 +27,9 @@
 
 ## 5. Scope and new-card order
 
-- [ ] 5.1 `PRESET_IDS` shared list used at all seven sites, with the guard test. Verify: guard test red on a planted literal, then green; "Reload keeps the preset" for Favourites and Almost mastered.
+- [x] 5.1 `PRESET_IDS` shared list used at all seven sites, with the guard test. Verify: guard test red on a planted literal, then green; "Reload keeps the preset" for Favourites and Almost mastered. Verified: `lib/review/presetIds.test.ts` (red on a planted allow-list and a planted `"starter"` literal, then green); `lib/settings/persistence.test.ts` "Reload keeps the preset (#2187)" (red: Almost mastered and Favourites dropped, then green).
 - [ ] 5.2 Favourites preset (client matcher, Scope control, label from the catalogue). Verify: "Practise your hearts", "Un-heart everything", "Japanese interface".
-- [ ] 5.3 Push route matches Favourites against `heartedSpeciesIds`. Verify: route test "Reminder with a Favourites scope".
+- [x] 5.3 Push route matches Favourites against `heartedSpeciesIds`. Verify: route test "Reminder with a Favourites scope". Verified: `app/api/push/send-daily/route.test.tsx` "Reminder with a Favourites scope" (red: 6 counted, then 4) and `lib/eligibility/scopePredicate.test.ts` favourites cases.
 - [ ] 5.4 `buildSessionQueues` priority partition before the cut and after the final reshuffle; all four `ReviewSession` callers pass the list; species leave the list when fully introduced. Verify: `lib/review/session.test.ts` "Learn Gengar's line next" across 30 salt and day combinations (written failing first), "Cap already used", "Scope excludes the line", "Fully introduced".
 
 ## 6. Sync and safety
