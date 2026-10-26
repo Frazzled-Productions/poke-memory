@@ -9,6 +9,7 @@ import {
   cardTypeIsEnabled,
   groupNewCandidatesBySpecies,
   stableShuffleForDay,
+  removeIntroducedPrioritySpecies,
   type DailyLimits,
   type EvolutionReviewCard,
   type NameReviewCard,
@@ -2693,3 +2694,140 @@ describe('buildSessionQueues - convergence-priority (#1764)', () => {
     expect(queues.reviewQueue).toHaveLength(0);
   });
 });
+
+describe('buildSessionQueues - priority new species (#2187)', () => {
+  const GASTLY_LINE = [92, 93, 94];
+  const limits: DailyLimits = {
+    name:      { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    evolution: { maxNewPerDay: 1, maxReviewsPerDay: 100 },
+    reverse:   { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+    cry:       { maxNewPerDay: 10, maxReviewsPerDay: 100 },
+  };
+
+  function nameCard(id: number, stateOverrides: Partial<ReviewState> = {}): NameReviewCard {
+    return makeCard(makeSeedPokemon(id), stateOverrides);
+  }
+  function reverseCard(pokemonId: number, stateOverrides: Partial<ReviewState> = {}): ReverseReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId),
+      id: REVERSE_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'reverse',
+      subjectKey: String(pokemonId),
+      state: { ...initialReviewState(NOW), ...stateOverrides },
+    };
+  }
+  function evoCard(id: number, preEvoId: number, postEvoId: number): EvolutionReviewCard {
+    return {
+      ...makeEvoEdge({ id, preEvoId, postEvoId }),
+      subjectKey: `${preEvoId}>>${postEvoId}`,
+      state: initialReviewState(NOW),
+    };
+  }
+  // 60 fresh species (61..120, so the Gastly line is in the middle).
+  const SPECIES = Array.from({ length: 60 }, (_, i) => 61 + i);
+  const freshCards = (): ReviewableCard[] =>
+    SPECIES.flatMap((id) => [nameCard(id), reverseCard(id)]);
+  const speciesOf = (cardId: number) => (cardId > REVERSE_ID_OFFSET ? cardId - REVERSE_ID_OFFSET : cardId);
+
+  const DAYS = ['2026-05-09', '2026-05-10', '2026-05-11', '2026-06-01', '2026-12-31'];
+  const SALTS = ['', 'user-a', 'user-b', 'a-guest-uuid', 42, 7];
+  const COMBOS = DAYS.flatMap((day) => SALTS.map((salt) => [day, salt] as const));
+
+  it('runs across 30 salt and day combinations', () => {
+    expect(COMBOS).toHaveLength(30);
+  });
+
+  it.each(COMBOS)("Learn Gengar's line next (day %s, salt %s): all three are introduced, before the other new cards", (day, salt) => {
+    const { newQueue } = buildSessionQueues(freshCards(), limits, day, undefined, salt, 'en', GASTLY_LINE);
+    const nameIds = newQueue.filter((id) => id < REVERSE_ID_OFFSET);
+    expect(nameIds).toHaveLength(10);
+    for (const id of GASTLY_LINE) expect(nameIds).toContain(id);
+    // Priority cards (name and reverse) come first, then everything else.
+    const isPriority = newQueue.map((id) => GASTLY_LINE.includes(speciesOf(id)));
+    expect(isPriority.slice(0, 6)).toEqual([true, true, true, true, true, true]);
+    expect(isPriority.slice(6).every((p) => !p)).toBe(true);
+  });
+
+  it('an empty list leaves the queue exactly as before', () => {
+    const cards = freshCards();
+    expect(buildSessionQueues(cards, limits, '2026-05-09', undefined, 'user-a', 'en', [])).toEqual(
+      buildSessionQueues(cards, limits, '2026-05-09', undefined, 'user-a', 'en'),
+    );
+  });
+
+  it('evolution cards anchored on a priority species are cut first', () => {
+    const cards: ReviewableCard[] = [
+      evoCard(1_500_010, 61, 62),
+      evoCard(1_500_011, 63, 64),
+      evoCard(1_500_012, 92, 93),
+      evoCard(1_500_013, 65, 66),
+    ];
+    for (const [day, salt] of COMBOS) {
+      const { newQueue } = buildSessionQueues(cards, limits, day, undefined, salt, 'en', GASTLY_LINE);
+      expect(newQueue).toEqual([1_500_012]);
+    }
+  });
+
+  it('Cap already used: no priority card is introduced and the list is kept', () => {
+    const today = '2026-05-09';
+    const spent = { firstSeen: today, lastReview: today, learningStep: 0 };
+    const cards: ReviewableCard[] = [
+      ...Array.from({ length: 10 }, (_, i) => nameCard(200 + i, spent)),
+      ...Array.from({ length: 10 }, (_, i) => reverseCard(200 + i, spent)),
+      ...freshCards(),
+    ];
+    const { newQueue } = buildSessionQueues(cards, limits, today, undefined, 'user-a', 'en', GASTLY_LINE);
+    expect(newQueue).toEqual([]);
+    expect(removeIntroducedPrioritySpecies(GASTLY_LINE, cards, 'en', {})).toEqual(GASTLY_LINE);
+  });
+
+  it('Scope excludes the line: none of it is introduced', () => {
+    const cards = freshCards();
+    const eligible = new Set(cards.filter((c) => !GASTLY_LINE.includes(speciesOf(c.id))).map((c) => c.id));
+    const { newQueue } = buildSessionQueues(cards, limits, '2026-05-09', eligible, 'user-a', 'en', GASTLY_LINE);
+    expect(newQueue.some((id) => GASTLY_LINE.includes(speciesOf(id)))).toBe(false);
+  });
+});
+
+describe('removeIntroducedPrioritySpecies (#2187)', () => {
+  const TODAY = '2026-05-09';
+  const seen = { firstSeen: TODAY, lastReview: TODAY };
+  function reverseCard(pokemonId: number, stateOverrides: Partial<ReviewState> = {}): ReverseReviewCard {
+    return {
+      ...makeSeedPokemon(pokemonId),
+      id: REVERSE_ID_OFFSET + pokemonId,
+      pokemonId,
+      cardType: 'reverse',
+      subjectKey: String(pokemonId),
+      state: { ...initialReviewState(NOW), ...stateOverrides },
+    };
+  }
+
+  it('Fully introduced: Gastly leaves once its name and reverse cards are introduced', () => {
+    const cards: ReviewableCard[] = [
+      makeCard(makeSeedPokemon(92), seen), reverseCard(92, seen),
+      makeCard(makeSeedPokemon(93), seen), reverseCard(93),
+      makeCard(makeSeedPokemon(94)), reverseCard(94),
+    ];
+    expect(removeIntroducedPrioritySpecies([92, 93, 94], cards, 'en', {})).toEqual([93, 94]);
+  });
+
+  it('counts only enabled directions and only the active locale', () => {
+    const cry: CryReviewCard = {
+      ...makeSeedPokemon(92, { cryUrl: 'https://example.com/92.ogg' }),
+      id: CRY_ID_OFFSET + 92,
+      pokemonId: 92,
+      cardType: 'cry',
+      subjectKey: '92',
+      state: initialReviewState(NOW),
+    };
+    const jaName: NameReviewCard = { ...makeCard(makeSeedPokemon(92)), locale: 'ja' };
+    const cards: ReviewableCard[] = [makeCard(makeSeedPokemon(92), seen), reverseCard(92, seen), cry, jaName];
+    // Cry cards off: the new cry card does not hold Gastly on the list.
+    expect(removeIntroducedPrioritySpecies([92], cards, 'en', { cryEnabled: false })).toEqual([]);
+    // Cry cards on: it does.
+    expect(removeIntroducedPrioritySpecies([92], cards, 'en', { cryEnabled: true })).toEqual([92]);
+  });
+});
+

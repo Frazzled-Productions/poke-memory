@@ -69,6 +69,10 @@ When a species has new-card candidates across multiple enabled directions (e.g. 
 
 **No-regression guarantee**: cards with `lastReview !== null` (already introduced on a prior day) are never in `newCandidatesByType`, so they never appear in any species group. A species whose reverse was introduced before its name was enabled will have the reverse as a solo entry - admitted freely with no name partner to block it. No persisted card state is touched; the change is confined to new-card introduction ordering.
 
+## Priority species: learn your favourite first (#2187)
+
+`buildSessionQueues` takes an optional `priorityNewSpeciesIds` (from `UserSettings`, set when the player accepts "Learn <name>'s evolution line next?"). Each direction's shuffled candidates are stably reordered so priority species come first, in list order, before the cut to budget (evolution cards by their pre-evolution); after the final reshuffle the admitted priority cards are moved ahead of the other new cards. Caps, eligibility and scope are unchanged, and reviews still come first. Every `ReviewSession` call passes the same list (`lib/review/priorityCallers.test.ts`). After a first sighting, `removeIntroducedPrioritySpecies` drops each species whose enabled-direction cards in the active locale all have a `firstSeen`, and the shorter list is saved like any setting.
+
 ## Persisted session shape
 
 `{ cards: ReviewCard[], limits: DailyLimits }` in `localStorage`. `loadSession` runs `migrateReviewState` on every card - including the SM-2 → FSRS conversion for any legacy persisted state - so the migration is idempotent and runs once per device automatically.

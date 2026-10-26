@@ -438,6 +438,46 @@ describe("ReviewSession reveal flow", () => {
   });
 });
 
+describe("Learn-first list (#2187)", () => {
+  it("Fully introduced: grading Bulbasaur's last new card removes it from priorityNewSpeciesIds", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...mockLoadSettings(),
+      priorityNewSpeciesIds: [1],
+    });
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+    const user = userEvent.setup();
+    renderWithIntl(<ReviewSession />);
+
+    await user.click(await screen.findByRole("button", { name: /reveal/i }));
+    await user.click(screen.getByRole("button", { name: /easy/i }));
+
+    await waitFor(() =>
+      expect(vi.mocked(saveSettings)).toHaveBeenCalledWith(
+        expect.objectContaining({ priorityNewSpeciesIds: [] }),
+      ),
+    );
+  });
+
+  it("does not touch the list before any card is introduced", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...mockLoadSettings(),
+      priorityNewSpeciesIds: [1],
+    });
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+    renderWithIntl(<ReviewSession />);
+    await screen.findByRole("button", { name: /reveal/i });
+    expect(vi.mocked(saveSettings)).not.toHaveBeenCalledWith(
+      expect.objectContaining({ priorityNewSpeciesIds: expect.anything() }),
+    );
+  });
+});
+
 describe("handleReveal decode-ahead (#930)", () => {
   /** Minimal EvolutionReviewCard fixture injected via loadSession. */
   const EVO_CARD = {
