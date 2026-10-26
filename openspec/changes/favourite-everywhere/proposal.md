@@ -166,3 +166,6 @@ All from Fraser on 2026-10-26 (grilling recorded on #2187):
 - 2026-10-26 Q: Partner cry on the all-done screen? A: Tap to play.
 - 2026-10-26 Q: Defaults (carry-over, sync, heart badge, nudge re-check, favourite always hearted)? A: All fine.
 - 2026-10-26 Q: Unlearned species in the finder? A: Full sprite, name hidden until learned (change 2).
+- 2026-10-26 Q: Reset progress and the favourite? A: Keep the favourite and hearts; clear the theme, learn-first list and offer marker.
+- 2026-10-26 Q: Favourite mastered with no theme set? A: Still ask once; never recolour without a yes.
+- 2026-10-26 Q: Learn-first against a narrow scope? A: Respect the scope; priority cards wait until it includes them.
