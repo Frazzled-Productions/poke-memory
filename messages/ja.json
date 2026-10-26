@@ -107,7 +107,6 @@
       "theme": {
         "heading": "アプリテーマ",
         "description": "Pokémon を習得済みにするとアプリのカラーテーマとして使用できるようになります。",
-        "selected": "選択中",
         "setAsTheme": "テーマに設定",
         "remove": "削除",
         "lockedHeading": "アプリテーマ",

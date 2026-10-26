@@ -107,7 +107,6 @@
       "theme": {
         "heading": "应用主题",
         "description": "掌握一只 Pokémon 后，可将其解锁为应用配色主题。",
-        "selected": "已选择",
         "setAsTheme": "设为主题",
         "remove": "移除",
         "lockedHeading": "应用主题",

@@ -107,7 +107,6 @@
       "theme": {
         "heading": "應用程式主題",
         "description": "掌握一隻寶可夢後，可將其解鎖為應用程式的配色主題。",
-        "selected": "已選擇",
         "setAsTheme": "設為主題",
         "remove": "移除",
         "lockedHeading": "應用程式主題",

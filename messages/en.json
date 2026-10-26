@@ -107,7 +107,6 @@
       "theme": {
         "heading": "App Theme",
         "description": "Master a Pokémon to unlock it as an app colour theme.",
-        "selected": "Selected",
         "setAsTheme": "Set as theme",
         "remove": "Remove",
         "lockedHeading": "App Theme",
