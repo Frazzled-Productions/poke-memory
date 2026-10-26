@@ -17,7 +17,7 @@ lose every theme), or nesting the favourite inside it (the deep merge keeps stal
 
 ### Lists are arrays
 
-`heartedSpeciesIds` and `priorityNewSpeciesIds` are arrays. `jsonb_deep_merge` (migration 036)
+`heartedSpeciesIds`, `priorityNewSpeciesIds` and `learnFirstAskedSpeciesIds` are arrays. `jsonb_deep_merge` (migration 036)
 recurses into objects, so a key deleted from an object never reaches the cloud; an array is replaced
 whole. `favouriteThemeOfferedForId` is a scalar (the last species offered).
 

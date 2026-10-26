@@ -1,14 +1,13 @@
 /**
  * "Learn <name>'s evolution line next?" (#2187): the species a Yes puts in
- * `priorityNewSpeciesIds`, and the device-local record of which species the
+ * `priorityNewSpeciesIds`, and the synced record of which species the
  * question has already been asked for.
  */
 
 import { deriveEvolutionFamilies } from "@/lib/evolution/chains";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { AppLocale } from "@/i18n/locales";
-import { KEY_LEARN_FIRST_ASKED } from "@/lib/storage/keys";
-import { parseSpeciesIdList } from "./favourite";
+import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 
 /**
  * The species in `speciesId`'s evolution family, in chain order, minus those
@@ -37,26 +36,19 @@ export function learnFirstSpeciesIds(
   return line.filter((id) => !introduced.has(id));
 }
 
-/** True when the learn-first question was already asked for this species on this device. */
+/** True when the learn-first question was already asked for this species (on any device). */
 export function wasLearnFirstAsked(speciesId: number): boolean {
   if (typeof window === "undefined") return false;
-  try {
-    const raw = window.localStorage.getItem(KEY_LEARN_FIRST_ASKED);
-    return raw !== null && parseSpeciesIdList(JSON.parse(raw)).includes(speciesId);
-  } catch {
-    return false;
-  }
+  return loadSettings().learnFirstAskedSpeciesIds.includes(speciesId);
 }
 
 /** Record that the learn-first question was asked for this species. */
 export function markLearnFirstAsked(speciesId: number): void {
   if (typeof window === "undefined") return;
-  try {
-    const raw = window.localStorage.getItem(KEY_LEARN_FIRST_ASKED);
-    const asked = raw === null ? [] : parseSpeciesIdList(JSON.parse(raw));
-    if (asked.includes(speciesId)) return;
-    window.localStorage.setItem(KEY_LEARN_FIRST_ASKED, JSON.stringify([...asked, speciesId]));
-  } catch {
-    // private browsing or storage full: the question may be asked again
-  }
+  const settings = loadSettings();
+  if (settings.learnFirstAskedSpeciesIds.includes(speciesId)) return;
+  saveSettings({
+    ...settings,
+    learnFirstAskedSpeciesIds: [...settings.learnFirstAskedSpeciesIds, speciesId],
+  });
 }

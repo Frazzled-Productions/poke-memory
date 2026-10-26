@@ -112,6 +112,7 @@ const SAMPLE: UserSettings = {
   heartedSpeciesIds: [],
   priorityNewSpeciesIds: [],
   favouriteThemeOfferedForId: null,
+  learnFirstAskedSpeciesIds: [],
 };
 
 describe("pushSettings", () => {

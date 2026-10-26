@@ -44,6 +44,7 @@ const NEW_KEYS = [
   "heartedSpeciesIds",
   "priorityNewSpeciesIds",
   "favouriteThemeOfferedForId",
+  "learnFirstAskedSpeciesIds",
 ] as const;
 
 type OlderSettings = Omit<UserSettings, (typeof NEW_KEYS)[number]>;
@@ -69,6 +70,7 @@ const CLOUD_BLOB = {
   heartedSpeciesIds: [1, 25],
   priorityNewSpeciesIds: [2, 3],
   favouriteThemeOfferedForId: 1,
+  learnFirstAskedSpeciesIds: [93],
 };
 
 function pushedPatches(): Record<string, unknown>[] {

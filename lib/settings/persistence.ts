@@ -572,6 +572,11 @@ export type UserSettings = {
    * for (#2187), so the offer is made once per favourite. Null = never offered.
    */
   favouriteThemeOfferedForId: number | null;
+  /**
+   * Species the "Learn <name>'s evolution line next?" question has been asked
+   * for (#2187), so it is never repeated for the same species on any device.
+   */
+  learnFirstAskedSpeciesIds: number[];
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -642,6 +647,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   heartedSpeciesIds: [],
   priorityNewSpeciesIds: [],
   favouriteThemeOfferedForId: null,
+  learnFirstAskedSpeciesIds: [],
 };
 
 /** Inclusive bounds for the retention-target slider. */
@@ -939,6 +945,7 @@ function parseStoredSettings(raw: string | null): UserSettings {
     heartedSpeciesIds,
     priorityNewSpeciesIds: parseSpeciesIdList(obj.priorityNewSpeciesIds),
     favouriteThemeOfferedForId: parseSpeciesId(obj.favouriteThemeOfferedForId),
+    learnFirstAskedSpeciesIds: parseSpeciesIdList(obj.learnFirstAskedSpeciesIds),
   };
 }
 

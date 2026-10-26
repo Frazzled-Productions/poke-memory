@@ -91,14 +91,6 @@ export const KEY_LAST_SEEN_VERSION = "poke-memory:last-seen-version:v1";
 
 // ─── Favourite ────────────────────────────────────────────────────────────────
 
-/**
- * Species ids the "Learn <name>'s evolution line next?" question has been
- * asked for on this device (#2187), so it is never repeated for the same
- * species. Device-local by design: the answer itself (`priorityNewSpeciesIds`)
- * lives in the synced settings.
- */
-export const KEY_LEARN_FIRST_ASKED = "poke-memory:learn-first-asked:v1";
-
 // ─── Legacy / superseded keys (kept for migration reads + clears only) ────────
 
 /**

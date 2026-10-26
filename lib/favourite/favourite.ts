@@ -76,8 +76,8 @@ export function toggleHeart(settings: UserSettings, speciesId: number): UserSett
 }
 
 /**
- * Settings after Reset progress (#2187): the theme, the learn-first list and
- * the colours-offer marker are progress-linked and cleared; the favourite and
+ * Settings after Reset progress (#2187): the theme, the learn-first list, the
+ * learn-first question marker and the colours-offer marker are progress-linked and cleared; the favourite and
  * the hearts are preferences and kept.
  */
 export function settingsAfterProgressReset(settings: UserSettings): UserSettings {
@@ -86,5 +86,6 @@ export function settingsAfterProgressReset(settings: UserSettings): UserSettings
     favouriteTheme: null,
     priorityNewSpeciesIds: [],
     favouriteThemeOfferedForId: null,
+    learnFirstAskedSpeciesIds: [],
   };
 }

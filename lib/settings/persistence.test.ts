@@ -188,6 +188,7 @@ describe('loadSettings migration', () => {
       heartedSpeciesIds: [94, 25],
       priorityNewSpeciesIds: [92, 93],
       favouriteThemeOfferedForId: 94,
+      learnFirstAskedSpeciesIds: [93],
     };
     saveSettings(custom);
     const loaded = loadSettings();
@@ -1352,6 +1353,7 @@ describe('favourite, hearts and learn-first keys (#2187)', () => {
     expect(settings.heartedSpeciesIds).toEqual([]);
     expect(settings.priorityNewSpeciesIds).toEqual([]);
     expect(settings.favouriteThemeOfferedForId).toBeNull();
+    expect(settings.learnFirstAskedSpeciesIds).toEqual([]);
   });
 
   it('round-trips valid values through save and load', () => {
@@ -1361,8 +1363,10 @@ describe('favourite, hearts and learn-first keys (#2187)', () => {
       heartedSpeciesIds: [94, 143, 25],
       priorityNewSpeciesIds: [92, 93, 94],
       favouriteThemeOfferedForId: 94,
+      learnFirstAskedSpeciesIds: [93, 133],
     });
     const settings = loadSettings();
+    expect(settings.learnFirstAskedSpeciesIds).toEqual([93, 133]);
     expect(settings.favouritePokemonId).toBe(94);
     expect(settings.heartedSpeciesIds).toEqual([94, 143, 25]);
     expect(settings.priorityNewSpeciesIds).toEqual([92, 93, 94]);
@@ -1375,12 +1379,14 @@ describe('favourite, hearts and learn-first keys (#2187)', () => {
       heartedSpeciesIds: [25, 'x', 0, 25, 1.5, 10100, 1025, 143],
       priorityNewSpeciesIds: [93, 93, -1, 92],
       favouriteThemeOfferedForId: 1026,
+      learnFirstAskedSpeciesIds: [93, 93, 'x', 2000],
     }));
     const settings = loadSettings();
     expect(settings.favouritePokemonId).toBeNull();
     expect(settings.heartedSpeciesIds).toEqual([25, 1025, 143]);
     expect(settings.priorityNewSpeciesIds).toEqual([93, 92]);
     expect(settings.favouriteThemeOfferedForId).toBeNull();
+    expect(settings.learnFirstAskedSpeciesIds).toEqual([93]);
   });
 
   it('treats a non-array list as empty', () => {

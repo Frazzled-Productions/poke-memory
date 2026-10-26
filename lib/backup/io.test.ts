@@ -123,6 +123,7 @@ const VALID_SETTINGS: UserSettings = {
   heartedSpeciesIds: [],
   priorityNewSpeciesIds: [],
   favouriteThemeOfferedForId: null,
+  learnFirstAskedSpeciesIds: [],
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

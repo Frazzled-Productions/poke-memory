@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { renderWithIntl, screen, waitFor } from "@/components/test-utils/renderWithIntl";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/lib/settings/persistence";
-import { KEY_LEARN_FIRST_ASKED } from "@/lib/storage/keys";
 import type { AppLocale } from "@/i18n/locales";
 import { FavouriteControls } from "./FavouriteControls";
 
@@ -113,12 +112,19 @@ describe("FavouriteControls (#2187)", () => {
     await userEvent.click(make);
     await userEvent.click(screen.getByRole("button", { name: "No, thanks" }));
     expect(loadSettings().priorityNewSpeciesIds).toEqual([]);
-    expect(JSON.parse(window.localStorage.getItem(KEY_LEARN_FIRST_ASKED)!)).toEqual([93]);
+    expect(loadSettings().learnFirstAskedSpeciesIds).toEqual([93]);
     // Clear and set again: no second question.
     await userEvent.click(make);
     await userEvent.click(make);
     expect(screen.queryByText("Learn Haunter's evolution line next?")).not.toBeInTheDocument();
     unmount();
+  });
+
+  it("Second device: a question already asked on another device is not asked again", async () => {
+    saveSettings({ ...loadSettings(), learnFirstAskedSpeciesIds: [93] });
+    renderWithIntl(<FavouriteControls speciesId={93} name="Haunter" mastered={false} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Make Haunter your favourite" }));
+    expect(screen.queryByText("Learn Haunter's evolution line next?")).not.toBeInTheDocument();
   });
 
   it("Already mastered: no question is asked", async () => {

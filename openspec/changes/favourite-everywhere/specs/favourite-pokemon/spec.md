@@ -333,7 +333,8 @@ its species is no longer mastered.
 ### Requirement: Reset progress clears the theme but keeps the favourite and hearts (MODIFIED from the baseline)
 
 Reset progress SHALL behave as today for the theme (saves `favouriteTheme: null` after the wipe, kept
-if the cloud wipe fails) and SHALL also clear `priorityNewSpeciesIds` and `favouriteThemeOfferedForId`.
+if the cloud wipe fails) and SHALL also clear `priorityNewSpeciesIds`, `favouriteThemeOfferedForId` and
+`learnFirstAskedSpeciesIds`.
 It SHALL keep `favouritePokemonId` and `heartedSpeciesIds`, which are preferences, not progress.
 Deleting the account SHALL clear everything, as today.
 
@@ -420,7 +421,8 @@ link to the Pokédex, and the other surfaces SHALL show nothing new.
 When the player sets a favourite that is not mastered, the app SHALL ask once, for that species:
 "Learn <name>'s evolution line next?". Yes SHALL set `priorityNewSpeciesIds` to the species in its
 evolution family (from `lib/evolution/chains.ts`) that are not yet introduced, in chain order; No or
-dismissing SHALL change nothing. The question SHALL not be repeated for the same species.
+dismissing SHALL change nothing. The question SHALL not be repeated for the same species on any
+device: asked species are recorded in the synced list `learnFirstAskedSpeciesIds`.
 
 #### Scenario: Yes
 
@@ -434,8 +436,8 @@ dismissing SHALL change nothing. The question SHALL not be repeated for the same
 
 ### Requirement: The new settings sync, and older versions never delete them
 
-`favouritePokemonId`, `heartedSpeciesIds`, `priorityNewSpeciesIds` and `favouriteThemeOfferedForId`
-SHALL be top-level settings keys that sync like any other setting for signed-in players and stay in
+`favouritePokemonId`, `heartedSpeciesIds`, `priorityNewSpeciesIds`, `favouriteThemeOfferedForId` and
+`learnFirstAskedSpeciesIds` SHALL be top-level settings keys that sync like any other setting for signed-in players and stay in
 localStorage for guests. The lists SHALL be arrays (never objects), so removing an item reaches the
 cloud through the deep merge. A device on the previous release SHALL never remove them from the
 cloud row.
