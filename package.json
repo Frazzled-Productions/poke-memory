@@ -51,7 +51,7 @@
     "@supabase/supabase-js": "^2.117.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "esbuild-wasm": "^0.28.0",
+    "esbuild-wasm": "^0.28.2",
     "idb": "^8.0.3",
     "next": "16.4.2",
     "next-intl": "^4.13.0",
