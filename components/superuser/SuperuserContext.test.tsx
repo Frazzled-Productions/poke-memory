@@ -218,6 +218,45 @@ describe("SuperuserProvider.exitCleanup - signed-in branch", () => {
     );
   });
 
+  it("keeps the device's favourite keys a pre-#2187 cloud row lacks", async () => {
+    const { pullSession, applyCloudAuthoritative } = await import("@/lib/sync/cloud");
+    const { pullSettingsWithTimestamp, pullRegionalPrefs } = await import("@/lib/sync/settings");
+    const { pullStreak } = await import("@/lib/sync/streak");
+    const { pullGradeLog } = await import("@/lib/sync/gradeLog");
+    const { loadSettings, saveSettings } = await import("@/lib/settings/persistence");
+    const local = {
+      masteryRepetitions: 3,
+      favouritePokemonId: 94,
+      heartedSpeciesIds: [94, 143],
+      priorityNewSpeciesIds: [92],
+      favouriteThemeOfferedForId: 94,
+      learnFirstAskedSpeciesIds: [93],
+    };
+    vi.mocked(loadSettings).mockReturnValueOnce(local as never);
+    vi.mocked(pullRegionalPrefs).mockResolvedValueOnce(null);
+    vi.mocked(pullStreak).mockResolvedValueOnce(null);
+    vi.mocked(pullGradeLog).mockResolvedValueOnce(null);
+    vi.mocked(pullSession).mockResolvedValueOnce([]);
+    vi.mocked(applyCloudAuthoritative).mockReturnValue([]);
+    vi.mocked(pullSettingsWithTimestamp).mockResolvedValueOnce({
+      settings: { masteryRepetitions: 5 } as never,
+      updatedAt: "2026-05-14T10:00:00.000Z",
+    });
+
+    let api!: ReturnType<typeof useSuperuser>;
+    render(
+      <SuperuserProvider>
+        <Harness onReady={(a) => (api = a)} />
+      </SuperuserProvider>,
+    );
+    document.querySelectorAll("button")[0].click();
+    await act(async () => {
+      await api.setFlag("pretendAllMastered", false);
+    });
+
+    expect(vi.mocked(saveSettings).mock.calls[0][0]).toMatchObject({ ...local, masteryRepetitions: 5 });
+  });
+
   it("does not run cleanup when pullSession returns null", async () => {
     const { pullSession } = await import("@/lib/sync/cloud");
     const { saveStreakData } = await import("@/lib/streak/persistence");

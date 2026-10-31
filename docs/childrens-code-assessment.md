@@ -93,7 +93,7 @@ The Code's 15 standards are assessed below. Each is marked **Met**, **Met (recor
 
 ### 13. Nudge techniques
 
-**Met, re-checked #1950.** The app uses no dark patterns to push children toward lower-privacy choices or to extend engagement against their interests. The streak counter and daily review limits are study-habit features common to spaced-repetition tools, and the daily review cap actively works against over-engagement by design. The `onboarding.guestStorage.body` copy was updated in #1431 to remove a soft sign-in nudge (the previous hazard-with-remedy framing presented sign-in as the fix for local-storage eviction). Sign-in is now described as a neutral capability (cross-device access) with no urgency framing. This standard should be re-checked whenever engagement-oriented features (notifications, reminders, reward mechanics) are added.
+**Met, re-checked #1950 and #2187.** The app uses no dark patterns to push children toward lower-privacy choices or to extend engagement against their interests. The streak counter and daily review limits are study-habit features common to spaced-repetition tools, and the daily review cap actively works against over-engagement by design. The `onboarding.guestStorage.body` copy was updated in #1431 to remove a soft sign-in nudge (the previous hazard-with-remedy framing presented sign-in as the fix for local-storage eviction). Sign-in is now described as a neutral capability (cross-device access) with no urgency framing. This standard should be re-checked whenever engagement-oriented features (notifications, reminders, reward mechanics) are added.
 
 **Re-check for #1950 (late-day streak-at-risk push).** A "streak at risk" reminder is inherently a re-engagement nudge, so it was assessed against Standard 13's nudge-technique guidance and found acceptable **only under recorded constraints**, which are conditions of the implementation, not aspirations:
 
@@ -104,6 +104,14 @@ The Code's 15 standards are assessed below. Each is marked **Met**, **Met (recor
 5. **No false urgency.** The send is suppressed when the streak is not genuinely at risk that day (e.g. an available streak-protection token would silently bridge the miss), so the app never tells a child their streak is at risk when it is not - an honesty control central to passing Standard 13.
 
 Conclusion: **Met**, with the five constraints above recorded as implementation conditions. See `docs/dpia.md` (purpose 5, R8) for the data-protection side.
+
+**Re-check for #2187 (favourite Pokémon).** Two one-off questions were assessed against Standard 13 and found acceptable under these recorded constraints:
+
+1. **"Learn <name>'s evolution line next?"** is asked once, only when the player has just chosen an unmastered favourite, and never again for that species on that account: the asked marker (`learnFirstAskedSpeciesIds`) is synced, so another device does not ask again, and only Reset progress clears it. It is opt-in: Yes adds that line's Pokémon to the front of the normal new-card order, within the usual daily new-card cap and the current scope, so it never adds work or extends a session; No or ignoring it changes nothing.
+2. **"Switch to <name>'s colours?"** is asked once per favourite, after it is mastered. Either answer is recorded and the question is not repeated; No keeps the current colours.
+3. **Neutral copy.** Neither question uses urgency, loss framing or reward pressure, and both offer a plainly worded No: Yes is a filled button and No an outlined one, clearly labelled ("No, thanks", "Keep my colours") and the same size. The partner's cry plays only on a tap, never by itself.
+
+Conclusion: **Met**, with the three constraints above recorded as implementation conditions.
 
 ### 14. Connected toys and devices
 
@@ -129,7 +137,7 @@ Conclusion: **Met**, with the five constraints above recorded as implementation 
 | 10 | Geolocation | Met (record only) |
 | 11 | Parental controls | Met (not applicable) |
 | 12 | Profiling | Met (record only) |
-| 13 | Nudge techniques | Met (re-checked #1950) |
+| 13 | Nudge techniques | Met (re-checked #1950, #2187) |
 | 14 | Connected toys and devices | Met (not applicable) |
 | 15 | Online tools | Met |
 
@@ -213,5 +221,5 @@ This assessment should be revisited if any of the following change:
 - The app UI is translated into a new locale, or machine-translated copy is replaced by human-reviewed copy.
 - Social, community, or user-to-user features are added.
 - Advertising, marketing, affiliate, or behavioural-profiling integrations are added.
-- Engagement mechanics (push notifications, reminders, reward loops) are added - re-check Standard 13. (Fired by #1950: the late-day streak-at-risk push was re-checked against Standard 13 and found Met under five recorded copy/frequency/opt-out/no-false-urgency constraints - see Standard 13 above.)
+- Engagement mechanics (push notifications, reminders, reward loops) are added - re-check Standard 13. (Fired by #1950: the late-day streak-at-risk push was re-checked against Standard 13 and found Met under five recorded copy/frequency/opt-out/no-false-urgency constraints - see Standard 13 above. Fired again by #2187: the one-off learn-first and colours questions, Met under three recorded constraints.)
 - Geolocation or any new category of personal data starts being collected.

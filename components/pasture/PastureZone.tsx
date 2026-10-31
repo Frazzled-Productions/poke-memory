@@ -19,6 +19,8 @@ import { SanctuaryBiome } from "./biomes/SanctuaryBiome";
 import { WildlandsBiome } from "./biomes/WildlandsBiome";
 import { useIdleBehaviour, type Placement } from "./useIdleBehaviour";
 import styles from "./Pasture.module.css";
+import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
+import type { NameReviewCard } from "@/lib/review/session";
 
 // Habitats with an illustrated backdrop. These suppress the flat HABITAT_TINTS
 // fallback below so the SVG scene is the entire visual.
@@ -84,6 +86,25 @@ const CATALOGUED_HABITATS = new Set([
   "grassland", "forest", "sea", "cave", "mountain",
   "urban", "waters-edge", "rough-terrain", "rare", "unknown",
 ]);
+
+/** The favourite's highlighted spot (#2187): a ring and a labelled heart. */
+function FavouriteSpot({ card, children }: { card: NameReviewCard; children: React.ReactNode }) {
+  const t = useTranslations("favourite");
+  // eslint-disable-next-line no-restricted-syntax -- English-fallback argument to useLocalePokemonName, not a render value.
+  const { name } = useLocalePokemonName(card.speciesId ?? card.id, card.displayName);
+  return (
+    <div className="relative rounded-full ring-4 ring-rose-400/80 ring-offset-2 ring-offset-transparent">
+      {children}
+      <span
+        role="img"
+        aria-label={t("pastureSpotAria", { name })}
+        className="absolute -right-1 -top-1 text-sm leading-none text-rose-500"
+      >
+        ♥
+      </span>
+    </div>
+  );
+}
 
 export function PastureZone({ zone, placements, onMarkSeen, biomeHref, stats }: Props) {
   const t = useTranslations("pasture");
@@ -154,7 +175,7 @@ export function PastureZone({ zone, placements, onMarkSeen, biomeHref, stats }: 
           // Sort back-to-front so foreground sprites paint on top of distant ones.
           ? [...placements].sort((a, b) => a.anchor.y - b.anchor.y)
           : placements
-        ).map(({ card, anchor }) => {
+        ).map(({ card, anchor, favourite }) => {
           // Depth scale: lerp from 0.65 (back) to 1.15 (front), keyed off
           // the "ground-band" y range [0.55, 0.97]. Anchors above 0.55 (e.g.
           // sea-surface fish at y≈0.28) clamp to the minimum scale instead
@@ -183,7 +204,13 @@ export function PastureZone({ zone, placements, onMarkSeen, biomeHref, stats }: 
                 className={styles.spriteWander}
                 data-sprite-id={card.id}
               >
-                <PasturePokemon card={card} onMarkSeen={onMarkSeen} />
+                {favourite ? (
+                  <FavouriteSpot card={card}>
+                    <PasturePokemon card={card} onMarkSeen={onMarkSeen} />
+                  </FavouriteSpot>
+                ) : (
+                  <PasturePokemon card={card} onMarkSeen={onMarkSeen} />
+                )}
               </div>
             </div>
           );

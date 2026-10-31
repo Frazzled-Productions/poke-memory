@@ -11,6 +11,13 @@ vi.mock("@/lib/share/generateShareImage", () => ({
 
 import { generateMilestoneShareImage } from "@/lib/share/generateShareImage";
 
+const { mockSharePartner } = vi.hoisted(() => ({
+  mockSharePartner: { value: undefined as undefined | { spriteUrl: string; name: string; silhouette: boolean } },
+}));
+vi.mock("@/components/favourite/useSharePartner", () => ({
+  useSharePartner: () => mockSharePartner.value,
+}));
+
 // ---------------------------------------------------------------------------
 // Fixtures - the structured Milestone shape produced by detectTopMilestone.
 // All user-facing strings are rendered by the component via the catalogue.
@@ -207,10 +214,11 @@ describe("MilestoneShareButton - Web Share API file path", () => {
     expect(arg.files![0].name).toBe("poke-memory.png");
     // The image generator receives pre-rendered hero strings (threshold as the
     // hero number, localised disc label), not raw catalogue-bypassing labels.
-    expect(vi.mocked(generateMilestoneShareImage)).toHaveBeenCalledWith({
-      heroNumber: "100",
-      heroLabel: "Pokémon mastered",
-    });
+    // No favourite set, so no partner (#2187).
+    expect(vi.mocked(generateMilestoneShareImage)).toHaveBeenCalledWith(
+      { heroNumber: "100", heroLabel: "Pokémon mastered" },
+      undefined,
+    );
     // No status message because share succeeded.
     expect(screen.queryByRole("status")).toBeNull();
   });
@@ -343,5 +351,20 @@ describe("MilestoneShareButton - Japanese locale (#1393)", () => {
     expect(
       screen.getByRole("button", { name: /マイルストーンをシェア/ }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("MilestoneShareButton - partner (#2187)", () => {
+  it("Mastered partner: passes the partner to the milestone image", async () => {
+    mockSharePartner.value = { spriteUrl: "/sprites/pokemon/webp/94/192.webp", name: "Gengar", silhouette: false };
+    renderWithIntl(<MilestoneShareButton milestone={countMilestone} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Share milestone/i }));
+    });
+    expect(vi.mocked(generateMilestoneShareImage)).toHaveBeenLastCalledWith(
+      { heroNumber: "100", heroLabel: "Pokémon mastered" },
+      mockSharePartner.value,
+    );
+    mockSharePartner.value = undefined;
   });
 });

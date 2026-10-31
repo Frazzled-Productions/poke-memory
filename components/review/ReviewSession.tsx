@@ -5,6 +5,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslations } from "next-intl";
 import { PokemonCard } from "@/components/review/PokemonCard";
 import { DailySpotlight } from "@/components/review/DailySpotlight";
+import { AllDonePartner } from "@/components/favourite/AllDonePartner";
+import { FavouriteThemeOffer } from "@/components/favourite/FavouriteThemeOffer";
 import { TypedEntryNameCard } from "@/components/review/TypedEntryNameCard";
 import type { TypedEntryStrictness } from "@/lib/srs/typedEntryGradeLocale";
 import { MultipleChoiceNameCard } from "@/components/review/MultipleChoiceNameCard";
@@ -28,6 +30,7 @@ import { buildMcOptions } from "@/lib/srs/multipleChoiceDistractors";
 import {
   buildSession,
   buildSessionQueues,
+  removeIntroducedPrioritySpecies,
   countDueTomorrow,
   countNewTomorrow,
   getNextCardId,
@@ -620,7 +623,12 @@ function EndOfSessionScreen({
           <p className="text-zinc-500 dark:text-zinc-400">
             {t("nothingDueBody")}
           </p>
-          <DailySpotlight timezone={timezone} />
+          {/* The partner sits beside the Pokémon of the day (#2187). */}
+          <div className="flex flex-wrap items-start justify-center gap-4">
+            <DailySpotlight timezone={timezone} />
+            <AllDonePartner />
+          </div>
+          <FavouriteThemeOffer />
           {onClearScope !== undefined && (
             <button
               type="button"
@@ -814,6 +822,12 @@ export function ReviewSession() {
   // All enrolled learning locales (#1562). Read from settings at mount.
   // Used by the end-of-session "switch language" button and TodayPill label.
   const [learningLocales, setLearningLocales] = useState<AppLocale[]>(["en"]);
+  // Species to introduce first (#2187, "learn your favourite's line next").
+  // Read from settings at load; every buildSessionQueues call passes it, and
+  // handleGrade drops a species once it is fully introduced.
+  const [priorityNewSpeciesIds, setPriorityNewSpeciesIds] = useState<readonly number[]>([]);
+  // Hearted species for the Favourites scope preset (#2187), read at mount.
+  const [heartedSpeciesIds, setHeartedSpeciesIds] = useState<ReadonlySet<number>>(new Set());
   // Verified typed-entry mode (#1251). Read into state on session load via the
   // session-load effect. Same-tab toggles take effect on the next session via the
   // storage event; the in-flight card always uses the value captured at load time.
@@ -971,7 +985,7 @@ export function ReviewSession() {
       // of whether reconcile modified any card state. Pass the current
       // incompleteChains context so the "Incomplete evolution chains" scope
       // correctly identifies in-scope species during snooze reconciliation.
-      reconcileHiddenState(cards, next, today, { incompleteChainSpeciesIds: incompleteChains, masteryBlockingSpeciesIds });
+      reconcileHiddenState(cards, next, today, { incompleteChainSpeciesIds: incompleteChains, masteryBlockingSpeciesIds, heartedSpeciesIds });
       // `alternateFormsEnabled` and the card-type flags are captured from
       // component state set at mount. The Settings page triggers a full page
       // reload when toggling card-type gates, so the state is always current.
@@ -987,7 +1001,7 @@ export function ReviewSession() {
           alternateFormsEnabled,
           practiceScope: next,
         },
-        { incompleteChainSpeciesIds: incompleteChains, masteryBlockingSpeciesIds },
+        { incompleteChainSpeciesIds: incompleteChains, masteryBlockingSpeciesIds, heartedSpeciesIds },
       );
       setEligibleCardIds(eligibleIds);
       // Clear the displayed-card render lock (#1088). The lock pins the
@@ -1205,9 +1219,10 @@ export function ReviewSession() {
         ? getSeenPokemon(cards, seedPokemon, alternateFormsEnabled, scope, {
             incompleteChainSpeciesIds: incompleteChains,
             masteryBlockingSpeciesIds,
+            heartedSpeciesIds,
           })
         : [],
-    [cards, alternateFormsEnabled, scope, incompleteChains, masteryBlockingSpeciesIds],
+    [cards, alternateFormsEnabled, scope, incompleteChains, masteryBlockingSpeciesIds, heartedSpeciesIds],
   );
 
   // Higher-or-Lower signpost nudge (#1573): one-shot hint teasing the
@@ -1360,6 +1375,7 @@ export function ReviewSession() {
           superuserFlags.pretendAllMastered,
         ),
         masteryBlockingSpeciesIds: loadMasteryBlockingSpeciesIds,
+        heartedSpeciesIds: new Set(settings.heartedSpeciesIds ?? []),
       };
       const { changed: reconcileChanged } = reconcileHiddenState(sessionCards, persistedScope, today, loadScopeContext);
       const eligibleIds = computeEligibleCardIds(
@@ -1405,6 +1421,8 @@ export function ReviewSession() {
       // Capture the active locale and enrolled locales once at mount.
       setActiveLocale(sessionLocale);
       setLearningLocales(sessionLearningLocales);
+      setPriorityNewSpeciesIds(settings.priorityNewSpeciesIds ?? []);
+      setHeartedSpeciesIds(new Set(settings.heartedSpeciesIds ?? []));
       setVerifiedTypedEntryMode(settings.verifiedTypedEntryMode ?? false);
       setTypedEntryStrictness(settings.typedEntryStrictness ?? "lenient");
       setMcCardOnboardingShown(settings.mcCardOnboardingShown ?? false);
@@ -1454,7 +1472,7 @@ export function ReviewSession() {
       // Initialize the learning queue from persisted learning-step cards.
       // Use stepStartedAt from persisted state so the countdown resumes correctly
       // after navigation instead of resetting to the full step duration.
-      const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today, undefined, shuffleSalt, (settings.activePokemonNameLocale ?? "en") as AppLocale);
+      const { learningCardIds } = buildSessionQueues(sessionCards, sessionLimits, today, undefined, shuffleSalt, (settings.activePokemonNameLocale ?? "en") as AppLocale, settings.priorityNewSpeciesIds);
 
       const initialLearning: LearningQueueEntry[] = learningCardIds.map((cardId) => {
         const card = sessionCards.find((c) => c.id === cardId)!;
@@ -1738,6 +1756,7 @@ export function ReviewSession() {
       eligibleCardIds,
       shuffleSalt,
       activeLocale,
+      priorityNewSpeciesIds,
     );
     const nowMs = Date.now();
     const dueLearningEntries = learningQueue
@@ -1764,7 +1783,7 @@ export function ReviewSession() {
     // only the React state inputs; recomputing on `displayedCardId` itself
     // would race with the setState call inside this effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, learningQueue, eligibleCardIds, limits, extendedReview]);
+  }, [cards, learningQueue, eligibleCardIds, limits, extendedReview, priorityNewSpeciesIds]);
 
   // --- Seed error state ---
   // If the async seed fetch failed, surface a retry prompt. This is distinct
@@ -1916,6 +1935,7 @@ export function ReviewSession() {
     eligibleCardIds,
     shuffleSalt,
     activeLocale,
+    priorityNewSpeciesIds,
   );
 
   // Cards that are mid-learning-step but fall outside the active scope.
@@ -2326,6 +2346,7 @@ export function ReviewSession() {
                 alternateFormsEnabled={alternateFormsEnabled}
                 incompleteChainSpeciesIds={incompleteChains}
                 masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+                heartedSpeciesIds={heartedSpeciesIds}
               />
             </div>
           )}
@@ -2623,6 +2644,25 @@ export function ReviewSession() {
     // the background persistence chain. Reuse `settings` already loaded at
     // the top of this handler (#1191).
     const wasNew = effectiveCard.state.firstSeen === null;
+    // Learn-first list (#2187): a species leaves it once every enabled-direction
+    // card in the active locale has been introduced. Only a first sighting can
+    // complete a species, so skip the scan otherwise.
+    if (wasNew && priorityNewSpeciesIds.length > 0) {
+      const keptPriority = removeIntroducedPrioritySpecies(
+        priorityNewSpeciesIds,
+        newFullCards,
+        activeLocale,
+        {
+          evolutionEnabled: evolutionCardsEnabled,
+          reverseEvolutionEnabled,
+          cryEnabled: cryCardsEnabled,
+        },
+      );
+      if (keptPriority !== priorityNewSpeciesIds) {
+        setPriorityNewSpeciesIds(keptPriority);
+        saveSettings({ ...loadSettings(), priorityNewSpeciesIds: [...keptPriority] });
+      }
+    }
     const wasMastered = isMastered(effectiveCard.state);
     const nowMastered = isMastered(nextState);
     // Species-level mastery crossing: BOTH name + reverse must cross the gate.
@@ -2651,6 +2691,7 @@ export function ReviewSession() {
       eligibleCardIds,
       shuffleSalt,
       activeLocale,
+      priorityNewSpeciesIds,
     );
 
     // Compute the post-grade learning queue here, mirroring the `setLearningQueue`
@@ -3115,6 +3156,7 @@ export function ReviewSession() {
                 alternateFormsEnabled={alternateFormsEnabled}
                 incompleteChainSpeciesIds={incompleteChains}
                 masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+                heartedSpeciesIds={heartedSpeciesIds}
               />
             </div>
           </>
@@ -3244,6 +3286,7 @@ export function ReviewSession() {
               alternateFormsEnabled={alternateFormsEnabled}
               incompleteChainSpeciesIds={incompleteChains}
               masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+                heartedSpeciesIds={heartedSpeciesIds}
             />
           </>
         }
@@ -3358,6 +3401,7 @@ export function ReviewSession() {
             alternateFormsEnabled={alternateFormsEnabled}
             incompleteChainSpeciesIds={incompleteChains}
             masteryBlockingSpeciesIds={masteryBlockingSpeciesIds}
+                heartedSpeciesIds={heartedSpeciesIds}
           />
         </>
       }
