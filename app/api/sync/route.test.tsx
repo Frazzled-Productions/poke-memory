@@ -355,10 +355,13 @@ describe("POST /api/sync", () => {
 
     it("per-row network error after 23514 returns 502", async () => {
       mockRowOutcomes({ "2": REJECTED, "3": "throw" });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const res = await POST(makeRequest({ cards: cards("1", "2", "3") }));
 
       expect(res.status).toBe(502);
+      expect(warn).toHaveBeenCalledWith("[sync/route] per-row upsert threw", expect.any(TypeError));
+      warn.mockRestore();
     });
 
     it("batch of only 23514 rejections returns 200", async () => {

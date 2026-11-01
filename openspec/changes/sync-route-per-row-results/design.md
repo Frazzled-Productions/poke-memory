@@ -11,7 +11,7 @@ land", and the response is built from that.
 | Good, stale, third row hits a timeout | landed, `23514`, `57014` | 200, client clears queue | 502 |
 | Good, stale, third row's request throws | landed, `23514`, thrown | 200 | 502 |
 | One stale card | `23514` | 502, false banner, retries | 200 |
-| Stale, then a row with a structural error | `23514`, `23503` | 200 | 409 with the code |
+| Stale, then a row with a structural error | `23514`, `23503` | 502, or 200 if another row landed | 409 with the code |
 
 **Expected behaviour:** the last column.
 
@@ -71,13 +71,17 @@ nothing, so only the first is needed.
 
 ## Blast radius
 
-**The fact it is safe because of:** replaying a queue after a 502 cannot harm the cloud. Rows that
-already landed upsert again, and the stale row is rejected again. Rung 4: integration test "a transient
+**The fact it is safe because of:** replaying a queue after a 502 cannot regress a column the trigger
+guards. Rows that already landed upsert again, and the stale row is rejected again. Rung 4: integration test "a transient
 row failure returns 502, and replaying the same queue lands the row" on real Postgres, exit 0: first
 POST 502 with the row absent, same queue again 200 with the row present.
 
 Risks:
 
+- `hidden_since` and `due_date` are not guarded, so a replay writes back the queue's values. Seen on
+  `postgres:15`: a row whose cloud copy had `hidden_since` set and `due_date` moved, then replayed, returned
+  200 with `hidden_since` null and the old `due_date`. It needs another device to change the row between
+  the 502 and a late replay, and any stale push does the same today. Noted in #2331.
 - A malformed row is now evicted on this path, not kept and retried forever. `app/api/sync/route.ts`.
   Rare: the client produces these rows. Cost: the row never reaches the cloud, which was already true.
   Pinned by "a row outside a table CHECK is also 23514". Open call 1.

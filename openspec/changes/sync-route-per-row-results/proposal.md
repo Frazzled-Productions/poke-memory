@@ -63,11 +63,14 @@ Each has a recommended answer, which the code assumes.
 - 2026-11-02 Open call 1: `23514` also comes from the table CHECKs (`difficulty`, `stability`,
   `fsrs_state`, `locale`), not only the regression trigger, so a malformed row now gets 200 and leaves
   the queue, where alone it used to get a 502 and stay. Recommended: accept, because it can never land
-  and `pushSingleCard` already evicts on any `23514`. The alternative is matching the trigger's message
+  and `pushSingleCard` already evicts on any `23514`. One exception to "never": a client that ships a
+  value before the migration widening its CHECK (a fifth locale, say) would lose those rows silently.
+  `docs/sync.md` already requires the migration first, and today the four locales match
+  `SUPPORTED_LOCALES`. The alternative is matching the trigger's message
   or the constraint name, which ties the route to Postgres wording.
 - 2026-11-02 Open call 2: after a structural error on a row, stop or finish the other rows?
   Recommended: stop, the same as the batch path. The client keeps its queue on a 409, so nothing is
   lost.
 - 2026-11-02 Open call 3: retry a failed row inside the request? Recommended: no. The 502 makes the
-  client replay the queue, and replaying is proven harmless (design.md). A retry would add up to 200
+  client replay the queue, and replaying cannot regress a guarded column (design.md). A retry would add up to 200
   rows of delay to a request made while the page is closing.

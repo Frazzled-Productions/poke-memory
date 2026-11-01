@@ -175,10 +175,10 @@ async function syncCards(
           allOk = false;
           break outerLoop;
         }
-        // 23514 = check_violation from the regression trigger. One stale row
-        // in the batch aborts the entire Postgres statement, preventing 199
-        // valid rows from landing. Fall back to per-row upserts so a single
-        // rejected row cannot poison the batch (F23 / #1856).
+        // 23514 = check_violation from the regression trigger or a table CHECK.
+        // One stale or malformed row in the batch aborts the entire Postgres
+        // statement, preventing 199 valid rows from landing. Fall back to per-row
+        // upserts so a single rejected row cannot poison the batch (F23 / #1856).
         if (error.code === "23514") {
           // Each row ends one of four ways: landed, rejected (a deliberate
           // eviction, not a failure), structural (409, as for a whole batch) or
