@@ -23,7 +23,7 @@
  * 13. check_rate_limit returning true -> proceeds to the normal auth path.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { syntheticEmail, normaliseUsername, MIN_PASSWORD_LENGTH } from "./username";
 
 // ---------------------------------------------------------------------------
@@ -240,6 +240,68 @@ describe("signUpWithUsername", () => {
 
     expect(result).toEqual({ ok: false, error: "signup_failed" });
     expect(mockDeleteUser).toHaveBeenCalledWith("user-uuid-1234");
+  });
+
+  // --- Failures an operator must be able to see: the visitor only gets signup_failed
+
+  describe("server log on failures the visitor cannot explain", () => {
+    let consoleError: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      consoleError.mockRestore();
+    });
+
+    function loggedText() {
+      return JSON.stringify(consoleError.mock.calls);
+    }
+
+    it("logs a missing secret key", async () => {
+      delete process.env.SUPABASE_SECRET_KEY;
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+      await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+      expect(loggedText()).toContain("secret key");
+    });
+
+    it("logs a createUser failure with its status and code, and no credentials", async () => {
+      mockCreateUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: `bad ${EXPECTED_EMAIL}`, code: "bad_jwt", status: 401 },
+      });
+
+      await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+      expect(loggedText()).toContain("401");
+      expect(loggedText()).toContain("bad_jwt");
+      expect(loggedText()).not.toContain(VALID_PASSWORD);
+      expect(loggedText()).not.toContain(EXPECTED_EMAIL);
+    });
+
+    it("does not log a taken username", async () => {
+      mockCreateUser.mockResolvedValue({
+        data: { user: null },
+        error: { message: "taken", code: "email_exists", status: 422 },
+      });
+
+      await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
+    it("logs the user id when the clean-up delete fails, so the username can be freed", async () => {
+      mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
+      mockSignInWithPassword.mockResolvedValue({ data: { session: null }, error: { message: "boom" } });
+      mockDeleteUser.mockResolvedValue({ data: null, error: { message: "nope", code: "unexpected_failure", status: 500 } });
+
+      const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+      expect(result).toEqual({ ok: false, error: "signup_failed" });
+      expect(loggedText()).toContain("user-uuid-1234");
+      expect(loggedText()).not.toContain(VALID_PASSWORD);
+    });
   });
 
   // --- New path: server-side creation, independent of the confirmation setting

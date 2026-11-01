@@ -49,7 +49,12 @@ SHALL NOT call the public `signUp`, so the result does not depend on the "Confir
 #### Scenario: No secret key
 
 - **WHEN** neither secret key is set
-- **THEN** the result is `signup_failed` and no account is created
+- **THEN** the result is `signup_failed`, no account is created and a server error is logged
+
+#### Scenario: Create fails for another reason
+
+- **WHEN** `admin.createUser` answers an error other than `email_exists`
+- **THEN** the result is `signup_failed` and a server error is logged with the status and code only
 
 #### Scenario: Username taken
 
@@ -65,6 +70,11 @@ inserting the `usernames` row, and SHALL delete the new user if no session resul
 
 - **WHEN** `signInWithPassword` returns an error or no session
 - **THEN** the result is `signup_failed`, the new user is deleted and no `usernames` row is written
+
+#### Scenario: The clean-up delete fails
+
+- **WHEN** the delete answers an error
+- **THEN** the result is `signup_failed` and a server error is logged with the user id, so the username can be freed by hand
 
 ### Requirement: The username row is written as the signed-in user (baseline, current behaviour)
 

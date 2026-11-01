@@ -88,6 +88,7 @@ export async function signUpWithUsername(
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const secretKey = supabaseSecretKey();
   if (!supabaseUrl || !secretKey) {
+    console.error("[sign-up] Supabase URL or secret key is not configured");
     return { ok: false, error: "signup_failed" };
   }
   const admin = createSupabaseAdminClient(supabaseUrl, secretKey, {
@@ -107,7 +108,12 @@ export async function signUpWithUsername(
     // `email_exists` is GoTrue's canonical signal for an already-registered
     // address; the message string can change across versions.
     const alreadyRegistered = (createError as { code?: string }).code === "email_exists";
-    return { ok: false, error: alreadyRegistered ? "username_taken" : "signup_failed" };
+    if (alreadyRegistered) {
+      return { ok: false, error: "username_taken" };
+    }
+    // Status and code only: the message can carry the synthetic email.
+    console.error("[sign-up] createUser failed", createError.status, createError.code);
+    return { ok: false, error: "signup_failed" };
   }
 
   const userId = created.user?.id;
@@ -123,7 +129,10 @@ export async function signUpWithUsername(
     password,
   });
   if (signInError || !signInData.session) {
-    await admin.auth.admin.deleteUser(userId);
+    const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
+    if (deleteError) {
+      console.error("[sign-up] could not remove the new user", userId, deleteError.status, deleteError.code);
+    }
     return { ok: false, error: "signup_failed" };
   }
 

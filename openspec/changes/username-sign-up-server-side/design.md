@@ -30,6 +30,10 @@ answers `signup_failed` and leaves a user with no username row.
 - **Clean up on a failed sign-in.** Create and sign-in are now two calls, which adds a failure window
   the old single call did not have.
 
+- **Log what the visitor cannot explain.** Sign-up now depends on a key, and a missing or wrong key
+  looks to the visitor like any other `signup_failed`. The missing key, a failed create and a failed
+  clean-up delete each write a server error, with status and code only, never the error message.
+
 ## Risks
 
 - **Missing key on a deployment:** username sign-up answers `signup_failed`. Check Vercel production

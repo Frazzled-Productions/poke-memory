@@ -11,6 +11,7 @@
 - [x] 2.5 Confirm behaviour in both setting states on a local auth server at the deployed version. Verified: 12 of 12 checks, exit 0 (see design.md).
 - [x] 2.6 Update `e2e/auth-real.spec.ts`, `.github/workflows/ci.yml` and `.env.local.example`. Verified by `npm run lint` and `tsc --noEmit`.
 - [x] 2.7 Add the changelog fragment. Verified by `npm run lint:changelog`.
+- [x] 2.8 Log a missing key, a failed create and a failed clean-up delete, with no credentials, from the final review. Verified by the "server log on failures" tests: 3 failed on the missing log first, then all passed.
 
 ## 3. Owner steps
 
