@@ -73,6 +73,13 @@ const IDB_ARCHIVE_KEYS = [
 
 const MT_BANNER_PREFIX = "poke-memory:mt-banner-dismissed";
 
+/**
+ * Fired after `restoreUserData` writes an archive back. `usePerGradeSync` may
+ * already be mounted by then (a username sign-in lands on the practice page),
+ * and it has to pick up the restored queue before its next write replaces it.
+ */
+export const USER_ARCHIVE_RESTORED_EVENT = "poke-memory:user-archive-restored";
+
 export type ArchiveBlob = {
   /** Version tag - increment if the shape changes to allow forward-compat guards. */
   v: 1;
@@ -95,9 +102,9 @@ function hasGrades(value: string | undefined): value is string {
 }
 
 /**
- * The part of a blob that the cloud does not have: the pending-grade queue and
- * the held grades. Null when there are none. The rest of the blob comes back
- * from the cloud on the user's next pull.
+ * The grades in a blob that were on their way to the cloud: the pending-grade
+ * queue and the held grades. Null when there are none. Everything else is left
+ * to the user's next pull, so whatever the cloud lacks is lost (#2214).
  */
 function pickUnpushed(blob: ArchiveBlob): ArchiveBlob | null {
   const ls: Record<string, string> = {};
@@ -243,6 +250,7 @@ export async function restoreUserData(userId: string): Promise<void> {
     try {
       window.dispatchEvent(new StorageEvent("storage", { key: KEY_REVIEW_SESSION }));
       window.dispatchEvent(new StorageEvent("storage", { key: KEY_GRADE_LOG }));
+      window.dispatchEvent(new Event(USER_ARCHIVE_RESTORED_EVENT));
     } catch {
       // Older browsers / non-standard envs.
     }

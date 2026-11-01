@@ -52,10 +52,13 @@ Keeping `lastPushFailed` lets the reconnect push pick the queue up.
 
 ## Risks
 
-- **Not changed, Inferred:** if `ReviewSession` is mounted while the guard restores, it seeds its queue
-  before the restore lands, and the next grade's `persistQueue` overwrites the restored queue
-  (`lib/sync/usePerGradeSync.ts:176-179,507`). The same applies to the full archive today. Sign-in
-  through `app/api/auth/callback/route.ts` lands on `/auth/callback-complete`, where it is not
-  mounted, so this needs an in-page sign-in. Not reproduced.
+- **Fixed in final review, proven by a red hook test:** `usePerGradeSync` seeds from storage in the same
+  commit that starts the guard, so a restore that lands later was missed, and the next `persistQueue`
+  replaced the restored queue. An OAuth sign-in avoids this through `/auth/callback-complete`, but a
+  username sign-in does a full navigation to `/` with `ReviewSession` mounted
+  (`components/auth/SignInSheet.tsx`). After a failed archive the pull's reload closed most of the gap;
+  after a saved archive nothing did, because a restored session is not a cold load. `restoreUserData`
+  now fires `USER_ARCHIVE_RESTORED_EVENT` and the hook seeds again. The seed removes duplicates, so
+  running it twice is safe.
 - **Cleared:** an old blob reads the same, the format is unchanged, so an upgrade and a rollback are
   both safe. A retained blob cannot restore over newer data without passing the merge and reset check.

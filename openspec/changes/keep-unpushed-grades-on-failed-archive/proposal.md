@@ -17,7 +17,9 @@ Fixes: #2208
   their SyncStatus, cursors nulled, through the new `saveUnpushedArchive`. `restoreUserData` reads it
   like any archive.
 - `restoreUserData` removes an archive only after every localStorage key is written and every
-  IndexedDB value reads back.
+  IndexedDB value reads back, and announces each restore.
+- `usePerGradeSync` seeds again on that announcement, because on a username sign-in it is already
+  mounted when the restore lands, and its next write would replace the restored queue.
 - New capability `account-switch`: a baseline of how the switch behaves today, plus these requirements.
 - `docs/sync.md` describes the failure path.
 
@@ -45,8 +47,12 @@ Evidence from `blast-radius` on 2 November 2026 against `origin/qa` at `d2456f44
 - **Guest mode (localStorage):** no change. A null owner returns before the archive step.
 - **Superuser mode and QA-seed scenarios:** no change. The guard does not read the superuser flags, and
   `archiveUserData` still skips device-level keys.
-- **Review and quiz screens (home), Pokédex, Pasture, Stats, Journey:** after a failed archive they
-  show the cloud's data until the pull finishes, as they already do; no code change.
+- **Review and quiz screens (home):** `usePerGradeSync` seeds again after a restore, for every restore,
+  not only a failed archive's. The seed is the existing one, so held grades follow the same rules and
+  an entry already in memory still wins. After a failed archive the screen shows the cloud's data once
+  the pull finishes, as it already does.
+- **Pokédex, Pasture, Stats, Journey:** after a failed archive they show the cloud's data until the
+  pull finishes, as they already do; no code change.
 - **What's new, locales (en, ja, zh-Hans, zh-Hant, pseudo-locale):** no change, no copy. The blob
   keeps each card's `locale`.
 - **Accessibility (keyboard, screen reader, reduced motion):** no change, no UI.
@@ -78,7 +84,7 @@ Evidence from `blast-radius` on 2 November 2026 against `origin/qa` at `d2456f44
 Nothing here has been put to Fraser yet. Each line is an open call with a recommendation.
 
 - 2026-11-02 The audit says stop the wipe or push first. Neither works: the guard runs once the session is already the incoming user's (`useSignInPull`), so a push cannot write the outgoing user's rows under row-level security, and an unwiped device hands their data to the incoming user, the #1850 leak. Recommended: wipe, and keep the queue under the outgoing user's own key, as built.
-- 2026-11-02 After a failed archive, grade-log rows the cloud lacks are still lost, and the session is rebuilt from the cloud. Keeping them means writing the archive to IndexedDB, which adds an erasure path to Delete account. Recommended: land this first and decide on #2214 separately.
+- 2026-11-02 After a failed archive, whatever the cloud lacks outside the queue is still lost: grade-log rows, in-step cards (`isSyncSafe` keeps them out of the queue), and any streak days or settings not yet pushed. The session is rebuilt from the cloud. Keeping them means writing the archive to IndexedDB, which adds an erasure path to Delete account. Recommended: land this first and decide on #2214 separately.
 - 2026-11-02 Proven in real Chrome 156 only. WebKit was not run, because Playwright's browsers are not installed here, and Safari has its own quota behaviour. Recommended: accept, since the code path only needs `setItem` to throw, which every browser does at quota.
 - 2026-11-02 If even the small blob cannot be written, the grades are lost and only `console.error` says so. By then neither store can take a write and the wipe has freed its own space. Recommended: accept, with no Sentry event.
 - 2026-11-02 An archive kept after a partial restore stays until the next archive of that user overwrites it. If that next archive fails with no grades queued, the older blob stays and is restored on their return, where the merge and the reset check still apply. Recommended: accept.

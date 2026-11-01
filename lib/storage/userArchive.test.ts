@@ -42,6 +42,7 @@ import {
   archiveUserData,
   restoreUserData,
   saveUnpushedArchive,
+  USER_ARCHIVE_RESTORED_EVENT,
   clearIdbPendingQueue,
   clearIdbUserData,
 } from "./userArchive";
@@ -353,6 +354,8 @@ describe("restoreUserData", () => {
     const keys = dispatchEvent.mock.calls.map((c) => (c[0] as { key: string | null }).key);
     expect(keys).toContain(KEY_REVIEW_SESSION);
     expect(keys).toContain(KEY_GRADE_LOG);
+    const types = dispatchEvent.mock.calls.map((c) => (c[0] as { type: string }).type);
+    expect(types).toContain(USER_ARCHIVE_RESTORED_EVENT);
   });
 
   it("ignores a malformed archive blob (non-fatal)", async () => {

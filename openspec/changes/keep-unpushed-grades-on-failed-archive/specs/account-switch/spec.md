@@ -104,6 +104,11 @@ kept. The incoming user SHALL get none of them.
 - **WHEN** A signs in again after that
 - **THEN** both queue copies hold A's grades, and A's cursors are null so the pull rebuilds the session
 
+#### Scenario: The review screen is already mounted
+
+- **WHEN** a restore lands after `usePerGradeSync` has seeded
+- **THEN** it seeds again, and the next grade does not replace the restored queue
+
 #### Scenario: Owner has reset before
 
 - **WHEN** A once reset progress and returns after a failed archive

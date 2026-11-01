@@ -6,6 +6,7 @@
 - [x] 1.4 `restoreUserData` keeps an archive after a partial restore. Verify: "partial restore keeps the archive blob" and "keeps the archive blob when an IDB value does not read back".
 - [x] 1.5 Real-browser run. Verify: bundled guard in headless Chrome at 40,000 entries, and with localStorage full, returns all three queued grades to A and none to B.
 - [x] 1.6 `docs/sync.md` and a `fixed` changelog fragment. Verify: `npm run lint`.
+- [x] 1.7 A queue restored after mount is taken up. Verify: "takes up a queue restored after mount, so the next grade cannot replace it (#2208)", red with "expected [ 88 ] to include 77".
 
 ## 2. Before merge
 

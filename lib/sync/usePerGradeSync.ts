@@ -16,6 +16,7 @@ import {
   markStructuralProbeAttempted,
 } from "@/lib/sync/structuralError";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
+import { USER_ARCHIVE_RESTORED_EVENT } from "@/lib/storage/userArchive";
 import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
 import { releaseCloudPushHold, type GradeLogEntry } from "@/lib/gradelog/persistence";
 import { pushGradeLogEntry } from "@/lib/sync/gradeLogPush";
@@ -495,29 +496,38 @@ export function usePerGradeSync(
   useEffect(() => {
     if (!client || !userId) return;
 
-    const queue = pendingQueueRef.current;
-    const have = new Set(queue.map(cardLocaleKey));
-    const seed = (card: ReviewableCard) => {
-      const key = cardLocaleKey(card);
-      if (have.has(key)) return;
-      have.add(key);
-      queue.push(card);
+    const seedFromStorage = () => {
+      const queue = pendingQueueRef.current;
+      const have = new Set(queue.map(cardLocaleKey));
+      const seed = (card: ReviewableCard) => {
+        const key = cardLocaleKey(card);
+        if (have.has(key)) return;
+        have.add(key);
+        queue.push(card);
+      };
+
+      for (const card of loadPendingQueue()) seed(card);
+
+      // Leftover held copies (#2052): same user only (never push one account's
+      // grade under another), and only when safe: left by THIS tab (a reload ended
+      // the undo window) or stale (its owner tab is gone). A copy a live other tab
+      // owns is left alone, and so is this tab's own record while it has a live
+      // hold (this effect re-runs when the client or user changes mid-hold).
+      const leftovers = takeLeftoverHeldCards(userId, tabId, {
+        ownHoldLive: heldRef.current !== null,
+      });
+      for (const card of leftovers) seed(card);
+      if (leftovers.length > 0) persistQueue();
+
+      if (queue.length > 0) scheduleDrain();
     };
 
-    for (const card of loadPendingQueue()) seed(card);
-
-    // Leftover held copies (#2052): same user only (never push one account's
-    // grade under another), and only when safe: left by THIS tab (a reload ended
-    // the undo window) or stale (its owner tab is gone). A copy a live other tab
-    // owns is left alone, and so is this tab's own record while it has a live
-    // hold (this effect re-runs when the client or user changes mid-hold).
-    const leftovers = takeLeftoverHeldCards(userId, tabId, {
-      ownHoldLive: heldRef.current !== null,
-    });
-    for (const card of leftovers) seed(card);
-    if (leftovers.length > 0) persistQueue();
-
-    if (queue.length > 0) scheduleDrain();
+    seedFromStorage();
+    // This effect and guardAccountSwitch start in the same commit, so on a
+    // username sign-in the seed above runs before the archive is restored.
+    // Without this second seed the next persistQueue replaces the restored queue.
+    window.addEventListener(USER_ARCHIVE_RESTORED_EVENT, seedFromStorage);
+    return () => window.removeEventListener(USER_ARCHIVE_RESTORED_EVENT, seedFromStorage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, userId]);
 
