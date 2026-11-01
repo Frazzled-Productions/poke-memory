@@ -32,7 +32,8 @@ Source: `app/settings/page.tsx:890`, `app/settings/page.tsx:906`, `app/settings/
 
 The modal SHALL offer a required category (bug, feature, other), an optional page chosen from a fixed
 list (`/`, `/pokedex`, `/pasture`, `/stats`, `/journey`, `/settings`, `other`), a message of up to 2000
-characters with a live counter, and a privacy notice. Submit SHALL be disabled without a category, with
+characters with a live counter, and a privacy notice. The textarea's `maxLength` SHALL stop typing or pasting
+past 2000, so the over-limit state is only reached when the value is set by code. Submit SHALL be disabled without a category, with
 a message that is empty after trimming, over the limit, or while a request is in flight. Text comes from
 `settings.feedback` messages in every locale.
 
@@ -43,7 +44,7 @@ a message that is empty after trimming, over the limit, or while a request is in
 
 #### Scenario: Message over the limit
 
-- **WHEN** the message exceeds 2000 characters
+- **WHEN** the value is set past 2000 characters by code, as the test does
 - **THEN** Submit is disabled and the counter turns red
 
 #### Scenario: Non-English locale
@@ -58,8 +59,9 @@ Source: `components/feedback/FeedbackModal.tsx:8`, `components/feedback/Feedback
 Submit, or Cmd/Ctrl+Enter from the message field, SHALL POST `category`, `message`, `page` and
 `appVersion` to `/api/feedback`. A blank page SHALL be sent as null; the current pathname is not sent.
 A 2xx response SHALL replace the form with the success state. Any other response, or a network error, SHALL
-show one inline error and keep the form and its text for a retry. The privacy notice still describes the
-old automatic pathname (ops #427).
+show one inline error and keep the form and its text for a retry. Cmd/Ctrl+Enter does not check the
+over-limit state; it sends the first 2000 characters. The modal's own notice only asks for no personal data;
+it is the `/privacy` page that still describes the old automatic pathname (ops #427).
 
 #### Scenario: Page left blank
 
@@ -76,7 +78,7 @@ old automatic pathname (ops #427).
 - **WHEN** `fetch` rejects
 - **THEN** the same inline alert shows and the form stays open
 
-Source: `components/feedback/FeedbackModal.tsx:88`, `components/feedback/FeedbackModal.tsx:93`, `components/feedback/FeedbackModal.tsx:105`, `components/feedback/FeedbackModal.tsx:118`, `components/feedback/FeedbackModal.tsx:269`, `next.config.ts:34`, `app/privacy/page.tsx:287`, `components/feedback/FeedbackModal.test.tsx:189`, `components/feedback/FeedbackModal.test.tsx:277`, `components/feedback/FeedbackModal.test.tsx:305`, `components/feedback/FeedbackModal.test.tsx:331`, `components/feedback/FeedbackModal.test.tsx:356`.
+Source: `components/feedback/FeedbackModal.tsx:88`, `components/feedback/FeedbackModal.tsx:89`, `components/feedback/FeedbackModal.tsx:93`, `components/feedback/FeedbackModal.tsx:100`, `components/feedback/FeedbackModal.tsx:105`, `components/feedback/FeedbackModal.tsx:118`, `components/feedback/FeedbackModal.tsx:269`, `next.config.ts:34`, `app/privacy/page.tsx:287`, `components/feedback/FeedbackModal.test.tsx:189`, `components/feedback/FeedbackModal.test.tsx:277`, `components/feedback/FeedbackModal.test.tsx:305`, `components/feedback/FeedbackModal.test.tsx:331`, `components/feedback/FeedbackModal.test.tsx:356`.
 
 ### Requirement: Closing the feedback form (baseline)
 
@@ -88,18 +90,25 @@ and the request carries on. Its result lands on the closed modal, which looks wr
 - **WHEN** the player presses Escape with a request in flight, the request succeeds, and they reopen the modal
 - **THEN** the success state shows instead of the form (#2304)
 
+#### Scenario: Escape during a submit that fails
+
+- **WHEN** the player presses Escape with a request in flight, the request fails, and they reopen the modal
+- **THEN** the empty form shows with the old inline error (#2304)
+
 #### Scenario: Close after typing
 
 - **WHEN** the player cancels with text in the form and reopens it
 - **THEN** the form is empty
 
-Source: `components/feedback/FeedbackModal.tsx:65`, `components/feedback/FeedbackModal.tsx:80`, `components/feedback/FeedbackModal.tsx:106`, `components/feedback/FeedbackModal.tsx:269`.
+Source: `components/feedback/FeedbackModal.tsx:65`, `components/feedback/FeedbackModal.tsx:80`, `components/feedback/FeedbackModal.tsx:106`, `components/feedback/FeedbackModal.tsx:108`, `components/feedback/FeedbackModal.tsx:269`.
 
 ### Requirement: Feedback route input handling (baseline)
 
 `POST /api/feedback` SHALL check configuration first, answering 500 `misconfigured` without a Supabase
 URL or secret key. It SHALL answer 400 `invalid_json` for an unparseable body, 400 `invalid_category`
-for anything but bug, feature or other, and 400 `missing_message` for a non-string or blank message.
+for anything but bug, feature or other, and 400 `missing_message` for a non-string or blank message. A
+body of literal JSON `null` parses, then throws an unhandled `TypeError` at the category check, which looks
+wrong (held in ops #442).
 
 #### Scenario: Blank message
 
@@ -110,6 +119,11 @@ for anything but bug, feature or other, and 400 `missing_message` for a non-stri
 
 - **WHEN** the category is `praise`
 - **THEN** the route answers 400 `invalid_category`
+
+#### Scenario: Body is literal null
+
+- **WHEN** the body is the JSON value `null`
+- **THEN** the handler throws before the rate limit and no row is inserted (ops #442)
 
 Source: `app/api/feedback/route.ts:29`, `app/api/feedback/route.ts:44`, `app/api/feedback/route.ts:49`, `app/api/feedback/route.ts:54`, `app/api/feedback/route.ts:63`, `lib/api/parseJsonBody.ts:19`, `app/api/feedback/route.test.tsx:117`, `app/api/feedback/route.test.tsx:162`, `app/api/feedback/route.test.tsx:381`.
 
@@ -151,7 +165,7 @@ Source: `app/api/feedback/route.ts:83`, `app/api/feedback/route.ts:86`, `app/api
 ### Requirement: Feedback rate limit (baseline)
 
 After validation and identity, the route SHALL call `check_rate_limit` with action `feedback` and a
-hash of the first `x-forwarded-for` entry. The caps are 5 in 10 minutes and 20 in an hour per hash. Only
+salted hash of the first `x-forwarded-for` entry, or of `unknown` without that header. The caps are 5 in 10 minutes and 20 in an hour per hash. Only
 an explicit `false` SHALL answer 429 `rate_limited`. An RPC error or throw SHALL log a warning and
 continue, and the check is skipped when no server client could be created.
 
@@ -165,7 +179,7 @@ continue, and the check is skipped when no server client could be created.
 - **WHEN** the RPC returns an error
 - **THEN** the insert goes ahead and the route answers 200
 
-Source: `app/api/feedback/route.ts:97`, `app/api/feedback/route.ts:99`, `app/api/feedback/route.ts:108`, `app/api/feedback/route.ts:111`, `app/api/feedback/route.ts:117`, `db/migrations/045_check_rate_limit_feedback_action.sql:24`, `app/api/feedback/route.test.tsx:395`, `app/api/feedback/route.test.tsx:412`, `app/api/feedback/route.test.tsx:432`.
+Source: `app/api/feedback/route.ts:97`, `app/api/feedback/route.ts:99`, `app/api/feedback/route.ts:108`, `app/api/feedback/route.ts:111`, `app/api/feedback/route.ts:117`, `lib/auth/rateLimitIp.ts:37`, `db/migrations/045_check_rate_limit_feedback_action.sql:24`, `app/api/feedback/route.test.tsx:395`, `app/api/feedback/route.test.tsx:412`, `app/api/feedback/route.test.tsx:432`.
 
 ### Requirement: Feedback storage and retention (baseline)
 
@@ -211,7 +225,8 @@ Source: `db/migrations/042_feedback_discord_notify.sql:55`, `db/migrations/042_f
 `POST /api/discord/notify` SHALL answer 503 `misconfigured` without `CRON_SHARED_SECRET`,
 `DISCORD_NOTIFY_WEBHOOK_URL` or the Supabase URL; 401 with no body unless the bearer matches in constant
 time; 400 `invalid_json` for an unparseable body; and 400 `forbidden_fields` if the body contains
-`message` or `user_id`. It does not check the rest of the body's shape or its category.
+`message` or `user_id`. It does not check the rest of the body's shape or its category, so any other
+authorised body posts as a bug report, and a `null` body or a missing `created_at` throws (held in ops #442).
 
 #### Scenario: Wrong bearer
 
@@ -223,7 +238,7 @@ time; 400 `invalid_json` for an unparseable body; and 400 `forbidden_fields` if 
 - **WHEN** the body contains `message`
 - **THEN** the route answers 400 and nothing reaches Discord
 
-Source: `app/api/discord/notify/route.ts:104`, `app/api/discord/notify/route.ts:112`, `app/api/discord/notify/route.ts:116`, `app/api/discord/notify/route.ts:126`, `lib/auth/bearerAuth.ts:18`, `app/api/discord/notify/route.test.tsx:108`, `app/api/discord/notify/route.test.tsx:142`, `app/api/discord/notify/route.test.tsx:148`, `app/api/discord/notify/route.test.tsx:164`, `app/api/discord/notify/route.test.tsx:175`.
+Source: `app/api/discord/notify/route.ts:104`, `app/api/discord/notify/route.ts:112`, `app/api/discord/notify/route.ts:116`, `app/api/discord/notify/route.ts:126`, `app/api/discord/notify/route.ts:133`, `lib/auth/bearerAuth.ts:18`, `app/api/discord/notify/route.test.tsx:108`, `app/api/discord/notify/route.test.tsx:142`, `app/api/discord/notify/route.test.tsx:148`, `app/api/discord/notify/route.test.tsx:164`, `app/api/discord/notify/route.test.tsx:175`.
 
 ### Requirement: Bug notification content (baseline)
 
@@ -266,8 +281,9 @@ Source: `app/api/discord/notify/route.ts:46`, `app/api/discord/notify/route.ts:5
 ### Requirement: Weekly feedback digest (baseline)
 
 The pg_cron job `feedback-discord-digest` SHALL run on Mondays at 09:00 UTC and POST `{"window_days":7}`
-to the digest route, skipping with a notice if a Vault secret is missing. The route SHALL use the same
-503 and 401 guards as notify, and also needs the secret key. `window_days` SHALL default to 7 when absent
+to the digest route, skipping with a notice if a Vault secret is missing. The route SHALL answer 503
+`misconfigured` without `CRON_SHARED_SECRET`, `DISCORD_DIGEST_WEBHOOK_URL` (its own webhook, not the notify
+one), the Supabase URL or the secret key, and 401 with no body on a wrong bearer. `window_days` SHALL default to 7 when absent
 or the body is unparseable, and a number SHALL be rounded and clamped to 1-90.
 
 #### Scenario: Window too large
@@ -280,7 +296,7 @@ or the body is unparseable, and a number SHALL be rounded and clamped to 1-90.
 - **WHEN** the body is not JSON
 - **THEN** the window is 7 days
 
-Source: `db/migrations/042_feedback_discord_notify.sql:155`, `db/migrations/042_feedback_discord_notify.sql:166`, `db/migrations/042_feedback_discord_notify.sql:194`, `app/api/discord/digest/route.ts:19`, `app/api/discord/digest/route.ts:55`, `app/api/discord/digest/route.ts:68`, `app/api/discord/digest/route.test.tsx:312`, `app/api/discord/digest/route.test.tsx:321`, `app/api/discord/digest/route.test.tsx:330`.
+Source: `db/migrations/042_feedback_discord_notify.sql:155`, `db/migrations/042_feedback_discord_notify.sql:166`, `db/migrations/042_feedback_discord_notify.sql:194`, `app/api/discord/digest/route.ts:19`, `app/api/discord/digest/route.ts:51`, `app/api/discord/digest/route.ts:55`, `app/api/discord/digest/route.ts:68`, `app/api/discord/digest/route.test.tsx:312`, `app/api/discord/digest/route.test.tsx:321`, `app/api/discord/digest/route.test.tsx:330`.
 
 ### Requirement: Digest content (baseline)
 
@@ -303,9 +319,9 @@ Source: `app/api/discord/digest/route.ts:97`, `app/api/discord/digest/route.ts:1
 
 ### Requirement: Unlocking superuser mode (baseline)
 
-Typing `super` with no gap over 2 seconds, outside an input, textarea or editable element, or tapping an
+Typing lower-case `super` with no gap over 2 seconds, outside an input, textarea or editable element, or tapping an
 element marked `data-superuser-tap` 7 times within 2 seconds of the first tap, SHALL toggle the unlocked
-state, stored locally. It SHALL only reveal the Developer section. Storage events SHALL keep other tabs' unlocked state and
+state, stored locally. It SHALL only reveal the Developer section and open the `/audit-themes` gate. Storage events SHALL keep other tabs' unlocked state and
 flags current. Locking SHALL clear every flag and, if any was on, run exit cleanup.
 
 #### Scenario: Typing in a field
@@ -331,7 +347,9 @@ There SHALL be five independent flags, default off and stored together: `pretend
 `forceNextStreakMilestone`, `forceTokenToast`, `forceCardsGraduated` and `qaSeedMode`. A stored value that
 is not exactly `true`, a missing field, or malformed JSON SHALL read as off. `forceNextStreakMilestone` and
 `forceTokenToast` SHALL clear themselves after one fire, through `setFlag`, so if that was the last flag on,
-exit cleanup runs.
+exit cleanup runs. A forced milestone SHALL not be saved as seen. `pretendAllMastered` SHALL make mastery
+read as full on the Pokédex, Pasture, Stats, Journey and theme or favourite gates; history and PWA badge
+figures stay real.
 
 #### Scenario: Corrupt blob
 
@@ -343,6 +361,11 @@ exit cleanup runs.
 - **WHEN** `forceTokenToast` is the only flag on and its toast is dismissed
 - **THEN** the flag clears and exit cleanup runs, which for a guest means the reset prompt
 
+#### Scenario: Forced milestone dismissed
+
+- **WHEN** `forceNextStreakMilestone` fires and the celebration is dismissed
+- **THEN** the flag clears and `seenStreakMilestones` is unchanged
+
 #### Scenario: pretendAllMastered on the Pokédex
 
 - **WHEN** the flag is on
@@ -353,13 +376,14 @@ exit cleanup runs.
 - **WHEN** the flag is on and a learning-phase card comes up
 - **THEN** typed entry shows, not multiple choice
 
-Source: `lib/superuser/persistence.ts:23`, `lib/superuser/persistence.ts:53`, `lib/superuser/persistence.ts:78`, `lib/superuser/persistence.ts:95`, `components/review/StreakBadge.tsx:153`, `components/review/StreakBadge.tsx:174`, `components/review/ReviewSession.tsx:3359`, `components/pokedex/PokemonDetailDisclosure.tsx:170`, `lib/superuser/SuperuserContext.tsx:280`, `lib/superuser/persistence.test.ts:101`, `lib/superuser/persistence.test.ts:106`, `e2e/superuser.spec.ts:111`, `e2e/superuser.spec.ts:156`.
+Source: `lib/superuser/persistence.ts:23`, `lib/superuser/persistence.ts:53`, `lib/superuser/persistence.ts:78`, `lib/superuser/persistence.ts:95`, `components/review/StreakBadge.tsx:149`, `components/review/StreakBadge.tsx:153`, `components/review/StreakBadge.tsx:174`, `components/review/ReviewSession.tsx:3359`, `components/pokedex/PokedexGrid.tsx:193`, `components/pokedex/PokemonDetailDisclosure.tsx:170`, `app/journey/page.tsx:587`, `app/pasture/page.tsx:312`, `app/stats/page.tsx:366`, `components/favourite/usePartner.ts:26`, `components/pwa/usePwaBadge.ts:34`, `lib/stats/activity-history.ts:36`, `lib/superuser/SuperuserContext.tsx:280`, `lib/superuser/persistence.test.ts:101`, `lib/superuser/persistence.test.ts:106`, `e2e/superuser.spec.ts:111`, `e2e/superuser.spec.ts:156`.
 
 ### Requirement: Developer section (baseline)
 
 While unlocked, Settings SHALL show a Developer section with a link to `/audit-themes`, a toggle for each
-flag, and a "Reset earned badges" button that empties `earnedBadges` in local settings with no confirmation.
-The QA seed panel SHALL show only with `qaSeedMode` on.
+flag, and a "Reset earned badges" button that empties `earnedBadges` in local settings with no confirmation. The
+button shows with every flag off, and then the write guard is not active, so the empty list goes to the
+sync path, which looks wrong (#2354). The QA seed panel SHALL show only with `qaSeedMode` on.
 
 #### Scenario: Unlocked with qaSeedMode off
 
@@ -371,14 +395,22 @@ The QA seed panel SHALL show only with `qaSeedMode` on.
 - **WHEN** the button is pressed
 - **THEN** `earnedBadges` is emptied and the label shows "cleared" for 1.5 seconds
 
-Source: `app/settings/page.tsx:128`, `app/settings/page.tsx:134`, `app/settings/page.tsx:139`, `app/settings/page.tsx:2103`, `app/settings/page.tsx:2116`, `app/settings/page.tsx:2199`, `app/settings/page.tsx:2221`, `e2e/qa-seed.spec.ts:38`, `e2e/qa-seed.spec.ts:62`, `e2e/qa-seed.spec.ts:200`.
+#### Scenario: Reset earned badges with no flag on
+
+- **WHEN** a signed-in operator presses the button with every flag off
+- **THEN** `AutoSyncOnChange` sends `earnedBadges: []`, which the `user_settings` regression trigger refuses when the cloud holds badges (#2354)
+
+Source: `app/settings/page.tsx:128`, `app/settings/page.tsx:134`, `app/settings/page.tsx:139`, `app/settings/page.tsx:2103`, `app/settings/page.tsx:2116`, `app/settings/page.tsx:2199`, `app/settings/page.tsx:2221`, `components/sync/AutoSyncOnChange.tsx:64`, `db/migrations/038_user_settings_reject_regression_trigger.sql:102`, `e2e/qa-seed.spec.ts:38`, `e2e/qa-seed.spec.ts:62`, `e2e/qa-seed.spec.ts:200`.
 
 ### Requirement: Superuser write guard (baseline)
 
-`anyFlagOn` SHALL be true while any flag is on or cleanup is pending in the provider's state, and each write
-path SHALL read it: `AutoSyncOnChange`, `OnlineReconnectSync`, the review session, Settings actions, push
-opt-in and the auth callback. Settings SHALL hide Force pull and pass `superuserPaused` to its controls.
-Sign-in and visibility pulls keep reading (see the `cloud-sync` capability).
+`anyFlagOn` SHALL be true while any flag is on or cleanup is pending in the provider's state; on the first
+render, before the mount effect reads storage, it is false. Each write path SHALL read it:
+`AutoSyncOnChange`, `OnlineReconnectSync`, the review session, Settings actions, the retry on Settings and
+Stats, the Known Pokémon quiz, the Pasture seen marker, push opt-in and the auth callback. Settings SHALL
+hide Force pull, disable Reset all progress and Delete account, and pass `superuserPaused` to its controls.
+Journey and Stats SHALL skip retroactive badge awards. Sign-in and visibility pulls keep reading but skip
+their write-backs (see the `cloud-sync` capability).
 
 #### Scenario: Flag on
 
@@ -395,7 +427,12 @@ Sign-in and visibility pulls keep reading (see the `cloud-sync` capability).
 - **WHEN** a sign-in completes with the guard active
 - **THEN** the automatic push and "keep local" push are skipped
 
-Source: `lib/superuser/SuperuserContext.tsx:423`, `components/sync/AutoSyncOnChange.tsx:48`, `components/sync/OnlineReconnectSync.tsx:21`, `components/review/ReviewSession.tsx:1117`, `components/pwa/PushOptIn.tsx:126`, `app/auth/callback-complete/page.tsx:149`, `app/auth/callback-complete/page.tsx:307`, `app/settings/page.tsx:468`, `app/settings/page.tsx:1987`, `components/auth/superuserGuard.test.tsx:127`, `components/auth/superuserGuard.test.tsx:174`, `components/auth/superuserGuard.test.tsx:202`, `components/auth/superuserGuard.test.tsx:473`, `components/auth/superuserGuard.test.tsx:514`.
+#### Scenario: Pull while guarded
+
+- **WHEN** a sign-in or visibility pull runs with the guard active
+- **THEN** cloud data is read, and the learning-locales and grade-log push-backs are skipped
+
+Source: `lib/superuser/SuperuserContext.tsx:423`, `components/sync/AutoSyncOnChange.tsx:48`, `components/sync/OnlineReconnectSync.tsx:21`, `components/review/ReviewSession.tsx:1117`, `components/pwa/PushOptIn.tsx:126`, `app/auth/callback-complete/page.tsx:149`, `app/auth/callback-complete/page.tsx:307`, `app/settings/page.tsx:468`, `app/settings/page.tsx:1009`, `app/settings/page.tsx:1987`, `app/settings/page.tsx:2245`, `app/settings/page.tsx:2263`, `app/stats/page.tsx:217`, `app/stats/page.tsx:315`, `app/journey/page.tsx:471`, `app/pasture/page.tsx:286`, `lib/sync/pullAndMerge.ts:458`, `lib/sync/pullAndMerge.ts:576`, `lib/superuser/SuperuserContext.tsx:76`, `components/auth/superuserGuard.test.tsx:127`, `components/auth/superuserGuard.test.tsx:174`, `components/auth/superuserGuard.test.tsx:202`, `components/auth/superuserGuard.test.tsx:473`, `components/auth/superuserGuard.test.tsx:514`.
 
 ### Requirement: Cleanup-pending marker (baseline)
 
@@ -539,8 +576,8 @@ Source: `lib/qa-seed/scenarios.ts:19`, `lib/qa-seed/scenarios.ts:156`, `lib/qa-s
 
 The panel SHALL ask for confirmation, load the seed, build the payload and show "Seed applied" or the error.
 Apply SHALL write only the keys the payload has: the session to IndexedDB with change events, a streak of
-days ending today, settings in one save with labs flags merged, the mastered-count cache, and the active
-slug. A value a scenario omits, such as an earlier streak, stays. The panel asks for a reload, and its
+days ending today by UTC date, settings in one save with labs flags merged (no scenario sets labs flags
+today), the mastered-count cache, and the active slug. A value a scenario omits, such as an earlier streak, stays. The panel asks for a reload, and its
 visible text is hard-coded English.
 
 #### Scenario: Confirmation dismissed
@@ -558,7 +595,7 @@ visible text is hard-coded English.
 - **WHEN** `pasture-progression` is applied and the page reloaded
 - **THEN** the Pasture shows the seeded species
 
-Source: `components/settings/QaSeedSection.tsx:39`, `components/settings/QaSeedSection.tsx:50`, `components/settings/QaSeedSection.tsx:65`, `components/settings/QaSeedSection.tsx:109`, `components/settings/QaSeedSection.tsx:169`, `lib/qa-seed/apply.ts:53`, `lib/qa-seed/apply.ts:87`, `lib/qa-seed/apply.ts:94`, `lib/qa-seed/apply.ts:110`, `lib/qa-seed/apply.ts:126`, `lib/qa-seed/apply.ts:136`, `components/settings/QaSeedSection.test.tsx:96`, `components/settings/QaSeedSection.test.tsx:148`, `components/settings/QaSeedSection.test.tsx:228`, `components/qa-seed/apply.test.tsx:187`, `components/qa-seed/apply.test.tsx:286`, `e2e/qa-seed.spec.ts:83`.
+Source: `components/settings/QaSeedSection.tsx:39`, `components/settings/QaSeedSection.tsx:50`, `components/settings/QaSeedSection.tsx:65`, `components/settings/QaSeedSection.tsx:109`, `components/settings/QaSeedSection.tsx:169`, `lib/qa-seed/apply.ts:36`, `lib/qa-seed/apply.ts:53`, `lib/qa-seed/apply.ts:87`, `lib/qa-seed/apply.ts:94`, `lib/qa-seed/apply.ts:110`, `lib/qa-seed/apply.ts:126`, `lib/qa-seed/apply.ts:136`, `components/settings/QaSeedSection.test.tsx:96`, `components/settings/QaSeedSection.test.tsx:148`, `components/settings/QaSeedSection.test.tsx:228`, `components/qa-seed/apply.test.tsx:187`, `components/qa-seed/apply.test.tsx:286`, `e2e/qa-seed.spec.ts:83`.
 
 ### Requirement: QA seed data stays local (baseline)
 
@@ -619,7 +656,8 @@ Every `Sentry.init` SHALL pass the shared `SENTRY_DATA_COLLECTION`, with every p
 and `beforeSend: scrubSentryEvent`. The scrub SHALL remove user, request cookies, data, query string and
 headers; strip query and fragment from the request URL, `nextjs.request_path`, and navigation breadcrumb
 `data.from` and `data.to`; and drop `data` from fetch and xhr breadcrumbs. Breadcrumb `message` text is not
-scrubbed (open item held in ops #426).
+scrubbed (open item held in ops #426). The scrub runs on error events only: `beforeSendTransaction` is
+deliberately not set, so span data rests on `SENTRY_DATA_COLLECTION` alone.
 
 #### Scenario: Error with a query string
 
@@ -636,7 +674,7 @@ scrubbed (open item held in ops #426).
 - **WHEN** an event has no user, request or breadcrumbs
 - **THEN** the scrub does not throw
 
-Source: `lib/observability/sentryPrivacy.ts:23`, `lib/observability/sentryPrivacy.ts:43`, `lib/observability/sentryPrivacy.ts:64`, `lib/observability/sentryPrivacy.ts:89`, `instrumentation-client.ts:23`, `instrumentation-client.ts:47`, `instrumentation-node.ts:26`, `instrumentation-edge.ts:22`, `lib/observability/sentryPrivacy.test.ts:37`, `lib/observability/sentryPrivacy.test.ts:51`, `lib/observability/sentryPrivacy.test.ts:68`, `lib/observability/sentryPrivacy.test.ts:85`, `lib/observability/sentryPrivacy.test.ts:101`, `lib/observability/sentryPrivacy.test.ts:121`.
+Source: `lib/observability/sentryPrivacy.ts:23`, `lib/observability/sentryPrivacy.ts:43`, `lib/observability/sentryPrivacy.ts:64`, `lib/observability/sentryPrivacy.ts:85`, `lib/observability/sentryPrivacy.ts:89`, `instrumentation-client.ts:23`, `instrumentation-client.ts:47`, `instrumentation-node.ts:26`, `instrumentation-edge.ts:22`, `lib/observability/sentryPrivacy.test.ts:37`, `lib/observability/sentryPrivacy.test.ts:51`, `lib/observability/sentryPrivacy.test.ts:68`, `lib/observability/sentryPrivacy.test.ts:85`, `lib/observability/sentryPrivacy.test.ts:101`, `lib/observability/sentryPrivacy.test.ts:121`.
 
 ### Requirement: Server errors reach Sentry, control flow does not (baseline)
 
