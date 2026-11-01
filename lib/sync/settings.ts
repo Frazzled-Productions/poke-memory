@@ -193,6 +193,30 @@ export type UserSettingsRow = {
 };
 
 /**
+ * Reads the account's last reset. Returns `null` only when the fetch failed; an
+ * account with no row, or no reset, gives `{ lastResetAt: null }`. Use this when
+ * "no reset" and "could not tell" must not be confused, which
+ * `pullUserSettingsRow` cannot show.
+ */
+export async function pullLastResetAt(
+  client: SupabaseClient,
+  userId: string,
+): Promise<{ lastResetAt: string | null } | null> {
+  try {
+    const { data, error } = await client
+      .from("user_settings")
+      .select("last_reset_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return null;
+    const row = data as { last_reset_at: string | null } | null;
+    return { lastResetAt: row?.last_reset_at ?? null };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Single-query helper that returns every column of the `user_settings` row the
  * sync layer cares about. Callers that only want the JSONB blob should use
  * `pullSettings` / `pullSettingsWithTimestamp`; the background pull uses this

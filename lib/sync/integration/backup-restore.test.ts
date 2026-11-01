@@ -75,7 +75,7 @@ function daysAgo(n: number): string {
 
 // ─── The cloud: a pg-backed stand-in for the calls the sync code makes ────────
 
-type CloudFailure = "pull" | "push";
+type CloudFailure = "pull" | "push" | "settings-read";
 
 function cloudAs(userId: string, fail?: CloudFailure): SupabaseClient {
   async function asUser<T>(fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
@@ -133,7 +133,9 @@ function cloudAs(userId: string, fail?: CloudFailure): SupabaseClient {
           return refuse(e);
         }
       }
-      if (fail === "pull") return { data: null, error: { message: "network down" } };
+      if (fail === "pull" || (fail === "settings-read" && table === "user_settings")) {
+        return { data: null, error: { message: "network down" } };
+      }
       const where = filters.map(([col], i) => `${col} = $${i + 1}`).join(" AND ");
       const sql =
         `SELECT to_jsonb(t) AS row FROM (SELECT ${columns} FROM ${table} WHERE ${where}` +
@@ -376,6 +378,24 @@ describe.skipIf(SKIP)("signed-in backup restore moves cards forward only", () =>
 
     expect(await readRow(userId, 1)).toBeNull();
     expect((await localCard(1))?.state.lastReview ?? null).toBeNull();
+  });
+
+  it("a failed read of the last reset stops the restore, so a card from before it is not stranded", async () => {
+    const userId = await newUser();
+    const client = cloudAs(userId);
+    await signedInWith(userId, [card(1, reviewed(4, 30))]);
+    expect((await client.rpc("reset_all_progress")).error).toBeNull();
+    expect(await pullAndMerge(client, userId)).toBe("ok");
+
+    const result = await restoreBackupSignedIn(
+      cloudAs(userId, "settings-read"),
+      userId,
+      backupOf([card(1, reviewed(4, 30))]),
+    );
+
+    expect(result).toEqual({ ok: false, reason: "pull-failed" });
+    expect((await localCard(1))?.state.lastReview ?? null).toBeNull();
+    expect(loadPendingQueue()).toEqual([]);
   });
 
   it("a pull failure changes nothing on this device or in the cloud", async () => {

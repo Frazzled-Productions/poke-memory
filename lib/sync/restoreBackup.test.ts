@@ -9,7 +9,7 @@ import { DEFAULT_SETTINGS } from "@/lib/settings/persistence";
 const mocks = vi.hoisted(() => ({
   pullSession: vi.fn(),
   pushSession: vi.fn(),
-  pullUserSettingsRow: vi.fn(),
+  pullLastResetAt: vi.fn(),
   loadSession: vi.fn(),
   saveSession: vi.fn(),
   loadPendingQueue: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock("@/lib/sync/cloud", async (importOriginal) => ({
   pullSession: mocks.pullSession,
   pushSession: mocks.pushSession,
 }));
-vi.mock("@/lib/sync/settings", () => ({ pullUserSettingsRow: mocks.pullUserSettingsRow }));
+vi.mock("@/lib/sync/settings", () => ({ pullLastResetAt: mocks.pullLastResetAt }));
 vi.mock("@/lib/sync/persistence", () => ({
   loadPendingQueue: mocks.loadPendingQueue,
   savePendingQueue: mocks.savePendingQueue,
@@ -208,7 +208,7 @@ describe("restoreBackupSignedIn", () => {
     vi.clearAllMocks();
     mocks.pullSession.mockResolvedValue([]);
     mocks.pushSession.mockResolvedValue(true);
-    mocks.pullUserSettingsRow.mockResolvedValue(null);
+    mocks.pullLastResetAt.mockResolvedValue({ lastResetAt: null });
     mocks.loadSession.mockResolvedValue(null);
     mocks.saveSession.mockResolvedValue({ ok: true });
     mocks.loadPendingQueue.mockReturnValue([]);
@@ -220,6 +220,15 @@ describe("restoreBackupSignedIn", () => {
     expect(result).toEqual({ ok: false, reason: "pull-failed" });
     expect(mocks.saveSession).not.toHaveBeenCalled();
     expect(mocks.pushSession).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when the last reset cannot be read", async () => {
+    mocks.pullLastResetAt.mockResolvedValue(null);
+    const result = await restoreBackupSignedIn(client, "u", data([card(1, reviewed(3, "2026-03-01"))]));
+    expect(result).toEqual({ ok: false, reason: "pull-failed" });
+    expect(mocks.saveSession).not.toHaveBeenCalled();
+    expect(mocks.pushSession).not.toHaveBeenCalled();
+    expect(mocks.savePendingQueue).not.toHaveBeenCalled();
   });
 
   it("does not push when the session cannot be saved", async () => {
@@ -267,6 +276,8 @@ describe("restoreBackupSignedIn", () => {
     await restoreBackupSignedIn(client, "u", data([card(1, reviewed(3, "2026-05-01"))]));
     const queued = mocks.savePendingQueue.mock.calls[0][0] as ReviewableCard[];
     expect(repsById(queued)).toEqual({ 1: 3, 7: 2 });
+    // The queue seeds first-wins by key, so an older copy left in would beat the restored one.
+    expect(queued).toHaveLength(2);
     expect(mocks.markPushSucceeded).not.toHaveBeenCalled();
   });
 
@@ -285,11 +296,7 @@ describe("restoreBackupSignedIn", () => {
   });
 
   it("uses the account's last reset as the cut-off", async () => {
-    mocks.pullUserSettingsRow.mockResolvedValue({
-      settings: null,
-      updatedAt: null,
-      lastResetAt: "2026-05-02T00:00:00+00:00",
-    });
+    mocks.pullLastResetAt.mockResolvedValue({ lastResetAt: "2026-05-02T00:00:00+00:00" });
     await restoreBackupSignedIn(client, "u", data([card(1, reviewed(3, "2026-03-01"))]));
     expect(mocks.pushSession).not.toHaveBeenCalled();
   });

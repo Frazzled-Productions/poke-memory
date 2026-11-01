@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ValidatedBackup } from "@/lib/backup/io";
 import { planSignedInRestore, pullSession, pushSession } from "@/lib/sync/cloud";
-import { pullUserSettingsRow } from "@/lib/sync/settings";
+import { pullLastResetAt } from "@/lib/sync/settings";
 import {
   loadPendingQueue,
   markPushSucceeded,
@@ -36,10 +36,13 @@ function currentShape(cards: readonly ReviewableCard[]): ReviewableCard[] {
  * whole patch, so older settings would stop this device's settings syncing:
  * `AutoSyncOnChange` keeps its snapshot on a refusal and resends the same keys.
  *
- * Follows the documented order for anything that merges and pushes (docs/sync.md):
- * load local, pull, merge, save, push. If the pull fails nothing has changed. If
- * the push fails, the cards go in the pending queue, which `usePerGradeSync`
- * drains after the reload, with its usual retry and its eviction of refused cards.
+ * Pulls before anything is written, as docs/sync.md requires of anything that
+ * merges and pushes: pull, load local, merge, save, push. Local is loaded after the
+ * pull, as in `pullAndMerge`, so a grade saved during the pull is merged too. If
+ * either read fails nothing has changed: without the last reset, cards the database
+ * refuses could not be left out. If the push fails, the cards go in the pending
+ * queue, which `usePerGradeSync` drains when Practice next opens, with its usual
+ * retry and its eviction of refused cards.
  */
 export async function restoreBackupSignedIn(
   client: SupabaseClient,
@@ -49,13 +52,15 @@ export async function restoreBackupSignedIn(
   const cloudRows = await pullSession(client, userId);
   if (cloudRows === null) return { ok: false, reason: "pull-failed" };
 
-  const settingsRow = await pullUserSettingsRow(client, userId);
+  const reset = await pullLastResetAt(client, userId);
+  if (reset === null) return { ok: false, reason: "pull-failed" };
+
   const local = await loadSession();
   const { cards, toPush } = planSignedInRestore(
     currentShape(data.cards),
     local?.cards ?? [],
     cloudRows,
-    settingsRow?.lastResetAt ?? null,
+    reset.lastResetAt,
   );
 
   const saved = await saveSession({ cards, limits: local?.limits ?? data.limits });
