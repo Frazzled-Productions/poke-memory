@@ -2,7 +2,8 @@
 
 Traced on 2 November 2026 (`root-cause` skill) on `origin/qa` at `d2456f44`. Surface: real
 `applyBackup`, `pullAndMerge` and `pushSingleCard` over real Postgres with every migration, through a
-stand-in client and an in-memory browser. A real sign-in was not used.
+stand-in client and an in-memory browser. A real sign-in was not used for this repro; the fix's end
+state is covered on one by `e2e/auth-real.spec.ts`.
 
 - **Current behaviour (Seen):** the cloud holds a card at reps 9 and this device has pulled it.
   Restore a backup holding reps 4, then run a full pull. Output with today's restore:
