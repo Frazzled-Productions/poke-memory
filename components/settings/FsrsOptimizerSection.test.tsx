@@ -357,7 +357,7 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Optimisation succeeded but couldn't be saved. Try again.",
+          "Optimisation succeeded but couldn't be saved. Try again next week.",
         );
       });
     });

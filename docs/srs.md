@@ -4,7 +4,7 @@ Canonical reference for the SRS scheduler - algorithm, per-card state, queue pol
 
 ## Algorithm
 
-FSRS via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Default parameters per FSRS, with a user-controlled `request_retention` knob (Settings → Recall target, 0.80–0.97, default 0.90). Per-user FSRS weight optimisation has shipped (#268) - the optimiser runs against the user's `grade_log` history and persists trained weights to `user_settings`.
+FSRS via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Default parameters per FSRS, with a user-controlled `request_retention` knob (Settings → Recall target, 0.80–0.97, default 0.90). Per-user FSRS weight optimisation has shipped (#268) - the optimiser runs against the user's `grade_log` history and persists trained weights to `user_settings`. Runs are limited to one a week per account by `claim_optimizer_slot` (migration 050) and by a per-IP bucket; `fsrsWeightsOptimizedAt` is display only.
 
 ## Anki-style learning steps layer
 

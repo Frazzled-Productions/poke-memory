@@ -343,7 +343,10 @@ export type UserSettings = {
    * Undefined means the user hasn't run the optimizer yet (defaults apply).
    */
   fsrsWeights?: number[];
-  /** ISO timestamp of the last successful weight optimization run (#268). */
+  /**
+   * ISO timestamp of the last successful weight optimization run (#268). Display
+   * only: the run limit is held on the server (migration 050).
+   */
   fsrsWeightsOptimizedAt?: string;
   /**
    * Number of distinct browser sessions in which the app has been visited.

@@ -2,7 +2,9 @@
  * Tests for POST /api/srs/optimize
  *
  * Verifies that `persistWeights` calls `.rpc("merge_user_settings", ...)` with
- * the expected arguments instead of the former read-merge-write pattern.
+ * the expected arguments, and that every fit is gated by the per-IP bucket and
+ * the server-side `claim_optimizer_slot` RPC. The RPCs' SQL is proved against
+ * real Postgres in lib/sync/integration/optimizer-slot.test.ts.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -35,10 +37,11 @@ vi.mock("@open-spaced-repetition/binding", () => {
 // Import after mocks so that vi.mock hoisting takes effect.
 // ---------------------------------------------------------------------------
 import { POST } from "./route";
+import { hashIp } from "@/lib/auth/rateLimitIp";
 import { createClient } from "@/lib/supabase/server";
 import { computeParameters } from "@open-spaced-repetition/binding";
-import { OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
 
+const CLIENT_IP = "203.0.113.7";
 const FAKE_WEIGHTS = [0.4, 0.6, 2.4, 5.8, 4.93, 0.94, 0.86, 0.01, 1.49, 0.14, 1.0, 1.96, 0.11, 0.29, 2.29, 2.31, 0.23];
 
 // ---------------------------------------------------------------------------
@@ -56,24 +59,34 @@ function makeLargeGradeLog(count = 210) {
   }));
 }
 
+/** A POST as the route sees it on Vercel: the first forwarded address is the client's. */
+function makeRequest() {
+  return new Request("https://pokememory.test/api/srs/optimize", {
+    method: "POST",
+    headers: { "x-forwarded-for": CLIENT_IP + ", 10.0.0.1" },
+  });
+}
+
 function makeSupabaseMock(overrides: {
-  settingsData?: unknown;
-  settingsError?: unknown;
   gradeLogData?: unknown;
   gradeLogError?: unknown;
   rpcError?: unknown;
+  /** claim_optimizer_slot's result: 0 claims, above 0 is the ms left. */
+  claimRetryAfterMs?: number;
+  claimError?: unknown;
+  ipAllowed?: boolean;
+  ipError?: unknown;
   user?: { id: string } | null;
 } = {}) {
-  const rpcMock = vi.fn().mockResolvedValue({ error: overrides.rpcError ?? null });
-
-  const settingsChain = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    maybeSingle: vi.fn().mockResolvedValue({
-      data: overrides.settingsData ?? null,
-      error: overrides.settingsError ?? null,
-    }),
-  };
+  const rpcMock = vi.fn<(name: string, args?: Record<string, unknown>) => Promise<unknown>>(async (name) => {
+    if (name === "check_rate_limit") {
+      return { data: overrides.ipAllowed ?? true, error: overrides.ipError ?? null };
+    }
+    if (name === "claim_optimizer_slot") {
+      return { data: overrides.claimRetryAfterMs ?? 0, error: overrides.claimError ?? null };
+    }
+    return { error: overrides.rpcError ?? null };
+  });
 
   // The grade_log query chains: select → eq → order → range(from, to)
   // fetchAllPages calls .range(from, to) as the terminal method.
@@ -89,7 +102,6 @@ function makeSupabaseMock(overrides: {
   };
 
   const fromMock = vi.fn((table: string) => {
-    if (table === "user_settings") return settingsChain;
     if (table === "grade_log") return gradeLogChain;
     throw new Error(`Unexpected table: ${table}`);
   });
@@ -109,6 +121,11 @@ function makeSupabaseMock(overrides: {
   return { client, rpcMock, fromMock };
 }
 
+/** Names of the RPCs the route called, in order. */
+function rpcNames(rpcMock: { mock: { calls: unknown[][] } }): string[] {
+  return rpcMock.mock.calls.map(([name]) => name as string);
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -124,26 +141,22 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
   it("calls rpc('merge_user_settings') with p_user_id and a p_patch containing fsrsWeights and fsrsWeightsOptimizedAt", async () => {
     const { rpcMock } = makeSupabaseMock();
 
-    const response = await POST();
+    const response = await POST(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.weights).toEqual(FAKE_WEIGHTS);
     expect(body.optimizedAt).toBeTruthy();
 
-    // F29: rpc is called twice - once to pre-stamp fsrsOptimizingAt (before the
-    // CPU-heavy fit, to close the concurrent-request window) and once to persist
-    // the final weights. The final call carries fsrsWeights + fsrsWeightsOptimizedAt.
-    expect(rpcMock).toHaveBeenCalledTimes(2);
-    const [fnName1, args1] = rpcMock.mock.calls[0];
-    expect(fnName1).toBe("merge_user_settings");
-    expect(args1.p_user_id).toBe(USER_ID);
-    expect(args1.p_patch).toHaveProperty("fsrsOptimizingAt");
-
-    const [fnName2, args2] = rpcMock.mock.calls[1];
-    expect(fnName2).toBe("merge_user_settings");
-    expect(args2.p_user_id).toBe(USER_ID);
-    expect(args2.p_patch).toMatchObject({
+    // The IP bucket, then the slot, then the final persist.
+    expect(rpcNames(rpcMock)).toEqual([
+      "check_rate_limit",
+      "claim_optimizer_slot",
+      "merge_user_settings",
+    ]);
+    const [, args] = rpcMock.mock.calls[2];
+    expect(args!.p_user_id).toBe(USER_ID);
+    expect(args!.p_patch).toEqual({
       fsrsWeights: FAKE_WEIGHTS,
       fsrsWeightsOptimizedAt: body.optimizedAt,
     });
@@ -152,7 +165,7 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
   it("returns 500 with save_failed when rpc returns an error", async () => {
     makeSupabaseMock({ rpcError: new Error("db error") });
 
-    const response = await POST();
+    const response = await POST(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(500);
@@ -165,7 +178,7 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
       new Error("not enough data for optimization"),
     );
 
-    const response = await POST();
+    const response = await POST(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(422);
@@ -178,7 +191,7 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
     makeSupabaseMock();
     (computeParameters as ReturnType<typeof vi.fn>).mockRejectedValue(42);
 
-    const response = await POST();
+    const response = await POST(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(422);
@@ -194,7 +207,7 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
       new Error("unexpected panic"),
     );
 
-    const response = await POST();
+    const response = await POST(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(500);
@@ -206,7 +219,7 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
     const { createClient: mockCreateClient } = await import("@/lib/supabase/server");
     (mockCreateClient as ReturnType<typeof vi.fn>).mockRejectedValueOnce(null);
 
-    const response = await POST();
+    const response = await POST(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(500);
@@ -217,7 +230,7 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
   it("returns 503 with reviews_unavailable when grade log fetch returns null", async () => {
     makeSupabaseMock({ gradeLogError: new Error("connection refused") });
 
-    const response = await POST();
+    const response = await POST(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(503);
@@ -227,7 +240,7 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
   it("returns 401 when the user is not authenticated", async () => {
     const { rpcMock } = makeSupabaseMock({ user: null });
 
-    const response = await POST();
+    const response = await POST(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(401);
@@ -235,49 +248,93 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
-  it("returns 429 when within cooldown window", async () => {
-    const recentlyOptimized = new Date(Date.now() - 1000).toISOString();
-    const { rpcMock } = makeSupabaseMock({
-      settingsData: {
-        settings: { fsrsWeightsOptimizedAt: recentlyOptimized },
-      },
-    });
+  it("returns 429 with Retry-After when the slot is refused, and does not fit", async () => {
+    const { rpcMock } = makeSupabaseMock({ claimRetryAfterMs: 90_500 });
 
-    const response = await POST();
+    const response = await POST(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(429);
-    expect(body.error).toBe("cooldown");
-    expect(body.retryAfterMs).toBeLessThanOrEqual(OPTIMIZER_COOLDOWN_MS);
-    expect(rpcMock).not.toHaveBeenCalled();
+    expect(body).toEqual({ error: "cooldown", retryAfterMs: 90_500 });
+    expect(response.headers.get("Retry-After")).toBe("91");
+    expect(computeParameters).not.toHaveBeenCalled();
+    expect(rpcNames(rpcMock)).not.toContain("merge_user_settings");
   });
 
-  it("returns 422 when grade log has fewer than MIN_REVIEWS_FOR_OPTIMIZATION entries with a subjectKey", async () => {
+  it("returns 503 and does not fit when the slot cannot be claimed", async () => {
+    makeSupabaseMock({ claimError: new Error("db down") });
+
+    const response = await POST(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe("service_unavailable");
+    expect(computeParameters).not.toHaveBeenCalled();
+  });
+
+  it("returns 422 without claiming when the grade log has too few reviews", async () => {
     const { rpcMock } = makeSupabaseMock({ gradeLogData: makeLargeGradeLog(5) });
 
-    const response = await POST();
+    const response = await POST(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(422);
     expect(body.error).toBe("not_enough_reviews");
-    // F29: the pre-stamp fires before grade log validation, so rpc is called
-    // once (to claim the slot). It is NOT called a second time (no final persist).
-    expect(rpcMock).toHaveBeenCalledOnce();
-    const [, args] = rpcMock.mock.calls[0];
-    expect(args.p_patch).toHaveProperty("fsrsOptimizingAt");
+    expect(rpcNames(rpcMock)).toEqual(["check_rate_limit"]);
   });
 
-  it("does not call the old update/insert write path on user_settings table", async () => {
+  it("returns 503 without claiming when the grade log cannot be read", async () => {
+    const { rpcMock } = makeSupabaseMock({ gradeLogError: new Error("connection refused") });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(503);
+    expect(rpcNames(rpcMock)).toEqual(["check_rate_limit"]);
+  });
+
+  it("does not read user_settings to decide whether to run", async () => {
     const { rpcMock, fromMock } = makeSupabaseMock();
 
-    await POST();
+    await POST(makeRequest());
 
-    // Confirm the only user_settings read is the cooldown SELECT.
-    const userSettingsCalls = fromMock.mock.calls.filter(([t]: [string]) => t === "user_settings");
-    expect(userSettingsCalls).toHaveLength(1);
-    // The write path is exclusively via rpc (pre-stamp + final persist = 2 calls).
-    // F29: rpc is called twice - once to pre-stamp the in-progress marker and
-    // once to persist the final weights.
-    expect(rpcMock).toHaveBeenCalledTimes(2);
+    expect(fromMock.mock.calls.map(([t]: [string]) => t)).toEqual(["grade_log"]);
+    // Nothing is stamped into settings before the fit.
+    expect(rpcNames(rpcMock).filter((n) => n === "merge_user_settings")).toHaveLength(1);
+  });
+
+  it("returns 429 before reading anything when the IP bucket is full", async () => {
+    const { rpcMock, fromMock } = makeSupabaseMock({ ipAllowed: false });
+
+    const response = await POST(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(body.error).toBe("rate_limited");
+    expect(body.retryAfterMs).toBe(60 * 60 * 1000);
+    expect(response.headers.get("Retry-After")).toBe("3600");
+    expect(fromMock).not.toHaveBeenCalled();
+    expect(rpcNames(rpcMock)).toEqual(["check_rate_limit"]);
+  });
+
+  it("sends the hashed first forwarded address, never the raw one", async () => {
+    const { rpcMock } = makeSupabaseMock();
+
+    await POST(makeRequest());
+
+    const [, args] = rpcMock.mock.calls[0];
+    expect(args).toEqual({ p_ip_hash: hashIp(CLIENT_IP), p_action: "optimize" });
+    expect(JSON.stringify(args)).not.toContain(CLIENT_IP);
+  });
+
+  it("carries on when the IP check errors, because the slot still holds", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { rpcMock } = makeSupabaseMock({ ipError: new Error("rpc missing") });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(rpcNames(rpcMock)).toContain("claim_optimizer_slot");
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

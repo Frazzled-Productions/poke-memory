@@ -22,7 +22,7 @@ import { createHash } from "node:crypto";
  * value here without a companion migration (that teaches the function + CHECK
  * constraint) will make the integration test fail. (#1883)
  */
-export const RATE_LIMIT_ACTIONS = ["signup", "signin", "feedback"] as const;
+export const RATE_LIMIT_ACTIONS = ["signup", "signin", "feedback", "optimize"] as const;
 
 /** A value accepted by the check_rate_limit RPC. */
 export type RateLimitAction = (typeof RATE_LIMIT_ACTIONS)[number];

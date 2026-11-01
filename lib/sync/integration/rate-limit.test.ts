@@ -273,6 +273,28 @@ describe("rate_limit_buckets + check_rate_limit RPC (integration)", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // 'optimize' action: 3 in 10 minutes, 10 in an hour
+  // ---------------------------------------------------------------------------
+
+  it("returns true at the 3rd optimize attempt (exactly at the 10-min cap)", async () => {
+    const hash = testHash("ip-optimize-at-3rd-cap");
+    await seedRows(adminPool, hash, "optimize", 2, 2);
+    expect(await callRpc(adminPool, hash, "optimize")).toBe(true);
+  });
+
+  it("returns false on the 4th optimize attempt (over the 10-min cap)", async () => {
+    const hash = testHash("ip-optimize-over-10m-cap");
+    await seedRows(adminPool, hash, "optimize", 3, 2);
+    expect(await callRpc(adminPool, hash, "optimize")).toBe(false);
+  });
+
+  it("returns false when over the optimize hourly cap (10 rows older than 10 min)", async () => {
+    const hash = testHash("ip-optimize-over-1h-cap");
+    await seedRows(adminPool, hash, "optimize", 10, 15);
+    expect(await callRpc(adminPool, hash, "optimize")).toBe(false);
+  });
+
+  // ---------------------------------------------------------------------------
   // 'feedback' action (migration 045, #1883)
   // ---------------------------------------------------------------------------
 

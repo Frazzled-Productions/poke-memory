@@ -7,12 +7,17 @@
  *
  * Flow:
  *  1. Authenticate via session cookie.
- *  2. Load the user's grade_log from Supabase.
- *  3. Build optimizer input via gradeLogToOptimizerItems.
- *  4. Gate on MIN_REVIEWS_FOR_OPTIMIZATION.
- *  5. Call computeParameters (native binding, Node.js only).
- *  6. Merge new weights into user_settings.settings and write back.
- *  7. Return { weights, optimizedAt, reviewCount }.
+ *  2. Check the per-IP bucket (check_rate_limit, action "optimize").
+ *  3. Load the user's grade_log from Supabase.
+ *  4. Build optimizer input via gradeLogToOptimizerItems.
+ *  5. Gate on MIN_REVIEWS_FOR_OPTIMIZATION.
+ *  6. Claim the run slot (claim_optimizer_slot, migration 050).
+ *  7. Call computeParameters (native binding, Node.js only).
+ *  8. Merge new weights into user_settings.settings and write back.
+ *  9. Return { weights, optimizedAt, reviewCount }.
+ *
+ * The slot is the only limit on runs. `fsrsWeightsOptimizedAt` in settings is
+ * what the Settings UI shows; it decides nothing here.
  */
 
 import { NextResponse } from "next/server";
@@ -20,6 +25,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth/requireAuth";
 import { fetchAllPages } from "@/lib/sync/paginatedFetch";
+import { hashIp } from "@/lib/auth/rateLimitIp";
+import type { RateLimitAction } from "@/lib/auth/rateLimitIp";
 
 // Native optimizer can take tens of seconds on large datasets. Default
 // (300s on current Vercel plans) is plenty; setting the cap explicitly so
@@ -37,8 +44,14 @@ import {
   MIN_REVIEWS_FOR_OPTIMIZATION,
   OPTIMIZER_COOLDOWN_MS,
 } from "@/lib/srs/optimizer";
-import type { UserSettings } from "@/lib/settings/persistence";
-import type { MergeUserSettingsRpc } from "@/lib/supabase/rpc-types";
+import type {
+  CheckRateLimitRpc,
+  ClaimOptimizerSlotRpc,
+  MergeUserSettingsRpc,
+} from "@/lib/supabase/rpc-types";
+
+/** Retry hint when the IP bucket is full: the longest check_rate_limit window. */
+const IP_RETRY_AFTER_MS = 60 * 60 * 1000;
 
 type GradeLogCloudRow = {
   occurred_at: number;
@@ -47,29 +60,6 @@ type GradeLogCloudRow = {
   grade: GradeLogEntry["grade"];
   subject_key: string | null;
 };
-
-type UserSettingsRow = {
-  settings: Partial<UserSettings>;
-};
-
-async function fetchUserSettings(
-  client: SupabaseClient,
-  userId: string,
-): Promise<UserSettingsRow | null> {
-  const { data, error } = await client
-    .from("user_settings")
-    .select("settings")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  const row = data as { settings: unknown };
-  const settings =
-    row.settings && typeof row.settings === "object"
-      ? (row.settings as Partial<UserSettings>)
-      : {};
-  return { settings };
-}
 
 async function fetchGradeLog(
   client: SupabaseClient,
@@ -153,9 +143,40 @@ function extractSafeDetail(err: unknown): string {
   return raw.slice(0, 200) || "internal_error";
 }
 
-export async function POST(): Promise<NextResponse> {
+/** A 429 in the shape the Settings UI reads, with the standard header. */
+function retryLater(error: "cooldown" | "rate_limited", retryAfterMs: number): NextResponse {
+  return NextResponse.json(
+    { error, retryAfterMs },
+    {
+      status: 429,
+      headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) },
+    },
+  );
+}
+
+/**
+ * True only when the bucket answers an explicit no. A failed check is logged
+ * and passed: the per-account slot still holds, so the route stays available
+ * (same rule as app/api/feedback).
+ */
+async function isIpRateLimited(client: SupabaseClient, request: Request): Promise<boolean> {
   try {
-    return await postHandler();
+    const rawIp = (request.headers.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
+    const { data, error } = await (client.rpc as unknown as CheckRateLimitRpc)(
+      "check_rate_limit",
+      { p_ip_hash: hashIp(rawIp), p_action: "optimize" satisfies RateLimitAction },
+    );
+    if (error) console.warn("[/api/srs/optimize] rate-limit check error, proceeding", error);
+    return data === false;
+  } catch {
+    console.warn("[/api/srs/optimize] rate-limit check failed, proceeding");
+    return false;
+  }
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+  try {
+    return await postHandler(request);
   } catch (err) {
     // Unhandled exceptions (e.g. an unexpected binding panic that bypasses the
     // inner try/catch, or a Vercel infrastructure error surfaced as a thrown
@@ -169,74 +190,15 @@ export async function POST(): Promise<NextResponse> {
   }
 }
 
-async function postHandler(): Promise<NextResponse> {
+async function postHandler(request: Request): Promise<NextResponse> {
   const supabase = (await createClient()) as unknown as SupabaseClient;
   const auth = await requireAuth(supabase);
   if (auth instanceof NextResponse) return auth;
   const { user } = auth;
 
-  // Enforce 7-day cooldown and guard against concurrent fits (F29).
-  //
-  // Strategy (migration-free): pre-stamp `fsrsOptimizingAt` via
-  // merge_user_settings BEFORE calling computeParameters so that concurrent
-  // requests reading the DB after this write see the in-progress marker and
-  // are rejected. The race window is now ~1 DB round-trip rather than the
-  // full 60 s fit duration. The full single-statement atomic claim would
-  // require a DB RPC migration (claim_optimizer_slot); this approach closes
-  // the practical window without one.
-  //
-  // Flow:
-  //   1. Read current settings (check cooldown + in-progress marker).
-  //   2. Stamp fsrsOptimizingAt now (write-before-fit).
-  //   3. Run computeParameters.
-  //   4. Persist final weights (clears fsrsOptimizingAt, sets fsrsWeightsOptimizedAt).
-  let currentSettings: UserSettingsRow | null;
-  try {
-    currentSettings = await fetchUserSettings(supabase, user.id);
-  } catch {
-    return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
+  if (await isIpRateLimited(supabase, request)) {
+    return retryLater("rate_limited", IP_RETRY_AFTER_MS);
   }
-  const last = currentSettings?.settings.fsrsWeightsOptimizedAt;
-  const inProgress = (currentSettings?.settings as Partial<UserSettings> & { fsrsOptimizingAt?: string } | undefined)?.fsrsOptimizingAt;
-
-  // Reject if the 7-day cooldown is still active.
-  if (last) {
-    const sinceMs = Date.now() - new Date(last).getTime();
-    if (sinceMs < OPTIMIZER_COOLDOWN_MS) {
-      const retryAfterMs = OPTIMIZER_COOLDOWN_MS - sinceMs;
-      return NextResponse.json(
-        { error: "cooldown", retryAfterMs },
-        {
-          status: 429,
-          headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) },
-        },
-      );
-    }
-  }
-
-  // Reject if another request is currently running the fit (stamp younger
-  // than 5 minutes - the Vercel maxDuration upper bound).
-  if (inProgress) {
-    const inProgressMs = Date.now() - new Date(inProgress).getTime();
-    if (inProgressMs < 5 * 60 * 1000) {
-      return NextResponse.json(
-        { error: "cooldown", retryAfterMs: 5 * 60 * 1000 - inProgressMs },
-        {
-          status: 429,
-          headers: { "Retry-After": String(Math.ceil((5 * 60 * 1000 - inProgressMs) / 1000)) },
-        },
-      );
-    }
-  }
-
-  // Pre-stamp the in-progress marker. After this write, any concurrent
-  // request that also passed the read above will see fsrsOptimizingAt set
-  // on its own read and be rejected before starting the expensive fit.
-  const optimizingAt = new Date().toISOString();
-  await (supabase.rpc as unknown as MergeUserSettingsRpc)("merge_user_settings", {
-    p_user_id: user.id,
-    p_patch: { fsrsOptimizingAt: optimizingAt } as unknown as Partial<UserSettings>,
-  });
 
   // Fetch grade log from Supabase.
   const entries = await fetchGradeLog(supabase, user.id);
@@ -266,6 +228,20 @@ async function postHandler(): Promise<NextResponse> {
       { status: 422 },
     );
   }
+
+  // Claim only now: a claim spends the user's slot, so a request that cannot fit
+  // yet must not reach it. One atomic statement in the database, so of any number
+  // of concurrent requests one gets 0 and the rest get the time left.
+  const { data: retryAfterMs, error: claimError } = await (
+    supabase.rpc as unknown as ClaimOptimizerSlotRpc
+  )("claim_optimizer_slot");
+  if (claimError) {
+    return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
+  }
+  if (retryAfterMs !== 0) {
+    return retryLater("cooldown", retryAfterMs ?? OPTIMIZER_COOLDOWN_MS);
+  }
+
   let weights: number[];
   try {
     const bindingItems = optimizerItems.map(

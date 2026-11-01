@@ -17,3 +17,18 @@ export type MergeUserSettingsRpc = (
   name: "merge_user_settings",
   args: MergeUserSettingsArgs,
 ) => Promise<{ error: PostgrestError | null }>;
+
+// The same call-expression rule applies to the two below.
+
+// check_rate_limit (migration 041, actions in RATE_LIMIT_ACTIONS): true when the
+// attempt is within the cap.
+export type CheckRateLimitRpc = (
+  name: "check_rate_limit",
+  args: { p_ip_hash: string; p_action: string },
+) => Promise<{ data: boolean | null; error: PostgrestError | null }>;
+
+// claim_optimizer_slot (migration 050): 0 when claimed, otherwise the
+// milliseconds until the slot frees up.
+export type ClaimOptimizerSlotRpc = (
+  name: "claim_optimizer_slot",
+) => Promise<{ data: number | null; error: PostgrestError | null }>;
