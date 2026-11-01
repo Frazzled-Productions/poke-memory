@@ -325,6 +325,21 @@ describe("signUpWithUsername", () => {
     expect(mockSignUp).not.toHaveBeenCalled();
   });
 
+  it("falls back to the legacy service_role key when the new key is not set", async () => {
+    delete process.env.SUPABASE_SECRET_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "legacy_service_role";
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
+
+    await signUpWithUsername("trainer99", VALID_PASSWORD);
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    expect(mockCreateAdminClient).toHaveBeenCalledWith(
+      "https://example.supabase.co",
+      "legacy_service_role",
+      expect.anything(),
+    );
+  });
+
   it("signs in with the same credentials, then inserts the username row", async () => {
     mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
 

@@ -23,24 +23,14 @@ NOT create an account.
 - **WHEN** neither `SUPABASE_SECRET_KEY` nor `SUPABASE_SERVICE_ROLE_KEY` is set and username sign-up is called
 - **THEN** it answers `signup_failed` and creates no account
 
-### Requirement: The secret key wins, the legacy service_role key is the fallback
+## ADDED Requirements
 
-The Discord digest and notify, feedback, push send-daily and push send-streak-nudge routes and the
-username sign-up action SHALL use
-`SUPABASE_SECRET_KEY` when it is set and not empty, and SHALL otherwise use
-`SUPABASE_SERVICE_ROLE_KEY`.
+### Requirement: Username sign-up reads the secret key the same way
 
-#### Scenario: Both keys set
-
-- **WHEN** both `SUPABASE_SECRET_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are set
-- **THEN** the routes use `SUPABASE_SECRET_KEY`
+The username sign-up action SHALL read its key through `supabaseSecretKey()`, so `SUPABASE_SECRET_KEY`
+wins when it is set and not empty, and `SUPABASE_SERVICE_ROLE_KEY` is the fallback, as for the routes.
 
 #### Scenario: Only the legacy service_role key set
 
-- **WHEN** only `SUPABASE_SERVICE_ROLE_KEY` is set
-- **THEN** the routes use it, as before
-
-#### Scenario: The new key is set but empty
-
-- **WHEN** `SUPABASE_SECRET_KEY` is an empty string and `SUPABASE_SERVICE_ROLE_KEY` is set
-- **THEN** the routes use `SUPABASE_SERVICE_ROLE_KEY`
+- **WHEN** only `SUPABASE_SERVICE_ROLE_KEY` is set and username sign-up is called
+- **THEN** the action creates the account with that key
