@@ -22,7 +22,7 @@ A real Chromium Background Sync event was not used, so the browser's own retry s
     (`app/api/sync/route.ts:45`, `:224`), and the parse guard returns 400 for bad JSON.
   - An existing test covers the branch: mutating the real 401 branch left `lib/sync/swReplay.test.ts`
     green (18 passed, exit 0), while the new file failed (4 failed, 11 passed, exit 1).
-- **First wrong step (Cited):** `app/sw.ts:702` on `qa`, `if (!res.ok) throw`, treats every other
+- **First wrong step (Cited):** `app/sw.ts:709` on `qa`, `if (!res.ok)` then throw, treats every other
   non-2xx as transient. That was true when written; the 409 came later and nothing could fail for the
   worker, because the logic sat inside the listener.
 - **Same fault elsewhere:** the "BLOCKER 3" block in `lib/sync/swReplay.test.ts` copies the client's ACK
