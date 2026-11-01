@@ -7,7 +7,7 @@
  *     (NO_POLICY_ALLOWLIST excepted), read from pg_class, so a migration that
  *     forgets ENABLE ROW LEVEL SECURITY fails here.
  *   - Cross-user: for every table in USER_TABLES, another signed-in user cannot
- *     read, insert or update a row, and anon cannot read one.
+ *     read, insert or update a row, and anon cannot read, insert or update one.
  *
  * Every public table must appear in USER_TABLES or NO_POLICY_ALLOWLIST, so a
  * new table fails until someone states which it is.
@@ -79,7 +79,7 @@ const USER_TABLES: Record<string, UserTable> = {
   },
   push_subscriptions: {
     insert: `INSERT INTO public.push_subscriptions (user_id, endpoint, p256dh, auth_secret)
-             VALUES ($1, 'https://push.example/rls', 'p256', 'auth')`,
+             VALUES ($1, 'https://fcm.googleapis.com/fcm/send/rls', 'p256', 'auth')`,
     ownerReads: true,
     ownerUpdates: false,
   },
@@ -104,8 +104,9 @@ const USER_TABLES: Record<string, UserTable> = {
 
 /**
  * Tables with RLS on and, by design, no policy. Migration 041: reached only
- * through a SECURITY DEFINER RPC. The exemption is from the policy rule only;
- * RLS must still be on.
+ * through a SECURITY DEFINER RPC. The exemption is from the policy rule only:
+ * RLS must still be on, and a policy added later is a gap, since nothing here
+ * tests what it lets through.
  */
 const NO_POLICY_ALLOWLIST = new Set(["rate_limit_buckets"]);
 
@@ -136,8 +137,11 @@ async function publicTables(db: pg.Pool | pg.PoolClient) {
 async function rlsGaps(db: pg.Pool | pg.PoolClient): Promise<string[]> {
   const gaps: string[] = [];
   for (const { table_name, rls_on, policies } of await publicTables(db)) {
+    const allowlisted = NO_POLICY_ALLOWLIST.has(table_name);
     if (!rls_on) gaps.push(`${table_name}: RLS off`);
-    else if (policies === 0 && !NO_POLICY_ALLOWLIST.has(table_name)) {
+    else if (allowlisted && policies > 0) {
+      gaps.push(`${table_name}: policy on an allowlisted table`);
+    } else if (!allowlisted && policies === 0) {
       gaps.push(`${table_name}: no policy`);
     }
   }
@@ -215,7 +219,7 @@ describe("RLS catalogue (integration)", () => {
     );
   });
 
-  it("the catalogue check catches RLS off, no policy, and RLS off on an allowlisted table", async () => {
+  it("the catalogue check catches RLS off, no policy, and RLS off or a policy on an allowlisted table", async () => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -230,6 +234,13 @@ describe("RLS catalogue (integration)", () => {
         "rls_probe_no_policy: no policy",
         "rls_probe_off: RLS off",
       ]);
+      await client.query(`
+        ALTER TABLE public.rate_limit_buckets ENABLE ROW LEVEL SECURITY;
+        CREATE POLICY rls_probe ON public.rate_limit_buckets USING (true);
+      `);
+      expect(await rlsGaps(client)).toContain(
+        "rate_limit_buckets: policy on an allowlisted table",
+      );
     } finally {
       await client.query("ROLLBACK");
       client.release();
@@ -262,6 +273,19 @@ describe.each(Object.entries(USER_TABLES))(
         c.query(`SELECT 1 FROM public.${table}`),
       );
       expect(rows).toHaveLength(0);
+    });
+
+    it("anon's INSERT is rejected by RLS", async () => {
+      await expect(
+        asRole("anon", null, (c) => c.query(insert, [USER_B])),
+      ).rejects.toThrow(/row-level security/);
+    });
+
+    it("anon's blind UPDATE reaches no row", async () => {
+      const result = await asRole("anon", null, (c) =>
+        c.query(`UPDATE public.${table} SET user_id = $1`, [USER_A]),
+      );
+      expect(result.rowCount).toBe(0);
     });
 
     it("user A's INSERT with user_id = B is rejected by RLS", async () => {

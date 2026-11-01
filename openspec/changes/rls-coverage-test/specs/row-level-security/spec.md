@@ -9,8 +9,8 @@ requirements describe `db/migrations/` as they stand on `qa` and on both live pr
 ### Requirement: Every public table has RLS on (baseline, current behaviour)
 
 Every table in the `public` schema SHALL have Row Level Security enabled by a migration, and SHALL
-have at least one policy, except `rate_limit_buckets`, which has RLS on and no policy because it is
-reached only through a SECURITY DEFINER function.
+have at least one policy, except `rate_limit_buckets`, which has RLS on and SHALL have no policy
+because it is reached only through a SECURITY DEFINER function.
 
 #### Scenario: The migrated schema
 
@@ -21,6 +21,11 @@ reached only through a SECURITY DEFINER function.
 
 - **WHEN** RLS is off on `rate_limit_buckets`
 - **THEN** that is a gap; the allowlist excuses the policy rule only
+
+#### Scenario: Allowlisted table gains a policy
+
+- **WHEN** a policy is added to `rate_limit_buckets`
+- **THEN** that is a gap; a table on the allowlist has no policy
 
 ### Requirement: Signed-in users reach only their own rows (baseline, current behaviour)
 
@@ -64,19 +69,30 @@ A signed-in user SHALL be able to read their own rows on `card_reviews`, `grade_
 - **WHEN** user B selects their own `feedback` row
 - **THEN** no row comes back
 
-### Requirement: Anon reads nothing (baseline, current behaviour)
+### Requirement: Anon reaches nothing (baseline, current behaviour)
 
-A request with only the public key SHALL NOT read a row from any user table.
+A request with only the public key SHALL NOT read, insert or update a row on any user table.
 
 #### Scenario: Anon selects
 
 - **WHEN** `anon` selects from `grade_log` with rows present
 - **THEN** no row comes back
 
+#### Scenario: Anon inserts
+
+- **WHEN** `anon` inserts a row into a user table
+- **THEN** the insert fails with a row-level security error
+
+#### Scenario: Anon updates
+
+- **WHEN** `anon` runs an UPDATE with no `WHERE` on a user table
+- **THEN** no row changes
+
 ### Requirement: CI fails a table that breaks these rules
 
 `lib/sync/integration/rls-coverage.test.ts` SHALL fail when a `public` table has RLS off, has no
-policy and is not allowlisted, or is listed neither as a user table nor on the allowlist. The
+policy and is not allowlisted, has a policy and is allowlisted, or is listed neither as a user
+table nor on the allowlist. The
 check SHALL read the migrated schema itself, so it does not rely on the live auto-enable trigger.
 
 #### Scenario: New table without RLS

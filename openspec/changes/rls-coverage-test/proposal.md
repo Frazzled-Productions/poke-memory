@@ -11,8 +11,8 @@ Fixes: #2212
 ## What Changes
 
 - New `lib/sync/integration/rls-coverage.test.ts`, with two parts:
-  - **Catalogue:** every `public` table has RLS on and at least one policy, with `rate_limit_buckets` allowlisted for the policy rule only. Every table must be listed as a user table or allowlisted, so a new table fails until someone classifies it.
-  - **Cross-user, over all seven user tables:** another user cannot SELECT, INSERT for, or UPDATE a row, a user cannot hand their own row to another user, and anon cannot SELECT.
+  - **Catalogue:** every `public` table has RLS on and at least one policy, with `rate_limit_buckets` allowlisted for the policy rule only (a policy added to it is a failure). Every table must be listed as a user table or allowlisted, so a new table fails until someone classifies it.
+  - **Cross-user, over all seven user tables:** another user cannot SELECT, INSERT for, or UPDATE a row, a user cannot hand their own row to another user, and anon cannot SELECT, INSERT or UPDATE.
 - New capability `row-level-security`: a baseline of each table's policies, plus the CI rule.
 - `docs/testing.md` and the new-table checklist in `docs/persistence.md` name the test.
 
