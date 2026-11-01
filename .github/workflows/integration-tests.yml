@@ -8,8 +8,8 @@ name: Integration Tests
 # cloud-write surface - lib/sync/**, app/api/sync/**, db/migrations/**,
 # lib/gradelog/**, the grade_log divergence monitor script (#2096), or this
 # workflow file itself - or what the suite imports or pins from outside it:
-# lib/storage/**, lib/idb/**, lib/settings/**, lib/auth/** and app/api/push/**
-# (#2220; scripts/integration-gate-paths.test.mjs keeps this list in step).
+# lib/storage/**, lib/idb/**, lib/settings/**, lib/auth/**, app/api/push/** and
+# app/api/feedback/** (#2220; scripts/integration-gate-paths.test.mjs keeps this list in step).
 # Path filtering keeps spend bounded: only relevant PRs trigger a run.
 #
 # Every push to qa runs the suite with no path filter (#2220), as the safety
@@ -74,12 +74,13 @@ jobs:
               - 'db/migrations/**'
               - 'lib/gradelog/**'
               # Outside the cloud-write surface, but the suite imports them
-              # or, for the push routes, pins the RPCs they read through.
+              # or, for the push and feedback routes, pins the RPCs they call.
               - 'lib/storage/**'
               - 'lib/idb/**'
               - 'lib/settings/**'
               - 'lib/auth/**'
               - 'app/api/push/**'
+              - 'app/api/feedback/**'
               # The divergence monitor's SQL is tested against the migrated
               # schema by lib/sync/integration/grade-log-divergence.test.ts
               # (#2096), so a change to the script alone must run the suite.

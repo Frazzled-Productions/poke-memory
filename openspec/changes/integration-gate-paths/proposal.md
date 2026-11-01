@@ -1,7 +1,7 @@
 ## Why
 
 The integration gate reports a pass when it skips the suite, so a PR that changes code the suite
-exercises can look covered without the suite running. Its path filter misses five paths the suite
+exercises can look covered without the suite running. Its path filter misses six paths the suite
 reaches, and nothing runs the suite after a PR lands on `qa`. Seen on real PRs: #2139, #2113 and #2163
 all changed `app/api/push/**` with `integration` skipped and `integration-gate` passing. Root cause
 proven on 2 November 2026 (see `design.md`). This is finding 13 of
@@ -12,8 +12,9 @@ Fixes: poke-memory #2220
 ## What Changes
 
 - `.github/workflows/integration-tests.yml`: add `lib/storage/**`, `lib/idb/**`, `lib/settings/**`,
-  `lib/auth/**` and `app/api/push/**` to the `cloud_write` filter. The audit named four;
-  `lib/settings/**` is a fifth, found by listing what the suite imports (open call, see Clarifications).
+  `lib/auth/**`, `app/api/push/**` and `app/api/feedback/**` to the `cloud_write` filter. The audit named
+  four; `lib/settings/**` is a fifth, found by listing what the suite imports, and `app/api/feedback/**`
+  a sixth, found by listing who calls the RPCs it pins (open calls, see Clarifications).
 - Same file: add a `push` trigger on `qa`, with the same sprite `paths-ignore`. `Decide` sets
   `run=true` on a push, as it does on a manual dispatch, so every code merge runs the suite.
 - New `scripts/integration-gate-paths.test.mjs` (runs in the required `test` job): fails, naming the
@@ -32,6 +33,7 @@ Filled with the `blast-radius` skill on 2 November 2026. Evidence for each line 
 - **Locales (en, ja, zh-Hans, zh-Hant, pseudo-locale):** no change, because no copy changes.
 - **Push notifications and the service worker (offline):** no change to either. A PR touching `app/api/push/**` now runs the suite.
 - **Sign-in:** no change to the code. A PR touching `lib/auth/**` now runs the suite.
+- **Feedback form:** no change to the code. A PR touching `app/api/feedback/**` now runs the suite.
 - **Privacy notice and sub-processors:** no change, because no data flow changes.
 - **Accessibility (keyboard, screen reader, reduced motion):** no change, because no UI changes.
 - **README screenshots:** no change, because no rendered surface changes.
@@ -65,7 +67,8 @@ Nobody has answered these. This was built unattended, so each takes the recommen
 default until Fraser rules.
 
 - 2026-11-02, open: add `lib/settings/**`, which the audit did not name? Recommended: yes. `favourite-settings.test.ts` and `settings-clobber.test.ts` import it directly, so leaving it out keeps the same gap.
+- 2026-11-02, open: add `app/api/feedback/**`, which the audit and the issue did not name? Recommended: yes. It calls `check_rate_limit`, which `rate-limit.test.ts` pins, so it is the same case as `app/api/push/**`. Added by the independent review. The test's list of routes covered without an import is still kept by hand: deriving it from the `.rpc()` callers is possible but is not built here.
 - 2026-11-02, open: `push` to `qa` or a schedule? Recommended: `push`. `perf-budget.yml` already does this, every merge gets a result, and a schedule would batch them and need `cron-health-monitor` wiring.
 - 2026-11-02, open: should the push run use a path filter? Recommended: no, sprites only. The point is to catch what a PR skipped, including Dependabot bumps, which change `package-lock.json`. The cost is about 2 free minutes on a docs-only merge.
 - 2026-11-02, open: stop at direct imports in the filter? Recommended: yes. The transitive closure is 72 files across 18 directories, so the filter would match far more PRs. The push run catches those after merge.
-- 2026-11-02, open: who hears about a red push run? Recommended: nothing new for now. Today it is a red mark on the `qa` commit and GitHub's own failure email to the person who merged. If that gets missed, add a marker-issue monitor as a separate change.
+- 2026-11-02, open: who hears about a red push run? Recommended: nothing new for now. Today it is a red mark on the `qa` commit and GitHub's own failure email to the person who merged. A cancelled run can also leave a red `integration-gate` on a superseded commit (`design.md`), so a red mark on an older commit needs its log read. If that gets missed, add a marker-issue monitor as a separate change.

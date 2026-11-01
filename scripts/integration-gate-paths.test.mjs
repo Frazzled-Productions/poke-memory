@@ -23,8 +23,12 @@ const workflow = readFileSync(
 );
 
 // Routes reach the suite through their RPCs, not through an import:
-// push-targets-rpc.test.ts and push-streak-nudge-rpc.test.ts pin what they read.
-const COVERED_WITHOUT_AN_IMPORT = ["app/api/push/send-daily/route.ts"];
+// push-targets-rpc.test.ts and push-streak-nudge-rpc.test.ts pin what the push
+// routes read, and rate-limit.test.ts pins what the feedback route calls.
+const COVERED_WITHOUT_AN_IMPORT = [
+  "app/api/push/send-daily/route.ts",
+  "app/api/feedback/route.ts",
+];
 
 const between = (text, start, end) => {
   const from = text.indexOf(start);

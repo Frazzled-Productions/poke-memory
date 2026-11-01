@@ -40,7 +40,9 @@ of what the suite covers, read as the "cloud-write surface" and not derived from
 gate at `:148` turns any skip into a pass. The missing `push` trigger at `:27-32` left no second chance.
 
 **Same fault elsewhere.** The audit named four paths. Listing the suite's imports found a fifth,
-`lib/settings/**` (Seen, red test below). `lib/push/**` and `lib/supabase/**` are not imported by the
+`lib/settings/**` (Seen, red test below). Listing the `.rpc()` callers of what the suite pins found a
+sixth, `app/api/feedback/**`, which calls `check_rate_limit` (Seen; `lib/auth/actions.ts` is its only
+other caller). `lib/push/**` and `lib/supabase/**` are not imported by the
 suite, so they are not in the filter and rely on the push run. `visual-regression.yml` has the same
 hand-kept shape but compares pixels, not imports, so it is not touched here.
 
@@ -64,7 +66,7 @@ no secrets. The delta spec records these as baseline requirements and adds the f
 - **Direct imports only:** see Clarifications.
 - **`Decide` is run, not read:** the test extracts the real script and executes it in `bash`, so the
   baseline scenarios are checked against the workflow as written.
-- **`decide`'s `if:` stays:** a push to `qa` is made by the merger. The last 8 `push` runs on `qa` show
+- **`decide`'s `if:` stays:** a push to `qa` is made by the merger. The last 60 `push` runs of `perf-budget.yml` on `qa` show
   `fraserbrookhouse` or `poke-memory-bot[bot]`, so the Dependabot guard does not stop them.
 
 ## Blast radius (2 November 2026)
@@ -72,13 +74,14 @@ no secrets. The delta spec records these as baseline requirements and adds the f
 **The one fact it is safe because of:** on PRs the change only adds matches, and nothing the old
 filter matched is lost; on pushes it adds a run that no ruleset requires. Rung 4, ran it: against the
 16,475 tracked files, with picomatch 2.3.2 and `dot: true` as a stand-in for the action's matcher,
-lost from the old filter 0, gained 38. The test's own matcher disagreed with picomatch on 0 files.
+lost from the old filter 0, gained 38. `app/api/feedback/**`, added later by the independent review,
+adds 2 tracked files, so 40 (`git ls-files`), and no PR beyond the four below. The test's own matcher disagreed with picomatch on 0 files.
 
 **Risks, confirmed**
 
 - More PRs wait on a required check. 4 of the last 100 merged to `qa` would newly match. Low cost: the suite took about 2 minutes, and the last 100 runs had 0 failures (73 success, 25 cancelled, 2 no conclusion yet).
 - A red push run has no owner beyond GitHub's email. Open call.
-- Two quick merges cancel the older push run (`concurrency`, `cancel-in-progress`). The newer tip is tested, so a fault is caught at the tip. The cancelled run shows as cancelled on the older commit. Same as `perf-budget.yml`.
+- Two quick merges cancel the older push run (`concurrency`, `cancel-in-progress`). The newer tip is tested, so a fault is caught at the tip. If the older run is past `decide`, the run shows as cancelled but its `integration-gate` job reports failure on the older commit: `decide.run` is true and the result is `cancelled` (Seen: 2 of the last 60 cancelled runs, on PRs). Before `decide` finishes it reports success, with nothing run. Only `test` is read by the check monitors, so nothing acts on that red mark, but it reads like a real failure. `perf-budget.yml`'s gate does the same.
 - Not proven until after merge: the `push` trigger itself cannot fire from a PR. `actionlint` exits 0 and the `Decide` branch is tested, but the first real run is the check (task 3.3).
 
 **Cleared**

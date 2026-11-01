@@ -72,8 +72,8 @@ nothing privileged.
 ### Requirement: The filter covers what the suite imports
 
 The `cloud_write` filter SHALL match every first-party path imported directly by a file in
-`lib/sync/integration/`, through `from`, `import()` or `vi.mock()`, and `app/api/push/**`, whose RPCs
-the suite pins. A test in the required `test` job SHALL fail, naming the path, when one is missing.
+`lib/sync/integration/`, through `from`, `import()` or `vi.mock()`, plus `app/api/push/**` and
+`app/api/feedback/**`, whose RPCs the suite pins. A test in the required `test` job SHALL fail, naming the path, when one is missing.
 
 #### Scenario: PR changes the account archive
 
@@ -83,6 +83,11 @@ the suite pins. A test in the required `test` job SHALL fail, naming the path, w
 #### Scenario: PR changes a push route
 
 - **WHEN** a PR changes `app/api/push/send-streak-nudge/route.ts`
+- **THEN** the `integration` job runs
+
+#### Scenario: PR changes the feedback route
+
+- **WHEN** a PR changes `app/api/feedback/route.ts`
 - **THEN** the `integration` job runs
 
 #### Scenario: A test starts importing from a new path
@@ -105,6 +110,7 @@ already merged.
 
 - **WHEN** a second push reaches `qa` while the first run is in progress
 - **THEN** the first run is cancelled and the newer tip is tested
+- **AND** the older commit's `integration-gate` may report failure, because a cancelled suite did not pass
 
 #### Scenario: Sprite-only merge
 
