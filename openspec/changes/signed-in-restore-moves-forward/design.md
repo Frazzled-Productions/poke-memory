@@ -34,7 +34,7 @@ stand-in client and an in-memory browser. A real sign-in was not used.
   - Something else pushes the restored session: nothing does. `pushSession` has one caller outside
     `lib/sync/cloud.ts`, the sign-in claim in `app/auth/callback-complete/page.tsx`.
 - **First wrong step (Cited):** `applyBackup` (`lib/backup/io.ts:115`) and `handleImport`
-  (`app/settings/page.tsx:705`, as at `d2456f44`) treat every restore as a local replace, with no
+  (`app/settings/page.tsx:704`) treat every restore as a local replace, with no
   signed-in branch, so a signed-in restore breaks the cloud's forward-only rule on the device.
 - **Same fault elsewhere:** the settings half. `user_settings_reject_regression` refuses a whole patch
   that lowers a guarded field (seen: `REFUSED 23514 ... earnedBadge id b removed`, and a later change
