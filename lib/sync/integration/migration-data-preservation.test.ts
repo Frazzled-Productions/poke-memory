@@ -18,8 +18,10 @@
  *
  * If the sweep fails on your migration, you are losing or rewriting rows. When
  * that is what you meant, add a named test for the rewrite and move SWEEP_BASELINE
- * to your migration, updating SWEEP_SEED only if the schema needs it. #2158 is the
- * separate check on what a migration's SQL is allowed to say.
+ * to your migration, updating SWEEP_SEED only if the schema needs it. The named
+ * tests also run to the head, so one of them may fail too: update its expected
+ * values to the new outcome. #2158 is the separate check on what a migration's SQL
+ * is allowed to say.
  */
 
 import { describe, it, expect } from "vitest";
@@ -101,10 +103,15 @@ async function readTable(pool: pg.Pool, table: string): Promise<Row[]> {
   return rows.map((r) => r.row);
 }
 
-/** Rows as sorted JSON, limited to `columns`, so added columns do not count as a change. */
+/**
+ * Rows as sorted JSON, limited to `columns`, so added columns do not count as a
+ * change. A dropped column disappears from the JSON, so it differs even from NULL.
+ */
 function comparable(rows: Row[], columns: string[]): string[] {
   return rows
-    .map((row) => JSON.stringify(columns.map((c) => [c, row[c]])))
+    .map((row) =>
+      JSON.stringify(Object.fromEntries(columns.map((c) => [c, row[c]]))),
+    )
     .sort();
 }
 

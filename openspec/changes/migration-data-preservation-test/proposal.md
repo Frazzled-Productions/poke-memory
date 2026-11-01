@@ -33,7 +33,7 @@ Checked with `blast-radius`. The one fact this is safe because of: `applyMigrati
 
 - Review and quiz screens (home), Pokédex, Pasture, Stats, Journey, Settings, What's new: no change, because no app code changes.
 - Guest mode (localStorage): no change, because guests have no cloud rows.
-- Cloud sync and Supabase migrations (both projects): no migration, nothing to apply to either project. A future migration that rewrites a seeded row now fails `integration-gate` (required on `qa`) until its author adds a named test and moves the baseline. That is the point of the change.
+- Cloud sync and Supabase migrations (both projects): no migration, nothing to apply to either project. A future migration that rewrites a seeded row now fails `integration-gate` (required on `qa`) until its author adds a named test and moves the baseline, and updates the expected values of any older named test the rewrite reaches, since those also run to the head. That is the point of the change.
 - Superuser mode and QA-seed scenarios: no change, because the tests build their own databases.
 - Locales: no change, because there is no UI copy.
 - Push notifications and the service worker: no change. `push_subscriptions` is covered as data only.
