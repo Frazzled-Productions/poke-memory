@@ -105,8 +105,9 @@ is set.
 
 ### Requirement: The privacy notice matches the notification
 
-Notice sections 3 and 6 SHALL say that no message text goes to Discord, and section 3 SHALL say the
-notification stays in the channel after the feedback is deleted. The DPIA and Children's Code
+Notice sections 3 and 6 SHALL say that no message text goes to Discord, section 3 SHALL say the
+notification stays in the channel after the feedback is deleted, and section 8 SHALL say these
+notifications are not deleted automatically. The DPIA and Children's Code
 assessment SHALL describe the same flow.
 
 #### Scenario: Reading the notice

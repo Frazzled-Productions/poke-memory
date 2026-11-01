@@ -164,6 +164,12 @@ describe("Privacy Notice page", () => {
       expect(
         screen.getByText(/the notification stays in that channel/i),
       ).toBeInTheDocument();
+      expect(
+        screen.getByText(/none of the message and no user identifier is included/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/we do not automatically delete the bug-report notifications/i),
+      ).toBeInTheDocument();
     });
 
     it("renders the feedback retention statement in section 8 (#1623)", async () => {

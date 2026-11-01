@@ -11,8 +11,9 @@ service and may type personal details. Refs ops #405 (held privately in Frazzled
   `feedback` table and the embed loses its "Message preview" field. Page, app version, signed-in
   state, timestamp and the Supabase link stay.
 - **The privacy notice, DPIA and Children's Code assessment describe the new flow.** Notice sections
-  3 and 6 say no message text goes to Discord, and section 3 says the notification stays in the
-  channel after the feedback is deleted.
+  3 and 6 say no message text goes to Discord, section 3 says the notification stays in the channel
+  after the feedback is deleted, and section 8 (retention) says these notifications are not deleted
+  automatically.
 - **The route stops using a Supabase key.** Its only read was the preview, so the `supabase-keys`
   requirement drops it.
 
@@ -73,10 +74,10 @@ The build assumes each recommendation.
    cascade, for a copy we do not need. Changing the notice to say the text is kept indefinitely is the
    third option and the weakest for a service in scope of the Children's Code.
 2. **2 November 2026, open: is it right for the remaining metadata to stay in Discord?** Recommended:
-   yes, disclosed in one sentence in section 3. Once the row is gone the post holds a page, a version,
+   yes, disclosed in one sentence each in sections 3 and 8. Once the row is gone the post holds a page, a version,
    a time, a signed-in flag and a link to nothing. A sweep of old posts would need the same machinery
    as option two in call 1.
-3. **2 November 2026, open: notice wording.** Recommended: Fraser reads the two changed passages, as
+3. **2 November 2026, open: notice wording.** Recommended: Fraser reads the three changed passages (sections 3, 6 and 8), as
    the owner of the notice. The "Last updated" date is 2 November 2026 here and should become the date
    of merge.
 4. **2 November 2026, open: tell existing users?** Recommended: no, beyond the changelog and the date.

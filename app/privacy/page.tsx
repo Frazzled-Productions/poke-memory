@@ -677,7 +677,8 @@ export default async function PrivacyPage() {
           <p className="mt-3">
             Feedback submissions are retained for 12 months from the date of
             submission and then automatically deleted, regardless of account
-            status.
+            status. We do not automatically delete the bug-report notifications
+            in our Discord channel (see §3), which hold none of your message.
           </p>
           <p className="mt-3">
             Error reports and performance traces held by Sentry are kept for
