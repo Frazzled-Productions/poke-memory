@@ -13,9 +13,9 @@ whatever one push service does. Refs ops #380 (held privately in Frazzled-Produc
 - **One slow send cannot hold up the others.** The helper sends through a pool of at most 20 at
   once, in the existing order. `send-daily` and `send-streak-nudge` both use it and stop duplicating
   the send and clean-up loop.
-- **A run always finishes.** Both routes set `maxDuration = 300`. The helper starts no new send after
-  240 seconds, so dead subscriptions are still cleared and the route still responds. Devices not
-  reached are counted in a log line.
+- **A run always finishes.** Both routes set `maxDuration = 300`. The helper starts no new send once
+  240 seconds have passed since the route started, reads included, so dead subscriptions are still
+  cleared and the route still responds. Devices not reached are counted in a log line.
 - **Subscriptions must point at a known push service.** Apple, Google, Mozilla and Microsoft hosts
   only, checked in `resubscribe`, at send time and by a database constraint. The next migration adds
   the constraint as `NOT VALID`; validating it waits for the check of existing rows (open call 2).
@@ -26,7 +26,9 @@ whatever one push service does. Refs ops #380 (held privately in Frazzled-Produc
 - **Review and quiz screens (home), Pokédex, Pasture, Stats, Journey, What's new:** no change, none
   of them read `push_subscriptions` or call the send routes.
 - **Settings:** no new UI. `PushOptIn` already shows the failure state from `subscribeToPush`
-  (`persist-failed`), which a browser using an unknown push service would now reach.
+  (`persist-failed`), which a browser using an unknown push service would now reach. On mount,
+  `reconcileSubscription` (`lib/push/subscribe.ts:315`) inserts a missing row itself: an unknown host
+  now gets `disabled`, and a device whose row was replaced at the limit re-inserts it.
 - **Guest mode (localStorage):** no change, push is signed-in only (`lib/push/subscribe.ts:6`).
 - **Cloud sync and Supabase migrations (both projects):** one new migration, next free number after
   048, on `push_subscriptions` only: a `NOT VALID` check and a `BEFORE INSERT` trigger. Sync does not
@@ -43,11 +45,14 @@ whatever one push service does. Refs ops #380 (held privately in Frazzled-Produc
 - **Privacy notice and sub-processors:** no change, same data and same push services.
 - **Accessibility, README screenshots:** no change.
 - **Changelog fragments and the release:** one `fixed` fragment, worded like this proposal. Release
-  needs the migration on both projects.
+  needs the migration on both projects, QA first: `migration-check.yml` fails a `db/migrations` PR
+  into `qa` until QA has it (`docs/persistence.md:77`).
 - **CI and GitHub Actions:** no workflow change. Fixtures that use `https://push.example/...` against
-  a real database must move to an allowed host: `lib/sync/integration/push-targets-rpc.test.ts:123`,
-  and `e2e/settings.spec.ts:596` if its insert reaches the database. The send route tests mock the database
-  but use the same host, so their fixtures move too, because the send-time check would skip them.
+  a real database must move to an allowed host: `lib/sync/integration/push-targets-rpc.test.ts:123`.
+  The send route tests mock the database but use the same host, so their fixtures move too, because
+  the send-time check would skip them, and so do the `resubscribe` route tests
+  (`app/api/push/resubscribe/route.test.tsx:117-152`), which would get a 400. `e2e/settings.spec.ts:596`
+  stays: its insert goes to the mock client (`lib/auth/mockAuth.ts:178`), which writes nothing.
 
 ## Removes
 
@@ -57,7 +62,8 @@ whatever one push service does. Refs ops #380 (held privately in Frazzled-Produc
 ## Out of scope
 
 - The other findings in the same audit (ops #378).
-- Retrying devices a run did not reach. They get the next run's reminder.
+- Retrying devices a run did not reach. A device is due in one hour of the day, so its next reminder
+  is tomorrow's. Order is stable, so the same devices are the ones missed if a run keeps running out.
 - Moving sends to a queue.
 - Grouping or de-duplicating a user's devices.
 
@@ -75,9 +81,12 @@ Each has a recommended answer, which the documents assume.
   reliability only, with the detail staying in ops #380.
 - 2026-11-01 Open call 2: what happens to existing rows on a host outside the list? Recommended: run
   a read-only count by host on both projects first, skip those rows at send time, then delete them
-  and validate the constraint in a follow-up.
+  and validate the constraint in a follow-up. The count also tests the list: Pushpad's public list of
+  known push services has `android.googleapis.com` and `jmt17.google.com`, which this pattern refuses.
 - 2026-11-01 Open call 3: at the limit of 10, refuse the new subscription or replace the oldest?
-  Recommended: replace the oldest, so a person on a new device is never told push failed.
+  Recommended: replace the oldest, so a person on a new device is never told push failed. "Oldest"
+  means least recently subscribed, not least recently used: nothing updates `last_seen_at` after the
+  insert, so a phone in daily use can be the one replaced.
 - 2026-11-01 Open call 4: are 20 at once, 15 seconds, 240 seconds and 300 seconds right for the
   number of live subscriptions and the Vercel plan? Recommended: keep them, after checking the row
   count from open call 2 and the plan's limit.

@@ -9,12 +9,19 @@ code as it stands.
 
 ### Requirement: Reminders reach users at their hour (baseline, current behaviour)
 
-The send routes SHALL only accept a caller with the shared cron secret and SHALL notify a device only
-when its owner's effective hour matches the current UTC hour.
+The send routes SHALL only accept a caller with the shared cron secret. `send-daily` SHALL notify a
+device only when its owner's effective hour matches the current UTC hour and something is due.
+`send-streak-nudge` SHALL notify a device only when it is 20:00 for its owner, at least 3 hours from
+their daily reminder, and their streak is at risk.
 
 #### Scenario: Wrong hour
 
-- **WHEN** the run fires at an hour that is not the owner's hour
+- **WHEN** `send-daily` fires at an hour that is not the owner's hour
+- **THEN** nothing is sent to that device
+
+#### Scenario: Nudge too close to the reminder
+
+- **WHEN** `send-streak-nudge` fires at 20:00 local for an owner whose daily reminder is within 3 hours
 - **THEN** nothing is sent to that device
 
 #### Scenario: Missing secret
@@ -22,7 +29,7 @@ when its owner's effective hour matches the current UTC hour.
 - **WHEN** a caller has no valid bearer secret
 - **THEN** the route returns 401
 
-<!-- source: app/api/push/send-daily/route.ts:660-664; lib/push/notificationHour.ts; app/api/push/send-daily/route.test.tsx "set hour" -->
+<!-- source: app/api/push/send-daily/route.ts:660-664; app/api/push/send-streak-nudge/route.ts:249-266; lib/push/notificationHour.ts; app/api/push/send-daily/route.test.tsx "set hour" -->
 
 ### Requirement: Dead subscriptions are removed (baseline, current behaviour)
 
@@ -90,13 +97,19 @@ the next device as soon as a send ends.
 
 ### Requirement: A run always finishes
 
-Both routes SHALL declare `maxDuration = 300`. No new send SHALL start after 240 seconds. The run
-SHALL still delete dead subscriptions and respond, and SHALL log how many devices it did not reach.
+Both routes SHALL declare `maxDuration = 300`. No new send SHALL start more than 240 seconds after
+the route started. The run SHALL still delete dead subscriptions and respond, and SHALL log how many
+devices it did not reach.
 
 #### Scenario: Budget used up
 
 - **WHEN** 240 seconds have passed with devices left
-- **THEN** those devices are skipped and counted in a log line, dead rows found so far are deleted and the route returns 200
+- **THEN** those devices are not sent to and are counted in a log line, dead rows found so far are deleted and the route returns 200
+
+#### Scenario: Budget includes the reads
+
+- **WHEN** the reads before the send take 230 seconds
+- **THEN** sends start for at most the remaining 10 seconds
 
 ### Requirement: Subscriptions point at a known push service
 
@@ -131,8 +144,8 @@ refuse a new row with one, and the send path SHALL skip an existing row with one
 
 ### Requirement: An account has at most 10 subscriptions
 
-Inserting an eleventh row for a user SHALL replace that user's row with the oldest `last_seen_at`,
-including when inserts run in parallel.
+Inserting a row for a user who already has 10 or more SHALL first delete that user's rows with the
+oldest `last_seen_at` until 9 remain, including when inserts run in parallel.
 
 #### Scenario: New device at the limit
 
@@ -143,6 +156,11 @@ including when inserts run in parallel.
 
 - **WHEN** 20 inserts for one user run at once
 - **THEN** the user ends with 10 rows
+
+#### Scenario: Account already over the limit
+
+- **WHEN** a user with 14 rows subscribes on a new device
+- **THEN** the user has 10 rows, the newest among them
 
 #### Scenario: Other users
 
