@@ -54,40 +54,49 @@ Evidence: `lib/storage/readLocalStorage.ts:25-37`; `lib/storage/writeLocalStorag
 ### Requirement: One IndexedDB database at version 2 with two stores (baseline)
 
 The app SHALL open the `poke-memory` database at version 2 with a `kv` store and an `offline-pack`
-store, as a single shared promise. The upgrade SHALL keep existing `kv` data. `lib/pwa/offlineStore.ts`
-takes the version from `DB_VERSION`; `app/sw.ts` holds its own copy, a constant that SHALL equal it.
+store. There are three openers, each with its own shared promise and upgrade handler: `openAppDb`,
+`openOfflineDb` in `lib/pwa/offlineStore.ts`, and `openIdb` in the service worker. Each upgrade SHALL keep
+existing `kv` data. `lib/pwa/offlineStore.ts` takes the version from `DB_VERSION`; `app/sw.ts` holds its
+own copy, a constant that SHALL equal it.
 
 #### Scenario: Upgrade from version 1
 
 - **WHEN** a browser holding version 1 data opens the database
 - **THEN** the `kv` values are still readable and `offline-pack` exists
 
+#### Scenario: The offline store cannot open
+
+- **WHEN** `openOfflineDb` fails
+- **THEN** it resolves null and `idbAvailable` does not change
+
 #### Scenario: Server render
 
 - **WHEN** `openAppDb` is called with no `window`
 - **THEN** it returns a promise that never settles
 
-Evidence: `lib/idb/db.ts:9`, `:21-23`, `:29-49`; `lib/pwa/offlineStore.ts:55`; `app/sw.ts:67-70`,
+Evidence: `lib/idb/db.ts:9`, `:21-23`, `:29-49`; `lib/pwa/offlineStore.ts:55`, `:80-132`; `app/sw.ts:67-70`,
 `:466-481`; `lib/idb/db.test.ts:67-85`, `:111`, `:142`.
 
 ### Requirement: Version conflicts close or wait, with no timeout (baseline)
 
 A connection that blocks a newer version SHALL close and clear the shared promise. A connection blocked
 by an older one SHALL log a warning and wait. The app's `openAppDb` has no timeout on that wait, so its
-IndexedDB reads stay pending until the old connection closes. The service worker's opener does time out.
+IndexedDB reads stay pending until the old connection closes. `openOfflineDb` behaves the same way. The
+service worker's opener does time out.
 
 #### Scenario: Another tab holds an older connection
 
 - **WHEN** an upgrade is blocked by a connection elsewhere
 - **THEN** a warning is logged and the open stays pending until that connection closes
 
-Evidence: `lib/idb/db.ts:50-64`; `app/sw.ts:452-465`.
+Evidence: `lib/idb/db.ts:50-64`; `lib/pwa/offlineStore.ts:99-119`; `app/sw.ts:452-465`.
 
 ### Requirement: One IndexedDB failure turns it off until the next page load (baseline)
 
 `idbGet`, `idbSet` and `idbDelete` SHALL never throw. On any failure, or when the open fails, they SHALL
 log a warning and set `idbAvailable` to false, after which later calls SHALL do nothing (`idbGet` returns
-null) until the page reloads. A non-string value in `kv` SHALL read as null.
+null) until the page reloads. That includes `idbDelete`, so a delete asked for while it is off does not
+happen. A non-string value in `kv` SHALL read as null.
 
 #### Scenario: A read fails once
 
@@ -120,9 +129,10 @@ Evidence: `components/IdbMigration.tsx:11-14`; `lib/idb/db.ts:135`, `:148-193`;
 ### Requirement: The session and grade log are read from IndexedDB first (baseline)
 
 `loadSession` and `loadGradeLog` SHALL read IndexedDB while it is available and SHALL read localStorage
-only when it is off or holds nothing for that key. Saves SHALL go to IndexedDB, or to localStorage when
-it is off or the write fails. The localStorage grade log SHALL be trimmed oldest-first to 4.5 MB, keeping
-at least 100 entries.
+only when it is off or holds nothing for that key. `saveSession` SHALL write to IndexedDB, or to
+localStorage when it is off or the write fails. Grade-log writes go to localStorage only when IndexedDB was
+already off before the write, so a write that fails is not retried there. The localStorage grade log SHALL
+be trimmed oldest-first to 4.5 MB, keeping at least 100 entries.
 
 #### Scenario: Offline guest, normal load
 
@@ -134,18 +144,52 @@ at least 100 entries.
 - **WHEN** one card is saved to IndexedDB, a failed write sends a two-card save to localStorage, and the page reloads
 - **THEN** `saveSession` returned ok and `loadSession` returns the one-card IndexedDB copy (run against fake-indexeddb, recorded in #2236)
 
-Looks wrong (#2236): localStorage writes made while IndexedDB is off are not read back after a reload
-once IndexedDB holds a value, and nothing merges them.
+#### Scenario: A grade whose IndexedDB write fails
+
+- **WHEN** `appendGradeEntry` is called and the IndexedDB write fails
+- **THEN** it returns the entry as saved, neither store holds it, and the log reads empty on that page (run against fake-indexeddb, recorded in #2336)
+
+Looks wrong: #2236 (localStorage writes made while IndexedDB is off are not read back after a reload
+once IndexedDB holds a value, and nothing merges them), #2336 (a grade whose write fails is lost).
 
 Evidence: `lib/review/persistence.ts:297-324`, `:436-465`; `lib/gradelog/persistence.ts:93-99`,
-`:175-192`, `:200-236`.
+`:175-192`, `:200-236`, `:293-299`, `:333-337`, `:387-391`.
 
-### Requirement: A local reset clears progress but keeps settings and archives (baseline)
+### Requirement: A failed session save shows the storage banner (baseline)
+
+During review, `ReviewSession` SHALL pass each `saveSession` result to `useStorageQuota`. Any failed result
+SHALL show a dismissible banner saying storage is full, whether the reason was `quota` or `unknown`, and
+the next successful save SHALL hide it. Grade-log and settings write failures do not show it.
+
+#### Scenario: A write fails for another reason
+
+- **WHEN** `saveSession` returns `{ ok: false, reason: "unknown" }`
+- **THEN** the banner shows the same storage-full message
+
+Evidence: `lib/review/useStorageQuota.ts:12-22`; `components/review/StorageQuotaBanner.tsx:10-19`;
+`components/review/ReviewSession.tsx:1036`, `:1309`; `messages/en.json:646`.
+
+### Requirement: The app asks the browser to keep its storage (baseline)
+
+On load, where the Storage API is present, the app SHALL check `navigator.storage.persisted()`, call
+`persist()` if it is false, and write `poke-memory:storage-persist-requested:v1` once persistence is held.
+A refusal is not recorded, so the next load asks again. A rejected promise SHALL be ignored.
+
+#### Scenario: Browser refuses
+
+- **WHEN** `persist()` resolves false
+- **THEN** no key is written and the next load asks again
+
+Evidence: `app/layout.tsx:256`; `components/pwa/StoragePersistenceRequester.tsx:15-18`;
+`lib/pwa/usePersistentStorage.ts:23-61`; `lib/storage/keys.ts:113`.
+
+### Requirement: A local reset clears progress but keeps the settings keys and archives (baseline)
 
 `clearLocalProgress` SHALL remove every localStorage key starting `poke-memory:` except those starting
 `poke-memory:settings:` or `poke-memory:user-archive:`, and SHALL delete the IndexedDB review session,
 grade log and migration flag. A localStorage error SHALL NOT stop the IndexedDB deletes. It SHALL then
-dispatch same-tab `storage` events for the session and grade-log keys. It does not touch the cloud.
+dispatch same-tab `storage` events for the session and grade-log keys. It does not touch the cloud or the
+`offline-pack` store.
 
 #### Scenario: Shared device
 
@@ -157,19 +201,32 @@ dispatch same-tab `storage` events for the session and grade-log keys. It does n
 - **WHEN** a reset runs with the superuser unlock and a remembered Settings section stored
 - **THEN** both are removed, because only the two prefixes are spared
 
+#### Scenario: Offline download
+
+- **WHEN** a reset runs after an offline download
+- **THEN** the download date and manifest keys are removed and the files stay in `offline-pack`
+
+#### Scenario: Reset after an IndexedDB failure
+
+- **WHEN** a reset runs on a page where IndexedDB has turned off, and the page reloads
+- **THEN** the IndexedDB session is still there (run against fake-indexeddb, recorded in #2337)
+
 #### Scenario: Open pages update
 
 - **WHEN** a reset finishes with Stats or Pasture subscribed
 - **THEN** they receive `storage` events for both keys and show the empty state without a reload
 
-Evidence: `lib/storage/reset.ts:18-70`; `lib/storage/reset.test.ts:117`, `:135`, `:155`, `:168`.
+Looks wrong (#2337): the deletes do nothing while IndexedDB is off, and the data returns on reload.
+
+Evidence: `lib/storage/reset.ts:18-70`; `lib/storage/keys.ts:135`, `:147`; `lib/storage/reset.test.ts:117`, `:135`, `:155`, `:168`.
 
 ### Requirement: Reset order depends on who is signed in (baseline)
 
 Settings SHALL do nothing on reset while a superuser flag is on. For a signed-in user it SHALL reset the
 cloud first and SHALL leave local data alone if that fails. For a guest it SHALL call
-`clearLocalProgress`. The error screen SHALL offer "reset local data" only once auth has settled and the
-user is a guest; a signed-in user gets a hint instead.
+`clearLocalProgress`. The dialog needs the word RESET typed, and its failure message is English only. The
+error screen SHALL offer "reset local data" only once auth has settled and the user is a guest. A pull
+that sees a reset made on another device SHALL also run `clearLocalProgress`.
 
 #### Scenario: Cloud reset fails
 
@@ -181,13 +238,36 @@ user is a guest; a signed-in user gets a hint instead.
 - **WHEN** a superuser flag is on and the user confirms a reset
 - **THEN** nothing is cleared
 
-Evidence: `app/settings/page.tsx:678-689`; `lib/sync/reset.ts:50-56`; `app/error.tsx:59-63`, `:128-139`.
+#### Scenario: Error screen
+
+- **WHEN** a guest confirms "reset local data", or a signed-in user reaches the screen
+- **THEN** the guest's `clearLocalProgress` runs and the page reloads, and the signed-in user sees a hint instead
+
+Evidence: `app/settings/page.tsx:678-689`; `components/settings/ResetProgressDialog.tsx:42-48`;
+`lib/sync/reset.ts:50-56`; `lib/sync/pullAndMerge.ts:179`; `app/error.tsx:59-63`, `:128-139`.
+
+### Requirement: A reset from Settings also clears progress-linked settings (baseline)
+
+After a successful reset, Settings SHALL clear `favouriteTheme`, `priorityNewSpeciesIds`,
+`favouriteThemeOfferedForId` and `learnFirstAskedSpeciesIds`, keep the favourite and hearts, and return to
+`/`. For a signed-in user that settings save also goes to the cloud. The error screen and a pulled reset do
+not run this step.
+
+#### Scenario: Learn-first list
+
+- **WHEN** a guest resets from Settings with a learn-first list stored
+- **THEN** the list is emptied, while a reset from the error screen leaves it
+
+Evidence: `app/settings/page.tsx:686-688`; `lib/favourite/favourite.ts:78-91`;
+`components/sync/AutoSyncOnChange.tsx:54-66`.
 
 ### Requirement: Account deletion clears all local keys, for every account (baseline)
 
-`deleteAccountEverywhere` SHALL delete the cloud account first and SHALL leave local data alone if that
-fails. On success it SHALL run `clearLocalProgress`, then remove every `poke-memory:*` localStorage key,
-including settings.
+Settings SHALL do nothing on account deletion while a superuser flag is on or for a guest, and the dialog
+needs the word DELETE typed. `deleteAccountEverywhere` SHALL delete the cloud account first and SHALL leave
+local data alone if that fails. On success it SHALL run `clearLocalProgress`, then remove every
+`poke-memory:*` localStorage key, including settings, and Settings SHALL then sign the user out. The
+failure message is English only.
 
 #### Scenario: Cloud deletion fails
 
@@ -201,8 +281,22 @@ including settings.
 
 Looks wrong (#2237): that sweep also removes other accounts' archives on the device.
 
-Evidence: `lib/sync/deleteAccount.ts:41-57`, `:77-88`; `lib/storage/keys.ts:261-262`;
+Evidence: `app/settings/page.tsx:691-702`; `components/settings/DeleteAccountDialog.tsx:51-65`;
+`lib/sync/deleteAccount.ts:41-57`, `:77-88`; `lib/storage/keys.ts:261-262`;
 `lib/sync/deleteAccount.test.ts:82`, `:100`.
+
+### Requirement: Sign-out leaves local data on the device (baseline)
+
+`signOut` SHALL end the Supabase session and redirect to `/`, and SHALL NOT clear local data or the recorded
+owner, so the app carries on with that data as a guest and the owner stays recorded for the next sign-in.
+
+#### Scenario: Same user returns
+
+- **WHEN** a user signs out and the same user signs back in
+- **THEN** `guardAccountSwitch` finds them as the owner and does nothing
+
+Evidence: `lib/auth/actions.ts:24-28`; `components/auth/AuthButton.tsx:61`;
+`lib/sync/guardAccountSwitch.ts:109-117`.
 
 ### Requirement: A confirmed account switch archives, clears and restores (baseline)
 
@@ -326,8 +420,8 @@ comment saying it falls through to the error path.
 - **THEN** the same error is returned (run against the real seed, recorded in #2234)
 
 Looks wrong (#2234): reverse-evolution and cry ids are not in the set, so a backup the app exported with
-those cards is refused. Legacy-range evolution ids are refused the same way, so the legacy shapes the
-schema accepts cannot get through when the seed is loaded.
+those cards is refused. Legacy-range evolution ids are refused the same way, so a real legacy card, whose
+shape the schema accepts, cannot get through when the seed is loaded.
 
 Evidence: `lib/backup/io.ts:12-27`, `:87-92`; `lib/pokemon/seed-constants.ts:9-27`;
 `lib/review/session.ts:197-206`, `:220-232`; `lib/backup/io.test.ts:425`, `:454`.
@@ -337,12 +431,18 @@ Evidence: `lib/backup/io.ts:12-27`, `:87-92`; `lib/pokemon/seed-constants.ts:9-2
 After a file validates, Settings SHALL ask for confirmation. On yes, `applyBackup` SHALL save the session
 and settings and the page SHALL reload; on no, nothing changes. Each card's `state.stepStartedAt` SHALL be
 set to null and its other state kept. The restore does not merge, and does not touch the grade log,
-streak, pending queue, sync status or cloud. There is no superuser guard, unlike reset.
+streak, pending queue or sync status, and does not send the session to the cloud. A failed settings write
+is silent. There is no superuser guard, unlike reset.
 
 #### Scenario: Confirmed guest restore
 
 - **WHEN** a guest confirms a valid backup
 - **THEN** session and settings are replaced, card steps restart, and the page reloads
+
+#### Scenario: Signed-in restore with different settings
+
+- **WHEN** a signed-in user with no superuser flag on confirms a backup whose settings differ from the last pushed ones
+- **THEN** the settings-saved event pushes the changed keys to the cloud straight away, racing the reload
 
 #### Scenario: Card with no name
 
@@ -365,12 +465,14 @@ for a signed-in user is undefined (#2218).
 
 Evidence: `app/settings/page.tsx:704-721`, `:1961-1980`; `lib/backup/io.ts:94-118`;
 `lib/backup/schema.ts:16-22`; `lib/review/persistence.ts:32-53`, `:269-271`, `:338-358`;
+`lib/settings/persistence.ts:1161-1179`; `components/sync/AutoSyncOnChange.tsx:46-49`, `:54-66`, `:102`;
 `lib/backup/io.test.ts:404`, `:472`, `:479`; `e2e/backup.spec.ts:126`, `:196`.
 
 ### Requirement: Review-history CSV is for signed-in users (baseline)
 
-`GET /api/export` SHALL answer 401 without a session, and 503 `service_unavailable` when the client cannot
-be built or a read fails, while re-throwing Next.js control errors that carry a `digest`. Settings SHALL
+`GET /api/export` SHALL answer 401 without a session, including when the auth check itself errors, and 503
+`service_unavailable` when the client cannot be built or a read fails. While building the client it SHALL
+re-throw Next.js control errors that carry a `digest`. Settings SHALL
 show the download link to signed-in users only, as a plain link with no error handling, so a failure
 produces no message in the app. The service worker SHALL NOT cache it, so it needs a network connection.
 
@@ -384,7 +486,7 @@ produces no message in the app. The service worker SHALL NOT cache it, so it nee
 - **WHEN** the `grade_log` read errors
 - **THEN** the answer is 503
 
-Evidence: `app/api/export/route.ts:97-112`, `:132-141`; `lib/auth/requireAuth.ts:35`;
+Evidence: `app/api/export/route.ts:97-112`, `:132-141`; `lib/auth/requireAuth.ts:26-36`;
 `app/settings/page.tsx:1939-1954`; `lib/pwa/cacheStrategy.ts:121-130`;
 `app/api/export/route.test.tsx:113`, `:123`, `:310`; `e2e/settings.spec.ts:462`.
 
@@ -405,9 +507,9 @@ Evidence: `app/api/export/route.ts:114-141`; `lib/sync/paginatedFetch.ts:31-52`.
 
 The body SHALL start with a UTF-8 byte order mark, use CRLF line ends and the header
 `date,pokemon,card_type,grade,grade_label`, and quote fields per RFC 4180. `pokemon` SHALL be the display
-name, `From -> To` for edges, the `subject_key` when it cannot be resolved, and empty when it is null.
-The response SHALL be a `no-store` CSV
-attachment named `poke-memory-reviews-<UTC date>.csv`.
+name, `From -> To` for edges with the numeric id for a species not in the seed, the `subject_key` when it
+cannot be parsed, and empty when it is null. An unknown grade SHALL show its number as the label. The
+response SHALL be a `no-store` CSV attachment named `poke-memory-reviews-<UTC date>.csv`.
 
 #### Scenario: Date column
 
@@ -469,3 +571,9 @@ and none has an owner answer yet.
   `lib/storage/userArchive.ts:19-22`, the seed fallback in `lib/backup/io.ts:12-14`, "every key" in
   `lib/storage/keys.ts:2`)? Recommend: yes, on the next change to each file.
 - Should legacy-range evolution ids pass the id check? Recommend: decide with #2234, since the schema accepts them.
+- Should reset and account deletion clear the offline download record while the files stay? Recommend: keep
+  the record, since those files are not personal data and the record then matches what is stored.
+- Should the Settings reset and delete failure messages be translated? Recommend: yes, with #2238.
+- Should a storage banner for a non-quota failure say something other than "storage is full"? Recommend: yes,
+  a small fix.
+- Should a restored backup's settings reach the cloud for a signed-in user? Recommend: decide with #2218.
