@@ -12,10 +12,11 @@ belong to stats-and-streaks; the pull and merge belong to cloud-sync.
 
 ### Requirement: Journey page load order (baseline)
 
-The Journey page SHALL wait for the seed, then load the saved session or build a fresh one, persist any
-healed cards, read settings, streak and grade log, and show a loading skeleton until both the mastery
-snapshot and the current streak exist. The load SHALL re-run when the stored session, any-flag state,
-Supabase client, user or seed changes. Metadata SHALL title the route "Journey - Poké Memory".
+The Journey page SHALL wait for the seed, then read settings, load the saved session or build a fresh
+one, persist any healed cards, read streak and grade log, and show a loading skeleton until both the
+mastery snapshot and the current streak exist. The load SHALL re-run when the stored session, any-flag
+state, Supabase client, user or seed changes, and not on a settings save, which looks wrong (#2339).
+Metadata SHALL title the route "Journey - Poké Memory".
 
 #### Scenario: Seed not ready
 
@@ -27,7 +28,12 @@ Supabase client, user or seed changes. Metadata SHALL title the route "Journey -
 - **WHEN** `hydrateSession` reports `anyHealed`
 - **THEN** the healed cards are saved before the page uses them
 
-Source: `app/journey/layout.tsx:3`, `app/journey/page.tsx:424`, `app/journey/page.tsx:435`, `app/journey/page.tsx:560`, `app/journey/page.tsx:627`.
+#### Scenario: Language switched on the page
+
+- **WHEN** the player switches language in the status bar while on Journey
+- **THEN** the status bar, language breakdown and Pokémon names change, and the snapshot, timeline, close-to-mastery list, next-badge hint and records stay on the old language until the page remounts (#2339)
+
+Source: `app/journey/layout.tsx:3`, `app/journey/page.tsx:424`, `app/journey/page.tsx:427`, `app/journey/page.tsx:435`, `app/journey/page.tsx:443`, `app/journey/page.tsx:560`, `app/journey/page.tsx:627`.
 
 ### Requirement: Journey reads the cloud for signed-in players (baseline)
 
@@ -201,8 +207,9 @@ Source: `lib/badges/catalog.ts:44`, `lib/badges/artwork.ts:26`, `lib/badges/chec
 
 A species SHALL count when both its name card and its reverse card in the given locale are at or above
 mastery stability. Cards with no locale SHALL read as `en`. `checkBadges` SHALL return, in catalogue
-order, unearned badges whose whole list is mastered. An earned badge SHALL stay earned after a lapse or
-a language switch, since nothing removes it. Older comments saying name-card mastery are stale.
+order, unearned badges whose whole list is mastered. An earned badge SHALL stay earned after a lapse, a
+language switch or an undo of the grade that earned it, since award code only appends. Older comments
+saying name-card mastery are stale.
 
 #### Scenario: Name mastered, reverse not
 
@@ -219,7 +226,12 @@ a language switch, since nothing removes it. Older comments saying name-card mas
 - **WHEN** a species in an earned badge falls below the gate
 - **THEN** the badge stays, because award code only appends
 
-Source: `lib/badges/derive.ts:33`, `lib/badges/derive.ts:43`, `lib/badges/check.ts:9`, `lib/badges/check.test.ts:39`, `lib/badges/check.test.ts:59`, `lib/badges/derive.test.ts:140`, `lib/badges/derive.test.ts:153`, `lib/badges/catalog.ts:12`.
+#### Scenario: The earning grade is undone
+
+- **WHEN** a player undoes the grade that earned a badge
+- **THEN** the badge and its `earnedAt` stay, because undo does not touch settings
+
+Source: `components/review/ReviewSession.tsx:3068`, `lib/badges/derive.ts:33`, `lib/badges/derive.ts:43`, `lib/badges/check.ts:9`, `lib/badges/check.test.ts:39`, `lib/badges/check.test.ts:59`, `lib/badges/derive.test.ts:140`, `lib/badges/derive.test.ts:153`, `lib/badges/catalog.ts:12`.
 
 ### Requirement: Award on the grade that crosses mastery (baseline)
 
@@ -268,8 +280,8 @@ Source: `app/journey/page.tsx:471`, `app/journey/page.tsx:480`, `app/journey/pag
 
 Earned badges SHALL live in settings as id and `earnedAt` pairs, reach the cloud inside the settings
 JSONB, and be replaced as a whole on write. The cloud trigger SHALL reject an update that removes a
-badge id. A Settings row SHALL clear the local list. The Journey page SHALL ignore a stored id that
-is not in the catalogue.
+badge id. A developer row in Settings, shown only in the superuser section, SHALL clear the local
+list. The Journey page SHALL ignore a stored id that is not in the catalogue.
 
 #### Scenario: A push would drop a badge
 
@@ -281,7 +293,7 @@ is not in the catalogue.
 - **WHEN** settings hold an id with no catalogue entry
 - **THEN** Journey leaves it out
 
-Source: `lib/settings/persistence.ts:338`, `lib/settings/persistence.ts:858`, `lib/settings/lastPushedSnapshot.ts:99`, `db/migrations/038_user_settings_reject_regression_trigger.sql:11`, `db/migrations/038_user_settings_reject_regression_trigger.sql:102`, `app/settings/page.tsx:139`, `app/journey/page.tsx:589`.
+Source: `lib/settings/persistence.ts:338`, `lib/settings/persistence.ts:858`, `lib/settings/lastPushedSnapshot.ts:99`, `db/migrations/038_user_settings_reject_regression_trigger.sql:11`, `db/migrations/038_user_settings_reject_regression_trigger.sql:102`, `app/settings/page.tsx:139`, `app/settings/page.tsx:2102`, `app/settings/page.tsx:2199`, `app/journey/page.tsx:589`.
 
 ### Requirement: Badge gallery (baseline)
 
@@ -395,8 +407,8 @@ Source: `lib/timeline/reconstruct.ts:267`, `lib/timeline/reconstruct.ts:284`, `l
 
 ### Requirement: Timeline forgetting projection (baseline)
 
-The future direction SHALL give one snapshot per day for 180 days from the active locale's reviewed name
-cards, measured from each card's last review with the FSRS power-law curve and the player's retention
+The future direction SHALL give one snapshot per day from day 0 to day 180, 181 in all, from the active
+locale's reviewed name cards, measured from each card's last review with the FSRS power-law curve and the player's retention
 target (default 0.9). A card already below target SHALL count as forgotten at day 0. A snapshot's `mastered` and `introduced` here both mean
 retained, across every reviewed card, not mastered cards only. No reviewed card SHALL give no future.
 
@@ -419,23 +431,30 @@ Source: `lib/timeline/reconstruct.ts:365`, `lib/timeline/reconstruct.ts:395`, `l
 
 ### Requirement: Timeline under pretend-all-mastered (baseline)
 
-With `pretendAllMastered` on, every name-card species SHALL be synthesised as introduced and mastered
-before the first daily checkpoint, and each card SHALL project with a stability of 9,999 days, so both
-directions read flat at full.
+With `pretendAllMastered` on, every name-card species SHALL be synthesised as introduced and mastered 90
+days and 1 ms before now, and each card SHALL project with a stability of 9,999 days. Both directions
+read flat at full, except the first past snapshot: it is the UTC midnight of that day, before the
+synthetic time unless now is exactly midnight, so it reads 0. This looks wrong (#2341).
 
 #### Scenario: Flag on with an empty log
 
 - **WHEN** the flag is on and there are no grades
-- **THEN** past snapshots still show every species mastered
+- **THEN** every past snapshot after the first shows every species mastered
 
-Source: `lib/timeline/reconstruct.ts:401`, `lib/timeline/reconstruct.ts:541`, `lib/timeline/reconstruct.ts:549`, `lib/timeline/reconstruct.test.ts:471`.
+#### Scenario: Far left of the slider
+
+- **WHEN** the flag is on, it is not exactly UTC midnight, and the slider is at 0
+- **THEN** the counts read 0 (#2341)
+
+Source: `lib/timeline/reconstruct.ts:303`, `lib/timeline/reconstruct.ts:401`, `lib/timeline/reconstruct.ts:541`, `lib/timeline/reconstruct.ts:549`, `lib/timeline/reconstruct.test.ts:471`.
 
 ### Requirement: Timeline scrubber (baseline)
 
 The widget SHALL start at now, on a 0 to 400 range input where 200 is now and position is
 `(value - 200) / 200`. `snapshotAtPosition` SHALL treat any position above 0 as future, while the widget
-labels future only above 0.01 and past only below -0.01. This looks wrong (#2284). Percentages SHALL use
-the default-form `totalSpecies`. A live region SHALL announce the date and counts.
+labels future only above 0.01 and past only below -0.01. This looks wrong (#2284). The same band applies
+left of now: 198 and 199 read Now while showing a past snapshot. Percentages SHALL use the default-form
+`totalSpecies`. A live region SHALL announce the date and counts.
 
 #### Scenario: Keyboard, one step right of now
 
@@ -476,12 +495,12 @@ no recoverable crossing, or under `pretendAllMastered`.
 - **WHEN** a species lapsed and crossed again
 - **THEN** the later date is returned
 
-#### Scenario: Guest log pruned
+#### Scenario: Crossing not in the log
 
-- **WHEN** the crossing's entries are gone from the log
-- **THEN** the hook returns null, never a guessed date
+- **WHEN** the crossing's entries are not in the log
+- **THEN** the hook returns null, never a guessed date. `pruneGradeLog` has no production caller, so the 365-day guest pruning in the comments does not happen on `qa`
 
-Source: `lib/timeline/reconstruct.ts:649`, `lib/timeline/reconstruct.ts:655`, `lib/timeline/useSpeciesMasteryDate.ts:26`, `lib/timeline/useSpeciesMasteryDate.ts:67`, `lib/timeline/useSpeciesMasteryDate.ts:94`, `components/pokedex/PokemonDetailDisclosure.tsx:354`, `lib/timeline/reconstruct.test.ts:670`, `lib/timeline/reconstruct.test.ts:707`, `components/timeline/useSpeciesMasteryDate.test.tsx:107`, `components/timeline/useSpeciesMasteryDate.test.tsx:155`.
+Source: `lib/timeline/reconstruct.ts:649`, `lib/timeline/reconstruct.ts:655`, `lib/timeline/useSpeciesMasteryDate.ts:26`, `lib/timeline/useSpeciesMasteryDate.ts:67`, `lib/timeline/useSpeciesMasteryDate.ts:94`, `lib/gradelog/persistence.ts:344`, `components/pokedex/PokemonDetailDisclosure.tsx:354`, `lib/timeline/reconstruct.test.ts:670`, `lib/timeline/reconstruct.test.ts:707`, `components/timeline/useSpeciesMasteryDate.test.tsx:107`, `components/timeline/useSpeciesMasteryDate.test.tsx:155`.
 
 ### Requirement: Milestone detection (baseline)
 
@@ -519,13 +538,19 @@ Source: `components/journey/MilestoneShareButton.tsx:47`, `components/journey/Mi
 
 Both share buttons SHALL try, in order: Web Share with the PNG when `canShare` accepts files; Web Share
 with text when file sharing is unavailable; a `poke-memory.png` download when an image exists; clipboard
-text. Dismissing the sheet SHALL stop quietly. Another file-share error SHALL skip the text sheet and
-continue to download. A copy result SHALL show for 2 seconds.
+text. Dismissing the file sheet SHALL stop quietly. Another file-share error SHALL skip the text sheet
+and continue to download. Any rejection of the text sheet, dismissal included, SHALL continue to
+download or clipboard. This looks wrong (#2340). A copy result SHALL show for 2 seconds.
 
-#### Scenario: Player dismisses the sheet
+#### Scenario: Player dismisses the file sheet
 
-- **WHEN** `share` rejects with `AbortError`
+- **WHEN** the file `share` rejects with `AbortError`
 - **THEN** nothing else happens
+
+#### Scenario: Player dismisses the text sheet
+
+- **WHEN** file sharing is unavailable and the text `share` rejects with `AbortError`
+- **THEN** the PNG downloads, or with no image the text is copied (#2340)
 
 #### Scenario: Offline desktop browser with no Web Share
 
@@ -537,7 +562,7 @@ continue to download. A copy result SHALL show for 2 seconds.
 - **WHEN** no image, no Web Share and no clipboard exist
 - **THEN** an error message shows for 2 seconds
 
-Source: `components/review/ShareTodayButton.tsx:46`, `components/review/ShareTodayButton.tsx:63`, `components/review/ShareTodayButton.tsx:75`, `components/review/ShareTodayButton.tsx:90`, `components/review/ShareTodayButton.tsx:105`, `components/journey/MilestoneShareButton.tsx:152`, `components/journey/MilestoneShareButton.tsx:181`, `components/journey/MilestoneShareButton.tsx:196`, `components/journey/MilestoneShareButton.tsx:211`, `components/review/ShareTodayButton.test.tsx:196`, `components/journey/MilestoneShareButton.test.tsx:226`, `components/journey/MilestoneShareButton.test.tsx:291`.
+Source: `components/review/ShareTodayButton.tsx:46`, `components/review/ShareTodayButton.tsx:63`, `components/review/ShareTodayButton.tsx:75`, `components/review/ShareTodayButton.tsx:83`, `components/review/ShareTodayButton.tsx:90`, `components/review/ShareTodayButton.tsx:105`, `components/journey/MilestoneShareButton.tsx:152`, `components/journey/MilestoneShareButton.tsx:181`, `components/journey/MilestoneShareButton.tsx:189`, `components/journey/MilestoneShareButton.tsx:196`, `components/journey/MilestoneShareButton.tsx:211`, `components/review/ShareTodayButton.test.tsx:196`, `components/journey/MilestoneShareButton.test.tsx:226`, `components/journey/MilestoneShareButton.test.tsx:291`.
 
 ### Requirement: Daily summary text (baseline)
 
@@ -572,20 +597,27 @@ Source: `components/review/useShareSheet.ts:32`, `components/review/useShareShee
 ### Requirement: Daily share availability (baseline)
 
 The button SHALL show at the end of a session when share text exists, including with a superuser flag on.
-The summary SHALL be saved locally after each grade with no flag on, so it survives a reload. Mastered in
-the summary SHALL count species crossings, from either leg.
+The summary SHALL be saved locally after each grade with no flag on, so it survives a reload. On load, a
+stored summary SHALL be restored whatever the flags. With none stored and no flag on, the grade sequence
+SHALL be rebuilt from today's grade log, leaving new and mastered at 0. Mastered in the summary SHALL
+count species crossings, from either leg.
 
 #### Scenario: Reload after the session
 
 - **WHEN** a player reloads on the same day
 - **THEN** the summary is restored and the button returns
 
+#### Scenario: Summary missing, grades logged
+
+- **WHEN** no summary is stored and today's grade log has entries
+- **THEN** the button returns with the grid and reviewed total, and new and mastered read 0
+
 #### Scenario: Superuser flag on
 
 - **WHEN** a flag is on
-- **THEN** the grades are not saved to the daily summary
+- **THEN** the grades are not saved to the daily summary and the grade log is not used to rebuild it
 
-Source: `components/review/ReviewSession.tsx:699`, `components/review/ReviewSession.tsx:2308`, `components/review/ReviewSession.tsx:3009`, `components/review/ReviewSession.tsx:3014`.
+Source: `components/review/ReviewSession.tsx:699`, `components/review/ReviewSession.tsx:1452`, `components/review/ReviewSession.tsx:1457`, `components/review/ReviewSession.tsx:2308`, `components/review/ReviewSession.tsx:3009`, `components/review/ReviewSession.tsx:3014`.
 
 ### Requirement: Share image (baseline)
 
@@ -635,7 +667,7 @@ Source: `components/favourite/useSharePartner.ts:16`, `components/favourite/useP
 The bar SHALL render below the nav on every route, except hidden below `md` on `/` only. It SHALL be a
 named region, not a live region, and hold a same-height skeleton until every value exists. Single-language
 players SHALL see streak, mastery, token. With languages on, players SHALL see streak, token, a divider,
-mastery and the language switcher. It SHALL make no cloud writes.
+mastery and the language switcher. The chips SHALL make no cloud writes; the switcher saves settings.
 
 #### Scenario: Mobile Practice
 
@@ -647,7 +679,12 @@ mastery and the language switcher. It SHALL make no cloud writes.
 - **WHEN** `languagesEnabled` is true
 - **THEN** the divider and switcher show
 
-Source: `app/layout.tsx:191`, `components/profile/ProfileStatusBar.tsx:58`, `components/profile/ProfileStatusBar.tsx:63`, `components/profile/ProfileStatusBar.tsx:84`, `components/profile/ProfileStatusBar.tsx:101`, `components/profile/ProfileStatusBar.test.tsx:122`, `components/profile/ProfileStatusBar.test.tsx:262`, `components/profile/ProfileStatusBar.test.tsx:285`.
+#### Scenario: Switching language, signed in
+
+- **WHEN** a signed-in player picks another language in the bar
+- **THEN** a settings patch carrying `pokemonNameLocale` is pushed; `activePokemonNameLocale` stays on the device
+
+Source: `components/i18n/LanguageSwitcher.tsx:182`, `lib/settings/persistence.ts:1170`, `lib/settings/lastPushedSnapshot.ts:41`, `components/sync/AutoSyncOnChange.tsx:64`, `app/layout.tsx:191`, `components/profile/ProfileStatusBar.tsx:58`, `components/profile/ProfileStatusBar.tsx:63`, `components/profile/ProfileStatusBar.tsx:84`, `components/profile/ProfileStatusBar.tsx:101`, `components/profile/ProfileStatusBar.test.tsx:122`, `components/profile/ProfileStatusBar.test.tsx:262`, `components/profile/ProfileStatusBar.test.tsx:285`.
 
 ### Requirement: Status chips (baseline)
 
@@ -694,11 +731,16 @@ Source: `lib/profile/useProfileStatus.ts:82`, `lib/profile/useProfileStatus.ts:1
 
 ### Requirement: Mastered and due count caches (baseline)
 
-Both caches SHALL be local only, per locale, with no sync leg, and read as zeros or false when absent or
-malformed. `ReviewSession` SHALL write them on mount and after grades, with no superuser flag on, and
-writers SHALL fire a synthetic `storage` event. The mastered count SHALL be written for the active locale
-only, with the same species-level derivation as `computeStats`. Due counts SHALL cover every locale,
-reviews only, excluding cards reviewed today. A progress reset SHALL clear both.
+Both caches SHALL be local only, per locale, and read as zeros when absent or malformed. With no
+superuser flag on, `ReviewSession` SHALL write both on mount, due counts after every grade and the
+mastered count after name and reverse grades, but not on undo (#2343). Each write SHALL fire a synthetic
+`storage` event. The mastered count SHALL cover the active locale only, derived as in `computeStats`. Due
+counts SHALL cover every locale, reviews only, not cards reviewed today.
+
+#### Scenario: Progress reset
+
+- **WHEN** a player resets progress
+- **THEN** both caches are cleared
 
 #### Scenario: Malformed cache
 
@@ -725,7 +767,12 @@ reviews only, excluding cards reviewed today. A progress reset SHALL clear both.
 - **WHEN** the account changes on a shared device
 - **THEN** the archive holds these caches per user
 
-Source: `lib/profile/masteredCountCache.ts:43`, `lib/profile/masteredCountCache.ts:72`, `lib/profile/dueCountCache.ts:46`, `lib/profile/dueCountCache.ts:72`, `lib/profile/dueCountCache.ts:109`, `components/review/ReviewSession.tsx:313`, `components/review/ReviewSession.tsx:328`, `components/review/ReviewSession.tsx:1494`, `components/review/ReviewSession.tsx:2860`, `components/review/ReviewSession.tsx:2869`, `lib/storage/reset.ts:25`, `lib/storage/userArchive.ts:44`, `components/profile/masteredCountCache.test.tsx`, `components/profile/dueCountCache.test.tsx`.
+#### Scenario: Undo of a mastering grade
+
+- **WHEN** a player undoes the grade that crossed mastery
+- **THEN** the status bar keeps the higher count until the next name or reverse grade or Practice mount (#2343)
+
+Source: `components/review/ReviewSession.tsx:3068`, `lib/profile/masteredCountCache.ts:43`, `lib/profile/masteredCountCache.ts:72`, `lib/profile/dueCountCache.ts:46`, `lib/profile/dueCountCache.ts:72`, `lib/profile/dueCountCache.ts:109`, `components/review/ReviewSession.tsx:313`, `components/review/ReviewSession.tsx:328`, `components/review/ReviewSession.tsx:1494`, `components/review/ReviewSession.tsx:2860`, `components/review/ReviewSession.tsx:2869`, `lib/storage/reset.ts:25`, `lib/storage/userArchive.ts:44`, `components/profile/masteredCountCache.test.tsx`, `components/profile/dueCountCache.test.tsx`.
 
 ### Requirement: Hard-coded English on these surfaces (baseline)
 
