@@ -85,6 +85,11 @@ go down.
 - **WHEN** the pull fails
 - **THEN** nothing changes on this device or in the cloud, and Settings says nothing was restored
 
+#### Scenario: Last reset cannot be read
+
+- **WHEN** the card pull succeeds but the read of the account's last reset fails
+- **THEN** nothing changes on this device or in the cloud, and Settings says nothing was restored
+
 #### Scenario: App closed after a failed push
 
 - **WHEN** the pull succeeds, the push fails and the page reloads

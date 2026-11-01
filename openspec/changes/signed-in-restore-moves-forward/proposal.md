@@ -15,9 +15,10 @@ This builds the **recommended** answer to the open call in Clarifications. It is
 
 - A signed-in restore only moves cards forward. A backup card is used when it is further on than both
   the cloud and this device; otherwise the further-on copy stays. Nothing in the cloud goes down.
-- New `restoreBackupSignedIn` (`lib/sync/restoreBackup.ts`) runs load local, pull, merge, save, push,
-  the order `docs/sync.md` sets. A failed pull changes nothing. A failed push leaves the cards in the
-  pending queue, which drains after the reload.
+- New `restoreBackupSignedIn` (`lib/sync/restoreBackup.ts`) pulls the cards and the last reset, loads
+  local, merges, saves and pushes. Local is loaded after the pull, as in `pullAndMerge`, so a grade
+  saved during the pull is merged too. If either read fails nothing changes. A failed push leaves the
+  cards in the pending queue, which drains when Practice next opens, or on reconnect or Retry.
 - New pure `planSignedInRestore` and `isFurtherOn` (`lib/sync/cloud.ts`). `isFurtherOn` mirrors the
   regression trigger and is checked against the real trigger case by case.
 - Cards dated before the account's last reset are left out, because the database refuses them on
@@ -65,6 +66,11 @@ Risks kept open, each small:
 
 - A background pull landing between this restore's load and save could overwrite the saved session.
   The pushed cards are in the cloud and come back on the next pull. Likelihood low, cost one pull.
+- A device already behind the cloud keeps its copy if the backup is no further on than the cloud, so
+  the spec's "holds the reps 9 copy" relies on the next pull. A card already stranded by today's
+  restore stays stranded. Adopting the cloud row there is a small follow-up.
+- A failed save reports `importFailedSignedIn`, which says the account could not be reached. Nothing
+  is restored, as it says, but the cause is local storage. Only a full device reaches this.
 - A card the database refuses on other grounds, for example a hand-edited stability, fails its batch of
   200, so that batch falls to the queue, where the refused card is evicted but stays on this device.
   Only a hand-edited file reaches this.
