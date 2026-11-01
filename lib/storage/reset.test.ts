@@ -193,6 +193,7 @@ describe("clearLocalProgress", () => {
 
     expect(await deleteAccountEverywhere(makeRpcClient())).toEqual({ ok: true });
 
+    expect(stubLocalStorage.getItem(KEY_PENDING_GRADE_QUEUE)).toBeNull();
     expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).toBeNull();
   });
 
@@ -201,6 +202,7 @@ describe("clearLocalProgress", () => {
 
     expect(await resetAllProgressEverywhere(makeRpcClient())).toEqual({ ok: true });
 
+    expect(stubLocalStorage.getItem(KEY_PENDING_GRADE_QUEUE)).toBeNull();
     expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).toBeNull();
   });
 
@@ -211,6 +213,7 @@ describe("clearLocalProgress", () => {
     await deleteAccountEverywhere(makeRpcClient({ message: "boom" }));
     await resetAllProgressEverywhere(makeRpcClient({ message: "boom" }));
 
+    expect(stubLocalStorage.getItem(KEY_PENDING_GRADE_QUEUE)).not.toBeNull();
     expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).not.toBeNull();
   });
 

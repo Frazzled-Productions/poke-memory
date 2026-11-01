@@ -1,7 +1,7 @@
 ## Root cause
 
 Traced on 2 November 2026 (`root-cause` skill) on `origin/qa` at `d2456f44`. The full analysis is in
-ops #400, because this repo is public. Surface: unit tests through the real write path against
+ops #400. Surface: unit tests through the real write path against
 `fake-indexeddb`; a real browser was not used.
 
 - **Current behaviour (Seen):** seed the queue with `savePendingQueue`, run `clearLocalProgress`,
@@ -39,5 +39,6 @@ dependency; `idbDelete` does not throw and is a no-op when IndexedDB is unavaila
 The one fact this rests on: every caller of `clearLocalProgress` has already removed the localStorage
 copy, so the only reader left for the IndexedDB copy is the service worker, and it treats an empty
 queue as nothing to do. Proven to rung 4 (real code, red then green) for the deletion; the service
-worker's handling of an empty queue is rung 2 (`app/sw.ts:678`), since `app/sw.ts` is outside the
-unit tests.
+worker's handling is rung 3, walked but not run, since `app/sw.ts` is outside the unit tests: a
+missing key reads as an empty queue (`app/sw.ts:544`), which returns before any request
+(`app/sw.ts:678`).

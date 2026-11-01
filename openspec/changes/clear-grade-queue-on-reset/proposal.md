@@ -1,10 +1,9 @@
 ## Why
 
 Reset all progress and Delete account should leave no progress on the device. Both remove the
-pending-grade queue from localStorage, but leave its copy in IndexedDB, the one the service worker
-reads for Background Sync. The two copies should go together, as they already do in
-`clearPendingQueue` and on an account switch. Refs ops #400 (held privately in
-Frazzled-Productions/ops).
+pending-grade queue from localStorage, but leave its copy in IndexedDB. The two copies should go
+together, as they already do in `clearPendingQueue` and on an account switch. Refs ops #400 (held
+privately in Frazzled-Productions/ops).
 
 Fixes: ops #400
 
@@ -34,8 +33,10 @@ Evidence from the `blast-radius` run on 2 November 2026 against `origin/qa` at `
   `clearLocalProgress`, and a superuser session writes no queue.
 - **Sign-in:** no change. `guardAccountSwitch` does not call `clearLocalProgress`, and archived blobs
   keep their own copy of the queue (`lib/storage/userArchive.ts:71`).
-- **Review and quiz screens (home), Pokédex, Pasture, Stats, Journey, What's new:** no change. None
-  reads the IndexedDB queue; only `app/sw.ts` does.
+- **Review and quiz screens (home), Pokédex, Pasture, Stats, Journey:** no change. None reads the
+  IndexedDB queue; only `app/sw.ts` does.
+- **What's new:** one more line in the next release's Fixed section, from the changelog fragment
+  (`app/whats-new/page.tsx` renders the changelog). No code change.
 - **Locales (en, ja, zh-Hans, zh-Hant, pseudo-locale):** no change, no copy.
 - **Privacy notice and sub-processors:** no change, because no new data or processor is involved.
 - **Accessibility (keyboard, screen reader, reduced motion):** no change, no UI.
@@ -67,3 +68,4 @@ Nothing here has been put to Fraser yet. Each line is an open call with a recomm
 - 2026-11-02 A grade still queued when a wipe runs is now dropped. The localStorage copy and the session were already wiped, so nothing on the device could show it. Recommended: accept; that is what a reset means.
 - 2026-11-02 This is proven against `fake-indexeddb` through the real write path, not in a real browser. Recommended: accept for a one-line delete, with no new Playwright case.
 - 2026-11-02 Should the wipe and `lib/storage/userArchive.ts` share one list of per-user IndexedDB keys, so a new key cannot be missed again? Recommended: not in this change; `keys.ts` has few IndexedDB keys and one new one has been added since the wipe was written.
+- 2026-11-02 The changelog fragment needs a number in this repo and ops #400 is private, so it uses this PR's number. Recommended: keep that.
