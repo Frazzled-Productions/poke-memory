@@ -26,27 +26,37 @@ and reload when the session storage key changes. Without a saved session it SHAL
 - **WHEN** the page renders before the seed resolves
 - **THEN** it shows the loading skeleton and the header placeholder
 
-Source: `app/pokedex/page.tsx:27`, `app/pokedex/page.tsx:40`, `app/pokedex/page.tsx:66`, `app/pokedex/page.tsx:90`, `app/pokedex/page.tsx:100`, `components/pokedex/PokedexGrid.tsx:230`, `app/pokedex/page.test.tsx:1`.
+#### Scenario: Seed fails to load
+
+- **WHEN** the seed load rejects
+- **THEN** the skeleton stays, with no message or retry, since the page reads only `seed` (#2342)
+
+Source: `app/pokedex/page.tsx:23`, `app/pokedex/page.tsx:27`, `app/pokedex/page.tsx:40`, `app/pokedex/page.tsx:66`, `app/pokedex/page.tsx:90`, `app/pokedex/page.tsx:100`, `components/pokedex/PokedexGrid.tsx:230`, `app/pokedex/page.test.tsx:1`.
 
 ### Requirement: Grid class comes from the name card, and is not language-aware (baseline)
 
-The page SHALL class each tile from a name card only: `locked` when never graded, `mastered` at
-stability of at least 21 days, otherwise `learning`, and `locked` when there is no card. It hydrates
-with no language, so `hydrateSession` adds an `en` name card for every species without one, and the
-last name card for an id SHALL decide its class. This looks wrong for anyone studying in another
-language: #2290. It also differs from the detail page: #2296.
+The page SHALL class each tile from a name card only: `locked` while `lastReview` is null (#2344),
+`mastered` at stability of at least 21 days, otherwise `learning`, and `locked` when there is no card.
+It hydrates with no language, so `hydrateSession` adds an `en` name card for every species without
+one, and the last name card for an id SHALL decide its class. This looks wrong for anyone studying in
+another language: #2290. It also differs from the detail page: #2296.
 
 #### Scenario: Only a Japanese card exists
 
 - **WHEN** a species has one reviewed `ja` name card and no `en` card
 - **THEN** an unseen `en` card is appended and the tile reads `locked`
 
+#### Scenario: First learning step
+
+- **WHEN** a new card is graded Good and enters learning step 0
+- **THEN** `firstSeen` is set, `lastReview` stays null and the tile reads `locked` (#2344)
+
 #### Scenario: Healed session is saved
 
 - **WHEN** hydration heals an invalid card
 - **THEN** the page saves the hydrated list, appended cards included
 
-Source: `app/pokedex/page.tsx:33`, `app/pokedex/page.tsx:36`, `app/pokedex/page.tsx:50`, `app/pokedex/page.tsx:79`, `lib/review/session.ts:270`, `lib/stats/derive.ts:84`, `lib/pokemon/filter.ts:25`.
+Source: `app/pokedex/page.tsx:33`, `app/pokedex/page.tsx:36`, `app/pokedex/page.tsx:50`, `app/pokedex/page.tsx:79`, `lib/review/session.ts:270`, `lib/srs/scheduler.ts:27`, `lib/stats/derive.ts:84`, `lib/pokemon/filter.ts:25`.
 
 ### Requirement: Introduced count (baseline)
 
@@ -108,7 +118,7 @@ Source: `components/pokedex/PokedexFiltered.tsx:114`, `components/pokedex/Pokede
 National order SHALL group tiles under generation headings with a mastered count over the filtered
 total, and omit empty generations. A generation filter SHALL show that one section. Any other sort
 SHALL show a flat list with no headings. An empty result SHALL show a message and a clear link. The
-heading text, message and link are English in every language: #2298.
+generation name, message and link are English in every language, while the count is translated: #2298.
 
 #### Scenario: Alphabetical sort with a generation filter
 
@@ -141,6 +151,8 @@ Source: `lib/pokemon/filter.ts:143`, `components/pokedex/PokedexFiltered.tsx:23`
 The search box SHALL filter from local state on every keystroke and update the URL after a 150 ms
 debounce. The local value is seeded once and never follows the URL afterwards, so an external URL
 change does not clear it. This looks wrong: the empty state's clear link leaves the grid empty, #2291.
+The timer keeps the URL filters from the moment of typing and is not cancelled on unmount, which looks
+wrong: #2345.
 
 #### Scenario: Clear filters after an empty search
 
@@ -151,6 +163,16 @@ change does not clear it. This looks wrong: the empty state's clear link leaves 
 
 - **WHEN** the player types `bul`
 - **THEN** tiles narrow immediately and `q=bul` reaches the URL after the debounce
+
+#### Scenario: Chip tapped inside the debounce
+
+- **WHEN** the player types and toggles a type within 150 ms
+- **THEN** the URL gets `type=fire`, then the timer replaces it with `q=bul` and the type is lost (#2345)
+
+#### Scenario: Page left inside the debounce
+
+- **WHEN** the component unmounts within 150 ms of typing
+- **THEN** the timer still calls `router.replace` with the Pokédex URL (#2345)
 
 Source: `components/pokedex/PokedexFiltered.tsx:110`, `components/pokedex/PokedexFiltered.tsx:143`, `components/pokedex/PokedexFiltered.tsx:206`, `components/pokedex/PokedexGrid.tsx:306`, `components/pokedex/PokedexFiltered.test.tsx:529`.
 
@@ -242,7 +264,8 @@ Source: `app/pokedex/[id]/page.tsx:23`, `app/pokedex/[id]/page.tsx:37`, `app/pok
 The detail page SHALL show a skeleton while pending. A species SHALL be `mastered` only when the first
 matching name card and reverse card are both mastered; a mastered name with an unmastered reverse SHALL
 read as `learning`. The lookup ignores language. `pretendAllMastered` SHALL force a resolved class to
-mastered. This differs from the tile: #2296.
+mastered. The class is read once per id and does not follow later session changes while the page stays
+open. This differs from the tile: #2296.
 
 #### Scenario: One leg mastered
 
@@ -285,14 +308,15 @@ Source: `app/pokedex/[id]/page.tsx:38`, `components/pokedex/PokemonDetailDisclos
 
 A learning species SHALL show its local name, audio, types, the English flavour text, its next review
 and any alternate forms, and SHALL NOT show stats, facts or the evolution chain. Next review SHALL
-show unless pending, not started or `pretendAllMastered` is on.
+show on a learning or mastered page unless pending, not started or `pretendAllMastered` is on. It is
+the earliest due date across started cards of every type and language that touch the page's id.
 
 #### Scenario: Due today
 
 - **WHEN** the next review is today
 - **THEN** the page says it is due today
 
-Source: `components/pokedex/PokemonDetailDisclosure.tsx:476`, `components/pokedex/PokemonDetailDisclosure.tsx:510`, `components/pokedex/PokemonDetailDisclosure.tsx:580`, `components/pokedex/PokemonDetailDisclosure.tsx:620`, `components/pokedex/PokemonDetailDisclosure.tsx:709`, `components/pokedex/NextReviewDate.test.tsx:1`.
+Source: `components/pokedex/PokemonDetailDisclosure.tsx:476`, `components/pokedex/PokemonDetailDisclosure.tsx:510`, `components/pokedex/PokemonDetailDisclosure.tsx:580`, `components/pokedex/PokemonDetailDisclosure.tsx:620`, `components/pokedex/PokemonDetailDisclosure.tsx:709`, `lib/review/useNextReviewDate.ts:55`, `components/pokedex/NextReviewDate.test.tsx:1`.
 
 ### Requirement: Mastered detail page (baseline)
 
@@ -316,10 +340,10 @@ Source: `components/pokedex/PokemonDetailDisclosure.tsx:147`, `components/pokede
 
 ### Requirement: Journey line and leg status (baseline)
 
-A non-locked page SHALL show the earliest `firstSeen` across all languages' name cards, even during a
-first learning step, a Mastered badge while mastered, and an approximate mastery month when the grade
-log gives one. Leg status SHALL use the active language, and SHALL be hidden under
-`pretendAllMastered`, with a note when blocked on one leg.
+A non-locked page SHALL show the earliest `firstSeen` across all languages' name cards, a Mastered
+badge while mastered, and an approximate mastery month when the grade log gives one. Leg status SHALL
+use the active language, and SHALL be hidden under `pretendAllMastered`, with a note when blocked on
+one leg. All of these look up the page's `speciesId`, not a form's own id.
 
 #### Scenario: Practised in English, viewed in Japanese
 
@@ -331,7 +355,17 @@ log gives one. Leg status SHALL use the active language, and SHALL be hidden und
 - **WHEN** the species is mastered but no date can be derived
 - **THEN** the badge shows with no date
 
-Source: `components/pokedex/PokemonDetailDisclosure.tsx:78`, `components/pokedex/PokemonDetailDisclosure.tsx:97`, `components/pokedex/PokemonDetailDisclosure.tsx:355`, `components/pokedex/PokemonDetailDisclosure.tsx:535`, `components/pokedex/PokemonDetailDisclosure.tsx:559`, `components/pokedex/PokemonDetailDisclosure.tsx:566`.
+#### Scenario: First learning step
+
+- **WHEN** the only name card has `firstSeen` set and a null `lastReview`
+- **THEN** the page is locked and no first-reviewed date shows (#2344)
+
+#### Scenario: Alternate form page
+
+- **WHEN** the page is for form 10100 and the default form has its own name card
+- **THEN** the date and leg rows come from the default form's cards
+
+Source: `components/pokedex/PokemonDetailDisclosure.tsx:78`, `components/pokedex/PokemonDetailDisclosure.tsx:97`, `components/pokedex/PokemonDetailDisclosure.tsx:347`, `components/pokedex/PokemonDetailDisclosure.tsx:355`, `components/pokedex/PokemonDetailDisclosure.tsx:535`, `components/pokedex/PokemonDetailDisclosure.tsx:559`, `components/pokedex/PokemonDetailDisclosure.tsx:566`.
 
 ### Requirement: Alternate form blocks (baseline)
 
@@ -450,7 +484,8 @@ Source: `lib/pasture/arrivals.ts:63`, `lib/pasture/arrivals.ts:72`, `lib/pasture
 
 The page SHALL render nothing until loaded. It SHALL hydrate saved cards with every card type disabled,
 so nothing is added, and SHALL save only if a card was healed. With nothing mastered it SHALL show the
-title, an explanation, the press-and-hold hint and Next arrivals, with no search bar.
+title, an explanation, the press-and-hold hint and Next arrivals, with no search bar. With mastery the
+title SHALL show the count of Pasture entries, alternate forms included.
 
 #### Scenario: First visit with no mastery
 
@@ -462,7 +497,12 @@ title, an explanation, the press-and-hold hint and Next arrivals, with no search
 - **WHEN** a sync pull or reset changes the session
 - **THEN** the page reloads it without navigation
 
-Source: `app/pasture/page.tsx:168`, `app/pasture/page.tsx:197`, `app/pasture/page.tsx:211`, `app/pasture/page.tsx:301`, `app/pasture/page.tsx:338`.
+#### Scenario: Seed fails to load
+
+- **WHEN** the seed load rejects
+- **THEN** the page stays blank (#2342)
+
+Source: `app/pasture/page.tsx:161`, `app/pasture/page.tsx:168`, `app/pasture/page.tsx:182`, `app/pasture/page.tsx:197`, `app/pasture/page.tsx:211`, `app/pasture/page.tsx:301`, `app/pasture/page.tsx:338`, `app/pasture/page.tsx:373`.
 
 ### Requirement: Pasture link visibility (baseline)
 
@@ -486,8 +526,9 @@ Source: `lib/pasture/usePastureMasteryState.ts:80`, `lib/pasture/usePastureMaste
 
 Pasture filters SHALL be held in page state, not the URL: name search, types (AND) and generation. In
 another language search SHALL also match the local name and transliteration; alternate form names are
-not searched. Stats SHALL ignore these filters. Filters SHALL reset when mastery falls to none. A
-filtered empty result SHALL show a message.
+not searched. Stats and the title count SHALL ignore these filters, while a zone heading's count
+follows them. Filters SHALL reset when mastery falls to none. A filtered empty result SHALL show a
+message.
 
 #### Scenario: Filter hides every zone
 
@@ -559,13 +600,18 @@ Dates use `dmy-year` in UTC, not the player's date setting.
 - **WHEN** a keyboard player activates a sprite
 - **THEN** it behaves as a tap and no popover opens
 
+#### Scenario: Long press slides off the sprite
+
+- **WHEN** the popover opens, the pointer leaves the sprite and the player then taps it
+- **THEN** that tap does nothing and the popover stays until a second tap, which looks wrong: #2348
+
 Source: `components/pasture/PasturePokemon.tsx:20`, `components/pasture/PasturePokemon.tsx:62`, `components/pasture/PasturePokemon.tsx:82`, `components/pasture/PasturePokemon.tsx:105`, `components/pasture/PasturePokemon.tsx:128`, `components/pasture/PasturePokemon.tsx:138`, `components/pasture/PasturePokemon.tsx:161`, `components/pasture/PasturePokemon.test.tsx:1`.
 
 ### Requirement: New arrivals are acknowledged once (baseline)
 
 An unseen mastered sprite SHALL sparkle and add a new-arrival suffix to its label. Tapping it on the
-main Pasture SHALL save `seenInPasture` and push the card, with a failed push only logged, and no push
-while any superuser flag is on. Marking matches every card with that id, in every language, and pushes
+main Pasture SHALL save `seenInPasture` and, when signed in, push the card, with a failed push only
+logged, and no push while any superuser flag is on. Marking matches every card with that id, in every language, and pushes
 the first match, which looks wrong: #2295.
 
 #### Scenario: Cards in two languages
@@ -602,7 +648,7 @@ Source: `lib/pasture/nextArrivals.ts:53`, `lib/pasture/nextArrivals.ts:60`, `lib
 ### Requirement: Biome view (baseline)
 
 `/pasture/<habitat>` SHALL show one zone with stats and a back button, return not found for an unknown
-habitat, and render nothing while loading. In portrait it SHALL rotate 90 degrees, and in landscape
+habitat, and render nothing while loading or after a failed seed load (#2342). In portrait it SHALL rotate 90 degrees, and in landscape
 not at all, following rotation live. Back SHALL go to `/pasture` when there is no history. Tapping an
 arrival here SHALL not clear its sparkle. The heading uses the English zone label: #2298.
 
@@ -610,6 +656,11 @@ arrival here SHALL not clear its sparkle. The heading uses the English zone labe
 
 - **WHEN** the page was opened with no history and back is pressed
 - **THEN** the player lands on `/pasture`
+
+#### Scenario: Empty habitat
+
+- **WHEN** the player opens a habitat with no mastered species in the active language
+- **THEN** the page SHALL show the heading, stats and an empty message in place of the zone
 
 #### Scenario: Device rotates
 
@@ -621,7 +672,7 @@ arrival here SHALL not clear its sparkle. The heading uses the English zone labe
 - **WHEN** `pretendAllMastered` is on
 - **THEN** cards come from the seed and do not sparkle
 
-Source: `app/pasture/[biome]/page.tsx:36`, `app/pasture/[biome]/page.tsx:125`, `app/pasture/[biome]/page.tsx:139`, `app/pasture/[biome]/page.tsx:189`, `app/pasture/[biome]/page.tsx:238`, `app/pasture/[biome]/page.tsx:266`, `app/pasture/[biome]/page.tsx:292`, `app/pasture/[biome]/page.tsx:337`.
+Source: `app/pasture/[biome]/page.tsx:36`, `app/pasture/[biome]/page.tsx:125`, `app/pasture/[biome]/page.tsx:139`, `app/pasture/[biome]/page.tsx:189`, `app/pasture/[biome]/page.tsx:238`, `app/pasture/[biome]/page.tsx:266`, `app/pasture/[biome]/page.tsx:292`, `app/pasture/[biome]/page.tsx:329`, `app/pasture/[biome]/page.tsx:337`.
 
 ### Requirement: Superuser pretendAllMastered on the Pasture (baseline)
 
@@ -637,11 +688,11 @@ Source: `app/pasture/page.tsx:312`, `app/pasture/page.tsx:317`, `app/pasture/pag
 
 ### Requirement: Idle motion (baseline)
 
-Sprites SHALL bob in CSS, wander and jump on one animation frame loop at about 8 updates a second,
-pausing when off-screen or when the tab is hidden, without React renders. Wander stays within a band
-from the sub-region's slots. The transform uses percentages of the sprite's own box, so travel is
-under one sprite width, which looks unintended: #2300. Motion SHALL not run when the screenshot freeze
-flag is set.
+Sprites SHALL bob in CSS, and wander and jump on one animation frame loop per zone at about 8 updates
+a second, pausing when off-screen or when the tab is hidden, without React renders. Wander stays within
+a band from the sub-region's slots. The transform uses percentages of the sprite's own box, so travel
+is under one sprite width, which looks unintended: #2300. The loop SHALL not start when the screenshot
+freeze flag is set; that flag leaves the CSS bob running.
 
 #### Scenario: Zone scrolls away
 
@@ -653,7 +704,12 @@ flag is set.
 - **WHEN** a tick arrives under 120 ms after the last
 - **THEN** `changed` is false and the DOM is not written
 
-Source: `lib/pasture/behavior.ts:15`, `lib/pasture/behavior.ts:107`, `lib/pasture/behavior.ts:148`, `lib/pasture/behavior.ts:196`, `components/pasture/useIdleBehaviour.ts:56`, `components/pasture/useIdleBehaviour.ts:117`, `components/pasture/useIdleBehaviour.ts:159`, `components/pasture/useIdleBehaviour.ts:168`, `components/pasture/useIdleBehaviour.ts:211`, `lib/pasture/behavior.test.ts:1`.
+#### Scenario: Page re-renders
+
+- **WHEN** the player types in the Pasture search and new `placements` are built
+- **THEN** each zone's loop restarts, its transforms clear and sprites step back to their anchors
+
+Source: `lib/pasture/behavior.ts:15`, `lib/pasture/behavior.ts:107`, `lib/pasture/behavior.ts:148`, `lib/pasture/behavior.ts:196`, `components/pasture/useIdleBehaviour.ts:56`, `components/pasture/useIdleBehaviour.ts:117`, `components/pasture/useIdleBehaviour.ts:159`, `components/pasture/useIdleBehaviour.ts:168`, `components/pasture/useIdleBehaviour.ts:211`, `components/pasture/useIdleBehaviour.ts:228`, `components/pasture/useIdleBehaviour.ts:234`, `lib/pasture/behavior.test.ts:1`.
 
 ### Requirement: Reduced motion on the Pasture (baseline)
 
@@ -670,9 +726,11 @@ Source: `components/pasture/Pasture.module.css:49`, `components/pasture/Pasture.
 
 ### Requirement: Seed loading (baseline)
 
-Seed data SHALL be fetched at runtime, with one shared request, cached on success. A failure SHALL
-reject with a description, clear the in-flight state so a retry can run, and surface through
-`SeedProvider` as `error` with `retry()`. Sidecars for names and flavour SHALL fail softly to empty.
+Seed data SHALL be fetched at runtime by one shared pair of requests, cached on success. A fetch or
+parse failure SHALL reject with a description, clear the in-flight state so a retry can run, and
+surface through `SeedProvider` as `error` with `retry()`, which only the review session reads: #2342.
+A `buildSeed` throw does not clear that state: #2350. Sidecars for names and flavour SHALL fail softly
+to empty, cached until a reload: #2350.
 
 #### Scenario: Offline first load
 
@@ -682,9 +740,14 @@ reject with a description, clear the in-flight state so a retry can run, and sur
 #### Scenario: Locale sidecar fails
 
 - **WHEN** the names file errors
-- **THEN** English names are used and no error shows
+- **THEN** English names are used, no error shows and no later call fetches again
 
-Source: `lib/pokemon/seed-async.ts:38`, `lib/pokemon/seed-async.ts:50`, `lib/pokemon/SeedContext.tsx:69`, `lib/pokemon/SeedContext.tsx:91`, `lib/pokemon/localeNames.ts:42`, `lib/pokemon/seed-async.test.ts:1`, `components/pokemon/SeedContext.test.tsx:1`.
+#### Scenario: Seed build throws
+
+- **WHEN** the files load but `buildSeed` throws
+- **THEN** `loadSeed` rejects, and the next call rejects the same way with no new fetch (#2350)
+
+Source: `lib/pokemon/seed-async.ts:38`, `lib/pokemon/seed-async.ts:50`, `lib/pokemon/seed-async.ts:85`, `lib/pokemon/SeedContext.tsx:69`, `lib/pokemon/SeedContext.tsx:91`, `lib/pokemon/localeNames.ts:42`, `lib/pokemon/facts.ts:45`, `components/review/ReviewSession.tsx:792`, `lib/pokemon/seed-async.test.ts:1`, `components/pokemon/SeedContext.test.tsx:1`.
 
 ### Requirement: Seed building and card ids (baseline)
 
@@ -722,15 +785,15 @@ Source: `lib/pokemon/forms.ts:40`, `lib/pokemon/forms.ts:58`, `lib/pokemon/forms
 ### Requirement: Evolution trigger phrases (baseline)
 
 Each edge SHALL get a phrase from its details, or null for an unknown shape. A fixed list of colliding
-edges SHALL gain a disambiguating clause. Wurmple's branches stay ambiguous on purpose, with either
-answer accepted.
+edges SHALL gain a disambiguating clause. Wurmple's branches stay ambiguous on purpose: each forward
+card keeps its own answer and shows a caption naming both outcomes.
 
 #### Scenario: Cosmoem to Solgaleo
 
 - **WHEN** the edge is 790 to 791
 - **THEN** the phrase gains `in Pokémon Sun / Ultra Sun`
 
-Source: `lib/pokemon/triggers.ts:157`, `lib/pokemon/disambiguateTrigger.ts:21`, `lib/pokemon/disambiguateTrigger.ts:37`, `lib/pokemon/disambiguateTrigger.ts:51`, `lib/pokemon/collisionScan.test.ts:1`.
+Source: `lib/pokemon/triggers.ts:157`, `lib/pokemon/disambiguateTrigger.ts:21`, `lib/pokemon/disambiguateTrigger.ts:37`, `lib/pokemon/disambiguateTrigger.ts:51`, `components/review/EvolutionCard.tsx:110`, `lib/pokemon/collisionScan.test.ts:1`.
 
 ### Requirement: Evolution families (baseline)
 
@@ -831,3 +894,9 @@ Source: `lib/minigame/higherOrLower.ts:37`, `lib/minigame/higherOrLower.ts:65`, 
 - Pasture cries skip the shared player, so they play at full volume and can overlap (`components/pasture/PasturePokemon.tsx:62`). Recommendation: route them through `playCry` with the next audio change.
 - Should alternate forms keep sharing the species name in other languages? `lib/pokemon/seed-builder.ts:54` says so. Recommendation: keep, unless translators ask.
 - A stale-closure reading of `handleQueryChange` was tested and is not a bug: `filters.types` is a new array each render, so the callback refreshes.
+
+2 November 2026, second pass (checked against the code unattended; five more issues filed).
+
+- Should a species in its first learning step stay locked (#2344)? It reads as locked although the `useSpeciesJourney` comment and Next arrivals treat it as seen. Recommendation: settle in #2344, and class on `firstSeen` if the tile should match Next arrivals.
+- Should Next arrivals name a species its Pokédex tile still hides (#2344)? It does today. Recommendation: decide with the point above.
+- Should the idle loop survive a page render? It restarts today because `placements` is rebuilt each render. Recommendation: memoise `placements` when the Pasture next changes; no issue filed, as the effect is sprites stepping back, not a fault.
