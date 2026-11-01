@@ -2,9 +2,9 @@ import webpush from "web-push";
 import { isKnownPushEndpoint } from "@/lib/push/endpoints";
 
 const MAX_SENDS_IN_FLIGHT = 20;
-/** Library socket timeout. It measures silence, so a slow trickle outlasts it. */
+/** Library socket timeout. It measures silence, so a slow response outlasts it. */
 const SOCKET_TIMEOUT_MS = 10_000;
-/** Overall limit on one send, which is what stops a slow trickle. */
+/** Overall limit on one send, which is what ends a slow response. */
 const SEND_LIMIT_MS = 15_000;
 /** No send starts this long after the route started; the rest of its 300 seconds finishes the run. */
 const RUN_BUDGET_MS = 240_000;

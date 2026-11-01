@@ -124,7 +124,7 @@ refuse a new row with one, and the send path SHALL skip an existing row with one
 
 #### Scenario: Unknown host
 
-- **WHEN** a signed-in client inserts a row whose endpoint is on another host, directly or through `resubscribe`
+- **WHEN** a row is written with an endpoint on another host
 - **THEN** no row is added
 
 #### Scenario: Lookalike endpoint

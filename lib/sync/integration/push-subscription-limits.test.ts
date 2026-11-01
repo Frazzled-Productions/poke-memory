@@ -1,7 +1,7 @@
 /**
  * Integration test: known push hosts and the per-account limit on
  * push_subscriptions (migration 049). Every insert runs as `authenticated`
- * with `auth.uid()` set, the same path the client takes through RLS.
+ * with `auth.uid()` set.
  */
 
 import { randomUUID } from "node:crypto";

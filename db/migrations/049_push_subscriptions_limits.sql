@@ -3,9 +3,9 @@
 -- Two limits on push_subscriptions, on top of the checks in the app:
 --
 -- KNOWN HOSTS
--- The client inserts through RLS directly (lib/push/subscribe.ts), so only the
--- database covers that path. The pattern repeats KNOWN_PUSH_ENDPOINT_PATTERN in
--- lib/push/endpoints.ts; the "One list" test fails if they differ. NOT VALID
+-- The database constraint is the rule. The pattern repeats
+-- KNOWN_PUSH_ENDPOINT_PATTERN in lib/push/endpoints.ts; the "One list" test
+-- fails if they differ. NOT VALID
 -- leaves existing rows alone (the send path skips any on another host) and
 -- checks new ones. VALIDATE CONSTRAINT is a follow-up, after a count of rows by
 -- host. An UPDATE to an old row would be refused; nothing updates this table.

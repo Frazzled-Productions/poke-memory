@@ -3,27 +3,13 @@
 Both send routes await `webpush.sendNotification` for each device in a `for` loop
 (`app/api/push/send-daily/route.ts`, `app/api/push/send-streak-nudge/route.ts`) with no options
 argument, and neither declares `maxDuration`. `web-push` 3.6.7 only sets a timeout when one is passed
-(`src/web-push-lib.js:222,356`). One unanswered request therefore blocks the loop, the devices after
-it and the clean-up that follows.
+(`src/web-push-lib.js:222,356`). One slow send therefore delays the loop, the devices after it and
+the clean-up that follows.
 
-Evidence, 1 November 2026:
-
-- **Seen** (real `web-push` 3.6.7 against local TLS servers, watched for 3 seconds):
-
-  | Server | Option | Result |
-  |---|---|---|
-  | Never replies | none | still pending |
-  | Never replies | `timeout: 500` | rejected, `Socket timeout` |
-  | Sends headers, then a byte every 200 ms | `timeout: 500` | still pending |
-  | Healthy | `timeout: 500` | resolved, 201 |
-
-- **Seen** (the real `send-daily` route with a mocked `sendNotification` whose first call never
-  settles, two devices due, after 600 simulated seconds): one call made, response not returned.
-  `expected "vi.fn()" to be called 2 times, but got 1 times`.
-- **Inferred:** how this behaves on Vercel at the function limit. It was not run there.
-
-The third row of the table is why the socket timeout alone is not the fix: Node's `timeout` measures
-inactivity, so the overall limit has to sit outside the library.
+Node's `timeout` measures inactivity, so a response that keeps arriving slowly outlasts it, and the
+overall limit has to sit outside the library. Both were measured with the real `web-push` 3.6.7
+against local TLS servers on 1 November 2026. How this behaves on Vercel at the function limit was
+not run there.
 
 ## Decisions
 
@@ -50,8 +36,7 @@ because SQL cannot import it, and a parity test reads the migration text and fai
 ^https://(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|[a-z0-9.-]+\.push\.apple\.com|[a-z0-9-]+\.notify\.windows\.com)/
 ```
 
-The client inserts through RLS directly (`lib/push/subscribe.ts:194`), so only the database covers
-that path; `resubscribe` checks first to return a 400 rather than a 500.
+The database constraint is the rule. `resubscribe` checks first to return a 400 rather than a 500.
 
 **Limit of 10 in a trigger.** It takes a per-user advisory lock so parallel inserts cannot pass the
 limit, then deletes that user's rows beyond the newest 9 by `last_seen_at`, then `id`, so an account
@@ -71,7 +56,7 @@ refused. Nothing in the app updates this table.
 ## Blast radius
 
 **The fact it is safe because of:** a healthy send behaves exactly as today, because `timeout` is a
-listed `web-push` option that only adds a socket timeout. Rung 4: the healthy row in the table above.
+listed `web-push` option that only adds a socket timeout. Rung 4: a healthy send measured against a local TLS server, with `timeout` set.
 
 Risks:
 

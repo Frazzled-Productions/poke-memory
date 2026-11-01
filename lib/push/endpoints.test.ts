@@ -20,7 +20,7 @@ describe("isKnownPushEndpoint", () => {
     "https://fcm.googleapis.com.example.com/x",
     "https://fcm.googleapis.com@example.com/x",
     "https://fcm.googleapis.com:8443/x",
-    "https://evilpush.apple.com/x",
+    "https://notpush.apple.com/x",
     "https://push.example/a",
   ])("Lookalike endpoint: refuses %s", (endpoint) => {
     expect(isKnownPushEndpoint(endpoint)).toBe(false);
