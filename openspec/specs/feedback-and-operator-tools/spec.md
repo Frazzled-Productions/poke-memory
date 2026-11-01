@@ -32,8 +32,7 @@ Source: `app/settings/page.tsx:890`, `app/settings/page.tsx:906`, `app/settings/
 
 The modal SHALL offer a required category (bug, feature, other), an optional page chosen from a fixed
 list (`/`, `/pokedex`, `/pasture`, `/stats`, `/journey`, `/settings`, `other`), a message of up to 2000
-characters with a live counter, and a privacy notice. The textarea's `maxLength` SHALL stop typing or pasting
-past 2000, so the over-limit state is only reached when the value is set by code. Submit SHALL be disabled without a category, with
+characters with a live counter, and a privacy notice. Submit SHALL be disabled without a category, with
 a message that is empty after trimming, over the limit, or while a request is in flight. Text comes from
 `settings.feedback` messages in every locale.
 
@@ -41,6 +40,11 @@ a message that is empty after trimming, over the limit, or while a request is in
 
 - **WHEN** the player types a message but has not chosen a category
 - **THEN** Submit stays disabled
+
+#### Scenario: Typing past the limit
+
+- **WHEN** the player types or pastes past 2000 characters
+- **THEN** the textarea's `maxLength` stops the text at 2000, so the state below needs a value set by code
 
 #### Scenario: Message over the limit
 
@@ -59,9 +63,17 @@ Source: `components/feedback/FeedbackModal.tsx:8`, `components/feedback/Feedback
 Submit, or Cmd/Ctrl+Enter from the message field, SHALL POST `category`, `message`, `page` and
 `appVersion` to `/api/feedback`. A blank page SHALL be sent as null; the current pathname is not sent.
 A 2xx response SHALL replace the form with the success state. Any other response, or a network error, SHALL
-show one inline error and keep the form and its text for a retry. Cmd/Ctrl+Enter does not check the
-over-limit state; it sends the first 2000 characters. The modal's own notice only asks for no personal data;
-it is the `/privacy` page that still describes the old automatic pathname (ops #427).
+show one inline error and keep the form and its text for a retry.
+
+#### Scenario: Cmd/Ctrl+Enter over the limit
+
+- **WHEN** the value is over 2000 characters and the player presses Cmd/Ctrl+Enter
+- **THEN** the first 2000 characters are sent, because this path skips the over-limit check
+
+#### Scenario: Privacy wording
+
+- **WHEN** a player reads about what feedback records
+- **THEN** the modal's notice only asks for no personal data, and the `/privacy` page still lists the page pathname (ops #427)
 
 #### Scenario: Page left blank
 
@@ -179,7 +191,7 @@ continue, and the check is skipped when no server client could be created.
 - **WHEN** the RPC returns an error
 - **THEN** the insert goes ahead and the route answers 200
 
-Source: `app/api/feedback/route.ts:97`, `app/api/feedback/route.ts:99`, `app/api/feedback/route.ts:108`, `app/api/feedback/route.ts:111`, `app/api/feedback/route.ts:117`, `lib/auth/rateLimitIp.ts:37`, `db/migrations/045_check_rate_limit_feedback_action.sql:24`, `app/api/feedback/route.test.tsx:395`, `app/api/feedback/route.test.tsx:412`, `app/api/feedback/route.test.tsx:432`.
+Source: `app/api/feedback/route.ts:97`, `app/api/feedback/route.ts:99`, `app/api/feedback/route.ts:108`, `app/api/feedback/route.ts:111`, `app/api/feedback/route.ts:117`, `lib/auth/rateLimitIp.ts:38`, `db/migrations/045_check_rate_limit_feedback_action.sql:24`, `app/api/feedback/route.test.tsx:395`, `app/api/feedback/route.test.tsx:412`, `app/api/feedback/route.test.tsx:432`.
 
 ### Requirement: Feedback storage and retention (baseline)
 
@@ -225,13 +237,17 @@ Source: `db/migrations/042_feedback_discord_notify.sql:55`, `db/migrations/042_f
 `POST /api/discord/notify` SHALL answer 503 `misconfigured` without `CRON_SHARED_SECRET`,
 `DISCORD_NOTIFY_WEBHOOK_URL` or the Supabase URL; 401 with no body unless the bearer matches in constant
 time; 400 `invalid_json` for an unparseable body; and 400 `forbidden_fields` if the body contains
-`message` or `user_id`. It does not check the rest of the body's shape or its category, so any other
-authorised body posts as a bug report, and a `null` body or a missing `created_at` throws (held in ops #442).
+`message` or `user_id`. It does not check the rest of the body's shape or its category.
 
 #### Scenario: Wrong bearer
 
 - **WHEN** the token is wrong or a different length
 - **THEN** the route answers 401
+
+#### Scenario: Malformed authorised body
+
+- **WHEN** an authorised body is `null` or has no valid `created_at`
+- **THEN** the handler throws (held in ops #442)
 
 #### Scenario: Forbidden field
 
@@ -282,8 +298,8 @@ Source: `app/api/discord/notify/route.ts:46`, `app/api/discord/notify/route.ts:5
 
 The pg_cron job `feedback-discord-digest` SHALL run on Mondays at 09:00 UTC and POST `{"window_days":7}`
 to the digest route, skipping with a notice if a Vault secret is missing. The route SHALL answer 503
-`misconfigured` without `CRON_SHARED_SECRET`, `DISCORD_DIGEST_WEBHOOK_URL` (its own webhook, not the notify
-one), the Supabase URL or the secret key, and 401 with no body on a wrong bearer. `window_days` SHALL default to 7 when absent
+without `CRON_SHARED_SECRET`, its own `DISCORD_DIGEST_WEBHOOK_URL`, the Supabase URL or the secret key, and
+401 on a wrong bearer. `window_days` SHALL default to 7 when absent
 or the body is unparseable, and a number SHALL be rounded and clamped to 1-90.
 
 #### Scenario: Window too large
@@ -347,9 +363,7 @@ There SHALL be five independent flags, default off and stored together: `pretend
 `forceNextStreakMilestone`, `forceTokenToast`, `forceCardsGraduated` and `qaSeedMode`. A stored value that
 is not exactly `true`, a missing field, or malformed JSON SHALL read as off. `forceNextStreakMilestone` and
 `forceTokenToast` SHALL clear themselves after one fire, through `setFlag`, so if that was the last flag on,
-exit cleanup runs. A forced milestone SHALL not be saved as seen. `pretendAllMastered` SHALL make mastery
-read as full on the Pokédex, Pasture, Stats, Journey and theme or favourite gates; history and PWA badge
-figures stay real.
+exit cleanup runs.
 
 #### Scenario: Corrupt blob
 
@@ -369,7 +383,7 @@ figures stay real.
 #### Scenario: pretendAllMastered on the Pokédex
 
 - **WHEN** the flag is on
-- **THEN** generation counters read full
+- **THEN** generation counters read full, and mastery reads full on Pasture, Stats, Journey and the theme and favourite gates, while activity history and the PWA badge stay real
 
 #### Scenario: forceCardsGraduated
 
@@ -407,10 +421,8 @@ Source: `app/settings/page.tsx:128`, `app/settings/page.tsx:134`, `app/settings/
 `anyFlagOn` SHALL be true while any flag is on or cleanup is pending in the provider's state; on the first
 render, before the mount effect reads storage, it is false. Each write path SHALL read it:
 `AutoSyncOnChange`, `OnlineReconnectSync`, the review session, Settings actions, the retry on Settings and
-Stats, the Known Pokémon quiz, the Pasture seen marker, push opt-in and the auth callback. Settings SHALL
-hide Force pull, disable Reset all progress and Delete account, and pass `superuserPaused` to its controls.
-Journey and Stats SHALL skip retroactive badge awards. Sign-in and visibility pulls keep reading but skip
-their write-backs (see the `cloud-sync` capability).
+Stats, the Known Pokémon quiz, the Pasture seen marker, push opt-in and the auth callback. Sign-in and
+visibility pulls keep reading but skip their write-backs (see the `cloud-sync` capability).
 
 #### Scenario: Flag on
 
@@ -426,6 +438,11 @@ their write-backs (see the `cloud-sync` capability).
 
 - **WHEN** a sign-in completes with the guard active
 - **THEN** the automatic push and "keep local" push are skipped
+
+#### Scenario: Controls while guarded
+
+- **WHEN** the guard is active
+- **THEN** Settings hides Force pull, disables Reset all progress and Delete account, and passes `superuserPaused` to its controls, and Journey and Stats skip retroactive badge awards
 
 #### Scenario: Pull while guarded
 
@@ -576,14 +593,18 @@ Source: `lib/qa-seed/scenarios.ts:19`, `lib/qa-seed/scenarios.ts:156`, `lib/qa-s
 
 The panel SHALL ask for confirmation, load the seed, build the payload and show "Seed applied" or the error.
 Apply SHALL write only the keys the payload has: the session to IndexedDB with change events, a streak of
-days ending today by UTC date, settings in one save with labs flags merged (no scenario sets labs flags
-today), the mastered-count cache, and the active slug. A value a scenario omits, such as an earlier streak, stays. The panel asks for a reload, and its
+days ending today by UTC date, settings in one save with labs flags merged, the mastered-count cache, and the active slug. A value a scenario omits, such as an earlier streak, stays. The panel asks for a reload, and its
 visible text is hard-coded English.
 
 #### Scenario: Confirmation dismissed
 
 - **WHEN** the operator cancels the dialog
 - **THEN** nothing is written
+
+#### Scenario: Labs flags
+
+- **WHEN** a payload has `labsFlags`
+- **THEN** they merge over the existing flags, although no current scenario sets any
 
 #### Scenario: Remount
 
@@ -656,8 +677,7 @@ Every `Sentry.init` SHALL pass the shared `SENTRY_DATA_COLLECTION`, with every p
 and `beforeSend: scrubSentryEvent`. The scrub SHALL remove user, request cookies, data, query string and
 headers; strip query and fragment from the request URL, `nextjs.request_path`, and navigation breadcrumb
 `data.from` and `data.to`; and drop `data` from fetch and xhr breadcrumbs. Breadcrumb `message` text is not
-scrubbed (open item held in ops #426). The scrub runs on error events only: `beforeSendTransaction` is
-deliberately not set, so span data rests on `SENTRY_DATA_COLLECTION` alone.
+scrubbed (open item held in ops #426).
 
 #### Scenario: Error with a query string
 
@@ -668,6 +688,11 @@ deliberately not set, so span data rests on `SENTRY_DATA_COLLECTION` alone.
 
 - **WHEN** an event holds a fetch breadcrumb
 - **THEN** its `data` is removed and other categories keep theirs
+
+#### Scenario: Transactions and spans
+
+- **WHEN** a transaction or span is sent
+- **THEN** the scrub does not run, because `beforeSendTransaction` is deliberately not set, and `SENTRY_DATA_COLLECTION` alone governs it
 
 #### Scenario: Sparse event
 
