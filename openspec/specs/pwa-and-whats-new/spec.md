@@ -49,8 +49,7 @@ Source: `lib/pwa/splashDevices.ts:29`, `lib/pwa/splashDevices.ts:55`, `lib/pwa/s
 is true, or the URL has `source=pwa`. Otherwise it SHALL report `android` with a prompt when the head
 script has captured `beforeinstallprompt`, `ios` on iPhone, iPad, iPod or a touch-capable Macintosh
 user agent that is not Chrome or CriOS, and `unsupported` for anything else. An `appinstalled` event
-SHALL move it to `already-installed`. Only an accepted prompt clears the captured event; a dismissed
-one stays captured although an event may only be prompted once (#2325).
+SHALL move it to `already-installed`.
 
 #### Scenario: Browser tab with the marker
 
@@ -60,7 +59,8 @@ one stays captured although an event may only be prompted once (#2325).
 #### Scenario: Prompt dismissed
 
 - **WHEN** the player dismisses the browser prompt
-- **THEN** the state stays `android` with `canPrompt` true and the same event
+- **THEN** the state stays `android` with `canPrompt` true and the same event, as only an accepted
+  prompt clears it, although an event may only be prompted once (#2325)
 
 Source: `app/layout.tsx:122`, `lib/pwa/useInstallPrompt.ts:28`, `lib/pwa/useInstallPrompt.ts:37`, `lib/pwa/useInstallPrompt.ts:46`, `lib/pwa/useInstallPrompt.ts:58`, `lib/pwa/useInstallPrompt.ts:62`, `lib/pwa/useInstallPrompt.ts:84`.
 
@@ -121,9 +121,7 @@ Source: `scripts/build-sw.mjs:25`, `scripts/build-sw.mjs:147`, `scripts/build-sw
 A new worker SHALL wait (`skipWaiting: false`) and `clientsClaim` SHALL be on. There is no refresh banner.
 When a worker is waiting, seen by the `waiting` event or by probing the registration on mount, and the
 tab goes hidden with no review session active, the client SHALL post `REQUEST_SKIP_WAITING` to it. The
-worker SHALL activate only when at most one window client exists, counting uncontrolled clients;
-otherwise it declines silently and the next hide tries again. It SHALL NOT use Serwist's `SKIP_WAITING`,
-which would bypass the client count.
+worker SHALL activate only when at most one window client exists, counting uncontrolled clients.
 
 #### Scenario: Review session running
 
@@ -133,7 +131,12 @@ which would bypass the client count.
 #### Scenario: Two tabs open
 
 - **WHEN** one of two tabs hides with a worker waiting
-- **THEN** the message is posted, the worker declines, and neither tab reloads
+- **THEN** the message is posted, the worker declines, neither tab reloads and the next hide tries again
+
+#### Scenario: Serwist's own message
+
+- **WHEN** the client asks a waiting worker to activate
+- **THEN** it sends `REQUEST_SKIP_WAITING`, not `SKIP_WAITING`, which would bypass the client count
 
 Source: `app/sw.ts:395`, `app/sw.ts:396`, `app/sw.ts:426`, `app/sw.ts:432`, `app/sw.ts:433`, `components/pwa/ServiceWorkerProvider.tsx:105`, `components/pwa/ServiceWorkerProvider.tsx:114`, `components/pwa/ServiceWorkerProvider.tsx:150`, `components/pwa/ServiceWorkerProvider.tsx:154`, `components/pwa/ServiceWorkerProvider.tsx:165`.
 
@@ -196,8 +199,7 @@ Source: `app/sw.ts:441`, `lib/pwa/useServiceWorkerVersion.ts:34`, `lib/pwa/useSe
 `classifyRequest` SHALL treat an unparseable URL, any cross-origin URL and any same-origin `/api/` path as
 `network-only`. `/sprites/` and `/cries/` SHALL be `idb-first`, `/_next/static/` `cache-first` in the
 static bucket, font files stale-while-revalidate in the fonts bucket, and everything else same-origin,
-navigations and `/pokemon-data/` included, stale-while-revalidate in the pages bucket. `/_next/image`
-SHALL be classified once by its decoded same-origin `url` parameter, then fall through to pages.
+navigations and `/pokemon-data/` included, stale-while-revalidate in the pages bucket.
 
 #### Scenario: Authenticated API response
 
@@ -208,6 +210,11 @@ SHALL be classified once by its decoded same-origin `url` parameter, then fall t
 
 - **WHEN** `/_next/image` carries a cross-origin `url`
 - **THEN** it goes to the pages bucket
+
+#### Scenario: Optimised image of a sprite
+
+- **WHEN** `/_next/image` carries a same-origin `url` under `/sprites/`
+- **THEN** it is classified once by that decoded path, as `idb-first`
 
 Source: `lib/pwa/cacheStrategy.ts:128`, `lib/pwa/cacheStrategy.ts:135`, `lib/pwa/cacheStrategy.ts:140`, `lib/pwa/cacheStrategy.ts:145`, `lib/pwa/cacheStrategy.ts:150`, `lib/pwa/cacheStrategy.ts:160`, `lib/pwa/cacheStrategy.ts:196`, `lib/pwa/cacheStrategy.ts:202`, `lib/pwa/cacheStrategy.ts:216`, `lib/pwa/cacheStrategy.ts:260`, `lib/pwa/cacheStrategy.test.ts:1`.
 
@@ -421,9 +428,7 @@ Source: `lib/pwa/downloadController.ts:356`, `lib/pwa/downloadController.ts:361`
 
 A manifest SHALL be an FNV-1a signature over the sorted URLs and `SW_CACHE_VERSION`, plus the species count.
 In `done`, Settings SHALL show up to date and disable Update when the signatures match, and otherwise show
-update available, with a count only when the species count rose. While the seed is unloaded the current
-manifest is an empty signature, and the comparison runs only when the download state changes, not when
-the seed arrives. With no seed the Download button still starts a run with no ids (#2324).
+update available, with a count only when the species count rose.
 
 #### Scenario: New species ship
 
@@ -433,7 +438,13 @@ the seed arrives. With no seed the Download button still starts a run with no id
 #### Scenario: Settings opens before the seed loads
 
 - **WHEN** the state is `done` and `getSeedIfLoaded` returns null
-- **THEN** Settings shows update available even for a current pack, until the state next changes (#2324)
+- **THEN** the current manifest has an empty signature and Settings shows update available even for a
+  current pack, until the download state next changes, as the seed's arrival does not recompute it (#2324)
+
+#### Scenario: Download tapped before the seed loads
+
+- **WHEN** the seed is null and Download is tapped
+- **THEN** a run starts with no ids and ends in `done` with nothing stored (#2324)
 
 Source: `lib/pwa/manifestSignature.ts:48`, `lib/pwa/manifestSignature.ts:75`, `lib/pwa/downloadController.ts:111`, `lib/pwa/downloadController.ts:114`, `components/settings/OfflineSection.tsx:74`, `components/settings/OfflineSection.tsx:85`, `components/settings/OfflineSection.tsx:191`, `lib/pwa/manifestSignature.test.ts:1`, `components/settings/OfflineSection.test.tsx:362`.
 
@@ -558,9 +569,8 @@ Source: `app/sw.ts:880`, `app/sw.ts:884`, `app/sw.ts:905`, `app/sw.ts:921`, `app
 
 `PushOptIn` SHALL render only when push is supported and the app is installed, and a local subscription SHALL
 be reconciled with the server on mount, turning the toggle off when reconciliation returns `disabled`. The
-toggle SHALL be disabled when permission is denied. With a superuser flag on it SHALL be replaced by a disabled
-button and do nothing. The streak toggle SHALL need the daily toggle on, and turning the daily toggle off SHALL
-turn the streak toggle off too. Some of the card's copy is hard-coded English (#2269).
+toggle SHALL be disabled when permission is denied, and the streak toggle SHALL need the daily toggle on.
+Some of the card's copy is hard-coded English (#2269).
 
 #### Scenario: Browser tab
 
@@ -572,6 +582,11 @@ turn the streak toggle off too. Some of the card's copy is hard-coded English (#
 - **WHEN** unsubscribing succeeds with the streak toggle on
 - **THEN** `streakNudgeEnabled` is saved false
 
+#### Scenario: Superuser flag on
+
+- **WHEN** any superuser flag is on
+- **THEN** the toggle is replaced by a disabled button and subscribing does nothing
+
 Source: `components/pwa/PushOptIn.tsx:86`, `components/pwa/PushOptIn.tsx:103`, `components/pwa/PushOptIn.tsx:107`, `components/pwa/PushOptIn.tsx:126`, `components/pwa/PushOptIn.tsx:158`, `components/pwa/PushOptIn.tsx:166`, `components/pwa/PushOptIn.tsx:185`, `components/pwa/PushOptIn.tsx:201`, `components/pwa/PushOptIn.test.tsx:1`.
 
 ### Requirement: What's New page (baseline)
@@ -579,9 +594,7 @@ Source: `components/pwa/PushOptIn.tsx:86`, `components/pwa/PushOptIn.tsx:103`, `
 `/whats-new` SHALL show a translated heading, the running version, and the 20 newest releases with at least one
 bullet, each with its version, a locale-formatted date and translated section labels. Bullet text stays in
 English in every locale. With no releases it SHALL show the empty message. Rendering SHALL write the running
-version to the last-seen marker. Because the worker serves same-origin pages stale-while-revalidate, a stale
-copy would carry the previous build's version and notes; from the code this is expected, not reproduced
-(#2327).
+version to the last-seen marker.
 
 #### Scenario: Normal visit
 
@@ -593,16 +606,26 @@ copy would carry the previous build's version and notes; from the code this is e
 - **WHEN** the locale is `ja`
 - **THEN** headings, labels and dates are localised and the bullets are English
 
+#### Scenario: Cached copy after an update
+
+- **WHEN** the worker serves a stale-while-revalidate copy from before an update
+- **THEN** the copy carries the previous build's version and notes; expected from the code, not
+  reproduced (#2327)
+
 Source: `app/whats-new/page.tsx:15`, `app/whats-new/page.tsx:16`, `app/whats-new/page.tsx:21`, `app/whats-new/page.tsx:25`, `app/whats-new/page.tsx:43`, `app/whats-new/page.tsx:63`, `app/whats-new/page.tsx:70`, `components/whats-new/MarkVisited.tsx:7`, `e2e/whats-new.spec.ts:9`.
 
 ### Requirement: Reading CHANGELOG.md (baseline)
 
 `parseChangelog` SHALL accept `## [X.Y.Z] - YYYY-MM-DD`, with a hyphen or a legacy em dash, and SHALL end a
 release at any other `## ` heading. It SHALL keep only the six known `###` kinds, in canonical order, merge
-repeated kinds, drop `Internal:` bullets, and drop releases with no bullets left. An indented line SHALL extend
-the bullet and a blank line SHALL end it. An unindented prose line does not end it, contrary to the comment
-(#2326). `getChangelog` SHALL read `CHANGELOG.md`, cache the result outside development, and return an
-empty list when the file is missing.
+repeated kinds, drop `Internal:` bullets, and drop releases with no bullets left. `getChangelog` SHALL read
+`CHANGELOG.md`, cache the result outside development, and return an empty list when the file is missing.
+
+#### Scenario: Wrapped bullet
+
+- **WHEN** an indented line follows a bullet
+- **THEN** it extends the bullet, a blank line ends it, and an unindented prose line does not end it,
+  contrary to the comment (#2326)
 
 #### Scenario: Internal-only release
 
