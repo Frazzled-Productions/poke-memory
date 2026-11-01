@@ -79,7 +79,7 @@ Source: `lib/streak/compute.ts:10-32`, `lib/streak/tokens.ts:413-420`, `lib/stre
 
 ### Requirement: Streak dates sync as a one-way-growing set (baseline)
 
-`pushStreak` SHALL upsert every local date into `streak_days`, ignoring duplicates, `pullStreak` SHALL page through all rows by date, and `mergeStreak` SHALL union and sort, so a background pull never removes a date. Force pull, choosing cloud at sign-in and leaving superuser mode SHALL replace the local list instead. Only `AutoSyncOnChange` and the keep-local sign-in choice SHALL push. Failures SHALL NOT interrupt anything. The database SHALL reject a date later than `current_date + 1`. Spend dates SHALL travel in settings, not `streak_days`.
+`pushStreak` SHALL upsert every local date into `streak_days`, ignoring duplicates, `pullStreak` SHALL page through all rows by date, and `mergeStreak` SHALL union and sort, so a background pull never removes a date. Force pull, choosing cloud at sign-in and leaving superuser mode SHALL replace the local list instead. Only `AutoSyncOnChange` and the keep-local sign-in choice SHALL push. Failures SHALL NOT interrupt anything. Spend dates SHALL travel in settings, not `streak_days`.
 
 #### Scenario: A new streak day on a signed-in device
 
@@ -125,6 +125,11 @@ Source: `lib/streak/compute.ts:10-32`, `lib/streak/tokens.ts:413-420`, `lib/stre
 
 - **WHEN** the date list is empty
 - **THEN** `pushStreak` returns `true` with no request (`lib/sync/streak.test.ts:57`)
+
+#### Scenario: A date too far ahead
+
+- **WHEN** a pushed date is later than `current_date + 1`
+- **THEN** the database check rejects it (`db/migrations/021_streak_days_no_future_date.sql:25-27`)
 
 Source: `lib/sync/streak.ts:15`, `lib/sync/streak.ts:18-36`, `lib/sync/streak.ts:38-60`, `lib/sync/streak.ts:65-68`, `components/sync/AutoSyncOnChange.tsx:81-90`, `db/migrations/021_streak_days_no_future_date.sql:25-27`, `app/stats/page.tsx:217-219`.
 
@@ -218,7 +223,7 @@ Source: `lib/streak/tokens.ts:229-234`, `lib/streak/tokens.ts:329-334`, `lib/str
 
 ### Requirement: Protection state lives in settings and is parsed defensively (baseline)
 
-`StreakProtection` SHALL live in the settings blob, so it follows settings sync. `validateStreakProtection` SHALL never throw: bad fields SHALL take defaults, the balance SHALL clamp to `MAX_BALANCE`, `spendDates` SHALL keep only valid dates, sorted and unique, and bad events SHALL drop. Each append SHALL cap events at `MAX_PROTECTION_EVENTS` (10), oldest first; the parser does not. `spendDates` SHALL have no cap. Cloud pushes SHALL be deep-merged, and the database SHALL protect spend dates and balance.
+`StreakProtection` SHALL live in the settings blob, so it follows settings sync. `validateStreakProtection` SHALL never throw: bad fields SHALL take defaults, the balance SHALL clamp to `MAX_BALANCE`, `spendDates` SHALL keep only valid dates, sorted and unique, and bad events SHALL drop. Each append SHALL cap events at `MAX_PROTECTION_EVENTS` (10), but `spendDates` SHALL have no cap. Cloud pushes SHALL be deep-merged, and the database SHALL protect spend dates and balance.
 
 #### Scenario: Corrupt state
 
