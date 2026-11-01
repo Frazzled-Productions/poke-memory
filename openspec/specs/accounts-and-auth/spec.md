@@ -10,24 +10,34 @@ should do. Which Supabase key each client uses is in `supabase-keys`. What sync 
 
 ## Requirements
 
-### Requirement: One sign-in control in the app header (baseline, current behaviour)
+### Requirement: The app header has one auth control (baseline, current behaviour)
 
 `AuthButton` SHALL render nothing while auth is loading, a "Sign in" button that opens `SignInSheet`
 for a guest, and for a signed-in user the avatar (when `user_metadata.avatar_url` exists) and a
-"Sign out" button.
+"Sign out" button. `NavLinks`, `MobileNavSlot` and `NavDrawer` each render it. The header is not the
+only way in: Settings' guest account section and `GuestSignUpNudge` on Stats and Journey open the
+same `SignInSheet`.
 
 #### Scenario: Guest opens the sheet
 
 - **WHEN** a guest presses "Sign in"
 - **THEN** the sign-in sheet opens
 
+#### Scenario: Guest opens the sheet from Settings
+
+- **WHEN** a guest presses the sign-in link in Settings' account section
+- **THEN** the same sheet opens
+
 #### Scenario: Username account has no avatar
 
 - **WHEN** the signed-in user has no `avatar_url` in their metadata (every username account)
 - **THEN** only the "Sign out" button shows
 
-Source: `components/auth/AuthButton.tsx:18-34`, `components/auth/AuthButton.tsx:36-67`; tests
-`components/auth/AuthButton.test.tsx:189`.
+Source: `components/auth/AuthButton.tsx:18-34`, `components/auth/AuthButton.tsx:36-67`,
+`components/NavLinks.tsx:68`, `components/MobileNavSlot.tsx:55`, `components/NavDrawer.tsx:288`,
+`app/settings/page.tsx:804`, `app/settings/page.tsx:2312-2315`,
+`components/onboarding/GuestSignUpNudge.tsx:74`, `app/stats/page.tsx:468`, `app/journey/page.tsx:666`;
+tests `components/auth/AuthButton.test.tsx:189`.
 
 ### Requirement: The sign-in sheet is a modal dialog (baseline, current behaviour)
 
@@ -211,8 +221,8 @@ tests `lib/auth/rateLimitIp.test.ts:19-67`, `lib/auth/actions.test.ts:20-23`.
 ### Requirement: The username form validates and then navigates (baseline, current behaviour)
 
 The sheet's username form SHALL default to sign-up mode, show the no-password-reset and no-real-name
-warnings only in that mode, check the username and password length before calling the server, and
-show a translated inline alert for each error. On success it SHALL do a full navigation to `/`,
+warnings only in that mode, validate the username format and the password length before calling the
+server in both modes, and show a translated inline alert for each error. On success it SHALL do a full navigation to `/`,
 because the server action writes the session cookie without the browser client noticing. Closing
 the sheet SHALL clear the form and return it to sign-up mode.
 
@@ -220,6 +230,11 @@ the sheet SHALL clear the form and return it to sign-up mode.
 
 - **WHEN** a password under 8 characters is submitted in either mode
 - **THEN** the alert shows and no server action is called
+
+#### Scenario: Malformed username in sign-in mode
+
+- **WHEN** a username that fails validation is submitted in sign-in mode
+- **THEN** the alert names the format problem, not `invalid_credentials`, and no server action is called
 
 #### Scenario: Japanese locale
 
@@ -272,8 +287,8 @@ Source: `lib/supabase/server.ts:8-32`; tests `lib/supabase/clients.test.ts`.
 
 ### Requirement: Sign-out ends the session and keeps local data (baseline, current behaviour)
 
-The `signOut` server action SHALL call `auth.signOut()` on the server client and redirect to `/`. It
-SHALL NOT clear local progress, settings or `ownerUserId`, and SHALL NOT call the browser Supabase
+The `signOut` server action SHALL call `auth.signOut()` with no options on the server client and
+redirect to `/` whatever that call returns. It SHALL NOT clear local progress, settings or `ownerUserId`, and SHALL NOT call the browser Supabase
 client. It is reachable from `AuthButton` and from Settings. When `userId` next becomes null,
 `useSignInPull` SHALL reset so that a later sign-in, even as the same user, pulls again.
 
@@ -282,20 +297,39 @@ client. It is reachable from `AuthButton` and from Settings. When `userId` next 
 - **WHEN** a signed-in player presses "Sign out"
 - **THEN** the session cookies are cleared, the app navigates to `/`, and local cards stay on the device
 
+#### Scenario: Signed in on two devices
+
+- **WHEN** a player signed in on two devices signs out on one
+- **THEN** the session on the other device is revoked too, because the upstream default scope is `global`
+
+#### Scenario: Supabase refuses the sign-out
+
+- **WHEN** `auth.signOut()` fails with anything other than a 401, 403 or 404
+- **THEN** the session stays in place and the app still navigates to `/`, with no error shown
+
 Source: `lib/auth/actions.ts:24-28`, `components/auth/AuthButton.tsx:61`, `app/settings/page.tsx:841`,
 `lib/sync/useSignInPull.ts:38-41`, `lib/sync/deleteAccount.ts:36-39`; tests `e2e/auth.spec.ts:66-76`.
 
-### Requirement: API routes share a session guard (baseline, current behaviour)
+### Requirement: Signed-in API routes share a session guard (baseline, current behaviour)
 
-`requireAuth` SHALL return `{ user }` for a valid session and otherwise a 401 response with
-`{ error: "unauthorized" }`, or `{ ok: false, error: "unauthorized" }` when `withOkField` is set.
+`/api/sync`, `/api/export`, `/api/srs/optimize` and `/api/push/resubscribe` SHALL call `requireAuth`,
+which SHALL return `{ user }` for a valid session and otherwise a 401 response with
+`{ error: "unauthorized" }`, or `{ ok: false, error: "unauthorized" }` when `withOkField` is set. `/api/feedback` SHALL NOT use it: it
+reads the user itself and treats a missing user or an error as a guest.
 
 #### Scenario: getUser reports an error
 
 - **WHEN** `getUser` returns an error
 - **THEN** the caller receives a 401
 
-Source: `lib/auth/requireAuth.ts:22-39`; tests `lib/auth/requireAuth.test.ts:21-55`.
+#### Scenario: Guest sends feedback
+
+- **WHEN** `/api/feedback` is called with no session
+- **THEN** the route carries on with a null `user_id`
+
+Source: `lib/auth/requireAuth.ts:22-39`, `app/api/sync/route.ts:52`, `app/api/export/route.ts:110`,
+`app/api/srs/optimize/route.ts:174`, `app/api/push/resubscribe/route.ts:37`,
+`app/api/feedback/route.ts:87-94`; tests `lib/auth/requireAuth.test.ts:21-55`.
 
 ### Requirement: Cron routes compare the bearer header in constant time (baseline, current behaviour)
 
@@ -347,7 +381,12 @@ and re-enable the button.
 - **WHEN** the provider returns to `/auth/callback-complete` and local and cloud both have reviewed cards
 - **THEN** the sync conflict picker shows, as it does after a sign-in
 
-Source: `components/auth/LinkIdentitiesSection.tsx:42-52`, `components/auth/LinkIdentitiesSection.tsx:57-78`,
+#### Scenario: Link comes back with no code
+
+- **WHEN** the provider step returns to `/api/auth/callback` without a `code`
+- **THEN** the player lands on `/?error=auth` with the sign-in failure alert, not one of the mapped link messages
+
+Source: `app/api/auth/callback/route.ts:8-15`, `components/auth/LinkIdentitiesSection.tsx:42-52`, `components/auth/LinkIdentitiesSection.tsx:57-78`,
 `components/auth/LinkIdentitiesSection.tsx:121-156`, `app/settings/page.tsx:2088-2090`; tests
 `components/auth/LinkIdentitiesSection.test.tsx:54-354`.
 
@@ -356,20 +395,27 @@ Source: `components/auth/LinkIdentitiesSection.tsx:42-52`, `components/auth/Link
 `/auth/callback-complete` SHALL wait for auth and the seed, send a missing user or client to `/`, and
 compare local reviewed cards with cloud rows. It is reached only through the OAuth callback; the
 username door goes straight to `/`. With neither side holding data it SHALL stamp `ownerUserId` and
-go to `/`. A cloud read failure SHALL show "Could not reach the cloud" with Retry.
+go to `/`. A failed `hasCloudData` read SHALL count as an empty cloud; only a failed `pullSession`
+SHALL show "Could not reach the cloud" with Retry.
 
 #### Scenario: New user, nothing anywhere
 
 - **WHEN** there are no local reviewed cards and no cloud rows
 - **THEN** `ownerUserId` is set to the user and the app goes to `/`
 
-#### Scenario: Offline at arrival
+#### Scenario: First cloud read fails
 
-- **WHEN** `hasCloudData` throws or `pullSession` returns null
+- **WHEN** the `card_reviews` count query fails
+- **THEN** `hasCloudData` catches the failure and returns false, no error screen shows, and the page carries on as if the cloud held no rows
+
+#### Scenario: Full pull fails
+
+- **WHEN** `hasCloudData` returns true and `pullSession` returns null
 - **THEN** the error screen shows, and Retry runs the check again
 
 Source: `app/auth/callback-complete/page.tsx:97-136`, `app/auth/callback-complete/page.tsx:403-415`,
-`components/auth/SignInSheet.tsx:211`; tests `app/auth/callback-complete/page.test.tsx:242-249`.
+`lib/sync/cloud.ts:150-165`, `components/auth/SignInSheet.tsx:211`. No test covers the error screen;
+the page tests mock `hasCloudData` and only ever resolve it.
 
 ### Requirement: Local-only progress is pushed on first arrival (baseline, current behaviour)
 
@@ -406,15 +452,31 @@ Source: `app/auth/callback-complete/page.tsx:173-194`, `app/auth/callback-comple
 
 ### Requirement: Progress on both sides asks the player to pick one (baseline, current behaviour)
 
-With reviewed cards on both sides, the page SHALL show a picker with the card, streak and grade
-counts for each side, whoever owns the device's data and however close the two sides are. "Keep
-local" SHALL push cards and, best-effort, settings, regional prefs, streak and grade log. "Keep
-cloud" SHALL apply the cloud state. Both SHALL stamp `ownerUserId`.
+With local reviewed cards and at least one cloud row, reviewed or not, the page SHALL show a picker
+with the reviewed card, streak and grade counts and the latest review date for each side, whoever
+owns the device's data and however close the two sides are. "Keep local" SHALL push cards and,
+best-effort, settings, regional prefs, streak and grade log. "Keep cloud" SHALL apply the cloud
+state. Both SHALL stamp `ownerUserId`.
+
+#### Scenario: Cloud rows but no cloud reviews
+
+- **WHEN** local has reviewed cards and every cloud row has a null `last_review`
+- **THEN** the picker shows with 0 reviewed cards on the cloud side
 
 #### Scenario: Same player returns to the same device
 
 - **WHEN** a player whose `ownerUserId` is on this device signs in again by OAuth and both sides have reviewed cards
 - **THEN** the picker shows
+
+#### Scenario: Cloud streak read fails
+
+- **WHEN** the streak or grade log read fails
+- **THEN** that cloud count shows 0, and "Keep cloud" leaves the local copy in place
+
+#### Scenario: Keep cloud fails
+
+- **WHEN** applying the cloud state throws
+- **THEN** the error screen shows
 
 #### Scenario: Keep local fails
 
@@ -424,7 +486,7 @@ cloud" SHALL apply the cloud state. Both SHALL stamp `ownerUserId`.
 #### Scenario: Japanese locale
 
 - **WHEN** the locale is `ja`
-- **THEN** the headings, explanation and button labels stay in hard-coded English, and only the counts and the loading label are translated
+- **THEN** the headings, explanation and button labels stay in hard-coded English, and only the counts are translated. On the loading screen the `aria-label` is translated and the visible text is not; the error and push-warning screens are hard-coded English
 
 #### Scenario: Superuser flag on
 
@@ -432,14 +494,16 @@ cloud" SHALL apply the cloud state. Both SHALL stamp `ownerUserId`.
 - **THEN** "Keep local" is replaced by a disabled "Sync paused (superuser)" button
 
 Source: `app/auth/callback-complete/page.tsx:195-226`, `app/auth/callback-complete/page.tsx:302-390`,
-`app/auth/callback-complete/page.tsx:431-468`, `app/auth/callback-complete/page.tsx:514-534`;
+`app/auth/callback-complete/page.tsx:431-468`, `app/auth/callback-complete/page.tsx:514-534`,
+`app/auth/callback-complete/page.tsx:125`, `app/auth/callback-complete/page.tsx:392-429`;
 tests `app/auth/callback-complete/page.test.tsx:326-406`, `e2e/auth.spec.ts:78`.
 
 ### Requirement: Sign-in runs the account guard before each pull (baseline, current behaviour)
 
 `SignInPull`, mounted in the root layout, SHALL run once per change of `userId` to a new non-null
 value, including a cold load. It SHALL await `guardAccountSwitch` and then call `pullAndMerge`, which
-SHALL write the incoming user as `ownerUserId` when it finishes. Reads SHALL run with a superuser
+SHALL write the incoming user as `ownerUserId` only at the end of a successful pass; a failed pull or
+save leaves `ownerUserId` as it was. Reads SHALL run with a superuser
 flag on; only the push-back inside `pullAndMerge` is suppressed.
 
 #### Scenario: Re-render
@@ -452,8 +516,13 @@ flag on; only the push-back inside `pullAndMerge` is suppressed.
 - **WHEN** a guest with local cards signs in with a username
 - **THEN** no picker shows, the guard does nothing, and `pullAndMerge` merges and sets `ownerUserId`
 
+#### Scenario: Guest's first pull fails
+
+- **WHEN** a guest signs in and `pullAndMerge` returns `error`
+- **THEN** `ownerUserId` stays null
+
 Source: `components/sync/SignInPull.tsx:12-19`, `app/layout.tsx:202`, `lib/sync/useSignInPull.ts:25-53`,
-`lib/sync/pullAndMerge.ts:620-626`; tests `components/sync/useSignInPull.test.tsx`.
+`lib/sync/pullAndMerge.ts:152`, `lib/sync/pullAndMerge.ts:351`, `lib/sync/pullAndMerge.ts:620-631`; tests `components/sync/useSignInPull.test.tsx`.
 
 ### Requirement: The account guard isolates local data between accounts (baseline, current behaviour)
 
@@ -510,8 +579,10 @@ Source: `lib/sync/deleteAccount.ts:18-30`, `db/migrations/027_delete_account_rpc
 
 `deleteAccountEverywhere` SHALL delete the cloud account first and return
 `cloud-delete-failed` with local data untouched if that fails. On success it SHALL run
-`clearLocalProgress`, then remove every `poke-memory:*` localStorage key on the device, including
-settings, superuser keys and every `user-archive:*` key of any account, and leave other keys alone.
+`clearLocalProgress`, which deletes the IndexedDB review session, grade log and migration flag, then
+remove every `poke-memory:*` localStorage key on the device, including settings, superuser keys and
+every `user-archive:*` key of any account, and leave other keys alone. The IndexedDB copy of the
+pending-grade queue SHALL stay (#2211).
 
 #### Scenario: Offline
 
