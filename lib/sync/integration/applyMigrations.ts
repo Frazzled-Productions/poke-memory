@@ -89,13 +89,39 @@ export function listMigrationFiles(): string[] {
   return sortAndValidateMigrationFiles(rawFiles);
 }
 
+/** Part of the migration sequence: the files after `after`, up to and including `through`. */
+export interface MigrationRange {
+  after?: string;
+  through?: string;
+}
+
+/** Throws on an unknown filename, so a renamed file cannot widen the range. */
+function selectMigrationFiles(
+  files: string[],
+  { after, through }: MigrationRange,
+): string[] {
+  const position = (filename: string): number => {
+    const index = files.indexOf(filename);
+    if (index === -1) throw new Error(`Unknown migration "${filename}"`);
+    return index;
+  };
+  return files.slice(
+    after === undefined ? 0 : position(after) + 1,
+    through === undefined ? files.length : position(through) + 1,
+  );
+}
+
 /**
- * Applies all migrations in numeric order to the given pg Pool.
+ * Applies migrations in numeric order to the given pg Pool: all of them, or the
+ * part named by `range`, so a test can seed rows in the middle of the sequence.
  * Each migration runs inside its own connection to keep error messages clear.
  * A failed migration throws with the filename included in the message.
  */
-export async function applyMigrations(pool: pg.Pool): Promise<void> {
-  const files = listMigrationFiles();
+export async function applyMigrations(
+  pool: pg.Pool,
+  range: MigrationRange = {},
+): Promise<void> {
+  const files = selectMigrationFiles(listMigrationFiles(), range);
   for (const filename of files) {
     const sql = readFileSync(join(MIGRATIONS_DIR, filename), "utf8");
     const client = await pool.connect();

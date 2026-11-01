@@ -40,6 +40,13 @@ gate and only goes red on CI's `integration` job. Give nested PL/pgSQL blocks a 
 (`$func$`, `$digest$`) or extract a top-level function and call it from the cron/trigger body
 (#1653, 2026-06-09).
 
+**A migration must keep the rows it should keep.** `apply-migrations.test.ts` runs on empty tables;
+`migration-data-preservation.test.ts` seeds rows at a cut-off and applies the rest. Its sweep carries
+a row in every table from `SWEEP_BASELINE` through every later file, so a new migration is covered
+with no edit. If the sweep fails, your migration loses or rewrites rows: if you meant that, add a
+named test for the rewrite and move `SWEEP_BASELINE` to your file (#2217). `check-migrations.mjs`
+reads the SQL; this checks the data.
+
 **Calling a Postgres RPC with a new action/enum value requires BOTH a migration** (teaching the
 function body and any CHECK constraint) **AND a real-RPC integration test** against the local
 container. A mocked-RPC unit test proves the caller's branching but not the DB contract; the
