@@ -46,7 +46,7 @@ SHALL be logged and SHALL NOT stop the run.
 - **WHEN** a send returns 500
 - **THEN** the row stays and the other devices are still sent to
 
-<!-- source: app/api/push/send-daily/route.ts:799-845; app/api/push/send-streak-nudge/route.ts:347-376 -->
+<!-- source: app/api/push/send-daily/route.ts:785-835; app/api/push/send-streak-nudge/route.ts:347-376 -->
 
 ### Requirement: Re-subscribing replaces the row (baseline, current behaviour)
 
@@ -95,11 +95,17 @@ the next device as soon as a send ends.
 - **WHEN** 100 devices are due
 - **THEN** no more than 20 sends are in flight at any moment
 
-### Requirement: A run always finishes
+#### Scenario: Payload build fails
+
+- **WHEN** building the message for one device throws
+- **THEN** that device counts as a failed send, the others are still sent to and dead rows found so far are deleted
+
+### Requirement: A run that starts sending always finishes
 
 Both routes SHALL declare `maxDuration = 300`. No new send SHALL start more than 240 seconds after
-the route started. The run SHALL still delete dead subscriptions and respond, and SHALL log how many
-devices it did not reach.
+the route started. Once sending has started, the run SHALL still delete dead subscriptions and
+respond, and SHALL log how many due devices it did not reach and how many rows it skipped. The reads
+before the first send have no limit of their own.
 
 #### Scenario: Budget used up
 
@@ -110,6 +116,11 @@ devices it did not reach.
 
 - **WHEN** the reads before the send take 230 seconds
 - **THEN** sends start for at most the remaining 10 seconds
+
+#### Scenario: Reads use up the budget
+
+- **WHEN** the reads before the send take 245 seconds and then return
+- **THEN** no send starts, the due devices are counted in a log line and the route returns 200
 
 ### Requirement: Subscriptions point at a known push service
 
@@ -124,7 +135,7 @@ refuse a new row with one, and the send path SHALL skip an existing row with one
 
 #### Scenario: Unknown host
 
-- **WHEN** a signed-in client inserts a row whose endpoint is on another host, directly or through `resubscribe`
+- **WHEN** a row is written with an endpoint on another host
 - **THEN** no row is added
 
 #### Scenario: Lookalike endpoint
@@ -135,17 +146,44 @@ refuse a new row with one, and the send path SHALL skip an existing row with one
 #### Scenario: Row from before the check
 
 - **WHEN** an existing row has an unknown host at send time
-- **THEN** it is skipped, not sent to, and not deleted
+- **THEN** it is skipped, not sent to, not deleted, and counted in a log line
 
 #### Scenario: One list
 
 - **WHEN** the pattern in `lib/push/endpoints.ts` differs from the migration
 - **THEN** the parity test fails
 
+### Requirement: Settings shows when a device has stopped getting reminders
+
+Opening Settings on a device SHALL reconcile its local subscription with the server. A device whose
+local subscription is on an unknown host SHALL show the toggle off, with or without a row. A device
+whose row is missing SHALL re-insert it. There is no reconcile outside Settings.
+
+#### Scenario: Unknown host in Settings
+
+- **WHEN** Settings opens on a device whose subscription is on an unknown host and a row exists
+- **THEN** the toggle shows off, not on
+
+#### Scenario: Replaced device opens Settings
+
+- **WHEN** a device's row was replaced at the limit and Settings opens on it
+- **THEN** the row is inserted again and the toggle stays on
+
+#### Scenario: More than 10 devices take turns
+
+- **WHEN** a user has 11 devices and Settings opens on the one with no row
+- **THEN** its row is inserted, the oldest other row is replaced and the user has 10 rows
+
+#### Scenario: New subscription refused
+
+- **WHEN** a browser on an unknown host turns the toggle on
+- **THEN** `PushOptIn` shows the existing `persist-failed` state and the toggle stays off
+
 ### Requirement: An account has at most 10 subscriptions
 
 Inserting a row for a user who already has 10 or more SHALL first delete that user's rows with the
-oldest `last_seen_at` until 9 remain, including when inserts run in parallel.
+oldest `last_seen_at` until 9 remain, including when inserts run in parallel. The database SHALL set
+`last_seen_at` to its own time on insert, whatever the client sends.
 
 #### Scenario: New device at the limit
 
@@ -171,3 +209,8 @@ oldest `last_seen_at` until 9 remain, including when inserts run in parallel.
 
 - **WHEN** a user with 10 rows re-subscribes a device that already has a row
 - **THEN** no other row is replaced
+
+#### Scenario: Wrong device clock
+
+- **WHEN** a device with a clock a year slow subscribes as a user's newest row
+- **THEN** its `last_seen_at` is the database's time and the next insert does not replace it first
