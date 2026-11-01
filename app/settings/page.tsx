@@ -14,6 +14,7 @@ import {
 import type { UserSettings } from "@/lib/settings/persistence";
 import { settingsAfterProgressReset } from "@/lib/favourite/favourite";
 import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
+import { restoreBackupSignedIn } from "@/lib/sync/restoreBackup";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
@@ -711,13 +712,24 @@ export default function SettingsPage() {
       setImportError(result.error);
       return;
     }
+    // A superuser session writes nothing to the cloud, so it restores locally.
+    const account = user && supabase && !anyFlagOn ? { userId: user.id, client: supabase } : null;
     const confirmed = window.confirm(
-      "Replace your current progress with this backup?"
+      account
+        ? t("settings.backup.importConfirmSignedIn")
+        : "Replace your current progress with this backup?"
     );
-    if (confirmed) {
+    if (!confirmed) return;
+    if (account) {
+      const restored = await restoreBackupSignedIn(account.client, account.userId, result.data);
+      if (!restored.ok) {
+        setImportError(t("settings.backup.importFailedSignedIn"));
+        return;
+      }
+    } else {
       await applyBackup(result.data);
-      window.location.reload();
     }
+    window.location.reload();
   }
 
   function handleSave() {
@@ -1957,7 +1969,9 @@ export default function SettingsPage() {
 
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("settings.backup.importLabel")}</p>
-                    <p className={`mt-1 ${mutedTextXs}`}>{t("settings.backup.importDescription")}</p>
+                    <p className={`mt-1 ${mutedTextXs}`}>
+                      {t(user && supabase && !anyFlagOn ? "settings.backup.importDescriptionSignedIn" : "settings.backup.importDescription")}
+                    </p>
                     <input
                       ref={fileInputRef}
                       type="file"
