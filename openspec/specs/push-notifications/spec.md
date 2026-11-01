@@ -105,7 +105,7 @@ Cites: `send-daily:619-630`, `send-daily:666-671`, `send-daily:739-751`, `send-n
 Cites: `lib/push/notificationHour.ts:26`, `:53-82`, `:106-122`, `send-daily:659-664`, `db/migrations/030_user_settings_push_notification_hour.sql:26-28`.
 
 ### Requirement: The daily reminder is skipped only when there is nothing to report
-For each included subscription, `send-daily` SHALL send unless the owner's due total and new-card estimate are both zero. Sends SHALL run one subscription at a time, in target order, and every device of a user SHALL get its own push.
+For each included subscription, `send-daily` SHALL send unless the owner's due total and new-card estimate are both zero. Sends SHALL run one subscription at a time, in target order, and every device of a user SHALL get its own push. Neither route SHALL record a send, so a second authorised call in the same hour sends again.
 
 #### Scenario: Due cards
 - **WHEN** a subscriber has due cards
@@ -119,13 +119,17 @@ For each included subscription, `send-daily` SHALL send unless the owner's due t
 - **WHEN** nothing is due and the estimate is zero
 - **THEN** nothing is sent (`app/api/push/send-daily/route.test.tsx:561`)
 
+#### Scenario: Called twice in one hour
+- **WHEN** the route is called again within the same UTC hour
+- **THEN** the same subscribers are sent the reminder again, because there is no per-day guard (`send-daily:659-664`, `:791-812`)
+
 Cites: `send-daily:791-812`, `db/migrations/046_get_push_targets.sql:72`.
 
 ### Requirement: The due count follows the user's cards, languages and scope
-`send-daily` SHALL count non-hidden `card_reviews` rows with `due_date` on or before the user's local today, grouped into one read per local date and paged with a stable order. A row SHALL count only when its locale is in the user's learning locales, its card type is enabled, its alternate-form rule passes and it matches the practice scope. Evolution-edge scope SHALL anchor on the pre-evolution species. Unknown card types and species missing from the lookup SHALL pass.
+`send-daily` SHALL count non-hidden `card_reviews` rows with `due_date` on or before the user's local today, grouped into one read per local date and paged ordered by `(user_id, due_date)`, which has ties. A row SHALL count only when it passes the user's learning-locale, card-type, alternate-form and practice-scope filters. Evolution-edge scope SHALL anchor on the pre-evolution species. Unknown card types and species missing from the lookup SHALL pass.
 
 #### Scenario: Language outside the learning set
-- **WHEN** a due row's locale is not in `learningLocales`
+- **WHEN** a due row's locale is not in the user's `learningLocales`
 - **THEN** it is not counted (`app/api/push/send-daily/route.test.tsx:1724`)
 
 #### Scenario: Alternate forms off
@@ -135,6 +139,10 @@ Cites: `send-daily:791-812`, `db/migrations/046_get_push_targets.sql:72`.
 #### Scenario: Practice scope
 - **WHEN** a generation, type or preset scope is set
 - **THEN** only matching cards count, and an evolution edge is judged on its first species (`app/api/push/send-daily/route.test.tsx:1267`, `:1398`, `:1440`)
+
+#### Scenario: More due rows than one page
+- **WHEN** a bucket passes the PostgREST page cap and a user has several cards due on one date
+- **THEN** those rows have no defined order between pages, so one can repeat and another be missed (`send-daily:739-745`, `db/migrations/029_card_reviews_locale.sql:28`; see poke-memory #2338)
 
 #### Scenario: Superuser mode
 - **WHEN** a superuser flag is on in a client
@@ -156,7 +164,7 @@ Cites: `send-daily:681-688`, `send-daily:729-783`, `send-daily:453-479`, `db/mig
 Cites: `send-daily:281-295`, `send-daily:309-417`.
 
 ### Requirement: The new-card estimate is caps minus cards started today
-The estimate SHALL be the sum, floored at zero per term, of `maxNewPerDay`, `maxNewReversePerDay`, the shared `maxNewEvolutionPerDay` when either evolution direction is on, and `maxNewCryPerDay` when cry cards are on, each less the eligible rows with `first_seen` equal to today among the rows the due read returned. It SHALL NOT check how many unseen cards exist, and SHALL be the same whatever the scope.
+The estimate SHALL be the sum, floored at zero per term, of `maxNewPerDay`, `maxNewReversePerDay`, the shared `maxNewEvolutionPerDay` when either evolution direction is on, and `maxNewCryPerDay` when cry cards are on, each less the rows with `first_seen` equal to today among the rows the due read returned that pass every due-count filter, scope included. It SHALL NOT check how many unseen cards exist.
 
 #### Scenario: Started today
 - **WHEN** five name cards with `first_seen` today are in the due read
@@ -167,8 +175,12 @@ The estimate SHALL be the sum, floored at zero per term, of `maxNewPerDay`, `max
 - **THEN** the evolution term is added once (`app/api/push/send-daily/route.test.tsx:1072`)
 
 #### Scenario: Scope filters due cards only
-- **WHEN** every due card is out of scope
+- **WHEN** every due card is out of scope and none was first seen today
 - **THEN** the estimate is unchanged (`app/api/push/send-daily/route.test.tsx:1482`)
+
+#### Scenario: Card started today, out of scope
+- **WHEN** a due card first seen today is outside the scope
+- **THEN** it is not subtracted, so the estimate is one higher than with no scope (`send-daily:762-781`; run against the real route on a throwaway test: 9 new with no scope, 10 with a generation scope that excludes the card)
 
 #### Scenario: Card started today and not due
 - **WHEN** a card first seen today now has a later `due_date`
@@ -207,7 +219,7 @@ On a 404 or 410 from a push service each route SHALL delete that row after the s
 Cites: `send-daily:789-836`, `send-nudge:346-381`.
 
 ### Requirement: The streak reminder needs opt-in and a local 20:00 hour
-`send-nudge` SHALL consider only users whose settings hold `streakNudgeEnabled === true`, and SHALL send only at the run where their local hour is 20, UTC standing in for a null or invalid timezone.
+`send-nudge` SHALL consider only users whose settings hold `streakNudgeEnabled === true`, and SHALL send only at the run where their local hour is 20, UTC standing in for a null or invalid timezone. Every device of such a user SHALL get its own push.
 
 #### Scenario: Not opted in
 - **WHEN** the flag is false, or the user has no settings row
@@ -221,7 +233,7 @@ Cites: `send-daily:789-836`, `send-nudge:346-381`.
 - **WHEN** the timezone is null or invalid
 - **THEN** both the hour gate and "today" use UTC (`app/api/push/send-streak-nudge/route.test.tsx:476`)
 
-Cites: `send-nudge:72`, `send-nudge:152-155`, `send-nudge:215-219`, `send-nudge:249-254`.
+Cites: `send-nudge:72`, `send-nudge:152-155`, `send-nudge:215-219`, `send-nudge:249-254`, `send-nudge:338-340`, `send-nudge:350-361`.
 
 ### Requirement: The streak reminder stays clear of the daily reminder
 `send-nudge` SHALL skip a user when the nudge's UTC hour and their daily reminder's effective UTC hour are less than 3 hours apart on the 24-hour clock. With no stored hour the daily hour SHALL be 08 UTC. The skip SHALL apply every day, so such a user never gets the nudge while those hours stay close.
@@ -335,7 +347,7 @@ Signing out and switching accounts SHALL NOT change `push_subscriptions` or the 
 Cites: `lib/push/subscribe.ts:103-108`, `components/pwa/PushOptIn.tsx:152`, `db/migrations/028_web_push_subscriptions.sql:80`, `:89`.
 
 ### Requirement: Opening Settings reconciles the local subscription
-When Settings loads with a local subscription, `reconcileSubscription` SHALL look for the signed-in user's row for that endpoint. A matching row, or a failed query, SHALL leave the state alone. With no row it SHALL re-insert one from the local keys, for whichever account is signed in, superuser flags on or off. If the re-insert fails or the keys are missing, the toggle SHALL show off. With no local subscription, the toggle SHALL show off without a server check.
+When Settings loads with a local subscription, `reconcileSubscription` SHALL look for the signed-in user's row for that endpoint. A matching row, or a failed query, SHALL show the toggle on. With no row it SHALL re-insert one from the local keys, for whichever account is signed in, superuser flags on or off. If the re-insert fails or the keys are missing, the toggle SHALL show off. With no local subscription, the toggle SHALL show off without a server check.
 
 #### Scenario: Row present
 - **WHEN** a matching row exists
@@ -352,6 +364,10 @@ When Settings loads with a local subscription, `reconcileSubscription` SHALL loo
 #### Scenario: Query error
 - **WHEN** the SELECT errors
 - **THEN** the result is `in-sync`, so the toggle is not falsely turned off (`components/pwa/subscribeHelpers.test.tsx:160`)
+
+#### Scenario: No VAPID key in the build
+- **WHEN** a local subscription exists and the VAPID key is missing
+- **THEN** the result is `no-local`, no server check runs and the toggle shows on, as only `disabled` turns it off (`lib/push/subscribe.ts:320-321`, `components/pwa/PushOptIn.tsx:107`)
 
 #### Scenario: Reminders turned off on another device
 - **WHEN** reminders were turned off elsewhere, and Settings opens on a device still holding a local subscription
@@ -385,11 +401,15 @@ Cites: `lib/push/subscribe.ts:315-386`, `components/pwa/PushOptIn.tsx:81-110`.
 Cites: `components/pwa/PushOptIn.tsx:81-91`, `:166-222`, `:272-296`, `lib/push/subscribe.ts:24-53`, `app/settings/page.tsx:1864-1866`.
 
 ### Requirement: The streak toggle depends on the daily toggle
-The streak toggle SHALL default off, SHALL stay visible but disabled while the device is not subscribed or a superuser flag is on, and SHALL save `streakNudgeEnabled` through local settings. `AutoSyncOnChange` SHALL send the change to the cloud JSONB when no superuser flag is on.
+The streak toggle SHALL default off, SHALL show the stored `streakNudgeEnabled` value, SHALL stay visible but disabled while the device is not subscribed or a superuser flag is on, and SHALL save `streakNudgeEnabled` through local settings. `AutoSyncOnChange` SHALL send the change to the cloud JSONB when no superuser flag is on.
 
 #### Scenario: Primary off
-- **WHEN** the primary toggle is off
+- **WHEN** the primary toggle is off and the stored value is false
 - **THEN** the streak toggle is off, disabled and does nothing on click (`components/pwa/PushOptIn.test.tsx:327`, `:398`)
+
+#### Scenario: Opted in on another device, not subscribed here
+- **WHEN** the stored value is true and this device has no local subscription
+- **THEN** the streak toggle shows on and disabled (`components/pwa/PushOptIn.tsx:122-124`, `:253-256`; run on a throwaway test)
 
 #### Scenario: Primary on
 - **WHEN** the device is subscribed
@@ -402,7 +422,7 @@ The streak toggle SHALL default off, SHALL stay visible but disabled while the d
 Cites: `components/pwa/PushOptIn.tsx:68`, `:121-130`, `:250-258`, `components/sync/AutoSyncOnChange.tsx:46-49`, `:54-66`.
 
 ### Requirement: The reminder hour is a separate regional setting
-The picker SHALL offer "Default (08:00)" and the hours 00:00 to 23:00, SHALL save locally and, for a signed-in user with no superuser flag, SHALL update the `push_notification_hour` column with `pushRegionalPrefs`, without retrying on failure. An update with no existing `user_settings` row SHALL change nothing. A pull SHALL apply a non-null cloud hour and leave the local hour when the cloud value is null.
+The picker SHALL offer "Default (08:00)" and the hours 00:00 to 23:00, SHALL save locally and, for a signed-in user with no superuser flag, SHALL update the `push_notification_hour` column with `pushRegionalPrefs`, without retrying on failure. An update with no existing `user_settings` row SHALL change nothing. A pull, and the keep-cloud sign-in choice, SHALL apply a non-null cloud hour and leave the local hour when the cloud value is null.
 
 #### Scenario: Choosing an hour
 - **WHEN** a signed-in user picks 19:00
@@ -416,11 +436,32 @@ The picker SHALL offer "Default (08:00)" and the hours 00:00 to 23:00, SHALL sav
 - **WHEN** device A goes back to Default and device B pulls
 - **THEN** device B keeps its old hour (`lib/sync/pullAndMerge.ts:485-487`; see poke-memory #2270)
 
+#### Scenario: Another regional change
+- **WHEN** a device changes the timezone or date format, pushes auto-detected prefs or takes the keep-local choice at sign-in
+- **THEN** `pushRegionalPrefs` writes all three columns, including that device's local hour (`app/settings/page.tsx:579-583`, `:1752-1756`, `:1800-1804`, `app/auth/callback-complete/page.tsx:326-329`; see poke-memory #2270)
+
+#### Scenario: Reminders off
+- **WHEN** Settings opens with reminders off, or the Daily review reminder card is hidden
+- **THEN** the picker still shows, as it sits outside `PushOptIn` (`app/settings/page.tsx:1830-1866`)
+
 #### Scenario: Guest
 - **WHEN** nobody is signed in
 - **THEN** the hour is saved on the device only (`app/settings/page.tsx:1842`)
 
-Cites: `app/settings/page.tsx:1830-1859`, `lib/sync/settings.ts:80-99`, `lib/sync/pullAndMerge.ts:478-489`, `messages/en.json:328-332`.
+Cites: `app/settings/page.tsx:579-583`, `:1830-1859`, `lib/sync/settings.ts:77-99`, `lib/sync/pullAndMerge.ts:478-489`, `app/auth/callback-complete/page.tsx:250-259`, `:326-329`, `messages/en.json:328-332`.
+
+### Requirement: The reminders use the stored timezone, not the device's
+The routes SHALL read the `timezone` column, not the device's clock. Settings SHALL detect the timezone only when none is stored locally, on load, and SHALL send it with `pushRegionalPrefs` once a user is known and no superuser flag is on. After that it SHALL change only through the Settings picker or a pull of a non-null cloud value. An update with no existing `user_settings` row leaves the column null, and the routes then use UTC.
+
+#### Scenario: First Settings visit
+- **WHEN** a signed-in user opens Settings with no local timezone
+- **THEN** the detected zone is saved and sent to the column (`app/settings/page.tsx:535-551`, `:573-584`)
+
+#### Scenario: Travelling
+- **WHEN** a user with a stored timezone moves to another zone
+- **THEN** reminders and "today" keep following the stored zone until it is changed in Settings (`app/settings/page.tsx:537`, `:1747-1757`)
+
+Cites: `app/settings/page.tsx:535-551`, `:573-584`, `:1745-1757`, `lib/sync/settings.ts:77-99`, `lib/sync/pullAndMerge.ts:483`, `send-daily:645-646`, `send-nudge:233`.
 
 ### Requirement: The resubscribe route replaces a rotated subscription
 `POST /api/push/resubscribe` SHALL parse the JSON body, answer 400 `invalid_json` or `invalid_payload` unless `endpoint`, `p256dh` and `auth` are non-empty strings, then require a session (401 `unauthorized`), delete the caller's row for that endpoint and insert the new one. Failures SHALL answer 500 `delete_failed` or `insert_failed`. It SHALL NOT remove the row for the previous endpoint.
@@ -504,7 +545,7 @@ Cites: `app/sw.ts:787-833`.
 Cites: `db/migrations/028_web_push_subscriptions.sql:78-105`, `lib/push/subscribe.ts:201`, `:378`, `app/api/push/resubscribe/route.ts:60`.
 
 ### Requirement: Sync counts subscriptions and nothing reads the count
-Each pull SHALL read the caller's row count, returning null on any error without failing the sync, and SHALL dispatch `poke-memory:push-subscriptions-pulled` with the count. No code SHALL listen for that event.
+Each pull SHALL read the caller's row count, returning null on any error without failing the sync, and SHALL dispatch `poke-memory:push-subscriptions-pulled` with the count only when it is not null. No code SHALL listen for that event.
 
 #### Scenario: Count
 - **WHEN** the query succeeds
@@ -512,7 +553,7 @@ Each pull SHALL read the caller's row count, returning null on any error without
 
 #### Scenario: Offline or query error
 - **WHEN** the query errors or throws
-- **THEN** the result is null and the pull carries on (`lib/sync/pushSubscriptions.test.ts:69-82`)
+- **THEN** the result is null, no event is dispatched and the pull carries on (`lib/sync/pushSubscriptions.test.ts:69-82`, `lib/sync/pullAndMerge.ts:593`)
 
 #### Scenario: Scoped to the user
 - **WHEN** the count runs
@@ -529,4 +570,5 @@ Open calls for the owner, 2 November 2026. Each has a recommendation; none has b
 - **Is the collision guard's permanent skip intended?** A user at about UTC+10 to UTC+14 or UTC-10 to UTC-12 on the default hour, or anyone whose chosen hour is near 20:00, opts in and never gets a streak reminder, with no word in Settings. It matches the #1950 sign-off, so no issue is filed. Recommendation: confirm it, then add a line to the toggle's description if it stays.
 - **Reminder language.** Notifications are English in every locale, as recorded in the route comment (#1504), so no issue is filed. Recommendation: leave it until the route can read a per-user app language.
 - **Push due count.** Already filed in #2193 (includes learning-step cards, compares UTC `due_date` with the local day), so it is not repeated here.
+- **Privacy notice wording.** `app/privacy/page.tsx:209-214` describes the daily reminder as sent "when you have Pokémon cards due for review", while the route also sends it with nothing due, and says "You will never receive more than two notifications in a day", which a repeated local hour (#2268) or a repeated call can exceed. Recommendation: correct the wording alongside #2266 and #2268, or in #2204, which already revises that notice.
 - **Service worker cover.** No test runs the `push`, `notificationclick` or `pushsubscriptionchange` handlers, so those requirements cite code. Recommendation: cover them if `app/sw.ts` next changes.
