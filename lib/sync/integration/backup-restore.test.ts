@@ -7,8 +7,8 @@
  *
  * Runs the real restore, real pullAndMerge and real push code over real Postgres
  * with every migration applied, so the regression trigger, the pre-reset trigger
- * and reset_all_progress are the real ones. Everything else is a stand-in, so
- * this does NOT prove the end state on a real sign-in:
+ * and reset_all_progress are the real ones. Everything else is a stand-in. The
+ * real sign-in case, with RLS and a real browser, is in e2e/auth-real.spec.ts:
  *   - `cloudAs` below answers the few PostgREST calls the sync code makes, by
  *     running plain SQL, and returns rows through to_jsonb so dates and timestamps
  *     have PostgREST's shape. It does not run under the `authenticated` role, so
