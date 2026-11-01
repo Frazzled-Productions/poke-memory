@@ -8,17 +8,17 @@
  *  1. syntheticEmail is derived from the NORMALISED username; raw email is not
  *     in the result.
  *  2. password never appears in the returned value or any error.
- *  3. signUp returns the "already registered" signal -> {ok:false, error:"username_taken"}.
- *  4. signUp returns any other error -> {ok:false, error:"signup_failed"}.
- *  5. signUp returns session:null -> {ok:false, error:"signup_failed"} (dashboard
- *     misconfiguration guard).
- *  6. signUp ok but usernames INSERT errors -> {ok:false, error:"username_taken"}.
- *  7. signUp + INSERT both ok -> {ok:true}.
+ *  3. createUser returns email_exists -> {ok:false, error:"username_taken"}.
+ *  4. createUser returns any other error -> {ok:false, error:"signup_failed"}.
+ *  5. sign-in after createUser fails -> {ok:false, error:"signup_failed"}, and the
+ *     new user is removed so the username stays free.
+ *  6. createUser ok but usernames INSERT errors -> {ok:false, error:"username_taken"}.
+ *  7. createUser + sign-in + INSERT all ok -> {ok:true}.
  *  8. signInWithPassword error -> {ok:false, error:"invalid_credentials"}.
  *  9. signInWithPassword success -> {ok:true}.
  * 10. Username normalisation applied before syntheticEmail in both actions.
  * 11. check_rate_limit RPC returning false -> {ok:false, error:"rate_limited"} without
- *     calling signUp / signInWithPassword.
+ *     calling createUser / signInWithPassword.
  * 12. check_rate_limit RPC error -> {ok:false, error:"rate_limited"} (fail-safe).
  * 13. check_rate_limit returning true -> proceeds to the normal auth path.
  */
@@ -31,10 +31,22 @@ import { syntheticEmail, normaliseUsername, MIN_PASSWORD_LENGTH } from "./userna
 // vi.mock factory runs (vi.mock is hoisted to top of file by vitest).
 // ---------------------------------------------------------------------------
 
-const { mockSignUp, mockSignInWithPassword, mockInsert, mockRpc, mockHeaders } =
+const {
+  mockSignUp,
+  mockSignInWithPassword,
+  mockCreateUser,
+  mockDeleteUser,
+  mockCreateAdminClient,
+  mockInsert,
+  mockRpc,
+  mockHeaders,
+} =
   vi.hoisted(() => ({
     mockSignUp: vi.fn(),
     mockSignInWithPassword: vi.fn(),
+    mockCreateUser: vi.fn(),
+    mockDeleteUser: vi.fn(),
+    mockCreateAdminClient: vi.fn(),
     mockInsert: vi.fn(),
     mockRpc: vi.fn(),
     mockHeaders: vi.fn(),
@@ -49,6 +61,11 @@ vi.mock("@/lib/supabase/server", () => ({
     from: (_table: string) => ({ insert: mockInsert }),
     rpc: mockRpc,
   }),
+}));
+
+// The admin client: sign-up creates the account with the secret key.
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: mockCreateAdminClient,
 }));
 
 // next/navigation redirect is irrelevant for these action tests.
@@ -77,22 +94,25 @@ const RAW_MIXED = "Trainer99";
 const NORMALISED = normaliseUsername(RAW_MIXED); // "trainer99"
 const EXPECTED_EMAIL = syntheticEmail(NORMALISED);
 
-/** Minimal successful signUp response (no error, valid user, live session). */
-function makeSignUpSuccess(overrides: { session?: null | object } = {}) {
-  return {
-    data: {
-      user: {
-        id: "user-uuid-1234",
-        identities: [{ id: "some-identity" }],
-      },
-      session: overrides.session !== undefined ? overrides.session : { access_token: "tok" },
-    },
-    error: null,
-  };
+/** Minimal successful createUser response. */
+function makeCreateUserSuccess() {
+  return { data: { user: { id: "user-uuid-1234" } }, error: null };
+}
+
+/** Minimal successful signInWithPassword response (live session). */
+function makeSignInSuccess() {
+  return { data: { session: { access_token: "tok" } }, error: null };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_SECRET_KEY = "sb_secret_test";
+  mockCreateAdminClient.mockReturnValue({
+    auth: { admin: { createUser: mockCreateUser, deleteUser: mockDeleteUser } },
+  });
+  mockDeleteUser.mockResolvedValue({ data: {}, error: null });
+  mockSignInWithPassword.mockResolvedValue(makeSignInSuccess());
   // Default: INSERT succeeds.
   mockInsert.mockResolvedValue({ error: null });
   // Default: rate limit allows the request.
@@ -108,8 +128,8 @@ beforeEach(() => {
 describe("signUpWithUsername", () => {
   // --- Test 7: happy path ---------------------------------------------------
 
-  it("returns {ok:true} when signUp and INSERT both succeed", async () => {
-    mockSignUp.mockResolvedValue(makeSignUpSuccess());
+  it("returns {ok:true} when create, sign-in and INSERT all succeed", async () => {
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
 
     const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
 
@@ -118,21 +138,21 @@ describe("signUpWithUsername", () => {
 
   // --- Test 1 + 10: normalisation + synthetic email -------------------------
 
-  it("passes the NORMALISED username's syntheticEmail to signUp, not the raw input", async () => {
-    mockSignUp.mockResolvedValue(makeSignUpSuccess());
+  it("passes the NORMALISED username's syntheticEmail to createUser, not the raw input", async () => {
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
 
     await signUpWithUsername(RAW_MIXED, VALID_PASSWORD);
 
-    expect(mockSignUp).toHaveBeenCalledOnce();
-    const callArg = mockSignUp.mock.calls[0][0] as { email: string };
+    expect(mockCreateUser).toHaveBeenCalledOnce();
+    const callArg = mockCreateUser.mock.calls[0][0] as { email: string };
     // The email must be derived from the normalised form.
     expect(callArg.email).toBe(EXPECTED_EMAIL);
     // The email must NOT contain the raw mixed-case form.
     expect(callArg.email).not.toContain(RAW_MIXED);
   });
 
-  it("syntheticEmail is never present in the returned result object for signUp", async () => {
-    mockSignUp.mockResolvedValue(makeSignUpSuccess());
+  it("syntheticEmail is never present in the returned result object for createUser", async () => {
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
 
     const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
 
@@ -144,7 +164,7 @@ describe("signUpWithUsername", () => {
   // --- Test 2: password never in result ------------------------------------
 
   it("password never appears in the returned value on success", async () => {
-    mockSignUp.mockResolvedValue(makeSignUpSuccess());
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
 
     const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
 
@@ -152,8 +172,8 @@ describe("signUpWithUsername", () => {
   });
 
   it("password never appears in an error result", async () => {
-    mockSignUp.mockResolvedValue({
-      data: { user: null, session: null },
+    mockCreateUser.mockResolvedValue({
+      data: { user: null },
       error: { message: "something went wrong", code: "unknown_error", status: 500 },
     });
 
@@ -164,20 +184,9 @@ describe("signUpWithUsername", () => {
 
   // --- Test 3: already-registered -> username_taken -------------------------
 
-  it("maps identities.length===0 to username_taken", async () => {
-    mockSignUp.mockResolvedValue({
-      data: { user: { id: "uid", identities: [] }, session: null },
-      error: { message: "User already registered", code: "email_exists", status: 422 },
-    });
-
-    const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
-
-    expect(result).toEqual({ ok: false, error: "username_taken" });
-  });
-
-  it("maps signUpError.code===email_exists to username_taken", async () => {
-    mockSignUp.mockResolvedValue({
-      data: { user: null, session: null },
+  it("maps createUser code===email_exists to username_taken", async () => {
+    mockCreateUser.mockResolvedValue({
+      data: { user: null },
       error: { message: "Email already in use", code: "email_exists", status: 422 },
     });
 
@@ -186,9 +195,9 @@ describe("signUpWithUsername", () => {
     expect(result).toEqual({ ok: false, error: "username_taken" });
   });
 
-  it("maps unrecognised signUpError (status 422, unknown code) to signup_failed", async () => {
-    mockSignUp.mockResolvedValue({
-      data: { user: null, session: null },
+  it("maps unrecognised createUser error (status 422, unknown code) to signup_failed", async () => {
+    mockCreateUser.mockResolvedValue({
+      data: { user: null },
       error: { message: "Unprocessable entity", code: "some_code", status: 422 },
     });
 
@@ -197,11 +206,11 @@ describe("signUpWithUsername", () => {
     expect(result).toEqual({ ok: false, error: "signup_failed" });
   });
 
-  // --- Test 4: other signUp error -> signup_failed -------------------------
+  // --- Test 4: other createUser error -> signup_failed -------------------------
 
-  it("maps an unrecognised signUp error to signup_failed", async () => {
-    mockSignUp.mockResolvedValue({
-      data: { user: null, session: null },
+  it("maps an unrecognised createUser error to signup_failed", async () => {
+    mockCreateUser.mockResolvedValue({
+      data: { user: null },
       error: { message: "Database connection error", code: "db_error", status: 500 },
     });
 
@@ -210,20 +219,77 @@ describe("signUpWithUsername", () => {
     expect(result).toEqual({ ok: false, error: "signup_failed" });
   });
 
-  // --- Test 5: session null -> signup_failed (dashboard misconfig) ----------
+  // --- Test 5: sign-in after create fails -> signup_failed, no stranded account
 
-  it("returns signup_failed when session is null (email confirmation enabled)", async () => {
-    mockSignUp.mockResolvedValue(makeSignUpSuccess({ session: null }));
+  it("returns signup_failed and removes the new user when the follow-up sign-in fails", async () => {
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
+    mockSignInWithPassword.mockResolvedValue({ data: { session: null }, error: { message: "boom" } });
 
     const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
 
     expect(result).toEqual({ ok: false, error: "signup_failed" });
+    expect(mockDeleteUser).toHaveBeenCalledWith("user-uuid-1234");
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  // --- Test 6: signUp ok but INSERT errors -> username_taken ---------------
+  it("returns signup_failed and removes the new user when sign-in returns no session", async () => {
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
+    mockSignInWithPassword.mockResolvedValue({ data: { session: null }, error: null });
+
+    const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(result).toEqual({ ok: false, error: "signup_failed" });
+    expect(mockDeleteUser).toHaveBeenCalledWith("user-uuid-1234");
+  });
+
+  // --- New path: server-side creation, independent of the confirmation setting
+
+  it("creates the account server-side, already confirmed, and never calls public signUp", async () => {
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
+
+    await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(mockCreateAdminClient).toHaveBeenCalledWith(
+      "https://example.supabase.co",
+      "sb_secret_test",
+      expect.objectContaining({ auth: { autoRefreshToken: false, persistSession: false } }),
+    );
+    expect(mockCreateUser).toHaveBeenCalledWith({
+      email: EXPECTED_EMAIL,
+      password: VALID_PASSWORD,
+      email_confirm: true,
+      user_metadata: { username: NORMALISED },
+    });
+    expect(mockSignUp).not.toHaveBeenCalled();
+  });
+
+  it("signs in with the same credentials, then inserts the username row", async () => {
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
+
+    const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(result).toEqual({ ok: true });
+    expect(mockSignInWithPassword).toHaveBeenCalledWith({ email: EXPECTED_EMAIL, password: VALID_PASSWORD });
+    expect(mockInsert).toHaveBeenCalledWith({ username: NORMALISED, user_id: "user-uuid-1234" });
+    expect(mockSignInWithPassword.mock.invocationCallOrder[0]).toBeLessThan(
+      mockInsert.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("returns signup_failed without creating an account when no secret key is set", async () => {
+    delete process.env.SUPABASE_SECRET_KEY;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
+
+    expect(result).toEqual({ ok: false, error: "signup_failed" });
+    expect(mockCreateUser).not.toHaveBeenCalled();
+  });
+
+  // --- Test 6: createUser ok but INSERT errors -> username_taken ---------------
 
   it("returns username_taken when INSERT into usernames fails", async () => {
-    mockSignUp.mockResolvedValue(makeSignUpSuccess());
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
     mockInsert.mockResolvedValue({ error: { message: "duplicate key", code: "23505" } });
 
     const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
@@ -231,71 +297,71 @@ describe("signUpWithUsername", () => {
     expect(result).toEqual({ ok: false, error: "username_taken" });
   });
 
-  // --- Test 10: normalisation before syntheticEmail in signUp ---------------
+  // --- Test 10: normalisation before syntheticEmail in createUser ---------------
 
-  it("normalises username before deriving syntheticEmail for signUp (Trainer99 -> trainer99)", async () => {
-    mockSignUp.mockResolvedValue(makeSignUpSuccess());
+  it("normalises username before deriving syntheticEmail for createUser (Trainer99 -> trainer99)", async () => {
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
 
     await signUpWithUsername("Trainer99", VALID_PASSWORD);
 
-    const callArg = mockSignUp.mock.calls[0][0] as { email: string };
+    const callArg = mockCreateUser.mock.calls[0][0] as { email: string };
     expect(callArg.email).toBe(syntheticEmail("trainer99"));
   });
 
   // --- Validation guards ----------------------------------------------------
 
-  it("rejects a too-short username without calling signUp", async () => {
+  it("rejects a too-short username without calling createUser", async () => {
     const result = await signUpWithUsername("ab", VALID_PASSWORD);
 
     expect(result).toEqual({ ok: false, error: "username_too_short" });
-    expect(mockSignUp).not.toHaveBeenCalled();
+    expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
-  it("rejects a password shorter than MIN_PASSWORD_LENGTH without calling signUp", async () => {
+  it("rejects a password shorter than MIN_PASSWORD_LENGTH without calling createUser", async () => {
     const shortPassword = "x".repeat(MIN_PASSWORD_LENGTH - 1);
 
     const result = await signUpWithUsername("trainer99", shortPassword);
 
     expect(result).toEqual({ ok: false, error: "password_too_short" });
-    expect(mockSignUp).not.toHaveBeenCalled();
+    expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
   // --- Test 11: rate_limited branch -----------------------------------------
 
-  it("returns rate_limited without calling signUp when the RPC returns false", async () => {
+  it("returns rate_limited without calling createUser when the RPC returns false", async () => {
     mockRpc.mockResolvedValue({ data: false, error: null });
 
     const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
 
     expect(result).toEqual({ ok: false, error: "rate_limited" });
-    expect(mockSignUp).not.toHaveBeenCalled();
+    expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
   // --- Test 12: RPC error -> fail-safe rate_limited -------------------------
 
-  it("returns rate_limited without calling signUp when the RPC returns an error", async () => {
+  it("returns rate_limited without calling createUser when the RPC returns an error", async () => {
     mockRpc.mockResolvedValue({ data: null, error: { message: "db error" } });
 
     const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
 
     expect(result).toEqual({ ok: false, error: "rate_limited" });
-    expect(mockSignUp).not.toHaveBeenCalled();
+    expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
-  // --- Test 13: RPC allowed -> proceeds to signUp ---------------------------
+  // --- Test 13: RPC allowed -> proceeds to createUser ---------------------------
 
-  it("proceeds to signUp when the RPC returns true", async () => {
+  it("proceeds to createUser when the RPC returns true", async () => {
     mockRpc.mockResolvedValue({ data: true, error: null });
-    mockSignUp.mockResolvedValue(makeSignUpSuccess());
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
 
     const result = await signUpWithUsername("trainer99", VALID_PASSWORD);
 
     expect(result).toEqual({ ok: true });
-    expect(mockSignUp).toHaveBeenCalledOnce();
+    expect(mockCreateUser).toHaveBeenCalledOnce();
   });
 
   it("calls check_rate_limit RPC with action 'signup'", async () => {
-    mockSignUp.mockResolvedValue(makeSignUpSuccess());
+    mockCreateUser.mockResolvedValue(makeCreateUserSuccess());
 
     await signUpWithUsername("trainer99", VALID_PASSWORD);
 

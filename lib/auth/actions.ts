@@ -1,7 +1,9 @@
 "use server";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseSecretKey } from "@/lib/supabase/keys";
 import type { AuthProvider } from "./types";
 import { normaliseUsername, validateUsername, syntheticEmail, MIN_PASSWORD_LENGTH } from "./username";
 import { hashIp } from "./rateLimitIp";
@@ -41,12 +43,11 @@ export type SignUpWithUsernameResult =
  * Steps:
  *   1. Normalise + validate the username.
  *   2. Derive the synthetic email (never shown to the user).
- *   3. Call supabase.auth.signUp with the synthetic email + password.
- *      emailRedirectTo is omitted - email confirmation MUST be disabled in the
- *      Supabase dashboard ("Confirm email" toggle off) so the session is
- *      usable immediately without any email round-trip. See PR body for the
- *      one-off dashboard toggle the maintainer must flip.
- *   4. Insert the (username, user_id) row into public.usernames.
+ *   3. Create the account with the admin API (secret key), already confirmed:
+ *      the synthetic address cannot receive mail, and creating it here means
+ *      this door works whichever way the Supabase "Confirm email" setting is set.
+ *   4. Sign in with the same credentials, which sets the session cookie.
+ *   5. Insert the (username, user_id) row into public.usernames.
  *
  * IMPORTANT: password is never logged. Do not add logging that captures it.
  */
@@ -84,54 +85,45 @@ export async function signUpWithUsername(
 
   const email = syntheticEmail(normalised);
 
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      // Do NOT pass emailRedirectTo - the synthetic address cannot receive mail.
-      // Email confirmation must be disabled in the Supabase dashboard.
-      data: {
-        // Store username in user_metadata for display purposes (does not
-        // replace the primary lookup path through public.usernames).
-        username: normalised,
-      },
-    },
-  });
-
-  if (signUpError) {
-    // Use GoTrue's canonical signal for an already-registered email rather than
-    // the human-readable message string, which can change across GoTrue versions.
-    // `code === "email_exists"` is the primary signal; `identities.length === 0`
-    // is the documented secondary indicator. Status 422 is GoTrue's general
-    // "Unprocessable Entity" and is intentionally excluded: it can cover
-    // non-duplicate rejections (e.g. a future password-strength rule) and would
-    // mislead the user into changing their username instead of their password.
-    // Cast signUpData.user via unknown so TS does not narrow 'identities' to
-    // never in the error branch (the Supabase SDK types differ between the
-    // error and success overloads of AuthResponse).
-    const maybeUser = signUpData.user as { identities?: unknown[] } | null;
-    const alreadyRegistered =
-      (signUpError as { code?: string }).code === "email_exists" ||
-      maybeUser?.identities?.length === 0;
-    if (alreadyRegistered) {
-      return { ok: false, error: "username_taken" };
-    }
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const secretKey = supabaseSecretKey();
+  if (!supabaseUrl || !secretKey) {
     return { ok: false, error: "signup_failed" };
   }
+  const admin = createSupabaseAdminClient(supabaseUrl, secretKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 
-  const userId = signUpData.user?.id;
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    // Store username in user_metadata for display purposes (does not replace
+    // the primary lookup path through public.usernames).
+    user_metadata: { username: normalised },
+  });
+
+  if (createError) {
+    // `email_exists` is GoTrue's canonical signal for an already-registered
+    // address; the message string can change across versions.
+    const alreadyRegistered = (createError as { code?: string }).code === "email_exists";
+    return { ok: false, error: alreadyRegistered ? "username_taken" : "signup_failed" };
+  }
+
+  const userId = created.user?.id;
   if (!userId) {
     return { ok: false, error: "signup_failed" };
   }
 
-  // If the Supabase dashboard has "Confirm email" enabled, the synthetic address
-  // cannot receive a confirmation mail, so the session will be null even when
-  // the auth.users row was created. Without a session there is no auth.uid(),
-  // which means the INSERT into public.usernames will be rejected by RLS, leaving
-  // an orphan auth.users row and surfacing a misleading "username_taken" error.
-  // Return signup_failed here and let the user (or the admin) investigate the
-  // dashboard misconfiguration rather than creating a confusing half-created account.
-  if (!signUpData.session) {
+  // Without a session there is no auth.uid(), so the INSERT below would be
+  // rejected by RLS. Remove the new user on failure: left behind, it would hold
+  // the username with no way in.
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (signInError || !signInData.session) {
+    await admin.auth.admin.deleteUser(userId);
     return { ok: false, error: "signup_failed" };
   }
 

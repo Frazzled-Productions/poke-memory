@@ -37,12 +37,9 @@ import { addOnboardingPreDismiss } from "./helpers/onboarding";
  *     this job.
  *
  * KNOWN PREREQUISITE (maintainer action)
- *   - The QA project MUST have "Confirm email" DISABLED in its Auth settings.
- *     The username door derives a synthetic, non-routable email, so a
- *     confirmation mail can never be received; with confirmation enabled,
- *     signUp returns no session and sign-in can never complete. If that is the
- *     case this spec fails FAST with a clear message rather than a cryptic
- *     timeout. Production has it disabled; QA must match.
+ *   - The server creates username accounts with the QA project's secret key, so
+ *     the e2e-real-auth job needs the QA_SUPABASE_SECRET_KEY GitHub secret. The
+ *     door works whichever way the project's "Confirm email" setting is set.
  */
 
 // NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY are inlined into the client bundle at
@@ -171,9 +168,9 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
     // SignInSheet does a full navigation, so the signed-in UI ("Sign out")
     // appears WITHOUT a manual reload. This is the exact regression we guard.
     //
-    // If the QA project has "Confirm email" ENABLED, signUp returns no session,
-    // signUpWithUsername returns signup_failed, and the inline error renders
-    // instead of the signed-in nav. Detect that and fail with a clear message.
+    // If the server has no QA secret key, signUpWithUsername returns
+    // signup_failed and the inline error renders instead of the signed-in nav.
+    // Detect that and fail with a clear message.
     const signOut = page.getByRole("button", { name: "Sign out" });
     const signupFailed = dialog.getByRole("alert");
 
@@ -189,11 +186,10 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
     if (await signupFailed.isVisible().catch(() => false)) {
       const msg = await signupFailed.textContent();
       throw new Error(
-        `Sign-up failed: "${msg?.trim()}". The most likely cause is that the QA ` +
-          `Supabase project has "Confirm email" ENABLED. The username door uses a ` +
-          `synthetic, non-routable email, so a confirmation mail can never be ` +
-          `received and signUp returns no session. A maintainer must DISABLE ` +
-          `"Confirm email" in the QA project's Auth settings (production has it off).`,
+        `Sign-up failed: "${msg?.trim()}". The most likely cause is a missing ` +
+          `SUPABASE_SECRET_KEY: the username door creates accounts on the server ` +
+          `with it, and the e2e-real-auth job reads it from the ` +
+          `QA_SUPABASE_SECRET_KEY GitHub secret.`,
       );
     }
 
