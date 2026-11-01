@@ -2,6 +2,11 @@ import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLocalProgress } from "./reset";
 import { idbGet, idbSet, __resetForTests } from "@/lib/idb/db";
+import { KEY_PENDING_GRADE_QUEUE } from "@/lib/storage/keys";
+import { savePendingQueue } from "@/lib/sync/persistence";
+import { deleteAccountEverywhere } from "@/lib/sync/deleteAccount";
+import { resetAllProgressEverywhere } from "@/lib/sync/reset";
+import type { ReviewableCard } from "@/lib/review/session";
 
 // Node 22+ exposes its own gated localStorage at the global scope which
 // hides jsdom's window.localStorage in component tests (see the
@@ -72,6 +77,26 @@ function makeStubStorage(): Storage {
   }) as unknown as Storage;
 }
 
+/** Queues one grade through the real write path and waits for its IDB mirror. */
+async function seedPendingQueue(): Promise<void> {
+  savePendingQueue([
+    {
+      cardType: "name",
+      subjectKey: "1",
+      state: { fsrsState: "review", dueDate: "2026-05-08", reps: 1 },
+    } as unknown as ReviewableCard,
+  ]);
+  await vi.waitFor(async () => {
+    expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).not.toBeNull();
+  });
+}
+
+function makeRpcClient(rpcError: null | object = null) {
+  return {
+    rpc: vi.fn().mockResolvedValue({ error: rpcError, data: null }),
+  } as unknown as import("@supabase/supabase-js").SupabaseClient;
+}
+
 describe("clearLocalProgress", () => {
   const events: Array<{ key: string | null }> = [];
   const stubLocalStorage = makeStubStorage();
@@ -110,6 +135,7 @@ describe("clearLocalProgress", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     await __resetForTests();
   });
@@ -150,6 +176,42 @@ describe("clearLocalProgress", () => {
     expect(await idbGet("poke-memory:review-session:v1")).toBeNull();
     expect(await idbGet("poke-memory:grade-log:v1")).toBeNull();
     expect(await idbGet("migration_done_v1")).toBeNull();
+  });
+
+  it("clearLocalProgress removes the IDB pending-grade queue", async () => {
+    await seedPendingQueue();
+
+    await clearLocalProgress();
+
+    expect(stubLocalStorage.getItem(KEY_PENDING_GRADE_QUEUE)).toBeNull();
+    expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).toBeNull();
+  });
+
+  it("deleteAccountEverywhere clears the IDB pending-grade queue", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await seedPendingQueue();
+
+    expect(await deleteAccountEverywhere(makeRpcClient())).toEqual({ ok: true });
+
+    expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).toBeNull();
+  });
+
+  it("resetAllProgressEverywhere clears the IDB pending-grade queue", async () => {
+    await seedPendingQueue();
+
+    expect(await resetAllProgressEverywhere(makeRpcClient())).toEqual({ ok: true });
+
+    expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).toBeNull();
+  });
+
+  it("keeps the IDB pending-grade queue when the cloud delete or reset fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await seedPendingQueue();
+
+    await deleteAccountEverywhere(makeRpcClient({ message: "boom" }));
+    await resetAllProgressEverywhere(makeRpcClient({ message: "boom" }));
+
+    expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).not.toBeNull();
   });
 
   it("preserves poke-memory:user-archive:* keys belonging to other accounts (F56 / #1856)", async () => {
