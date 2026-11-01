@@ -12,7 +12,7 @@ depends on appears here. Superuser flags are named in full; "species-mastered" m
 
 ### Requirement: A streak day is recorded per user-local day (baseline)
 
-The app SHALL add the player's timezone-local date to the streak list when today's graded count, including the current grade, reaches `STREAK_MIN_CARDS` (5), or when the due queue is empty. The list SHALL be a sorted, duplicate-free array of `YYYY-MM-DD` strings in localStorage under `poke-memory:streak:v1`, and a new date SHALL dispatch `poke-memory:streak-updated`. Corrupt or non-string stored data SHALL read as an empty list.
+The app SHALL add the player's timezone-local date to the streak list when today's graded count, including the current grade, reaches `STREAK_MIN_CARDS` (5), or when the due queue is empty. The date SHALL be recorded only after the session save succeeds. The list SHALL be a sorted, duplicate-free array of `YYYY-MM-DD` strings in localStorage under `poke-memory:streak:v1`, and a new date SHALL dispatch `poke-memory:streak-updated`. Corrupt or non-string stored data SHALL read as an empty list.
 
 #### Scenario: Below the threshold with cards still due
 
@@ -27,7 +27,7 @@ The app SHALL add the player's timezone-local date to the streak list when today
 #### Scenario: A light queue
 
 - **WHEN** a grade leaves no due reviews, with fewer than 5 grades today
-- **THEN** the day still counts (`lib/streak/persistence.test.ts:135`)
+- **THEN** the day still counts (`lib/streak/persistence.test.ts:135`); "no due reviews" means no active-language session card that has been reviewed, is out of learning steps, is due and was not reviewed today, so new and in-learning cards do not hold it back
 
 #### Scenario: Grading near midnight in a non-UTC timezone
 
@@ -39,11 +39,16 @@ The app SHALL add the player's timezone-local date to the streak list when today
 - **WHEN** the player undoes the fifth grade of the day
 - **THEN** the streak date stays, because only `recordReview` writes it in `ReviewSession` (looks wrong: #2279)
 
-Source: `lib/streak/persistence.ts:7`, `lib/streak/persistence.ts:11`, `lib/streak/persistence.ts:13-25`, `lib/streak/persistence.ts:31-45`, `lib/storage/keys.ts:61`, `components/review/ReviewSession.tsx:2640`, `components/review/ReviewSession.tsx:2965-2972`, `components/review/ReviewSession.tsx:3068`.
+#### Scenario: Superuser flag on
+
+- **WHEN** a player grades with a superuser flag on
+- **THEN** the date is still written locally, because `recordReview` has no flag guard, and only the cloud push is suppressed
+
+Source: `lib/streak/persistence.ts:7`, `lib/streak/persistence.ts:11`, `lib/streak/persistence.ts:13-25`, `lib/streak/persistence.ts:31-45`, `lib/storage/keys.ts:61`, `components/review/ReviewSession.tsx:2640`, `components/review/ReviewSession.tsx:2946-2972`, `components/review/ReviewSession.tsx:3068`.
 
 ### Requirement: The current streak counts back from today or yesterday (baseline)
 
-`computeStreak` SHALL count consecutive dates back from today if today is present, otherwise from yesterday, and SHALL return 0 when neither is present. Order and duplicates SHALL NOT matter. Date arithmetic SHALL be UTC on the date string, so daylight saving has no effect. Every reader SHALL pass `effectiveStreakDates` (review dates plus spend dates) and a timezone-local today.
+`computeStreak` SHALL count consecutive dates back from today if today is present, otherwise from yesterday, and SHALL return 0 when neither is present. Order and duplicates SHALL NOT matter. Date arithmetic SHALL be UTC on the date string, so daylight saving has no effect. Every reader SHALL pass `effectiveStreakDates` (review dates plus spend dates). Every reader except the daily share SHALL pass a timezone-local today; the daily share passes a UTC today.
 
 #### Scenario: Not reviewed yet today
 
@@ -65,11 +70,16 @@ Source: `lib/streak/persistence.ts:7`, `lib/streak/persistence.ts:11`, `lib/stre
 - **WHEN** a missed day is in `spendDates`
 - **THEN** it counts as a streak day (`lib/streak/tokens.test.ts:691`), but a stale spend alone does not start a streak (`:698`)
 
-Source: `lib/streak/compute.ts:10-32`, `lib/streak/tokens.ts:413-420`, `lib/streak/useStreakNavState.ts:76-85`, `components/review/StreakBadge.tsx:77-89`, `app/journey/page.tsx:458-465`, `components/review/useShareSheet.ts:51`.
+#### Scenario: Sharing the daily summary east of UTC
+
+- **WHEN** the player's local date is ahead of the UTC date
+- **THEN** the shared streak is counted back from the UTC date, so it reads low or zero (looks wrong: #2283)
+
+Source: `lib/streak/compute.ts:10-32`, `lib/streak/tokens.ts:413-420`, `lib/streak/useStreakNavState.ts:76-85`, `components/review/StreakBadge.tsx:77-89`, `app/journey/page.tsx:458-465`, `components/review/useShareSheet.ts:43-58`, `lib/push/streakNudgePredicate.ts:52-56`.
 
 ### Requirement: Streak dates sync as a one-way-growing set (baseline)
 
-For signed-in players, `pushStreak` SHALL upsert every local date into `streak_days` with `ignoreDuplicates`, `pullStreak` SHALL page through all rows ordered by date, and `mergeStreak` SHALL union and sort, so sync never removes a date. Failures SHALL NOT interrupt anything. The database SHALL reject a date later than `current_date + 1`. Spend dates SHALL NOT go to `streak_days`; they travel in the settings blob.
+`pushStreak` SHALL upsert every local date into `streak_days`, ignoring duplicates, `pullStreak` SHALL page through all rows by date, and `mergeStreak` SHALL union and sort, so a background pull never removes a date. Force pull, choosing cloud at sign-in and leaving superuser mode SHALL replace the local list instead. Only `AutoSyncOnChange` and the keep-local sign-in choice SHALL push. Failures SHALL NOT interrupt anything. The database SHALL reject a date later than `current_date + 1`. Spend dates SHALL travel in settings, not `streak_days`.
 
 #### Scenario: A new streak day on a signed-in device
 
@@ -85,6 +95,21 @@ For signed-in players, `pushStreak` SHALL upsert every local date into `streak_d
 
 - **WHEN** no user is signed in
 - **THEN** dates stay on the device, because `AutoSyncOnChange` has no client to push with
+
+#### Scenario: Signing in with local progress
+
+- **WHEN** the player chooses at sign-in between local and cloud progress
+- **THEN** keeping local pushes every local date, and keeping cloud replaces the local list (`app/auth/callback-complete/page.tsx:279`, `:334`)
+
+#### Scenario: Force pull
+
+- **WHEN** the cloud list lacks a date this device holds
+- **THEN** Force pull drops that date without firing `poke-memory:streak-updated` (`components/settings/ForcePullSection.tsx:93`), and so does leaving superuser mode, by design (`lib/superuser/SuperuserContext.tsx:176-181`)
+
+#### Scenario: Another account on a shared device
+
+- **WHEN** a different user signs in
+- **THEN** the outgoing user's dates go into their per-user archive and return if they sign in again (`lib/storage/userArchive.ts:1-8`, `:55`)
 
 #### Scenario: Superuser flag on
 
@@ -193,7 +218,7 @@ Source: `lib/streak/tokens.ts:229-234`, `lib/streak/tokens.ts:329-334`, `lib/str
 
 ### Requirement: Protection state lives in settings and is parsed defensively (baseline)
 
-`StreakProtection` SHALL live in the settings blob, so it follows settings sync. `validateStreakProtection` SHALL never throw: a malformed field SHALL fall back to its default, the balance SHALL clamp to `MAX_BALANCE`, `spendDates` SHALL keep only valid dates, sorted and unique, and malformed events SHALL be dropped. Events SHALL be capped at `MAX_PROTECTION_EVENTS` (10), dropping the oldest. `spendDates` SHALL have no cap.
+`StreakProtection` SHALL live in the settings blob, so it follows settings sync. `validateStreakProtection` SHALL never throw: bad fields SHALL take defaults, the balance SHALL clamp to `MAX_BALANCE`, `spendDates` SHALL keep only valid dates, sorted and unique, and bad events SHALL drop. Each append SHALL cap events at `MAX_PROTECTION_EVENTS` (10), oldest first; the parser does not. `spendDates` SHALL have no cap. Cloud pushes SHALL be deep-merged, and the database SHALL protect spend dates and balance.
 
 #### Scenario: Corrupt state
 
@@ -205,7 +230,12 @@ Source: `lib/streak/tokens.ts:229-234`, `lib/streak/tokens.ts:329-334`, `lib/str
 - **WHEN** an eleventh event is added
 - **THEN** the oldest is dropped (`lib/streak/tokens.test.ts:630`)
 
-Source: `lib/streak/tokens.ts:37`, `lib/streak/tokens.ts:59-96`, `lib/streak/tokens.ts:113-187`, `lib/streak/tokens.ts:398-401`, `lib/settings/persistence.ts:426`, `lib/settings/persistence.ts:905`.
+#### Scenario: A stale device pushes protection
+
+- **WHEN** a settings push would remove a spend date from the cloud row, or lower the balance without adding one
+- **THEN** the trigger raises `23514`, the push reports failure and it is retried on the next settings save (`components/sync/AutoSyncOnChange.tsx:63-75`)
+
+Source: `lib/streak/tokens.ts:37`, `lib/streak/tokens.ts:59-96`, `lib/streak/tokens.ts:113-187`, `lib/streak/tokens.ts:398-401`, `lib/settings/persistence.ts:426`, `lib/settings/persistence.ts:905`, `db/migrations/037_merge_user_settings_deep.sql:9-19`, `db/migrations/038_user_settings_reject_regression_trigger.sql:78-100`.
 
 ### Requirement: The protection step runs only on the client, with stored settings (baseline)
 
@@ -227,6 +257,53 @@ Source: `lib/streak/tokens.ts:37`, `lib/streak/tokens.ts:59-96`, `lib/streak/tok
 - **THEN** the spend is saved before the protection card renders, with no toast, because only `StreakBadge` shows toasts (`app/stats/page.tsx:257-260`)
 
 Source: `lib/streak/runProtection.ts:40-64`, `components/review/StreakBadge.tsx:71-143`, `app/stats/page.tsx:255-260`, `lib/streak/useStreakNavState.ts:58-61`.
+
+### Requirement: A toast reports a token change once per visit (baseline)
+
+`StreakBadge` SHALL show one `ProtectionToast` for the first pass in a page visit whose step earned, spent or did both, and SHALL ignore later changes in that visit. The toast SHALL use `role="status"`, dismiss after 5000 ms or on a tap, and give the streak figure for a spend or a combined event. The figure SHALL be `StreakBadge`'s own streak state. Under `forceTokenToast` the earn toast SHALL show once with no real event, and the flag SHALL clear on dismissal.
+
+#### Scenario: Each kind
+
+- **WHEN** a step earns, spends or does both
+- **THEN** one toast shows for that kind (`components/review/StreakBadge.test.tsx:165`, `:263`, `:297`)
+
+#### Scenario: A later event in the same visit
+
+- **WHEN** another streak event fires after a toast
+- **THEN** no second toast shows (`components/review/StreakBadge.test.tsx:230`)
+
+#### Scenario: At the cap
+
+- **WHEN** an earn at the cap adds nothing
+- **THEN** no toast shows (`components/review/StreakBadge.test.tsx:326`)
+
+#### Scenario: A spend on mount
+
+- **WHEN** the step spends a token during the first pass on Practice
+- **THEN** the streak is computed from settings read before the step, so the toast says "0-day streak", the mobile chip says "Start streak" and a pending milestone is held back until the next event, as a scratch run of the real component confirmed on 2 November 2026 (looks wrong: #2351)
+
+#### Scenario: Force flag
+
+- **WHEN** `forceTokenToast` is on
+- **THEN** the earn toast shows once and the flag clears on dismissal (`components/review/StreakBadge.test.tsx:601`, `:617`)
+
+Source: `components/review/StreakBadge.tsx:66`, `components/review/StreakBadge.tsx:77-90`, `components/review/StreakBadge.tsx:101-139`, `components/review/StreakBadge.tsx:168-176`, `components/review/ProtectionToast.tsx:20`, `components/review/ProtectionToast.tsx:36-59`.
+
+### Requirement: Resetting progress clears dates but keeps tokens and milestones (baseline)
+
+Reset progress SHALL delete the player's `streak_days` rows and the local streak list. `streakProtection` and `seenStreakMilestones` SHALL survive, locally and in the cloud, because settings are outside both the RPC and the local sweep. Another signed-in device SHALL wipe its local progress before merging when the cloud `last_reset_at` is newer than the one it last saw. Superuser mode SHALL block the Settings reset.
+
+#### Scenario: Reset on this device
+
+- **WHEN** a player with tokens and seen milestones resets
+- **THEN** the streak is 0, the balance and spend dates remain, and a milestone already seen does not celebrate again on the regrown streak
+
+#### Scenario: A second device
+
+- **WHEN** a pull finds a newer `last_reset_at`
+- **THEN** local progress is cleared first, so old dates are not merged back (`lib/sync/pullAndMerge.ts:174-185`)
+
+Source: `app/settings/page.tsx:678-689`, `lib/favourite/favourite.ts:83-91`, `lib/storage/reset.ts:18-41`, `lib/sync/reset.ts:50-56`, `lib/storage/keys.ts:32`, `db/migrations/026_reset_all_progress_cooldown.sql:56`.
 
 ### Requirement: Streak milestones celebrate once per player (baseline)
 
@@ -351,7 +428,7 @@ Source: `lib/stats/derive.ts:33`, `lib/stats/derive.ts:76-78`, `lib/stats/derive
 - **WHEN** `forceAllMastered` is true
 - **THEN** queue and forecast keep real scheduling state (`lib/stats/dashboard-snapshot.test.ts:1032`)
 
-Source: `lib/stats/dashboard-snapshot.ts:234-250`, `lib/stats/dashboard-snapshot.ts:440-450`, `components/stats/DashboardSnapshotContext.tsx:62-84`, `components/stats/DashboardSnapshotContext.tsx:94-98`, `components/stats/DashboardSnapshotContext.tsx:108-116`, `app/stats/page.tsx:404-413`.
+Source: `lib/stats/dashboard-snapshot.ts:234-250`, `lib/stats/dashboard-snapshot.ts:440-450`, `components/stats/DashboardSnapshotContext.tsx:62-84`, `components/stats/DashboardSnapshotContext.tsx:94-98`, `components/stats/DashboardSnapshotContext.tsx:108-116`, `app/stats/page.tsx:387-396`.
 
 ### Requirement: The due forecast covers 14 days (baseline)
 
@@ -428,24 +505,29 @@ Source: `lib/stats/completion-projection.ts:41`, `lib/stats/completion-projectio
 
 ### Requirement: First-mastery hint shows before the first mastery (baseline)
 
-The snapshot SHALL give a projected day count only when the active locale has introduced cards, none mastered and `pretendAllMastered` is off, and the page SHALL render the hint only then.
+The snapshot SHALL give a projected day count only when the active locale has introduced cards, no mastered species and `pretendAllMastered` is off, and the page SHALL render the hint only then. The count SHALL be the fastest simulated card under always-Good, at least 1, and null if no simulation finishes.
 
 #### Scenario: Nothing mastered yet
 
 - **WHEN** cards are introduced and none mastered
 - **THEN** a positive day count is given (`lib/stats/dashboard-snapshot.test.ts:860`), shown by `e2e/stats.spec.ts:302`
 
-#### Scenario: Something mastered
+#### Scenario: A species mastered
 
-- **WHEN** a card is mastered
-- **THEN** the value is null and the hint hides (`lib/stats/dashboard-snapshot.test.ts:851`, `e2e/stats.spec.ts:359`)
+- **WHEN** both legs of a species are mastered
+- **THEN** the value is null and the hint hides (`e2e/stats.spec.ts:359`)
+
+#### Scenario: One leg mastered on Stats
+
+- **WHEN** a name card is mastered, no species is complete and all axes are computed
+- **THEN** the gate is species-level, so the hint still shows, while a snapshot asking for `firstMastery` alone counts cards, as a run of the real function confirmed on 2 November 2026 (all axes 8 days, `firstMastery` alone null); the unit test at `lib/stats/dashboard-snapshot.test.ts:851` covers only the card-level path
 
 #### Scenario: Superuser flag on
 
 - **WHEN** `pretendAllMastered` is on
 - **THEN** the hint hides (`e2e/stats.spec.ts:453`)
 
-Source: `lib/stats/dashboard-snapshot.ts:395-428`, `app/stats/page.tsx:569-574`, `components/stats/FirstMasteryHint.tsx:35-51`.
+Source: `lib/stats/dashboard-snapshot.ts:395-428`, `lib/srs/timeToMastery.ts:61-90`, `app/stats/page.tsx:569-574`, `components/stats/FirstMasteryHint.tsx:35-51`.
 
 ### Requirement: Accuracy and recall treat Good and Easy as a pass (baseline)
 
@@ -513,10 +595,10 @@ The heatmap SHALL be 53 weeks of 7 days ending with the current week, Sunday-fir
 - **WHEN** an entry has no `subjectKey`
 - **THEN** it counts as a review, not an introduction (`lib/stats/activity-history.test.ts:113`)
 
-#### Scenario: Guest
+#### Scenario: A log older than a year
 
-- **WHEN** a guest's log has been pruned to 365 days
-- **THEN** a card first seen before that can count as introduced again, as the code comment records (`lib/stats/activity-history.ts:42-50`)
+- **WHEN** a guest or signed-in player has entries older than 365 days
+- **THEN** they stay in the log and still suppress a repeat introduction, because no production code calls `pruneGradeLog` (`lib/gradelog/persistence.ts:344`, `lib/stats/retention.ts:5-10`); the pruning caveat at `lib/stats/activity-history.ts:42-50` is out of date
 
 Source: `lib/stats/heatmap.ts:19-54`, `lib/stats/heatmap.ts:61-67`, `lib/stats/activity-history.ts:57-126`, `app/stats/page.tsx:419`, `app/stats/page.tsx:520-522`, `components/review/ReviewSession.tsx:2977`.
 
@@ -558,7 +640,7 @@ Mastery over time SHALL be a cumulative series with one point per mastery-event 
 #### Scenario: Records under the flag
 
 - **WHEN** `pretendAllMastered` is on
-- **THEN** longest run and best day stay real (`lib/stats/records.ts:101-107`)
+- **THEN** longest run and best day stay real, the average is 0 and the 7-day figure is the active-locale name card count (`lib/stats/records.ts:101-107`)
 
 #### Scenario: Consistent across surfaces
 
@@ -595,7 +677,7 @@ Source: `lib/stats/per-game.ts:59-124`, `app/stats/page.tsx:361-369`, `app/stats
 
 ### Requirement: The Stats page loads local data, then overlays the cloud (baseline)
 
-The client page SHALL show a skeleton until a snapshot exists, then the Accuracy, Activity, Progress, Languages and Scheduling sections, charts loading lazily. It SHALL read settings, session and grade log locally, recompute on storage version changes, and silently award badges unless a superuser flag is on. For a signed-in player with no flag on, it SHALL then replace card state in memory with `applyCloudAuthoritative`, without saving.
+The client page SHALL show a skeleton until a snapshot exists, then the Accuracy, Activity, Progress, Languages and Scheduling sections, charts loading lazily. It SHALL read settings, session and grade log locally, save the session when hydration heals a card, recompute on storage version changes, and silently award badges unless a superuser flag is on. For a signed-in player with no flag on, it SHALL then replace card state in memory with `applyCloudAuthoritative`, without saving.
 
 #### Scenario: Signed in
 
@@ -622,6 +704,11 @@ The client page SHALL show a skeleton until a snapshot exists, then the Accuracy
 - **WHEN** this device holds grades the cloud lacks
 - **THEN** card figures omit them while grade-log charts include them (looks wrong: #2274)
 
+#### Scenario: A retroactive badge on the same load as a token change
+
+- **WHEN** the protection step changes state and the same load awards a badge
+- **THEN** the badge save spreads settings read before the step, overwriting that change until the next step re-applies it (`app/stats/page.tsx:255`, `:260`, `:332`; looks wrong: #2352)
+
 #### Scenario: A non-English locale
 
 - **WHEN** the page renders in Japanese
@@ -631,7 +718,7 @@ Source: `app/stats/page.tsx:124-138`, `app/stats/page.tsx:247-356`, `app/stats/p
 
 ### Requirement: The sync line reports the worst state first (baseline)
 
-`SyncStatusLine` SHALL show, in priority order, a schema error, a retry in progress, a failed retry, cards out of sync or sync failed with a retry button, then last synced in the player's timezone or not synced yet. Retry buttons SHALL be disabled while a superuser flag is on. Zero failed cards SHALL read as synced.
+`SyncStatusLine` SHALL show, in priority order, a schema error, a retry in progress, a failed retry, cards out of sync or sync failed with a retry button, then last synced in the player's timezone or not synced yet. Retry buttons SHALL be disabled while a superuser flag is on. Zero failed cards SHALL read as last synced, or not synced yet if no push has succeeded.
 
 #### Scenario: Failed cards
 
@@ -666,8 +753,12 @@ Source: `lib/stats/useCountUp.ts:17-65`.
 Open calls from writing this baseline on 2 November 2026, for the owner. Nothing here was answered by the owner; each has a recommendation.
 
 - 2026-11-02: Where should this spec sit? It is directly in `openspec/specs/`, not a change folder, because a baseline alters no behaviour and other wave 3 baselines do the same. Recommendation: keep it.
-- 2026-11-02: Should the requirements marked "looks wrong" stay as they are? Recommendation: yes, a baseline records today; each fix modifies the requirement in its own change (#2272 to #2276, #2278, #2279, #2281).
+- 2026-11-02: Should the requirements marked "looks wrong" stay as they are? Recommendation: yes, a baseline records today; each fix modifies the requirement in its own change (#2272 to #2276, #2278, #2279, #2281, #2283, #2351, #2352).
 - 2026-11-02: Should the superuser flag stop the protection step saving? It writes local settings while the badge award on the same page is guarded, and `docs/superuser.md` only rules out cloud writes. Recommendation: no issue filed; decide when superuser mode is next specified.
 - 2026-11-02: Should Records and the review surfaces (`StreakBadge`, Journey, the nudge route) move here or stay out? They were only described where this capability depends on them. Recommendation: keep `StreakBadge` here for milestones, and the nudge route with push.
+- 2026-11-02: Should Reset progress also clear `streakProtection` and `seenStreakMilestones`? Today a reset keeps tokens and spend dates and stops old milestones celebrating again. No issue is filed, because this may be deliberate. Recommendation: clear both, since they are progress rather than preferences, as #2187 did for the learn-first list; the regression trigger on spend dates and balance would need to allow it.
+- 2026-11-02: Should the first-mastery gate be species-level on both paths? The two paths disagree, and the unit test only covers the card-level one. Recommendation: keep species-level, which is what Stats shows, and change the fallback and test to match.
+- 2026-11-02: `pruneGradeLog` has no production caller, and comments at `lib/stats/activity-history.ts:42-50` and `lib/timeline/reconstruct.ts:638` still describe pruning. Recommendation: delete the function and fix the comments in the next change that touches them; no behaviour changes.
+- 2026-11-02: #2272 left the settings outcome untraced. This recheck recorded the deep merge and the regression trigger, but not the race between the pull and the push of a spend. Recommendation: settle it in #2272's root-cause step.
 - 2026-11-02: Existing oddities not repeated as new issues: #2193 covers the unused `computeStats` forecast and the UTC or local today seam.
-- 2026-11-02: Verification was by reading code and tests, plus a Node run of the real `applyProtectionStep`. The unit, end-to-end and integration suites were not run for this baseline, and no UI was opened.
+- 2026-11-02: Verification was by reading code and tests, a Node run of the real `applyProtectionStep`, and scratch tests of the real `StreakBadge` and `computeDashboardSnapshot`. The recheck ran `vitest` on the streak, stats and sync-streak files: 55 files, 913 tests, exit 0. The end-to-end and integration suites were not run locally, and no UI was opened. #2352 and the second-device reset path come from reading the code.
