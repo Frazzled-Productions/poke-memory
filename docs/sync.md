@@ -72,6 +72,16 @@ During a constraint-affecting migration window (see [Constraint-affecting migrat
 
 Cards are the primary contract - they flow through `usePerGradeSync` (per-grade debounced upsert) and `useSyncOnUnload` (beacon on page hide). Everything else is best-effort: the regional-prefs leg inside `pullAndMerge`, the `pushSettings` / `pushStreak` / `pushGradeLog` calls inside `AutoSyncOnChange`, and the settings-page write-back of auto-detected regional prefs. Their failures `console.warn` and continue - they must not flip the user-visible sync status into the error state. Surfacing "Sync failed" because the streak push hiccuped is worse than silently degrading. Structural-error detection (42xxx / 23505 / 23503) is explicitly NOT applied to auxiliary legs - only the card_reviews primary path.
 
+### Signed-in backup restore (#2218)
+
+A signed-in restore never lowers the cloud. `restoreBackupSignedIn` (`lib/sync/restoreBackup.ts`) follows the documented order: load local, `pullSession`, merge, save, push. `planSignedInRestore` (`lib/sync/cloud.ts`) uses a backup card only when it is further on than both the cloud and this device, by `isFurtherOn`, which mirrors `card_reviews_reject_regression`. `lib/sync/integration/backup-restore.test.ts` runs that mirror against the real trigger, case by case, so a change to the trigger fails the test. If the pull fails, nothing changes. If the push fails, the cards go in the pending queue and drain after the reload, with the usual retry and eviction.
+
+- **Why it does not replace the cloud:** a replace needs a new `SECURITY DEFINER` bypass. Pushing a lower row is refused by the regression trigger, and resetting first does not help, because the pre-reset trigger (migration 022) refuses any row dated before `last_reset_at`.
+- **Cards dated before the last reset are left out.** The pre-reset trigger fires on every push of them, including after a new grade, so restoring one would strand it on the device.
+- **Settings and daily limits are left alone.** `user_settings_reject_regression` (migration 038) refuses a whole patch that lowers a guarded field, later changes in it included, and `AutoSyncOnChange` keeps its snapshot on a refusal, so older settings would stop the device's settings syncing.
+- **`grade_log` and `streak_days` are not in a backup**, so a restore never touches them, for guests either.
+- **Guests and superuser sessions** keep the local replace in `applyBackup`: there is no cloud to reconcile, or cloud writes are suppressed.
+
 ### Undo hold (#2052)
 
 **Contract: an undoable grade is held on the device; the cloud sees a grade only once it is committed; Undo expires on commit.** The pre-#2052 premise (#257: "sync is end-of-session, so undo never races a push") was false: `card_reviews` was pushed on a 200 ms debounce and `grade_log` immediately, both before Undo was even enabled. `grade_log` is append-only from the client (migration 018 dropped its UPDATE/DELETE policies) and `mergeGradeLog` is a pure union, so an undone grade that had reached the cloud was resurrected by the next pull. The fix keeps the undone grade off the wire in the first place: no migration, no tombstone, the regression trigger untouched.

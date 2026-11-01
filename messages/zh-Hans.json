@@ -300,6 +300,9 @@
       "downloadCsv": "下载 CSV",
       "importLabel": "导入进度",
       "importDescription": "从之前导出的备份文件恢复。确认后将替换当前进度。",
+      "importDescriptionSignedIn": "从之前导出的备份文件恢复卡片进度。卡片只会向前推进：账户中进度更靠前的内容保持不变。",
+      "importConfirmSignedIn": "你已登录，因此卡片只会向前推进。账户中进度更靠前的内容保持不变，设置不会更改，上次重置之前的进度无法恢复。要恢复此备份吗？",
+      "importFailedSignedIn": "无法连接到你的账户，因此未恢复任何内容。请检查网络连接后重试。",
       "importButton": "导入"
     },
     "howThisWorks": {
