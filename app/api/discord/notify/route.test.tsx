@@ -1,5 +1,5 @@
 /**
- * Tests for POST /api/discord/notify (#1653, #1848).
+ * Tests for POST /api/discord/notify (#1653, ops #405).
  *
  * Covers:
  *   - 503 on missing env vars (all combinations)
@@ -7,14 +7,13 @@
  *   - 400 on invalid JSON body
  *   - 400 if body contains forbidden fields (message, user_id) - guard unchanged
  *   - 200 success path: formats the correct Discord embed, posts to webhook
- *   - Message preview fetched by id (route-side, NOT from trigger payload)
- *   - 500-char cap + "…" truncation on long messages
- *   - Missing/failed message fetch → embed still sent without the preview field
+ *   - The message is never read or sent: no text reaches Discord (ops #405)
  *   - user_id is never in the Discord webhook payload
  *   - 502 when the Discord webhook fetch fails or returns non-2xx
  *
  * `fetch` is mocked globally so the test never touches the network.
- * `@supabase/supabase-js` is mocked to intercept the service-role DB query.
+ * `@supabase/supabase-js` is mocked with a row holding a sentinel message, so
+ * a route that read `feedback` again would put that text in the payload.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -22,23 +21,11 @@ import { POST } from "./route";
 
 // ── Supabase admin mock ──────────────────────────────────────────────────────
 
-// Default: message fetch returns a short message.
-let supabaseSingleResult: { data: { message: string } | null; error: unknown } = {
-  data: { message: "app crashes on the practice screen" },
-  error: null,
-};
+const SENTINEL_MESSAGE = "sentinel text a child typed";
 
-vi.mock("@supabase/supabase-js", () => {
-  const mockSingle = vi.fn(() => Promise.resolve(supabaseSingleResult));
-  const mockEq = vi.fn(() => ({ single: mockSingle }));
-  const mockSelect = vi.fn(() => ({ eq: mockEq }));
-  const mockFrom = vi.fn(() => ({ select: mockSelect }));
-  return {
-    createClient: vi.fn(() => ({
-      from: mockFrom,
-    })),
-  };
-});
+const { createClientMock } = vi.hoisted(() => ({ createClientMock: vi.fn() }));
+
+vi.mock("@supabase/supabase-js", () => ({ createClient: createClientMock }));
 
 // ── Environment helpers ──────────────────────────────────────────────────────
 
@@ -90,11 +77,17 @@ beforeEach(() => {
   );
   vi.stubGlobal("fetch", fetchMock);
   setRequiredEnv();
-  // Reset the Supabase mock to a short message by default.
-  supabaseSingleResult = {
-    data: { message: "app crashes on the practice screen" },
-    error: null,
-  };
+  createClientMock.mockReset();
+  createClientMock.mockReturnValue({
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () =>
+            Promise.resolve({ data: { message: SENTINEL_MESSAGE }, error: null }),
+        }),
+      }),
+    }),
+  });
 });
 
 afterEach(() => {
@@ -280,102 +273,37 @@ describe("POST /api/discord/notify - success", () => {
   });
 });
 
-// ── Message preview (#1848) ────────────────────────────────────────────────
+// ── No message text (ops #405) ─────────────────────────────────────────────
 
-describe("POST /api/discord/notify - message preview (#1848)", () => {
-  it("fetches the message by id and adds a 'Message preview' embed field", async () => {
-    supabaseSingleResult = {
-      data: { message: "app crashes on the practice screen" },
-      error: null,
-    };
+describe("POST /api/discord/notify - no message text (ops #405)", () => {
+  it("CRITICAL: Discord webhook payload contains no message text", async () => {
     await POST(makeRequest(VALID_BODY));
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const payload = JSON.parse(init.body as string) as {
-      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
-    };
-    const fields = payload.embeds[0].fields;
-    const previewField = fields.find((f) => f.name === "Message preview");
-    expect(previewField).toBeDefined();
-    expect(previewField!.value).toBe("app crashes on the practice screen");
-  });
-
-  it("appears between the Timestamp field and the View in Supabase field", async () => {
-    supabaseSingleResult = {
-      data: { message: "short message" },
-      error: null,
-    };
-    await POST(makeRequest(VALID_BODY));
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const payload = JSON.parse(init.body as string) as {
-      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
-    };
-    const fields = payload.embeds[0].fields;
-    const previewIdx = fields.findIndex((f) => f.name === "Message preview");
-    const supabaseIdx = fields.findIndex((f) => f.name === "View in Supabase");
-    const timestampIdx = fields.findIndex((f) => f.name === "Timestamp");
-    expect(previewIdx).toBeGreaterThan(timestampIdx);
-    expect(previewIdx).toBeLessThan(supabaseIdx);
-  });
-
-  it("caps the message at 500 chars and appends '…' when longer", async () => {
-    const longMessage = "x".repeat(600);
-    supabaseSingleResult = { data: { message: longMessage }, error: null };
-    await POST(makeRequest(VALID_BODY));
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const payload = JSON.parse(init.body as string) as {
-      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
-    };
-    const fields = payload.embeds[0].fields;
-    const previewField = fields.find((f) => f.name === "Message preview");
-    expect(previewField).toBeDefined();
-    // 500 chars of "x" + the ellipsis character (1 char).
-    expect(previewField!.value).toHaveLength(501);
-    expect(previewField!.value).toMatch(/…$/);
-    expect(previewField!.value.slice(0, 500)).toBe("x".repeat(500));
-  });
-
-  it("does NOT truncate a message that is exactly 500 chars", async () => {
-    const exactMessage = "y".repeat(500);
-    supabaseSingleResult = { data: { message: exactMessage }, error: null };
-    await POST(makeRequest(VALID_BODY));
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const payload = JSON.parse(init.body as string) as {
-      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
-    };
-    const previewField = payload.embeds[0].fields.find((f) => f.name === "Message preview")!;
-    expect(previewField.value).toBe(exactMessage);
-    expect(previewField.value).not.toMatch(/…$/);
-  });
-
-  it("omits the 'Message preview' field when the DB query fails", async () => {
-    supabaseSingleResult = { data: null, error: { message: "DB error" } };
-    await POST(makeRequest(VALID_BODY));
-    // Embed is still posted to Discord.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.body as string).not.toContain(SENTINEL_MESSAGE);
     const payload = JSON.parse(init.body as string) as {
-      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
+      embeds: Array<{ fields: Array<{ name: string }> }>;
     };
-    const fields = payload.embeds[0].fields;
-    const previewField = fields.find((f) => f.name === "Message preview");
-    // No preview field when fetch fails - deep link is still present.
-    expect(previewField).toBeUndefined();
-    expect(fields.find((f) => f.name === "View in Supabase")).toBeDefined();
-    // Route should still return 200.
-    const res = await POST(makeRequest(VALID_BODY));
-    expect(res.status).toBe(200);
+    expect(payload.embeds[0].fields.map((f) => f.name)).toEqual([
+      "Page",
+      "App version",
+      "Authenticated",
+      "Timestamp",
+      "View in Supabase",
+    ]);
   });
 
-  it("omits the 'Message preview' field when SUPABASE_SERVICE_ROLE_KEY is absent", async () => {
+  it("CRITICAL: the route never opens a Supabase client", async () => {
+    await POST(makeRequest(VALID_BODY));
+    expect(createClientMock).not.toHaveBeenCalled();
+  });
+
+  it("posts the embed with no Supabase key set", async () => {
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete process.env.SUPABASE_SECRET_KEY;
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(200);
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const payload = JSON.parse(init.body as string) as {
-      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
-    };
-    const previewField = payload.embeds[0].fields.find((f) => f.name === "Message preview");
-    expect(previewField).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

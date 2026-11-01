@@ -155,6 +155,17 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
+    it("says bug notifications carry no message text and what stays in Discord (ops #405)", async () => {
+      await renderPage();
+      expect(screen.queryAllByText(/capped preview/i)).toHaveLength(0);
+      expect(
+        screen.getByText(/this notification contains none of your message/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/the notification stays in that channel/i),
+      ).toBeInTheDocument();
+    });
+
     it("renders the feedback retention statement in section 8 (#1623)", async () => {
       await renderPage();
       expect(
@@ -179,9 +190,9 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 17 October 2026", async () => {
+    it("shows the last updated date as 2 November 2026", async () => {
       await renderPage();
-      expect(screen.getByText(/17 october 2026/i)).toBeTruthy();
+      expect(screen.getByText(/2 november 2026/i)).toBeTruthy();
     });
 
     it("offers a complaints route to us before the ICO, with a 30-day acknowledgement", async () => {

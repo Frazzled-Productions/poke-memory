@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 17 October 2026
+          Last updated: 2 November 2026
         </p>
       </header>
 
@@ -297,10 +297,12 @@ export default async function PrivacyPage() {
             reported issues. It is not used for profiling or marketing. Bug
             reports trigger an automated notification to a private,
             maintainer-only Discord channel used for triage: this notification
-            includes a capped preview (up to 500 characters) of the message,
-            plus the non-identifying metadata above (page, app version,
-            timestamp). No user identifier is included. Discord is a
-            sub-processor under a data processing agreement (see §6).
+            contains none of your message, only the non-identifying metadata
+            above (page, app version, timestamp), whether you were signed in,
+            and a link to the report that only the maintainer can open. No user
+            identifier is included. The notification stays in that channel
+            after the feedback itself is deleted. Discord is a sub-processor
+            under a data processing agreement (see §6).
           </p>
         </section>
 
@@ -520,10 +522,11 @@ export default async function PrivacyPage() {
                     Maintainer notification channel for bug-report triage
                   </td>
                   <td className="py-2">
-                    A capped preview (up to 500 characters) of the free-text
-                    message, plus non-identifying metadata (page, app version,
-                    timestamp). No user identifier is included. Sent to a
-                    private, maintainer-only channel.
+                    Non-identifying metadata only (page, app version,
+                    timestamp, whether the reporter was signed in) and a
+                    maintainer-only link to the report. None of the message and
+                    no user identifier is included. Sent to a private,
+                    maintainer-only channel.
                   </td>
                 </tr>
               </tbody>

@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { isAuthorized } from "@/lib/auth/bearerAuth";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
-import { supabaseSecretKey } from "@/lib/supabase/keys";
 
 /**
- * POST /api/discord/notify (#1653, #1848)
+ * POST /api/discord/notify (#1653, ops #405)
  *
  * Receives safe feedback metadata from the pg_net AFTER INSERT trigger on
  * the `feedback` table (via migration 042) and posts a Discord embed to
@@ -19,11 +17,10 @@ import { supabaseSecretKey } from "@/lib/supabase/keys";
  *   { id, category, page, app_version, created_at, authenticated }
  *   NEVER contains message or user_id.
  *
- * MESSAGE PREVIEW (#1848)
- *   After the forbidden-fields guard passes, this route fetches the message
- *   by id from the feedback table using the service-role client. A capped
- *   preview (≤500 chars) is added to the embed. The message is never in the
- *   inbound trigger payload and never passes through pg_net.
+ * NO MESSAGE TEXT (ops #405)
+ *   The embed never carries the feedback message. Nothing deletes a Discord
+ *   post, so text sent there would outlive the feedback row. The maintainer
+ *   reads the message in Supabase through the deep link.
  *
  * DISCORD WEBHOOK
  *   URL read from DISCORD_NOTIFY_WEBHOOK_URL env (server-side only). The
@@ -41,45 +38,6 @@ type NotifyBody = {
   created_at: string;
   authenticated: boolean;
 };
-
-/** Maximum characters in the message preview field sent to Discord. */
-const MESSAGE_PREVIEW_MAX = 500;
-
-/**
- * Fetch the feedback message by row id using the service-role client.
- * Returns the capped preview string, or null if the query fails / returns
- * no row (the embed is still useful via the deep link in that case).
- */
-async function fetchMessagePreview(
-  supabaseUrl: string,
-  serviceRoleKey: string,
-  feedbackId: string,
-): Promise<string | null> {
-  try {
-    const admin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { data, error } = await admin
-      .from("feedback")
-      .select("message")
-      .eq("id", feedbackId)
-      .single();
-
-    if (error || !data) {
-      console.warn("[discord/notify] message fetch failed or no row", error);
-      return null;
-    }
-
-    const raw = (data as { message: string }).message ?? "";
-    if (raw.length > MESSAGE_PREVIEW_MAX) {
-      return raw.slice(0, MESSAGE_PREVIEW_MAX) + "…";
-    }
-    return raw;
-  } catch (err) {
-    console.warn("[discord/notify] message fetch threw", err);
-    return null;
-  }
-}
 
 /** Supabase dashboard deep link to the feedback row for the maintainer. */
 function buildDeepLink(supabaseUrl: string, feedbackId: string): string {
@@ -99,7 +57,6 @@ export async function POST(request: Request) {
   const sharedSecret = process.env.CRON_SHARED_SECRET;
   const webhookUrl = process.env.DISCORD_NOTIFY_WEBHOOK_URL;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = supabaseSecretKey();
 
   if (!sharedSecret || !webhookUrl || !supabaseUrl) {
     return NextResponse.json(
@@ -120,8 +77,6 @@ export async function POST(request: Request) {
   // Validate that neither message nor user_id are present in the body
   // (belt-and-braces guard - the trigger never sends them, but we assert here
   // so the route is provably safe even if the body were to change).
-  // This guard checks the trigger payload only. The route fetches the message
-  // separately by id using the service-role client after this check passes.
   const rawBody = body as Record<string, unknown>;
   if ("message" in rawBody || "user_id" in rawBody) {
     // Refuse to forward - log and return 400.
@@ -131,12 +86,6 @@ export async function POST(request: Request) {
 
   const deepLink = buildDeepLink(supabaseUrl, body.id);
   const ts = new Date(body.created_at).toISOString();
-
-  // Fetch the message preview route-side (never via pg_net). Failures are
-  // non-fatal: the embed still posts with the deep link.
-  const messagePreview = serviceRoleKey
-    ? await fetchMessagePreview(supabaseUrl, serviceRoleKey, body.id)
-    : null;
 
   const embed = {
     title: "New bug report",
@@ -162,15 +111,6 @@ export async function POST(request: Request) {
         value: ts,
         inline: false,
       },
-      ...(messagePreview !== null
-        ? [
-            {
-              name: "Message preview",
-              value: messagePreview,
-              inline: false,
-            },
-          ]
-        : []),
       {
         name: "View in Supabase",
         value: deepLink,
