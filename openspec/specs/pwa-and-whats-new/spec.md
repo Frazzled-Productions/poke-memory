@@ -47,7 +47,7 @@ Source: `lib/pwa/splashDevices.ts:29`, `lib/pwa/splashDevices.ts:55`, `lib/pwa/s
 
 `useInstallPrompt` SHALL report `already-installed` when the display mode is standalone, `navigator.standalone`
 is true, or the URL has `source=pwa`. Otherwise it SHALL report `android` with a prompt when the head
-script has captured `beforeinstallprompt`, `ios` on iPhone, iPad, iPod or a touch-capable Macintosh
+script has captured `beforeinstallprompt`, on any platform despite the name, `ios` on iPhone, iPad, iPod or a touch-capable Macintosh
 user agent that is not Chrome or CriOS, and `unsupported` for anything else. An `appinstalled` event
 SHALL move it to `already-installed`.
 
@@ -55,6 +55,11 @@ SHALL move it to `already-installed`.
 
 - **WHEN** an ordinary browser tab opens a URL carrying `?source=pwa`
 - **THEN** the state is `already-installed`
+
+#### Scenario: Desktop Chromium
+
+- **WHEN** desktop Chrome or Edge fires `beforeinstallprompt`
+- **THEN** the state is `android` and the nudge offers its install button
 
 #### Scenario: Prompt dismissed
 
@@ -66,8 +71,8 @@ Source: `app/layout.tsx:122`, `lib/pwa/useInstallPrompt.ts:28`, `lib/pwa/useInst
 
 ### Requirement: Install nudge (baseline)
 
-`PwaInstallNudge` SHALL count one visit per browser session in `appVisitCount` and render only from
-the third visit, when not dismissed, and on `android` or `ios`. Android SHALL show an install button;
+`PwaInstallNudge`, mounted in the root layout, SHALL count one visit per browser session in the
+device-local `appVisitCount` and render only from the third visit, when not dismissed, and on `android` or `ios`. Android SHALL show an install button;
 iOS SHALL show translated manual steps. Dismissing, or accepting the prompt, SHALL set
 `onboarding.installNudgeDismissed`. A rejected prompt SHALL be swallowed and leave the nudge in place.
 
@@ -76,12 +81,18 @@ iOS SHALL show translated manual steps. Dismissing, or accepting the prompt, SHA
 - **WHEN** `appVisitCount` is 2
 - **THEN** the nudge renders nothing
 
+#### Scenario: Dismissed on another device
+
+- **WHEN** a signed-in player dismisses the nudge on one device and settings sync
+- **THEN** `onboarding.installNudgeDismissed` travels with the settings blob and the nudge stays hidden
+  on their other devices, while `appVisitCount` stays per device
+
 #### Scenario: Install tapped again after a dismissal
 
 - **WHEN** the same event's `prompt()` rejects
 - **THEN** nothing visible happens and the nudge stays (#2325)
 
-Source: `components/onboarding/PwaInstallNudge.tsx:12`, `components/onboarding/PwaInstallNudge.tsx:13`, `components/onboarding/PwaInstallNudge.tsx:27`, `components/onboarding/PwaInstallNudge.tsx:45`, `components/onboarding/PwaInstallNudge.tsx:55`, `components/onboarding/PwaInstallNudge.tsx:62`, `components/onboarding/PwaInstallNudge.tsx:68`, `components/onboarding/PwaInstallNudge.i18n.test.tsx:1`.
+Source: `components/onboarding/PwaInstallNudge.tsx:12`, `components/onboarding/PwaInstallNudge.tsx:13`, `components/onboarding/PwaInstallNudge.tsx:27`, `components/onboarding/PwaInstallNudge.tsx:45`, `components/onboarding/PwaInstallNudge.tsx:55`, `components/onboarding/PwaInstallNudge.tsx:62`, `components/onboarding/PwaInstallNudge.tsx:68`, `components/onboarding/PwaInstallNudge.i18n.test.tsx:1`, `app/layout.tsx:205`, `lib/settings/lastPushedSnapshot.ts:42`, `lib/settings/persistence.ts:72`.
 
 ### Requirement: Service worker registration (baseline)
 
@@ -107,14 +118,22 @@ Source: `components/pwa/ServiceWorkerProvider.tsx:66`, `components/pwa/ServiceWo
 `scripts/build-sw.mjs` SHALL run after `next build` and write `public/sw/sw.js` as a static file, baking
 in the precache manifest, the `package.json` version and the public VAPID key. It SHALL fail the build
 when the manifest is empty or the emitted worker has no `/_next/` URL. `next.config.ts` SHALL serve
-`/sw/sw.js` with `Cache-Control: no-cache` and `Service-Worker-Allowed: /`.
+`/sw/sw.js` with `Cache-Control: no-cache` and `Service-Worker-Allowed: /`. Neither check catches a
+missing `.next` (#2357).
+
+#### Scenario: Manifest with no files at all
+
+- **WHEN** no file matches any glob
+- **THEN** the script throws and the process exits 1
 
 #### Scenario: Run without a Next build
 
-- **WHEN** the script finds no build output
-- **THEN** it throws and the process exits 1
+- **WHEN** `.next` is absent and the script is run directly
+- **THEN** the manifest still holds the `public` files, the bundled `/_next/` literals from
+  `lib/pwa/cacheStrategy.ts` satisfy the second check, and the script is expected to exit 0; from code,
+  not run (#2357)
 
-Source: `scripts/build-sw.mjs:25`, `scripts/build-sw.mjs:147`, `scripts/build-sw.mjs:162`, `scripts/build-sw.mjs:181`, `scripts/build-sw.mjs:186`, `scripts/build-sw.mjs:206`, `scripts/build-sw.mjs:230`, `scripts/build-sw.mjs:240`, `next.config.ts:63`.
+Source: `scripts/build-sw.mjs:25`, `scripts/build-sw.mjs:147`, `scripts/build-sw.mjs:162`, `scripts/build-sw.mjs:181`, `scripts/build-sw.mjs:186`, `scripts/build-sw.mjs:206`, `scripts/build-sw.mjs:230`, `scripts/build-sw.mjs:240`, `scripts/build-sw.mjs:65`, `scripts/build-sw.mjs:85`, `lib/pwa/cacheStrategy.ts:145`, `lib/pwa/cacheStrategy.ts:216`, `next.config.ts:63`.
 
 ### Requirement: Silent update at a safe moment (baseline)
 
@@ -127,6 +146,12 @@ worker SHALL activate only when at most one window client exists, counting uncon
 
 - **WHEN** the tab hides during an active review session with a worker waiting
 - **THEN** nothing is posted and the worker keeps waiting
+
+#### Scenario: Offline download running
+
+- **WHEN** the only tab hides during an offline pack download with a worker waiting
+- **THEN** the message is posted as usual, as only a review session holds it back, and the reload that
+  follows ends the run; from code, not reproduced (#2356)
 
 #### Scenario: Two tabs open
 
@@ -161,12 +186,17 @@ Source: `components/pwa/ServiceWorkerProvider.tsx:34`, `components/pwa/ServiceWo
 ### Requirement: Update checks (baseline)
 
 The client SHALL call `update()` when a tab returns after at least 90 seconds hidden and at least 2
-minutes since the last visibility check, and every hour regardless of visibility.
+minutes since the last `update()` call of either kind, and every hour regardless of visibility.
 
 #### Scenario: Short tab switch
 
 - **WHEN** a tab returns after 30 seconds hidden
 - **THEN** no update check runs
+
+#### Scenario: Hourly check just ran
+
+- **WHEN** a tab returns after 100 seconds hidden, 60 seconds after the hourly check
+- **THEN** no update check runs, as the hourly check resets the same timestamp
 
 #### Scenario: Flipping at the threshold
 
@@ -199,7 +229,7 @@ Source: `app/sw.ts:441`, `lib/pwa/useServiceWorkerVersion.ts:34`, `lib/pwa/useSe
 `classifyRequest` SHALL treat an unparseable URL, any cross-origin URL and any same-origin `/api/` path as
 `network-only`. `/sprites/` and `/cries/` SHALL be `idb-first`, `/_next/static/` `cache-first` in the
 static bucket, font files stale-while-revalidate in the fonts bucket, and everything else same-origin,
-navigations and `/pokemon-data/` included, stale-while-revalidate in the pages bucket.
+navigations, RSC payloads and `/pokemon-data/` included, stale-while-revalidate in the pages bucket.
 
 #### Scenario: Authenticated API response
 
@@ -222,7 +252,8 @@ Source: `lib/pwa/cacheStrategy.ts:128`, `lib/pwa/cacheStrategy.ts:135`, `lib/pwa
 
 Bucket names SHALL carry the `SW_CACHE_VERSION` suffix, currently `v2`. Static SHALL hold 128 entries for
 30 days, fonts 16 for 30 days and pages 64 for 7 days. Requests classified `network-only` match no route
-and go straight to the network. Navigation preload SHALL be off.
+and go straight to the network, as do non-GET requests, since no runtime route sets a method and Serwist
+defaults to GET. Navigation preload SHALL be off.
 
 #### Scenario: Cold launch after a deploy
 
@@ -354,13 +385,18 @@ Source: `lib/pwa/precache.ts:36`, `lib/pwa/precache.ts:202`, `lib/pwa/precache.t
 
 `downloadController` SHALL hold the state and abort controller at module level, so unmounting Settings does
 not stop a run. `subscribe` SHALL emit the current state at once, a second `startDownload` during a run
-SHALL do nothing, and Stop SHALL return to `idle`. A full page unload during a run SHALL trigger the
-browser's leave warning. On load, a stored timestamp SHALL seed `done`.
+SHALL do nothing, and Stop SHALL return to `idle`. While `OfflineSection` is mounted, a full page unload
+during a run SHALL trigger the browser's leave warning. On load, a stored timestamp SHALL seed `done`.
 
 #### Scenario: Leaving Settings mid-download
 
 - **WHEN** the player navigates within the app and comes back
 - **THEN** the run continues and progress shows on return
+
+#### Scenario: Unload away from Settings
+
+- **WHEN** the player leaves Settings within the app and then closes the tab mid-run
+- **THEN** no leave warning shows, as the handler went with the component, and the run ends
 
 #### Scenario: Stop
 
@@ -399,6 +435,11 @@ the download SHALL start without a check.
 - **WHEN** free space equals the required bytes
 - **THEN** `hasHeadroom` is true
 
+#### Scenario: Update of a stored pack
+
+- **WHEN** Update is tapped with the pack already stored
+- **THEN** the same 186 MB is required on top of current use, although only missing URLs will be fetched
+
 #### Scenario: Too little, proceed
 
 - **WHEN** the player chooses to download anyway
@@ -435,6 +476,17 @@ update available, with a count only when the species count rose.
 - **WHEN** the current count is above the persisted count
 - **THEN** Settings shows the count of new species and Update is enabled
 
+#### Scenario: Update run
+
+- **WHEN** Update runs after the signature changed
+- **THEN** only URLs not yet stored are fetched: a changed file at an existing URL is not refetched and
+  a URL no longer listed is not removed
+
+#### Scenario: Download with no stored manifest
+
+- **WHEN** a timestamp exists with no valid stored manifest, as for a download from before #1539
+- **THEN** the current manifest stands in for it, so Settings says up to date without any check
+
 #### Scenario: Settings opens before the seed loads
 
 - **WHEN** the state is `done` and `getSeedIfLoaded` returns null
@@ -446,7 +498,7 @@ update available, with a count only when the species count rose.
 - **WHEN** the seed is null and Download is tapped
 - **THEN** a run starts with no ids and ends in `done` with nothing stored (#2324)
 
-Source: `lib/pwa/manifestSignature.ts:48`, `lib/pwa/manifestSignature.ts:75`, `lib/pwa/downloadController.ts:111`, `lib/pwa/downloadController.ts:114`, `components/settings/OfflineSection.tsx:74`, `components/settings/OfflineSection.tsx:85`, `components/settings/OfflineSection.tsx:191`, `lib/pwa/manifestSignature.test.ts:1`, `components/settings/OfflineSection.test.tsx:362`.
+Source: `lib/pwa/manifestSignature.ts:48`, `lib/pwa/manifestSignature.ts:75`, `lib/pwa/downloadController.ts:111`, `lib/pwa/downloadController.ts:114`, `components/settings/OfflineSection.tsx:74`, `components/settings/OfflineSection.tsx:85`, `components/settings/OfflineSection.tsx:191`, `lib/pwa/manifestSignature.test.ts:1`, `components/settings/OfflineSection.test.tsx:362`, `lib/pwa/downloadController.ts:88`, `lib/pwa/precache.ts:202`.
 
 ### Requirement: Deleting the pack (baseline)
 
@@ -464,7 +516,31 @@ storage use, not the pack's.
 - **WHEN** the dialog is cancelled or Escape is pressed
 - **THEN** nothing changes
 
-Source: `components/settings/OfflineSection.tsx:236`, `components/settings/OfflineSection.tsx:242`, `components/settings/OfflineSection.tsx:256`, `components/settings/OfflineSection.tsx:268`, `components/settings/OfflineSection.tsx:340`, `components/settings/OfflineSection.tsx:420`, `lib/pwa/offlineStore.ts:274`, `components/settings/OfflineSection.test.tsx:461`, `components/settings/OfflineSection.test.tsx:484`.
+#### Scenario: Store clear fails
+
+- **WHEN** IndexedDB is unavailable or `clear()` errors
+- **THEN** `offlineClear` resolves anyway, the keys are removed and the phase returns to `idle` with any
+  stored entries left in place; the translated delete error shows only if a later step throws
+
+Source: `components/settings/OfflineSection.tsx:236`, `components/settings/OfflineSection.tsx:242`, `components/settings/OfflineSection.tsx:256`, `components/settings/OfflineSection.tsx:268`, `components/settings/OfflineSection.tsx:340`, `components/settings/OfflineSection.tsx:420`, `lib/pwa/offlineStore.ts:274`, `lib/pwa/offlineStore.ts:282`, `components/settings/OfflineSection.tsx:271`, `components/settings/OfflineSection.test.tsx:461`, `components/settings/OfflineSection.test.tsx:484`.
+
+### Requirement: Offline download nudge in Practice (baseline)
+
+`ReviewSession` SHALL show a dismissible hint linking to `/settings#offline-download-heading` once
+`slowSpriteLoadCount` reaches 3 or `practiceSessionsCount` reaches 5. It SHALL stay hidden when a download
+timestamp exists, before the first-visit modal is done, when dismissed, or with a superuser flag on.
+
+#### Scenario: Slow sprite on the grade path
+
+- **WHEN** the grade-path sprite decode loses its 150 ms race
+- **THEN** `slowSpriteLoadCount` rises by one, capped at 3, unless a superuser flag is on
+
+#### Scenario: Pack already downloaded
+
+- **WHEN** `poke-memory:offline-downloaded-at` is set
+- **THEN** no hint shows, whatever the counters say
+
+Source: `components/review/ReviewSession.tsx:136`, `components/review/ReviewSession.tsx:137`, `components/review/ReviewSession.tsx:1440`, `components/review/ReviewSession.tsx:1836`, `components/review/ReviewSession.tsx:1847`, `components/review/ReviewSession.tsx:2539`, `components/review/ReviewSession.tsx:2762`, `lib/sprites/decode.ts:68`, `lib/settings/persistence.ts:142`, `lib/storage/keys.ts:135`.
 
 ### Requirement: App icon due count (baseline)
 
@@ -527,12 +603,17 @@ browser retries. Retrying 400 and 409 is #2209, and the handler has no test that
 - **WHEN** the event fires with no windows and a queued grade
 - **THEN** the worker POSTs the queue and clears it on 200
 
+#### Scenario: Nothing queued
+
+- **WHEN** the worker reaches the direct path with an empty queue
+- **THEN** no request is sent and the event resolves
+
 #### Scenario: Signed out meanwhile
 
 - **WHEN** the POST returns 401
 - **THEN** the queue is cleared and the event resolves
 
-Source: `app/sw.ts:595`, `app/sw.ts:627`, `app/sw.ts:636`, `app/sw.ts:663`, `app/sw.ts:667`, `app/sw.ts:678`, `app/sw.ts:687`, `app/sw.ts:699`, `app/sw.ts:709`, `app/sw.ts:716`, `lib/sync/swReplay.test.ts:18`.
+Source: `app/sw.ts:595`, `app/sw.ts:627`, `app/sw.ts:636`, `app/sw.ts:663`, `app/sw.ts:667`, `app/sw.ts:677`, `app/sw.ts:678`, `app/sw.ts:687`, `app/sw.ts:699`, `app/sw.ts:709`, `app/sw.ts:716`, `lib/sync/swReplay.test.ts:18`.
 
 ### Requirement: Showing a push and opening it (baseline)
 
@@ -567,14 +648,14 @@ Source: `app/sw.ts:880`, `app/sw.ts:884`, `app/sw.ts:905`, `app/sw.ts:921`, `app
 
 ### Requirement: Reminder toggle in Settings (baseline)
 
-`PushOptIn` SHALL render only when push is supported and the app is installed, and a local subscription SHALL
-be reconciled with the server on mount, turning the toggle off when reconciliation returns `disabled`. The
+`PushOptIn` SHALL render only for a signed-in player when push is supported and the app is installed by
+display mode or `navigator.standalone`, not `?source=pwa`, and a local subscription SHALL be reconciled with the server on mount, turning the toggle off when reconciliation returns `disabled`. The
 toggle SHALL be disabled when permission is denied, and the streak toggle SHALL need the daily toggle on.
 Some of the card's copy is hard-coded English (#2269).
 
 #### Scenario: Browser tab
 
-- **WHEN** Settings opens outside an installed app
+- **WHEN** Settings opens outside an installed app, or with no signed-in player
 - **THEN** the card renders nothing
 
 #### Scenario: Daily reminder turned off
@@ -587,13 +668,13 @@ Some of the card's copy is hard-coded English (#2269).
 - **WHEN** any superuser flag is on
 - **THEN** the toggle is replaced by a disabled button and subscribing does nothing
 
-Source: `components/pwa/PushOptIn.tsx:86`, `components/pwa/PushOptIn.tsx:103`, `components/pwa/PushOptIn.tsx:107`, `components/pwa/PushOptIn.tsx:126`, `components/pwa/PushOptIn.tsx:158`, `components/pwa/PushOptIn.tsx:166`, `components/pwa/PushOptIn.tsx:185`, `components/pwa/PushOptIn.tsx:201`, `components/pwa/PushOptIn.test.tsx:1`.
+Source: `components/pwa/PushOptIn.tsx:86`, `components/pwa/PushOptIn.tsx:103`, `components/pwa/PushOptIn.tsx:107`, `components/pwa/PushOptIn.tsx:126`, `components/pwa/PushOptIn.tsx:158`, `components/pwa/PushOptIn.tsx:166`, `components/pwa/PushOptIn.tsx:185`, `components/pwa/PushOptIn.tsx:201`, `components/pwa/PushOptIn.test.tsx:1`, `app/settings/page.tsx:1864`, `lib/push/subscribe.ts:44`.
 
 ### Requirement: What's New page (baseline)
 
 `/whats-new` SHALL show a translated heading, the running version, and the 20 newest releases with at least one
-bullet, each with its version, a locale-formatted date and translated section labels. Bullet text stays in
-English in every locale. With no releases it SHALL show the empty message. Rendering SHALL write the running
+bullet, each with its version, a locale-formatted date and translated section labels. Bullet text and the
+page's metadata title and description stay in English in every locale. With no releases it SHALL show the empty message. Rendering SHALL write the running
 version to the last-seen marker.
 
 #### Scenario: Normal visit
@@ -604,7 +685,7 @@ version to the last-seen marker.
 #### Scenario: Non-English locale
 
 - **WHEN** the locale is `ja`
-- **THEN** headings, labels and dates are localised and the bullets are English
+- **THEN** headings, labels and dates are localised, and the bullets and document title are English
 
 #### Scenario: Cached copy after an update
 
@@ -612,7 +693,7 @@ version to the last-seen marker.
 - **THEN** the copy carries the previous build's version and notes; expected from the code, not
   reproduced (#2327)
 
-Source: `app/whats-new/page.tsx:15`, `app/whats-new/page.tsx:16`, `app/whats-new/page.tsx:21`, `app/whats-new/page.tsx:25`, `app/whats-new/page.tsx:43`, `app/whats-new/page.tsx:63`, `app/whats-new/page.tsx:70`, `components/whats-new/MarkVisited.tsx:7`, `e2e/whats-new.spec.ts:9`.
+Source: `app/whats-new/page.tsx:9`, `app/whats-new/page.tsx:15`, `app/whats-new/page.tsx:16`, `app/whats-new/page.tsx:21`, `app/whats-new/page.tsx:25`, `app/whats-new/page.tsx:43`, `app/whats-new/page.tsx:63`, `app/whats-new/page.tsx:70`, `components/whats-new/MarkVisited.tsx:7`, `e2e/whats-new.spec.ts:9`.
 
 ### Requirement: Reading CHANGELOG.md (baseline)
 
@@ -623,9 +704,15 @@ repeated kinds, drop `Internal:` bullets, and drop releases with no bullets left
 
 #### Scenario: Wrapped bullet
 
-- **WHEN** an indented line follows a bullet
+- **WHEN** a line indented by exactly two spaces follows a bullet
 - **THEN** it extends the bullet, a blank line ends it, and an unindented prose line does not end it,
   contrary to the comment (#2326)
+
+#### Scenario: Other indents
+
+- **WHEN** a line with four spaces or a tab follows a bullet, or a two-space `- ` line does
+- **THEN** the four-space or tab line is dropped and the bullet stays open, and the two-space `- ` line
+  is folded into the bullet as ` - text` rather than kept as a sub-bullet
 
 #### Scenario: Internal-only release
 
@@ -637,7 +724,7 @@ repeated kinds, drop `Internal:` bullets, and drop releases with no bullets left
 - **WHEN** `CHANGELOG.md` cannot be read
 - **THEN** the page shows its empty message, not a 500
 
-Source: `lib/changelog/parse.ts:33`, `lib/changelog/parse.ts:52`, `lib/changelog/parse.ts:74`, `lib/changelog/parse.ts:92`, `lib/changelog/parse.ts:105`, `lib/changelog/parse.ts:110`, `lib/changelog/parse.ts:114`, `lib/changelog/parse.ts:139`, `lib/changelog/parse.ts:145`, `lib/changelog/parse.ts:150`, `next.config.ts:47`, `lib/changelog/parse.test.ts:99`, `lib/changelog/parse.test.ts:255`.
+Source: `lib/changelog/parse.ts:33`, `lib/changelog/parse.ts:36`, `lib/changelog/parse.ts:52`, `lib/changelog/parse.ts:74`, `lib/changelog/parse.ts:92`, `lib/changelog/parse.ts:105`, `lib/changelog/parse.ts:110`, `lib/changelog/parse.ts:114`, `lib/changelog/parse.ts:139`, `lib/changelog/parse.ts:145`, `lib/changelog/parse.ts:150`, `next.config.ts:47`, `lib/changelog/parse.test.ts:99`, `lib/changelog/parse.test.ts:255`.
 
 ### Requirement: Bullet formatting (baseline)
 
@@ -705,9 +792,23 @@ Source: `scripts/lib/changelog-fragment.mjs:20`, `scripts/lib/changelog-fragment
 
 `cut-release.mjs` SHALL do nothing with no fragments, or none with content and no minor bump. Otherwise it SHALL
 bump the minor version for any `minor-bump` and the patch version if not, insert the section after `[Unreleased]`
-in canonical kind order, and update `package.json`; `auto-release.yml` SHALL remove the fragments. A `minor-bump`
-with no other fragment cuts an empty section, which What's New omits while the version still rises and the
-pill shows.
+in canonical kind order, and update `package.json`; `auto-release.yml` SHALL remove the fragments. `auto-release.yml` SHALL run on a merged `qa` to `main` PR, daily at 09:00 UTC and by hand, and
+each cut SHALL commit to `main`, tag `vX.Y.Z` and create a GitHub Release.
+
+#### Scenario: Promotion merged
+
+- **WHEN** a `qa` to `main` PR merges with fragments present
+- **THEN** the release commit lands on `main` and `qa` is reset to `main`
+
+#### Scenario: Scheduled or manual cut
+
+- **WHEN** the daily or manual run finds fragments on `main`
+- **THEN** the release commit is merged back into `qa`, with no reset
+
+#### Scenario: Minor bump alone
+
+- **WHEN** the only fragment is `minor-bump`
+- **THEN** an empty section is cut, which What's New omits while the version still rises and the pill shows
 
 #### Scenario: Patch release
 
@@ -719,22 +820,38 @@ pill shows.
 - **WHEN** a fragment fails to parse
 - **THEN** the cut exits with an error
 
-Source: `.github/scripts/cut-release.mjs:49`, `.github/scripts/cut-release.mjs:68`, `.github/scripts/cut-release.mjs:93`, `.github/scripts/cut-release.mjs:100`, `.github/scripts/cut-release.mjs:114`, `.github/scripts/cut-release.mjs:141`, `.github/scripts/cut-release.mjs:168`, `.github/workflows/auto-release.yml:133`, `.github/workflows/auto-release.yml:143`.
+Source: `.github/scripts/cut-release.mjs:49`, `.github/scripts/cut-release.mjs:68`, `.github/scripts/cut-release.mjs:93`, `.github/scripts/cut-release.mjs:100`, `.github/scripts/cut-release.mjs:114`, `.github/scripts/cut-release.mjs:141`, `.github/scripts/cut-release.mjs:168`, `.github/workflows/auto-release.yml:50`, `.github/workflows/auto-release.yml:56`, `.github/workflows/auto-release.yml:57`, `.github/workflows/auto-release.yml:133`, `.github/workflows/auto-release.yml:135`, `.github/workflows/auto-release.yml:143`, `.github/workflows/auto-release.yml:150`, `.github/workflows/auto-release.yml:170`, `.github/workflows/auto-release.yml:182`.
 
 ### Requirement: Release gates on PRs (baseline)
 
-`changelog-gate` SHALL fail a non-fork PR touching a user-facing path with no added fragment, unless it has the
-`no-changelog` label. `version-bump-gate` SHALL fail a PR with a `minor-bump` or `major-bump` fragment unless it
-has `version-bump:approved`. `major-bump` passes that gate's recognition, but the shared parser rejects it.
+`changelog-gate` SHALL fail a non-fork PR touching `app/`, `components/` or `lib/` with no changed file under
+`changelog.d/unreleased/`, unless it has the `no-changelog` label. `version-bump-gate` SHALL fail a non-fork PR
+when any fragment in its checkout, whoever added it, is `minor-bump` or `major-bump`, unless it has
+`version-bump:approved` (#2355). `major-bump` passes that gate's recognition, but the shared parser rejects it.
 
 #### Scenario: Minor bump without the label
 
 - **WHEN** a PR adds `kind: minor-bump` with no approval label
 - **THEN** `version-bump-gate` fails
 
+#### Scenario: Bump already on the base branch
+
+- **WHEN** a PR with no fragment of its own targets `qa` while `qa` holds a `minor-bump` fragment
+- **THEN** `version-bump-gate` fails, as it did on this baseline's PR (#2355)
+
+#### Scenario: Capitalised kind
+
+- **WHEN** a fragment has `kind: Minor-Bump`
+- **THEN** the gate does not match it, while the shared parser accepts it as `minor-bump` (#2355)
+
+#### Scenario: Fragment edited, not added
+
+- **WHEN** a PR touching `lib/` only edits or deletes an existing fragment
+- **THEN** `changelog-gate` passes, as its filter matches any change under that folder
+
 #### Scenario: Major bump
 
 - **WHEN** a fragment has `kind: major-bump`
 - **THEN** the lint and the release cut reject it
 
-Source: `.github/workflows/changelog-gate.yml:6`, `.github/workflows/changelog-gate.yml:12`, `.github/workflows/version-bump-gate.yml:3`, `.github/workflows/version-bump-gate.yml:40`, `scripts/lib/changelog-fragment.mjs:75`.
+Source: `.github/workflows/changelog-gate.yml:35`, `.github/workflows/changelog-gate.yml:47`, `.github/workflows/changelog-gate.yml:52`, `.github/workflows/changelog-gate.yml:62`, `.github/workflows/version-bump-gate.yml:27`, `.github/workflows/version-bump-gate.yml:40`, `.github/workflows/version-bump-gate.yml:44`, `.github/workflows/version-bump-gate.yml:58`, `scripts/lib/changelog-fragment.mjs:75`.
