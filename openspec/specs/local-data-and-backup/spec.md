@@ -406,8 +406,7 @@ Evidence: `app/api/export/route.ts:114-141`; `lib/sync/paginatedFetch.ts:31-52`.
 The body SHALL start with a UTF-8 byte order mark, use CRLF line ends and the header
 `date,pokemon,card_type,grade,grade_label`, and quote fields per RFC 4180. `pokemon` SHALL be the display
 name, `From -> To` for edges, the `subject_key` when it cannot be resolved, and empty when it is null.
-`evolution-edge` and `reverse-evolution-edge` SHALL appear as `evolution` and `reverse-evolution`. Grades
-1, 2, 4 and 5 SHALL be labelled Again, Hard, Good and Easy. The response SHALL be a `no-store` CSV
+The response SHALL be a `no-store` CSV
 attachment named `poke-memory-reviews-<UTC date>.csv`.
 
 #### Scenario: Date column
@@ -417,8 +416,13 @@ attachment named `poke-memory-reviews-<UTC date>.csv`.
 
 #### Scenario: Evolution row
 
-- **WHEN** a row has card type `evolution-edge`
-- **THEN** the line shows `From -> To`, `evolution`, the grade and its label
+- **WHEN** a row has card type `evolution-edge` or `reverse-evolution-edge`
+- **THEN** the line shows `From -> To`, then `evolution` or `reverse-evolution`, then the grade and its label
+
+#### Scenario: Grade labels
+
+- **WHEN** a row has grade 1, 2, 4 or 5
+- **THEN** `grade_label` is Again, Hard, Good or Easy
 
 #### Scenario: No rows
 
