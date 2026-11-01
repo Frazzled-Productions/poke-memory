@@ -30,7 +30,7 @@ retry, so it hard-failed against the component's async mount render) and had to 
 `VITEST_INTEGRATION=1 npm run test:integration`. CI's `integration-tests.yml` runs on PRs touching
 `lib/sync/**`, `app/api/sync/**`, `db/migrations/**`, `lib/gradelog/**`, or itself (#611); the
 `integration-tests` label is the escape hatch. In scope: `apply-migrations.test.ts`, `rls.test.ts`,
-`regression-trigger.test.ts`. `auth.uid()` is polyfilled via `SET LOCAL "request.jwt.claims"` in a
+`rls-coverage.test.ts`, `regression-trigger.test.ts`. `auth.uid()` is polyfilled via `SET LOCAL "request.jwt.claims"` in a
 transaction.
 
 **Any change that adds or edits a `db/migrations/*.sql` file must run this suite locally before
