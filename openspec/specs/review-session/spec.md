@@ -47,8 +47,8 @@ a busy skeleton. If the seed fetch fails it SHALL show a localised error with a 
 
 ### Requirement: A session is built once, or hydrated from the saved one (baseline)
 
-With no saved session the load SHALL build one and save it. With a saved session it SHALL hydrate it, saving again
-only when the card count changed or a card was healed. Limits SHALL come from settings, never the saved session.
+With no saved session the load SHALL build one and save it. With a saved session it SHALL hydrate it, and this step
+SHALL save only when the card count changed or a card was healed; the later stamp and snooze steps can also save. Limits SHALL come from settings, never the saved session.
 Every saved card SHALL be kept whatever its type's setting, seed fields SHALL be refreshed while FSRS state and
 locale are kept, and only enabled directions SHALL gain missing cards, in the active locale only.
 
@@ -64,7 +64,7 @@ locale are kept, and only enabled directions SHALL gain missing cards, in the ac
 - **WHEN** cry cards are off and saved cry cards exist
 - **THEN** they stay in storage and no new cry cards are added
 
-<!-- source: RS:1278-1325; lib/review/session.ts:257-344; lib/review/session.ts:411-494; lib/review/session.test.ts:99; lib/review/session.test.ts:108; lib/review/session.test.ts:116; lib/review/session.test.ts:127 -->
+<!-- source: RS:1278-1325; RS:1340-1343; RS:1397-1400; lib/review/session.ts:257-344; lib/review/session.ts:411-494; lib/review/session.test.ts:99; lib/review/session.test.ts:108; lib/review/session.test.ts:116; lib/review/session.test.ts:127 -->
 
 ### Requirement: An impossible FSRS state is healed on load (baseline)
 
@@ -85,8 +85,8 @@ never be healed. The heal SHALL be saved once and SHALL NOT fire again on the ne
 ### Requirement: The full set is saved, the active language is shown (baseline)
 
 The session SHALL keep the whole multi-locale array in a ref and hold only the active locale's cards
-in React state. Every queue, lookup and render SHALL use the active-locale view, and every save SHALL
-write the whole array. The active locale and enrolled languages SHALL be read once at load.
+in React state. Once loaded, every queue, lookup and render SHALL use the active-locale view, and every save
+SHALL write the whole array. The load itself works on the whole array, which is where #2247 and #2249 come from. The active locale and enrolled languages SHALL be read once at load.
 
 #### Scenario: Same id in two languages
 - **WHEN** the active locale is `ja` and id 1 exists in `en` and `ja`
@@ -100,7 +100,9 @@ write the whole array. The active locale and enrolled languages SHALL be read on
 
 ### Requirement: The session reloads when its inputs change elsewhere (baseline)
 
-Settings, card-type toggles, caps and locale SHALL be read at load only. The page SHALL do a full
+Card-type toggles, caps, typed-entry settings and locale SHALL be read at load only. Retention target, FSRS
+weights, the cry and spoken-name settings and the audio-wait setting SHALL be read live on each render, reveal or
+grade. The page SHALL do a full
 reload when settings change in another tab, when the active locale changes in this tab, and when a
 cloud pull applies progress. Other same-tab settings saves SHALL NOT reload it.
 
@@ -116,7 +118,7 @@ cloud pull applies progress. Other same-tab settings saves SHALL NOT reload it.
 - **WHEN** `SYNC_PULL_APPLIED_EVENT` fires
 - **THEN** the page reloads and rebuilds from the merged cards
 
-<!-- source: components/review/useSessionReloadListeners.ts:23-57; components/review/useSessionReloadListeners.test.tsx:54; components/review/useSessionReloadListeners.test.tsx:76; components/review/useSessionReloadListeners.test.tsx:86; components/review/useSessionReloadListeners.test.tsx:97; RS:1278-1287 -->
+<!-- source: components/review/useSessionReloadListeners.ts:23-57; components/review/useSessionReloadListeners.test.tsx:54; components/review/useSessionReloadListeners.test.tsx:76; components/review/useSessionReloadListeners.test.tsx:86; components/review/useSessionReloadListeners.test.tsx:97; RS:1278-1287; RS:2070-2076; RS:2488-2490; RS:2602-2608; RS:2774-2776 -->
 
 ### Requirement: Background work stands off while a session is mounted (baseline)
 
@@ -138,8 +140,9 @@ clear on grade and on unmount, and undo SHALL set it again.
 ### Requirement: Saved sessions live in IndexedDB with a localStorage fallback (baseline)
 
 Which store is read and written is owned by `local-data-and-backup`. A `localStorage` write failure SHALL return
-`quota` or `unknown` rather than throw, and a save on the server SHALL do nothing. Any failed result SHALL show the
-dismissible storage banner, including `unknown`, and the next successful save SHALL clear it.
+`quota` or `unknown` rather than throw, and a save on the server SHALL do nothing. Any failed result SHALL set the
+dismissible storage banner, including `unknown`, and the next successful save SHALL clear it. Only card screens render
+the banner; the countdown and end screens have no slot for it, which looks like a bug (#2346).
 
 #### Scenario: Private browsing with no IndexedDB
 - **WHEN** IndexedDB is unavailable
@@ -153,7 +156,11 @@ dismissible storage banner, including `unknown`, and the next successful save SH
 - **WHEN** the `localStorage` write raises a quota error
 - **THEN** `{ ok: false, reason: "quota" }` returns and the banner shows
 
-<!-- source: lib/review/persistence.ts:292-324; lib/review/persistence.ts:338-358; lib/review/persistence.ts:436-465; lib/review/useStorageQuota.ts:12-28; lib/review/persistence.test.ts:243; lib/review/persistence.test.ts:318; lib/review/persistence.test.ts:376; lib/review/persistence.test.ts:421; lib/review/persistence.test.ts:498 -->
+#### Scenario: Last card's save fails
+- **WHEN** the save of the last card in play fails
+- **THEN** the end screen shows with no banner (#2346)
+
+<!-- source: lib/review/persistence.ts:292-324; lib/review/persistence.ts:338-358; lib/review/persistence.ts:436-465; lib/review/useStorageQuota.ts:12-28; RS:3142; RS:3274; RS:3389; RS:2162-2181; RS:2333-2405; lib/review/persistence.test.ts:243; lib/review/persistence.test.ts:318; lib/review/persistence.test.ts:376; lib/review/persistence.test.ts:421; lib/review/persistence.test.ts:498 -->
 
 ### Requirement: Saved data is checked whole and migrated on read (baseline)
 
@@ -255,8 +262,9 @@ when the setting changes back. On load, snooze SHALL run over every locale's car
 
 `computeQueueCount` and the Stats snapshot SHALL gate cards with no scope context, so `favourites`,
 `incomplete-chains` and `mastery-blockers` match nothing on those surfaces. They SHALL pass no shuffle
-salt and no priority list, which changes which cards are picked but not the counts. This differs from
-Practice and looks like a bug (#2253).
+salt and no priority list, which changes which cards are picked but not the counts. The app-icon and title badges
+SHALL take their caps from the saved session, not from settings. The scope gap differs from Practice and looks like
+a bug (#2253).
 
 #### Scenario: Favourites-only scope with two hearts
 - **WHEN** the scope is Favourites with two hearted species that have new cards
@@ -266,7 +274,7 @@ Practice and looks like a bug (#2253).
 - **WHEN** the scope is Favourites plus Gen I
 - **THEN** the badge counts Gen I cards only
 
-<!-- source: lib/stats/dashboard-snapshot.ts:165-187; lib/stats/dashboard-snapshot.ts:209-218; lib/stats/dashboard-snapshot.ts:298-299; components/pwa/usePwaBadge.ts:62-80; RS:1372-1379 -->
+<!-- source: lib/stats/dashboard-snapshot.ts:165-187; lib/stats/dashboard-snapshot.ts:209-218; lib/stats/dashboard-snapshot.ts:298-299; components/pwa/usePwaBadge.ts:62-80; components/pwa/useDocumentTitleBadge.ts:83; RS:1372-1379 -->
 
 ### Requirement: Learning queue is rebuilt from saved cards (baseline)
 
@@ -293,9 +301,10 @@ any locale, so a non-first language can take its state from another language's c
 ### Requirement: Learning cards stay in play whatever the gates say (baseline)
 
 Cards in a learning step SHALL be served regardless of `eligibleCardIds`, so an out-of-scope card, a
-disabled-type card and an alternate form with the toggle off all finish their steps. Practice SHALL show
-the "Finishing an in-progress card" hint on such a card. A comment says disabled types are never queued,
-which is true of the review and new queues only.
+disabled-type card and an alternate form with the toggle off all finish their steps. The one exception is a non-empty
+scope with an empty eligible set: the no-match screen returns first, so no card is served until the scope changes.
+Practice SHALL show
+the "Finishing an in-progress card" hint on such a card.
 
 #### Scenario: Scope changed mid-step
 - **WHEN** a card in a learning step falls out of scope
@@ -305,7 +314,11 @@ which is true of the review and new queues only.
 - **WHEN** cry cards are turned off with a cry card mid-step
 - **THEN** after the reload that card is still served once due
 
-<!-- source: lib/review/session.ts:676-688; RS:1475; RS:1928-1930; RS:1945; RS:3228; lib/review/session.test.ts:857; lib/review/session.test.ts:878 -->
+#### Scenario: Scope that matches nothing, card mid-step
+- **WHEN** the scope matches no card and a card is in a learning step
+- **THEN** the no-match screen shows and that card waits
+
+<!-- source: lib/review/session.ts:676-688; RS:1475; RS:1888-1904; RS:1928-1930; RS:1945; RS:3228; lib/review/session.test.ts:857; lib/review/session.test.ts:878 -->
 
 ### Requirement: Learn-ahead fills an empty queue, else a countdown shows (baseline)
 
@@ -329,7 +342,7 @@ no scope control.
 The first card shown SHALL be pinned in `displayedCardId` until a grade releases it, so a learning card
 coming due cannot replace it. A revealed card SHALL also be held by a second lock. A scope change SHALL
 clear the first lock, and a card that stopped being eligible SHALL lose it, but the reveal lock takes no
-account of scope, so a revealed card stays through a scope change until it is graded.
+account of scope, so a revealed card stays through a scope change until it is graded or the no-match screen replaces it.
 
 #### Scenario: Learning card comes due before Reveal
 - **WHEN** a learning card's `dueAt` passes while another card waits for Reveal
@@ -343,7 +356,11 @@ account of scope, so a revealed card stays through a scope change until it is gr
 - **WHEN** the scope changes while the answer is showing
 - **THEN** that card stays until it is graded
 
-<!-- source: RS:1044-1059; RS:1741-1786; RS:1994-2012; RS:1015; components/review/ReviewSession.test.tsx:957; components/review/ReviewSession.test.tsx:1078; components/review/ReviewSession.test.tsx:1553 -->
+#### Scenario: Scope matching nothing while the answer shows
+- **WHEN** the new scope matches no card while the answer is showing
+- **THEN** the no-match screen shows, and Clear scope brings the revealed card back
+
+<!-- source: RS:1044-1059; RS:1741-1786; RS:1888-1904; RS:1994-2012; RS:1015; components/review/ReviewSession.test.tsx:957; components/review/ReviewSession.test.tsx:1078; components/review/ReviewSession.test.tsx:1553 -->
 
 ### Requirement: Renderer depends on card type and lifecycle (baseline)
 
@@ -379,8 +396,7 @@ like a bug, #2259).
 
 Reveal SHALL pick a fact for the card, wait for the evolution answer sprite to decode (bounded by the
 decoder's time limit), then show the answer, lock the card and play the cry and spoken name by setting.
-The cry SHALL finish before the name is spoken. Cry cards SHALL not replay their cry. A cry card SHALL
-auto-play once when it first comes on screen. Decoding SHALL block a second reveal, and leaving during
+The cry SHALL finish before the name is spoken. Cry cards SHALL not replay their cry. Decoding SHALL block a second reveal, and leaving during
 the decode SHALL stop the rest.
 
 #### Scenario: Slow decode
@@ -393,12 +409,22 @@ the decode SHALL stop the rest.
 
 <!-- source: RS:2410-2526; RS:1545-1551; components/review/ReviewSession.test.tsx:545; components/review/ReviewSession.test.tsx:586; components/review/ReviewSession.test.tsx:598; components/review/ReviewSession.test.tsx:619; components/review/ReviewSession.test.tsx:394 -->
 
+### Requirement: A cry card plays when it is pinned (baseline)
+
+A cry card SHALL auto-play each time the display lock pins it unrevealed, whatever the cry-on-reveal setting.
+
+#### Scenario: Scope change keeps a cry card on screen
+- **WHEN** a scope change clears the lock and the same unrevealed cry card is pinned again
+- **THEN** its cry plays again
+
+<!-- source: RS:1545-1551; RS:1015; RS:1777-1778 -->
+
 ### Requirement: Keyboard controls the session (baseline)
 
-Unless focus is in a text field or the language panel is open, `?` SHALL open the shortcut overlay, Escape
+Unless focus is in a text field or the language panel is open, `?` SHALL set the shortcut overlay open, Escape
 SHALL close it, Space or Enter SHALL reveal, and after reveal 1, 2, 4 and 5 SHALL grade with 3 as a second
-Good. Cmd or Ctrl+Z SHALL undo. The Space and Enter branch SHALL call `preventDefault` whatever is focused
-and SHALL run on picker and multiple-choice cards too, which looks like a bug (#2261).
+Good. These keys SHALL work with the overlay open, and grade keys SHALL NOT check modifiers (#2349). Only the flip
+layouts render the overlay, so elsewhere `?` shows nothing until the next flip card (#2349).
 
 #### Scenario: Focus in a text field
 - **WHEN** an input has focus and Space is pressed
@@ -408,30 +434,61 @@ and SHALL run on picker and multiple-choice cards too, which looks like a bug (#
 - **WHEN** 1 is pressed before reveal
 - **THEN** nothing happens
 
+#### Scenario: Shortcut overlay on a reverse card
+- **WHEN** `?` is pressed on a reverse card
+- **THEN** no dialog opens (#2349)
+
+#### Scenario: Modified digit
+- **WHEN** Cmd+1 is pressed on a revealed card
+- **THEN** the card is graded (#2349)
+
+<!-- source: RS:1660-1732; RS:3223-3227; RS:3518-3522; components/review/ReviewSession.test.tsx:3960; components/review/ReviewSession.test.tsx:3972; components/review/ReviewSession.test.tsx:3984; components/review/ReviewSession.test.tsx:3997; components/review/ReviewSession.test.tsx:4043; components/review/ReviewSession.test.tsx:4089 -->
+
+### Requirement: Space and Enter are taken whatever has focus (baseline)
+
+The Space and Enter branch SHALL call `preventDefault` whatever is focused, whenever no card is revealed. So it runs
+on picker and multiple-choice cards and also with no card on screen, as on the end screens and in Higher or Lower,
+which looks like a bug (#2261).
+
 #### Scenario: Enter on a focused picker tile
 - **WHEN** a keyboard user presses Enter on a focused tile of a reverse card
 - **THEN** the handler runs the reveal, sets `revealed` and stops the browser's default action (#2261)
 
-<!-- source: RS:1556-1568; RS:1660-1732; RS:2492-2493; components/review/ReviewSession.test.tsx:3960; components/review/ReviewSession.test.tsx:3972; components/review/ReviewSession.test.tsx:3984; components/review/ReviewSession.test.tsx:3997; components/review/ReviewSession.test.tsx:4043; components/review/ReviewSession.test.tsx:4089 -->
+#### Scenario: Enter on an end-screen button
+- **WHEN** a keyboard user presses Enter on a focused button on All caught up
+- **THEN** the keydown's default action is stopped (#2261)
+
+<!-- source: RS:1694-1700; RS:2492-2493 -->
+
+### Requirement: The undo shortcut has its own listener (baseline)
+
+Cmd or Ctrl+Z, without Shift, SHALL undo while Undo is armed and no grade is running. It SHALL NOT check for a text
+field or the language panel, so it works on end screens and takes the key from a focused field (#2349).
+
+#### Scenario: Undo with a text field focused
+- **WHEN** Ctrl+Z is pressed in a text field while Undo is armed
+- **THEN** the last grade is undone and the native undo is stopped (#2349)
+
+<!-- source: RS:1556-1568 -->
 
 ### Requirement: Swiping grades a revealed flip card (baseline)
 
-On a revealed flip card, a swipe past 80 pixels SHALL grade: right Good, left Again, up Easy, down Hard.
-Swiping SHALL be off while grading, and off on picker, multiple-choice and typed cards, which render no
+On a revealed flip card, a swipe of 80 pixels or more along its main axis SHALL grade: right Good, left Again, up
+Easy, down Hard. A gesture between 40 and 50 degrees from horizontal SHALL be ignored as too diagonal. Swiping SHALL be off while grading, and off on picker, multiple-choice and typed cards, which render no
 swipe target.
 
 #### Scenario: Swipe right on a revealed card
 - **WHEN** a revealed name card is swiped 100 pixels right
 - **THEN** it is graded Good
 
-<!-- source: RS:1647-1653; RS:3171; RS:3459; lib/review/swipeGesture.ts:27; lib/review/swipeGesture.ts:107-115; lib/review/swipeGesture.test.ts:12; lib/review/swipeGesture.test.ts:39 -->
+<!-- source: RS:1647-1653; RS:3171; RS:3459; lib/review/swipeGesture.ts:27; lib/review/swipeGesture.ts:34; lib/review/swipeGesture.ts:60-101; lib/review/swipeGesture.ts:107-115; lib/review/swipeGesture.test.ts:12; lib/review/swipeGesture.test.ts:39 -->
 
 ### Requirement: Grade applies in a fixed order (baseline)
 
 A grade SHALL compute the next state, decode the next card's sprites, wait for audio if that setting is on, enqueue
 the sync, update the screen, then chain the device save and log write behind any earlier grade. The log SHALL be written only after a successful save. A grade SHALL be dropped when the
-page is left during the audio wait, and a queued save step SHALL be skipped after unmount (looks like a bug, #2264).
-A `nextReview` error SHALL skip the grade and show a banner.
+page is left during the waits, and a queued save step SHALL be skipped after unmount (looks like a bug, #2264). A
+`nextReview` error SHALL skip the grade and show a banner.
 
 #### Scenario: Slow disk
 - **WHEN** `saveSession` has not resolved
@@ -439,24 +496,24 @@ A `nextReview` error SHALL skip the grade and show a banner.
 
 #### Scenario: Save fails
 - **WHEN** the save returns not ok
-- **THEN** no grade-log entry is written, the banner shows and Undo stays off
+- **THEN** no grade-log entry is written, the banner shows and no Undo is armed for this grade
 
 #### Scenario: Leaving during the audio wait
 - **WHEN** the player navigates away before the audio finishes
-- **THEN** the card is not graded
+- **THEN** the card is not graded, but the practice count and learn-first save have already run (#2264)
 
 #### Scenario: Corrupt grade value
 - **WHEN** `nextReview` throws
 - **THEN** the session continues with a localised error banner
 
-<!-- source: RS:2554-2617; RS:2676-2802; RS:2819-2921; RS:2935-2956; components/review/ReviewSession.test.tsx:2013; components/review/ReviewSession.test.tsx:4278; components/review/ReviewSession.test.tsx:4541; components/review/ReviewSession.test.tsx:4586; components/review/ReviewSession.test.tsx:4640 -->
+<!-- source: RS:2554-2617; RS:2650-2665; RS:2676-2802; RS:2819-2921; RS:2935-2956; components/review/ReviewSession.test.tsx:2013; components/review/ReviewSession.test.tsx:4278; components/review/ReviewSession.test.tsx:4541; components/review/ReviewSession.test.tsx:4586; components/review/ReviewSession.test.tsx:4640 -->
 
 ### Requirement: Grades feed the log, streak and daily summary (baseline)
 
 After a successful save a grade SHALL call `recordReview` and append to the grade log with its locale, the local
 day and the post-grade step. `dueQueueEmpty` SHALL be true when no active-locale card is due, with no scope or
 card-type check, so a scoped session can finish with it false (looks like a bug, #2257). The daily summary SHALL be
-saved per grade, unless a superuser flag is on, and restored at load from the summary or else the grade log.
+saved per grade, even if the device save fails, unless a superuser flag is on, and restored at load from the summary or else the grade log.
 
 #### Scenario: Reload after a session
 - **WHEN** the page reloads on the same local day
@@ -475,9 +532,10 @@ saved per grade, unless a superuser flag is on, and restored at load from the su
 ### Requirement: Undo reverts one grade while it is still on the device (baseline)
 
 Undo SHALL be one step, armed only after the save succeeds and the log entry exists, and SHALL expire when a held
-grade commits. Undo by button or shortcut SHALL wait for pending saves, drop the held grade, restore cards, tallies
-and the learning queue, save, remove the log entry, roll back the summary and return to the card revealed. It SHALL
-NOT restore `priorityNewSpeciesIds` (looks like a bug, #2251) and does not reverse `recordReview`.
+grade commits. A guest has no hold, so a guest's armed snapshot stays until a later save succeeds, and after a failed
+save Undo reverts two grades (looks like a bug, #2347). Undo by button or shortcut SHALL wait for pending saves, drop
+the held grade, restore cards, tallies and the learning queue, save, remove the log entry, roll back the summary and
+return to the card revealed.
 
 #### Scenario: Signed in, undo in time
 - **WHEN** a signed-in player undoes before the hold commits
@@ -487,23 +545,41 @@ NOT restore `priorityNewSpeciesIds` (looks like a bug, #2251) and does not rever
 - **WHEN** a guest grades and undoes
 - **THEN** there is no hold, and undo reverts the device state
 
+#### Scenario: Guest, next save fails
+- **WHEN** a guest grades A, then grades B with a failing save, then presses Undo
+- **THEN** Undo is still on beside the banner and the session returns to before A (#2347)
+
+<!-- source: lib/sync/usePerGradeSync.ts:539-553; RS:147-166; RS:1128-1137; RS:1556-1614; RS:2650-2665; RS:2957-2999; RS:3068-3119; components/review/ReviewSession.test.tsx:449; components/review/ReviewSession.test.tsx:4171; components/review/ReviewSession.test.tsx:4191; components/review/ReviewSession.test.tsx:4704; components/review/ReviewSession.test.tsx:4746; components/review/ReviewSession.test.tsx:6105 -->
+
+### Requirement: Undo offers and leaves some things (baseline)
+
+The Undo button SHALL show on card screens and the countdown, not on end screens, where only the shortcut undoes. A
+picker, multiple-choice or typed card has no answer face, so after Undo it shows its prompt with grade keys live.
+Undo SHALL NOT restore `priorityNewSpeciesIds` (looks like a bug, #2251), and does not reverse `recordReview`, the due
+and mastered caches, the has-mastered flag or an awarded badge.
+
 #### Scenario: Learn-first species
 - **WHEN** a species' last new card is graded and undone
 - **THEN** the card is new again and the species stays off the list (#2251)
 
-<!-- source: RS:147-166; RS:1128-1137; RS:1556-1614; RS:2650-2665; RS:2957-2999; RS:3068-3119; components/review/ReviewSession.test.tsx:449; components/review/ReviewSession.test.tsx:4171; components/review/ReviewSession.test.tsx:4191; components/review/ReviewSession.test.tsx:4704; components/review/ReviewSession.test.tsx:4746; components/review/ReviewSession.test.tsx:6105 -->
+#### Scenario: Last card
+- **WHEN** the last card is graded and the end screen shows
+- **THEN** no Undo button shows, and Ctrl+Z returns to the card
+
+<!-- source: components/review/ReviewCardLayout.tsx:153; components/review/ReviewCardLayout.tsx:226; RS:2650-2665; RS:2849-2875; RS:2972; RS:3033-3065; RS:3106-3119 -->
 
 ### Requirement: Superuser flags keep QA out of the cloud, not off the device (baseline)
 
-With any superuser flag on, grade sync SHALL run as signed out. Badges, daily summary, mastered and due caches,
-the practice count and the slow-load count SHALL be skipped. Device session saves, the device grade log and
-the learn-first list save SHALL still run.
+With any superuser flag on, grade sync and the grade-log push SHALL run as signed out. Badges, daily summary, mastered
+and due caches, the has-mastered flag, the multiple-choice banner flag, the practice count and the slow-load count
+SHALL be skipped. Device session saves, the device grade log, the streak record and the learn-first list save SHALL
+still run.
 
 #### Scenario: QA grade
 - **WHEN** a card is graded with a flag on
-- **THEN** the card is saved on the device and nothing is enqueued for the cloud
+- **THEN** the card is saved on the device, the streak can record the day, and nothing is enqueued for the cloud
 
-<!-- source: RS:1118-1123; RS:1457; RS:1494; RS:2540; RS:2566; RS:2661-2664; RS:2849; RS:2861; RS:2869; RS:2946; RS:3009; RS:3033 -->
+<!-- source: components/sync/AutoSyncOnChange.tsx:45-49; RS:2811; RS:2972; RS:1118-1123; RS:1457; RS:1494; RS:2540; RS:2566; RS:2661-2664; RS:2849; RS:2861; RS:2869; RS:2946; RS:3009; RS:3033 -->
 
 ### Requirement: Wall checks see every enabled card, not only eligible ones (baseline)
 
@@ -528,11 +604,11 @@ wall. Because `cards` is the active-locale view, another language's cards SHALL 
 
 ### Requirement: End screen affordances (baseline)
 
-All three end variants SHALL show the tomorrow teaser, Done today pill, accuracy row and Share today when they
-apply. The Pokemon of the day and partner SHALL show only on All caught up. With a scope
+All three end variants SHALL show the tomorrow teaser, Done today pill, accuracy row, Share today and card-types hint
+when they apply. The Pokemon of the day, partner and theme offer SHALL show only on All caught up. With a scope
 active, Clear filter SHALL show on All caught up and New cards locked, and the Scope control above any variant. A
 switch-language button SHALL show on All caught up when another language has due cards. The accuracy row labels are
-English in every locale (looks like a bug, #2259).
+English in every locale (#2259).
 
 #### Scenario: Scope finished
 - **WHEN** a scoped session is all caught up
@@ -542,7 +618,7 @@ English in every locale (looks like a bug, #2259).
 - **WHEN** the active language is finished and `ja` has 5 due
 - **THEN** a button offers to switch to it
 
-<!-- source: RS:493-519; RS:537-737; RS:2336-2373; components/review/ReviewSession.test.tsx:1684; components/review/ReviewSession.test.tsx:1811; components/review/ReviewSession.test.tsx:2805; components/review/ReviewSession.test.tsx:2950; components/review/ReviewSession.test.tsx:5479 -->
+<!-- source: RS:493-519; RS:537-737; RS:1415-1417; RS:2336-2373; components/review/ReviewSession.test.tsx:1684; components/review/ReviewSession.test.tsx:1811; components/review/ReviewSession.test.tsx:2805; components/review/ReviewSession.test.tsx:2950; components/review/ReviewSession.test.tsx:5479 -->
 
 ### Requirement: Tomorrow's new-card estimate counts one direction (baseline)
 
@@ -570,10 +646,10 @@ for a highlights bar and the game, moving focus to the first tile, and Back SHAL
 
 ### Requirement: One-shot nudges wait for their moment (baseline)
 
-During practice, nudges SHALL show above the Scope control in this order: Higher or Lower, scope, Almost mastered,
-offline. None SHALL show before the first-visit modal is dismissed. The scope nudge SHALL need an empty scope, a
-never-opened scope control and 3 practice sessions. The offline nudge SHALL need no download, no superuser flag, and
-3 slow sprite loads or 5 practice sessions. A practice session SHALL count once per tab session, on the first grade.
+Nudges SHALL show above the Scope control in the order Higher or Lower, scope, Almost mastered, offline. None SHALL show before the first-visit modal is dismissed. Higher or Lower SHALL need 2 seen Pokemon, Almost
+mastered a blocked species with that preset off, scope an empty scope, a never-opened control and 3 practice sessions,
+and offline no download, no superuser flag, and 3 slow sprite loads or 5 practice sessions. A practice session SHALL
+count once per tab session, on the first grade.
 
 #### Scenario: Reload in the same tab
 - **WHEN** the page reloads and a card is graded in the same browser tab session
@@ -588,13 +664,15 @@ never-opened scope control and 3 practice sessions. The offline nudge SHALL need
 ### Requirement: Queues use the UTC day, personal records the local day (baseline)
 
 Queue building, due comparisons and snooze SHALL use the UTC day. The streak, grade log and daily summary SHALL use
-the player's time zone, and the tomorrow teaser SHALL use a local tomorrow against UTC due dates (#2188, #2193).
+the player's time zone, and the tomorrow teaser SHALL use a local tomorrow against UTC due dates (#2188, #2193). The
+app-icon and title badges SHALL pass the local day to the queue builder, so near midnight they can disagree with
+Practice (#2193).
 
 #### Scenario: Evening in Los Angeles
 - **WHEN** it is 20:00 on 1 May in Los Angeles (03:00 UTC on 2 May)
 - **THEN** the queue's day is 2 May while the grade log's day is 1 May
 
-<!-- source: RS:1352; RS:1907; RS:2197-2201; RS:2634-2640; lib/review/session.ts:503-505 -->
+<!-- source: RS:1352; RS:1907; RS:2197-2201; RS:2634-2640; lib/review/session.ts:503-505; components/pwa/usePwaBadge.ts:61; components/pwa/useDocumentTitleBadge.ts:67 -->
 
 ### Requirement: The no-card-types screen cannot show (baseline)
 
@@ -658,8 +736,14 @@ All dated 2 November 2026; open calls, each with a recommendation. Nothing here 
 - Should a disabled type's card in a learning step still be served? It is today, and RS:1928-1930 says otherwise.
   Recommendation: keep the behaviour, because finishing the step protects FSRS state, and fix the comment. No issue
   filed.
-- Should a revealed card survive a scope change? It does today. Recommendation: keep it, so a grade cannot land on
-  a different card. No issue filed.
+- Should a revealed card survive a scope change? It does today, except under a scope that matches nothing.
+  Recommendation: keep it, so a grade cannot land on a different card. No issue filed.
+- Should end screens offer an Undo button? They do not, though Undo is armed there and the shortcut works. Grading the
+  last card is the likeliest moment to want it. Recommendation: judge it as a product call alongside #2347. No issue filed.
+- Should a card mid-step wait behind the no-match screen? Today it does, which pauses its step. Recommendation:
+  keep it, since Clear scope is one tap and the step resumes. No issue filed.
+- #2261's body names only the card screens; the same branch also runs on end screens and in Higher or Lower.
+  Recommendation: add that to the issue. Left alone here because changing shared issue text needs the owner's yes.
 - #2255 is marked deliberate in the code (#835). Recommendation: judge it as a product call in that issue.
 - `comeback-return-mode` adds an end variant and pauses new cards. Recommendation: when #2194 is built, it should
   MODIFY "End screen affordances" and "Learn-ahead fills an empty queue, else a countdown shows" if their text
@@ -669,3 +753,6 @@ All dated 2 November 2026; open calls, each with a recommendation. Nothing here 
   "Eligible set is fixed between scope changes" and "Learning queue is rebuilt from saved cards".
 - #2261 has not been tried in a real browser: Chromium was not installed for this run. Recommendation: confirm it
   by hand with a keyboard before fixing.
+- The second check of this spec (2 November 2026) ran throwaway jsdom tests, not committed, for #2346, #2347, #2349, the
+  no-match cases, the dropped grade and "Enter on an end-screen button"; jsdom shows `preventDefault` ran, not what a
+  browser then does. Recommendation: add these as real tests when each is fixed.
