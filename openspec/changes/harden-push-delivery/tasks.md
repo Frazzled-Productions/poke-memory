@@ -5,21 +5,21 @@
 
 ## 2. Delivery
 
-- [ ] 2.1 `lib/push/deliver.ts`: socket timeout, overall limit, pool of 20, 240 second budget. Verify: `lib/push/deliver.test.ts` written failing first, with "No reply", "Slow reply", "Healthy reply", "First device hangs", "Limit on sends in flight", "Budget used up" and "Budget includes the reads".
-- [ ] 2.2 Both routes use the helper, set `maxDuration = 300`, and lose their own loops. Verify: `route.test.tsx` in both routes, red on a first send that never settles (expected 2 calls, got 1), then green, plus "Gone" and "Server error from a push service".
-- [ ] 2.3 Prove the helper against real sockets. Verify: the local TLS script from design.md re-run through `deliverPushes`, all four servers.
+- [x] 2.1 `lib/push/deliver.ts`: socket timeout, overall limit, pool of 20, 240 second budget. Verify: `lib/push/deliver.test.ts` written failing first, with "No reply", "Slow reply", "Healthy reply", "First device hangs", "Limit on sends in flight", "Budget used up" and "Budget includes the reads".
+- [x] 2.2 Both routes use the helper, set `maxDuration = 300`, and lose their own loops. Verify: `route.test.tsx` in both routes, red on a first send that never settles (expected 2 calls, got 1), then green, plus "Gone" and "Server error from a push service".
+- [x] 2.3 Prove the helper against real sockets. Verify: the local TLS script from design.md re-run through `deliverPushes`, all four servers.
 
 ## 3. Known hosts
 
-- [ ] 3.1 `lib/push/endpoints.ts`, with the check in `resubscribe` and the send path. Verify: unit tests for "Known hosts", "Lookalike endpoint" and "Row from before the check", written failing first; `resubscribe/route.test.tsx` "Unknown host".
+- [x] 3.1 `lib/push/endpoints.ts`, with the check in `resubscribe` and the send path. Verify: unit tests for "Known hosts", "Lookalike endpoint" and "Row from before the check", written failing first; `resubscribe/route.test.tsx` "Unknown host".
 - [ ] 3.2 Migration: `NOT VALID` check, written for both projects and applied to QA before the PR needs `migration-check` green. Verify: integration test "Unknown host" through RLS, and the parity test "One list", red on a planted difference.
-- [ ] 3.3 Move fixtures to an allowed host: `lib/sync/integration/push-targets-rpc.test.ts`, the send route tests (the send-time check would skip `push.example`) and `app/api/push/resubscribe/route.test.tsx` (the new check would return 400). Verify: `npm run test:integration` in CI and all three `route.test.tsx` files.
+- [x] 3.3 Move fixtures to an allowed host: `lib/sync/integration/push-targets-rpc.test.ts`, the send route tests (the send-time check would skip `push.example`) and `app/api/push/resubscribe/route.test.tsx` (the new check would return 400). Verify: `npm run test:integration` in CI and all three `route.test.tsx` files.
 
 ## 4. Limit per account
 
-- [ ] 4.1 Trigger with an advisory lock in the same migration. Verify: integration tests "New device at the limit", "Parallel inserts", "Other users", "Account already over the limit" and "Existing device re-subscribes at the limit", written failing first.
+- [x] 4.1 Trigger with an advisory lock in the same migration. Verify: integration tests "New device at the limit", "Parallel inserts", "Other users", "Account already over the limit" and "Existing device re-subscribes at the limit", written failing first.
 
 ## 5. Finish
 
-- [ ] 5.1 Remove the stale cron comment, add the trigger to the `push_subscriptions` row in `docs/persistence.md`, and add a `fixed` changelog fragment in this proposal's wording. Verify: `npm run lint` and the changelog lint.
+- [x] 5.1 Remove the stale cron comment, add the trigger to the `push_subscriptions` row in `docs/persistence.md`, and add a `fixed` changelog fragment in this proposal's wording. Verify: `npm run lint` and the changelog lint.
 - [ ] 5.2 Run `/opsx:verify harden-push-delivery`, `blast-radius` and `final-review`. Verify: findings fixed or listed in the PR.

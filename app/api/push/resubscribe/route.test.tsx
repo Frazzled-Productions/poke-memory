@@ -82,7 +82,7 @@ beforeEach(() => {
 describe("POST /api/push/resubscribe", () => {
   it("returns 401 when the user is not authenticated", async () => {
     makeSupabaseMock({ authError: true });
-    const res = await POST(makeRequest({ endpoint: "https://push.example.com/1", p256dh: "a", auth: "b" }));
+    const res = await POST(makeRequest({ endpoint: "https://fcm.googleapis.com/fcm/send/1", p256dh: "a", auth: "b" }));
     expect(res.status).toBe(401);
     const body = await res.json() as { ok: boolean };
     expect(body.ok).toBe(false);
@@ -101,7 +101,7 @@ describe("POST /api/push/resubscribe", () => {
 
   it("returns 400 when required fields are missing", async () => {
     makeSupabaseMock();
-    const res = await POST(makeRequest({ endpoint: "https://push.example.com/1" }));
+    const res = await POST(makeRequest({ endpoint: "https://fcm.googleapis.com/fcm/send/1" }));
     expect(res.status).toBe(400);
   });
 
@@ -114,7 +114,7 @@ describe("POST /api/push/resubscribe", () => {
   it("performs delete-then-insert and returns 200 on success", async () => {
     const { deleteMock, insertMock } = makeSupabaseMock();
     const res = await POST(makeRequest({
-      endpoint: "https://push.example.com/sub/1",
+      endpoint: "https://fcm.googleapis.com/fcm/send/sub/1",
       p256dh: "p256dhkey",
       auth: "authkey",
     }));
@@ -127,7 +127,7 @@ describe("POST /api/push/resubscribe", () => {
     // insert was called with the correct shape
     expect(insertMock).toHaveBeenCalledWith(expect.objectContaining({
       user_id: "user-1",
-      endpoint: "https://push.example.com/sub/1",
+      endpoint: "https://fcm.googleapis.com/fcm/send/sub/1",
       p256dh: "p256dhkey",
       auth_secret: "authkey",
     }));
@@ -136,7 +136,7 @@ describe("POST /api/push/resubscribe", () => {
   it("returns 500 when the delete fails", async () => {
     makeSupabaseMock({ deleteError: true });
     const res = await POST(makeRequest({
-      endpoint: "https://push.example.com/sub/1",
+      endpoint: "https://fcm.googleapis.com/fcm/send/sub/1",
       p256dh: "p256dhkey",
       auth: "authkey",
     }));
@@ -149,7 +149,7 @@ describe("POST /api/push/resubscribe", () => {
   it("returns 500 when the insert fails", async () => {
     makeSupabaseMock({ insertError: true });
     const res = await POST(makeRequest({
-      endpoint: "https://push.example.com/sub/1",
+      endpoint: "https://fcm.googleapis.com/fcm/send/sub/1",
       p256dh: "p256dhkey",
       auth: "authkey",
     }));
@@ -157,5 +157,20 @@ describe("POST /api/push/resubscribe", () => {
     const body = await res.json() as { ok: boolean; error: string };
     expect(body.ok).toBe(false);
     expect(body.error).toBe("insert_failed");
+  });
+});
+
+describe("POST /api/push/resubscribe - known hosts", () => {
+  it("Unknown host: returns 400 invalid_payload and writes nothing", async () => {
+    const { insertMock, deleteMock } = makeSupabaseMock();
+    const res = await POST(makeRequest({
+      endpoint: "https://push.example/sub/1",
+      p256dh: "p256dhkey",
+      auth: "authkey",
+    }));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ ok: false, error: "invalid_payload" });
+    expect(deleteMock).not.toHaveBeenCalled();
+    expect(insertMock).not.toHaveBeenCalled();
   });
 });
