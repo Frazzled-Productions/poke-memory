@@ -63,8 +63,8 @@ touch the localStorage copy, which a worker cannot reach.
 
 ### Requirement: Transient failures retry (baseline, current behaviour)
 
-On a network error or a 5xx the worker SHALL reject, so the browser retries the event, and SHALL keep
-the queue.
+On a network error, a 5xx or any non-2xx status not named elsewhere in this spec, the worker SHALL
+reject, so the browser retries the event, and SHALL keep the queue.
 
 #### Scenario: Offline again
 
@@ -74,6 +74,11 @@ the queue.
 #### Scenario: Server error
 
 - **WHEN** `/api/sync` answers 502
+- **THEN** the event rejects and the queue is kept
+
+#### Scenario: Any other refusal
+
+- **WHEN** a 404, 408, 413 or 429 comes back for `/api/sync`
 - **THEN** the event rejects and the queue is kept
 
 <!-- source: lib/pwa/swReplay.ts; lib/pwa/swReplayHandler.test.ts -->

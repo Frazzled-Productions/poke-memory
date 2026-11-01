@@ -153,6 +153,14 @@ describe("replayPendingGrades: all tabs closed", () => {
     expect(d.clearQueue).not.toHaveBeenCalled();
   });
 
+  it.each([404, 408, 413, 429])("still rejects on a %i: only 400 and 409 are permanent", async (status) => {
+    const d = deps({ status });
+
+    await expect(replayPendingGrades(d)).rejects.toThrow(`/api/sync returned ${String(status)}`);
+
+    expect(d.clearQueue).not.toHaveBeenCalled();
+  });
+
   it("rejects on a network error and keeps the queue", async () => {
     const d = deps();
     d.fetch.mockRejectedValue(new TypeError("Failed to fetch"));

@@ -5,6 +5,7 @@
 - [x] 1.3 Add the 400 and 409 branch. Verify: all 15 tests in that file green.
 - [x] 1.4 Remove `simulateSwPush` from `lib/sync/swReplay.test.ts`. Verify: mutating the real 401 branch fails the new file, which it could not do to the old one.
 - [x] 1.5 `docs/sync.md`, the `vitest.config.ts` comment and a `fixed` changelog fragment. Verify: `npm run lint`.
+- [x] 1.6 Pin other 4xx statuses as retrying, from the final review. Verify: widening the new branch to every 4xx passed all 15 tests before this and fails the new 404, 408, 413 and 429 cases after it.
 
 ## 2. Before merge
 
