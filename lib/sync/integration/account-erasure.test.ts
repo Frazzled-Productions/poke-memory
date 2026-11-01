@@ -24,6 +24,7 @@ import {
   USER_TABLES,
   callRpcAs,
   readUserRows,
+  rpcHardening,
   seedUserRows,
 } from "./userRows";
 
@@ -106,6 +107,13 @@ describe("the schema cascades from auth.users (integration)", () => {
 });
 
 describe("delete_account (integration)", () => {
+  it("is SECURITY DEFINER with an empty search_path", async () => {
+    expect(await rpcHardening(pool, "delete_account")).toEqual({
+      securityDefiner: true,
+      searchPath: "search_path=",
+    });
+  });
+
   it("removes the caller from every table and leaves another user untouched", async () => {
     const userA = await newSeededUser();
     const userB = await newSeededUser();

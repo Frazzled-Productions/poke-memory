@@ -137,3 +137,27 @@ export async function callRpcAs(
     client.release();
   }
 }
+
+/**
+ * The hardening `docs/sync.md` requires of a user-session RPC: SECURITY DEFINER
+ * with an empty search_path. A `CREATE OR REPLACE` that drops either clause
+ * still passes every behavioural test while the superuser owns the function.
+ */
+export async function rpcHardening(
+  pool: pg.Pool,
+  rpc: "delete_account" | "reset_all_progress",
+): Promise<{ securityDefiner: boolean; searchPath: string | undefined }> {
+  const { rows } = await pool.query(
+    `SELECT prosecdef, proconfig
+     FROM pg_proc
+     WHERE oid = to_regprocedure($1)`,
+    [`public.${rpc}()`],
+  );
+  const config: string[] = rows[0].proconfig ?? [];
+  return {
+    securityDefiner: rows[0].prosecdef,
+    searchPath: config
+      .find((c) => c.startsWith("search_path="))
+      ?.replace(/"/g, ""),
+  };
+}

@@ -24,6 +24,7 @@ import {
   USER_TABLES,
   callRpcAs,
   readUserRows,
+  rpcHardening,
   seedProgressRows,
   seedUserRows,
 } from "./userRows";
@@ -70,6 +71,13 @@ async function ageTombstone(userId: string, seconds: number): Promise<void> {
 }
 
 describe("reset_all_progress (integration)", () => {
+  it("is SECURITY DEFINER with an empty search_path", async () => {
+    expect(await rpcHardening(pool, "reset_all_progress")).toEqual({
+      securityDefiner: true,
+      searchPath: "search_path=",
+    });
+  });
+
   it("deletes the caller's progress from all three tables", async () => {
     const userA = await newSeededUser();
 

@@ -4,6 +4,7 @@
 - [x] 1.2 Add `lib/sync/integration/account-erasure.test.ts`: users A and B across all seven tables, A gone, B untouched, and the catalogue checks on every `user_id` column and every foreign key to `auth.users`. Verified by: the file passes, and each mutation in 1.4 fails it in the predicted test.
 - [x] 1.3 Add `lib/sync/integration/reset-all-progress.test.ts`: the three deletes, the tombstone, the cooldown, `user_settings` surviving. Verified by: the file passes, and each mutation in 1.4 fails it in the predicted test.
 - [x] 1.4 Prove the tests can fail (no behaviour changes, so the failing run comes from throwaway migrations, never committed). Verified by: one run per mutation, predicted failures matching, results in the PR body.
+- [x] 1.5 Assert `delete_account` and `reset_all_progress` stay `SECURITY DEFINER` with an empty `search_path`. Verified by: a throwaway migration resetting `search_path` on both turns the two new tests red and only those, and they pass without it.
 
 ## 2. Docs
 
