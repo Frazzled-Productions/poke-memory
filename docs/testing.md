@@ -28,8 +28,11 @@ retry, so it hard-failed against the component's async mount render) and had to 
 `lib/sync/integration/` runs against a local `postgres:15` container - no Supabase Pro/branch quota
 (#464 / #545 replaced PR #531's branching approach). Opt-in locally:
 `VITEST_INTEGRATION=1 npm run test:integration`. CI's `integration-tests.yml` runs on PRs touching
-`lib/sync/**`, `app/api/sync/**`, `db/migrations/**`, `lib/gradelog/**`, or itself (#611); the
-`integration-tests` label is the escape hatch. In scope: `apply-migrations.test.ts`, `rls.test.ts`,
+`lib/sync/**`, `app/api/sync/**`, `db/migrations/**`, `lib/gradelog/**`, `lib/storage/**`,
+`lib/idb/**`, `lib/settings/**`, `lib/auth/**`, `app/api/push/**`, the divergence script or itself
+(#611, #2220), and on every push to `qa` (a red run there does not block anything already merged);
+`scripts/integration-gate-paths.test.mjs` fails if an integration test imports a path the filter
+misses. The `integration-tests` label is the escape hatch. In scope: `apply-migrations.test.ts`, `rls.test.ts`,
 `regression-trigger.test.ts`. `auth.uid()` is polyfilled via `SET LOCAL "request.jwt.claims"` in a
 transaction.
 

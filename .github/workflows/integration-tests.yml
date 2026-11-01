@@ -7,8 +7,14 @@ name: Integration Tests
 # Trigger (#611): the suite runs automatically on PRs that touch the
 # cloud-write surface - lib/sync/**, app/api/sync/**, db/migrations/**,
 # lib/gradelog/**, the grade_log divergence monitor script (#2096), or this
-# workflow file itself.  Path filtering keeps spend
-# bounded: only relevant PRs trigger a run.
+# workflow file itself - or what the suite imports or pins from outside it:
+# lib/storage/**, lib/idb/**, lib/settings/**, lib/auth/** and app/api/push/**
+# (#2220; scripts/integration-gate-paths.test.mjs keeps this list in step).
+# Path filtering keeps spend bounded: only relevant PRs trigger a run.
+#
+# Every push to qa runs the suite with no path filter (#2220), as the safety
+# net for what a PR skipped: transitive imports, Dependabot bumps (the `decide`
+# job skips those PRs) and merges that only break in combination.
 #
 # The `integration-tests` PR label remains an explicit opt-in escape hatch for
 # changes that fall outside the path filter but still need DB-level
@@ -17,8 +23,8 @@ name: Integration Tests
 # `labeled`.  Adding the label to a sprite-only PR will not trigger this
 # workflow - use workflow_dispatch for that case instead.
 #
-# `paths-ignore` on the `pull_request` trigger short-circuits the workflow
-# entirely on PRs whose diff is confined to sprite assets under
+# `paths-ignore` on the `pull_request` and `push` triggers short-circuits the
+# workflow entirely on changes confined to sprite assets under
 # `public/sprites/**` (e.g. quality-regen batches). Those files cannot match
 # the `cloud_write` filter, so the outer fence is safe to widen; it also
 # prevents dorny/paths-filter from paging the GitHub Compare API over a
@@ -27,6 +33,10 @@ name: Integration Tests
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
+    paths-ignore:
+      - 'public/sprites/**'
+  push:
+    branches: [qa]
     paths-ignore:
       - 'public/sprites/**'
   workflow_dispatch:
@@ -63,6 +73,13 @@ jobs:
               - 'app/api/sync/**'
               - 'db/migrations/**'
               - 'lib/gradelog/**'
+              # Outside the cloud-write surface, but the suite imports them
+              # or, for the push routes, pins the RPCs they read through.
+              - 'lib/storage/**'
+              - 'lib/idb/**'
+              - 'lib/settings/**'
+              - 'lib/auth/**'
+              - 'app/api/push/**'
               # The divergence monitor's SQL is tested against the migrated
               # schema by lib/sync/integration/grade-log-divergence.test.ts
               # (#2096), so a change to the script alone must run the suite.
@@ -76,7 +93,7 @@ jobs:
           PATHS_MATCH: ${{ steps.filter.outputs.cloud_write }}
           HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'integration-tests') }}
         run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ "$EVENT_NAME" = "push" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           elif [ "$PATHS_MATCH" = "true" ] || [ "$HAS_LABEL" = "true" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
