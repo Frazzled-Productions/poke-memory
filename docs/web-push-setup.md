@@ -5,8 +5,9 @@ Manual one-off setup for the daily review reminder Web Push feature
 
 ## Architecture summary
 
-- `pg_cron` fires once a day (08:00 UTC) and posts to the Vercel route at
-  `/api/push/send-daily`.
+- `pg_cron` fires every hour at minute 0 (migration 031) and posts to the
+  Vercel route at `/api/push/send-daily`. The route only notifies users whose
+  own reminder hour is the current UTC hour.
 - The route handler verifies a Bearer token, queries every active
   subscription, fans out per-user pushes via the `web-push` npm package,
   and deletes any subscriptions the push service reports as dead (410 / 404).
@@ -101,15 +102,9 @@ After all five steps are in place:
   returns 410 (Gone) or 404 (Not Found) from the push service. Other
   errors are logged but skipped - a single bad endpoint does not block
   the rest of the batch.
-- **Schedule changes.** To move the daily fire time, update the cron
-  expression via `cron.alter_job`:
-
-  ```sql
-  SELECT cron.alter_job(
-    (SELECT jobid FROM cron.job WHERE jobname = 'web-push-daily-reminders'),
-    schedule := '0 16 * * *' -- 16:00 UTC
-  );
-  ```
+- **Schedule changes.** Leave the job hourly. Each user's reminder hour
+  comes from `push_notification_hour`, so a job that fires once a day would
+  only reach the users due in that hour.
 
 - **Secret rotation.** Updating `vault.secrets` is enough on the
   Supabase side; the cron command re-reads on every fire. Update the
