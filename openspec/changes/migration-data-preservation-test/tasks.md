@@ -13,4 +13,4 @@
 ## 3. Checks
 
 - [x] 3.1 Run the whole integration suite, the runner's unit test, `tsc --noEmit` and ESLint. Verified by: exit codes and counts in the PR body.
-- [x] 3.2 Run `/opsx:verify`, `blast-radius` and the consistency pass. Verified by: result at the top of the PR body.
+- [x] 3.2 Run `openspec validate --strict`, `blast-radius` and the consistency pass (`/opsx:verify` has no delta to check with `skip_specs: true`). Verified by: result in the PR body.
