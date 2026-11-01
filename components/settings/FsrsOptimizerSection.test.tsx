@@ -411,7 +411,7 @@ describe("FsrsOptimizerSection", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("fsrs-optimize-help")).toHaveTextContent(
-          "Couldn't load your settings. Check your connection and try again.",
+          "Couldn't start the optimiser. Check your connection and try again.",
         );
       });
     });

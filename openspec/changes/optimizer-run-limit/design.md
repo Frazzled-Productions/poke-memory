@@ -36,7 +36,7 @@ caller wins. Parallel claims are tested on a free slot and on an expired one.
 
 **The result is a number.** `0` means claimed; above `0` is the milliseconds left. Real PostgREST
 returns a scalar `bigint` as a bare JSON number (`0`, `604800000`), so the route's `!== 0` is sound, and
-anything else falls to a refusal.
+anything else falls to a refusal, which a route test holds.
 
 **Claim, with no release.** Any RPC a session can reach, a client can reach too, so a release or refund
 callable by `authenticated` would undo the limit. Claiming is safe to expose because it can only spend

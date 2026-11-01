@@ -107,7 +107,13 @@ NOT read `user_settings` to decide whether to run.
 #### Scenario: Claim cannot be made
 
 - **WHEN** the claim RPC errors
-- **THEN** the route returns 503 `service_unavailable` and does not fit
+- **THEN** the route returns 503 `service_unavailable`, Settings says it couldn't start the optimiser,
+  and no fit runs
+
+#### Scenario: Claim gives no number
+
+- **WHEN** the claim returns neither 0 nor a number of milliseconds
+- **THEN** the route treats it as a refusal, returns 429 `cooldown` with a full week, and does not fit
 
 #### Scenario: Reset and deletion
 

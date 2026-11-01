@@ -24,8 +24,9 @@ Refs ops #404 (held privately in Frazzled-Productions/ops).
 
 - **Review and quiz screens (home), Pokédex, Pasture, Stats, Journey, What's new:** no change, none of
   them call the route. Scheduling reads `fsrsWeights`, which is unchanged.
-- **Settings:** one copy change, in English only like its neighbours: `save_failed` now says "Try again
-  next week", because the slot is spent. A full IP bucket reuses the 429 path and shows "Try again in 1
+- **Settings:** two copy changes, in English only like their neighbours: `save_failed` now says "Try
+  again next week", because the slot is spent, and `service_unavailable` now says "Couldn't start the
+  optimiser", because the route no longer loads settings. A full IP bucket reuses the 429 path and shows "Try again in 1
   day" through `optimizerRetryAfter`, so no new string. Another device whose date is out of date shows
   a live button, then the same 429 message.
 - **Guest mode (localStorage):** no change, the route is signed-in only and the section tells guests to
@@ -90,6 +91,14 @@ Each has a recommended answer, which the documents and the spike assume.
   cooldown. The alternative is a second RPC that only reports the time left.
 - 2026-11-02 Open call 5: how much of the reason goes in this public PR? Recommended: this wording, with
   the detail staying in ops #404.
-- 2026-11-02 Open call 6: carry today's dates into the new table? Recommended: no. The stored value is
-  not validated, so a cast could fail the migration, and the only effect is one early run for anyone
-  inside a window when it ships.
+- 2026-11-02 Open call 6: carry today's dates into the new table? Recommended: no. A date that does
+  not parse could fail the migration, and the only effect is one early run for anyone inside a window
+  when it ships.
+- 2026-11-02 Open call 7: `optimizer_runs` is per-account data and the data categories table in
+  `docs/dpia.md` lists per-account tables, but this change does not add a row (nor is
+  `rate_limit_buckets` listed there). Recommended: add one short row in the build; it is the same kind
+  of operational date as `fsrsWeightsOptimizedAt`, so the DPIA review trigger for a new category does
+  not fire.
+- 2026-11-02 Open call 8: a full IP bucket shows "Try again in 1 day" although the wait is at most an
+  hour, because the 429 message rounds up to days. Three presses while syncing can reach it. Recommended:
+  accept it, as a new message needs a key in every locale. The alternative is one new catalogue key.

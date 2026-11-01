@@ -72,7 +72,7 @@ function makeSupabaseMock(overrides: {
   gradeLogError?: unknown;
   rpcError?: unknown;
   /** claim_optimizer_slot's result: 0 claims, above 0 is the ms left. */
-  claimRetryAfterMs?: number;
+  claimRetryAfterMs?: number | null;
   claimError?: unknown;
   ipAllowed?: boolean;
   ipError?: unknown;
@@ -83,7 +83,10 @@ function makeSupabaseMock(overrides: {
       return { data: overrides.ipAllowed ?? true, error: overrides.ipError ?? null };
     }
     if (name === "claim_optimizer_slot") {
-      return { data: overrides.claimRetryAfterMs ?? 0, error: overrides.claimError ?? null };
+      return {
+        data: overrides.claimRetryAfterMs === undefined ? 0 : overrides.claimRetryAfterMs,
+        error: overrides.claimError ?? null,
+      };
     }
     return { error: overrides.rpcError ?? null };
   });
@@ -259,6 +262,17 @@ describe("POST /api/srs/optimize - persistWeights via RPC", () => {
     expect(response.headers.get("Retry-After")).toBe("91");
     expect(computeParameters).not.toHaveBeenCalled();
     expect(rpcNames(rpcMock)).not.toContain("merge_user_settings");
+  });
+
+  it("refuses and does not fit when the claim returns no number", async () => {
+    makeSupabaseMock({ claimRetryAfterMs: null });
+
+    const response = await POST(makeRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(body).toEqual({ error: "cooldown", retryAfterMs: 7 * 24 * 60 * 60 * 1000 });
+    expect(computeParameters).not.toHaveBeenCalled();
   });
 
   it("returns 503 and does not fit when the slot cannot be claimed", async () => {

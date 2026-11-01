@@ -1,6 +1,6 @@
 ## 1. Before the build
 
-- [ ] 1.1 Fraser settles the six open calls in proposal.md. Verify: Clarifications holds his dated answers.
+- [ ] 1.1 Fraser settles the eight open calls in proposal.md. Verify: Clarifications holds his dated answers.
 
 ## 2. Database
 
@@ -11,8 +11,8 @@
 
 ## 3. Route and UI
 
-- [x] 3.1 Route order: session, IP bucket, grade log, count, claim, fit, save; settings read and stamp removed. Verify: `route.test.tsx`, failing first, then green: "returns 429 with Retry-After when the slot is refused", "returns 422 without claiming", "does not read user_settings to decide whether to run", "returns 429 before reading anything when the IP bucket is full", "sends the hashed first forwarded address", "carries on when the IP check errors", "returns 503 and does not fit when the slot cannot be claimed".
-- [x] 3.2 `save_failed` copy. Verify: `FsrsOptimizerSection.test.tsx` "shows save-failed message".
+- [x] 3.1 Route order: session, IP bucket, grade log, count, claim, fit, save; settings read and stamp removed. Verify: `route.test.tsx`, failing first, then green: "returns 429 with Retry-After when the slot is refused", "returns 422 without claiming", "does not read user_settings to decide whether to run", "returns 429 before reading anything when the IP bucket is full", "sends the hashed first forwarded address", "carries on when the IP check errors", "returns 503 and does not fit when the slot cannot be claimed", "refuses and does not fit when the claim returns no number".
+- [x] 3.2 `save_failed` and `service_unavailable` copy. Verify: `FsrsOptimizerSection.test.tsx` "shows save-failed message" and "shows service-unavailable message for 503 service_unavailable error code".
 - [x] 3.3 Prove the scalar result shape the route compares. Verify: real PostgREST 12.2.3 on local Postgres returned `0` and `604800000` as bare JSON numbers.
 
 ## 4. Finish

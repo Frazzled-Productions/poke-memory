@@ -16,7 +16,7 @@
  *  8. Merge new weights into user_settings.settings and write back.
  *  9. Return { weights, optimizedAt, reviewCount }.
  *
- * The slot is the only limit on runs. `fsrsWeightsOptimizedAt` in settings is
+ * The slot is the weekly limit on runs. `fsrsWeightsOptimizedAt` in settings is
  * what the Settings UI shows; it decides nothing here.
  */
 
