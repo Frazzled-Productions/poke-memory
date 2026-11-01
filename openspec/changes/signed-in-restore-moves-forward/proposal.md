@@ -58,7 +58,8 @@ removing its reps guard fails two cases.
 - **README screenshots:** no change. Settings is not one of the six surfaces.
 - **Changelog fragments and the release:** one `fixed` fragment.
 - **CI and GitHub Actions:** no workflow change. `lib/sync/**` already sets off the integration suite,
-  which picks up the new test file.
+  which picks up the new test file, and the new real sign-in case runs in the existing `e2e-real-auth`
+  job, on the QA project with its ephemeral user.
 
 Risks kept open, each small:
 
@@ -72,7 +73,6 @@ Risks kept open, each small:
 
 - Replacing the cloud, or undoing a reset, from a backup. Both need a new bypass (see Clarifications).
 - Adding `grade_log` or `streak_days` to the backup file.
-- A signed-in Playwright path. `e2e/` has no way to sign in today.
 - The hard-coded English guest confirmation, and `applyBackup` ignoring a failed save on the guest
   path. Both are existing behaviour on a path this change leaves alone.
 
@@ -95,6 +95,6 @@ Nothing here has been put to Fraser yet. Each line is an open call with a recomm
 - 2026-11-02 Should settings restore too? Recommended: no. A patch lowering a guarded field is refused whole (seen against migration 038), which would quietly stop this device's settings syncing. Restoring only unguarded settings is possible, but it needs a second mirror of a trigger.
 - 2026-11-02 A backup cannot undo a reset, the case someone is most likely to try it for. Recommended: accept and say so in the dialog, as built. Undoing a reset needs the same bypass as replacing the cloud.
 - 2026-11-02 A backup file names no account, so another account's backup would now move this account forward. Recommended: accept for now, because it takes picking the file and confirming, and it only touches the signed-in person's own rows.
-- 2026-11-02 The end state is proven against real Postgres through a stand-in client and an in-memory browser, not on a real sign-in. Recommended: walk it once on a QA preview with a real account before merge (task 2.2).
-- 2026-11-02 The ja, zh-Hans and zh-Hant strings are mine and no native speaker has read them. Recommended: the usual translation check before merge (task 2.3).
+- 2026-11-02 The real sign-in case covers an older copy and a newer one. The reset, two-device and failure cases are proven against real Postgres through a stand-in client only. Recommended: accept; they are the same code path, and the triggers involved are the real ones.
+- 2026-11-02 The ja, zh-Hans and zh-Hant strings are mine and no native speaker has read them. Recommended: the usual translation check before merge (task 2.2).
 - 2026-11-02 The guest dialog stays hard-coded English. Recommended: leave it here and fix it in its own small change.
