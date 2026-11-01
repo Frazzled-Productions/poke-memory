@@ -6,7 +6,8 @@ with its learning-step layer, the per-user weight optimiser and its route, typed
 multiple-choice and reverse-card distractors, and card identity keys. This is the baseline: current
 behaviour on `qa` at d2456f44, written from code and tests, not what it should be. A requirement that
 records behaviour which looks wrong says so and names the issue. Line references are to that commit.
-Queue order, daily limits and mastery rules live in `lib/review` and `lib/stats` and are out of scope.
+Queue order, daily limits, the filter snooze that shifts `dueDate` and mastery rules live in `lib/review`
+and `lib/stats` and are out of scope.
 
 ## Requirements
 
@@ -64,14 +65,21 @@ Source: `lib/srs/scheduler.ts:368`, `lib/srs/scheduler.ts:393`, `lib/srs/schedul
 
 Easy on a brand-new card SHALL run FSRS from an empty card, then force `fsrsState` to "review",
 `scheduledDays` to 4 and `dueDate` to four days on, overriding the interval FSRS computed. It SHALL set
-`lastReview` to today and `firstSeen` if it is null. The "I already know these" quiz uses this same path.
+`lastReview` to today and `firstSeen` if it is null. The "I already know these" quiz uses this same path,
+only on cards with null `lastReview` and null `firstSeen`, and writes a grade 5 grade-log entry for each,
+so the optimiser sees those grades.
 
 #### Scenario: Easy first time
 
 - **WHEN** a brand-new card is graded Easy
 - **THEN** the card is in review, due in 4 days, with FSRS stability and difficulty set
 
-Source: `lib/srs/scheduler.ts:371`, `lib/srs/constants.ts:53`, `lib/onboarding/applyKnownGrades.ts:105`, `lib/srs/scheduler.test.ts:128`.
+#### Scenario: Quiz on a card already seen
+
+- **WHEN** a selected card has `firstSeen` set
+- **THEN** the quiz leaves it unchanged
+
+Source: `lib/srs/scheduler.ts:371`, `lib/srs/constants.ts:53`, `lib/onboarding/applyKnownGrades.ts:38`, `lib/onboarding/applyKnownGrades.ts:104`, `lib/onboarding/applyKnownGrades.ts:105`, `components/onboarding/KnownPokemonQuiz.tsx:338`, `lib/srs/scheduler.test.ts:128`.
 
 ### Requirement: Again and Hard inside a step leave FSRS alone (baseline)
 
@@ -222,7 +230,7 @@ Source: `lib/srs/scheduler.ts:27`, `lib/srs/scheduler.ts:369`, `lib/srs/schedule
 `nextReview` SHALL take optional `retentionTarget` and `weights`. With neither (or the default 0.9 and
 no or empty weights) it SHALL use the shared default FSRS instance. Other combinations SHALL use an
 instance cached by retention at two decimal places plus weights at six. Settings clamps the stored
-target to 0.80 to 0.97 and the slider moves in whole percent.
+target to 0.80 to 0.97 and the slider moves in whole percent. The timeline replay passes neither option.
 
 #### Scenario: Higher target schedules sooner
 
@@ -234,7 +242,13 @@ target to 0.80 to 0.97 and the slider moves in whole percent.
 - **WHEN** `weights` is an empty array
 - **THEN** the default weights apply and the interval is a finite number
 
-Source: `lib/srs/scheduler.ts:80`, `lib/srs/scheduler.ts:95`, `lib/srs/scheduler.ts:253`, `lib/settings/persistence.ts:655`, `app/settings/page.tsx:941`, `lib/srs/scheduler.test.ts:501`, `lib/srs/scheduler.test.ts:520`, `lib/srs/scheduler.test.ts:554`.
+#### Scenario: Timeline replay with a custom target
+
+- **WHEN** a player with a 0.85 target opens the timeline
+- **THEN** each replayed grade calls `nextReview` with no options and cards are keyed without locale,
+  although the file header says it replays through current per-user weights
+
+Source: `lib/srs/scheduler.ts:80`, `lib/srs/scheduler.ts:95`, `lib/srs/scheduler.ts:253`, `lib/settings/persistence.ts:655`, `lib/timeline/reconstruct.ts:185`, `lib/timeline/reconstruct.ts:195`, `app/settings/page.tsx:941`, `lib/srs/scheduler.test.ts:501`, `lib/srs/scheduler.test.ts:520`, `lib/srs/scheduler.test.ts:554`.
 
 ### Requirement: Grading runs on default weights (baseline)
 
@@ -278,7 +292,8 @@ Source: `lib/srs/scheduler.ts:172`, `lib/srs/scheduler.ts:185`, `lib/review/sess
 
 `previewIntervals` SHALL simulate each grade through `nextReview` with the same options. A result in a
 step SHALL read `<Nm`, using the time left on that step rounded up, at least 1. A graduated result
-SHALL read `Nd` under 30 days, `Nmo` (days over 30, rounded) under 365 days, otherwise `Ny`.
+SHALL read `Nd` under 30 days, `Nmo` (days divided by 30, rounded) under 365 days, otherwise `Ny` (days
+divided by 365, rounded).
 
 #### Scenario: Brand-new card
 
@@ -287,8 +302,18 @@ SHALL read `Nd` under 30 days, `Nmo` (days over 30, rounded) under 365 days, oth
 
 #### Scenario: Lapsed card on its last step
 
-- **WHEN** previews are built on a single-step relearning card
+- **WHEN** previews are built on a single-step relearning card whose step has just started
 - **THEN** Again and Hard read `<10m`, Good `1d` and Easy `4d`
+
+#### Scenario: Hard part-way through a step
+
+- **WHEN** previews are built three minutes into the same step
+- **THEN** Again still reads `<10m`, because it restarts the step, and Hard reads `<7m`
+
+#### Scenario: Hard after the step has run out
+
+- **WHEN** previews are built eleven minutes into the same step
+- **THEN** Hard reads `<1m`
 
 Source: `lib/srs/intervalPreview.ts:6`, `lib/srs/intervalPreview.ts:19`, `lib/srs/intervalPreview.test.ts:31`, `lib/srs/intervalPreview.test.ts:105`.
 
@@ -309,7 +334,8 @@ Source: `lib/srs/eval.ts:82`, `lib/srs/eval.ts:152`, `lib/srs/eval.test.ts:12`.
 `projectTimeToFirstMastery` SHALL simulate every graduated-or-lapsed, not yet mastered card under
 always-Good for at most 50 steps, skip cards that never reach mastery in that cap, and return the
 smallest result, rounded and at least 1. It SHALL return null days with no such card, or with the
-`forceAllMastered` superuser flag on. The Stats caller passes only the retention target.
+`forceAllMastered` superuser flag on. The Stats caller runs it only while the player has introduced cards
+and none mastered, and passes only the active locale's name cards and only the retention target.
 
 #### Scenario: Superuser flag on
 
@@ -321,7 +347,7 @@ smallest result, rounded and at least 1. It SHALL return null days with no such 
 - **WHEN** the only introduced card has null `lastReview`
 - **THEN** it is skipped and the result is `{ days: null }`
 
-Source: `lib/srs/timeToMastery.ts:37`, `lib/srs/timeToMastery.ts:61`, `lib/srs/timeToMastery.ts:99`, `lib/stats/dashboard-snapshot.ts:421`, `lib/srs/timeToMastery.test.ts:97`, `lib/srs/timeToMastery.test.ts:170`, `lib/srs/timeToMastery.test.ts:184`.
+Source: `lib/srs/timeToMastery.ts:37`, `lib/srs/timeToMastery.ts:61`, `lib/srs/timeToMastery.ts:99`, `lib/stats/dashboard-snapshot.ts:398`, `lib/stats/dashboard-snapshot.ts:419`, `lib/stats/dashboard-snapshot.ts:421`, `lib/srs/timeToMastery.test.ts:97`, `lib/srs/timeToMastery.test.ts:170`, `lib/srs/timeToMastery.test.ts:184`.
 
 ### Requirement: Optimiser input groups a player's reviews by card (baseline)
 
@@ -372,7 +398,7 @@ Source: `lib/srs/optimizer.ts:79`, `lib/srs/optimizer.ts:90`, `lib/srs/optimizer
 when the fittable review count is at least 200, otherwise answer 422 `not_enough_reviews` with the
 count. That count comes from the cloud grade log, so it can be lower than the local count on Settings;
 the screen then asks the player to sync first. Guests see a sign-in prompt, and the button is disabled
-while a superuser flag is on.
+during a superuser flag, a run, or a local fittable count under 200.
 
 #### Scenario: Guest calls the route
 
@@ -389,13 +415,19 @@ while a superuser flag is on.
 - **WHEN** Settings renders with any superuser flag on
 - **THEN** the button is disabled
 
-Source: `lib/srs/optimizer.ts:12`, `app/api/srs/optimize/route.ts:174`, `app/api/srs/optimize/route.ts:256`, `app/api/srs/optimize/route.ts:263`, `components/settings/FsrsOptimizerSection.tsx:84`, `components/settings/FsrsOptimizerSection.tsx:175`, `app/api/srs/optimize/route.test.tsx:227`, `app/api/srs/optimize/route.test.tsx:255`.
+#### Scenario: Too few local reviews
+
+- **WHEN** the signed-in player's local fittable count is under 200
+- **THEN** the button is disabled, the count shows and no request is sent
+
+Source: `lib/srs/optimizer.ts:12`, `app/api/srs/optimize/route.ts:174`, `app/api/srs/optimize/route.ts:256`, `app/api/srs/optimize/route.ts:263`, `components/settings/FsrsOptimizerSection.tsx:84`, `components/settings/FsrsOptimizerSection.tsx:175`, `components/settings/FsrsOptimizerSection.tsx:183`, `components/settings/FsrsOptimizerSection.tsx:240`, `app/api/srs/optimize/route.test.tsx:227`, `app/api/srs/optimize/route.test.tsx:255`.
 
 ### Requirement: One optimiser run a week (baseline)
 
 The route SHALL answer 429 `cooldown` with `retryAfterMs` and a `Retry-After` header in whole seconds
 while the last successful run is under 7 days old. If its stored state cannot be read it SHALL answer
-503 `service_unavailable`. Settings rounds the wait up to whole days.
+503 `service_unavailable`. Settings rounds the wait up to whole days, and blocks the button only while it
+holds the last-run date, which `loadSettings` drops (#2248).
 
 #### Scenario: Second run on day three
 
@@ -407,14 +439,24 @@ while the last successful run is under 7 days old. If its stored state cannot be
 - **WHEN** the read fails
 - **THEN** the answer is 503 `service_unavailable`
 
-Source: `lib/srs/optimizer.ts:13`, `app/api/srs/optimize/route.ts:194`, `app/api/srs/optimize/route.ts:203`, `components/settings/FsrsOptimizerSection.tsx:103`, `app/api/srs/optimize/route.test.tsx:238`.
+#### Scenario: Settings just after a successful run
+
+- **WHEN** a run succeeds and the page stays open
+- **THEN** the button is disabled and shows the days left
+
+#### Scenario: Settings after a reload
+
+- **WHEN** the player reloads Settings two days after a successful run
+- **THEN** no last-run date shows, the button is enabled and pressing it gives the retry-after error
+
+Source: `lib/srs/optimizer.ts:13`, `app/api/srs/optimize/route.ts:194`, `app/api/srs/optimize/route.ts:203`, `components/settings/FsrsOptimizerSection.tsx:23`, `components/settings/FsrsOptimizerSection.tsx:103`, `components/settings/FsrsOptimizerSection.tsx:204`, `app/settings/page.tsx:967`, `app/api/srs/optimize/route.test.tsx:238`.
 
 ### Requirement: A running or failed fit blocks new runs for five minutes (baseline)
 
-The route SHALL write an in-progress stamp before reading the grade log, and answer 429 `cooldown`
-while a stamp is under 5 minutes old. The stamp is not cleared on any path, and the result of its write
-is not checked. So a run ending in `not_enough_reviews`, `degenerate_data`, `reviews_unavailable` or
-`save_failed` blocks a retry for 5 minutes, and Settings reports that wait as a day (#2250). The
+The route SHALL write an in-progress stamp before reading the grade log, and answer 429 `cooldown` with
+`retryAfterMs` and a `Retry-After` header while a stamp is under 5 minutes old. The stamp is not cleared on any path, and the result of its write
+is not checked. So a run ending in `not_enough_reviews`, `degenerate_data`, `reviews_unavailable`,
+`save_failed` or `unknown` blocks a retry for 5 minutes, and Settings reports that wait as a day (#2250). The
 route's own limit is 60 seconds.
 
 #### Scenario: Retry after syncing
@@ -457,14 +499,52 @@ Success SHALL save the weights through the `merge_user_settings` RPC and answer 
 #### Scenario: Binding rejects the data
 
 - **WHEN** `computeParameters` throws
-- **THEN** the answer is 422 `degenerate_data`, and a non-Error throw gives the detail "internal_error"
+- **THEN** the answer is 422 `degenerate_data`, with the message as detail for an Error or a string, and
+  "internal_error" for anything else or an empty message
 
 #### Scenario: Save fails
 
 - **WHEN** the RPC returns an error
 - **THEN** the answer is 500 `save_failed`
 
-Source: `lib/srs/optimizer.ts:5`, `app/api/srs/optimize/route.ts:117`, `app/api/srs/optimize/route.ts:150`, `app/api/srs/optimize/route.ts:156`, `app/api/srs/optimize/route.ts:269`, `app/api/srs/optimize/route.ts:292`, `app/api/srs/optimize/route.test.tsx:124`, `app/api/srs/optimize/route.test.tsx:152`, `app/api/srs/optimize/route.test.tsx:162`, `app/api/srs/optimize/route.test.tsx:189`.
+Source: `lib/srs/optimizer.ts:5`, `app/api/srs/optimize/route.ts:117`, `app/api/srs/optimize/route.ts:150`, `app/api/srs/optimize/route.ts:151`, `app/api/srs/optimize/route.ts:156`, `app/api/srs/optimize/route.ts:269`, `app/api/srs/optimize/route.ts:292`, `app/api/srs/optimize/route.test.tsx:124`, `app/api/srs/optimize/route.test.tsx:152`, `app/api/srs/optimize/route.test.tsx:162`, `app/api/srs/optimize/route.test.tsx:189`.
+
+### Requirement: Flip cards are graded by the player (baseline)
+
+Flip cards SHALL be graded with the buttons, the keys 1, 2, 4 and 5, or a swipe (left Again, down Hard,
+right Good, up Easy). The key 3 SHALL be an alias for Good, so it never reaches `nextReview` as grade 3.
+
+#### Scenario: The 3 key
+
+- **WHEN** the player presses 3 on a revealed flip card
+- **THEN** `handleGrade` receives 4
+
+Source: `components/review/ReviewSession.tsx:1706`, `components/review/ReviewSession.tsx:1709`, `lib/review/swipeGesture.ts:107`, `lib/review/swipeGesture.test.ts:97`.
+
+### Requirement: Reverse cards and multiple choice grade themselves (baseline)
+
+A reverse card SHALL grade Good on the right tile and Again on a wrong one. With the typed-entry setting
+on, a name card in its learning phase (null `lastReview` or on a step) SHALL show multiple choice, graded
+the same way after a 1.5 second hold, and a name card past it SHALL show typed entry. The
+`forceCardsGraduated` superuser flag puts every name card past that phase. Neither gives Hard or Easy.
+With the setting off, name cards are flip cards.
+
+#### Scenario: Wrong tile on a reverse card
+
+- **WHEN** the player taps a wrong tile
+- **THEN** the card is graded Again
+
+#### Scenario: Typed entry on, new name card
+
+- **WHEN** the setting is on and a name card has null `lastReview`
+- **THEN** multiple choice shows, and the right option is graded Good after the hold
+
+#### Scenario: Typed entry on, graduated name card
+
+- **WHEN** the setting is on and a name card has `lastReview` set and null `learningStep`
+- **THEN** typed entry shows
+
+Source: `components/review/ReviewSession.tsx:3301`, `components/review/ReviewSession.tsx:3357`, `components/review/ReviewSession.tsx:3362`, `components/review/ReviewSession.tsx:3366`, `components/review/MultipleChoiceNameCard.tsx:14`, `components/review/MultipleChoiceNameCard.tsx:138`, `components/review/MultipleChoiceNameCard.test.tsx:106`, `components/review/MultipleChoiceNameCard.test.tsx:114`.
 
 ### Requirement: English typed answers are normalised before comparing (baseline)
 
@@ -488,7 +568,7 @@ Source: `lib/srs/typedEntryGrade.ts:24`, `lib/srs/typedEntryGrade.test.ts:21`, `
 
 A Levenshtein distance of 0 SHALL be Good, 1 or 2 Hard, and more Again, whatever the name's length.
 Typed entry never gives Easy. Empty input after normalising SHALL be Again, as SHALL the skip button. On
-a two-character name any non-empty answer of up to two characters is therefore Hard (#2258). Typed
+a two-character name any wrong answer of one or two characters is therefore Hard (#2258). Typed
 entry runs for name cards past their learning phase when the setting is on.
 
 #### Scenario: Two-letter typo
@@ -590,22 +670,28 @@ Source: `lib/srs/multipleChoiceDistractors.ts:67`, `lib/srs/multipleChoiceDistra
 
 ### Requirement: Reverse-card distractors (baseline)
 
-`pickDistractors` SHALL return `count` entries other than the target in a fixed hashed order, or every
-non-target entry when the pool is no larger than `count`. The reverse card asks for three from the full
-seed with the card id as seed. It has no generation preference and no form filter, so alternate forms
-can appear (#2262).
+`pickDistractors` SHALL return `count` entries other than the target in a fixed hashed order, or, when
+the pool holds `count` or fewer non-target entries, all of them in pool order. The reverse card asks for
+three from the full seed with the card id as seed. It has no generation preference and no form filter,
+so alternate forms can appear (#2262). Unlike multiple choice, its four tiles are shuffled at random on
+each presentation, so a replay shows the same species in a new order.
 
 #### Scenario: Small pool
 
 - **WHEN** the pool has `count` or fewer non-target entries
-- **THEN** all of them are returned without error
+- **THEN** all of them are returned without error, in pool order
 
 #### Scenario: Re-render
 
 - **WHEN** the same card renders again
 - **THEN** the distractors are the same
 
-Source: `lib/pokemon/distractors.ts:14`, `lib/pokemon/distractors.ts:20`, `components/review/ReviewSession.tsx:3258`, `lib/pokemon/distractors.test.ts:49`, `lib/pokemon/distractors.test.ts:57`, `lib/pokemon/distractors.test.ts:64`.
+#### Scenario: Learning-step replay of a reverse card
+
+- **WHEN** a reverse card returns in the same session
+- **THEN** the picker remounts with the same four species, and their order comes from `Math.random`
+
+Source: `lib/pokemon/distractors.ts:14`, `lib/pokemon/distractors.ts:20`, `components/review/ReviewSession.tsx:3258`, `components/review/ReviewSession.tsx:3298`, `components/review/SpritePicker.tsx:93`, `components/review/SpritePicker.tsx:147`, `components/review/SpritePicker.test.tsx:158`, `lib/pokemon/distractors.test.ts:49`, `lib/pokemon/distractors.test.ts:57`, `lib/pokemon/distractors.test.ts:64`.
 
 ### Requirement: Five database card types (baseline)
 
