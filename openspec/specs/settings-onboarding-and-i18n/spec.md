@@ -15,7 +15,8 @@ practice (change `favourite-everywhere`).
 ### Requirement: Settings load from one blob and never throw (baseline, current behaviour)
 
 `loadSettings` SHALL read the single localStorage key `poke-memory:settings:v1` and return defaults on
-the server, when the key is absent, when the JSON is corrupt, and when the value is not an object.
+the server, when the key is absent, when the JSON is corrupt, and when the value is not an object. An
+array passes that check, so it reads field by field: defaults, except `mobileNav` as `hamburger`.
 
 #### Scenario: Corrupt blob
 
@@ -107,6 +108,18 @@ parsed.
 
 Source: `lib/settings/persistence.ts:803-815`, `lib/settings/persistence.ts:1134-1147`, `lib/theme/persistence.ts:28-53`.
 
+### Requirement: A name locale from before enrolment becomes enrolment (baseline, current behaviour)
+
+A blob with no `learningLocales` and a non-English `pokemonNameLocale` SHALL read as enrolled in English
+and that locale, with that locale active.
+
+#### Scenario: Older Japanese record
+
+- **WHEN** a blob has `pokemonNameLocale: "ja"` and no `learningLocales`
+- **THEN** `learningLocales` reads as `["en", "ja"]` and the active locale as `ja`
+
+Source: `lib/settings/persistence.ts:787-801`, `lib/settings/persistence.ts:1078-1085`.
+
 ### Requirement: Saving mirrors the active locale and announces the save (baseline, current behaviour)
 
 `saveSettings` SHALL set `pokemonNameLocale` from `activePokemonNameLocale` when present, write the
@@ -125,7 +138,8 @@ Source: `lib/settings/persistence.ts:1158-1186`, `lib/storage/writeLocalStorage.
 
 While signed in with no superuser flag on, each save SHALL push only the top-level keys that differ
 from the last successful push; a first push SHALL leave out keys equal to their defaults.
-`appVisitCount` and `activePokemonNameLocale` SHALL never be pushed or taken from a normal pull.
+`appVisitCount` and `activePokemonNameLocale` SHALL stay out of that diff and out of a background pull.
+The paths that skip this are in the next requirement.
 
 #### Scenario: Superuser flag on
 
@@ -139,18 +153,44 @@ from the last successful push; a first push SHALL leave out keys equal to their 
 
 Source: `lib/settings/lastPushedSnapshot.ts:41-58`, `lib/settings/lastPushedSnapshot.ts:114-143`, `components/sync/AutoSyncOnChange.tsx:48-49`, `components/sync/AutoSyncOnChange.tsx:54-65`.
 
+### Requirement: Sign-in choices and the superuser exit skip the device-local rule (baseline, current behaviour)
+
+Keep local at sign-in SHALL push the whole local object, device-local keys included, with no diff or
+locale merge. Keep cloud and a brand-new device SHALL save the cloud blob as it is, and the superuser exit
+SHALL spread it over defaults, keeping only the favourite keys. None of these SHALL keep the device's
+own `appVisitCount` or active language, or run the learning-language union (open issue #2353).
+
+#### Scenario: Keep local
+
+- **WHEN** a user with local and cloud cards chooses Keep local
+- **THEN** the push carries `appVisitCount` and `activePokemonNameLocale`
+
+#### Scenario: Keep cloud
+
+- **WHEN** the user chooses Keep cloud and the blob has no `appVisitCount`
+- **THEN** `appVisitCount` reads as 0 on this device
+
+Source: `app/auth/callback-complete/page.tsx:245`, `app/auth/callback-complete/page.tsx:322`, `lib/superuser/SuperuserContext.tsx:147-151`, `lib/settings/lastPushedSnapshot.ts:41-44`, `lib/sync/settings.ts:27`.
+
 ### Requirement: Regional preferences use their own columns (baseline, current behaviour)
 
 Timezone, date format and push hour SHALL be written by `pushRegionalPrefs` to scalar columns with an
 UPDATE, so a user with no row writes nothing. The Settings page SHALL call it after each change while
-signed in with no superuser flag on, and SHALL ignore its failure.
+signed in with no superuser flag on, and SHALL ignore its failure. The same values SHALL also stay in the
+settings blob and its diff. Each background pull SHALL then overlay the columns' non-null values on local
+settings, all three of them.
 
 #### Scenario: Offline change
 
 - **WHEN** a signed-in user changes timezone and the update fails
 - **THEN** the local value stays changed and no error shows
 
-Source: `lib/sync/settings.ts:77-99`, `app/settings/page.tsx:572-584`, `app/settings/page.tsx:1751-1757`.
+#### Scenario: Hour changed on another device
+
+- **WHEN** a pull finds a non-null `push_notification_hour` that differs from local
+- **THEN** the local value takes the column's
+
+Source: `lib/sync/settings.ts:77-99`, `lib/sync/pullAndMerge.ts:478-497`, `app/settings/page.tsx:572-584`, `app/settings/page.tsx:1751-1757`.
 
 ### Requirement: Learning languages merge as sets with tombstones (baseline, current behaviour)
 
@@ -169,8 +209,7 @@ Source: `lib/sync/settings.ts:263-306`, `lib/sync/pullAndMerge.ts:395-402`, `lib
 
 The `user_settings` regression trigger SHALL reject a true-to-false change of 17 listed onboarding flags
 and a decrease of `practiceSessionsCount` or `slowSpriteLoadCount`, unless the write carries a strictly
-newer `onboardingResetAt`. `cardTypesDefaultOpenDismissed` and `masteryBlockersNudgeDismissed` are not
-listed, although the type's comment requires every boolean dismissal flag to be, so the trigger SHALL
+newer `onboardingResetAt`. `cardTypesDefaultOpenDismissed` and `masteryBlockersNudgeDismissed` are not listed, although the type's comment requires every boolean dismissal flag to be, so the trigger SHALL
 NOT protect them (open issue #2318).
 
 #### Scenario: Stale device clears a listed flag
@@ -178,17 +217,23 @@ NOT protect them (open issue #2318).
 - **WHEN** a stale write sets `statsHintDismissed` from true to false with no newer reset stamp
 - **THEN** the database rejects it
 
+#### Scenario: Top-level one-shot flag
+
+- **WHEN** any write sets `typedEntryOnboardingShown` or `mcCardOnboardingShown` from true to false
+- **THEN** the database rejects it, even with a newer reset stamp
+
 #### Scenario: Stale device clears an unlisted flag
 
 - **WHEN** a stale write sets `masteryBlockersNudgeDismissed` from true to false
 - **THEN** the database accepts it
 
-Source: `db/migrations/038_user_settings_reject_regression_trigger.sql:142-166`, `db/migrations/038_user_settings_reject_regression_trigger.sql:200-202`, `lib/settings/persistence.ts:51-56`, `lib/settings/persistence.ts:197`, `lib/settings/persistence.ts:209`.
+Source: `db/migrations/038_user_settings_reject_regression_trigger.sql:142-166`, `db/migrations/038_user_settings_reject_regression_trigger.sql:178-195`, `db/migrations/038_user_settings_reject_regression_trigger.sql:200-202`, `lib/settings/persistence.ts:51-56`, `lib/settings/persistence.ts:197`, `lib/settings/persistence.ts:209`.
 
 ### Requirement: The Settings page writes back its mount-time snapshot (baseline, current behaviour)
 
 The page SHALL load settings once on mount into React state, SHALL NOT listen for later saves, and its
-controls SHALL save that state with one key changed. A value another writer saved after mount (a
+controls SHALL save that state with one key changed. Only the first collapse of Card types SHALL
+refresh that state from storage. A value another writer saved after mount (a
 favourite, a dismissed hint, the language pill, a pull) SHALL be overwritten by the page's next save
 (open issue #2307).
 
@@ -202,7 +247,7 @@ favourite, a dismissed hint, the language pill, a pull) SHALL be overwritten by 
 - **WHEN** the user switches the active language from the pill while on Settings and then flips a toggle
 - **THEN** the previous active language is written back
 
-Source: `app/settings/page.tsx:427`, `app/settings/page.tsx:531-570`, `app/settings/page.tsx:640-642`, `app/settings/page.tsx:1662-1666`, `components/favourite/FavouriteSettings.tsx:73`, `components/i18n/LanguageSwitcher.tsx:180-183`.
+Source: `app/settings/page.tsx:427`, `app/settings/page.tsx:531-570`, `app/settings/page.tsx:640-642`, `app/settings/page.tsx:771-781`, `app/settings/page.tsx:1662-1666`, `components/favourite/FavouriteSettings.tsx:73`, `components/i18n/LanguageSwitcher.tsx:180-183`.
 
 ### Requirement: Regional defaults are detected on first Settings load (baseline, current behaviour)
 
@@ -228,6 +273,11 @@ be lost on leaving the page (open issue #2308).
 - **WHEN** the user turns on Play cry on reveal
 - **THEN** it is saved at once
 
+#### Scenario: TTS controls hidden
+
+- **WHEN** Speak name on reveal is off
+- **THEN** the voice, rate and volume controls do not show
+
 #### Scenario: TTS rate
 
 - **WHEN** the user moves the rate slider and leaves Settings
@@ -237,7 +287,7 @@ Source: `app/settings/page.tsx:586-598`, `app/settings/page.tsx:634-642`, `app/s
 
 ### Requirement: Daily limits are bounded only by Save (baseline, current behaviour)
 
-New-card limits SHALL be 1..50 and review limits 1..500. On blur the page SHALL parse the draft, keep the
+New-card limits SHALL be 1..50 and review limits 1..500 for name, evolution and reverse cards; cry limits and `masteryRepetitions` SHALL have no control. On blur the page SHALL parse the draft, keep the
 old value when it is not a number, and apply only the minimum. Save SHALL clamp both ends. Any immediate
 save between blur and Save SHALL write the unclamped value (open issue #2309).
 
@@ -250,6 +300,11 @@ save between blur and Save SHALL write the unclamped value (open issue #2309).
 
 - **WHEN** the user enters 9999 new cards, leaves the field, then flips a toggle
 - **THEN** 9999 is stored
+
+#### Scenario: Cry limit
+
+- **WHEN** a stored `maxNewCryPerDay` is 9999 and the user presses Save
+- **THEN** 9999 stays
 
 Source: `app/settings/page.tsx:188-244`, `app/settings/page.tsx:590-598`, `app/settings/page.tsx:723-745`, `components/settings/NumericFieldDraft.test.tsx:72`, `components/settings/NumericFieldDraft.test.tsx:88`.
 
@@ -289,39 +344,52 @@ Source: `app/settings/page.tsx:618-632`, `app/settings/page.tsx:1097`, `app/sett
 The page SHALL always show the account block, then, once settings have loaded, search, the nudge, the
 feedback row and ten sections: Practice schedule, Card types, Audio, Language, Appearance, Offline,
 Regional & reminders, Data & backup, About, Advanced. Each section SHALL start collapsed and remember its
-state per device under `poke-memory:settings-section:<id>`.
+state per device under `poke-memory:settings-section:<id>`; Reset progress clears that. While searching, the nudge
+SHALL hide and the feedback row SHALL show only if its terms match.
 
 #### Scenario: Return visit
 
 - **WHEN** a user expands Audio and reloads
 - **THEN** Audio is open
 
-Source: `app/settings/page.tsx:254-265`, `app/settings/page.tsx:791-855`, `components/settings/CollapsibleSection.tsx:7-23`, `components/settings/CollapsibleSection.tsx:92-100`, `e2e/settings.spec.ts:40`.
+Source: `app/settings/page.tsx:254-265`, `app/settings/page.tsx:791-855`, `components/settings/CollapsibleSection.tsx:7-23`, `components/settings/CollapsibleSection.tsx:92-100`, `lib/storage/reset.ts:25-38`, `e2e/settings.spec.ts:40`.
 
 ### Requirement: Card types is open until first collapsed, and force-open scrolls (baseline, current behaviour)
 
 While `cardTypesDefaultOpenDismissed` is not true, with no filter and no deep link elsewhere, Card types
 SHALL be force-opened; the first collapse SHALL set the flag. Every force-open SHALL also scroll the
 section into view, so each Settings load before that first collapse SHALL scroll to Card types with no
-hash in the URL (open issue #2311).
+hash in the URL, and so SHALL clearing a search (open issue #2311). A force-open SHALL also store the
+section as open.
 
 #### Scenario: New user opens Settings
 
 - **WHEN** a user who has never collapsed Card types opens `/settings`
 - **THEN** Card types is open and the page scrolls to it
 
+#### Scenario: Search cleared
+
+- **WHEN** that user searches and then clears the query
+- **THEN** the page scrolls to Card types again
+
 Source: `app/settings/page.tsx:761-781`, `app/settings/page.tsx:1042-1047`, `components/settings/CollapsibleSection.tsx:75-86`.
 
 ### Requirement: Deep links resolve once, on mount (baseline, current behaviour)
 
 On mount the page SHALL map a known hash, section or sub-section, to its section and force it open, and
-SHALL keep that section visible during search. There SHALL be no listener for later hash changes, so a
+SHALL keep that section visible during search; it stays open on later visits. Opening the known-Pokémon
+quiz SHALL set the same target. There SHALL be no listener for later hash changes, so a
 link followed while already on Settings SHALL NOT open a collapsed section (open issue #2312).
 
 #### Scenario: Arriving by link
 
 - **WHEN** the user opens `/settings#onboarding-heading`
 - **THEN** Data & backup is open
+
+#### Scenario: Remembered after a link
+
+- **WHEN** the user arrives by a link to Audio and later opens `/settings` with no hash
+- **THEN** Audio is open
 
 #### Scenario: In-page link
 
@@ -447,7 +515,8 @@ Source: `app/settings/page.tsx:678-702`, `app/settings/page.tsx:2103`, `app/sett
 ### Requirement: About shows versions and legal links (baseline, current behaviour)
 
 About SHALL show `v` plus `NEXT_PUBLIC_APP_VERSION`, or `dev` without it, and the controlling service
-worker's state; when both versions are known and differ, it SHALL show a mismatch warning.
+worker's state; when both versions are known and differ, it SHALL show a mismatch warning. It SHALL link
+to What's New, the company site, Privacy and Terms.
 
 #### Scenario: Stale worker
 
@@ -511,23 +580,28 @@ Source: `components/onboarding/OnboardingHint.tsx:63-93`, `lib/settings/persiste
 
 ### Requirement: Nudge gates (baseline, current behaviour)
 
-The scope nudge SHALL need an empty scope, scope never opened, at least 3 sessions and the first visit
-done. The offline nudge SHALL need the first visit done, superuser guard off, and at least 3 slow loads or
-5 sessions. The mastery-blockers nudge SHALL need a blocked species and that preset off. Higher-or-Lower
-SHALL need two Pokémon seen. The guest sign-up nudge, on Stats and Journey for guests only, SHALL need 10
-mastered species or 3 sessions.
+The four Practice nudges SHALL each need the first visit done. The scope nudge SHALL also need an empty
+scope, scope never opened and at least 3 sessions. The offline nudge SHALL also need no offline download, superuser guard
+off, and at least 3 slow loads or 5 sessions. The mastery-blockers nudge SHALL also need a blocked
+species and that preset off. Higher-or-Lower SHALL also need two Pokémon seen. The guest sign-up nudge, on
+Stats and Journey for guests only, SHALL need 10 mastered species or 3 sessions.
 
 #### Scenario: Guest with three sessions
 
 - **WHEN** a guest with 3 sessions and no mastered species opens Stats
 - **THEN** the nudge shows its low-mastery copy
 
+#### Scenario: First-visit modal still open
+
+- **WHEN** a user with a blocked species has not dismissed the first-visit modal
+- **THEN** the mastery-blockers nudge stays hidden
+
 #### Scenario: Visit count
 
 - **WHEN** two browser sessions have been counted
 - **THEN** the install nudge stays hidden, and it needs 3 on a platform that can install
 
-Source: `components/review/ReviewSession.tsx:127-137`, `components/review/ReviewSession.tsx:942-947`, `components/review/ReviewSession.tsx:1199-1202`, `components/review/ReviewSession.tsx:1236-1239`, `components/review/ReviewSession.tsx:1838-1841`, `components/onboarding/GuestSignUpNudge.tsx:9-12`, `components/onboarding/GuestSignUpNudge.tsx:52-55`, `components/onboarding/PwaInstallNudge.tsx:12-13`, `components/onboarding/PwaInstallNudge.tsx:26-34`, `components/onboarding/PwaInstallNudge.tsx:68-75`, `app/stats/page.tsx:468`, `app/journey/page.tsx:666`.
+Source: `components/review/ReviewSession.tsx:127-137`, `components/review/ReviewSession.tsx:942-947`, `components/review/ReviewSession.tsx:1199-1202`, `components/review/ReviewSession.tsx:1236-1239`, `components/review/ReviewSession.tsx:1838-1843`, `components/onboarding/GuestSignUpNudge.tsx:9-12`, `components/onboarding/GuestSignUpNudge.tsx:52-55`, `components/onboarding/PwaInstallNudge.tsx:12-13`, `components/onboarding/PwaInstallNudge.tsx:26-34`, `components/onboarding/PwaInstallNudge.tsx:68-75`, `app/stats/page.tsx:468`, `app/journey/page.tsx:666`.
 
 ### Requirement: Mark Pokémon I already know (baseline, current behaviour)
 
@@ -535,6 +609,11 @@ The quiz SHALL list untouched name cards in `pokemonNameLocale`, grouped by gene
 forms only when enabled, and build a session when none exists. Apply SHALL grade each chosen card Easy
 through the normal scheduler, never as mastered, append a grade-log entry stamped in the user's timezone,
 and queue a cloud upsert. While a superuser flag is on, Apply SHALL be disabled.
+
+#### Scenario: Nudge button
+
+- **WHEN** the user presses the discovery nudge's button
+- **THEN** Practice schedule and the closed-by-default quiz open and `markWhatIKnowNudgeDismissed` is saved
 
 #### Scenario: Two enrolled languages
 
@@ -551,7 +630,7 @@ and queue a cloud upsert. While a superuser flag is on, Apply SHALL be disabled.
 - **WHEN** a guest applies
 - **THEN** the session and grade log change locally and no cloud write happens
 
-Source: `components/onboarding/KnownPokemonQuiz.tsx:165-201`, `components/onboarding/KnownPokemonQuiz.tsx:269-357`, `components/onboarding/KnownPokemonQuiz.tsx:461-469`, `lib/onboarding/applyKnownGrades.ts:38-40`, `lib/onboarding/applyKnownGrades.ts:58-76`, `lib/onboarding/applyKnownGrades.ts:93-110`.
+Source: `app/settings/page.tsx:489-505`, `app/settings/page.tsx:875-889`, `components/onboarding/KnownPokemonQuiz.tsx:165-201`, `components/onboarding/KnownPokemonQuiz.tsx:269-357`, `components/onboarding/KnownPokemonQuiz.tsx:461-469`, `lib/onboarding/applyKnownGrades.ts:38-40`, `lib/onboarding/applyKnownGrades.ts:58-76`, `lib/onboarding/applyKnownGrades.ts:93-110`.
 
 ### Requirement: App language comes from a cookie, not the URL (baseline, current behaviour)
 
@@ -611,9 +690,9 @@ Source: `lib/i18n/PokemonLocaleContext.tsx:55-77`, `lib/i18n/PokemonLocaleContex
 
 ### Requirement: The language pill switches only names (baseline, current behaviour)
 
-The pill SHALL list enrolled locales with due badges from a cache and SHALL write
-`activePokemonNameLocale`, updating names with no reload. While a card is revealed when the panel opens,
-choosing another language SHALL be blocked with a prompt to grade first. Escape, an outside press or a
+The pill SHALL show even with only English enrolled, list enrolled locales with cached due badges and
+write `activePokemonNameLocale`, updating names with no reload. While a card is revealed when the panel
+opens, choosing another language SHALL be blocked with a prompt to grade first. Escape, an outside press or a
 choice SHALL close it; Tab SHALL stay inside; keydowns SHALL stop propagating while open. A zero count SHALL
 read as caught up with history, and as no cards yet without.
 
@@ -628,9 +707,9 @@ Source: `components/i18n/LanguageSwitcher.tsx:96-146`, `components/i18n/Language
 
 Outside English the banner SHALL show until dismissed for that locale, in the root layout and inside the
 first-visit modal. Dismissing SHALL write `poke-memory:mt-banner-dismissed:<locale>` and add the locale to
-`dismissedMtBannerLocales`. `useAppLocale` SHALL read
-the cookie once and re-read only on a `storage` event, so a same-tab language switch SHALL leave the banner
-on the old locale until a reload, and the two banners SHALL not see each other's dismissal (open issue #2313).
+`dismissedMtBannerLocales`. `useAppLocale` SHALL read the cookie once and re-read only on a `storage` event,
+so a same-tab language switch SHALL leave the banner on the old locale until a reload, and the two banners
+SHALL not see each other's dismissal (open issue #2313).
 
 #### Scenario: English
 
@@ -645,14 +724,19 @@ on the old locale until a reload, and the two banners SHALL not see each other's
 #### Scenario: Dismissed on another device
 
 - **WHEN** a pull brings a cloud dismissal
-- **THEN** it is written to the local key and the banner stays hidden
+- **THEN** it is written to the local key, and a mounted banner stays until its next mount
+
+#### Scenario: Reset progress
+
+- **WHEN** a user who dismissed the banner resets progress
+- **THEN** the standalone key is cleared and the banner returns until a pull rewrites the key
 
 #### Scenario: Cookie set before load
 
 - **WHEN** the page loads with cookie `ja` and no dismissal
 - **THEN** the banner shows
 
-Source: `components/i18n/MachineTranslationBanner.tsx:40-79`, `components/onboarding/FirstVisitOnboardingModal.tsx:211`, `app/layout.tsx:198`, `lib/i18n/useAppLocale.ts:17-27`, `lib/i18n/useAppLocale.ts:38-56`, `lib/sync/pullAndMerge.ts:263-278`, `e2e/i18n.spec.ts:65`.
+Source: `components/i18n/MachineTranslationBanner.tsx:40-79`, `components/onboarding/FirstVisitOnboardingModal.tsx:211`, `app/layout.tsx:198`, `lib/i18n/useAppLocale.ts:17-27`, `lib/i18n/useAppLocale.ts:38-56`, `lib/sync/pullAndMerge.ts:263-278`, `lib/storage/reset.ts:25-38`, `e2e/i18n.spec.ts:65`.
 
 ### Requirement: Catalogue integrity is checked in lint (baseline, current behaviour)
 
@@ -669,15 +753,15 @@ Source: `scripts/lint-i18n.mjs:1-26`, `scripts/generate-pseudo-locale.mjs:1-41`,
 
 ### Requirement: Type names come from one helper (baseline, current behaviour)
 
-The Pokédex, Pasture and scope pills SHALL render type names through `getTypeName`, using the `types`
-catalogue group of 18 names.
+The Pokédex, Pasture, scope pills and Stats type breakdown SHALL render type names through `getTypeName`,
+using the `types` catalogue group of 18 names.
 
 #### Scenario: Japanese
 
 - **WHEN** the app language is Japanese
 - **THEN** `fire` renders from the Japanese catalogue
 
-Source: `lib/i18n/typeNames.ts:33-38`, `lib/i18n/typeNames.test.ts:1`.
+Source: `lib/i18n/typeNames.ts:33-38`, `components/stats/TypeBreakdown.tsx:7`, `lib/i18n/typeNames.test.ts:1`.
 
 ### Requirement: Theme colours resolve from the species palette (baseline, current behaviour)
 
@@ -720,14 +804,20 @@ Source: `lib/theme/intensity.ts:12-20`, `components/theme/ThemeWatermark.tsx:23-
 
 Any default-form species MAY be chosen as favourite. Choosing a theme SHALL be limited to mastered species,
 with a locked state when none are mastered. The current theme SHALL show with Remove even when its mastery
-has lapsed. Mastery counts in any enrolled language, with both name and reverse legs.
+has lapsed. Mastery counts in any enrolled language, with both name and reverse legs. When superuser
+flags go off after a cards pull, a theme not earned by that test SHALL be removed.
+
+#### Scenario: Superuser exit
+
+- **WHEN** a theme was chosen under `pretendAllMastered` and the flag goes off with the species unmastered
+- **THEN** the theme is removed
 
 #### Scenario: Nothing mastered
 
 - **WHEN** a user has mastered nothing
 - **THEN** the locked state shows a link to Practice and no theme search
 
-Source: `components/favourite/FavouriteSettings.tsx:53`, `components/favourite/FavouriteSettings.tsx:103-125`, `components/favourite/FavouriteSettings.tsx:131-156`, `lib/theme/persistence.ts:67-100`, `app/settings/page.test.tsx:1260`.
+Source: `components/favourite/FavouriteSettings.tsx:53`, `components/favourite/FavouriteSettings.tsx:103-125`, `components/favourite/FavouriteSettings.tsx:131-156`, `lib/theme/persistence.ts:67-100`, `lib/superuser/SuperuserContext.tsx:258-271`, `app/settings/page.test.tsx:1260`.
 
 ### Requirement: Labs is empty infrastructure (baseline, current behaviour)
 
