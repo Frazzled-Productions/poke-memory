@@ -64,6 +64,8 @@ When a structural code is returned by `pushSingleCard` or `pushSession`, the cli
 - Network `TypeError` - lands in the `catch` block, not `error.code`. Best-effort retry is appropriate.
 - Generic 5xx - transient.
 
+**Per-row fallback in `/api/sync` (#1856, #2206).** One `23514` aborts the whole batch statement, so the route retries that batch row by row. A row rejected with `23514` counts as evicted, whether or not any row beside it landed. A structural error on a row returns 409, as for a batch. Any other row failure returns 502, because the unload path and the service worker clear the queue on a 2xx. Row retries are the client's: a 502 replays the queue, and rows that already landed upsert again harmlessly. `23514` is also what the table CHECKs raise (`difficulty`, `stability`, `fsrs_state`, `locale`), so a malformed row is evicted the same way, here and in `pushSingleCard`.
+
 The predicate is `isStructuralError(error)` in `lib/sync/cloud.ts`. It is only wired to the `card_reviews` call sites - auxiliary legs (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs) must warn-and-continue regardless of error code.
 
 During a constraint-affecting migration window (see [Constraint-affecting migration ordering](#constraint-affecting-migration-ordering)), a 42P10 produced by the structural-error path is the **expected loud signal** - it surfaces the mismatch to the user immediately rather than hiding it for 19 hours. That prominence is desirable; it is not a regression of the structural-error feature itself.
