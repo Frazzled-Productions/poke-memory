@@ -5,7 +5,8 @@ How a signed-in player's review state moves between the device and Supabase: the
 per-grade push and its fallbacks, the grade log, the sync status, and the database rules that guard
 them. This is the baseline: current behaviour on `qa` at d2456f44, written from code and tests, not
 what it should be. A requirement that records behaviour which looks wrong says so and names the issue.
-Line references are to that commit.
+Line references are to that commit. The first-arrival choice between local and cloud belongs to
+`accounts-and-auth`, and the Force pull control to `settings-onboarding-and-i18n`.
 
 ## Requirements
 
@@ -58,6 +59,25 @@ replay message, which are not gated on an active session.
 - **THEN** no second pull runs; signing out resets this, so a later sign-in pulls again
 
 Source: `lib/sync/useSignInPull.ts:42`, `lib/sync/useSignInPull.ts:49`, `lib/sync/useVisibilityPull.ts:10`, `lib/sync/useVisibilityPull.ts:12`, `lib/sync/useVisibilityPull.ts:59`, `lib/sync/useOnlineReconnectSync.ts:80`, `lib/sync/useOnlineReconnectSync.ts:152`, `lib/sync/useOnlineReconnectSync.ts:167`.
+
+### Requirement: Cloud reads outside the pull (baseline)
+
+`pullAndMerge` SHALL NOT be the only reader of `card_reviews`. For a signed-in player with no superuser
+flag, Stats and Journey SHALL call `pullSession` on load and show `applyCloudAuthoritative` over the seed,
+saving nothing and moving no cursor. Force pull and the superuser exit cleanup SHALL replace local cards,
+streak and grade log with cloud state and stamp `lastPullAt`. None of these runs the tombstone check.
+
+#### Scenario: Stats opens with the cloud reachable
+
+- **WHEN** a signed-in player opens Stats and `pullSession` succeeds
+- **THEN** the page shows cloud state, and the saved session and `lastPullAt` are unchanged
+
+#### Scenario: Cloud read fails on Stats
+
+- **WHEN** `pullSession` returns null
+- **THEN** the page keeps showing local state
+
+Source: `app/stats/page.tsx:337`, `app/journey/page.tsx:501`, `components/settings/ForcePullSection.tsx:55`, `components/settings/ForcePullSection.tsx:109`, `lib/superuser/SuperuserContext.tsx:131`, `lib/superuser/SuperuserContext.tsx:191`.
 
 ### Requirement: Pulls read every row in a stable order (baseline)
 
@@ -188,30 +208,41 @@ Source: `lib/sync/pullAndMerge.ts:59`, `lib/sync/pullAndMerge.ts:301`, `lib/sync
 
 ### Requirement: Settings blob, last write wins (baseline)
 
-Each pull SHALL read the `user_settings` row in one query. A null or empty blob counts as no cloud
-settings. A non-empty blob SHALL be applied over `DEFAULT_SETTINGS` when this device has no stored
-settings, or the row's `updated_at` is later than `lastSettingsPullAt`, or both are null. The merge
-SHALL keep device-local keys and favourite keys the blob lacks, and leave out the two locale sets. A
-settings pull failure is non-fatal.
+Each pull SHALL read the blob, `updated_at` and `last_reset_at` in one query, and the regional columns
+in a second. A null or empty blob counts as no cloud settings. A non-empty blob SHALL be applied over
+`DEFAULT_SETTINGS` when this device has no stored settings, or `lastSettingsPullAt` is null, or the
+row's `updated_at` is later than it. The merge SHALL keep device-local keys and favourite keys the blob
+lacks, and leave out the two locale sets. A settings pull failure is non-fatal.
 
 #### Scenario: Cloud settings are newer
 
 - **WHEN** the row's `updated_at` is later than `lastSettingsPullAt`
 - **THEN** the blob is applied, `appVisitCount` and `activePokemonNameLocale` stay as they were, and the last-pushed snapshot is saved before `saveSettings`, so the listener sees no difference
 
+#### Scenario: Stored settings, no settings cursor
+
+- **WHEN** this device has stored settings, `lastSettingsPullAt` is null and the row has an `updated_at`
+- **THEN** the cloud blob is applied over the stored settings
+
+#### Scenario: Cloud blob lacks a favourite key
+
+- **WHEN** the blob has no favourite key and this device holds a value for it
+- **THEN** the device keeps the value, the snapshot holds the default, and the listener pushes the value up
+
 #### Scenario: Reset-only row
 
 - **WHEN** the row has `last_reset_at` but an empty blob
 - **THEN** no settings are applied and the tombstone check still runs
 
-Source: `lib/sync/settings.ts:204`, `lib/sync/settings.ts:224`, `lib/sync/pullAndMerge.ts:161`, `lib/sync/pullAndMerge.ts:206`, `lib/sync/pullAndMerge.ts:218`, `lib/sync/pullAndMerge.ts:234`, `lib/sync/pullAndMerge.ts:255`, `lib/settings/lastPushedSnapshot.ts:41`, `lib/settings/lastPushedSnapshot.ts:79`.
+Source: `lib/sync/settings.ts:107`, `lib/sync/settings.ts:204`, `lib/sync/settings.ts:224`, `lib/sync/pullAndMerge.ts:161`, `lib/sync/pullAndMerge.ts:206`, `lib/sync/pullAndMerge.ts:238`, `lib/sync/pullAndMerge.ts:218`, `lib/sync/pullAndMerge.ts:234`, `lib/sync/pullAndMerge.ts:255`, `lib/settings/lastPushedSnapshot.ts:41`, `lib/settings/lastPushedSnapshot.ts:79`, `lib/settings/lastPushedSnapshot.ts:92`.
 
 ### Requirement: Settings push sends only changed keys (baseline)
 
 `AutoSyncOnChange` SHALL diff saved settings against the last-pushed snapshot by top-level key, leaving
 out device-local keys, and send only a non-empty patch through `merge_user_settings`, which deep-merges
-and sets `updated_at`. With no snapshot, keys equal to their default SHALL be left out. The snapshot
-SHALL advance only after a successful push. A rejected or failed push warns and waits for the next save.
+and sets `updated_at`. With no snapshot, keys equal to their default SHALL be left out. This path SHALL
+advance the snapshot only after a successful push; a pull also writes it, with no push. A rejected or
+failed push waits for the next save.
 
 #### Scenario: First push from a device
 
@@ -223,28 +254,28 @@ SHALL advance only after a successful push. A rejected or failed push warns and 
 - **WHEN** `pushSettings` returns false
 - **THEN** the snapshot stays put and the next save resends those keys
 
-Source: `components/sync/AutoSyncOnChange.tsx:63`, `components/sync/AutoSyncOnChange.tsx:66`, `components/sync/AutoSyncOnChange.tsx:73`, `lib/settings/lastPushedSnapshot.ts:114`, `lib/settings/lastPushedSnapshot.ts:119`, `lib/sync/settings.ts:30`, `db/migrations/037_merge_user_settings_deep.sql:9`, `db/migrations/037_merge_user_settings_deep.sql:14`.
+Source: `components/sync/AutoSyncOnChange.tsx:63`, `components/sync/AutoSyncOnChange.tsx:66`, `components/sync/AutoSyncOnChange.tsx:73`, `lib/sync/pullAndMerge.ts:255`, `lib/sync/pullAndMerge.ts:441`, `lib/settings/lastPushedSnapshot.ts:114`, `lib/settings/lastPushedSnapshot.ts:119`, `lib/sync/settings.ts:30`, `db/migrations/037_merge_user_settings_deep.sql:9`, `db/migrations/037_merge_user_settings_deep.sql:14`.
 
 ### Requirement: The database refuses settings that lose data (baseline)
 
 A BEFORE UPDATE trigger on `user_settings` SHALL raise 23514 when an update removes a streak spend date,
 drops the balance with no new spend, removes a badge, turns off a one-way onboarding flag or lowers an
-onboarding counter (unless `onboardingResetAt` advanced), or removes a learning locale not in
-`removedLocales`.
+onboarding counter (both unless `onboardingResetAt` advanced), turns off `typedEntryOnboardingShown` or
+`mcCardOnboardingShown` (never bypassed), or removes a learning locale not in `removedLocales`.
 
 #### Scenario: Stale device drops a badge
 
 - **WHEN** an update's `earnedBadges` lacks a badge id the row holds
 - **THEN** the update fails with 23514 and `pushSettings` returns false
 
-Source: `db/migrations/038_user_settings_reject_regression_trigger.sql:38`, `db/migrations/038_user_settings_reject_regression_trigger.sql:95`, `db/migrations/038_user_settings_reject_regression_trigger.sql:142`, `db/migrations/038_user_settings_reject_regression_trigger.sql:235`, `db/migrations/038_user_settings_reject_regression_trigger.sql:252`.
+Source: `db/migrations/038_user_settings_reject_regression_trigger.sql:38`, `db/migrations/038_user_settings_reject_regression_trigger.sql:95`, `db/migrations/038_user_settings_reject_regression_trigger.sql:142`, `db/migrations/038_user_settings_reject_regression_trigger.sql:183`, `db/migrations/038_user_settings_reject_regression_trigger.sql:235`, `db/migrations/038_user_settings_reject_regression_trigger.sql:252`.
 
 ### Requirement: Locale sets union across devices (baseline)
 
 On every pull with a cloud blob, `learningLocales` and `removedLocales` SHALL be merged from the values
 held before the blob was applied: removed is the union, learning is the union minus removed, with
 `"en"` always present and never removable. The active locale SHALL fall back when no longer enrolled.
-Only if the cloud lacks the merged sets, and not paused by superuser mode, SHALL the result be pushed
+Only if the cloud's sets differ from the merged sets, and not paused by superuser mode, SHALL the result be pushed
 back, fire-and-forget. A change to the active locale alone SHALL NOT push.
 
 #### Scenario: Tombstone on another device
@@ -262,7 +293,8 @@ Source: `lib/sync/pullAndMerge.ts:194`, `lib/sync/pullAndMerge.ts:395`, `lib/syn
 ### Requirement: Regional prefs and banner dismissals (baseline)
 
 Each pull SHALL copy non-null `timezone`, `date_format` and `push_notification_hour` columns over local
-values and save only on a difference. Invalid values read as null. These columns are written through
+values and save only on a difference. An invalid date format or hour reads as null; `timezone` is not
+validated. These columns are written through
 their own `update`, which creates no row. Cloud `dismissedMtBannerLocales` SHALL be added to the
 standalone localStorage keys, never removing a local dismissal, whenever a blob is present.
 
@@ -276,14 +308,14 @@ standalone localStorage keys, never removing a local dismissal, whenever a blob 
 - **WHEN** `pushRegionalPrefs` runs and the user has no row
 - **THEN** nothing is created and it returns true
 
-Source: `lib/sync/pullAndMerge.ts:271`, `lib/sync/pullAndMerge.ts:478`, `lib/sync/pullAndMerge.ts:489`, `lib/sync/settings.ts:77`, `lib/sync/settings.ts:106`, `lib/sync/settings.ts:131`, `lib/sync/settings.ts:136`.
+Source: `lib/sync/pullAndMerge.ts:271`, `lib/sync/pullAndMerge.ts:478`, `lib/sync/pullAndMerge.ts:489`, `lib/sync/settings.ts:77`, `lib/sync/settings.ts:106`, `lib/sync/settings.ts:122`, `lib/sync/settings.ts:131`, `lib/sync/settings.ts:136`.
 
 ### Requirement: Streak days union across devices (baseline)
 
 `pullAndMerge` SHALL union cloud and local streak dates, sorted and deduplicated, and on a change save
 them, dispatch `STREAK_UPDATED_EVENT` and bump the session storage key. `AutoSyncOnChange` SHALL upsert
-all local dates on `STREAK_UPDATED_EVENT`, ignoring duplicates. A failure in either direction warns and
-never changes the sync result. The database SHALL reject a date later than tomorrow.
+all local dates on `STREAK_UPDATED_EVENT`, ignoring duplicates. A failure in either direction never
+changes the sync result. The database SHALL reject a date later than tomorrow.
 
 #### Scenario: Streak earned on a phone
 
@@ -317,8 +349,8 @@ Source: `lib/gradelog/persistence.ts:93`, `lib/gradelog/persistence.ts:99`, `lib
 A new entry that is not held SHALL be pushed from `GRADE_LOG_APPENDED_EVENT`. Grade-log upserts SHALL
 use `(user_id, occurred_at)` with duplicates ignored, through one column mapping. A push result SHALL be
 `"rejected"` only for SQLSTATE class 22 or 23, otherwise `"failed"`. Each pull SHALL union the cloud log
-by `occurredAt`, local winning a tie, and save and notify only when the length changes. A failure warns
-and never changes the sync result.
+by `occurredAt`, local winning a tie, and save and notify only when the length changes. A failure never
+changes the sync result.
 
 #### Scenario: RLS denial is not a row rejection
 
@@ -366,8 +398,8 @@ Source: `lib/sync/pullAndMerge.ts:576`, `lib/sync/gradeLogRepush.ts:20`, `lib/sy
 `enqueueGrade` SHALL coalesce by card id and locale, push on a 200 ms debounce and persist on a 500 ms
 debounce. An in-step card (`firstSeen` set, `lastReview` null) SHALL NOT be queued. With no client or
 user it SHALL clear the persisted queue and queue nothing. A drain SHALL push each card, keep the
-failed ones and any re-graded mid-flight, and stamp `lastPushAt` on any success. On mount the hook SHALL
-seed from the persisted queue and drain. Open item held in ops #417.
+failed ones and any card whose key was not in its snapshot, and stamp `lastPushAt` on any success. On
+mount the hook SHALL seed from the persisted queue and drain. Open item held in ops #417.
 
 #### Scenario: Offline for three drains
 
@@ -379,12 +411,22 @@ seed from the persisted queue and drain. Open item held in ops #417.
 - **WHEN** `pushSingleCard` returns `"rejected"`
 - **THEN** the card leaves the queue and no failure is counted
 
+#### Scenario: Same card re-graded during a drain
+
+- **WHEN** a card is re-graded while its push is in flight, and that push succeeds before the next drain
+- **THEN** the newer state leaves the queue unsent, under the same key, and the cloud keeps the older state until the card is graded again. This looks like a bug (#2333)
+
+#### Scenario: One drain fails
+
+- **WHEN** a drain fails and nothing else happens
+- **THEN** no retry is scheduled, and the next grade, a hide or a later mount sends those cards
+
 #### Scenario: App closed with cards queued
 
 - **WHEN** the tab was killed with a persisted queue and `lastPushFailed` false
 - **THEN** the next mount seeds the queue and drains it
 
-Source: `lib/sync/usePerGradeSync.ts:35`, `lib/sync/usePerGradeSync.ts:188`, `lib/sync/usePerGradeSync.ts:196`, `lib/sync/usePerGradeSync.ts:255`, `lib/sync/usePerGradeSync.ts:270`, `lib/sync/usePerGradeSync.ts:293`, `lib/sync/usePerGradeSync.ts:316`, `lib/sync/usePerGradeSync.ts:351`, `lib/sync/usePerGradeSync.ts:495`, `lib/sync/usePerGradeSync.ts:553`, `lib/sync/usePerGradeSync.ts:584`, `lib/sync/cloud.ts:94`, `lib/sync/cloud.ts:287`, `components/sync/usePerGradeSync.test.tsx`, `components/sync/loadPendingQueue.test.tsx`.
+Source: `lib/sync/usePerGradeSync.ts:35`, `lib/sync/usePerGradeSync.ts:188`, `lib/sync/usePerGradeSync.ts:196`, `lib/sync/usePerGradeSync.ts:192`, `lib/sync/usePerGradeSync.ts:255`, `lib/sync/usePerGradeSync.ts:270`, `lib/sync/usePerGradeSync.ts:293`, `lib/sync/usePerGradeSync.ts:316`, `lib/sync/usePerGradeSync.ts:351`, `lib/sync/usePerGradeSync.ts:495`, `lib/sync/usePerGradeSync.ts:553`, `lib/sync/usePerGradeSync.ts:584`, `lib/sync/cloud.ts:94`, `lib/sync/cloud.ts:287`, `components/sync/usePerGradeSync.test.tsx`, `components/sync/loadPendingQueue.test.tsx`.
 
 ### Requirement: Queue persistence and its IndexedDB mirror (baseline)
 
@@ -437,9 +479,9 @@ Source: `lib/sync/heldGrade.ts:38`, `lib/sync/heldGrade.ts:47`, `lib/sync/heldGr
 ### Requirement: Unload safety net (baseline)
 
 On hide, when unsynced cards exist and no earlier hide push is running, the hook SHALL persist them and
-POST to `/api/sync` with `fetch` keepalive. On pagehide, never skipped, it SHALL commit the hold and call
-`sendBeacon` with the cards and the held grade-log entry; `queued` true counts as success, since the
-response cannot be read.
+POST to `/api/sync` with `fetch` keepalive. On pagehide, which that running push never blocks, it SHALL
+commit the hold and, if there are cards or a held grade-log entry, call `sendBeacon` with them; `queued`
+true counts as success, since the response cannot be read.
 
 #### Scenario: Beacon accepted, server fails
 
@@ -461,13 +503,14 @@ response cannot be read.
 - **WHEN** the `fetch` answers 409 with a structural code
 - **THEN** the code is recorded, as well as `lastPushFailed` and `failedCardCount`, and Background Sync is registered
 
-Source: `lib/sync/useSyncOnUnload.ts:59`, `lib/sync/useSyncOnUnload.ts:69`, `lib/sync/useSyncOnUnload.ts:96`, `lib/sync/useSyncOnUnload.ts:106`, `lib/sync/useSyncOnUnload.ts:114`, `lib/sync/useSyncOnUnload.ts:136`, `lib/sync/useSyncOnUnload.ts:143`, `lib/sync/useSyncOnUnload.ts:175`, `lib/sync/cloud.ts:415`, `components/sync/useSyncOnUnload.test.tsx`.
+Source: `lib/sync/useSyncOnUnload.ts:59`, `lib/sync/useSyncOnUnload.ts:69`, `lib/sync/useSyncOnUnload.ts:77`, `lib/sync/useSyncOnUnload.ts:96`, `lib/sync/useSyncOnUnload.ts:106`, `lib/sync/useSyncOnUnload.ts:114`, `lib/sync/useSyncOnUnload.ts:136`, `lib/sync/useSyncOnUnload.ts:143`, `lib/sync/useSyncOnUnload.ts:175`, `lib/sync/cloud.ts:415`, `components/sync/useSyncOnUnload.test.tsx`.
 
 ### Requirement: Sync route (baseline)
 
 `POST /api/sync` SHALL check the body before auth: invalid JSON or non-array `cards` answers 400. No
-session answers 401. The server SHALL set `user_id` from the session, default `locale` to `"en"`, omit
-`updated_at`, and omit `seen_in_pasture` when absent. Cards SHALL go in batches of 200, each tried up to 3
+session answers 401. An empty `cards` array answers 200 with no card write. The server SHALL set `user_id`
+from the session, default `locale` to `"en"`, omit `updated_at`, and omit `seen_in_pasture` when absent or
+null. Cards SHALL go in batches of 200, each tried up to 3
 times 100 ms apart, answering 200 when all land. Per-row reporting after the fallback is wrong today
 (#2206).
 
@@ -501,13 +544,18 @@ times 100 ms apart, answering 200 when all land. Per-row reporting after the fal
 - **WHEN** an entry in `cards` is null
 - **THEN** the route throws and answers an unhandled 500, because row shapes are not validated (#2232)
 
-Source: `app/api/sync/route.ts:44`, `app/api/sync/route.ts:52`, `app/api/sync/route.ts:105`, `app/api/sync/route.ts:117`, `app/api/sync/route.ts:123`, `app/api/sync/route.ts:146`, `app/api/sync/route.ts:157`, `app/api/sync/route.ts:168`, `app/api/sync/route.ts:182`, `app/api/sync/route.ts:204`, `app/api/sync/route.ts:224`, `app/api/sync/route.ts:234`, `app/api/sync/route.test.tsx:111`, `app/api/sync/route.test.tsx:253`, `app/api/sync/route.test.tsx:278`.
+#### Scenario: Body is JSON null
+
+- **WHEN** the body is the JSON value `null`
+- **THEN** the route throws reading `cards`, before any 400 check, and answers an unhandled 500
+
+Source: `app/api/sync/route.ts:44`, `app/api/sync/route.ts:52`, `app/api/sync/route.ts:99`, `app/api/sync/route.ts:105`, `app/api/sync/route.ts:117`, `app/api/sync/route.ts:123`, `app/api/sync/route.ts:146`, `app/api/sync/route.ts:157`, `app/api/sync/route.ts:168`, `app/api/sync/route.ts:182`, `app/api/sync/route.ts:204`, `app/api/sync/route.ts:224`, `app/api/sync/route.ts:234`, `app/api/sync/route.test.tsx:111`, `app/api/sync/route.test.tsx:253`, `app/api/sync/route.test.tsx:278`.
 
 ### Requirement: Beacon grade-log leg (baseline)
 
 The route SHALL treat `gradeLog` as untrusted and best-effort: a non-array is ignored, entries failing
 `isGradeLogEntry` are dropped, at most 200 are kept, and they are upserted with duplicates ignored. It
-SHALL start alongside the card leg, be awaited on every return, and never change the response.
+SHALL start after auth, alongside the card leg, be awaited on every return, and never change the response.
 
 #### Scenario: Grade log fails, cards succeed
 
@@ -518,6 +566,11 @@ SHALL start alongside the card leg, be awaited on every return, and never change
 
 - **WHEN** the card leg returns 409
 - **THEN** valid grade-log entries are still written
+
+#### Scenario: Held entry with no cards
+
+- **WHEN** `cards` is empty and `gradeLog` holds a valid entry
+- **THEN** the route answers 200 and the entry is written
 
 Source: `app/api/sync/route.ts:24`, `app/api/sync/route.ts:63`, `app/api/sync/route.ts:66`, `app/api/sync/route.ts:72`, `lib/sync/gradeLog.ts:70`, `app/api/sync/routeGradeLog.test.tsx:128`, `app/api/sync/routeGradeLog.test.tsx:185`, `app/api/sync/routeGradeLog.test.tsx:216`.
 
@@ -621,9 +674,10 @@ Source: `lib/sync/persistence.ts:83`, `lib/sync/persistence.ts:87`, `lib/sync/pe
 ### Requirement: Structural errors stop retries (baseline)
 
 On `card_reviews` pushes, SQLSTATE 42xxx, 23505 and 23503 SHALL count as structural; 23514 and `PGRST*`
-SHALL NOT. A structural error SHALL be recorded at once with `lastPushFailed`, and only a successful
-`card_reviews` push clears it. While one is recorded, drains SHALL stop, apart from one probe per app
-load, reset by the `online` event. `pushSession` has no row-by-row fallback: a 23514 fails its batch.
+SHALL NOT. A structural error SHALL be recorded at once with `lastPushFailed`. Of the push paths, only a
+successful `pushSingleCard` or `pushSession` clears it, so a 2xx from `/api/sync` leaves it set. While one
+is recorded, drains SHALL stop, apart from one probe per app load, reset by the `online` event or a
+replay message. `pushSession` has no row-by-row fallback: a 23514 fails its batch.
 
 #### Scenario: Deploy fixes a mismatch
 
@@ -635,15 +689,20 @@ load, reset by the `online` event. `pushSession` has no row-by-row fallback: a 2
 - **WHEN** a second drain runs in the same app load with the error still recorded
 - **THEN** it returns without pushing
 
-Source: `lib/sync/cloud.ts:69`, `lib/sync/cloud.ts:238`, `lib/sync/cloud.ts:256`, `lib/sync/cloud.ts:325`, `lib/sync/cloud.ts:342`, `lib/sync/structuralError.ts:38`, `lib/sync/structuralError.ts:126`, `lib/sync/structuralError.ts:143`, `lib/sync/usePerGradeSync.ts:209`, `lib/sync/structuralError.test.ts`.
+#### Scenario: Keepalive push succeeds with an error recorded
+
+- **WHEN** a structural error is recorded and the hide `fetch` answers 2xx
+- **THEN** `lastPushFailed` clears and `structuralSyncError` stays
+
+Source: `lib/sync/useSyncOnUnload.ts:168`, `lib/sync/useOnlineReconnectSync.ts:75`, `lib/sync/cloud.ts:69`, `lib/sync/cloud.ts:238`, `lib/sync/cloud.ts:256`, `lib/sync/cloud.ts:325`, `lib/sync/cloud.ts:342`, `lib/sync/structuralError.ts:38`, `lib/sync/structuralError.ts:126`, `lib/sync/structuralError.ts:143`, `lib/sync/usePerGradeSync.ts:209`, `lib/sync/structuralError.test.ts`.
 
 ### Requirement: Database guards on card rows (baseline)
 
 `card_reviews` SHALL be keyed by `(user_id, card_type, subject_key, locale)`, the column list every
 upsert uses. A BEFORE UPDATE trigger SHALL raise 23514 when `last_review` or `first_seen` becomes null,
 `last_review` moves back, `reps` or `lapses` fall, `scheduled_days` falls on the same `last_review`, or
-`seen_in_pasture` goes from true to false. A second trigger SHALL set `updated_at` to server time on
-every update. Row-level security SHALL limit each table to its own user.
+`seen_in_pasture` goes from true to false. A second trigger SHALL set `updated_at` to server time on every update.
+Row-level security SHALL limit each table to its own user.
 
 #### Scenario: A stale device writes lower reps
 
@@ -657,14 +716,27 @@ every update. Row-level security SHALL limit each table to its own user.
 
 Source: `lib/sync/cloud.ts:41`, `db/migrations/029_card_reviews_locale.sql:27`, `db/migrations/029_card_reviews_locale.sql:36`, `db/migrations/029_card_reviews_locale.sql:67`, `db/migrations/029_card_reviews_locale.sql:81`, `db/migrations/017_card_reviews_pasture_one_way.sql:74`, `db/migrations/043_card_reviews_updated_at_trigger.sql:36`, `db/migrations/001_initial_sync_schema.sql:23`, `lib/sync/integration/regression-trigger.test.ts`, `lib/sync/integration/onconflict-pk-parity.test.ts`.
 
+### Requirement: CHECK constraints share the regression code (baseline)
+
+CHECK constraints SHALL bound `locale`, `fsrs_state`, `stability` and `difficulty` on `card_reviews`. They
+raise 23514, as the triggers do, so clients and the route treat such a row as if the cloud row were newer.
+
+#### Scenario: A row breaks a CHECK constraint
+
+- **WHEN** `pushSingleCard` sends a `difficulty` above 10
+- **THEN** it returns `"rejected"` and the card leaves the queue
+
+Source: `lib/sync/cloud.ts:336`, `db/migrations/004_card_reviews_fsrs_schema.sql:72`, `db/migrations/020_card_reviews_stability_difficulty_bounds.sql:15`, `db/migrations/029_card_reviews_locale.sql:21`.
+
 ### Requirement: Resetting progress (baseline)
 
 `reset_all_progress` SHALL require a session, refuse a repeat within 5 seconds, delete the user's
-`card_reviews`, `grade_log` and `streak_days` rows, and stamp `last_reset_at`, keeping settings.
-`resetAllProgressEverywhere` SHALL do this first and clear local only on success. A pull seeing
-`last_reset_at` later than `lastSeenResetAt`, or with that cursor null, SHALL clear local before merging.
+`card_reviews`, `grade_log` and `streak_days` rows, and stamp `last_reset_at` and `updated_at`, keeping
+the settings blob. `resetAllProgressEverywhere` SHALL do this first and clear local only on success. A
+pull seeing `last_reset_at` later than `lastSeenResetAt`, or with that cursor null, SHALL clear local
+before merging.
 
-This looks like a bug: the device that made the reset clears itself again on its next pull (#2231).
+Two scenarios below look like bugs (#2231, #2334).
 
 #### Scenario: Cloud reset fails
 
@@ -686,7 +758,22 @@ This looks like a bug: the device that made the reset clears itself again on its
 - **WHEN** a row is inserted dated before the UTC date of `last_reset_at`
 - **THEN** the INSERT trigger raises 23514
 
-Source: `db/migrations/026_reset_all_progress_cooldown.sql:28`, `db/migrations/026_reset_all_progress_cooldown.sql:45`, `db/migrations/026_reset_all_progress_cooldown.sql:54`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:68`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:133`, `lib/sync/reset.ts:50`, `lib/sync/pullAndMerge.ts:174`, `lib/sync/pullAndMerge.ts:624`, `lib/storage/reset.ts:18`, `lib/sync/pullAndMerge.test.ts:741`.
+#### Scenario: Queued rows at a reset
+
+- **WHEN** local is cleared with rows in the pending-queue mirror
+- **THEN** the mirror stays in IndexedDB, and the service worker can replay it
+
+#### Scenario: Stale row dated the reset day
+
+- **WHEN** a row is inserted dated the same UTC day as `last_reset_at`
+- **THEN** the trigger lets it in, even if it was graded before the reset
+
+#### Scenario: Settings row cannot be read
+
+- **WHEN** a pull's settings read fails after a reset elsewhere
+- **THEN** local is not cleared on this pull, the merge continues, and the next pull clears it
+
+Source: `db/migrations/026_reset_all_progress_cooldown.sql:28`, `db/migrations/026_reset_all_progress_cooldown.sql:45`, `db/migrations/026_reset_all_progress_cooldown.sql:54`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:25`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:68`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:133`, `lib/sync/reset.ts:50`, `lib/sync/pullAndMerge.ts:174`, `lib/sync/pullAndMerge.ts:624`, `lib/storage/reset.ts:18`, `lib/storage/reset.ts:49`, `lib/sync/pullAndMerge.test.ts:741`.
 
 ### Requirement: Deleting an account (baseline)
 
