@@ -541,8 +541,8 @@ Source: `components/settings/ReenableCardTypeDialog.tsx:58-85`, `components/sett
 
 ### Requirement: First-visit modal on Practice (baseline, current behaviour)
 
-`/` SHALL mount the modal, which SHALL open while `firstVisitOnboardingDismissed` is not true, including
-after any settings save that clears it. Close, Get started, Escape and the Audio settings link SHALL set
+`/` SHALL mount the modal, open while `firstVisitOnboardingDismissed` is not true, including after any
+save that clears it. Close, Get started, Escape and the Audio settings link SHALL set
 the flag. The guest storage section SHALL show only once auth resolves to no user. While open, `#app-root`
 SHALL be inert and aria-hidden, scroll locked and Tab trapped. On close it SHALL try to restore focus, but
 that call runs before `#app-root` stops being inert (open issue #2316).
@@ -580,11 +580,11 @@ Source: `components/onboarding/OnboardingHint.tsx:63-93`, `lib/settings/persiste
 
 ### Requirement: Nudge gates (baseline, current behaviour)
 
-The four Practice nudges SHALL each need the first visit done. The scope nudge SHALL also need an empty
-scope, scope never opened and at least 3 sessions. The offline nudge SHALL also need no offline download, superuser guard
-off, and at least 3 slow loads or 5 sessions. The mastery-blockers nudge SHALL also need a blocked
-species and that preset off. Higher-or-Lower SHALL also need two Pokémon seen. The guest sign-up nudge, on
-Stats and Journey for guests only, SHALL need 10 mastered species or 3 sessions.
+Four Practice nudges SHALL need the first visit done. The scope nudge SHALL also need an empty
+scope, scope never opened and at least 3 sessions. The offline nudge SHALL also need no offline download,
+superuser guard off, and at least 3 slow loads or 5 sessions. The mastery-blockers nudge SHALL also need a blocked
+species and that preset off. Higher-or-Lower SHALL also need two Pokémon seen. The guest sign-up
+nudge, for guests on Stats and Journey, SHALL need 10 mastered species or 3 sessions.
 
 #### Scenario: Guest with three sessions
 
