@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 2 November 2026
+          Last updated: 3 November 2026
         </p>
       </header>
 
@@ -297,12 +297,12 @@ export default async function PrivacyPage() {
             reported issues. It is not used for profiling or marketing. Bug
             reports trigger an automated notification to a private,
             maintainer-only Discord channel used for triage: this notification
-            contains none of your message, only the non-identifying metadata
-            above (page, app version, timestamp), whether you were signed in,
-            and a link to the report that only the maintainer can open. No user
-            identifier is included. The notification stays in that channel
-            after the feedback itself is deleted. Discord is a sub-processor
-            under a data processing agreement (see §6).
+            includes a capped preview (up to 500 characters) of the message,
+            plus the non-identifying metadata above (page, app version,
+            timestamp). No user identifier is included. When the feedback is
+            deleted, we delete this notification from Discord too (see §8).
+            Discord is a sub-processor under a data processing agreement (see
+            §6).
           </p>
         </section>
 
@@ -522,11 +522,11 @@ export default async function PrivacyPage() {
                     Maintainer notification channel for bug-report triage
                   </td>
                   <td className="py-2">
-                    Non-identifying metadata only (page, app version,
-                    timestamp, whether the reporter was signed in) and a
-                    maintainer-only link to the report. None of the message and
-                    no user identifier is included. Sent to a private,
-                    maintainer-only channel.
+                    A capped preview (up to 500 characters) of the free-text
+                    message, plus non-identifying metadata (page, app version,
+                    timestamp). No user identifier is included. Sent to a
+                    private, maintainer-only channel, and deleted when the
+                    feedback is deleted.
                   </td>
                 </tr>
               </tbody>
@@ -677,8 +677,9 @@ export default async function PrivacyPage() {
           <p className="mt-3">
             Feedback submissions are retained for 12 months from the date of
             submission and then automatically deleted, regardless of account
-            status. We do not automatically delete the bug-report notifications
-            in our Discord channel (see §3), which hold none of your message.
+            status. When a bug report is deleted, after 12 months or with your
+            account, we also delete its notification in our Discord channel,
+            message preview included.
           </p>
           <p className="mt-3">
             Error reports and performance traces held by Sentry are kept for

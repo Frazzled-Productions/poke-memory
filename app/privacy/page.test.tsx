@@ -155,20 +155,16 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("says bug notifications carry no message text and what stays in Discord (ops #405)", async () => {
+    it("says the Discord bug notification is deleted with the feedback (ops #405)", async () => {
       await renderPage();
-      expect(screen.queryAllByText(/capped preview/i)).toHaveLength(0);
       expect(
-        screen.getByText(/this notification contains none of your message/i),
+        screen.getByText(/we delete this notification from discord too/i),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/the notification stays in that channel/i),
+        screen.getByText(/and deleted when the\s+feedback is deleted/i),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/none of the message and no user identifier is included/i),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/we do not automatically delete the bug-report notifications/i),
+        screen.getByText(/we also delete its notification in our discord channel/i),
       ).toBeInTheDocument();
     });
 
@@ -196,9 +192,9 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 2 November 2026", async () => {
+    it("shows the last updated date as 3 November 2026", async () => {
       await renderPage();
-      expect(screen.getByText(/2 november 2026/i)).toBeTruthy();
+      expect(screen.getByText(/3 november 2026/i)).toBeTruthy();
     });
 
     it("offers a complaints route to us before the ICO, with a 30-day acknowledgement", async () => {

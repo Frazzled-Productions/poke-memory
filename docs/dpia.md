@@ -106,7 +106,7 @@ The browser's Web Push service (Google FCM, Mozilla, or Apple, depending on the 
 
 Authenticated-path data is retained for the lifetime of the account. Account deletion triggers a cascading delete on all rows associated with the user's UUID across `card_reviews`, `streak_days`, `grade_log`, `user_settings`, and `feedback`. The self-service "Reset all progress" action deletes review history immediately. There is currently no point-in-time backup (issue #298), so deletion is permanent and immediate.
 
-Feedback rows are retained for 12 months from `created_at` and are then automatically deleted by a scheduled database function. For authenticated users, feedback rows are also deleted by cascade on account deletion. Discord notifications hold no message text and no user identifier, and stay in the channel after the row is deleted.
+Feedback rows are retained for 12 months from `created_at` and are then automatically deleted by a scheduled database function. For authenticated users, feedback rows are also deleted by cascade on account deletion. When a bug-report row is deleted either way, an AFTER DELETE trigger (migration 051) has the notify route delete its Discord notification, message preview included (ops #405).
 
 Sentry error reports and performance traces are retained for Sentry's default of 90 days and then deleted automatically. They carry no user identifier, so they are not linked to any account and are not affected by account deletion.
 
@@ -305,9 +305,9 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 - Feedback rows are automatically deleted after 12 months by a scheduled database function.
 - For authenticated users, feedback rows are deleted by cascade on account deletion.
 - Feedback data is not used for profiling or marketing.
-- Bug-report notifications to Discord carry no message text (ops #405, replacing the capped preview from #1848, because nothing deletes a Discord post and the text would outlive the 12-month purge and account deletion). They carry only page, app version, timestamp, whether the reporter was signed in, and a maintainer-only link to the Supabase row, go to a private maintainer-only channel, and are processed under a DPA. No user identifier is included. The message remains in Supabase within the existing RLS perimeter.
+- Bug-report notifications to Discord: the message preview forwarded is capped at 500 characters, fetched by the Vercel route via the service-role client (keeping it out of pg_net request logs), sent to a private maintainer-only Discord channel, and processed under a DPA. No user identifier is included. The full message remains in Supabase within the existing RLS perimeter. The Discord notification is deleted when its feedback row is deleted, by the 12-month purge or the account cascade (ops #405, migration 051), so the preview does not outlive the row. Notifications posted before that change are deleted by hand (ops #406).
 
-**Residual risk:** Low. Users may still include personal data despite the inline notice; the server-side truncation and automatic deletion schedule bound both the quantity and retention of any such data, and the free-text message does not leave Supabase.
+**Residual risk:** Low. Users may still include personal data despite the inline notice; the server-side truncation and automatic deletion schedule bound both the quantity and retention of any such data. The Discord preview is additionally capped at 500 characters, sent to a maintainer-only channel, and deleted with the feedback row.
 
 **Acceptable:** Yes.
 
