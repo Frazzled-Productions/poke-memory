@@ -6,6 +6,7 @@ import {
   pushSettings,
   pushRegionalPrefs,
   pullRegionalPrefs,
+  pullLastResetAt,
   mergeRemovedLocales,
   mergeLearnedLocales,
 } from "./settings";
@@ -394,6 +395,38 @@ describe("pullRegionalPrefs", () => {
 });
 
 // ─── mergeRemovedLocales (#1568) ─────────────────────────────────────────────
+
+describe("pullLastResetAt (#2218)", () => {
+  it("returns the last reset when the row has one", async () => {
+    const { client } = makeClientWithMaybeSingle({ last_reset_at: "2026-10-01T09:00:00.000Z" });
+    expect(await pullLastResetAt(client, "user-1")).toEqual({
+      lastResetAt: "2026-10-01T09:00:00.000Z",
+    });
+  });
+
+  it("returns lastResetAt: null for an account that never reset", async () => {
+    const { client } = makeClientWithMaybeSingle({ last_reset_at: null });
+    expect(await pullLastResetAt(client, "user-1")).toEqual({ lastResetAt: null });
+  });
+
+  it("returns lastResetAt: null for an account with no settings row", async () => {
+    const { client } = makeClientWithMaybeSingle(null);
+    expect(await pullLastResetAt(client, "user-1")).toEqual({ lastResetAt: null });
+  });
+
+  it("returns null, not 'no reset', when the read reports an error", async () => {
+    const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
+    expect(await pullLastResetAt(client, "user-1")).toBeNull();
+  });
+
+  it("returns null when the client throws", async () => {
+    const from = vi.fn(() => {
+      throw new Error("network");
+    });
+    const client = { from } as unknown as SupabaseClient;
+    expect(await pullLastResetAt(client, "user-1")).toBeNull();
+  });
+});
 
 describe("mergeRemovedLocales (#1568)", () => {
   it("union of two disjoint non-empty sets", () => {
