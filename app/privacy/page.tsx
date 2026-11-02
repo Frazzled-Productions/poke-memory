@@ -213,8 +213,10 @@ export default async function PrivacyPage() {
             have not yet reviewed that day. You will never receive more than
             two notifications in a day. The subscription is deleted as soon as
             you turn the daily reminder toggle off, when you delete your
-            account, or when your browser or operating system invalidates the
-            endpoint. Notification content is limited to the number of cards
+            account, when your browser or operating system invalidates the
+            endpoint, or when your account has 10 subscribed devices and you
+            subscribe another one, which replaces the least recently
+            subscribed device. Notification content is limited to the number of cards
             waiting for review (daily reminder) or your current streak length
             (streak reminder); no other personal data appears in a notification.
           </p>

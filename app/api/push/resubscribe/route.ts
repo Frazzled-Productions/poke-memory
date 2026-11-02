@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { requireAuth } from "@/lib/auth/requireAuth";
+import { isKnownPushEndpoint } from "@/lib/push/endpoints";
 
 /**
  * Push subscription re-persist endpoint (#1858 F35).
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
 
   const { endpoint, p256dh, auth } = body;
   if (
-    typeof endpoint !== "string" || endpoint.length === 0 ||
+    typeof endpoint !== "string" || !isKnownPushEndpoint(endpoint) ||
     typeof p256dh !== "string" || p256dh.length === 0 ||
     typeof auth !== "string" || auth.length === 0
   ) {

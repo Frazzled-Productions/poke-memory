@@ -30,7 +30,7 @@ vi.mock("@supabase/supabase-js", () => ({
 // below depend on the real local-day maths. Determinism comes from
 // `vi.setSystemTime` in beforeEach.
 
-import { POST, buildStreakNudgeMessage, STREAK_NUDGE_LOCAL_HOUR } from "./route";
+import { POST, buildStreakNudgeMessage, maxDuration, STREAK_NUDGE_LOCAL_HOUR } from "./route";
 import webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
@@ -166,7 +166,7 @@ function optedInTarget(overrides: Partial<TargetRow> = {}): TargetRow {
   return {
     subscription_id: "sub-1",
     user_id: "user-a",
-    endpoint: "https://push.example/a",
+    endpoint: "https://fcm.googleapis.com/fcm/send/a",
     p256dh: "p256-a",
     auth_secret: "auth-a",
     timezone: "UTC",
@@ -583,7 +583,7 @@ describe("POST /api/push/send-streak-nudge - streak_days pagination (#2115)", ()
         optedInTarget({
           subscription_id: "sub-2",
           user_id: "user-b",
-          endpoint: "https://push.example/b",
+          endpoint: "https://fcm.googleapis.com/fcm/send/b",
         }),
       ],
       streakDays,
@@ -599,7 +599,7 @@ describe("POST /api/push/send-streak-nudge - streak_days pagination (#2115)", ()
     // today (only visible on page two) is not.
     expect(body.sent).toBe(1);
     expect(mockSendNotification).toHaveBeenCalledTimes(1);
-    expect(mockSendNotification.mock.calls[0][0].endpoint).toBe("https://push.example/a");
+    expect(mockSendNotification.mock.calls[0][0].endpoint).toBe("https://fcm.googleapis.com/fcm/send/a");
 
     expect(admin.streakDayPages.map((p) => [p.from, p.to])).toEqual([
       [0, 999],
@@ -712,5 +712,84 @@ describe("POST /api/push/send-streak-nudge - dead-endpoint cleanup", () => {
     expect(body.sent).toBe(0);
     expect(body.deleted).toBe(0);
     expect(admin.client.from).not.toHaveBeenCalled();
+  });
+});
+
+// ─── ops #380: a slow push service cannot hold up a run ─────────────────────
+
+describe("POST /api/push/send-streak-nudge - delivery limits", () => {
+  const twoDevices = () => [
+    optedInTarget({ subscription_id: "sub-a" }),
+    optedInTarget({ subscription_id: "sub-b", endpoint: "https://fcm.googleapis.com/fcm/send/b" }),
+  ];
+  const atRisk = () =>
+    consecutiveDatesEnding("2026-05-19", 5).map((review_date) => ({ user_id: "user-a", review_date }));
+
+  it("declares a 300 second limit", () => {
+    expect(maxDuration).toBe(300);
+  });
+
+  it("a first send that never settles does not stop the second or the response", async () => {
+    const admin = buildAdminMock({ targets: twoDevices(), streakDays: atRisk() });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockImplementationOnce(() => new Promise(() => {}));
+    mockSendNotification.mockResolvedValueOnce({ statusCode: 201, body: "", headers: {} });
+
+    let settled = false;
+    const run = POST(makeRequest()).finally(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    expect(mockSendNotification).toHaveBeenCalledTimes(2);
+    expect(settled).toBe(true);
+    const body = (await (await run).json()) as { sent: number };
+    expect(body.sent).toBe(1);
+  });
+
+  it("Server error from a push service: the other device is still sent to", async () => {
+    const admin = buildAdminMock({ targets: twoDevices(), streakDays: atRisk() });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockRejectedValueOnce({ statusCode: 500, body: "", headers: {} });
+    mockSendNotification.mockResolvedValueOnce({ statusCode: 201, body: "", headers: {} });
+
+    const body = (await (await POST(makeRequest())).json()) as { sent: number; deleted: number };
+    expect(body).toMatchObject({ sent: 1, deleted: 0 });
+  });
+
+  it("Reads use up the budget: no send starts, the due devices are logged and the route returns 200", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const admin = buildAdminMock({ targets: twoDevices(), streakDays: atRisk() });
+    const read = admin.client.rpc;
+    admin.client.rpc = vi.fn((fn: string, args?: Record<string, unknown>) => {
+      if (fn === "get_push_streak_days") vi.setSystemTime(Date.now() + 245_000);
+      return read(fn, args);
+    }) as typeof read;
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(mockSendNotification).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith("[push] devices not reached", { notReached: 2 });
+  });
+
+  it("Budget used up: devices left are logged, dead rows found so far are deleted and the route returns 200", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const targets = Array.from({ length: 21 }, (_, i) =>
+      optedInTarget({ subscription_id: `sub-${i}`, endpoint: `https://fcm.googleapis.com/fcm/send/${i}` }),
+    );
+    const admin = buildAdminMock({ targets, streakDays: atRisk() });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockImplementationOnce(() => {
+      vi.setSystemTime(Date.now() + 241_000);
+      return Promise.reject({ statusCode: 410, body: "", headers: {} });
+    });
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(mockSendNotification).toHaveBeenCalledTimes(20);
+    expect(admin.deleteCalls).toEqual([{ ids: ["sub-0"] }]);
+    expect(warn).toHaveBeenCalledWith("[push] devices not reached", { notReached: 1 });
   });
 });

@@ -5,8 +5,9 @@ Manual one-off setup for the daily review reminder Web Push feature
 
 ## Architecture summary
 
-- `pg_cron` fires once a day (08:00 UTC) and posts to the Vercel route at
-  `/api/push/send-daily`.
+- `pg_cron` fires every hour at minute 0 (migration 031) and posts to the
+  Vercel route at `/api/push/send-daily`. The route only notifies users whose
+  own reminder hour is the current UTC hour.
 - The route handler verifies a Bearer token, queries every active
   subscription, fans out per-user pushes via the `web-push` npm package,
   and deletes any subscriptions the push service reports as dead (410 / 404).
@@ -99,17 +100,30 @@ After all five steps are in place:
 
 - **Subscription cleanup.** The route deletes any subscription that
   returns 410 (Gone) or 404 (Not Found) from the push service. Other
-  errors are logged but skipped - a single bad endpoint does not block
+  errors are logged as `[push] sendNotification failed` with the
+  subscription id and skipped - a single bad endpoint does not block
   the rest of the batch.
-- **Schedule changes.** To move the daily fire time, update the cron
-  expression via `cron.alter_job`:
-
-  ```sql
-  SELECT cron.alter_job(
-    (SELECT jobid FROM cron.job WHERE jobname = 'web-push-daily-reminders'),
-    schedule := '0 16 * * *' -- 16:00 UTC
-  );
-  ```
+- **Time limits.** Both send routes share `lib/push/deliver.ts`: each send
+  has a 10 second socket timeout and a 15 second overall limit, at most 20
+  sends run at once, and no new send starts 240 seconds after the route
+  started (`maxDuration` is 300). A send past a limit counts as failed and
+  its row stays. Devices left when the 240 seconds run out are logged as
+  `[push] devices not reached`; they are not retried, so they get the next
+  day's reminder.
+- **Known push services only.** An endpoint must be https on an Apple,
+  Google (FCM), Mozilla or Microsoft push host (`lib/push/endpoints.ts`,
+  repeated in migration 049). `resubscribe` returns 400 for any other host
+  and the database refuses the insert. Rows from before migration 049 on
+  another host are skipped at send time, kept, and logged as
+  `[push] rows on an unknown host skipped`; Settings shows the toggle off
+  on that device.
+- **At most 10 subscriptions per account.** A `BEFORE INSERT` trigger
+  (migration 049) deletes the least recently subscribed rows so an account
+  keeps 10. The replaced device gets its row back the next time Settings
+  is opened on it.
+- **Schedule changes.** Leave the job hourly. Each user's reminder hour
+  comes from `push_notification_hour`, so a job that fires once a day would
+  only reach the users due in that hour.
 
 - **Secret rotation.** Updating `vault.secrets` is enough on the
   Supabase side; the cron command re-reads on every fire. Update the

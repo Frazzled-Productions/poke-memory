@@ -258,6 +258,42 @@ describe("PushOptIn - subscription reconciliation", () => {
     });
   });
 
+  it("Unknown host in Settings: the toggle shows off, not on", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    mockReconcileSubscription.mockResolvedValue("disabled");
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const toggle = await screen.findByTestId("push-optin-button");
+    await waitFor(() => {
+      expect(mockReconcileSubscription).toHaveBeenCalled();
+      expect(toggle.getAttribute("aria-checked")).toBe("false");
+    });
+  });
+
+  it("Replaced device opens Settings: the row is inserted again and the toggle stays on", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    mockReconcileSubscription.mockResolvedValue("re-inserted");
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const toggle = await screen.findByTestId("push-optin-button");
+    await waitFor(() => {
+      expect(mockReconcileSubscription).toHaveBeenCalled();
+      expect(toggle.getAttribute("aria-checked")).toBe("true");
+    });
+  });
+
+  it("New subscription refused: shows the persist-failed state and the toggle stays off", async () => {
+    mockSubscribeToPush.mockResolvedValue({ ok: false, reason: "persist-failed" });
+    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    const toggle = await screen.findByTestId("push-optin-button");
+
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/could not save/i);
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+  });
+
   it("shows the toggle OFF when reconcile returns 'disabled' (orphaned subscription, re-insert failed)", async () => {
     // The local PushManager has a subscription but there is no server row and
     // re-insert failed (orphaned endpoint). PushOptIn should flip the toggle

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isKnownPushEndpoint } from "@/lib/push/endpoints";
 
 /**
  * Web Push subscription helpers (#1056).
@@ -300,6 +301,7 @@ export type ReconcileResult =
  *
  * This helper runs the full check:
  *   1. Get the local PushManager subscription. If absent, return `"no-local"`.
+ *      If it is on a host outside the known list, return `"disabled"`.
  *   2. Query `push_subscriptions` for the `(user_id, endpoint)` pair.
  *   3. If a row exists, return `"in-sync"`.
  *   4. If no row exists, re-insert the subscription keys (same delete-then-insert
@@ -328,6 +330,10 @@ export async function reconcileSubscription(
     return "no-local";
   }
   if (!subscription) return "no-local";
+
+  // A row on an unknown host is skipped at send time, so this device gets no
+  // reminders whether or not a row exists: show the toggle off (ops #380).
+  if (!isKnownPushEndpoint(subscription.endpoint)) return "disabled";
 
   // Check for a matching server row.
   try {

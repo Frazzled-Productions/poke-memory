@@ -91,7 +91,7 @@ function mockNavigatorServiceWorker(subscription: PushSubscription | null) {
   return registration;
 }
 
-function makeFakeSubscription(endpoint = "https://push.example.com/sub/1"): PushSubscription {
+function makeFakeSubscription(endpoint = "https://fcm.googleapis.com/fcm/send/1"): PushSubscription {
   const fakeKey = new ArrayBuffer(16);
   return {
     endpoint,
@@ -139,6 +139,31 @@ describe("reconcileSubscription", () => {
   });
 
   it("returns 're-inserted' when no server row exists and re-insert succeeds", async () => {
+    const sub = makeFakeSubscription();
+    mockNavigatorServiceWorker(sub);
+    const client = makeMockClient({ selectData: null });
+    const result = await reconcileSubscription(client, "user-1");
+    expect(result).toBe("re-inserted");
+  });
+
+  it("Unknown host in Settings: returns 'disabled' when a row exists", async () => {
+    const sub = makeFakeSubscription("https://push.example.com/sub/1");
+    mockNavigatorServiceWorker(sub);
+    const client = makeMockClient({ selectData: { endpoint: sub.endpoint } });
+    const result = await reconcileSubscription(client, "user-1");
+    expect(result).toBe("disabled");
+  });
+
+  it("Unknown host in Settings: returns 'disabled' with no row, and inserts nothing", async () => {
+    const sub = makeFakeSubscription("https://push.example.com/sub/1");
+    mockNavigatorServiceWorker(sub);
+    const client = makeMockClient({ selectData: null });
+    const result = await reconcileSubscription(client, "user-1");
+    expect(result).toBe("disabled");
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it("Replaced device opens Settings: no row, so it is inserted again", async () => {
     const sub = makeFakeSubscription();
     mockNavigatorServiceWorker(sub);
     const client = makeMockClient({ selectData: null });

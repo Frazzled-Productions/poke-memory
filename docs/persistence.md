@@ -13,7 +13,7 @@ Every table in `public`, as created by `db/migrations/`. All nine have RLS enabl
 | `streak_days` | 001 | One row per day reviewed; append-only, client-synced. |
 | `user_settings` | 001 | One row per user (`user_id` is the PK); `settings` JSONB plus scalar columns such as `timezone` (019). |
 | `grade_log` | 006 | Append-only per-grade event log; `UNIQUE (user_id, occurred_at)` is the cross-device dedup key. |
-| `push_subscriptions` | 028 | One row per (user, browser endpoint); client SELECT / INSERT / DELETE policies, no UPDATE. Precedent for a create-or-delete, never-mutated table. |
+| `push_subscriptions` | 028 | One row per (user, browser endpoint); client SELECT / INSERT / DELETE policies, no UPDATE. Precedent for a create-or-delete, never-mutated table. Migration 049: a `NOT VALID` check on the endpoint host, and a `BEFORE INSERT` trigger that keeps an account to 10 rows. |
 | `feedback` | 034 | Write-once, append-only; written only by the service-role Route Handler (`app/api/feedback`), no client policies. `user_id` is **nullable** (guest feedback), and a pg_cron job purges rows after 12 months. |
 | `usernames` | 035 | Uniqueness-constraint table (`username` is the PK, `UNIQUE (user_id)`); owner-only INSERT policy (the public SELECT policy was dropped in 044). |
 | `rate_limit_buckets` | 041 | Service-role-only internal table with **no `user_id`**: keyed on a salted `ip_hash` because callers are pre-session. No client policies; every write goes through the `check_rate_limit` SECURITY DEFINER RPC, and pg_cron purges rows after 2 hours. |
