@@ -44,7 +44,8 @@ The delta spec records the first three as baseline requirements and adds the fix
   dropped 2026-10-26 as settled.)
 - **Move, do not rewrite.** `git mv` keeps the file's history (`git log --follow`) and leaves its
   body untouched, so nothing about what the skill says changes. The only frontmatter edit is the
-  `allowed-tools` line, and only if Fraser takes the recommendation to narrow it (open call).
+  `allowed-tools` line, narrowed to `[Bash(gh *), Bash(git *), Bash(npx playwright *), Bash(npm run *), Read, Grep, Glob]`
+  (Fraser, 26 October 2026).
 - **Reference by slash name.** `batch-issues.md:224` becomes `/investigate-ci-failure`, matching
   `AGENTS.md:148` and `batch-issues.md:201`, so a future move cannot leave a stale path.
 - **Layout lint, no model call.** `scripts/lib/skills-layout.mjs` exports a pure function that takes
@@ -54,8 +55,8 @@ The delta spec records the first three as baseline requirements and adds the fix
   a Finder `.DS_Store` or an untracked scratch file cannot fail `npm run lint` on a Mac while CI
   stays green, and fails with each path named. Same shape as the Playwright pin check (`scripts/check-playwright-pin.mjs` with
   `scripts/lib/playwright-pin.mjs`), so it is picked up by the existing `scripts/**/*.test.mjs`
-  Vitest project. Placement: the `lint` chain, which the required `test` job runs. Recommended (open
-  call): also re-include `'.claude/skills/**'` in `ci.yml`'s `code` filter; no `em-dash` job step,
+  Vitest project. Placement: the `lint` chain, which the required `test` job runs, and `'.claude/skills/**'`
+  re-included in `ci.yml`'s `code` filter (Fraser, 26 October 2026); no `em-dash` job step,
   because `em-dash` is not a required check on `qa`.
 
 ## Blast radius (25 October 2026)
@@ -92,8 +93,8 @@ Cleared:
   and `dorny/paths-filter` defaults to `some`, where a file counts if any one pattern matches, so
   `'**'` matches every file. This PR's own `changes` job (run 40229453529) reported
   `Filter code = true` for its five `.md` files. So today every PR runs `test` and the `lint` chain,
-  and the build PR does too. The broken fast path is an existing bug, not fixed here (open call).
-- The build PR edits `ci.yml` only if the `code` filter re-include is kept; `ci.yml` is in
+  and the build PR does too. The broken fast path is an existing bug, not fixed here (filed as #2200).
+- The build PR edits `ci.yml` for the `code` filter re-include; `ci.yml` is in
   `e2e_relevant`, so `e2e` then runs on the build PR (CI time only).
 - Required checks on `qa` (ruleset qa-staging): `test`, `e2e`, `Test coverage report`,
   `integration-gate`, `changelog-gate`, `i18n-leak`, `OpenSpec required`, `Context budget`.
@@ -108,14 +109,15 @@ Risks:
 - The skill now runs for real, and its procedure has never been exercised (the issue's own warning).
   Where: `.claude/skills/investigate-ci-failure/SKILL.md`. Likelihood: medium that some step is
   stale; cost: low, it is guidance for an agent.
-  Cheapest check: one live run on the next non-converging CI failure (task 4.1, moved to an issue).
+  Cheapest check: one live run on the next non-converging CI failure (task 4.1, moved to #2199).
 - The skill's `allowed-tools` (unscoped `Bash`, `Edit`, `Agent` and others) are approved without a
   prompt while the skill is active (Claude Code skills docs; cited, not run here), which is wider
   than `.claude/settings.json`'s allow-list. Where: the skill's frontmatter. Likelihood: certain
-  once it loads; cost: an agent in the skill can run any shell command or edit unprompted. Cheapest
-  fix: narrow the list in this change (open call).
-- Once the docs fast path is fixed, a skill-only PR would skip the `lint` chain. Covered if
-  `'.claude/skills/**'` is re-included in the `code` filter (open call).
+  once it loads; cost: an agent in the skill can run any shell command or edit unprompted. Fixed
+  in this change: the list is narrowed (Fraser, 26 October 2026).
+- Once the docs fast path is fixed, a skill-only PR would skip the `lint` chain. Covered by
+  `'.claude/skills/**'`, re-included in the `code` filter in this change; #2200 must keep that
+  re-include working when it sets a `predicate-quantifier`.
 
 Before merge, the cheapest test that would catch the real bug: `scripts/lib/skills-layout.test.mjs`
 fed today's `.claude/skills/` entries must report `investigate-ci-failure.md` (task 1.1, red first).
