@@ -691,6 +691,79 @@ export function mergeCloudIntoLocalSilent(
 }
 
 /**
+ * True when `next` is further on than `base`: the two differ in a field the
+ * regression trigger guards, and writing `next` over `base` would pass that
+ * trigger. Mirrors `card_reviews_reject_regression` (migration 029); the
+ * integration test backup-restore.test.ts checks every branch against the real
+ * trigger, so a change there fails the test rather than drifting from this.
+ */
+export function isFurtherOn(next: CloudRow, base: CloudRow): boolean {
+  const newLastReview = next.last_review;
+  const oldLastReview = base.last_review;
+  if (oldLastReview !== null && newLastReview === null) return false;
+  if (base.first_seen !== null && next.first_seen === null) return false;
+  if (oldLastReview !== null && newLastReview !== null && newLastReview < oldLastReview) return false;
+  if (next.reps < base.reps || next.lapses < base.lapses) return false;
+  if (newLastReview === oldLastReview && next.scheduled_days < base.scheduled_days) return false;
+  if (base.seen_in_pasture && !next.seen_in_pasture) return false;
+  return (
+    newLastReview !== oldLastReview ||
+    next.first_seen !== base.first_seen ||
+    next.reps !== base.reps ||
+    next.lapses !== base.lapses ||
+    next.scheduled_days !== base.scheduled_days ||
+    next.seen_in_pasture !== base.seen_in_pasture
+  );
+}
+
+/**
+ * Works out a signed-in restore: which copy of each backup card this device
+ * should hold, and which cards the cloud should be given.
+ *
+ * A backup card is used only when it is further on than both the cloud and this
+ * device. Otherwise this device keeps what it has, so a grade still waiting to
+ * sync is never lost; a card this device lacks takes the cloud row. A card dated
+ * before the account's last reset is left out: the pre-reset trigger (migration
+ * 022) refuses it on every push, including after it is graded again, so keeping
+ * it would leave it stranded on this device. `resetDate` matches the trigger's
+ * `reset_at::date`.
+ */
+export function planSignedInRestore(
+  backup: readonly ReviewableCard[],
+  local: readonly ReviewableCard[],
+  cloud: readonly CloudRow[],
+  lastResetAt: string | null,
+): { cards: ReviewableCard[]; toPush: ReviewableCard[] } {
+  const resetDate = lastResetAt?.slice(0, 10) ?? null;
+  const cloudByKey = new Map(cloud.map((r) => [cloudRowKey(r), r]));
+  const byKey = new Map(local.map((c) => [cardKey(c), c]));
+  const toPush: ReviewableCard[] = [];
+
+  for (const card of backup) {
+    const key = cardKey(card);
+    const { firstSeen, lastReview } = card.state;
+    const beforeReset =
+      resetDate !== null &&
+      ((firstSeen !== null && firstSeen < resetDate) ||
+        (lastReview !== null && lastReview < resetDate));
+    if (beforeReset) continue;
+
+    const row = cloudByKey.get(key);
+    const held = byKey.get(key);
+    const candidate = toCloudRow(card);
+    if (row && !isFurtherOn(candidate, row)) {
+      if (!held) byKey.set(key, applyCloudRow(card, row));
+      continue;
+    }
+    if (held && !isFurtherOn(candidate, toCloudRow(held))) continue;
+    byKey.set(key, card);
+    if (lastReview !== null) toPush.push(card);
+  }
+
+  return { cards: [...byKey.values()], toPush };
+}
+
+/**
  * Merges cloud rows into a local card array. For each card, if a matching
  * cloud row exists (keyed by `(card_type, subject_key)`), its FSRS state
  * fields overwrite the local state. Cards without a cloud counterpart are

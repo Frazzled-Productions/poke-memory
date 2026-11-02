@@ -282,4 +282,160 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
 
     await nodeClient.auth.signOut();
   });
+
+  test("signed-in backup restore moves cards forward and never lowers the cloud (#2218)", async ({
+    page,
+  }, testInfo) => {
+    // The one path the integration suite cannot reach: a real browser, a real
+    // session cookie, real PostgREST and real RLS. Runs after the round-trip test,
+    // which leaves Bulbasaur (subject "1") in the cloud at reps 3.
+    testInfo.setTimeout(90_000);
+    if (!nodeClient) throw new Error("nodeClient not initialised");
+
+    const { data: signInData, error: signInErr } = await nodeClient.auth.signInWithPassword({
+      email: syntheticEmail(username),
+      password: E2E_PASSWORD,
+    });
+    expect(signInErr, signInErr?.message ?? "").toBeNull();
+    const userId = signInData.user?.id;
+
+    // Ivysaur (subject "2") is further on in the cloud than in the backup below.
+    const { error: seedErr } = await nodeClient.from("card_reviews").upsert(
+      {
+        user_id: userId,
+        card_type: "name",
+        subject_key: "2",
+        locale: "en",
+        stability: 10,
+        difficulty: 5,
+        elapsed_days: 1,
+        scheduled_days: 21,
+        reps: 9,
+        lapses: 0,
+        fsrs_state: "review",
+        due_date: "2099-01-01",
+        last_review: "2026-03-01",
+        first_seen: "2025-12-01",
+        hidden_since: null,
+        seen_in_pasture: false,
+      },
+      { onConflict: "user_id,card_type,subject_key,locale" },
+    );
+    expect(seedErr, seedErr?.message ?? "").toBeNull();
+
+    const cloudReps = async (subjectKey: string) => {
+      const { data } = await nodeClient!
+        .from("card_reviews")
+        .select("reps")
+        .eq("card_type", "name")
+        .eq("subject_key", subjectKey)
+        .eq("locale", "en")
+        .single();
+      return data?.reps;
+    };
+
+    await addOnboardingPreDismiss(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Sign in" }).first().click();
+    const dialog = page.getByRole("dialog", { name: /keep your progress safe/i });
+    await dialog.getByRole("button", { name: /already have an account/i }).click();
+    await dialog.getByLabel("Username").fill(username);
+    await dialog.getByLabel("Password").fill(E2E_PASSWORD);
+    await dialog.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Sign out" }).first()).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await page.goto("/settings");
+    await expect(page.getByLabel("Loading settings")).toBeHidden();
+    await page.getByRole("button", { name: /data & backup/i, exact: true }).click();
+
+    const restored = (id: number, reps: number, lastReview: string) => ({
+      id,
+      name: `Pokemon ${id}`,
+      spriteUrl: `/sprites/pokemon/${id}.png`,
+      cardType: "name",
+      subjectKey: String(id),
+      locale: "en",
+      state: {
+        stability: 10,
+        difficulty: 5,
+        elapsedDays: 1,
+        scheduledDays: 21,
+        reps,
+        lapses: 0,
+        fsrsState: "review",
+        dueDate: "2099-01-01",
+        lastReview,
+        firstSeen: "2025-12-01",
+        learningStep: null,
+        stepStartedAt: null,
+        hiddenSince: null,
+        seenInPasture: false,
+      },
+    });
+    const limits = { maxNewPerDay: 10, maxReviewsPerDay: 100 };
+    const backup = {
+      version: 1,
+      exportedAt: "2026-04-01T00:00:00.000Z",
+      cards: [restored(1, 8, "2026-02-01"), restored(2, 4, "2026-01-15")],
+      limits: { name: limits, evolution: limits, reverse: limits, cry: limits },
+      settings: {
+        masteryRepetitions: 3,
+        maxNewPerDay: 10,
+        maxReviewsPerDay: 100,
+        maxNewEvolutionPerDay: 5,
+        maxReviewsEvolutionPerDay: 50,
+      },
+    };
+
+    let confirmation = "";
+    page.once("dialog", (d) => {
+      confirmation = d.message();
+      void d.accept();
+    });
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      page.getByRole("button", { name: /^import$/i }).click(),
+    ]);
+    await fileChooser.setFiles({
+      name: "poke-memory-backup-2026-04-01.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(backup)),
+    });
+
+    // Bulbasaur reaching reps 8 in the cloud can only come from the restore's push.
+    await expect.poll(() => cloudReps("1"), { timeout: 20_000 }).toBe(8);
+    expect(confirmation).toMatch(/only moves cards forward/);
+    expect(await cloudReps("2")).toBe(9);
+
+    // This device agrees with the cloud after the reload: the older copy did not stick.
+    const localReps = (subjectKey: string) =>
+      page.evaluate(async (key) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const req = indexedDB.open("poke-memory");
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        const raw = await new Promise<unknown>((resolve, reject) => {
+          const req = db.transaction("kv").objectStore("kv").get("poke-memory:review-session:v1");
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        db.close();
+        if (typeof raw !== "string") return null;
+        const session = JSON.parse(raw) as {
+          cards: { cardType: string; subjectKey: string; locale: string; state: { reps: number } }[];
+        };
+        return (
+          session.cards.find(
+            (c) => c.cardType === "name" && c.subjectKey === key && c.locale === "en",
+          )?.state.reps ?? null
+        );
+      }, subjectKey);
+    await expect.poll(() => localReps("1"), { timeout: 20_000 }).toBe(8);
+    await expect.poll(() => localReps("2"), { timeout: 20_000 }).toBe(9);
+
+    await nodeClient.auth.signOut();
+  });
 });
