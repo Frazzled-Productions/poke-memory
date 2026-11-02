@@ -5,9 +5,8 @@
 The route SHALL insert through the service-role client and answer `{ ok: true }`, or 500 `{ ok: false }`
 on an insert error or throw. The `feedback` table SHALL have RLS on and a deny-all SELECT policy, so
 no client reads or writes it. `user_id` is nullable with `ON DELETE CASCADE`. A daily pg_cron job at
-03:00 UTC SHALL delete rows older than 12 months. Deleting a bug-report row, by the purge or the
-cascade, SHALL also delete its Discord notification (see "Bug notifications are deleted with their
-feedback").
+03:00 UTC SHALL delete rows older than 12 months. Either deletion SHALL also delete a bug report's
+Discord notification.
 
 #### Scenario: Account deleted
 
@@ -20,39 +19,6 @@ feedback").
 - **THEN** the route logs it and answers 500 `{ ok: false }`
 
 Source: `app/api/feedback/route.ts:124`, `app/api/feedback/route.ts:137`, `app/api/feedback/route.ts:146`, `db/migrations/034_feedback.sql:17`, `db/migrations/034_feedback.sql:29`, `db/migrations/034_feedback.sql:53`, `db/migrations/040_security_audit.sql:61`, `app/api/feedback/route.test.tsx:351`, `app/api/feedback/route.test.tsx:365`.
-
-### Requirement: Bug notification content (baseline)
-
-The route SHALL post one red embed titled "New bug report" with page, app version, authenticated (Yes or
-"No (guest)"), timestamp, and a Supabase dashboard link built from the row id, never `user_id`. A null
-page or version SHALL show "(not provided)". A failed webhook SHALL answer 502, `webhook_fetch_failed`
-for a network error and `webhook_error` with the status for a non-2xx. Success answers `{ ok: true }`.
-The post SHALL be sent with `wait=true`, keeping any query parameters already on the webhook URL, and
-when a Supabase key is set the route SHALL store the message id Discord returns in
-`feedback_discord_posts` against the feedback id. Failing to store it SHALL be logged and SHALL NOT
-change the answer.
-
-#### Scenario: Guest report
-
-- **WHEN** the trigger payload has `authenticated` false
-- **THEN** the embed shows "No (guest)" and holds no user id
-
-#### Scenario: Discord down
-
-- **WHEN** the webhook answers non-2xx
-- **THEN** the route answers 502 with that status, and the feedback row stays
-
-#### Scenario: Message id stored
-
-- **WHEN** Discord accepts the post and returns a message id
-- **THEN** one `feedback_discord_posts` row holds the feedback id and that message id
-
-#### Scenario: Storing the id fails
-
-- **WHEN** the insert into `feedback_discord_posts` errors, or Discord returns no id
-- **THEN** the route logs it and still answers 200
-
-Source: `app/api/discord/notify/route.ts`, `app/api/discord/notify/route.test.tsx` "posts to the Discord webhook URL with wait=true" and "stores the Discord message id (ops #405)".
 
 ### Requirement: Bug notification message preview (baseline)
 
@@ -74,6 +40,25 @@ by the owner on 2 November 2026) and is deleted with its feedback.
 Source: `app/api/discord/notify/route.ts`, `app/api/discord/notify/route.test.tsx` "message preview (#1848)".
 
 ## ADDED Requirements
+
+### Requirement: The notify route stores the Discord message id
+
+The route SHALL send the bug embed with `wait=true`, keeping any query parameters already on the
+webhook URL, and when a Supabase key is set SHALL store the message id Discord returns in
+`feedback_discord_posts` against the feedback id. Failing to store it SHALL be logged and SHALL NOT
+change the answer.
+
+#### Scenario: Message id stored
+
+- **WHEN** Discord accepts the post and returns a message id
+- **THEN** one `feedback_discord_posts` row holds the feedback id and that message id
+
+#### Scenario: Storing the id fails
+
+- **WHEN** the insert into `feedback_discord_posts` errors, or Discord returns no id
+- **THEN** the route logs it and still answers 200
+
+Source: `app/api/discord/notify/route.ts`, `app/api/discord/notify/route.test.tsx` "posts to the Discord webhook URL with wait=true" and "stores the Discord message id (ops #405)".
 
 ### Requirement: Bug notifications are deleted with their feedback
 
