@@ -108,9 +108,9 @@ export function FsrsOptimizerSection({
         } else if (errorCode === "reviews_unavailable") {
           setErrorMsg("Couldn't load your reviews. Check your connection and try again.");
         } else if (errorCode === "service_unavailable") {
-          setErrorMsg("Couldn't load your settings. Check your connection and try again.");
+          setErrorMsg("Couldn't start the optimiser. Check your connection and try again.");
         } else if (errorCode === "save_failed") {
-          setErrorMsg("Optimisation succeeded but couldn't be saved. Try again.");
+          setErrorMsg("Optimisation succeeded but couldn't be saved. Try again next week.");
         } else if (errorCode === "unknown") {
           // The server returned a structured unknown error - surface the status
           // code so the next opaque failure can be diagnosed from a screenshot.
