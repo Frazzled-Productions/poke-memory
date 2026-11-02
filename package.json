@@ -88,7 +88,7 @@
     "eslint-config-next": "16.4.2",
     "fake-indexeddb": "^6.2.6",
     "jsdom": "^29.1.1",
-    "pg": "^8.23.0",
+    "pg": "^8.23.1",
     "pinyin-pro": "3.29",
     "tailwindcss": "^4",
     "typescript": "^6",
