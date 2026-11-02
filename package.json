@@ -86,7 +86,7 @@
     "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
-    "fake-indexeddb": "^6.2.5",
+    "fake-indexeddb": "^6.2.6",
     "jsdom": "^29.1.1",
     "pg": "^8.23.0",
     "pinyin-pro": "3.29",
