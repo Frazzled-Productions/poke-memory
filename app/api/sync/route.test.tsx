@@ -319,6 +319,99 @@ describe("POST /api/sync", () => {
   });
 
   // -------------------------------------------------------------------------
+  // Per-row fallback after a 23514 batch failure (#2206)
+  // -------------------------------------------------------------------------
+
+  describe("per-row fallback", () => {
+    const REJECTED = { code: "23514", message: "regression" };
+
+    /**
+     * The batch statement fails with 23514, as Postgres aborts the whole
+     * statement for one bad row. Each single-row upsert then gets the outcome
+     * named for its subject_key: an error, a thrown error, or success.
+     */
+    function mockRowOutcomes(outcomes: Record<string, { code: string; message: string } | "throw">) {
+      const { fromMock } = makeSupabaseMock();
+      const upsertMock = vi.fn(async (rows: { subject_key: string } | unknown[]) => {
+        if (Array.isArray(rows)) return { error: REJECTED };
+        const outcome = outcomes[rows.subject_key];
+        if (outcome === "throw") throw new TypeError("fetch failed");
+        return { error: outcome ?? null };
+      });
+      fromMock.mockReturnValue({ upsert: upsertMock });
+      return upsertMock;
+    }
+
+    const cards = (...keys: string[]) => keys.map((subject_key) => makeCard({ subject_key }));
+
+    it("per-row transient failure after 23514 returns 502", async () => {
+      mockRowOutcomes({ "2": REJECTED, "3": { code: "57014", message: "statement timeout" } });
+
+      const res = await POST(makeRequest({ cards: cards("1", "2", "3") }));
+
+      expect(res.status).toBe(502);
+      expect(await res.json()).toEqual({ ok: false, error: "partial_failure" });
+    });
+
+    it("per-row network error after 23514 returns 502", async () => {
+      mockRowOutcomes({ "2": REJECTED, "3": "throw" });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const res = await POST(makeRequest({ cards: cards("1", "2", "3") }));
+
+      expect(res.status).toBe(502);
+      expect(warn).toHaveBeenCalledWith("[sync/route] per-row upsert threw", expect.any(TypeError));
+      warn.mockRestore();
+    });
+
+    it("batch of only 23514 rejections returns 200", async () => {
+      mockRowOutcomes({ "1": REJECTED });
+
+      const res = await POST(makeRequest({ cards: cards("1") }));
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+    });
+
+    it("a rejected row beside good rows returns 200 and tries each row once", async () => {
+      const upsertMock = mockRowOutcomes({ "2": REJECTED });
+
+      const res = await POST(makeRequest({ cards: cards("1", "2", "3") }));
+
+      expect(res.status).toBe(200);
+      expect(upsertMock).toHaveBeenCalledTimes(4); // the batch, then three rows
+    });
+
+    it("per-row structural error returns 409", async () => {
+      mockRowOutcomes({ "2": REJECTED, "3": { code: "23503", message: "fk" } });
+
+      const res = await POST(makeRequest({ cards: cards("1", "2", "3") }));
+
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ ok: false, error: "structural_error", code: "23503" });
+    });
+
+    it("a per-row structural error stops the remaining rows and batches", async () => {
+      const upsertMock = mockRowOutcomes({ "2": { code: "42P10", message: "no constraint" } });
+      const keys = Array.from({ length: 201 }, (_, i) => String(i + 1));
+
+      await POST(makeRequest({ cards: cards(...keys) }));
+
+      expect(upsertMock).toHaveBeenCalledTimes(3); // the batch, then rows 1 and 2
+    });
+
+    it("a per-row transient failure does not stop the next batch", async () => {
+      const upsertMock = mockRowOutcomes({ "1": { code: "57014", message: "statement timeout" } });
+      const keys = Array.from({ length: 201 }, (_, i) => String(i + 1));
+
+      const res = await POST(makeRequest({ cards: cards(...keys) }));
+
+      expect(res.status).toBe(502);
+      expect(upsertMock.mock.calls.at(-1)?.[0]).toMatchObject({ subject_key: "201" });
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // No cache-invalidation side effects
   // -------------------------------------------------------------------------
 
