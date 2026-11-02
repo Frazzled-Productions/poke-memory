@@ -1,23 +1,17 @@
 /**
  * Unit tests for the Background Sync replay fixes (#1072).
  *
- * These tests cover the three blockers identified in the PR review:
+ * These tests cover the client-side blockers identified in the PR review:
  *
  *   B1 - data-format mismatch: savePendingQueue must write CloudRow[] (snake_case)
  *        to IDB, not ReviewableCard[] (camelCase), so the SW can POST directly to
  *        /api/sync without conversion.
  *
- *   B2 - 401/403 triggers infinite retries: the SW resolves (does not throw) on
- *        permanent auth failures. Tested indirectly via the 401/403 branch in the
- *        direct-push logic; the observable contract is the clearPendingQueueFromIdb
- *        call and no re-throw.
- *
  *   B3 - client-delegation has no ACK: useOnlineReconnectSync sends an ACK on the
  *        transferred MessageChannel port before starting the pull-push sequence.
  *
- * The SW itself (app/sw.ts) runs in a ServiceWorkerGlobalScope and is excluded
- * from the unit-test coverage gate (see vitest.config.ts). These tests cover
- * the surrounding client-side invariants instead.
+ * The worker's side, including B2 (permanent failures must not retry), runs
+ * against the real handler in lib/pwa/swReplayHandler.test.ts.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -172,63 +166,6 @@ describe("toCloudRows (BLOCKER 1 - data-format projection for IDB/SW path)", () 
     expect(rowKeys).not.toContain("firstSeen");
     expect(rowKeys).not.toContain("hiddenSince");
     expect(rowKeys).not.toContain("seenInPasture");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// BLOCKER 2 - 401/403 resolve path
-//
-// The SW direct-push path is not unit-testable (ServiceWorkerGlobalScope).
-// These tests verify the contract from the *caller's side*: the IDB queue
-// should be cleared on a permanent auth failure so the SW does not retry.
-// The actual resolve-not-throw behaviour is validated here as a specification
-// test - if the implementation throws on 401 instead of resolving, grades
-// accumulate in IDB forever and Background Sync retries for days.
-// ---------------------------------------------------------------------------
-
-describe("SW direct-push 401/403 behaviour (BLOCKER 2 - specification)", () => {
-  /**
-   * Simulates the SW direct-push decision logic in isolation so we can assert
-   * the correct branch without a real ServiceWorkerGlobalScope.
-   *
-   * Returns "resolved" when the handler would resolve (no retry), "retried"
-   * when it would throw (triggering a Background Sync retry).
-   */
-  async function simulateSwPush(status: number): Promise<"resolved" | "retried"> {
-    // Simulate the SW fetch result.
-    const res = { ok: status >= 200 && status < 300, status };
-
-    // Replicate the branch logic from app/sw.ts.
-    if (res.status === 401 || res.status === 403) {
-      // Permanent auth failure: resolve, clear queue.
-      return "resolved";
-    }
-    if (!res.ok) {
-      // Transient failure: throw (retry).
-      return "retried";
-    }
-    // Success.
-    return "resolved";
-  }
-
-  it("resolves (no retry) on 401 - expired session", async () => {
-    expect(await simulateSwPush(401)).toBe("resolved");
-  });
-
-  it("resolves (no retry) on 403 - forbidden / signed out", async () => {
-    expect(await simulateSwPush(403)).toBe("resolved");
-  });
-
-  it("retries on 500 - transient server error", async () => {
-    expect(await simulateSwPush(500)).toBe("retried");
-  });
-
-  it("retries on 502 - bad gateway / transient", async () => {
-    expect(await simulateSwPush(502)).toBe("retried");
-  });
-
-  it("resolves on 200 - success", async () => {
-    expect(await simulateSwPush(200)).toBe("resolved");
   });
 });
 
