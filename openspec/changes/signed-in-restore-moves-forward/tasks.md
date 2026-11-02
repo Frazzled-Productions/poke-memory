@@ -5,9 +5,10 @@
 - [x] 1.3 Settings wiring and three catalogue keys in every locale. Verify: "SettingsPage - backup restore (#2218)" in `app/settings/page.test.tsx`, `npm run lint`.
 - [x] 1.4 `docs/sync.md` and a `fixed` changelog fragment. Verify: `npm run lint`.
 - [x] 1.5 Real sign-in case in `e2e/auth-real.spec.ts`: a real browser, session and RLS against the QA project. Verify: `e2e-real-auth` green on this PR. The case was not run red, because that job needs the QA secrets and a build; its cloud assertion can only pass through the restore's push.
+- [x] 1.6 Unit tests for `pullLastResetAt` in `lib/sync/settings.test.ts`, closing the diff-coverage gap (`lib/sync/settings.ts` 0 / 12). Verify: `vitest run lib/sync/settings.test.ts`, exit 0, 48 passed; with coverage on, lines 205 to 216 no longer uncovered (settings.ts 100% functions, 100% branches).
 
 ## 2. Before merge
 
-- [ ] 2.1 Fraser settles the open calls in proposal.md. Verify: Clarifications holds his dated answers.
-- [ ] 2.2 Translation check of the three new strings in ja, zh-Hans and zh-Hant. Verify: reviewer named in the PR.
+- [x] 2.1 Fraser settles the open calls in proposal.md. Verify: Clarifications holds his dated answers. Done: "Ruling 2026-11-02 (Fraser)" on PR #2228, move forward only, as built, copied into proposal.md.
+- [x] 2.2 Translation check of the three new strings in ja, zh-Hans and zh-Hant. Verify: reviewer named in the PR. Done 3 November 2026 by Claude, under Fraser's standing poke-memory directive (2026-10-26) to check translations: the ja, zh-Hans and zh-Hant strings say the same as en, use the catalogue's existing words for restore and reset, and need no change.
 - [ ] 2.3 `/opsx:verify signed-in-restore-moves-forward`, `blast-radius` again and `final-review`. Verify: findings fixed or listed in the PR.

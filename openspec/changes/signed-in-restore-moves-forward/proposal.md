@@ -11,7 +11,7 @@ Fixes: #2218
 
 ## What Changes
 
-This builds the **recommended** answer to the open call in Clarifications. It is not a decision.
+This builds the answer Fraser chose on 2 November 2026 (see Clarifications): cards only move forward.
 
 - A signed-in restore only moves cards forward. A backup card is used when it is further on than both
   the cloud and this device; otherwise the further-on copy stays. Nothing in the cloud goes down.
@@ -95,7 +95,13 @@ code beside it.
 
 ## Clarifications
 
-Nothing here has been put to Fraser yet. Each line is an open call with a recommendation.
+Fraser ruled on 2 November 2026 ("Ruling 2026-11-02 (Fraser)" on PR #2228): move forward only, as
+built; close the coverage gap in `lib/sync/settings.ts`, then four reviewers at a real build. "As
+built" settles every call below on its recommendation. The original calls follow, with that answer.
+
+- 2026-11-02 Answer (Fraser): move forward only, as built. Settings stay as they are, a backup does
+  not undo a reset, another account's backup is accepted for now, the stand-in client proof is
+  accepted, and the guest dialog is left for its own change. The translation check runs before merge.
 
 - 2026-11-02 Should a signed-in restore replace the cloud, or only local data? Recommended: neither as worded. Cards only move forward, as built here, so the restore recovers lost progress and can never lower the account. Replacing the cloud needs a new `SECURITY DEFINER` bypass, a migration on both Supabase projects and an irreversible write across every device, with point-in-time recovery still deferred (#298); `docs/sync.md` warns against both. Local only is today's behaviour, which strands the card (see design.md).
 - 2026-11-02 Should settings restore too? Recommended: no. A patch lowering a guarded field is refused whole (seen against migration 038), which would quietly stop this device's settings syncing. Restoring only unguarded settings is possible, but it needs a second mirror of a trigger.
