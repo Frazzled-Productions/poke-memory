@@ -6,5 +6,5 @@
 
 ## 2. Before merge
 
-- [ ] 2.1 Fraser settles the open calls in proposal.md. Verify: Clarifications holds his dated answers.
-- [ ] 2.2 `/opsx:verify clear-grade-queue-on-reset`, `blast-radius` again and `final-review`. Verify: findings fixed or listed in the PR.
+- [x] 2.1 Fraser settles the open calls in proposal.md. Verify: Clarifications holds his dated answers. Done: "Ruling 2026-11-02 (Fraser)" on #2211 took all five recommended answers; each is recorded, dated, in proposal.md.
+- [x] 2.2 `/opsx:verify clear-grade-queue-on-reset`, `blast-radius` again and `final-review`. Verify: findings fixed or listed in the PR. Done 2026-11-03 on `qa`: verify found no critical issue (two scenarios without their own test, accepted by Fraser); blast-radius rung 4 (new line commented out: `reset.test.ts` exit 1, 3 failed, 5 passed; restored: exit 0, 8 passed); four reviewers found no blocker, two proposal wording fixes applied and one Clarification added, listed in the build PR.
