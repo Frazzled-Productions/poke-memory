@@ -46,6 +46,7 @@ jobs:
               - '!.claude/agents/**'
               - '!openspec/**'
               - 'changelog.d/unreleased/**'
+              - '.claude/skills/**'
             e2e_relevant:
               - 'app/**'
               - 'components/**'

@@ -37,9 +37,8 @@ Each `openspec-*` skill SHALL be a folder under `.claude/skills/` holding `SKILL
 Each project skill SHALL live at `.claude/skills/<name>/SKILL.md`, where `<name>` is the slash name
 the docs use. `investigate-ci-failure` SHALL live at
 `.claude/skills/investigate-ci-failure/SKILL.md` with its body, `name` and `description` unchanged,
-and SHALL load as `/investigate-ci-failure`. Its `allowed-tools` line SHALL be unchanged unless the
-owner chooses to narrow it (open call in the proposal), in which case it SHALL list only the
-narrowed tools.
+and SHALL load as `/investigate-ci-failure`. Its `allowed-tools` line SHALL list only
+`Bash(gh *)`, `Bash(git *)`, `Bash(npx playwright *)`, `Bash(npm run *)`, `Read`, `Grep` and `Glob`.
 
 #### Scenario: The CI investigation skill loads
 
@@ -54,7 +53,7 @@ narrowed tools.
 #### Scenario: Content kept
 
 - **WHEN** the moved `SKILL.md` is compared with the old flat file
-- **THEN** `git diff -M` shows a rename whose only changed line, if any, is `allowed-tools`
+- **THEN** `git diff -M` shows a rename whose only changed line is `allowed-tools`
 
 #### Scenario: Playwright pin still checked at the new path
 

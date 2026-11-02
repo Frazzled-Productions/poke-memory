@@ -18,5 +18,4 @@ jobs:
     uses: Frazzled-Productions/.github/.github/workflows/openspec-overlap.yml@v1
     with:
       runs-on: '"ubuntu-latest"'
-      install-openspec: true
       base-branch: qa
