@@ -80,6 +80,7 @@ import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 import { loadSession } from "@/lib/review/persistence";
 import type { SyncStatus } from "@/lib/sync/persistence";
 import { usePerGradeSync } from "@/lib/sync/usePerGradeSync";
+import { USER_ARCHIVE_RESTORED_EVENT } from "@/lib/storage/userArchive";
 import { useRetryPush } from "@/lib/sync/useRetryPush";
 import { useOnlineReconnectSync } from "@/lib/sync/useOnlineReconnectSync";
 import type { ReviewableCard } from "@/lib/review/session";
@@ -673,6 +674,27 @@ describe("usePerGradeSync - mount rehydration from persisted queue (F2 / #1856)"
     // Both the orphan (77) and the new card (88) should have been pushed.
     const pushed = vi.mocked(pushSingleCard).mock.calls.map(([, , c]) => (c as ReviewableCard).id);
     expect(pushed).toContain(77);
+    expect(pushed).toContain(88);
+  });
+
+  it("takes up a queue restored after mount, so the next grade cannot replace it (#2208)", async () => {
+    // Username sign-in lands on the practice page: this hook seeds in the same
+    // commit that starts guardAccountSwitch, before the restore has landed.
+    vi.mocked(loadPendingQueue).mockReturnValue([]);
+    vi.mocked(pushSingleCard).mockResolvedValue("ok");
+    const { result } = renderHook(() => usePerGradeSync(FAKE_CLIENT, FAKE_USER));
+
+    vi.mocked(loadPendingQueue).mockReturnValue([makeCard(77)]);
+    await act(async () => {
+      window.dispatchEvent(new Event(USER_ARCHIVE_RESTORED_EVENT));
+      result.current.enqueueGrade(makeCard(88));
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const pushed = vi.mocked(pushSingleCard).mock.calls.map(([, , c]) => (c as ReviewableCard).id);
+    expect(pushed, "the restored grade reaches the cloud").toContain(77);
     expect(pushed).toContain(88);
   });
 

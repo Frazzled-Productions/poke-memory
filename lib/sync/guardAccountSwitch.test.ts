@@ -7,10 +7,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ArchiveResult } from "@/lib/storage/userArchive";
 
 // ─── Mock userArchive ─────────────────────────────────────────────────────────
 
-const mockArchive = vi.fn((_userId: string): Promise<void> => Promise.resolve());
+const mockArchive = vi.fn(
+  (_userId: string): Promise<ArchiveResult> => Promise.resolve({ saved: true }),
+);
+const mockSaveUnpushed = vi.fn((_userId: string, _blob: unknown): void => {});
 const mockRestore = vi.fn((_userId: string): Promise<void> => Promise.resolve());
 const mockClearIdb = vi.fn((): Promise<void> => Promise.resolve());
 const mockClearIdbUserData = vi.fn((): Promise<void> => Promise.resolve());
@@ -18,6 +22,7 @@ const mockClearIdbUserData = vi.fn((): Promise<void> => Promise.resolve());
 vi.mock("@/lib/storage/userArchive", () => ({
   archiveUserData: (...args: [string]) => mockArchive(...args),
   restoreUserData: (...args: [string]) => mockRestore(...args),
+  saveUnpushedArchive: (...args: [string, unknown]) => mockSaveUnpushed(...args),
   clearIdbPendingQueue: () => mockClearIdb(),
   clearIdbUserData: () => mockClearIdbUserData(),
 }));
@@ -71,6 +76,7 @@ beforeEach(() => {
   vi.stubGlobal("localStorage", storage);
 
   mockArchive.mockClear();
+  mockSaveUnpushed.mockClear();
   mockRestore.mockClear();
   mockClearIdb.mockClear();
   mockClearIdbUserData.mockClear();
@@ -134,7 +140,10 @@ describe("same-user path (ownerUserId === incomingUserId)", () => {
 describe("switch path (ownerUserId !== incomingUserId)", () => {
   it("calls archive(outgoing), clearIdb, clearIdbUserData, restore(incoming) in order", async () => {
     const callOrder: string[] = [];
-    mockArchive.mockImplementation(async () => { callOrder.push("archive"); });
+    mockArchive.mockImplementationOnce(async () => {
+      callOrder.push("archive");
+      return { saved: true };
+    });
     mockClearIdb.mockImplementation(async () => { callOrder.push("clearIdb"); });
     mockClearIdbUserData.mockImplementation(async () => { callOrder.push("clearIdbUserData"); });
     mockRestore.mockImplementation(async () => { callOrder.push("restore"); });
@@ -235,28 +244,82 @@ describe("switch path (ownerUserId !== incomingUserId)", () => {
     expect(after.lastSettingsPullAt).toBe("2026-04-15T07:00:00.000Z");
   });
 
-  it("continues gracefully if archiveUserData throws (cloud is intact)", async () => {
-    mockArchive.mockRejectedValueOnce(new Error("quota exceeded"));
+  it("still wipes and restores when the archive fails", async () => {
+    mockArchive.mockResolvedValueOnce({ saved: false, unpushed: null });
 
     saveSyncStatus({ ...ZERO_STATUS, ownerUserId: "user-A" });
 
-    // Must not throw even if archive fails.
     await expect(guardAccountSwitch("user-B")).resolves.toBeUndefined();
 
-    // Clear and restore still ran.
+    // The outgoing user's data must not stay for the incoming user (#1850).
     expect(mockRestore).toHaveBeenCalledWith("user-B");
     expect(mockClearIdb).toHaveBeenCalled();
     expect(mockClearIdbUserData).toHaveBeenCalled();
+    expect(mockSaveUnpushed).not.toHaveBeenCalled();
   });
 
   it("writes SyncStatus.ownerUserId = incomingUserId even after archive failure", async () => {
-    mockArchive.mockRejectedValueOnce(new Error("quota exceeded"));
+    mockArchive.mockResolvedValueOnce({ saved: false, unpushed: null });
     saveSyncStatus({ ...ZERO_STATUS, ownerUserId: "user-A" });
 
     await guardAccountSwitch("user-B");
 
     const after = loadSyncStatus();
     expect(after.ownerUserId).toBe("user-B");
+  });
+
+  it("saves the unpushed grades under the outgoing user, after the wipe has freed space", async () => {
+    const unpushed = { v: 1 as const, ls: { queue: "[1]" }, idb: {} };
+    mockArchive.mockResolvedValueOnce({ saved: false, unpushed });
+    storage.setItem(KEY_STREAK, "[]");
+    saveSyncStatus({ ...ZERO_STATUS, ownerUserId: "user-A" });
+    let streakAtSave: string | null = "not called";
+    mockSaveUnpushed.mockImplementationOnce(() => {
+      streakAtSave = storage.getItem(KEY_STREAK);
+    });
+
+    await guardAccountSwitch("user-B");
+
+    expect(mockSaveUnpushed).toHaveBeenCalledWith("user-A", expect.objectContaining({
+      ls: expect.objectContaining({ queue: "[1]" }) as unknown,
+    }));
+    expect(streakAtSave).toBeNull();
+  });
+
+  it("saves null cursors and the last seen reset with the unpushed grades", async () => {
+    mockArchive.mockResolvedValueOnce({ saved: false, unpushed: { v: 1, ls: {}, idb: {} } });
+    saveSyncStatus({
+      ...ZERO_STATUS,
+      ownerUserId: "user-A",
+      lastPullAt: "2026-04-15T08:00:00.000Z",
+      lastSettingsPullAt: "2026-04-15T07:00:00.000Z",
+      lastSeenResetAt: "2026-03-01T00:00:00.000Z",
+      lastPushFailed: true,
+    });
+
+    await guardAccountSwitch("user-B");
+
+    const blob = mockSaveUnpushed.mock.calls[0]?.[1] as { ls: Record<string, string> };
+    const status = JSON.parse(blob.ls[KEY_SYNC_STATUS] ?? "{}") as SyncStatus;
+    expect(status.ownerUserId).toBe("user-A");
+    expect(status.lastPullAt).toBeNull();
+    expect(status.lastSettingsPullAt).toBeNull();
+    // Without this, pullAndMerge sees the old reset as new and wipes the queue.
+    expect(status.lastSeenResetAt).toBe("2026-03-01T00:00:00.000Z");
+    // The reconnect push only runs when this is set.
+    expect(status.lastPushFailed).toBe(true);
+  });
+
+  it("saves the unpushed grades before restoring the incoming user", async () => {
+    const order: string[] = [];
+    mockArchive.mockResolvedValueOnce({ saved: false, unpushed: { v: 1, ls: {}, idb: {} } });
+    mockSaveUnpushed.mockImplementationOnce(() => { order.push("save"); });
+    mockRestore.mockImplementationOnce(() => { order.push("restore"); return Promise.resolve(); });
+    saveSyncStatus({ ...ZERO_STATUS, ownerUserId: "user-A" });
+
+    await guardAccountSwitch("user-B");
+
+    expect(order).toEqual(["save", "restore"]);
   });
 
   it("preserves device-level keys (superuser) across a switch", async () => {

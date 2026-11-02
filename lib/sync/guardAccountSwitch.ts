@@ -14,7 +14,8 @@
  *                                       No-op; merge proceeds as before.
  *
  *   ownerUserId !== incomingUserId    → different user.  Archive outgoing user's
- *                                       full local state, wipe all per-user LS
+ *                                       full local state (only their unpushed
+ *                                       grades if that fails), wipe all per-user LS
  *                                       keys (incl. settings:*) AND the
  *                                       IDB-primary review session + grade log,
  *                                       restore incoming user's archive if
@@ -36,12 +37,14 @@ import {
 import {
   archiveUserData,
   restoreUserData,
+  saveUnpushedArchive,
   clearIdbPendingQueue,
   clearIdbUserData,
 } from "@/lib/storage/userArchive";
 import {
   KEY_SETTINGS,
   KEY_SETTINGS_LAST_PUSHED,
+  KEY_SYNC_STATUS,
 } from "@/lib/storage/keys";
 
 /** Zero SyncStatus cursors for a freshly-switched user. */
@@ -117,11 +120,10 @@ export async function guardAccountSwitch(incomingUserId: string): Promise<void> 
   if (ownerUserId === incomingUserId) return;
 
   // Different user: archive → clear → restore → fresh SyncStatus.
-  try {
-    await archiveUserData(ownerUserId);
-  } catch (e) {
-    console.warn("[guardAccountSwitch] archive failed (continuing with wipe):", e);
-  }
+  // A failed archive does not stop the wipe: whatever stays would reach the
+  // incoming user (#1850), and their session cannot push the outgoing user's
+  // grades. Those grades are saved below instead.
+  const archive = await archiveUserData(ownerUserId);
 
   // Clear the IDB pending-grade queue BEFORE wiping localStorage. A Background
   // Sync event fired in the await gap between wipeUserLocalStorage (which removes
@@ -150,6 +152,18 @@ export async function guardAccountSwitch(incomingUserId: string): Promise<void> 
     }
   } catch {
     // Best-effort.
+  }
+
+  // The wipe has freed the space, and the blob stays keyed to the outgoing user.
+  // Null cursors make their return rebuild the session from the cloud, while
+  // lastSeenResetAt stops pullAndMerge treating an old reset as new and wiping
+  // the restored queue.
+  if (!archive.saved && archive.unpushed) {
+    const status = { ...syncStatus, lastPullAt: null, lastSettingsPullAt: null };
+    saveUnpushedArchive(ownerUserId, {
+      ...archive.unpushed,
+      ls: { ...archive.unpushed.ls, [KEY_SYNC_STATUS]: JSON.stringify(status) },
+    });
   }
 
   // Restore incoming user's archive (no-op if no archive exists).

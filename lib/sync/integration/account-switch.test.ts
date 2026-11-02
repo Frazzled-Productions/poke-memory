@@ -244,6 +244,82 @@ describe("account-switch isolation", () => {
     vi.unstubAllGlobals();
   }, 15_000);
 
+  it("archive quota failure with non-empty pending queue does not discard the queue", async () => {
+    if (SKIP) return;
+
+    // localStorage with a real limit, IndexedDB backed by a map.
+    const QUOTA_CHARS = 5_000;
+    const storage = makeMockStorage();
+    const setItem = storage.setItem;
+    storage.setItem = (key: string, value: string) => {
+      if (value.length > QUOTA_CHARS) throw new DOMException("quota", "QuotaExceededError");
+      setItem(key, value);
+    };
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
+    vi.stubGlobal("localStorage", storage);
+    vi.stubGlobal("StorageEvent", class {
+      key: string | null;
+      constructor(_: string, init: { key?: string } = {}) {
+        this.key = init.key ?? null;
+      }
+    });
+    const db = await import("@/lib/idb/db");
+    const idb = new Map<string, string>();
+    vi.mocked(db.idbGet).mockImplementation((key) => Promise.resolve(idb.get(key) ?? null));
+    vi.mocked(db.idbSet).mockImplementation((key, val) => { idb.set(key, val); return Promise.resolve(); });
+    vi.mocked(db.idbDelete).mockImplementation((key) => { idb.delete(key); return Promise.resolve(); });
+
+    const { guardAccountSwitch } = await import("../guardAccountSwitch");
+    const { loadSyncStatus, saveSyncStatus, loadPendingQueue } = await import("../persistence");
+    const { KEY_GRADE_LOG, KEY_PENDING_GRADE_QUEUE, KEY_REVIEW_SESSION, userArchiveKey } =
+      await import("@/lib/storage/keys");
+
+    // A has a grade log too big for one localStorage value, and one unpushed grade.
+    const queued = [{ id: 1, cardType: "name", subjectKey: "a-1", locale: "ja", state: { reps: 2 } }];
+    const cloudRows = JSON.stringify([{ subject_key: "a-1" }]);
+    idb.set(KEY_GRADE_LOG, "x".repeat(QUOTA_CHARS * 2));
+    idb.set(KEY_REVIEW_SESSION, '{"cards":[]}');
+    idb.set(KEY_PENDING_GRADE_QUEUE, cloudRows);
+    storage.setItem(KEY_PENDING_GRADE_QUEUE, JSON.stringify(queued));
+    saveSyncStatus({
+      lastPushAt: null,
+      lastPushFailed: true,
+      lastPushAttemptAt: null,
+      failedCardCount: 1,
+      lastPullAt: "2026-05-20T10:00:00.000Z",
+      lastSettingsPullAt: null,
+      lastSeenResetAt: "2026-03-01T00:00:00.000Z",
+      structuralSyncError: null,
+      ownerUserId: USER_A_ID,
+    });
+
+    await guardAccountSwitch(USER_B_ID);
+
+    // Nothing of A's reaches B: not in either queue copy, and not as a session.
+    expect(loadSyncStatus().ownerUserId).toBe(USER_B_ID);
+    expect(loadPendingQueue(), "A's queue must not be pushable as B").toEqual([]);
+    expect(idb.has(KEY_PENDING_GRADE_QUEUE), "service worker must not replay A's rows").toBe(false);
+    expect(idb.has(KEY_REVIEW_SESSION)).toBe(false);
+    expect(storage.getItem(userArchiveKey(USER_A_ID)), "A's grades are kept for A").not.toBeNull();
+
+    await guardAccountSwitch(USER_A_ID);
+
+    // A is back with the queue, and with null cursors so the pull rebuilds the
+    // session from the cloud rather than assuming it is already local.
+    expect(loadPendingQueue()).toEqual(queued);
+    expect(idb.get(KEY_PENDING_GRADE_QUEUE)).toBe(cloudRows);
+    expect(loadSyncStatus().ownerUserId).toBe(USER_A_ID);
+    expect(loadSyncStatus().lastPullAt).toBeNull();
+    expect(loadSyncStatus().lastSeenResetAt, "an old reset must not wipe the queue").toBe(
+      "2026-03-01T00:00:00.000Z",
+    );
+
+    vi.mocked(db.idbGet).mockResolvedValue(null);
+    vi.mocked(db.idbSet).mockResolvedValue(undefined);
+    vi.mocked(db.idbDelete).mockResolvedValue(undefined);
+    vi.unstubAllGlobals();
+  }, 15_000);
+
   it("AC6: no cross-contamination - after guardAccountSwitch + pullAndMerge simulation, local state contains only B's cards", async () => {
     if (SKIP) return;
 

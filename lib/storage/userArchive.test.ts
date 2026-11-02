@@ -41,6 +41,8 @@ let storage: ReturnType<typeof makeMockStorage>;
 import {
   archiveUserData,
   restoreUserData,
+  saveUnpushedArchive,
+  USER_ARCHIVE_RESTORED_EVENT,
   clearIdbPendingQueue,
   clearIdbUserData,
 } from "./userArchive";
@@ -86,7 +88,7 @@ beforeEach(() => {
 describe("archiveUserData", () => {
   it("is a no-op when window is undefined (SSR)", async () => {
     vi.unstubAllGlobals();
-    await expect(archiveUserData(USER_A)).resolves.toBeUndefined();
+    await expect(archiveUserData(USER_A)).resolves.toEqual({ saved: true });
   });
 
   it("writes a blob under the user-archive key when LS has data", async () => {
@@ -164,11 +166,83 @@ describe("archiveUserData", () => {
     expect(Object.keys(blob.idb)).toHaveLength(0);
   });
 
-  it("swallows quota errors (non-fatal)", async () => {
-    // Simulate setItem throwing a QuotaExceededError.
+  it("reports success when the blob is written", async () => {
+    storage.setItem(KEY_STREAK, "[]");
+
+    await expect(archiveUserData(USER_A)).resolves.toEqual({ saved: true });
+  });
+
+  it("reports failure, without throwing, on a quota error", async () => {
     storage.setItem = (_key: string, _val: string) => { throw new Error("QuotaExceededError"); };
 
-    await expect(archiveUserData(USER_A)).resolves.toBeUndefined();
+    await expect(archiveUserData(USER_A)).resolves.toEqual({ saved: false, unpushed: null });
+  });
+
+  it("does not claim the cloud is intact when the archive fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    storage.setItem(KEY_PENDING_GRADE_QUEUE, '[{"id":1}]');
+    storage.setItem = (_key: string, _val: string) => { throw new Error("QuotaExceededError"); };
+
+    await archiveUserData(USER_A);
+
+    expect(String(warn.mock.calls[0]?.[0])).not.toContain("cloud intact");
+    warn.mockRestore();
+  });
+
+  it("hands back the queue and held grades, and nothing else, when the archive fails", async () => {
+    const heldKey = `${KEY_HELD_GRADE_PREFIX}tab-1`;
+    storage.setItem(KEY_PENDING_GRADE_QUEUE, '[{"id":1}]');
+    storage.setItem(heldKey, '{"userId":"user-aaa-111"}');
+    storage.setItem(KEY_STREAK, "[]");
+    storage.setItem(KEY_SYNC_STATUS, "{}");
+    mockIdbGet.mockImplementation((key: string) =>
+      Promise.resolve(key === KEY_PENDING_GRADE_QUEUE ? '[{"subject_key":"1"}]' : "large"),
+    );
+    storage.setItem = (_key: string, _val: string) => { throw new Error("QuotaExceededError"); };
+
+    await expect(archiveUserData(USER_A)).resolves.toEqual({
+      saved: false,
+      unpushed: {
+        v: 1,
+        ls: { [KEY_PENDING_GRADE_QUEUE]: '[{"id":1}]', [heldKey]: '{"userId":"user-aaa-111"}' },
+        idb: { [KEY_PENDING_GRADE_QUEUE]: '[{"subject_key":"1"}]' },
+      },
+    });
+  });
+
+  it("hands back nothing when the queue is an empty list", async () => {
+    storage.setItem(KEY_PENDING_GRADE_QUEUE, "[]");
+    mockIdbGet.mockImplementation((key: string) =>
+      Promise.resolve(key === KEY_PENDING_GRADE_QUEUE ? "[]" : "large"),
+    );
+    storage.setItem = (_key: string, _val: string) => { throw new Error("QuotaExceededError"); };
+
+    await expect(archiveUserData(USER_A)).resolves.toEqual({ saved: false, unpushed: null });
+  });
+});
+
+// ─── saveUnpushedArchive ──────────────────────────────────────────────────────
+
+describe("saveUnpushedArchive", () => {
+  const blob = { v: 1 as const, ls: { [KEY_PENDING_GRADE_QUEUE]: '[{"id":1}]' }, idb: {} };
+
+  it("writes a blob that restoreUserData can read back", async () => {
+    saveUnpushedArchive(USER_A, blob);
+    storage.removeItem(KEY_PENDING_GRADE_QUEUE);
+
+    await restoreUserData(USER_A);
+
+    expect(storage.getItem(KEY_PENDING_GRADE_QUEUE)).toBe('[{"id":1}]');
+  });
+
+  it("logs an error, without throwing, when even this write fails", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    storage.setItem = (_key: string, _val: string) => { throw new Error("QuotaExceededError"); };
+
+    expect(() => saveUnpushedArchive(USER_A, blob)).not.toThrow();
+
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
   });
 });
 
@@ -231,6 +305,43 @@ describe("restoreUserData", () => {
     expect(storage.getItem(userArchiveKey(USER_B))).toBeNull();
   });
 
+  it("partial restore keeps the archive blob", async () => {
+    const blob = { v: 1, ls: { [KEY_STREAK]: "[]", [KEY_SETTINGS]: "{}" }, idb: {} };
+    storage.setItem(userArchiveKey(USER_B), JSON.stringify(blob));
+    const setItem = storage.setItem;
+    storage.setItem = (key: string, val: string) => {
+      if (key === KEY_SETTINGS) throw new Error("QuotaExceededError");
+      setItem(key, val);
+    };
+
+    await restoreUserData(USER_B);
+
+    // The other key is still restored, and the blob stays for a later retry.
+    expect(storage.getItem(KEY_STREAK)).toBe("[]");
+    expect(storage.getItem(userArchiveKey(USER_B))).not.toBeNull();
+  });
+
+  it("keeps the archive blob when an IDB value does not read back", async () => {
+    const blob = { v: 1, ls: {}, idb: { [KEY_GRADE_LOG]: '[{"grade":4}]' } };
+    storage.setItem(userArchiveKey(USER_B), JSON.stringify(blob));
+    // idbSet swallows its own failures, so only a read-back can see one.
+    mockIdbGet.mockResolvedValue(null);
+
+    await restoreUserData(USER_B);
+
+    expect(storage.getItem(userArchiveKey(USER_B))).not.toBeNull();
+  });
+
+  it("removes the archive blob once every IDB value reads back", async () => {
+    const blob = { v: 1, ls: {}, idb: { [KEY_GRADE_LOG]: '[{"grade":4}]' } };
+    storage.setItem(userArchiveKey(USER_B), JSON.stringify(blob));
+    mockIdbGet.mockResolvedValue('[{"grade":4}]');
+
+    await restoreUserData(USER_B);
+
+    expect(storage.getItem(userArchiveKey(USER_B))).toBeNull();
+  });
+
   it("dispatches StorageEvents for KEY_REVIEW_SESSION and KEY_GRADE_LOG after restore", async () => {
     const dispatchEvent = vi.fn();
     vi.stubGlobal("window", { localStorage: storage, dispatchEvent });
@@ -243,6 +354,8 @@ describe("restoreUserData", () => {
     const keys = dispatchEvent.mock.calls.map((c) => (c[0] as { key: string | null }).key);
     expect(keys).toContain(KEY_REVIEW_SESSION);
     expect(keys).toContain(KEY_GRADE_LOG);
+    const types = dispatchEvent.mock.calls.map((c) => (c[0] as { type: string }).type);
+    expect(types).toContain(USER_ARCHIVE_RESTORED_EVENT);
   });
 
   it("ignores a malformed archive blob (non-fatal)", async () => {

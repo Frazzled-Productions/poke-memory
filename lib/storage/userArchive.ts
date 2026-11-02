@@ -73,7 +73,14 @@ const IDB_ARCHIVE_KEYS = [
 
 const MT_BANNER_PREFIX = "poke-memory:mt-banner-dismissed";
 
-type ArchiveBlob = {
+/**
+ * Fired after `restoreUserData` writes an archive back. `usePerGradeSync` may
+ * already be mounted by then (a username sign-in lands on the practice page),
+ * and it has to pick up the restored queue before its next write replaces it.
+ */
+export const USER_ARCHIVE_RESTORED_EVENT = "poke-memory:user-archive-restored";
+
+export type ArchiveBlob = {
   /** Version tag - increment if the shape changes to allow forward-compat guards. */
   v: 1;
   ls: Record<string, string>;
@@ -81,15 +88,49 @@ type ArchiveBlob = {
 };
 
 /**
+ * Outcome of `archiveUserData`. On failure, `unpushed` holds what exists only
+ * on this device (null when there is none), for `saveUnpushedArchive` to store
+ * once the wipe has freed space.
+ */
+export type ArchiveResult =
+  | { saved: true }
+  | { saved: false; unpushed: ArchiveBlob | null };
+
+/** Whether a stored queue value holds at least one grade. */
+function hasGrades(value: string | undefined): value is string {
+  return value !== undefined && value !== "[]";
+}
+
+/**
+ * The grades in a blob that were on their way to the cloud: the pending-grade
+ * queue and the held grades. Null when there are none. Everything else is left
+ * to the user's next pull, so whatever the cloud lacks is lost (#2214).
+ */
+function pickUnpushed(blob: ArchiveBlob): ArchiveBlob | null {
+  const ls: Record<string, string> = {};
+  const idb: Record<string, string> = {};
+  const lsQueue = blob.ls[KEY_PENDING_GRADE_QUEUE];
+  const idbQueue = blob.idb[KEY_PENDING_GRADE_QUEUE];
+  if (hasGrades(lsQueue)) ls[KEY_PENDING_GRADE_QUEUE] = lsQueue;
+  if (hasGrades(idbQueue)) idb[KEY_PENDING_GRADE_QUEUE] = idbQueue;
+  for (const [key, val] of Object.entries(blob.ls)) {
+    if (key.startsWith(KEY_HELD_GRADE_PREFIX)) ls[key] = val;
+  }
+  if (Object.keys(ls).length === 0 && Object.keys(idb).length === 0) return null;
+  return { v: 1, ls, idb };
+}
+
+/**
  * Snapshot the current user's full local state into a single JSON blob stored
  * under `poke-memory:user-archive:<userId>`.
  *
- * Best-effort: a localStorage quota error is caught and logged; the cloud copy
- * is intact so data is not lost.
+ * Never throws. A heavy user's blob can pass the localStorage quota, in which
+ * case the result says so and carries the grades the cloud does not have.
  */
-export async function archiveUserData(userId: string): Promise<void> {
-  if (typeof window === "undefined") return;
+export async function archiveUserData(userId: string): Promise<ArchiveResult> {
+  if (typeof window === "undefined") return { saved: true };
 
+  let blob: ArchiveBlob | null = null;
   try {
     const ls = window.localStorage;
     const lsData: Record<string, string> = {};
@@ -123,11 +164,27 @@ export async function archiveUserData(userId: string): Promise<void> {
       if (val !== null) idbData[key] = val;
     }
 
-    const blob: ArchiveBlob = { v: 1, ls: lsData, idb: idbData };
+    blob = { v: 1, ls: lsData, idb: idbData };
     ls.setItem(userArchiveKey(userId), JSON.stringify(blob));
+    return { saved: true };
   } catch (e) {
-    // Quota-full or Safari ITP. Cloud is intact; log and continue.
-    console.warn("[userArchive] archiveUserData failed (non-fatal, cloud intact):", e);
+    // Quota-full or Safari ITP. Grades not yet pushed are NOT in the cloud.
+    console.warn("[userArchive] archiveUserData failed, keeping unpushed grades only:", e);
+    return { saved: false, unpushed: blob === null ? null : pickUnpushed(blob) };
+  }
+}
+
+/**
+ * Stores the grades `archiveUserData` could not, as a smaller blob in the same
+ * format, so `restoreUserData` needs no second path.
+ *
+ * Call after the outgoing user's keys are wiped, so their space is free.
+ */
+export function saveUnpushedArchive(userId: string, blob: ArchiveBlob): void {
+  try {
+    window.localStorage.setItem(userArchiveKey(userId), JSON.stringify(blob));
+  } catch (e) {
+    console.error("[userArchive] unpushed grades could not be saved and are lost:", e);
   }
 }
 
@@ -137,6 +194,9 @@ export async function archiveUserData(userId: string): Promise<void> {
  * If no archive exists for the user, this is a no-op - the local storage will
  * be clean (just cleared by the switch guard) and `pullAndMerge` will populate
  * it from cloud.
+ *
+ * The blob is removed only after every key is restored; a partial restore
+ * keeps it, so nothing in it is lost.
  *
  * After restore, dispatches synthetic StorageEvents for KEY_REVIEW_SESSION and
  * KEY_GRADE_LOG so same-tab subscribers (Stats / Pasture / NavLinks) react to
@@ -162,27 +222,35 @@ export async function restoreUserData(userId: string): Promise<void> {
     }
     const blob = parsed as ArchiveBlob;
 
+    let complete = true;
+
     // Restore LS keys.
     for (const [key, val] of Object.entries(blob.ls)) {
       try {
         ls.setItem(key, val);
       } catch {
         // Quota - skip this key but keep restoring others.
+        complete = false;
       }
     }
 
-    // Restore IDB keys in parallel.
+    // Restore IDB keys in parallel. idbSet swallows its failures, so read back.
     await Promise.all(
-      Object.entries(blob.idb).map(([key, val]) => idbSet(key, val)),
+      Object.entries(blob.idb).map(async ([key, val]) => {
+        await idbSet(key, val);
+        if ((await idbGet(key)) !== val) complete = false;
+      }),
     );
 
     // Remove the archive blob itself (now consumed).
-    ls.removeItem(archiveKey);
+    if (complete) ls.removeItem(archiveKey);
+    else console.warn("[userArchive] restoreUserData was partial, keeping the archive");
 
     // Notify same-tab subscribers of the restored data.
     try {
       window.dispatchEvent(new StorageEvent("storage", { key: KEY_REVIEW_SESSION }));
       window.dispatchEvent(new StorageEvent("storage", { key: KEY_GRADE_LOG }));
+      window.dispatchEvent(new Event(USER_ARCHIVE_RESTORED_EVENT));
     } catch {
       // Older browsers / non-standard envs.
     }
