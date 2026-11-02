@@ -104,6 +104,9 @@ export async function applySeedScenario(payload: SeedPayload, slug?: string): Pr
   if (payload.streakProtection !== undefined) {
     settingsPatch.streakProtection = payload.streakProtection;
   }
+  if (payload.favourite !== undefined) {
+    Object.assign(settingsPatch, payload.favourite);
+  }
   if (payload.labsFlags !== undefined) {
     // Merge the scenario's labs flags into the existing labs flags so that
     // unrelated flags (e.g. flags the user already had on) are preserved.

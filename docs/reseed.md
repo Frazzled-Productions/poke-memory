@@ -30,6 +30,8 @@ Steps run in this order:
 5. `generate:scope-lookup` - regenerates `lib/pokemon/scopeLookup.ts` from `generated.json`. Required to avoid `scope-lookup-drift.yml` CI failures.
 6. `generate:pseudo-locale` - regenerates `messages/xx-pseudo.json` from `messages/en.json`. Required to avoid `pseudo-locale-drift.yml` / `lint:pseudo-locale` CI failures.
 
+After a reseed that adds species, also raise `MAX_SPECIES_ID` in `lib/pokemon/seed-constants.ts` and run `npm run seed:palettes` (theme palettes from the sprites, uses `sharp`; #2187), then commit `lib/theme/generated-palettes.json`. `lib/pokemon/seed.test.ts` and `lib/theme/generated-palettes.test.ts` fail until both are done.
+
 `seed:locale-names` is subsumed by a full `seed`; keep it for a locale-only patch when PokéAPI only corrected names.
 
 ## Reviewing the diff

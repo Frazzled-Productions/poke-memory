@@ -237,3 +237,50 @@ describe("ScopeControl - matchCount summary in Traditional Chinese locale", () =
     expect(screen.getByText(/\d[\d,]*\s*隻中有\s*\d[\d,]*\s*隻符合/)).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Favourites preset (#2187)
+// ---------------------------------------------------------------------------
+
+describe("ScopeControl - Favourites preset (#2187)", () => {
+  const FAVOURITES = { en: "Favourites", ja: "お気に入り", "zh-Hans": "最爱", "zh-Hant": "最愛" } as const;
+
+  for (const locale of Object.keys(FAVOURITES) as (keyof typeof FAVOURITES)[]) {
+    it(`Japanese interface and others: the label comes from the catalogue (${locale})`, async () => {
+      const user = userEvent.setup();
+      renderWithIntl(
+        <ScopeControl scope={EMPTY_SCOPE} onChange={vi.fn()} heartedSpeciesIds={new Set([25, 94])} />,
+        { locale },
+      );
+      await user.click(screen.getByRole("button", { name: SCOPE_LABEL_PATTERN[locale] }));
+      expect(screen.getByRole("button", { name: FAVOURITES[locale] })).toBeInTheDocument();
+    });
+  }
+
+  it("Practise your hearts: selecting Favourites adds the preset, and the count is the hearts", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = renderWithIntl(
+      <ScopeControl scope={EMPTY_SCOPE} onChange={onChange} heartedSpeciesIds={new Set([25, 94])} />,
+    );
+    await user.click(screen.getByRole("button", { name: /scope/i }));
+    await user.click(screen.getByRole("button", { name: "Favourites" }));
+    expect(onChange).toHaveBeenCalledWith({ ...EMPTY_SCOPE, presets: ["favourites"] });
+    rerender(
+      <ScopeControl
+        scope={{ ...EMPTY_SCOPE, presets: ["favourites"] }}
+        onChange={onChange}
+        heartedSpeciesIds={new Set([25, 94])}
+      />,
+    );
+    expect(screen.getByText(/^2 of [\d,]+ Pokémon match$/)).toBeInTheDocument();
+  });
+
+  it("Un-heart everything: with no hearts the preset is hidden", async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<ScopeControl scope={EMPTY_SCOPE} onChange={vi.fn()} heartedSpeciesIds={new Set()} />);
+    await user.click(screen.getByRole("button", { name: /scope/i }));
+    expect(screen.queryByRole("button", { name: "Favourites" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Starters" })).toBeInTheDocument();
+  });
+});

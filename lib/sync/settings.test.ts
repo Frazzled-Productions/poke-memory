@@ -108,6 +108,11 @@ const SAMPLE: UserSettings = {
   dismissedMtBannerLocales: [],
   removedLocales: [],
   streakNudgeEnabled: false,
+  favouritePokemonId: null,
+  heartedSpeciesIds: [],
+  priorityNewSpeciesIds: [],
+  favouriteThemeOfferedForId: null,
+  learnFirstAskedSpeciesIds: [],
 };
 
 describe("pushSettings", () => {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toRoman, type Milestone } from "@/lib/journey/milestones";
 import { generateMilestoneShareImage } from "@/lib/share/generateShareImage";
+import { useSharePartner } from "@/components/favourite/useSharePartner";
 
 // ---------------------------------------------------------------------------
 // Milestone string rendering
@@ -99,6 +100,7 @@ export function MilestoneShareButton({ milestone }: Props) {
   const t = useTranslations("journey.milestoneShare");
   const [status, setStatus] = useState<"idle" | "copied" | "error">("idle");
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const partner = useSharePartner();
 
   // Clear any pending timeout on unmount to avoid state updates after unmount.
   useEffect(() => {
@@ -135,7 +137,7 @@ export function MilestoneShareButton({ milestone }: Props) {
     setStatus("idle");
 
     // Try to render the image card first.
-    const blob = await generateMilestoneShareImage({ heroNumber, heroLabel }).catch(() => null);
+    const blob = await generateMilestoneShareImage({ heroNumber, heroLabel }, partner).catch(() => null);
     const file =
       blob !== null
         ? new File([blob], "poke-memory.png", { type: "image/png" })

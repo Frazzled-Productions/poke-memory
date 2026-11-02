@@ -28,6 +28,7 @@ import { initialReviewState, nextReview } from "@/lib/srs/scheduler";
 import type { StreakProtection } from "@/lib/streak/tokens";
 import type { AppLocale } from "@/i18n/locales";
 import type { LabsFlags } from "@/lib/labs/flags";
+import type { UserSettings } from "@/lib/settings/persistence";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-constants";
 import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
@@ -132,6 +133,11 @@ export type SeedPayload = {
    * manually enable them in Settings > Labs. Omit to leave untouched.
    */
   labsFlags?: Partial<LabsFlags>;
+  /**
+   * The favourite, hearts and colours-offer marker to write into settings
+   * (#2187). Omit to leave them untouched.
+   */
+  favourite?: Pick<UserSettings, "favouritePokemonId" | "heartedSpeciesIds" | "favouriteThemeOfferedForId">;
 };
 
 export type Scenario = {
@@ -831,6 +837,36 @@ function buildMasteryGaps(): SeedPayload {
   };
 }
 
+/**
+ * `favourite-unmastered` (#2187)
+ *
+ * The `pasture-progression` cards with Gengar (94) as the favourite and
+ * hearted, never introduced. Shows the silhouette partner on Journey, Share
+ * today and the all-done screen, the Favourites scope preset, and no Pasture
+ * spot or colours offer.
+ */
+function buildFavouriteUnmastered(): SeedPayload {
+  return {
+    ...buildPastureProgression(),
+    favourite: { favouritePokemonId: 94, heartedSpeciesIds: [94, 25, 133], favouriteThemeOfferedForId: null },
+  };
+}
+
+/**
+ * `favourite-mastered` (#2187)
+ *
+ * The `pasture-progression` cards with Pikachu (25, mastered in en) as the
+ * favourite and hearted, and the colours offer not yet made. Shows the full
+ * partner sprite, its Pasture spot, Match my favourite and the one-time
+ * "Switch to Pikachu's colours?" offer.
+ */
+function buildFavouriteMastered(): SeedPayload {
+  return {
+    ...buildPastureProgression(),
+    favourite: { favouritePokemonId: 25, heartedSpeciesIds: [25, 1, 4], favouriteThemeOfferedForId: null },
+  };
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
 export const SCENARIOS: Scenario[] = [
@@ -868,6 +904,22 @@ export const SCENARIOS: Scenario[] = [
       "Visit Pasture to verify the Next arrivals strip, and Journey to verify Close to mastery. " +
       "Switch to Japanese to see 0 mastered, confirming per-locale FSRS storage.",
     build: buildMasteryGaps,
+  },
+  {
+    slug: "favourite-unmastered",
+    label: "Favourite set, not mastered",
+    description:
+      "Pasture progression cards with Gengar as the favourite (not yet learned) and three hearts. " +
+      "Visit Journey for the silhouette partner, the Pokédex for the heart badges, and Practice for the Favourites scope.",
+    build: buildFavouriteUnmastered,
+  },
+  {
+    slug: "favourite-mastered",
+    label: "Favourite mastered",
+    description:
+      "Pasture progression cards with Pikachu (mastered) as the favourite and three hearts. " +
+      "Visit Pasture for its highlighted spot, Settings for Match my favourite and the one-time colours offer.",
+    build: buildFavouriteMastered,
   },
 ];
 

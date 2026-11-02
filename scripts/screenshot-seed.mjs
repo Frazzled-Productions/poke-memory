@@ -432,6 +432,14 @@ export function buildScreenshotSeed() {
     },
     gradeLog: buildGradeLog(),
     streakDates: buildStreakDates(),
+    // A mastered favourite (#2187) so Journey shows the partner, the Pokédex
+    // its hearts and Pasture its highlighted spot. The colours offer is
+    // marked answered so it does not appear in the screenshots.
+    favourite: {
+      favouritePokemonId: 4,
+      heartedSpeciesIds: [4, 1, 7],
+      favouriteThemeOfferedForId: 4,
+    },
     // Per-locale mastered-count cache (en only; other locales 0). Warms the
     // ProfileStatusBar mastery on non-Practice surfaces.
     masteredCountByLocale: {

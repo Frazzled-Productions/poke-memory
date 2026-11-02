@@ -197,11 +197,13 @@ export default function BiomeLandscapePage({
   );
 
   // Build placements exactly as the main Pasture page does.
-  const assignments = assignAnchors(biomeCards, zone);
+  // The favourite's highlighted spot (#2187), as on the main Pasture page.
+  const assignments = assignAnchors(biomeCards, zone, loadSettings().favouritePokemonId);
   const placements: Placement[] = assignments.map((a) => ({
     card: a.card as NameReviewCard,
     subRegion: a.subRegion,
     anchor: a.anchor,
+    favourite: a.favourite,
   }));
 
   const isEmpty = biomeCards.length === 0;

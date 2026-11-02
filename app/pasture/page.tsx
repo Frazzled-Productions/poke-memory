@@ -59,6 +59,7 @@ function buildZoneData(
   visibleCards: NameReviewCard[],
   allMasteredCards: NameReviewCard[],
   forceAllMastered: boolean,
+  favouriteId: number | null,
 ): ZoneData[] {
   const byHabitat = new Map<string, NameReviewCard[]>();
 
@@ -78,12 +79,13 @@ function buildZoneData(
     const cards = byHabitat.get(zone.habitat);
     if (!cards || cards.length === 0) continue;
 
-    const assignments = assignAnchors(cards, zone);
+    const assignments = assignAnchors(cards, zone, favouriteId);
     const placements: Placement[] = assignments.map((a) => ({
       // assignAnchors accepts ReviewableCard but we only pass NameReviewCards
       card: a.card as NameReviewCard,
       subRegion: a.subRegion,
       anchor: a.anchor,
+      favourite: a.favourite,
     }));
 
     result.push({
@@ -221,7 +223,9 @@ export default function PasturePage() {
   // Re-read settings on settingsVersion bump so a locale change re-derives
   // the filtered pasture immediately.
   void settingsVersion;
-  const { pokemonNameLocale } = loadSettings();
+  // The favourite gets a highlighted spot once it is mastered (#2187): it is
+  // only in masteredCards then (or under pretendAllMastered).
+  const { pokemonNameLocale, favouritePokemonId } = loadSettings();
 
   // Derive mastered count so the reset-on-empty effect below can read it
   // without duplicating the full derivation logic.
@@ -356,6 +360,7 @@ export default function PasturePage() {
     visibleCards,
     masteredCards,
     flags.pretendAllMastered,
+    favouritePokemonId,
   );
 
   const filtered = isFiltered(filters);

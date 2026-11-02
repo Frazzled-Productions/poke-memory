@@ -632,6 +632,13 @@ export function buildSessionQueues(
    * and test is unaffected.
    */
   activeLocale: AppLocale = "en",
+  /**
+   * Species to introduce first, in order (`UserSettings.priorityNewSpeciesIds`,
+   * #2187). Their new-card candidates go to the front of each direction's list
+   * before the cut to budget, and the admitted ones are served before other
+   * new cards. Caps, eligibility and scope are unchanged. Defaults to none.
+   */
+  priorityNewSpeciesIds: readonly number[] = [],
 ): {
   learningCardIds: number[];
   /** Subset of `learningCardIds` whose cards fall outside the active scope.
@@ -647,6 +654,24 @@ export function buildSessionQueues(
   // Convenience wrapper that binds the per-user salt so every shuffle call
   // inside this function automatically gets the same (today, userSalt) pair.
   const shuffle = (ids: readonly number[]) => stableShuffleForDay(ids, today, userSalt);
+
+  // Priority species (#2187): rank of each listed species, and helpers that
+  // reorder a list of new-card ids without changing which ids it holds.
+  const priorityRank = new Map<number, number>(priorityNewSpeciesIds.map((id, i) => [id, i]));
+  const cardSpecies = new Map<number, number>(
+    priorityRank.size === 0 ? [] : cards.map((c) => [c.id, newCardSpeciesId(c)]),
+  );
+  const rankOf = (cardId: number) =>
+    priorityRank.get(cardSpecies.get(cardId) ?? -1) ?? Number.POSITIVE_INFINITY;
+  // Before the cut: priority candidates first, in list order (stable for the rest).
+  const priorityFirst = (ids: number[]) =>
+    priorityRank.size === 0 ? ids : [...ids].sort((a, b) => rankOf(a) - rankOf(b));
+  // After the final reshuffle: admitted priority cards ahead, order kept.
+  const priorityAhead = (ids: number[]) =>
+    priorityRank.size === 0
+      ? ids
+      : [...ids.filter((id) => rankOf(id) !== Number.POSITIVE_INFINITY),
+         ...ids.filter((id) => rankOf(id) === Number.POSITIVE_INFINITY)];
 
   const learningCardIds = cards
     .filter((c) => c.state.learningStep !== null && (c.locale ?? "en") === activeLocale)
@@ -765,9 +790,9 @@ export function buildSessionQueues(
   // every present direction still has budget remaining.  Budgets are consumed
   // atomically per species: either all directions of a species are admitted, or
   // none are.
-  const nameCandidates    = shuffle(newCandidatesByType.name).slice(0,    remainingNew.name);
-  const reverseCandidates = shuffle(newCandidatesByType.reverse).slice(0, remainingNew.reverse);
-  const cryCandidates     = shuffle(newCandidatesByType.cry).slice(0,     remainingNew.cry);
+  const nameCandidates    = priorityFirst(shuffle(newCandidatesByType.name)).slice(0,    remainingNew.name);
+  const reverseCandidates = priorityFirst(shuffle(newCandidatesByType.reverse)).slice(0, remainingNew.reverse);
+  const cryCandidates     = priorityFirst(shuffle(newCandidatesByType.cry)).slice(0,     remainingNew.cry);
 
   const speciesGroups = groupNewCandidatesBySpecies(
     { name: nameCandidates, reverse: reverseCandidates, cry: cryCandidates },
@@ -842,14 +867,14 @@ export function buildSessionQueues(
   }
 
   // --- Pass 2: evolution cards (unchanged) ---
-  const evolutionSlice = shuffle(newCandidatesByType.evolution).slice(0, remainingNew.evolution);
+  const evolutionSlice = priorityFirst(shuffle(newCandidatesByType.evolution)).slice(0, remainingNew.evolution);
 
   const newQueue: number[] = [...speciesNewIds, ...evolutionSlice];
 
   // Reshuffle the merged new-card queue so species pairs and evolution cards
   // interleave deterministically rather than appearing in contiguous blocks.
   const shuffledReviewQueue = shuffle(reviewQueue);
-  const shuffledNewQueue = shuffle(newQueue);
+  const shuffledNewQueue = priorityAhead(shuffle(newQueue));
 
   const newIntroducedToday =
     perType.name.newIntroducedToday +
@@ -871,6 +896,46 @@ export function buildSessionQueues(
     reviewsDoneToday,
     perType,
   };
+}
+
+/**
+ * The species a card introduces (#2187): its own id for a name card, its
+ * `pokemonId` for reverse and cry cards, and the pre-evolution for evolution
+ * and reverse-evolution cards (the same anchor the scope matcher uses).
+ */
+function newCardSpeciesId(card: ReviewableCard): number {
+  switch (card.cardType) {
+    case "name": return card.id;
+    case "reverse":
+    case "cry": return card.pokemonId;
+    case "evolution":
+    case "reverse-evolution": return card.preEvoId;
+  }
+}
+
+/**
+ * `priorityNewSpeciesIds` without the species that are fully introduced
+ * (#2187): every enabled-direction card anchored on it in the active locale
+ * has a `firstSeen`. Returns the same array when nothing changed, so callers
+ * can skip the save.
+ */
+export function removeIntroducedPrioritySpecies(
+  priorityNewSpeciesIds: readonly number[],
+  cards: readonly ReviewableCard[],
+  activeLocale: AppLocale,
+  opts: CardTypeOpts,
+): readonly number[] {
+  if (priorityNewSpeciesIds.length === 0) return priorityNewSpeciesIds;
+  const typeOpts: CardTypeOpts = { reverseEnabled: true, ...opts };
+  const stillNew = new Set<number>();
+  for (const card of cards) {
+    if ((card.locale ?? "en") !== activeLocale) continue;
+    if (card.state.firstSeen !== null) continue;
+    if (!cardTypeIsEnabled(card, typeOpts)) continue;
+    stillNew.add(newCardSpeciesId(card));
+  }
+  const kept = priorityNewSpeciesIds.filter((id) => stillNew.has(id));
+  return kept.length === priorityNewSpeciesIds.length ? priorityNewSpeciesIds : kept;
 }
 
 // Note: the component checks its in-memory learning queue before calling this.

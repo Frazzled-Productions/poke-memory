@@ -57,6 +57,41 @@ export function preserveDeviceLocalKeys(
   return result;
 }
 
+// Settings keys added by #2187. A cloud blob written before they existed lacks
+// them, and spreading it over DEFAULT_SETTINGS would wipe this device's values.
+const FAVOURITE_KEYS = [
+  "favouritePokemonId",
+  "heartedSpeciesIds",
+  "priorityNewSpeciesIds",
+  "favouriteThemeOfferedForId",
+  "learnFirstAskedSpeciesIds",
+] as const satisfies ReadonlyArray<keyof UserSettings>;
+
+/**
+ * For each favourite key the pulled `cloud` blob lacks, keeps the device's
+ * pre-pull value in `merged`. When neither side has a favourite, the key is
+ * left out so loadSettings' carry-over takes the favourite from the theme.
+ * `lastPushed` is `merged` as pulled, so a key the cloud lacks holds its
+ * default there: the next diff pushes the device's non-default values up and
+ * never pushes a default (an explicit [] or null in the cloud would then win
+ * over another device's unsynced values).
+ */
+export function keepDeviceFavouriteKeys(
+  merged: UserSettings,
+  cloud: object,
+  local: UserSettings,
+): { settings: UserSettings; lastPushed: UserSettings } {
+  const settings: Record<string, unknown> = { ...merged };
+  for (const key of FAVOURITE_KEYS) {
+    if (key in cloud) continue;
+    settings[key] = local[key];
+  }
+  if (!("favouritePokemonId" in cloud) && local.favouritePokemonId === null) {
+    delete settings.favouritePokemonId;
+  }
+  return { settings: settings as UserSettings, lastPushed: merged };
+}
+
 /**
  * Shallow top-level key diff. Two reasons we stop at the top level:
  *   1. `merge_user_settings`'s `||` JSONB overlay merges at the same depth,

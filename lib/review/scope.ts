@@ -15,10 +15,12 @@ import {
   EMPTY_SCOPE,
   isScopeEmpty,
   parseFormCategoryFilter,
+  PRESET_IDS,
+  isPresetId,
+  type PracticeScopePreset,
 } from "@/lib/eligibility/scopeConstants";
-export { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter };
-
-export type PracticeScopePreset = "starters" | "legendaries" | "incomplete-chains" | "mastery-blockers";
+export { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter, PRESET_IDS, isPresetId };
+export type { PracticeScopePreset };
 
 /**
  * Runtime context the scope matcher needs for presets that depend on the
@@ -46,6 +48,12 @@ export type ScopeMatchContext = {
    * no-op until the UI PR wires the computation.
    */
   masteryBlockingSpeciesIds?: ReadonlySet<number>;
+  /**
+   * The player's hearted species (`UserSettings.heartedSpeciesIds`, #2187),
+   * read at match time so hearting or un-hearting changes the `favourites`
+   * preset without editing the scope. A missing set matches nothing.
+   */
+  heartedSpeciesIds?: ReadonlySet<number>;
 };
 
 /**
@@ -194,6 +202,11 @@ function speciesMatchesScope(
   if (
     scope.presets.includes("mastery-blockers") &&
     (context.masteryBlockingSpeciesIds?.has(speciesId) ?? false)
+  )
+    return true;
+  if (
+    scope.presets.includes("favourites") &&
+    (context.heartedSpeciesIds?.has(speciesId) ?? false)
   )
     return true;
   if (gamesActive) {
@@ -545,10 +558,7 @@ function parseScopeShape(value: unknown): PracticeScope | null {
     ? (obj.types as unknown[]).filter((v): v is string => typeof v === "string")
     : [];
   const presets = Array.isArray(obj.presets)
-    ? (obj.presets as unknown[]).filter(
-        (v): v is PracticeScopePreset =>
-          v === "starters" || v === "legendaries" || v === "incomplete-chains" || v === "mastery-blockers",
-      )
+    ? (obj.presets as unknown[]).filter(isPresetId)
     : [];
   // formCategories: absent in pre-#450 persisted scopes → default to {mode:'all'}.
   const formCategories: FormCategoryFilter = parseFormCategoryFilter(obj.formCategories);
@@ -623,6 +633,16 @@ const ROMAN_NUMERALS: Record<number, string> = {
   6: "VI", 7: "VII", 8: "VIII", 9: "IX",
 };
 
+// English chip labels, one per preset id (the Record type makes a new preset
+// fail to compile until it has a label).
+const PRESET_LABELS: Record<PracticeScopePreset, string> = {
+  starters: "Starters",
+  legendaries: "Legendaries",
+  "incomplete-chains": "Incomplete chains",
+  "mastery-blockers": "Almost mastered",
+  favourites: "Favourites",
+};
+
 /** Human label for the chip / aria-label, e.g. "Gen I · Fire · Starters". */
 export function scopeLabel(scope: PracticeScope): string {
   if (isScopeEmpty(scope)) return "All Pokémon";
@@ -635,10 +655,9 @@ export function scopeLabel(scope: PracticeScope): string {
       scope.types.map((t) => t[0].toUpperCase() + t.slice(1)).join(", "),
     );
   }
-  if (scope.presets.includes("starters")) parts.push("Starters");
-  if (scope.presets.includes("legendaries")) parts.push("Legendaries");
-  if (scope.presets.includes("incomplete-chains")) parts.push("Incomplete chains");
-  if (scope.presets.includes("mastery-blockers")) parts.push("Almost mastered");
+  for (const preset of PRESET_IDS) {
+    if (scope.presets.includes(preset)) parts.push(PRESET_LABELS[preset]);
+  }
   const fc = scope.formCategories ?? { mode: "all" };
   if (fc.mode === "default-only") parts.push("Default forms only");
   else if (fc.mode === "include" && fc.categories.length > 0) {

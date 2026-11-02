@@ -6,7 +6,7 @@
  * previously uninstrumented and failing the diff-coverage gate.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderWithIntl, screen, waitFor } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
@@ -88,8 +88,13 @@ vi.mock("@/lib/pasture/arrivals", () => ({
   isMastered: vi.fn(() => false),
 }));
 
+const { mockZones, realZone } = vi.hoisted(() => ({
+  mockZones: [] as unknown[],
+  // When true the PastureZone stub renders the real component (#2187).
+  realZone: { value: false },
+}));
 vi.mock("@/lib/pasture/zones", () => ({
-  HABITAT_ZONES: [],
+  HABITAT_ZONES: mockZones,
 }));
 
 vi.mock("@/lib/pasture/assign", () => ({
@@ -148,9 +153,17 @@ vi.mock("@/lib/srs/scheduler", () => ({
 }));
 
 // Stub heavy child components.
-vi.mock("@/components/pasture/PastureZone", () => ({
-  PastureZone: () => <div data-testid="pasture-zone" />,
+// The real PastureZone's idle animation needs layout APIs jsdom lacks.
+vi.mock("@/components/pasture/useIdleBehaviour", () => ({
+  useIdleBehaviour: () => undefined,
 }));
+vi.mock("@/components/pasture/PastureZone", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/pasture/PastureZone")>();
+  return {
+    PastureZone: (props: Parameters<typeof actual.PastureZone>[0]) =>
+      realZone.value ? <actual.PastureZone {...props} /> : <div data-testid="pasture-zone" />,
+  };
+});
 
 vi.mock("@/components/pasture/PastureSearchBar", () => ({
   PastureSearchBar: ({
@@ -175,6 +188,7 @@ import { useLocalStorageKey } from "@/lib/hooks/useLocalStorageKey";
 import { hydrateSession } from "@/lib/review/session";
 import type { ReviewableCard } from "@/lib/review/session";
 import { filterMastered } from "@/lib/pasture/arrivals";
+import { assignAnchors } from "@/lib/pasture/assign";
 import { saveSession } from "@/lib/review/persistence";
 import { loadSettings } from "@/lib/settings/persistence";
 
@@ -664,5 +678,36 @@ describe("PasturePage - long-press hint locale coverage (#1572)", () => {
         screen.getByText(/長按任意寶可夢/),
       ).toBeInTheDocument();
     });
+  });
+});
+
+describe("PasturePage - the favourite's spot (#2187)", () => {
+  afterEach(() => {
+    realZone.value = false;
+    mockZones.length = 0;
+    vi.mocked(assignAnchors).mockImplementation(() => []);
+    vi.mocked(filterMastered).mockImplementation(() => []);
+  });
+
+  it("a mastered favourite renders in its labelled spot", async () => {
+    const zones = await vi.importActual<typeof import("@/lib/pasture/zones")>("@/lib/pasture/zones");
+    const assign = await vi.importActual<typeof import("@/lib/pasture/assign")>("@/lib/pasture/assign");
+    realZone.value = true;
+    mockZones.push(zones.HABITAT_ZONES.find((z) => z.habitat === "forest"));
+    vi.mocked(assignAnchors).mockImplementation(assign.assignAnchors);
+    vi.mocked(loadSettings).mockReturnValue({
+      ...loadSettings(),
+      favouritePokemonId: 25,
+    } as ReturnType<typeof loadSettings>);
+    mockLoadSession.mockResolvedValue({ cards: [RAW_SAVED_NAME_CARD, RAW_SAVED_REVERSE_CARD] });
+    vi.mocked(hydrateSession).mockReturnValue({
+      cards: [HYDRATED_NAME_CARD, HYDRATED_REVERSE_CARD] as unknown as ReviewableCard[],
+      anyHealed: false,
+    });
+    vi.mocked(filterMastered).mockImplementation(() => [HYDRATED_NAME_CARD] as ReturnType<typeof filterMastered>);
+
+    renderWithIntl(<PasturePage />);
+
+    expect(await screen.findByRole("img", { name: "Pikachu, your favourite" })).toBeInTheDocument();
   });
 });

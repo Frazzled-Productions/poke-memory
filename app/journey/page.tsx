@@ -22,6 +22,7 @@ import { MilestoneShareButton } from "@/components/journey/MilestoneShareButton"
 import { deriveEvolutionFamilies, type EvolutionFamily } from "@/lib/evolution/chains";
 import type { ReviewableCard } from "@/lib/review/session";
 import { TrainerCard } from "@/components/stats/TrainerCard";
+import { usePartner } from "@/components/favourite/usePartner";
 import { BadgeGallery } from "@/components/badges/BadgeGallery";
 import { TypeBreakdown } from "@/components/stats/TypeBreakdown";
 import { RecordsCard } from "@/components/stats/RecordsCard";
@@ -398,6 +399,7 @@ export default function JourneyPage() {
   const t = useTranslations("journey");
   const { user, supabase } = useAuth();
   const { flags, anyFlagOn } = useSuperuser();
+  const partner = usePartner();
   const { seed } = useSeed();
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
   const [cards, setCards] = useState<Awaited<ReturnType<typeof buildSession>> | null>(null);
@@ -653,6 +655,7 @@ export default function JourneyPage() {
                 totalMastered={masterySnapshot.mastered}
                 perGeneration={masterySnapshot.perGeneration}
                 earnedBadges={badgesToShow}
+                partner={partner}
               />
 
               {/* Guest sign-up value-prop nudge - shown to guests with real progress,

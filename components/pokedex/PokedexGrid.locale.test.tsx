@@ -273,3 +273,37 @@ describe("PokedexGrid - masteryCount label locale coverage (#1393)", () => {
     expect(screen.getByText(/0 \/ 1 習得済み/)).toBeInTheDocument();
   });
 });
+
+// ─── Heart badge (#2187) ─────────────────────────────────────────────────────
+
+describe("PokedexGrid - heart badge (#2187)", () => {
+  const SNORLAX = makeCell({ id: 143, name: "Snorlax", cardClass: "mastered" });
+  const BADGE: Record<string, string> = {
+    en: "Hearted",
+    ja: "ハートつき",
+    "zh-Hans": "已点亮爱心",
+    "zh-Hant": "已點亮愛心",
+  };
+
+  for (const locale of ["en", "ja", "zh-Hans", "zh-Hant"] as const) {
+    it(`Heart and un-heart: a hearted species shows a heart, others do not (${locale})`, async () => {
+      const { saveSettings, DEFAULT_SETTINGS } = await import("@/lib/settings/persistence");
+      saveSettings({ ...DEFAULT_SETTINGS, heartedSpeciesIds: [143] });
+      renderWithIntl(<PokedexGrid pokemon={[BULBASAUR, SNORLAX]} />, { locale });
+      const badges = await screen.findAllByRole("img", { name: BADGE[locale] });
+      expect(badges).toHaveLength(1);
+      expect(badges[0].closest("a")).toHaveAttribute("href", "/pokedex/143");
+      window.localStorage.clear();
+    });
+  }
+
+  it("the favourite always shows a heart", async () => {
+    const { saveSettings, DEFAULT_SETTINGS } = await import("@/lib/settings/persistence");
+    saveSettings({ ...DEFAULT_SETTINGS, favouritePokemonId: 1, heartedSpeciesIds: [] });
+    renderWithIntl(<PokedexGrid pokemon={[BULBASAUR, SNORLAX]} />);
+    const badges = await screen.findAllByRole("img", { name: "Hearted" });
+    expect(badges).toHaveLength(1);
+    expect(badges[0].closest("a")).toHaveAttribute("href", "/pokedex/1");
+    window.localStorage.clear();
+  });
+});

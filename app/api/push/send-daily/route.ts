@@ -9,7 +9,8 @@ import { isCardEligible } from "@/lib/eligibility";
 import { scopeMatchesEntry, resolveAnchorId } from "@/lib/eligibility/scopePredicate";
 import { SCOPE_LOOKUP } from "@/lib/pokemon/scopeLookup";
 import type { PracticeScope } from "@/lib/review/scope";
-import { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter } from "@/lib/eligibility/scopeConstants";
+import { EMPTY_SCOPE, isScopeEmpty, isPresetId, parseFormCategoryFilter } from "@/lib/eligibility/scopeConstants";
+import { parseSpeciesIdList } from "@/lib/favourite/favourite";
 import { shouldSendToUser, PUSH_DEFAULT_HOUR_UTC } from "@/lib/push/notificationHour";
 import {
   SUPPORTED_LOCALES,
@@ -272,6 +273,8 @@ type UserEligibility = {
    * Any invalid element is silently dropped.
    */
   learningLocales: AppLocale[];
+  /** Hearted species, for the `favourites` scope preset (#2187). */
+  heartedSpeciesIds: ReadonlySet<number>;
 };
 
 /** DEFAULT_SETTINGS-aligned fallbacks, used when a JSONB field is missing or invalid. */
@@ -288,6 +291,7 @@ const DEFAULT_ELIGIBILITY: UserEligibility = {
   // Pre-#1484 users have no `learningLocales` JSONB key; default to ["en"]
   // which matches migration 029's backfill of locale = 'en' for all legacy rows.
   learningLocales: ["en"],
+  heartedSpeciesIds: new Set(),
 };
 
 /**
@@ -324,14 +328,13 @@ function parsePracticeScope(raw: unknown): PracticeScope {
     }
   }
 
-  const VALID_PRESETS = new Set(["starters", "legendaries", "incomplete-chains"]);
   const presets: PracticeScope["presets"] = [];
   if (Array.isArray(obj.presets)) {
     const seen = new Set<string>();
     for (const p of obj.presets) {
-      if (typeof p !== "string" || !VALID_PRESETS.has(p) || seen.has(p)) continue;
+      if (!isPresetId(p) || seen.has(p)) continue;
       seen.add(p);
-      presets.push(p as PracticeScope["presets"][number]);
+      presets.push(p);
     }
   }
 
@@ -409,6 +412,7 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
     maxNewCryPerDay:       numField("maxNewCryPerDay",       DEFAULT_ELIGIBILITY.maxNewCryPerDay),
     practiceScope: parsePracticeScope(s.practiceScope),
     learningLocales,
+    heartedSpeciesIds: new Set(parseSpeciesIdList(s.heartedSpeciesIds)),
   };
 }
 
@@ -471,7 +475,7 @@ function rowIsEligible(
     return true;
   }
 
-  return scopeMatchesEntry(entry, scope);
+  return scopeMatchesEntry(entry, scope, eligibility.heartedSpeciesIds);
 }
 
 /**

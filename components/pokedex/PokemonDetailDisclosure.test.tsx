@@ -115,17 +115,23 @@ vi.mock("@/lib/stats/legStatus", async (importOriginal) => ({
 
 // loadSettings (#1948) - fixed dateFormat/timezone so the first-reviewed date
 // assertions are deterministic regardless of the CI machine's locale/tz.
+// The rest of the settings are the defaults, for the favourite controls (#2187).
 const { mockLoadSettings } = vi.hoisted(() => ({
   mockLoadSettings: vi.fn(() => ({
     dateFormat: "dmy" as const,
     timezone: "UTC",
   })),
 }));
-vi.mock("@/lib/settings/persistence", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/settings/persistence")>()),
-  loadSettings: (() =>
-    mockLoadSettings()) as typeof import("@/lib/settings/persistence").loadSettings,
-}));
+vi.mock("@/lib/settings/persistence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/settings/persistence")>();
+  return {
+    ...actual,
+    loadSettings: (() => ({
+      ...actual.DEFAULT_SETTINGS,
+      ...mockLoadSettings(),
+    })) as typeof import("@/lib/settings/persistence").loadSettings,
+  };
+});
 
 // useSpeciesMasteryDate (#1956) - default to null so existing tests (which
 // predate the derived mastery date) are unaffected; the dedicated describe
@@ -1101,5 +1107,54 @@ describe("PokemonDetailDisclosure - approximate mastery date (#1956)", () => {
     expect(
       screen.getByText(`約 ${EXPECTED_MONTH} 掌握`),
     ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests - favourite controls use species-level mastery (#2187)
+// ---------------------------------------------------------------------------
+
+describe("PokemonDetailDisclosure - learn-first question uses species-level mastery (#2187)", () => {
+  const MASTERED = { stability: 30, firstSeen: "2026-01-01", lastReview: "2026-02-01", dueDate: "2026-03-01" };
+  const LEARNING = { stability: 2, firstSeen: "2026-01-01", lastReview: "2026-02-01", dueDate: "2026-02-03" };
+  const QUESTION = "Learn Bulbasaur's evolution line next?";
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    mockPretendAllMastered.value = false;
+    mockLegStatusMap.value = new Map();
+    mockMasteryDate.value = null;
+    mockLoadSettings.mockReturnValue({ dateFormat: "dmy", timezone: "UTC" });
+  });
+
+  it("name leg mastered, reverse leg not: the question is asked", async () => {
+    mockCardClass.value = "mastered";
+    mockLoadSession.mockResolvedValue({
+      cards: [
+        { cardType: "name", id: 1, locale: "en", state: MASTERED },
+        { cardType: "reverse", id: 2_000_001, locale: "en", state: LEARNING },
+      ],
+    });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Make Bulbasaur your favourite" }));
+    expect(await screen.findByText(QUESTION)).toBeInTheDocument();
+  });
+
+  it("mastered in another enrolled locale only: the question is not asked", async () => {
+    mockCardClass.value = "learning";
+    mockLoadSettings.mockReturnValue({ dateFormat: "dmy", timezone: "UTC", learningLocales: ["en", "ja"] } as never);
+    mockLoadSession.mockResolvedValue({
+      cards: [
+        { cardType: "name", id: 1, locale: "en", state: LEARNING },
+        { cardType: "name", id: 1, locale: "ja", state: MASTERED },
+        { cardType: "reverse", id: 2_000_001, locale: "ja", state: MASTERED },
+      ],
+    });
+    renderWithIntl(<PokemonDetailDisclosure pokemon={makePokemon()} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Make Bulbasaur your favourite" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(QUESTION)).not.toBeInTheDocument();
   });
 });

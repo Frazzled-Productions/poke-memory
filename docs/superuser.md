@@ -8,13 +8,13 @@ reveals a **Developer** section on Settings that houses per-axis-of-cheating fla
 
 | Flag | Purpose |
 |---|---|
-| `pretendAllMastered` | Renders every species as mastered across Pokédex, Pasture, Stats, theme picker. |
+| `pretendAllMastered` | Renders every species as mastered across Pokédex, Pasture, Stats, theme picker, and the favourite partner (full sprite, Match my favourite, Pasture spot). The one-time colours offer is not shown, so fake mastery records no offer. |
 | `forceNextStreakMilestone` | Fires the smallest un-seen streak celebration on next Practice visit. Self-clears after one fire. |
 | `forceCardsGraduated` | Treats all cards as graduated; skips the learning phase. QA typed-entry without grinding. |
 | `qaSeedMode` | Reveals a scenario picker (#1326). Pick a scenario, "Apply seed" injects deterministic test data into IndexedDB. Local-only; sync write-guard applies. |
 
 QA-seed scenarios (when `qaSeedMode` on): `fsrs-locale-mastery`, `optimiser-stress`,
-`pasture-progression`, `mastery-gaps` - details in `lib/qa-seed/scenarios.ts`. Clear via "Clear
+`pasture-progression`, `mastery-gaps`, `favourite-unmastered`, `favourite-mastered` - details in `lib/qa-seed/scenarios.ts`. Clear via "Clear
 seed" + reload, or by locking superuser mode.
 
 ## Every new user-facing feature must honour the relevant flag

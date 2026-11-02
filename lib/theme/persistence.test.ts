@@ -8,6 +8,8 @@ import type { ReviewableCard } from "@/lib/review/session";
 import { REVERSE_ID_OFFSET } from "@/lib/pokemon/seed-constants";
 import { filterMastered } from "@/lib/pasture/arrivals";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
+import { loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { setFavouritePokemon } from "@/lib/favourite/favourite";
 
 function makeMockStorage() {
   const store: Record<string, string> = {};
@@ -90,6 +92,17 @@ describe("loadFavourite", () => {
     expect(loadFavourite()).toBeNull();
   });
 
+  it("A non-curated theme: accepts any species id in the seed (Bulbasaur, id 1)", () => {
+    const bulbasaur = { ...SAMPLE_FAV, id: 1, name: "Bulbasaur", spriteUrl: "/sprites/pokemon/1.png" };
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ favouriteTheme: bulbasaur }));
+    expect(loadFavourite()?.id).toBe(1);
+  });
+
+  it("Unknown id: an alternate-form id is not a theme species", () => {
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ favouriteTheme: { ...SAMPLE_FAV, id: 10100 } }));
+    expect(loadFavourite()).toBeNull();
+  });
+
   it("rejects a favourite with malformed colours", () => {
     storage.setItem(
       SETTINGS_KEY,
@@ -114,19 +127,20 @@ describe("saveFavourite", () => {
     vi.unstubAllGlobals();
   });
 
-  it("writes the entry into settings.favouriteTheme", () => {
-    saveFavourite(SAMPLE, "/sprites/pokemon/1.png");
-    const settings = JSON.parse(storage.getItem(SETTINGS_KEY)!);
-    expect(settings.favouriteTheme).toEqual({
-      id: SAMPLE.id,
-      name: SAMPLE.name,
+  it("writes the theme into settings.favouriteTheme, any species (#2187)", () => {
+    const bulbasaur = {
+      id: 1,
+      name: "Bulbasaur",
       colors: SAMPLE.colors,
       spriteUrl: "/sprites/pokemon/1.png",
-    });
+    };
+    saveFavourite(bulbasaur);
+    const settings = JSON.parse(storage.getItem(SETTINGS_KEY)!);
+    expect(settings.favouriteTheme).toEqual(bulbasaur);
   });
 
   it("clears settings.favouriteTheme when passed null", () => {
-    saveFavourite(SAMPLE);
+    saveFavourite({ id: SAMPLE.id, name: SAMPLE.name, colors: SAMPLE.colors, spriteUrl: null });
     saveFavourite(null);
     const settings = JSON.parse(storage.getItem(SETTINGS_KEY)!);
     expect(settings.favouriteTheme).toBeNull();
@@ -411,5 +425,81 @@ describe("Pasture / Stats / theme-picker mastery contract (#1865 AC4)", () => {
 
     const themeIds = masteredSpeciesUnion(cards, true, ["en"]);
     expect(themeIds.has(SPECIES_A)).toBe(true);
+  });
+});
+
+describe("carry-over of an existing theme to the favourite (#2187)", () => {
+  let storage: ReturnType<typeof makeMockStorage>;
+  const UMBREON = CURATED_POKEMON.find((p) => p.id === 197)!;
+  const UMBREON_THEME = {
+    id: UMBREON.id,
+    name: UMBREON.name,
+    colors: UMBREON.colors,
+    spriteUrl: "/sprites/pokemon/197.png",
+  };
+
+  beforeEach(() => {
+    storage = makeMockStorage();
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
+    vi.stubGlobal("localStorage", storage);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("Upgrade: a player with Umbreon as their theme gets Umbreon as favourite and hearted, palette unchanged", () => {
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ favouriteTheme: UMBREON_THEME, heartedSpeciesIds: [25] }));
+    const settings = loadSettings();
+    expect(settings.favouritePokemonId).toBe(197);
+    expect(settings.heartedSpeciesIds).toEqual([197, 25]);
+    expect(loadFavourite()).toEqual(UMBREON_THEME);
+  });
+
+  it("Cleared favourite is not refilled: a stored null favourite stays null on the next load", () => {
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ favouriteTheme: UMBREON_THEME }));
+    saveSettings(setFavouritePokemon(loadSettings(), null));
+    expect(loadSettings().favouritePokemonId).toBeNull();
+    expect(JSON.parse(storage.getItem(SETTINGS_KEY)!).favouritePokemonId).toBeNull();
+  });
+
+  it("does not carry over a theme that fails validation", () => {
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ favouriteTheme: { ...UMBREON_THEME, id: 999999 } }));
+    expect(loadSettings().favouritePokemonId).toBeNull();
+    expect(loadSettings().heartedSpeciesIds).toEqual([]);
+  });
+});
+
+describe("superuser exit cleanup and the favourite (#2187)", () => {
+  let storage: ReturnType<typeof makeMockStorage>;
+
+  beforeEach(() => {
+    storage = makeMockStorage();
+    vi.stubGlobal("window", { localStorage: storage, dispatchEvent: vi.fn() });
+    vi.stubGlobal("localStorage", storage);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("Cheat theme, flag off: the unearned theme is cleared and the favourite is whatever the cloud holds", () => {
+    const charizard = CURATED_POKEMON.find((p) => p.id === 6)!;
+    // After the force-pull, local settings hold the cloud's favourite and
+    // hearts (Pikachu) plus the cheat-selected Charizard theme.
+    storage.setItem(SETTINGS_KEY, JSON.stringify({
+      favouriteTheme: { id: 6, name: charizard.name, colors: charizard.colors, spriteUrl: null },
+      favouritePokemonId: 25,
+      heartedSpeciesIds: [25, 6],
+    }));
+    // The exit-cleanup step: no cards, flag off, so Charizard is not earned.
+    const favourite = loadFavourite();
+    expect(isFavouriteEarned(favourite, [], false, ["en"])).toBe(false);
+    saveFavourite(null);
+
+    const after = loadSettings();
+    expect(after.favouriteTheme).toBeNull();
+    expect(after.favouritePokemonId).toBe(25);
+    expect(after.heartedSpeciesIds).toEqual([25, 6]);
   });
 });

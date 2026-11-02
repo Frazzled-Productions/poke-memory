@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assignAnchors } from "./assign";
+import { assignAnchors, FAVOURITE_SPOT } from "./assign";
 import type { HabitatZone } from "./zones";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { ReviewState } from "@/lib/srs/scheduler";
@@ -246,5 +246,28 @@ describe("assignAnchors", () => {
     // Card 2 gets slot 1 (sub-a second anchor).
     expect(result[1].card.id).toBe(2);
     expect(result[1].anchor).toEqual(tinyZone.subRegions[0].anchorSlots[1]);
+  });
+});
+
+describe("assignAnchors - the favourite's spot (#2187)", () => {
+  it("Mastered partner: the favourite takes the fixed highlighted spot", () => {
+    const cards = [makeCard(1, "2026-01-01"), makeCard(94, "2026-01-02"), makeCard(3, "2026-01-03")];
+    const result = assignAnchors(cards, tinyZone, 94);
+    const fav = result.find((a) => a.card.id === 94)!;
+    expect(fav.favourite).toBe(true);
+    expect(fav.anchor).toEqual(FAVOURITE_SPOT);
+    expect(result.filter((a) => a.favourite)).toHaveLength(1);
+  });
+
+  it("every other placement is unchanged by the favourite", () => {
+    const others = [makeCard(1, "2026-01-01"), makeCard(3, "2026-01-03")];
+    const withFavourite = assignAnchors([...others, makeCard(94, "2026-01-02")], tinyZone, 94)
+      .filter((a) => !a.favourite);
+    expect(withFavourite).toEqual(assignAnchors(others, tinyZone));
+  });
+
+  it("a favourite not in this zone changes nothing", () => {
+    const cards = [makeCard(1), makeCard(2)];
+    expect(assignAnchors(cards, tinyZone, 94)).toEqual(assignAnchors(cards, tinyZone));
   });
 });

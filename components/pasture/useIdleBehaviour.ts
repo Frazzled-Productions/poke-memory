@@ -34,6 +34,8 @@ export type Placement = {
   card: NameReviewCard;
   subRegion: SubRegion;
   anchor: AnchorSlot;
+  /** The player's favourite in its highlighted spot (#2187). */
+  favourite?: boolean;
 };
 
 /** Per-entry in the sprite map - combines DOM ref, band, and tick state. */

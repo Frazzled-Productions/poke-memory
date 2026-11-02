@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { DailySummaryParts } from "@/lib/review/share";
 import { generateDailyShareImage } from "@/lib/share/generateShareImage";
 import { mutedTextXs } from "@/lib/utils/class-names";
+import { useSharePartner } from "@/components/favourite/useSharePartner";
 
 type Props = {
   /** Summary parts used to render the image card and, via `text`, the plain-text fallback. */
@@ -24,12 +25,13 @@ type Props = {
  */
 export function ShareTodayButton({ parts, text }: Props) {
   const [status, setStatus] = useState<"idle" | "copied" | "error">("idle");
+  const partner = useSharePartner();
 
   async function handleShare() {
     setStatus("idle");
 
     // Try to render the image card first.
-    const blob = await generateDailyShareImage(parts).catch(() => null);
+    const blob = await generateDailyShareImage(parts, partner).catch(() => null);
     const file =
       blob !== null
         ? new File([blob], "poke-memory.png", { type: "image/png" })
