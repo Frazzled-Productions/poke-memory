@@ -296,6 +296,8 @@ jobs:
           # delete_account teardown via a fresh supabase-js client.
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.QA_NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.QA_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # The server's username sign-up action creates accounts with this key.
+          SUPABASE_SECRET_KEY: ${{ secrets.QA_SUPABASE_SECRET_KEY }}
           # Unique per run+attempt so concurrent / repeated runs never collide on
           # the ephemeral username, and no QA account accretes.
           E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
