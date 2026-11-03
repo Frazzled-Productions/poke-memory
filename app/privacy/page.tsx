@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 17 October 2026
+          Last updated: 3 November 2026
         </p>
       </header>
 
@@ -299,8 +299,10 @@ export default async function PrivacyPage() {
             maintainer-only Discord channel used for triage: this notification
             includes a capped preview (up to 500 characters) of the message,
             plus the non-identifying metadata above (page, app version,
-            timestamp). No user identifier is included. Discord is a
-            sub-processor under a data processing agreement (see §6).
+            timestamp). No user identifier is included. When the feedback is
+            deleted, we delete this notification from Discord too, and retry
+            any deletion that fails (see §8). Discord is a sub-processor under
+            a data processing agreement (see §6).
           </p>
         </section>
 
@@ -523,7 +525,8 @@ export default async function PrivacyPage() {
                     A capped preview (up to 500 characters) of the free-text
                     message, plus non-identifying metadata (page, app version,
                     timestamp). No user identifier is included. Sent to a
-                    private, maintainer-only channel.
+                    private, maintainer-only channel, and deleted when the
+                    feedback is deleted (we retry any deletion that fails).
                   </td>
                 </tr>
               </tbody>
@@ -674,7 +677,9 @@ export default async function PrivacyPage() {
           <p className="mt-3">
             Feedback submissions are retained for 12 months from the date of
             submission and then automatically deleted, regardless of account
-            status.
+            status. When a bug report is deleted, after 12 months or with your
+            account, we also delete its notification in our Discord channel,
+            message preview included, and retry any deletion that fails.
           </p>
           <p className="mt-3">
             Error reports and performance traces held by Sentry are kept for

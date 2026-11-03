@@ -155,6 +155,32 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
+    it("says the Discord bug notification is deleted with the feedback (ops #405)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/we delete this notification from discord too/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/and deleted when the\s+feedback is deleted/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/we also delete its notification in our discord channel/i),
+      ).toBeInTheDocument();
+    });
+
+    it("says a failed Discord deletion is retried, in sections 3, 6 and 8 (ruling 3 November 2026)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/delete this notification from discord too, and retry\s+any deletion that fails/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/feedback is deleted \(we retry any deletion that fails\)/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/message preview included, and retry any deletion that fails/i),
+      ).toBeInTheDocument();
+    });
+
     it("renders the feedback retention statement in section 8 (#1623)", async () => {
       await renderPage();
       expect(
@@ -179,9 +205,9 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 17 October 2026", async () => {
+    it("shows the last updated date as 3 November 2026", async () => {
       await renderPage();
-      expect(screen.getByText(/17 october 2026/i)).toBeTruthy();
+      expect(screen.getByText(/3 november 2026/i)).toBeTruthy();
     });
 
     it("offers a complaints route to us before the ICO, with a 30-day acknowledgement", async () => {

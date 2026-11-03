@@ -4,7 +4,7 @@ Canonical reference for choosing where new persisted data lives - a column on an
 
 ## Tables today
 
-Every table in `public`, as created by `db/migrations/`. All eight have RLS enabled. `scripts/persistence-tables.test.mjs` fails if this list drifts from the `CREATE TABLE` / `DROP TABLE` statements in the migrations, so add a row here in the same PR as the migration. Before designing a new table, find the closest precedent below and extend its pattern rather than reinventing one.
+Every table in `public`, as created by `db/migrations/`. All nine have RLS enabled. `scripts/persistence-tables.test.mjs` fails if this list drifts from the `CREATE TABLE` / `DROP TABLE` statements in the migrations, so add a row here in the same PR as the migration. Before designing a new table, find the closest precedent below and extend its pattern rather than reinventing one.
 
 <!-- persistence-tables:start -->
 | Table | Migration | Shape and precedent |
@@ -17,9 +17,10 @@ Every table in `public`, as created by `db/migrations/`. All eight have RLS enab
 | `feedback` | 034 | Write-once, append-only; written only by the service-role Route Handler (`app/api/feedback`), no client policies. `user_id` is **nullable** (guest feedback), and a pg_cron job purges rows after 12 months. |
 | `usernames` | 035 | Uniqueness-constraint table (`username` is the PK, `UNIQUE (user_id)`); owner-only INSERT policy (the public SELECT policy was dropped in 044). |
 | `rate_limit_buckets` | 041 | Service-role-only internal table with **no `user_id`**: keyed on a salted `ip_hash` because callers are pre-session. No client policies; every write goes through the `check_rate_limit` SECURITY DEFINER RPC, and pg_cron purges rows after 2 hours. |
+| `feedback_discord_posts` | 051 | Service-role-only internal table with **no `user_id`** and no message text: maps a feedback id to its Discord bug-notification message id. No foreign key to `feedback`, so the mapping outlives the row until the AFTER DELETE trigger has had the route delete the Discord post (ops #405). No client policies. |
 <!-- persistence-tables:end -->
 
-**Foreign keys.** Every table with a `user_id` column references `auth.users(id) ON DELETE CASCADE`, so account deletion erases the user's rows. The two exceptions to "every row belongs to a user" are deliberate: `feedback.user_id` is nullable, so the cascade only applies where a user is attached (guest rows rely on the 12-month purge), and `rate_limit_buckets` has no user link at all (041 explains why a FK is inapplicable before a session exists). The new-table checklist below still requires the FK for any per-user table.
+**Foreign keys.** Every table with a `user_id` column references `auth.users(id) ON DELETE CASCADE`, so account deletion erases the user's rows. The exceptions to "every row belongs to a user" are deliberate: `feedback.user_id` is nullable, so the cascade only applies where a user is attached (guest rows rely on the 12-month purge), and `rate_limit_buckets` has no user link at all (041 explains why a FK is inapplicable before a session exists), and neither has `feedback_discord_posts` (051: it must outlive the feedback row it points to). The new-table checklist below still requires the FK for any per-user table.
 
 ## Decide where the data lives
 

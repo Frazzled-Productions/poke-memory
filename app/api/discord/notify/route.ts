@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
+import {
+  createClient as createSupabaseAdminClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import { isAuthorized } from "@/lib/auth/bearerAuth";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { supabaseSecretKey } from "@/lib/supabase/keys";
 
 /**
- * POST /api/discord/notify (#1653, #1848)
+ * POST /api/discord/notify (#1653, #1848, ops #405)
  *
  * Receives safe feedback metadata from the pg_net AFTER INSERT trigger on
  * the `feedback` table (via migration 042) and posts a Discord embed to
@@ -18,12 +21,20 @@ import { supabaseSecretKey } from "@/lib/supabase/keys";
  * PAYLOAD CONTRACT (from the DB trigger)
  *   { id, category, page, app_version, created_at, authenticated }
  *   NEVER contains message or user_id.
+ *   Deletion event (migration 051, AFTER DELETE trigger): { event: "deleted", id }
  *
  * MESSAGE PREVIEW (#1848)
  *   After the forbidden-fields guard passes, this route fetches the message
  *   by id from the feedback table using the service-role client. A capped
  *   preview (≤500 chars) is added to the embed. The message is never in the
  *   inbound trigger payload and never passes through pg_net.
+ *
+ * DELETION WITH THE FEEDBACK (ops #405)
+ *   The post is sent with `?wait=true` so Discord returns its message id,
+ *   which is stored in `feedback_discord_posts` against the feedback id. When
+ *   the feedback row is deleted (the 12-month purge or the account cascade),
+ *   the AFTER DELETE trigger from migration 051 sends a deletion event and this
+ *   route deletes the Discord message, preview included, then the stored id.
  *
  * DISCORD WEBHOOK
  *   URL read from DISCORD_NOTIFY_WEBHOOK_URL env (server-side only). The
@@ -42,6 +53,12 @@ type NotifyBody = {
   authenticated: boolean;
 };
 
+/** Shape of the JSON body sent by the AFTER DELETE trigger (migration 051). */
+type DeletedBody = {
+  event: "deleted";
+  id: string;
+};
+
 /** Maximum characters in the message preview field sent to Discord. */
 const MESSAGE_PREVIEW_MAX = 500;
 
@@ -51,14 +68,10 @@ const MESSAGE_PREVIEW_MAX = 500;
  * no row (the embed is still useful via the deep link in that case).
  */
 async function fetchMessagePreview(
-  supabaseUrl: string,
-  serviceRoleKey: string,
+  admin: SupabaseClient,
   feedbackId: string,
 ): Promise<string | null> {
   try {
-    const admin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
     const { data, error } = await admin
       .from("feedback")
       .select("message")
@@ -90,6 +103,144 @@ function buildDeepLink(supabaseUrl: string, feedbackId: string): string {
     .replace(/^https?:\/\//, "")
     .split(".")[0];
   return `https://supabase.com/dashboard/project/${projectRef}/editor?filter=id%3Aeq%3A${feedbackId}`;
+}
+
+function adminClient(supabaseUrl: string, serviceRoleKey: string): SupabaseClient {
+  return createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+/**
+ * The webhook URL with `extraPath` appended and `wait=true` set where asked.
+ * Existing query parameters (such as `thread_id`) are kept.
+ */
+function webhookUrlFor(webhookUrl: string, extraPath = "", wait = false): string {
+  const url = new URL(webhookUrl);
+  url.pathname = url.pathname.replace(/\/$/, "") + extraPath;
+  if (wait) url.searchParams.set("wait", "true");
+  return url.toString();
+}
+
+/**
+ * Store the Discord message id against the feedback id so the post can be
+ * deleted with the feedback. Failures are logged, never fatal: the post has
+ * already gone out. Returns whether the id was stored.
+ */
+async function storeDiscordMessageId(
+  admin: SupabaseClient,
+  feedbackId: string,
+  discordRes: Response,
+): Promise<boolean> {
+  try {
+    const sent = (await discordRes.json()) as { id?: unknown };
+    if (typeof sent.id !== "string" || sent.id === "") {
+      console.error("[discord/notify] webhook response had no message id; post cannot be deleted later");
+      return false;
+    }
+    const { error } = await admin
+      .from("feedback_discord_posts")
+      .insert({ feedback_id: feedbackId, discord_message_id: sent.id });
+    if (error) {
+      console.error("[discord/notify] storing the Discord message id failed", error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[discord/notify] storing the Discord message id threw", err);
+    return false;
+  }
+}
+
+/**
+ * True only when the feedback row is known to be gone. A row deleted before
+ * its id was stored found nothing for the delete trigger to act on, so the
+ * route deletes that post itself.
+ */
+async function feedbackRowGone(admin: SupabaseClient, feedbackId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("feedback")
+    .select("id")
+    .eq("id", feedbackId)
+    .maybeSingle();
+  if (error) {
+    console.error("[discord/notify] re-checking the feedback row failed", error);
+    return false;
+  }
+  return !data;
+}
+
+/** Discord's error code for a message it no longer has (Unknown Message). */
+const DISCORD_UNKNOWN_MESSAGE = 10008;
+
+/** Rate-limit retries on a delete, and the longest wait honoured for each. */
+const DELETE_RETRIES = 2;
+const RETRY_WAIT_MAX_MS = 3000;
+
+async function discordErrorBody(res: Response): Promise<{ code?: unknown; retry_after?: unknown }> {
+  try {
+    return (await res.json()) as { code?: unknown; retry_after?: unknown };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Delete the Discord post for a deleted feedback row, then its stored id.
+ * Only Discord's "Unknown Message" (404, code 10008) counts as already
+ * deleted: a 404 for an unknown webhook means the post may still be up. A
+ * rate limit (429) is retried after Discord's `retry_after`, a bounded number
+ * of times. Any other failure keeps the stored id and answers 502.
+ */
+async function deleteDiscordPost(
+  admin: SupabaseClient,
+  webhookUrl: string,
+  feedbackId: string,
+): Promise<NextResponse> {
+  const { data, error } = await admin
+    .from("feedback_discord_posts")
+    .select("discord_message_id")
+    .eq("feedback_id", feedbackId)
+    .maybeSingle();
+  if (error) {
+    console.error("[discord/notify] reading the stored Discord message id failed", error);
+    return NextResponse.json({ ok: false, error: "lookup_failed" }, { status: 502 });
+  }
+  if (!data) return NextResponse.json({ ok: true, deleted: false });
+
+  const messageId = (data as { discord_message_id: string }).discord_message_id;
+  const deleteUrl = webhookUrlFor(webhookUrl, `/messages/${encodeURIComponent(messageId)}`);
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(deleteUrl, { method: "DELETE" });
+    } catch (err) {
+      console.error("[discord/notify] delete fetch failed", err);
+      return NextResponse.json({ ok: false, error: "webhook_fetch_failed" }, { status: 502 });
+    }
+    if (res.ok) break;
+    const err = await discordErrorBody(res);
+    if (res.status === 404 && err.code === DISCORD_UNKNOWN_MESSAGE) break;
+    if (res.status === 429 && attempt < DELETE_RETRIES) {
+      const waitMs = Math.min(Number(err.retry_after ?? 1) * 1000 || 1000, RETRY_WAIT_MAX_MS);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      continue;
+    }
+    console.error("[discord/notify] webhook delete error", res.status, err.code);
+    return NextResponse.json(
+      { ok: false, error: "webhook_error", status: res.status },
+      { status: 502 },
+    );
+  }
+
+  const { error: deleteError } = await admin
+    .from("feedback_discord_posts")
+    .delete()
+    .eq("feedback_id", feedbackId);
+  if (deleteError) {
+    console.error("[discord/notify] removing the stored Discord message id failed", deleteError);
+  }
+  return NextResponse.json({ ok: true, deleted: true });
 }
 
 /** Discord embed colour for bug reports (red). */
@@ -129,14 +280,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "forbidden_fields" }, { status: 400 });
   }
 
+  const admin = serviceRoleKey ? adminClient(supabaseUrl, serviceRoleKey) : null;
+
+  if (rawBody.event === "deleted") {
+    const { id } = body as unknown as DeletedBody;
+    if (typeof id !== "string" || id === "") {
+      return NextResponse.json({ ok: false, error: "missing_id" }, { status: 400 });
+    }
+    if (!admin) {
+      console.error("[discord/notify] no Supabase key; cannot delete the Discord post");
+      return NextResponse.json({ ok: false, error: "misconfigured" }, { status: 503 });
+    }
+    return deleteDiscordPost(admin, webhookUrl, id);
+  }
+
   const deepLink = buildDeepLink(supabaseUrl, body.id);
   const ts = new Date(body.created_at).toISOString();
 
   // Fetch the message preview route-side (never via pg_net). Failures are
   // non-fatal: the embed still posts with the deep link.
-  const messagePreview = serviceRoleKey
-    ? await fetchMessagePreview(supabaseUrl, serviceRoleKey, body.id)
-    : null;
+  const messagePreview = admin ? await fetchMessagePreview(admin, body.id) : null;
 
   const embed = {
     title: "New bug report",
@@ -184,7 +347,7 @@ export async function POST(request: Request) {
 
   let discordRes: Response;
   try {
-    discordRes = await fetch(webhookUrl, {
+    discordRes = await fetch(webhookUrlFor(webhookUrl, "", true), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ embeds: [embed] }),
@@ -201,6 +364,13 @@ export async function POST(request: Request) {
       { ok: false, error: "webhook_error", status: discordRes.status },
       { status: 502 },
     );
+  }
+
+  if (admin && (await storeDiscordMessageId(admin, body.id, discordRes))) {
+    // The row went while the post was in flight: delete the post now.
+    if (await feedbackRowGone(admin, body.id)) {
+      await deleteDiscordPost(admin, webhookUrl, body.id);
+    }
   }
 
   return NextResponse.json({ ok: true });
