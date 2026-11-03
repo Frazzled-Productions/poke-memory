@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLocalProgress } from "./reset";
-import { idbGet, idbSet, __resetForTests } from "@/lib/idb/db";
+import { idbDelete, idbGet, idbSet, __resetForTests } from "@/lib/idb/db";
 import { KEY_PENDING_GRADE_QUEUE } from "@/lib/storage/keys";
 import { savePendingQueue } from "@/lib/sync/persistence";
 import { deleteAccountEverywhere } from "@/lib/sync/deleteAccount";
@@ -137,6 +137,8 @@ describe("clearLocalProgress", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    // __resetForTests only closes the connection; drop a queue a test kept on purpose.
+    await idbDelete(KEY_PENDING_GRADE_QUEUE);
     await __resetForTests();
   });
 
@@ -206,11 +208,20 @@ describe("clearLocalProgress", () => {
     expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).toBeNull();
   });
 
-  it("keeps the IDB pending-grade queue when the cloud delete or reset fails", async () => {
+  it("keeps the IDB pending-grade queue when the cloud delete fails", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     await seedPendingQueue();
 
     await deleteAccountEverywhere(makeRpcClient({ message: "boom" }));
+
+    expect(stubLocalStorage.getItem(KEY_PENDING_GRADE_QUEUE)).not.toBeNull();
+    expect(await idbGet(KEY_PENDING_GRADE_QUEUE)).not.toBeNull();
+  });
+
+  it("keeps the IDB pending-grade queue when the cloud reset fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await seedPendingQueue();
+
     await resetAllProgressEverywhere(makeRpcClient({ message: "boom" }));
 
     expect(stubLocalStorage.getItem(KEY_PENDING_GRADE_QUEUE)).not.toBeNull();

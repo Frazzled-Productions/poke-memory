@@ -13,8 +13,11 @@ Fixes: ops #400
   Every reset and delete path goes through it (Settings, the error page, Delete account and a reset
   seen from another device), so one line covers them all. The superuser guest exit and the account
   switch wipe through their own code and are unchanged; neither leaves the queue behind.
-- New capability `local-progress-reset`: a baseline of how the wipe behaves today, plus the one new
-  requirement.
+- Spec deltas MODIFY the three existing requirements this makes wrong: "A local reset clears progress
+  but keeps the settings keys and archives" (`local-data-and-backup`), "Account deletion clears the
+  cloud first, then the device" (`accounts-and-auth`, which said the IndexedDB copy stays) and
+  "Resetting progress" (`cloud-sync`, whose "Queued rows at a reset" scenario said the same). No new
+  capability.
 - `docs/sync.md` says the queue's two copies are also cleared on a reset or delete.
 
 ## Also touches
@@ -77,4 +80,12 @@ Fraser approved the change on 2 November 2026 with all five recommended answers 
 - 2026-11-03 (final review) A device that already ran Reset all progress or Delete account on the last
   shipped version keeps its orphaned IndexedDB queue until the next wipe, a guest's first grade, the
   service worker's 401 path or the next successful drain clears it; this change does not sweep it on
-  upgrade. Recommended: accept, with no migration step. Open for Fraser.
+  upgrade. This is a possible cross-account write, not only leftover data: Delete account clears the
+  sync status, so if another person then signs in on that device, `guardAccountSwitch` returns early
+  on a null owner (`lib/sync/guardAccountSwitch.ts:114`) and never clears the queue, and a direct
+  service-worker push (`app/sw.ts:677-693`) would post the deleted account's rows under the new
+  session (`app/api/sync/route.ts:125`). Traced in code, not run; it needs the sync tag still
+  registered, no open window to take the sync, and the push to fire before the new person's first
+  grade overwrites the copy. Options: accept with no migration step, or a follow-up change that
+  deletes the IndexedDB queue once on upgrade or when `guardAccountSwitch` sees a null owner.
+  Recommended: accept for this change and file the follow-up. Open for Fraser.
