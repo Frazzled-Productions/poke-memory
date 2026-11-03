@@ -24,5 +24,5 @@
 ## 5. Finish
 
 - [x] 5.1 Remove the three stale cron comments in `send-daily/route.ts`, add the trigger to the `push_subscriptions` row in `docs/persistence.md`, cover the time limits, the log lines, skipped hosts and the limit of 10 in the operational notes of `docs/web-push-setup.md`, and add a `fixed` changelog fragment in this proposal's wording. Verify: `npm run lint` and the changelog lint.
-- [ ] 5.2 Add the limit of 10 to the privacy notice's list of when a subscription is deleted (`app/privacy/page.tsx`), and Microsoft and the same deletion to `docs/dpia.md`. Verify: Fraser reads the wording in the PR.
+- [x] 5.2 Add the limit of 10 to the privacy notice's list of when a subscription is deleted (`app/privacy/page.tsx`), and Microsoft and the same deletion to `docs/dpia.md`. Verify: Fraser reads the wording in the PR. Done: Fraser read the notice and DPIA wording and approved it in chat on 3 November 2026.
 - [x] 5.3 Run `/opsx:verify harden-push-delivery`, `blast-radius` and `final-review`. Verify: findings fixed or listed in the PR. Done 3 November 2026: `/opsx:verify` at the build; four reviewers (test quality, security and privacy, blast radius with a real Postgres upgrade run, OpenSpec conformance) at 2631f7cc; fixes in the follow-up commit and judged in the PR body.
