@@ -46,12 +46,17 @@ Source: `app/api/discord/notify/route.ts`, `app/api/discord/notify/route.test.ts
 The route SHALL send the bug embed with `wait=true`, keeping any query parameters already on the
 webhook URL, and when a Supabase key is set SHALL store the message id Discord returns in
 `feedback_discord_posts` against the feedback id. Failing to store it SHALL be logged and SHALL NOT
-change the answer.
+change the answer. If the row is gone once the id is stored, the route SHALL delete the post.
 
 #### Scenario: Message id stored
 
 - **WHEN** Discord accepts the post and returns a message id
 - **THEN** one `feedback_discord_posts` row holds the feedback id and that message id
+
+#### Scenario: Row deleted while the post was in flight
+
+- **WHEN** the feedback row is gone by the time the message id is stored
+- **THEN** the route deletes that Discord post and its stored id
 
 #### Scenario: Storing the id fails
 
@@ -92,10 +97,10 @@ Source: `db/migrations/051_feedback_discord_posts.sql`.
 
 ### Requirement: The notify route deletes the stored post
 
-For a deletion event the route SHALL, after the same bearer and forbidden-field guards, delete the
-stored Discord message through the webhook and then the stored id. A 404 from Discord SHALL count as
-deleted. Any other failure SHALL answer 502 and keep the stored id. With no stored id it SHALL answer
-200 without calling Discord; with no Supabase key it SHALL answer 503.
+After the bearer and forbidden-field guards, a deletion event with an id SHALL delete the stored
+Discord message, then the stored id. Only 404 code 10008 SHALL count as deleted; a 429 SHALL be retried
+twice after `retry_after`. Other failures SHALL answer 502 and keep the id. No id: 400; no stored id:
+200 without calling Discord; no Supabase key: 503.
 
 #### Scenario: Discord down at deletion
 
@@ -104,8 +109,18 @@ deleted. Any other failure SHALL answer 502 and keep the stored id. With no stor
 
 #### Scenario: Already gone
 
-- **WHEN** Discord answers 404 for the message
+- **WHEN** Discord answers 404 with code 10008 (Unknown Message)
 - **THEN** the stored id is removed and the route answers 200
+
+#### Scenario: Webhook gone
+
+- **WHEN** Discord answers 404 with code 10015 (Unknown Webhook)
+- **THEN** the route answers 502 and the stored id stays
+
+#### Scenario: Rate limited
+
+- **WHEN** Discord answers 429 and then accepts the delete
+- **THEN** the post and the stored id are deleted and the route answers 200
 
 #### Scenario: Nothing stored
 

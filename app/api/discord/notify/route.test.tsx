@@ -30,8 +30,14 @@ let supabaseSingleResult: { data: { message: string } | null; error: unknown } =
   error: null,
 };
 
+// The re-check after storing the id (ops #405): whether the row still exists.
+let feedbackRowResult: { data: { id: string } | null; error: unknown } = {
+  data: { id: "row" },
+  error: null,
+};
+
 // `feedback_discord_posts` (ops #405): what the stored-id lookup returns, and
-// every insert and delete the route makes.
+// every lookup, insert and delete the route makes.
 let postLookupResult: { data: { discord_message_id: string } | null; error: unknown } = {
   data: null,
   error: null,
@@ -40,17 +46,28 @@ let postInsertResult: { error: unknown } = { error: null };
 let postDeleteResult: { error: unknown } = { error: null };
 const postInserts: unknown[] = [];
 const postDeletes: Array<[string, unknown]> = [];
+const postLookups: Array<[string, string, unknown]> = [];
 
 vi.mock("@supabase/supabase-js", () => {
   const feedbackTable = {
-    select: () => ({ eq: () => ({ single: () => Promise.resolve(supabaseSingleResult) }) }),
+    select: () => ({
+      eq: () => ({
+        single: () => Promise.resolve(supabaseSingleResult),
+        maybeSingle: () => Promise.resolve(feedbackRowResult),
+      }),
+    }),
   };
   const postsTable = {
     insert: (row: unknown) => {
       postInserts.push(row);
       return Promise.resolve(postInsertResult);
     },
-    select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve(postLookupResult) }) }),
+    select: (cols: string) => ({
+      eq: (col: string, value: unknown) => {
+        postLookups.push([cols, col, value]);
+        return { maybeSingle: () => Promise.resolve(postLookupResult) };
+      },
+    }),
     delete: () => ({
       eq: (col: string, value: unknown) => {
         postDeletes.push([col, value]);
@@ -107,11 +124,15 @@ const VALID_BODY = {
 
 // ── fetch mock ───────────────────────────────────────────────────────────────
 
+const DISCORD_MESSAGE_ID = "1234567890123456789";
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
-  fetchMock = vi.fn().mockResolvedValue(
-    new Response(null, { status: 204 }),
+  // Discord with `wait=true` answers 200 with the message JSON. A fresh
+  // Response each call, since a body can only be read once.
+  fetchMock = vi.fn().mockImplementation(() =>
+    Promise.resolve(Response.json({ id: DISCORD_MESSAGE_ID })),
   );
   vi.stubGlobal("fetch", fetchMock);
   setRequiredEnv();
@@ -120,11 +141,13 @@ beforeEach(() => {
     data: { message: "app crashes on the practice screen" },
     error: null,
   };
+  feedbackRowResult = { data: { id: "row" }, error: null };
   postLookupResult = { data: null, error: null };
   postInsertResult = { error: null };
   postDeleteResult = { error: null };
   postInserts.length = 0;
   postDeletes.length = 0;
+  postLookups.length = 0;
 });
 
 afterEach(() => {
@@ -433,27 +456,48 @@ describe("POST /api/discord/notify - webhook errors", () => {
 
 // ── Deletion with the feedback (ops #405) ───────────────────────────────────
 
-const DISCORD_MESSAGE_ID = "1234567890123456789";
 const DELETED_BODY = { event: "deleted", id: VALID_BODY.id } as const;
 
 describe("POST /api/discord/notify - stores the Discord message id (ops #405)", () => {
   it("stores the message id Discord returns against the feedback id", async () => {
-    fetchMock.mockResolvedValue(Response.json({ id: DISCORD_MESSAGE_ID }));
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(200);
     expect(postInserts).toEqual([
       { feedback_id: VALID_BODY.id, discord_message_id: DISCORD_MESSAGE_ID },
     ]);
+    // The row is still there, so the post stays.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(postDeletes).toHaveLength(0);
+  });
+
+  it("deletes the post at once when the row went before its id was stored", async () => {
+    feedbackRowResult = { data: null, error: null };
+    postLookupResult = { data: { discord_message_id: DISCORD_MESSAGE_ID }, error: null };
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe(`https://discord.com/api/webhooks/test/notify/messages/${DISCORD_MESSAGE_ID}`);
+    expect(init.method).toBe("DELETE");
+    expect(postDeletes).toEqual([["feedback_id", VALID_BODY.id]]);
+  });
+
+  it("keeps the post when the re-check of the row fails", async () => {
+    feedbackRowResult = { data: null, error: { message: "DB error" } };
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(postDeletes).toHaveLength(0);
   });
 
   it("still answers 200 when storing the id fails", async () => {
-    fetchMock.mockResolvedValue(Response.json({ id: DISCORD_MESSAGE_ID }));
     postInsertResult = { error: { message: "insert failed" } };
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(200);
   });
 
-  it("stores nothing when Discord returns no body", async () => {
+  it("stores nothing when Discord's answer is not JSON", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(200);
     expect(postInserts).toHaveLength(0);
@@ -468,9 +512,13 @@ describe("POST /api/discord/notify - stores the Discord message id (ops #405)", 
 
   it("stores nothing, and sends no preview, without a Supabase key", async () => {
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    fetchMock.mockResolvedValue(Response.json({ id: DISCORD_MESSAGE_ID }));
     await POST(makeRequest(VALID_BODY));
     expect(postInserts).toHaveLength(0);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(init.body as string) as {
+      embeds: Array<{ fields: Array<{ name: string }> }>;
+    };
+    expect(payload.embeds[0].fields.find((f) => f.name === "Message preview")).toBeUndefined();
   });
 });
 
@@ -484,6 +532,18 @@ describe("POST /api/discord/notify - deletes the post with the feedback (ops #40
     expect(url).toBe(`https://discord.com/api/webhooks/test/notify/messages/${DISCORD_MESSAGE_ID}`);
     expect(init.method).toBe("DELETE");
     expect(postDeletes).toEqual([["feedback_id", VALID_BODY.id]]);
+  });
+
+  it("looks the stored id up by the deleted row's feedback id", async () => {
+    await POST(makeRequest(DELETED_BODY));
+    expect(postLookups).toEqual([["discord_message_id", "feedback_id", VALID_BODY.id]]);
+  });
+
+  it("answers 400 to a deletion event without an id", async () => {
+    const res = await POST(makeRequest({ event: "deleted" }));
+    expect(res.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(postLookups).toHaveLength(0);
   });
 
   it("keeps a thread_id on the webhook URL when deleting", async () => {
@@ -510,12 +570,46 @@ describe("POST /api/discord/notify - deletes the post with the feedback (ops #40
     expect(postDeletes).toHaveLength(0);
   });
 
-  it("treats a post Discord no longer has (404) as deleted", async () => {
+  it("treats a post Discord no longer has (404 Unknown Message) as deleted", async () => {
     postLookupResult = { data: { discord_message_id: DISCORD_MESSAGE_ID }, error: null };
-    fetchMock.mockResolvedValue(new Response("Unknown Message", { status: 404 }));
+    fetchMock.mockResolvedValue(
+      Response.json({ message: "Unknown Message", code: 10008 }, { status: 404 }),
+    );
     const res = await POST(makeRequest(DELETED_BODY));
     expect(res.status).toBe(200);
     expect(postDeletes).toEqual([["feedback_id", VALID_BODY.id]]);
+  });
+
+  it("answers 502 and keeps the stored id for a 404 Unknown Webhook", async () => {
+    postLookupResult = { data: { discord_message_id: DISCORD_MESSAGE_ID }, error: null };
+    fetchMock.mockResolvedValue(
+      Response.json({ message: "Unknown Webhook", code: 10015 }, { status: 404 }),
+    );
+    const res = await POST(makeRequest(DELETED_BODY));
+    expect(res.status).toBe(502);
+    expect(postDeletes).toHaveLength(0);
+  });
+
+  it("retries a rate-limited delete after Discord's retry_after", async () => {
+    postLookupResult = { data: { discord_message_id: DISCORD_MESSAGE_ID }, error: null };
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ retry_after: 0.01 }, { status: 429 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const res = await POST(makeRequest(DELETED_BODY));
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(postDeletes).toEqual([["feedback_id", VALID_BODY.id]]);
+  });
+
+  it("answers 502 and keeps the stored id when still rate-limited after the retries", async () => {
+    postLookupResult = { data: { discord_message_id: DISCORD_MESSAGE_ID }, error: null };
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(Response.json({ retry_after: 0.01 }, { status: 429 })),
+    );
+    const res = await POST(makeRequest(DELETED_BODY));
+    expect(res.status).toBe(502);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(postDeletes).toHaveLength(0);
   });
 
   it("still answers 200 once the post is gone, if removing the stored id fails", async () => {

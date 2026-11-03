@@ -4,8 +4,9 @@
 
 ## 2. Route and database
 
-- [x] 2.1 Failing tests first in `app/api/discord/notify/route.test.tsx`: "posts to the Discord webhook URL with wait=true", "stores the Discord message id (ops #405)" and "deletes the post with the feedback (ops #405)". Verify: red against the `qa` route (exit 1, 11 failed, 29 passed), then green (exit 0, 40 passed).
+- [x] 2.1 Failing tests first in `app/api/discord/notify/route.test.tsx`: "posts to the Discord webhook URL with wait=true", "stores the Discord message id (ops #405)" and "deletes the post with the feedback (ops #405)". Verify: red against the `qa` route (exit 1, 12 failed, 30 passed of 42, re-run 3 November 2026 after the review found the first counts were taken on an earlier test set), then green (exit 0, 42 passed).
 - [x] 2.2 Route posts with `wait=true`, stores the message id, and handles the deletion event. Verify: the tests in 2.1 and `npm run typecheck`.
+- [x] 2.4 Review fixes (3 November 2026): only 404 code 10008 counts as deleted, a 429 is retried twice after `retry_after`, a deletion event without an id answers 400, and a row deleted before its id was stored has its post deleted by the route. Verify: 5 new tests red against the head route (exit 1, 5 failed, 44 passed), then green (exit 0, 49 passed); `npm run typecheck`.
 - [x] 2.3 Migration 051: `feedback_discord_posts`, deny-all policy, AFTER DELETE trigger. Verify: the integration-tests job applies every migration on CI's postgres; `scripts/persistence-tables.test.mjs` with the new inventory rows.
 
 ## 3. Notice and records

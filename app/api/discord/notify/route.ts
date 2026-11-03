@@ -68,7 +68,7 @@ const MESSAGE_PREVIEW_MAX = 500;
  * no row (the embed is still useful via the deep link in that case).
  */
 async function fetchMessagePreview(
-  admin: AdminClient,
+  admin: SupabaseClient,
   feedbackId: string,
 ): Promise<string | null> {
   try {
@@ -105,9 +105,7 @@ function buildDeepLink(supabaseUrl: string, feedbackId: string): string {
   return `https://supabase.com/dashboard/project/${projectRef}/editor?filter=id%3Aeq%3A${feedbackId}`;
 }
 
-type AdminClient = SupabaseClient;
-
-function adminClient(supabaseUrl: string, serviceRoleKey: string): AdminClient {
+function adminClient(supabaseUrl: string, serviceRoleKey: string): SupabaseClient {
   return createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -127,37 +125,75 @@ function webhookUrlFor(webhookUrl: string, extraPath = "", wait = false): string
 /**
  * Store the Discord message id against the feedback id so the post can be
  * deleted with the feedback. Failures are logged, never fatal: the post has
- * already gone out.
+ * already gone out. Returns whether the id was stored.
  */
 async function storeDiscordMessageId(
-  admin: AdminClient,
+  admin: SupabaseClient,
   feedbackId: string,
   discordRes: Response,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const sent = (await discordRes.json()) as { id?: unknown };
     if (typeof sent.id !== "string" || sent.id === "") {
       console.error("[discord/notify] webhook response had no message id; post cannot be deleted later");
-      return;
+      return false;
     }
     const { error } = await admin
       .from("feedback_discord_posts")
       .insert({ feedback_id: feedbackId, discord_message_id: sent.id });
     if (error) {
       console.error("[discord/notify] storing the Discord message id failed", error);
+      return false;
     }
+    return true;
   } catch (err) {
     console.error("[discord/notify] storing the Discord message id threw", err);
+    return false;
+  }
+}
+
+/**
+ * True only when the feedback row is known to be gone. A row deleted before
+ * its id was stored found nothing for the delete trigger to act on, so the
+ * route deletes that post itself.
+ */
+async function feedbackRowGone(admin: SupabaseClient, feedbackId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("feedback")
+    .select("id")
+    .eq("id", feedbackId)
+    .maybeSingle();
+  if (error) {
+    console.error("[discord/notify] re-checking the feedback row failed", error);
+    return false;
+  }
+  return !data;
+}
+
+/** Discord's error code for a message it no longer has (Unknown Message). */
+const DISCORD_UNKNOWN_MESSAGE = 10008;
+
+/** Rate-limit retries on a delete, and the longest wait honoured for each. */
+const DELETE_RETRIES = 2;
+const RETRY_WAIT_MAX_MS = 3000;
+
+async function discordErrorBody(res: Response): Promise<{ code?: unknown; retry_after?: unknown }> {
+  try {
+    return (await res.json()) as { code?: unknown; retry_after?: unknown };
+  } catch {
+    return {};
   }
 }
 
 /**
  * Delete the Discord post for a deleted feedback row, then its stored id.
- * A post Discord no longer has (404) counts as deleted. Any other failure
- * keeps the stored id and answers 502.
+ * Only Discord's "Unknown Message" (404, code 10008) counts as already
+ * deleted: a 404 for an unknown webhook means the post may still be up. A
+ * rate limit (429) is retried after Discord's `retry_after`, a bounded number
+ * of times. Any other failure keeps the stored id and answers 502.
  */
 async function deleteDiscordPost(
-  admin: AdminClient,
+  admin: SupabaseClient,
   webhookUrl: string,
   feedbackId: string,
 ): Promise<NextResponse> {
@@ -173,17 +209,24 @@ async function deleteDiscordPost(
   if (!data) return NextResponse.json({ ok: true, deleted: false });
 
   const messageId = (data as { discord_message_id: string }).discord_message_id;
-  let res: Response;
-  try {
-    res = await fetch(webhookUrlFor(webhookUrl, `/messages/${encodeURIComponent(messageId)}`), {
-      method: "DELETE",
-    });
-  } catch (err) {
-    console.error("[discord/notify] delete fetch failed", err);
-    return NextResponse.json({ ok: false, error: "webhook_fetch_failed" }, { status: 502 });
-  }
-  if (!res.ok && res.status !== 404) {
-    console.error("[discord/notify] webhook delete error", res.status);
+  const deleteUrl = webhookUrlFor(webhookUrl, `/messages/${encodeURIComponent(messageId)}`);
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(deleteUrl, { method: "DELETE" });
+    } catch (err) {
+      console.error("[discord/notify] delete fetch failed", err);
+      return NextResponse.json({ ok: false, error: "webhook_fetch_failed" }, { status: 502 });
+    }
+    if (res.ok) break;
+    const err = await discordErrorBody(res);
+    if (res.status === 404 && err.code === DISCORD_UNKNOWN_MESSAGE) break;
+    if (res.status === 429 && attempt < DELETE_RETRIES) {
+      const waitMs = Math.min(Number(err.retry_after ?? 1) * 1000 || 1000, RETRY_WAIT_MAX_MS);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      continue;
+    }
+    console.error("[discord/notify] webhook delete error", res.status, err.code);
     return NextResponse.json(
       { ok: false, error: "webhook_error", status: res.status },
       { status: 502 },
@@ -241,6 +284,9 @@ export async function POST(request: Request) {
 
   if (rawBody.event === "deleted") {
     const { id } = body as unknown as DeletedBody;
+    if (typeof id !== "string" || id === "") {
+      return NextResponse.json({ ok: false, error: "missing_id" }, { status: 400 });
+    }
     if (!admin) {
       console.error("[discord/notify] no Supabase key; cannot delete the Discord post");
       return NextResponse.json({ ok: false, error: "misconfigured" }, { status: 503 });
@@ -320,7 +366,12 @@ export async function POST(request: Request) {
     );
   }
 
-  if (admin) await storeDiscordMessageId(admin, body.id, discordRes);
+  if (admin && (await storeDiscordMessageId(admin, body.id, discordRes))) {
+    // The row went while the post was in flight: delete the post now.
+    if (await feedbackRowGone(admin, body.id)) {
+      await deleteDiscordPost(admin, webhookUrl, body.id);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

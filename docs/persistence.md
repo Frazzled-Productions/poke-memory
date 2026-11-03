@@ -4,7 +4,7 @@ Canonical reference for choosing where new persisted data lives - a column on an
 
 ## Tables today
 
-Every table in `public`, as created by `db/migrations/`. All eight have RLS enabled. `scripts/persistence-tables.test.mjs` fails if this list drifts from the `CREATE TABLE` / `DROP TABLE` statements in the migrations, so add a row here in the same PR as the migration. Before designing a new table, find the closest precedent below and extend its pattern rather than reinventing one.
+Every table in `public`, as created by `db/migrations/`. All nine have RLS enabled. `scripts/persistence-tables.test.mjs` fails if this list drifts from the `CREATE TABLE` / `DROP TABLE` statements in the migrations, so add a row here in the same PR as the migration. Before designing a new table, find the closest precedent below and extend its pattern rather than reinventing one.
 
 <!-- persistence-tables:start -->
 | Table | Migration | Shape and precedent |
