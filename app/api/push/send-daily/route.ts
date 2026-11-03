@@ -3,6 +3,7 @@ import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js
 import { isAuthorized } from "@/lib/auth/bearerAuth";
 import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 import webpush from "web-push";
+import { deliverPushes } from "@/lib/push/deliver";
 import { createTranslator as _createTranslatorRaw } from "use-intl/core";
 import { todayInTimezone } from "@/lib/utils/format-date";
 import { isCardEligible } from "@/lib/eligibility";
@@ -33,24 +34,9 @@ const _createTranslator = _createTranslatorRaw as unknown as (
  * via `net.http_post` with a Bearer header carrying the
  * `cron_shared_secret` Vault value.
  *
- * CURRENT CRON SCHEDULE: once per day at 08:00 UTC (0 8 * * *).
- * This route now supports per-user notification hours (#1315) but the cron
- * has NOT yet been changed to hourly - that is a deliberate split to avoid
- * a deploy-ordering hazard (the phase-2 migration must only be applied
- * AFTER this PR is promoted to production). See the follow-up issue filed
- * alongside #1315 for the phase-2 cron change.
- *
- * INTERIM BEHAVIOUR:
- *   - Users with no preferred hour (NULL → effective UTC 8) continue to
- *     receive their notification at 08:00 UTC exactly as before.
- *   - Users who set a non-8-UTC-equivalent preferred hour are DORMANT
- *     until the phase-2 cron flip activates hourly delivery.
- *   - No user receives a duplicate notification in the interim.
- *
- * AFTER PHASE-2 (hourly cron):
- *   The cron fires at `0 * * * *`. At each UTC hour H, only users whose
- *   effective UTC send-hour equals H are notified. Each user receives at
- *   most one notification per day, at their chosen local hour.
+ * The cron fires hourly at `0 * * * *` (migration 031). At each UTC hour H,
+ * only users whose effective UTC send-hour equals H are notified, so each user
+ * receives at most one notification per day, at their chosen local hour.
  *
  * This handler fans out per-user Web Push notifications for every
  * `push_subscriptions` row whose owning user:
@@ -558,7 +544,11 @@ type DueRow = {
   due_date: string;
 };
 
+/** Covers the route's reads and the 240 second send budget in lib/push/deliver.ts. */
+export const maxDuration = 300;
+
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const sharedSecret = process.env.CRON_SHARED_SECRET;
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
@@ -651,11 +641,6 @@ export async function POST(request: Request) {
 
   // Per-user UTC-hour gate (#1315). Evaluated against the current moment so
   // DST transitions are handled correctly via Intl.DateTimeFormat.
-  //
-  // INTERIM BEHAVIOUR: the cron is still daily (0 8 * * *), so this runs
-  // once at 08:00 UTC. NULL users (no preference) use PUSH_DEFAULT_HOUR_UTC
-  // (8) and match; users with a non-8-UTC-equivalent hour are dormant until
-  // the phase-2 cron change flips delivery to hourly (migration 031).
   const now = new Date();
   const filteredSubscriptions = subscriptions.filter((sub) => {
     const tz = timezoneByUser.get(sub.user_id) ?? null;
@@ -664,9 +649,7 @@ export async function POST(request: Request) {
   });
 
   if (filteredSubscriptions.length === 0) {
-    // No subscriptions match the current UTC hour. This is expected while the
-    // cron is still daily (only NULL/default-8 users arrive here at 08:00 UTC
-    // and they all pass) - in phase-2 it means no user scheduled this hour.
+    // No subscriptions match the current UTC hour: no user scheduled this hour.
     return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
   }
 
@@ -782,55 +765,34 @@ export async function POST(request: Request) {
     }
   }
 
-  // Step 5: send. Dead subscriptions (410 Gone) and not-found (404) are
-  // deleted so the next cron run doesn't try them again. All other errors
-  // are logged and skipped - a single bad endpoint must not abort the
-  // whole batch.
-  const toDelete: string[] = [];
-  let sent = 0;
-  for (const sub of filteredSubscriptions) {
-    const localeDueCounts: LocaleDueMap = dueByUser.get(sub.user_id) ?? new Map();
-    const eligibility = eligibilityByUser.get(sub.user_id) ?? DEFAULT_ELIGIBILITY;
-    const startedTodayCounts = startedTodayByUser.get(sub.user_id) ?? {};
-    const newEstimate = computeNewEstimate(startedTodayCounts, eligibility);
-
-    // Check global due total from the map.
+  // Step 5: send to the devices with something due. Dead subscriptions (410
+  // Gone) and not-found (404) are deleted so the next cron run doesn't try them
+  // again.
+  const newEstimateFor = (userId: string) =>
+    computeNewEstimate(
+      startedTodayByUser.get(userId) ?? {},
+      eligibilityByUser.get(userId) ?? DEFAULT_ELIGIBILITY,
+    );
+  const dueSubscriptions = filteredSubscriptions.filter((sub) => {
     let dueTotal = 0;
-    for (const count of localeDueCounts.values()) dueTotal += count;
-
-    if (dueTotal <= 0 && newEstimate <= 0) continue;
-
-    const payload = await buildDailyMessage(localeDueCounts, newEstimate);
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.p256dh, auth: sub.auth_secret },
-        },
-        JSON.stringify(payload),
-      );
-      sent++;
-    } catch (err: unknown) {
-      const status = (err as { statusCode?: number }).statusCode;
-      if (status === 404 || status === 410) {
-        toDelete.push(sub.id);
-        continue;
-      }
-      // Transient or non-fatal error - keep going so a single bad device
-      // does not block the rest of the batch.
-      console.warn("[push] sendNotification failed", { id: sub.id, status });
-    }
-  }
+    for (const count of (dueByUser.get(sub.user_id) ?? new Map()).values()) dueTotal += count;
+    return dueTotal > 0 || newEstimateFor(sub.user_id) > 0;
+  });
+  const { sent, deadIds } = await deliverPushes(
+    dueSubscriptions,
+    (sub) => buildDailyMessage(dueByUser.get(sub.user_id) ?? new Map(), newEstimateFor(sub.user_id)),
+    startedAt,
+  );
 
   // Step 6: cleanup. Best-effort - if the delete fails we'll retry on the
   // next cron cycle when the same endpoints fail again.
   let deleted = 0;
-  if (toDelete.length > 0) {
+  if (deadIds.length > 0) {
     const { error: deleteError, count } = await admin
       .from("push_subscriptions")
       .delete({ count: "exact" })
-      .in("id", toDelete);
-    if (!deleteError) deleted = count ?? toDelete.length;
+      .in("id", deadIds);
+    if (!deleteError) deleted = count ?? deadIds.length;
   }
 
   return NextResponse.json({ ok: true, sent, deleted });

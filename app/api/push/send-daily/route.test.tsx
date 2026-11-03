@@ -35,7 +35,7 @@ vi.mock("@/lib/utils/format-date", () => ({
   todayInTimezone: () => "2026-05-20",
 }));
 
-import { POST, buildDailyMessage, type LocaleDueMap } from "./route";
+import { POST, buildDailyMessage, maxDuration, type LocaleDueMap } from "./route";
 import webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
@@ -466,7 +466,7 @@ describe("POST /api/push/send-daily - happy path", () => {
         {
           id: "sub-1",
           user_id: "user-a",
-          endpoint: "https://push.example/a",
+          endpoint: "https://fcm.googleapis.com/fcm/send/a",
           p256dh: "p256-a",
           auth_secret: "auth-a",
         },
@@ -495,7 +495,7 @@ describe("POST /api/push/send-daily - happy path", () => {
         {
           id: "sub-1",
           user_id: "user-a",
-          endpoint: "https://push.example/a",
+          endpoint: "https://fcm.googleapis.com/fcm/send/a",
           p256dh: "p256-a",
           auth_secret: "auth-a",
         },
@@ -528,7 +528,7 @@ describe("POST /api/push/send-daily - happy path", () => {
         {
           id: "sub-1",
           user_id: "user-a",
-          endpoint: "https://push.example/a",
+          endpoint: "https://fcm.googleapis.com/fcm/send/a",
           p256dh: "p256-a",
           auth_secret: "auth-a",
         },
@@ -550,7 +550,7 @@ describe("POST /api/push/send-daily - happy path", () => {
     expect(mockSendNotification).toHaveBeenCalledTimes(1);
     const [target, payload] = mockSendNotification.mock.calls[0];
     expect(target).toEqual({
-      endpoint: "https://push.example/a",
+      endpoint: "https://fcm.googleapis.com/fcm/send/a",
       keys: { p256dh: "p256-a", auth: "auth-a" },
     });
     expect(typeof payload).toBe("string");
@@ -564,7 +564,7 @@ describe("POST /api/push/send-daily - happy path", () => {
         {
           id: "sub-1",
           user_id: "user-a",
-          endpoint: "https://push.example/a",
+          endpoint: "https://fcm.googleapis.com/fcm/send/a",
           p256dh: "p256-a",
           auth_secret: "auth-a",
         },
@@ -607,7 +607,7 @@ describe("POST /api/push/send-daily - happy path", () => {
         {
           id: "sub-1",
           user_id: "user-a",
-          endpoint: "https://push.example/a",
+          endpoint: "https://fcm.googleapis.com/fcm/send/a",
           p256dh: "p256-a",
           auth_secret: "auth-a",
         },
@@ -654,7 +654,7 @@ describe("POST /api/push/send-daily - dead-endpoint cleanup", () => {
         {
           id: "sub-1",
           user_id: "user-a",
-          endpoint: "https://push.example/a",
+          endpoint: "https://fcm.googleapis.com/fcm/send/a",
           p256dh: "p256-a",
           auth_secret: "auth-a",
         },
@@ -681,7 +681,7 @@ describe("POST /api/push/send-daily - dead-endpoint cleanup", () => {
         {
           id: "sub-1",
           user_id: "user-a",
-          endpoint: "https://push.example/a",
+          endpoint: "https://fcm.googleapis.com/fcm/send/a",
           p256dh: "p256-a",
           auth_secret: "auth-a",
         },
@@ -705,7 +705,7 @@ describe("POST /api/push/send-daily - dead-endpoint cleanup", () => {
         {
           id: "sub-1",
           user_id: "user-a",
-          endpoint: "https://push.example/a",
+          endpoint: "https://fcm.googleapis.com/fcm/send/a",
           p256dh: "p256-a",
           auth_secret: "auth-a",
         },
@@ -730,7 +730,7 @@ describe("POST /api/push/send-daily - card-type filtering (#1153)", () => {
   const SUB = {
     id: "sub-1",
     user_id: "user-a",
-    endpoint: "https://push.example/a",
+    endpoint: "https://fcm.googleapis.com/fcm/send/a",
     p256dh: "p256-a",
     auth_secret: "auth-a",
   };
@@ -937,7 +937,7 @@ describe("POST /api/push/send-daily - new-card estimate (#1153)", () => {
   const SUB = {
     id: "sub-1",
     user_id: "user-a",
-    endpoint: "https://push.example/a",
+    endpoint: "https://fcm.googleapis.com/fcm/send/a",
     p256dh: "p256-a",
     auth_secret: "auth-a",
   };
@@ -1224,7 +1224,7 @@ describe("POST /api/push/send-daily - practice scope filtering (#1159)", () => {
   const SUB = {
     id: "sub-1",
     user_id: "user-a",
-    endpoint: "https://push.example/a",
+    endpoint: "https://fcm.googleapis.com/fcm/send/a",
     p256dh: "p256-a",
     auth_secret: "auth-a",
   };
@@ -1530,7 +1530,7 @@ describe("POST /api/push/send-daily - per-user notification-hour gate (#1315)", 
   const SUB = {
     id: "sub-1",
     user_id: "user-a",
-    endpoint: "https://push.example/a",
+    endpoint: "https://fcm.googleapis.com/fcm/send/a",
     p256dh: "p256-a",
     auth_secret: "auth-a",
   };
@@ -1616,7 +1616,7 @@ describe("POST /api/push/send-daily - per-user notification-hour gate (#1315)", 
     const admin = buildAdminMock({
       subscriptions: [
         SUB,
-        { id: "sub-2", user_id: "user-b", endpoint: "https://push.example/b", p256dh: "p256-b", auth_secret: "auth-b" },
+        { id: "sub-2", user_id: "user-b", endpoint: "https://fcm.googleapis.com/fcm/send/b", p256dh: "p256-b", auth_secret: "auth-b" },
       ],
       settings: [
         { user_id: "user-a", timezone: "UTC", settings: ALL_ENABLED_SETTINGS, push_notification_hour: 20 },
@@ -1642,7 +1642,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
   const SUB = {
     id: "sub-1",
     user_id: "user-a",
-    endpoint: "https://push.example/a",
+    endpoint: "https://fcm.googleapis.com/fcm/send/a",
     p256dh: "p256-a",
     auth_secret: "auth-a",
   };
@@ -1952,7 +1952,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
     const admin = buildAdminMock({
       subscriptions: [
         SUB,
-        { id: "sub-2", user_id: "user-b", endpoint: "https://push.example/b", p256dh: "p256-b", auth_secret: "auth-b" },
+        { id: "sub-2", user_id: "user-b", endpoint: "https://fcm.googleapis.com/fcm/send/b", p256dh: "p256-b", auth_secret: "auth-b" },
       ],
       settings: [
         { user_id: "user-a", timezone: "UTC", settings: { ...ALL_ENABLED_SETTINGS, learningLocales: ["en"] } },
@@ -1991,12 +1991,122 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
     }
 
     // user-a: 3 due (en only), single-locale compact form
-    expect(payloads["https://push.example/a"].body).toContain("3");
-    expect(payloads["https://push.example/a"].body).not.toContain("6");
+    expect(payloads["https://fcm.googleapis.com/fcm/send/a"].body).toContain("3");
+    expect(payloads["https://fcm.googleapis.com/fcm/send/a"].body).not.toContain("6");
 
     // user-b: 6 due (en=3 + ja=3), multi-locale breakdown form
-    expect(payloads["https://push.example/b"].body).toContain("6");
-    expect(payloads["https://push.example/b"].body).toContain("English 3");
-    expect(payloads["https://push.example/b"].body).toContain("日本語 3");
+    expect(payloads["https://fcm.googleapis.com/fcm/send/b"].body).toContain("6");
+    expect(payloads["https://fcm.googleapis.com/fcm/send/b"].body).toContain("English 3");
+    expect(payloads["https://fcm.googleapis.com/fcm/send/b"].body).toContain("日本語 3");
+  });
+});
+
+// ─── ops #380: a slow push service cannot hold up a run ─────────────────────
+
+describe("POST /api/push/send-daily - delivery limits", () => {
+  function twoDevices() {
+    return buildAdminMock({
+      subscriptions: ["a", "b"].map((name) => ({
+        id: `sub-${name}`,
+        user_id: "user-a",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${name}`,
+        p256dh: "p256",
+        auth_secret: "auth",
+      })),
+      settings: [{ user_id: "user-a", timezone: "UTC", settings: ALL_ENABLED_SETTINGS }],
+      due: dueRowsFor({ "user-a": 1 }),
+      deleteCount: 1,
+    });
+  }
+
+  it("declares a 300 second limit", () => {
+    expect(maxDuration).toBe(300);
+  });
+
+  it("a first send that never settles does not stop the second or the response", async () => {
+    mockCreateClient.mockReturnValue(twoDevices().client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockImplementationOnce(() => new Promise(() => {}));
+    mockSendNotification.mockResolvedValueOnce({ statusCode: 201, body: "", headers: {} });
+
+    let settled = false;
+    const run = POST(makeRequest()).finally(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    expect(mockSendNotification).toHaveBeenCalledTimes(2);
+    expect(settled).toBe(true);
+    const body = (await (await run).json()) as { sent: number };
+    expect(body.sent).toBe(1);
+  });
+
+  it("Gone: a dead row is still cleared when another send hangs", async () => {
+    const admin = twoDevices();
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockImplementationOnce(() => new Promise(() => {}));
+    mockSendNotification.mockRejectedValueOnce({ statusCode: 410, body: "", headers: {} });
+
+    const run = POST(makeRequest());
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    expect((await run).status).toBe(200);
+    expect(admin.deleteCalls).toEqual([{ ids: ["sub-b"] }]);
+  });
+
+  it("Server error from a push service: the other device is still sent to", async () => {
+    mockCreateClient.mockReturnValue(twoDevices().client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockRejectedValueOnce({ statusCode: 500, body: "", headers: {} });
+    mockSendNotification.mockResolvedValueOnce({ statusCode: 201, body: "", headers: {} });
+
+    const body = (await (await POST(makeRequest())).json()) as { sent: number; deleted: number };
+    expect(body).toMatchObject({ sent: 1, deleted: 0 });
+  });
+
+  it("Reads use up the budget: no send starts, the due devices are logged and the route returns 200", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const admin = twoDevices();
+    const read = admin.client.rpc;
+    let readsDone = false;
+    admin.client.rpc = vi.fn((fn: string, args?: Record<string, unknown>) => {
+      if (!readsDone) {
+        readsDone = true;
+        vi.setSystemTime(Date.now() + 245_000);
+      }
+      return read(fn, args);
+    }) as typeof read;
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(mockSendNotification).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith("[push] devices not reached", { notReached: 2 });
+  });
+
+  it("Budget used up: devices left are logged, dead rows found so far are deleted and the route returns 200", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const admin = buildAdminMock({
+      subscriptions: Array.from({ length: 21 }, (_, i) => ({
+        id: `sub-${i}`,
+        user_id: "user-a",
+        endpoint: `https://fcm.googleapis.com/fcm/send/${i}`,
+        p256dh: "p256",
+        auth_secret: "auth",
+      })),
+      settings: [{ user_id: "user-a", timezone: "UTC", settings: ALL_ENABLED_SETTINGS }],
+      due: dueRowsFor({ "user-a": 1 }),
+      deleteCount: 1,
+    });
+    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    mockSendNotification.mockImplementationOnce(() => {
+      vi.setSystemTime(Date.now() + 241_000);
+      return Promise.reject({ statusCode: 410, body: "", headers: {} });
+    });
+    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(mockSendNotification).toHaveBeenCalledTimes(20);
+    expect(admin.deleteCalls).toEqual([{ ids: ["sub-0"] }]);
+    expect(warn).toHaveBeenCalledWith("[push] devices not reached", { notReached: 1 });
   });
 });

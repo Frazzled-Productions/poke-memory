@@ -100,13 +100,15 @@ As of #1369, the app UI renders in the user's chosen locale (`en` / `ja` / `zh-H
 
 GitHub and Google act as **independent controllers** for the OAuth authentication interaction only. They are not processors for our review data. The app itself never sees the OAuth token - the exchange is handled server-side by Supabase Auth.
 
-The browser's Web Push service (Google FCM, Mozilla, or Apple, depending on the user's browser) acts as a **protocol-level conduit** for delivering push messages, not a sub-processor with access to message content: the notification payload is end-to-end encrypted under the Web Push standard using the subscription's `p256dh`/`auth` keys, so the push service relays ciphertext it cannot read. No new sub-processor is therefore added by the push feature.
+The browser's Web Push service (Google FCM, Mozilla, Apple or Microsoft, depending on the user's browser) acts as a **protocol-level conduit** for delivering push messages, not a sub-processor with access to message content: the notification payload is end-to-end encrypted under the Web Push standard using the subscription's `p256dh`/`auth` keys, so the push service relays ciphertext it cannot read. No new sub-processor is therefore added by the push feature.
 
 ### Retention
 
 Authenticated-path data is retained for the lifetime of the account. Account deletion triggers a cascading delete on all rows associated with the user's UUID across `card_reviews`, `streak_days`, `grade_log`, `user_settings`, and `feedback`. The self-service "Reset all progress" action deletes review history immediately. There is currently no point-in-time backup (issue #298), so deletion is permanent and immediate.
 
 Feedback rows are retained for 12 months from `created_at` and are then automatically deleted by a scheduled database function. For authenticated users, feedback rows are also deleted by cascade on account deletion. When a bug-report row is deleted either way, an AFTER DELETE trigger (migration 051) has the notify route delete its Discord notification, message preview included (ops #405).
+
+A Web Push subscription is deleted when the user turns the reminder toggle off, on account deletion, when the push service reports the endpoint as gone, or when the account already has 10 subscriptions and another device subscribes, which replaces the least recently subscribed one (migration 049).
 
 Sentry error reports and performance traces are retained for Sentry's default of 90 days and then deleted automatically. They carry no user identifier, so they are not linked to any account and are not affected by account deletion.
 

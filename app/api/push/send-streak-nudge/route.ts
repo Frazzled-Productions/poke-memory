@@ -3,6 +3,7 @@ import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js
 import { isAuthorized } from "@/lib/auth/bearerAuth";
 import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 import webpush from "web-push";
+import { deliverPushes } from "@/lib/push/deliver";
 import { createTranslator as _createTranslatorRaw } from "use-intl/core";
 import { todayInTimezone } from "@/lib/utils/format-date";
 import { localHourToUtcHour, currentUtcHour, PUSH_DEFAULT_HOUR_UTC } from "@/lib/push/notificationHour";
@@ -165,7 +166,11 @@ function parseStreakProtectionField(rawSettings: Record<string, unknown> | null)
   return validateStreakProtection(rawSettings.streakProtection);
 }
 
+/** Covers the route's reads and the 240 second send budget in lib/push/deliver.ts. */
+export const maxDuration = 300;
+
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const sharedSecret = process.env.CRON_SHARED_SECRET;
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
@@ -344,38 +349,20 @@ export async function POST(request: Request) {
   }
 
   // Step: send. Dead subscriptions (410/404) are deleted so the next cron
-  // run doesn't retry them, same cleanup loop as send-daily.
-  const toDelete: string[] = [];
-  let sent = 0;
-  for (const sub of finalSubscriptions) {
-    const streakDays = streakLengthByUser.get(sub.user_id) ?? 0;
-    const payload = await buildStreakNudgeMessage(streakDays);
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.p256dh, auth: sub.auth_secret },
-        },
-        JSON.stringify(payload),
-      );
-      sent++;
-    } catch (err: unknown) {
-      const status = (err as { statusCode?: number }).statusCode;
-      if (status === 404 || status === 410) {
-        toDelete.push(sub.id);
-        continue;
-      }
-      console.warn("[push] streak-nudge sendNotification failed", { id: sub.id, status });
-    }
-  }
+  // run doesn't retry them, same cleanup as send-daily.
+  const { sent, deadIds } = await deliverPushes(
+    finalSubscriptions,
+    (sub) => buildStreakNudgeMessage(streakLengthByUser.get(sub.user_id) ?? 0),
+    startedAt,
+  );
 
   let deleted = 0;
-  if (toDelete.length > 0) {
+  if (deadIds.length > 0) {
     const { error: deleteError, count } = await admin
       .from("push_subscriptions")
       .delete({ count: "exact" })
-      .in("id", toDelete);
-    if (!deleteError) deleted = count ?? toDelete.length;
+      .in("id", deadIds);
+    if (!deleteError) deleted = count ?? deadIds.length;
   }
 
   return NextResponse.json({ ok: true, sent, deleted });

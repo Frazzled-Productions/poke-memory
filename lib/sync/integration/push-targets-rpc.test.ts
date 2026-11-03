@@ -122,10 +122,10 @@ beforeAll(async () => {
   await adminPool.query(
     `INSERT INTO public.push_subscriptions (user_id, endpoint, p256dh, auth_secret)
      VALUES
-       ($1, 'https://push.example/a1', 'p256-a1', 'auth-a1'),
-       ($1, 'https://push.example/a2', 'p256-a2', 'auth-a2'),
-       ($2, 'https://push.example/b',  'p256-b',  'auth-b'),
-       ($3, 'https://push.example/n',  'p256-n',  'auth-n')`,
+       ($1, 'https://fcm.googleapis.com/fcm/send/a1', 'p256-a1', 'auth-a1'),
+       ($1, 'https://fcm.googleapis.com/fcm/send/a2', 'p256-a2', 'auth-a2'),
+       ($2, 'https://fcm.googleapis.com/fcm/send/b',  'p256-b',  'auth-b'),
+       ($3, 'https://fcm.googleapis.com/fcm/send/n',  'p256-n',  'auth-n')`,
     [USER_A, USER_B, USER_NO_SETTINGS],
   );
 
@@ -232,7 +232,7 @@ describe("get_push_targets - row shape and join semantics", () => {
     const byEndpoint = new Map(res.rows.map((r) => [r.endpoint, r]));
 
     // USER_A: two devices, both carrying the same settings fields.
-    for (const endpoint of ["https://push.example/a1", "https://push.example/a2"]) {
+    for (const endpoint of ["https://fcm.googleapis.com/fcm/send/a1", "https://fcm.googleapis.com/fcm/send/a2"]) {
       const row = byEndpoint.get(endpoint);
       expect(row).toBeDefined();
       expect(row.user_id).toBe(USER_A);
@@ -241,18 +241,18 @@ describe("get_push_targets - row shape and join semantics", () => {
       expect(row.settings).toEqual({ learningLocales: ["en", "ja"] });
       expect(typeof row.subscription_id).toBe("string");
     }
-    expect(byEndpoint.get("https://push.example/a1").p256dh).toBe("p256-a1");
-    expect(byEndpoint.get("https://push.example/a1").auth_secret).toBe("auth-a1");
+    expect(byEndpoint.get("https://fcm.googleapis.com/fcm/send/a1").p256dh).toBe("p256-a1");
+    expect(byEndpoint.get("https://fcm.googleapis.com/fcm/send/a1").auth_secret).toBe("auth-a1");
 
     // USER_B: settings row exists but timezone/hour are NULL.
-    const rowB = byEndpoint.get("https://push.example/b");
+    const rowB = byEndpoint.get("https://fcm.googleapis.com/fcm/send/b");
     expect(rowB.user_id).toBe(USER_B);
     expect(rowB.timezone).toBeNull();
     expect(rowB.push_notification_hour).toBeNull();
     expect(rowB.settings).toEqual({});
 
     // USER_NO_SETTINGS: LEFT JOIN null branch - subscription still returned.
-    const rowN = byEndpoint.get("https://push.example/n");
+    const rowN = byEndpoint.get("https://fcm.googleapis.com/fcm/send/n");
     expect(rowN.user_id).toBe(USER_NO_SETTINGS);
     expect(rowN.timezone).toBeNull();
     expect(rowN.settings).toBeNull();
