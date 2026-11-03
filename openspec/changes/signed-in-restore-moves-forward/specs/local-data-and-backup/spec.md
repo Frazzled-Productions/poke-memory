@@ -7,13 +7,11 @@
 
 ### Requirement: A guest or superuser restore replaces the session and settings, then reloads
 
-After a file validates, Settings SHALL ask for confirmation. For a guest, or for anyone with a superuser
-flag on, on yes `applyBackup` SHALL save the session and settings and the page SHALL reload; on no,
-nothing changes. Each card's `state.stepStartedAt` SHALL be set to null and its other state kept. This
-restore does not merge, and does not touch the grade log, streak, pending queue or sync status, and does
-not send the session to the cloud. A failed settings write is silent. A signed-in person with no
-superuser flag on takes the signed-in restore instead (see "A signed-in restore only moves cards
-forward").
+After a file validates, Settings SHALL ask for confirmation. For a guest, or with a superuser flag on,
+on yes `applyBackup` SHALL save the session and settings and the page SHALL reload; on no, nothing
+changes. Each card's `state.stepStartedAt` SHALL be set to null and its other state kept. This restore
+does not merge, and does not touch the grade log, streak, pending queue, sync status or the cloud. A
+failed settings write is silent. Anyone else signed in takes the signed-in restore.
 
 #### Scenario: Confirmed guest restore
 
