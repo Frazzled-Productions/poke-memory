@@ -88,4 +88,5 @@ Fraser approved the change on 2 November 2026 with all five recommended answers 
   registered, no open window to take the sync, and the push to fire before the new person's first
   grade overwrites the copy. Options: accept with no migration step, or a follow-up change that
   deletes the IndexedDB queue once on upgrade or when `guardAccountSwitch` sees a null owner.
-  Recommended: accept for this change and file the follow-up. Open for Fraser.
+  Recommended: accept for this change and file the follow-up. Fraser, 2026-11-03: accept as is; a
+  follow-up clears the leftover queue once on upgrade or at sign-in (#2373).
