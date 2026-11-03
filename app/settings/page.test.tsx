@@ -110,7 +110,7 @@ const { mockSuperuserFlags, mockSuperuserState, mockSetFlag } = vi.hoisted(
       string,
       boolean
     >,
-    mockSuperuserState: { unlocked: false },
+    mockSuperuserState: { unlocked: false, anyFlagOn: false },
     mockSetFlag: vi.fn(),
   }),
 );
@@ -119,7 +119,7 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
     unlocked: mockSuperuserState.unlocked,
     flags: mockSuperuserFlags,
     setFlag: mockSetFlag,
-    anyFlagOn: false,
+    anyFlagOn: mockSuperuserState.anyFlagOn,
   }),
 }));
 
@@ -173,6 +173,10 @@ vi.mock("@/lib/pokemon/SeedContext", () => ({
 
 vi.mock("@/lib/stats/derive", () => ({
   isMastered: vi.fn(() => false),
+}));
+
+vi.mock("@/lib/sync/restoreBackup", () => ({
+  restoreBackupSignedIn: vi.fn(),
 }));
 
 vi.mock("@/lib/backup/io", () => ({
@@ -456,6 +460,8 @@ function defaultSettings() {
 // ---------------------------------------------------------------------------
 
 import SettingsPage from "@/app/settings/page";
+import { applyBackup, validateBackup } from "@/lib/backup/io";
+import { restoreBackupSignedIn } from "@/lib/sync/restoreBackup";
 
 // ---------------------------------------------------------------------------
 // Shared setup
@@ -2155,5 +2161,99 @@ describe("SettingsPage - reset progress keeps the favourite (#2187)", () => {
         }),
       );
     });
+  });
+});
+
+describe("SettingsPage - backup restore (#2218)", () => {
+  const validated = { cards: [], limits: {}, settings: {} };
+  const GUEST_CONFIRM = "Replace your current progress with this backup?";
+
+  async function importFile() {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(validateBackup).mockResolvedValue({ ok: true, data: validated as never });
+    render(<SettingsPage />);
+    await screen.findByRole("button", { name: /^import$/i });
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await user.upload(input, new File(["{}"], "backup.json", { type: "application/json" }));
+    await waitFor(() => expect(confirm).toHaveBeenCalled());
+    return confirm;
+  }
+
+  beforeEach(() => {
+    vi.mocked(applyBackup).mockReset();
+    vi.mocked(restoreBackupSignedIn).mockReset();
+  });
+
+  afterEach(() => {
+    mockSuperuserState.anyFlagOn = false;
+    vi.restoreAllMocks();
+  });
+
+  function signIn() {
+    mockUseAuth.mockReturnValue({ user: makeUser(), supabase: {} as unknown, loading: false });
+  }
+
+  it("a signed-in restore moves cards forward and says so before it runs", async () => {
+    signIn();
+    vi.mocked(restoreBackupSignedIn).mockResolvedValue({ ok: true });
+    const confirm = await importFile();
+
+    expect(confirm.mock.calls[0][0]).toMatch(/only moves cards forward/);
+    await waitFor(() => expect(restoreBackupSignedIn).toHaveBeenCalledOnce());
+    expect(applyBackup).not.toHaveBeenCalled();
+    expect(screen.getByText(/anything your account has got further with stays/i)).toBeInTheDocument();
+  });
+
+  it("a signed-in restore that cannot reach the cloud reports it", async () => {
+    signIn();
+    vi.mocked(restoreBackupSignedIn).mockResolvedValue({ ok: false, reason: "pull-failed" });
+    await importFile();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/nothing was restored/i);
+  });
+
+  it("a signed-in restore that cannot save on this device says so, not the connection", async () => {
+    signIn();
+    vi.mocked(restoreBackupSignedIn).mockResolvedValue({ ok: false, reason: "save-failed" });
+    await importFile();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't save the backup on this device/i);
+    expect(alert).not.toHaveTextContent(/check your connection/i);
+  });
+
+  it("a guest restore replaces local progress as before", async () => {
+    const confirm = await importFile();
+
+    expect(confirm).toHaveBeenCalledWith(GUEST_CONFIRM);
+    await waitFor(() => expect(applyBackup).toHaveBeenCalledOnce());
+    expect(restoreBackupSignedIn).not.toHaveBeenCalled();
+  });
+
+  it("a signed-in restore under a superuser flag stays local", async () => {
+    signIn();
+    mockSuperuserState.anyFlagOn = true;
+    const confirm = await importFile();
+
+    expect(confirm).toHaveBeenCalledWith(GUEST_CONFIRM);
+    await waitFor(() => expect(applyBackup).toHaveBeenCalledOnce());
+    expect(restoreBackupSignedIn).not.toHaveBeenCalled();
+  });
+
+  it("a declined restore changes nothing", async () => {
+    signIn();
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    vi.mocked(validateBackup).mockResolvedValue({ ok: true, data: validated as never });
+    render(<SettingsPage />);
+    await screen.findByRole("button", { name: /^import$/i });
+    await user.upload(
+      document.querySelector<HTMLInputElement>('input[type="file"]')!,
+      new File(["{}"], "backup.json", { type: "application/json" }),
+    );
+    await waitFor(() => expect(window.confirm).toHaveBeenCalled());
+    expect(restoreBackupSignedIn).not.toHaveBeenCalled();
+    expect(applyBackup).not.toHaveBeenCalled();
   });
 });

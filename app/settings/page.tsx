@@ -14,6 +14,7 @@ import {
 import type { UserSettings } from "@/lib/settings/persistence";
 import { settingsAfterProgressReset } from "@/lib/favourite/favourite";
 import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
+import { restoreBackupSignedIn } from "@/lib/sync/restoreBackup";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
@@ -423,6 +424,8 @@ export default function SettingsPage() {
   const { user, supabase } = useAuth();
   const { updateFavourite } = useFavourite();
   const { unlocked, flags, setFlag, anyFlagOn } = useSuperuser();
+  // A superuser session writes nothing to the cloud, so it restores locally.
+  const restoreAccount = user && supabase && !anyFlagOn ? { userId: user.id, client: supabase } : null;
   const { seed } = useSeed();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [activeLocale, setActiveLocale] = useState<AppLocale>(DEFAULT_LOCALE);
@@ -712,12 +715,31 @@ export default function SettingsPage() {
       return;
     }
     const confirmed = window.confirm(
-      "Replace your current progress with this backup?"
+      restoreAccount
+        ? t("settings.backup.importConfirmSignedIn")
+        : "Replace your current progress with this backup?"
     );
-    if (confirmed) {
+    if (!confirmed) return;
+    if (restoreAccount) {
+      const restored = await restoreBackupSignedIn(
+        restoreAccount.client,
+        restoreAccount.userId,
+        result.data
+      );
+      if (!restored.ok) {
+        setImportError(
+          t(
+            restored.reason === "save-failed"
+              ? "settings.backup.importSaveFailedSignedIn"
+              : "settings.backup.importFailedSignedIn"
+          )
+        );
+        return;
+      }
+    } else {
       await applyBackup(result.data);
-      window.location.reload();
     }
+    window.location.reload();
   }
 
   function handleSave() {
@@ -1957,7 +1979,9 @@ export default function SettingsPage() {
 
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("settings.backup.importLabel")}</p>
-                    <p className={`mt-1 ${mutedTextXs}`}>{t("settings.backup.importDescription")}</p>
+                    <p className={`mt-1 ${mutedTextXs}`}>
+                      {t(restoreAccount ? "settings.backup.importDescriptionSignedIn" : "settings.backup.importDescription")}
+                    </p>
                     <input
                       ref={fileInputRef}
                       type="file"

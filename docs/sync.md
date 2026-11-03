@@ -10,7 +10,7 @@ The rules below exist because of incidents that have already happened (#293 wipe
 
 ### Order constraints
 
-- **Pull-before-push wherever an orchestrator merges cloud and local cards.** Today the only path that does this is `pullAndMerge` (`lib/sync/pullAndMerge.ts`), driven by `useVisibilityPull` and `useSignInPull`. Its order is `pullSession` → `mergeCloudIntoLocalSilent` → `saveSession`; it does **not** push back, by design. If you add a future orchestrator that does push, the order must be load local → `pullSession` → merge → save → push the merged result. Pushing first lets stale or emptied local state overwrite real cloud progress through the `(user_id, card_type, subject_key)` upsert key.
+- **Pull-before-push wherever an orchestrator merges cloud and local cards.** Two paths do this: `pullAndMerge` (`lib/sync/pullAndMerge.ts`), driven by `useVisibilityPull` and `useSignInPull`, and the signed-in backup restore, the one orchestrator that pushes (see "Signed-in backup restore" below). `pullAndMerge`'s order is `pullSession` → `mergeCloudIntoLocalSilent` → `saveSession`; it does **not** push back, by design. Any orchestrator that pushes must pull, then merge, save and push the merged result. Pushing first lets stale or emptied local state overwrite real cloud progress through the `(user_id, card_type, subject_key)` upsert key.
 - **Brand-new device (`loadSession()` returned `null`).** `pullAndMerge` handles this by building a fresh base session, merging cloud rows into it, and saving - it never pushes the merged result. Any future write path must preserve that property: the merged state is entirely cloud-sourced, so pushing it back is wasted bandwidth and widens the window for a future regression.
 - **If `pullSession` fails, do not push.** Pushing without knowing cloud state is the exact failure mode of #293. The same rule applies to anywhere else you sync: cards, streak, settings, future tables. Pull first, decide, then push.
 
@@ -71,6 +71,17 @@ During a constraint-affecting migration window (see [Constraint-affecting migrat
 ### Auxiliary sync legs are best-effort
 
 Cards are the primary contract - they flow through `usePerGradeSync` (per-grade debounced upsert) and `useSyncOnUnload` (beacon on page hide). Everything else is best-effort: the regional-prefs leg inside `pullAndMerge`, the `pushSettings` / `pushStreak` / `pushGradeLog` calls inside `AutoSyncOnChange`, and the settings-page write-back of auto-detected regional prefs. Their failures `console.warn` and continue - they must not flip the user-visible sync status into the error state. Surfacing "Sync failed" because the streak push hiccuped is worse than silently degrading. Structural-error detection (42xxx / 23505 / 23503) is explicitly NOT applied to auxiliary legs - only the card_reviews primary path.
+
+### Signed-in backup restore (#2218)
+
+A signed-in restore never lowers the cloud. `restoreBackupSignedIn` (`lib/sync/restoreBackup.ts`) runs `pullSession`, reads `last_reset_at`, loads local, merges, saves, then pushes. Local is loaded after the pull, as in `pullAndMerge`, so a grade saved during the pull is merged too. `planSignedInRestore` (`lib/sync/cloud.ts`) uses a backup card only when it is further on than both the cloud and this device, by `isFurtherOn`, which mirrors `card_reviews_reject_regression`. `lib/sync/integration/backup-restore.test.ts` runs that mirror against the real trigger, case by case, so a change to the trigger fails the test. If either read fails, nothing changes. If the push fails, the cards go in the pending queue and drain when Practice next opens, or on reconnect or Retry, with the usual retry and eviction.
+
+- **Why it does not replace the cloud:** a replace needs a new `SECURITY DEFINER` bypass. Pushing a lower row is refused by the regression trigger, and resetting first does not help, because the pre-reset trigger (migration 022) refuses any row dated before `last_reset_at`.
+- **Cards dated before the last reset are left out.** The pre-reset trigger fires on every push of them, including after a new grade, so restoring one would strand it on the device.
+- **Future-dated cards are left out.** A card whose first seen or last review is after tomorrow in UTC (a wrong clock, or a hand-edited file) would otherwise reach the cloud, where nothing caps `last_review`, and the regression trigger would refuse every real grade of it until that date.
+- **Settings and daily limits are left alone.** `user_settings_reject_regression` (migration 038) refuses a whole patch that lowers a guarded field, later changes in it included, and `AutoSyncOnChange` keeps its snapshot on a refusal, so older settings would stop the device's settings syncing.
+- **`grade_log` and `streak_days` are not in a backup**, so a restore never touches them, for guests either.
+- **Guests and superuser sessions** keep the local replace in `applyBackup`: there is no cloud to reconcile, or cloud writes are suppressed.
 
 ### Undo hold (#2052)
 

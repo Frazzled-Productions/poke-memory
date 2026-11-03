@@ -300,6 +300,10 @@
       "downloadCsv": "下載 CSV",
       "importLabel": "匯入進度",
       "importDescription": "從先前匯出的備份檔案還原。確認後將取代目前的進度。",
+      "importDescriptionSignedIn": "從先前匯出的備份檔案還原卡片進度。卡片只會向前推進：帳戶中進度較前面的內容維持不變。",
+      "importConfirmSignedIn": "你已登入，因此卡片只會向前推進。帳戶中進度較前面的內容維持不變，設定不會變更，上次重設之前的進度無法還原。要還原此備份嗎？",
+      "importFailedSignedIn": "無法連線到你的帳戶，因此未還原任何內容。請檢查網路連線後再試一次。",
+      "importSaveFailedSignedIn": "無法在此裝置上儲存備份，因此未還原任何內容。請釋出一些儲存空間後再試一次。",
       "importButton": "匯入"
     },
     "howThisWorks": {
