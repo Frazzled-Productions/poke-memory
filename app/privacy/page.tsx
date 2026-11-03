@@ -300,9 +300,9 @@ export default async function PrivacyPage() {
             includes a capped preview (up to 500 characters) of the message,
             plus the non-identifying metadata above (page, app version,
             timestamp). No user identifier is included. When the feedback is
-            deleted, we delete this notification from Discord too (see §8).
-            Discord is a sub-processor under a data processing agreement (see
-            §6).
+            deleted, we delete this notification from Discord too, and retry
+            any deletion that fails (see §8). Discord is a sub-processor under
+            a data processing agreement (see §6).
           </p>
         </section>
 
@@ -526,7 +526,7 @@ export default async function PrivacyPage() {
                     message, plus non-identifying metadata (page, app version,
                     timestamp). No user identifier is included. Sent to a
                     private, maintainer-only channel, and deleted when the
-                    feedback is deleted.
+                    feedback is deleted (we retry any deletion that fails).
                   </td>
                 </tr>
               </tbody>
@@ -679,7 +679,7 @@ export default async function PrivacyPage() {
             submission and then automatically deleted, regardless of account
             status. When a bug report is deleted, after 12 months or with your
             account, we also delete its notification in our Discord channel,
-            message preview included.
+            message preview included, and retry any deletion that fails.
           </p>
           <p className="mt-3">
             Error reports and performance traces held by Sentry are kept for

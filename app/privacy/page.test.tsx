@@ -168,6 +168,19 @@ describe("Privacy Notice page", () => {
       ).toBeInTheDocument();
     });
 
+    it("says a failed Discord deletion is retried, in sections 3, 6 and 8 (ruling 3 November 2026)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/delete this notification from discord too, and retry\s+any deletion that fails/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/feedback is deleted \(we retry any deletion that fails\)/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/message preview included, and retry any deletion that fails/i),
+      ).toBeInTheDocument();
+    });
+
     it("renders the feedback retention statement in section 8 (#1623)", async () => {
       await renderPage();
       expect(

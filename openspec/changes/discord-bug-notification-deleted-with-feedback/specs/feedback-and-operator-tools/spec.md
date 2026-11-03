@@ -138,12 +138,14 @@ Source: `app/api/discord/notify/route.ts`, `app/api/discord/notify/route.test.ts
 
 Notice section 3 SHALL say the Discord notification is deleted when the feedback is deleted, section 6
 SHALL say the same in the Discord row, and section 8 SHALL say a bug report's Discord notification,
-message preview included, is deleted after 12 months or with the account. The DPIA and the Children's
-Code assessment SHALL describe the same flow.
+message preview included, is deleted after 12 months or with the account. All three SHALL say that a
+deletion that fails is retried (Fraser, 3 November 2026; the retry sweep is #2369). The DPIA and the
+Children's Code assessment SHALL describe the same flow.
 
 #### Scenario: Reading the notice
 
 - **WHEN** anyone opens the privacy notice, in any locale
 - **THEN** sections 3, 6 and 8 say the notification is deleted with the feedback
+- **AND** each says a deletion that fails is retried
 
-Source: `app/privacy/page.tsx`, `app/privacy/page.test.tsx` "says the Discord bug notification is deleted with the feedback (ops #405)".
+Source: `app/privacy/page.tsx`, `app/privacy/page.test.tsx` "says the Discord bug notification is deleted with the feedback (ops #405)" and "says a failed Discord deletion is retried, in sections 3, 6 and 8 (ruling 3 November 2026)".

@@ -14,6 +14,7 @@
 - [x] 3.1 Notice sections 3, 6 and 8, and "Last updated" to 3 November 2026. Verify: `app/privacy/page.test.tsx` "says the Discord bug notification is deleted with the feedback (ops #405)" and the date test, red first (exit 1, 2 failed), then green (exit 0, 20 passed).
 - [x] 3.2 `docs/dpia.md` and `docs/childrens-code-assessment.md`. Verify: both mention deletion with the feedback row, by search for "ops #405".
 - [x] 3.3 `changed` changelog fragment. Verify: `npm run lint:changelog`.
+- [x] 3.4 Soften the notice to Fraser's 3 November ruling: sections 3, 6 and 8 say a failed deletion is retried. Verify: `app/privacy/page.test.tsx` "says a failed Discord deletion is retried, in sections 3, 6 and 8 (ruling 3 November 2026)" red against the previous wording (exit 1, 1 failed, 20 passed), then green (exit 0, 21 passed).
 
 ## 4. Finish
 

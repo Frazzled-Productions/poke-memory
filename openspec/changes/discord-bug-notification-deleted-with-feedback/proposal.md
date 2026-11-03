@@ -81,3 +81,6 @@ text later instead. This change replaces the earlier draft that removed the prev
 5. 3 November 2026, open: the notice's new sentence is only true once migration 051 is on production
    and ops #406 has cleared older posts. Recommended: apply 051 before promotion and do ops #406 straight
    after (#2368).
+- 3 November 2026, Fraser: as built, delete with the row, no retry for now (calls 2 and 3); soften
+  the notice to say we delete the post and retry any that fail (call 4, and PR call 7). The retry
+  sweep #2369 comes later. Built: sections 3, 6 and 8 now add "and retry any deletion that fails".
