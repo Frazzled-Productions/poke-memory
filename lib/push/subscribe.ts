@@ -332,8 +332,20 @@ export async function reconcileSubscription(
   if (!subscription) return "no-local";
 
   // A row on an unknown host is skipped at send time, so this device gets no
-  // reminders whether or not a row exists: show the toggle off (ops #380).
-  if (!isKnownPushEndpoint(subscription.endpoint)) return "disabled";
+  // reminders whether or not a row exists: show the toggle off (ops #380) and
+  // delete any row, as the privacy notice says for a toggle that is off.
+  if (!isKnownPushEndpoint(subscription.endpoint)) {
+    try {
+      await client
+        .from("push_subscriptions")
+        .delete()
+        .eq("user_id", userId)
+        .eq("endpoint", subscription.endpoint);
+    } catch {
+      // Best effort: account deletion still removes the row.
+    }
+    return "disabled";
+  }
 
   // Check for a matching server row.
   try {

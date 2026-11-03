@@ -32,7 +32,7 @@ people on time whatever one push service does. Refs ops #380.
   (`persist-failed`), which a browser using an unknown push service would now reach. `PushOptIn` only
   renders on the Settings page, and it is the only caller of `reconcileSubscription`
   (`lib/push/subscribe.ts:315`), so these both happen when Settings is opened on that device: an
-  unknown host gets `disabled`, with or without a row, and a device whose row was replaced at the
+  unknown host gets `disabled`, with or without a row, and its row is deleted, and a device whose row was replaced at the
   limit re-inserts it. Without the first, a skipped row would leave the toggle on while reminders
   have stopped, because a row existing returns `in-sync` today.
 - **Guest mode (localStorage):** no change, push is signed-in only (`lib/push/subscribe.ts:6`).
@@ -61,7 +61,8 @@ people on time whatever one push service does. Refs ops #380.
   The send route tests mock the database but use the same host, so their fixtures move too, because
   the send-time check would skip them, and so do the `resubscribe` route tests
   (`app/api/push/resubscribe/route.test.tsx:117-152`), which would get a 400. `e2e/settings.spec.ts:596`
-  stays: its insert goes to the mock client (`lib/auth/mockAuth.ts:178`), which writes nothing.
+  moves too: its insert goes to the mock client (`lib/auth/mockAuth.ts:178`), which writes nothing,
+  but a real-database run would refuse it.
   Draft #2222 (RLS coverage test) seeds `https://push.example/rls` at the latest schema, so whichever
   lands second moves that fixture. Draft #2227 seeds `push.example.test` at a cut-off, which needs a
   check when both exist. Those two, draft #2225 and draft #2221 also edit `docs/persistence.md`.
@@ -113,3 +114,10 @@ Each has a recommended answer, which the documents assume.
   with validation in ops #416. Open call 2: replace the least recently subscribed at 10 per account.
   Open call 3: keep 20, 15 seconds, 240 seconds and 300 seconds; Vercel Pro allows 300 seconds.
   Migration 049 may be applied to QA.
+- 2026-11-03 Review fixes (four reviewers at 2631f7cc). The delta now changes the existing
+  `push-notifications` capability (MODIFIED: Settings reconcile, `resubscribe`, storage, dead rows)
+  instead of adding a separate `push-delivery` one, so the archive leaves one consistent spec.
+  Migration 049 also brings a future `last_seen_at` on an existing row back to now, so a row from a
+  device whose clock ran ahead can still be replaced. Opening Settings on an unknown host now
+  deletes that device's row, which keeps the privacy notice's "deleted when the toggle is off" true.
+  Three integration tests were rewritten to prove what they name.

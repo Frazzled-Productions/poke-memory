@@ -14,10 +14,11 @@ import {
   insertAuthUser,
 } from "./setup";
 import { applyMigrations } from "./applyMigrations";
-import { KNOWN_PUSH_ENDPOINT_PATTERN } from "@/lib/push/endpoints";
 
 let adminPool: pg.Pool;
 let dbName: string;
+/** Rows seeded before migration 049 ran, read straight after it. */
+let rowsAfter049: { endpoint: string; clamped: boolean }[];
 
 const HOST = "https://fcm.googleapis.com/fcm/send";
 
@@ -85,7 +86,23 @@ async function newUser(): Promise<string> {
 beforeAll(async () => {
   ({ pool: adminPool, dbName } = await createTestDatabase());
   await applyPreMigrationFixture(adminPool);
-  await applyMigrations(adminPool);
+  await applyMigrations(adminPool, { through: "048_drop_get_push_reviewed_today.sql" });
+  // Rows that exist when 049 runs: one on an unknown host, one whose device
+  // clock was a year ahead.
+  const oldUser = randomUUID();
+  await insertAuthUser(adminPool, oldUser);
+  await adminPool.query(
+    `INSERT INTO public.push_subscriptions (user_id, endpoint, p256dh, auth_secret, last_seen_at)
+     VALUES ($1, 'https://push.example/old', 'p256', 'auth', now()),
+            ($1, $2, 'p256', 'auth', now() + interval '1 year')`,
+    [oldUser, `${HOST}/fast-clock`],
+  );
+  await applyMigrations(adminPool, { after: "048_drop_get_push_reviewed_today.sql" });
+  ({ rows: rowsAfter049 } = await adminPool.query(
+    `SELECT endpoint, last_seen_at <= now() AS clamped
+     FROM public.push_subscriptions WHERE user_id = $1 ORDER BY endpoint`,
+    [oldUser],
+  ));
   await adminPool.query(`GRANT USAGE ON SCHEMA public, auth TO authenticated`);
   await adminPool.query(`GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated`);
   await adminPool.query(
@@ -132,22 +149,8 @@ describe("known push hosts", () => {
     expect(await endpoints(user)).toHaveLength(10);
   });
 
-  it("keeps a row from before the check, which is NOT VALID until the follow-up", async () => {
-    const user = await newUser();
-    await adminPool.query(
-      `ALTER TABLE public.push_subscriptions DROP CONSTRAINT push_subscriptions_endpoint_known_host`,
-    );
-    await adminPool.query(
-      `INSERT INTO public.push_subscriptions (user_id, endpoint, p256dh, auth_secret)
-       VALUES ($1, 'https://push.example/old', 'p256', 'auth')`,
-      [user],
-    );
-    await adminPool.query(
-      `ALTER TABLE public.push_subscriptions
-       ADD CONSTRAINT push_subscriptions_endpoint_known_host
-       CHECK (endpoint ~ '${KNOWN_PUSH_ENDPOINT_PATTERN}') NOT VALID`,
-    );
-    expect(await endpoints(user)).toEqual(["https://push.example/old"]);
+  it("keeps a row from before the check, which is NOT VALID until the follow-up", () => {
+    expect(rowsAfter049.map((r) => r.endpoint)).toContain("https://push.example/old");
   });
 });
 
@@ -194,15 +197,31 @@ describe("at most 10 subscriptions per account", () => {
     const other = await newUser();
     const caller = await newUser();
     await seed(other, 10);
-    await expect(subscribe(caller, `${HOST}/x`).then(() =>
+    await subscribe(caller, `${HOST}/x`);
+    await expect(
       asUser(
         caller,
         `INSERT INTO public.push_subscriptions (user_id, endpoint, p256dh, auth_secret)
          VALUES ($1, $2, 'p256', 'auth')`,
         [other, `${HOST}/y`],
       ),
-    )).rejects.toMatchObject({ code: "42501" });
+    ).rejects.toMatchObject({ code: "42501" });
     expect(await endpoints(other)).toHaveLength(10);
+    expect(await endpoints(caller)).toEqual([`${HOST}/x`]);
+    // The refused insert rolls back whatever the trigger deleted, so the checks
+    // above pass either way. What keeps the delete inside the caller's own rows
+    // is that the trigger runs as the caller.
+    const { rows } = await adminPool.query<{ prosecdef: boolean }>(
+      `SELECT prosecdef FROM pg_proc WHERE proname = 'push_subscriptions_enforce_limit'`,
+    );
+    expect(rows).toEqual([{ prosecdef: false }]);
+  });
+
+  it("Device clock ahead before 049: the migration brings last_seen_at back to now", () => {
+    expect(rowsAfter049.find((r) => r.endpoint === `${HOST}/fast-clock`)).toEqual({
+      endpoint: `${HOST}/fast-clock`,
+      clamped: true,
+    });
   });
 
   it("Wrong device clock: the database sets last_seen_at, so the next insert does not replace it first", async () => {
@@ -227,17 +246,17 @@ describe("at most 10 subscriptions per account", () => {
   it("More than 10 devices take turns: the device with no row gets one back and the oldest other goes", async () => {
     const user = await newUser();
     await seed(user, 10);
-    // Device 11 was replaced earlier; Settings opens on it, so reconcile re-inserts its row.
-    await asUser(
-      user,
-      `DELETE FROM public.push_subscriptions WHERE user_id = $1 AND endpoint = $2`,
-      [user, `${HOST}/eleven`],
-    );
+    // An 11th device subscribes: device 0, the oldest, loses its row.
     await subscribe(user, `${HOST}/eleven`);
+    expect(await endpoints(user)).not.toContain(`${HOST}/0`);
+    // Settings opens on device 0: reconcile finds no row and inserts it again,
+    // so device 1, now the oldest, goes and the 11th device keeps its row.
+    await subscribe(user, `${HOST}/0`);
     const rows = await endpoints(user);
     expect(rows).toHaveLength(10);
+    expect(rows).toContain(`${HOST}/0`);
     expect(rows).toContain(`${HOST}/eleven`);
-    expect(rows).not.toContain(`${HOST}/0`);
+    expect(rows).not.toContain(`${HOST}/1`);
   });
 
   it("Existing device re-subscribes at the limit: no other row is replaced", async () => {

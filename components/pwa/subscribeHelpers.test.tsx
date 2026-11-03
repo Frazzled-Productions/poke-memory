@@ -146,21 +146,32 @@ describe("reconcileSubscription", () => {
     expect(result).toBe("re-inserted");
   });
 
-  it("Unknown host in Settings: returns 'disabled' when a row exists", async () => {
+  it("Unknown host in Settings: returns 'disabled', deletes the device's row and inserts nothing", async () => {
     const sub = makeFakeSubscription("https://push.example.com/sub/1");
     mockNavigatorServiceWorker(sub);
     const client = makeMockClient({ selectData: { endpoint: sub.endpoint } });
     const result = await reconcileSubscription(client, "user-1");
     expect(result).toBe("disabled");
+    const table = vi.mocked(client.from).mock.results[0].value;
+    expect(table.delete).toHaveBeenCalled();
+    expect(table.delete.mock.results[0].value.eq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(table.delete.mock.results[0].value.eq.mock.results[0].value.eq).toHaveBeenCalledWith(
+      "endpoint",
+      sub.endpoint,
+    );
+    expect(table.insert).not.toHaveBeenCalled();
+    expect(table.select).not.toHaveBeenCalled();
   });
 
-  it("Unknown host in Settings: returns 'disabled' with no row, and inserts nothing", async () => {
+  it("Unknown host in Settings: still 'disabled' when the delete throws", async () => {
     const sub = makeFakeSubscription("https://push.example.com/sub/1");
     mockNavigatorServiceWorker(sub);
-    const client = makeMockClient({ selectData: null });
-    const result = await reconcileSubscription(client, "user-1");
-    expect(result).toBe("disabled");
-    expect(client.from).not.toHaveBeenCalled();
+    const client = {
+      from: vi.fn(() => {
+        throw new Error("offline");
+      }),
+    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+    expect(await reconcileSubscription(client, "user-1")).toBe("disabled");
   });
 
   it("Replaced device opens Settings: no row, so it is inserted again", async () => {

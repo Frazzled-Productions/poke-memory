@@ -22,6 +22,14 @@
 -- their own clock and a wrong one would otherwise decide which row goes.
 -- Callers delete the matching row first, so re-subscribing a device never
 -- replaces another.
+--
+-- Rows from before this migration carry the client's clock. One dated in the
+-- future would never be the oldest, so it is brought back to now first (before
+-- the constraint, which would refuse an UPDATE to a row on another host).
+
+UPDATE public.push_subscriptions
+  SET last_seen_at = pg_catalog.now()
+  WHERE last_seen_at > pg_catalog.now();
 
 ALTER TABLE public.push_subscriptions
   ADD CONSTRAINT push_subscriptions_endpoint_known_host

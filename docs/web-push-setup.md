@@ -116,7 +116,7 @@ After all five steps are in place:
   and the database refuses the insert. Rows from before migration 049 on
   another host are skipped at send time, kept, and logged as
   `[push] rows on an unknown host skipped`; Settings shows the toggle off
-  on that device.
+  on that device and deletes its row.
 - **At most 10 subscriptions per account.** A `BEFORE INSERT` trigger
   (migration 049) deletes the least recently subscribed rows so an account
   keeps 10. The replaced device gets its row back the next time Settings

@@ -593,7 +593,7 @@ test.describe("Settings page - Web Push opt-in (#1056)", () => {
       // a non-existent VAPID-keyed endpoint and fail. The stub keeps the
       // round-trip purely client-side and deterministic.
       const fakeSubscription = {
-        endpoint: "https://push.example/e2e-fake-endpoint",
+        endpoint: "https://fcm.googleapis.com/fcm/send/e2e-fake-endpoint",
         getKey: (name: string) => {
           // Return a small buffer with a recognisable byte so the base64url
           // encoder in subscribe.ts produces a non-empty string.
