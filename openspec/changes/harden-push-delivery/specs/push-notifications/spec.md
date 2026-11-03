@@ -140,10 +140,25 @@ future `last_seen_at` on an existing row back to its own time.
 - **WHEN** a row written before the limit existed has a `last_seen_at` in the future
 - **THEN** the migration sets it to the database's time, so that row can be replaced like any other
 
+### Requirement: Settings turns off a device on an unknown push host
+
+When Settings loads with a local subscription on an unknown push host, `reconcileSubscription` SHALL
+delete the signed-in user's row for that endpoint, ignoring a failure, and return `disabled`, so the
+toggle shows off with or without a row: the send path skips that row, so the device gets no reminders.
+
+#### Scenario: Unknown host in Settings
+- **WHEN** Settings opens on a device whose subscription is on an unknown host and a row exists
+- **THEN** the row is deleted, nothing is inserted and the toggle shows off, not on (`components/pwa/subscribeHelpers.test.tsx:149-175`, `components/pwa/PushOptIn.test.tsx:261`)
+
+#### Scenario: Delete fails
+
+- **WHEN** the delete throws
+- **THEN** the result is still `disabled` (`components/pwa/subscribeHelpers.test.tsx:166`)
+
 ## MODIFIED Requirements
 
 ### Requirement: Opening Settings reconciles the local subscription
-When Settings loads with a local subscription, `reconcileSubscription` SHALL first check its endpoint against the known push hosts. On an unknown host it SHALL delete the signed-in user's row for that endpoint, ignoring a failure, and the toggle SHALL show off, with or without a row, because the send path skips that row. Otherwise it SHALL look for the signed-in user's row for that endpoint. A matching row, or a failed query, SHALL show the toggle on. With no row it SHALL re-insert one from the local keys, for whichever account is signed in, superuser flags on or off; at the limit of 10 that insert replaces the user's least recently subscribed other row. If the re-insert fails or the keys are missing, the toggle SHALL show off. With no local subscription, the toggle SHALL show off without a server check. There is no reconcile outside Settings.
+When Settings loads with a local subscription on a known push host, `reconcileSubscription` SHALL look for the signed-in user's row for that endpoint. A matching row, or a failed query, SHALL show the toggle on. With no row it SHALL re-insert one from the local keys, for whichever account is signed in, superuser flags on or off. If the re-insert fails or the keys are missing, the toggle SHALL show off. With no local subscription, the toggle SHALL show off without a server check.
 
 #### Scenario: Row present
 - **WHEN** a matching row exists
@@ -152,10 +167,6 @@ When Settings loads with a local subscription, `reconcileSubscription` SHALL fir
 #### Scenario: Row gone
 - **WHEN** no row exists and the re-insert works
 - **THEN** the result is `re-inserted` and the toggle shows on (`components/pwa/subscribeHelpers.test.tsx:141`, `components/pwa/PushOptIn.test.tsx:251`)
-
-#### Scenario: Unknown host in Settings
-- **WHEN** Settings opens on a device whose subscription is on an unknown host and a row exists
-- **THEN** the row is deleted, nothing is inserted and the toggle shows off, not on (`components/pwa/subscribeHelpers.test.tsx:149-175`, `components/pwa/PushOptIn.test.tsx:261`)
 
 #### Scenario: Replaced device opens Settings
 - **WHEN** a device's row was replaced at the limit and Settings opens on it
