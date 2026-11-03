@@ -303,6 +303,7 @@
       "importDescriptionSignedIn": "[Restore card progress from a previously exported backup. Cards only move forward: anything your account has got further with stays as it is.]",
       "importConfirmSignedIn": "[You're signed in, so this only moves cards forward. Anything your account has got further with stays as it is, your settings don't change, and progress from before your last reset can't be restored. Restore this backup?]",
       "importFailedSignedIn": "[Couldn't reach your account, so nothing was restored. Check your connection and try again.]",
+      "importSaveFailedSignedIn": "[Couldn't save the backup on this device, so nothing was restored. Free up some storage space and try again.]",
       "importButton": "[Import]"
     },
     "howThisWorks": {

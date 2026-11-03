@@ -2213,6 +2213,16 @@ describe("SettingsPage - backup restore (#2218)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/nothing was restored/i);
   });
 
+  it("a signed-in restore that cannot save on this device says so, not the connection", async () => {
+    signIn();
+    vi.mocked(restoreBackupSignedIn).mockResolvedValue({ ok: false, reason: "save-failed" });
+    await importFile();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't save the backup on this device/i);
+    expect(alert).not.toHaveTextContent(/check your connection/i);
+  });
+
   it("a guest restore replaces local progress as before", async () => {
     const confirm = await importFile();
 

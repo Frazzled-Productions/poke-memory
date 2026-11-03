@@ -78,6 +78,7 @@ A signed-in restore never lowers the cloud. `restoreBackupSignedIn` (`lib/sync/r
 
 - **Why it does not replace the cloud:** a replace needs a new `SECURITY DEFINER` bypass. Pushing a lower row is refused by the regression trigger, and resetting first does not help, because the pre-reset trigger (migration 022) refuses any row dated before `last_reset_at`.
 - **Cards dated before the last reset are left out.** The pre-reset trigger fires on every push of them, including after a new grade, so restoring one would strand it on the device.
+- **Future-dated cards are left out.** A card whose first seen or last review is after tomorrow in UTC (a wrong clock, or a hand-edited file) would otherwise reach the cloud, where nothing caps `last_review`, and the regression trigger would refuse every real grade of it until that date.
 - **Settings and daily limits are left alone.** `user_settings_reject_regression` (migration 038) refuses a whole patch that lowers a guarded field, later changes in it included, and `AutoSyncOnChange` keeps its snapshot on a refusal, so older settings would stop the device's settings syncing.
 - **`grade_log` and `streak_days` are not in a backup**, so a restore never touches them, for guests either.
 - **Guests and superuser sessions** keep the local replace in `applyBackup`: there is no cloud to reconcile, or cloud writes are suppressed.

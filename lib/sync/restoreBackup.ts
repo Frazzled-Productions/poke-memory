@@ -9,7 +9,7 @@ import {
 } from "@/lib/sync/persistence";
 import { cardPushKey } from "@/lib/sync/heldGrade";
 import { loadSession, migrateReviewCard, saveSession } from "@/lib/review/persistence";
-import type { ReviewableCard } from "@/lib/review/session";
+import { todayString, type ReviewableCard } from "@/lib/review/session";
 
 export type SignedInRestoreResult =
   | { ok: true }
@@ -24,6 +24,18 @@ function currentShape(cards: readonly ReviewableCard[]): ReviewableCard[] {
   const copies = structuredClone(cards) as ReviewableCard[];
   copies.forEach(migrateReviewCard);
   return copies.filter((c) => typeof c.subjectKey === "string");
+}
+
+/**
+ * True when a card carries a date no real grade could have yet. Nothing in the
+ * database caps `last_review`, and the regression trigger refuses any later grade
+ * dated before it, so pushing a 2099 card (a wrong clock, or a hand-edited file)
+ * would stop that card syncing until 2099. `latest` is tomorrow in UTC, the
+ * furthest ahead any timezone's today can be.
+ */
+function isFutureDated(card: ReviewableCard, latest: string): boolean {
+  const { firstSeen, lastReview } = card.state;
+  return (firstSeen !== null && firstSeen > latest) || (lastReview !== null && lastReview > latest);
 }
 
 /**
@@ -56,8 +68,9 @@ export async function restoreBackupSignedIn(
   if (reset === null) return { ok: false, reason: "pull-failed" };
 
   const local = await loadSession();
+  const latest = todayString(new Date(Date.now() + 24 * 60 * 60 * 1000));
   const { cards, toPush } = planSignedInRestore(
-    currentShape(data.cards),
+    currentShape(data.cards).filter((c) => !isFutureDated(c, latest)),
     local?.cards ?? [],
     cloudRows,
     reset.lastResetAt,
@@ -67,14 +80,17 @@ export async function restoreBackupSignedIn(
   if (!saved.ok) return { ok: false, reason: "save-failed" };
 
   if (toPush.length > 0) {
-    if (await pushSession(client, userId, toPush)) {
+    const pushed = await pushSession(client, userId, toPush);
+    // A queued copy of a restored card is older than it, so it goes either way:
+    // the database would refuse it, and the queue keeps the first copy per key.
+    const restored = new Set(toPush.map(cardPushKey));
+    const queue = loadPendingQueue();
+    const others = queue.filter((c) => !restored.has(cardPushKey(c)));
+    if (pushed) {
       markPushSucceeded();
+      if (others.length < queue.length) savePendingQueue(others);
     } else {
-      const restored = new Set(toPush.map(cardPushKey));
-      savePendingQueue([
-        ...loadPendingQueue().filter((c) => !restored.has(cardPushKey(c))),
-        ...toPush,
-      ]);
+      savePendingQueue([...others, ...toPush]);
     }
   }
   return { ok: true };

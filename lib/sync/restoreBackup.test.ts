@@ -295,6 +295,33 @@ describe("restoreBackupSignedIn", () => {
     expect(pushed.map((c) => c.subjectKey)).toEqual(["1"]);
   });
 
+  it("drops a queued older copy of a card it pushed, keeping other waiting grades", async () => {
+    mocks.loadPendingQueue.mockReturnValue([
+      card(1, reviewed(1, "2026-02-01")),
+      card(7, reviewed(2, "2026-02-01")),
+    ]);
+    await restoreBackupSignedIn(client, "u", data([card(1, reviewed(3, "2026-05-01"))]));
+    expect(mocks.markPushSucceeded).toHaveBeenCalledOnce();
+    const queued = mocks.savePendingQueue.mock.calls[0][0] as ReviewableCard[];
+    expect(repsById(queued)).toEqual({ 7: 2 });
+  });
+
+  it("leaves out a card dated after tomorrow, which would lock the cloud row", async () => {
+    await restoreBackupSignedIn(
+      client,
+      "u",
+      data([
+        card(1, reviewed(3, "2099-01-01")),
+        card(2, { ...reviewed(3, "2026-05-01"), firstSeen: "2099-01-01" }),
+        card(3, reviewed(3, "2026-05-01")),
+      ]),
+    );
+    const pushed = mocks.pushSession.mock.calls[0][2] as ReviewableCard[];
+    expect(pushed.map((c) => c.id)).toEqual([3]);
+    const saved = mocks.saveSession.mock.calls[0][0].cards as ReviewableCard[];
+    expect(saved.map((c) => c.id)).toEqual([3]);
+  });
+
   it("uses the account's last reset as the cut-off", async () => {
     mocks.pullLastResetAt.mockResolvedValue({ lastResetAt: "2026-05-02T00:00:00+00:00" });
     await restoreBackupSignedIn(client, "u", data([card(1, reviewed(3, "2026-03-01"))]));

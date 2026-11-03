@@ -22,11 +22,16 @@ This builds the answer Fraser chose on 2 November 2026 (see Clarifications): car
 - New pure `planSignedInRestore` and `isFurtherOn` (`lib/sync/cloud.ts`). `isFurtherOn` mirrors the
   regression trigger and is checked against the real trigger case by case.
 - Cards dated before the account's last reset are left out, because the database refuses them on
-  every push.
+  every push. Cards dated after tomorrow in UTC are left out too, because nothing caps `last_review`
+  and one in the cloud would make the trigger refuse every real grade of it until that date.
+- After a successful push, an older queued copy of a pushed card leaves the pending queue, so it is
+  not sent and refused later.
 - A signed-in restore leaves settings and daily limits alone.
 - Settings shows signed-in wording in the description and the confirmation, and reports a failed
-  restore. Guests and superuser sessions keep the current local replace, with the same dialog.
-- New capability `backup-restore`: a baseline of current behaviour plus the signed-in requirements.
+  restore, naming this device rather than the connection when only the save failed. Guests and superuser sessions keep the current local replace, with the same dialog.
+- Capability `local-data-and-backup`: the restore requirement is renamed and scoped to guests and
+  superuser sessions, and the signed-in requirements are added beside it. Export and file validation
+  are already baselined there and do not change.
 
 ## Also touches
 
@@ -46,8 +51,11 @@ removing its reps guard fails two cases.
   saved session after the reload. `grade_log` and `streak_days` are not in a backup, so Stats history
   stays as it was, as it does today.
 - **What's new:** no change, this corrects an existing action.
-- **Locales (en, ja, zh-Hans, zh-Hant, pseudo-locale):** three new keys, `importDescriptionSignedIn`,
-  `importConfirmSignedIn` and `importFailedSignedIn`, in all four catalogues; pseudo-locale regenerated.
+- **Locales (en, ja, zh-Hans, zh-Hant, pseudo-locale):** four new keys, `importDescriptionSignedIn`,
+  `importConfirmSignedIn`, `importFailedSignedIn` and `importSaveFailedSignedIn`, in all four
+  catalogues; pseudo-locale regenerated.
+- **Specs:** `local-data-and-backup` (baselined in #2265), whose restore requirement said a restore
+  never merges or reaches the cloud; it is renamed and modified here, not duplicated.
 - **Push notifications and the service worker (offline):** no code change. On a failed push
   `savePendingQueue` writes the existing queue and its IndexedDB mirror, so the existing replay
   applies. An offline restore fails at the pull and changes nothing.
@@ -69,8 +77,6 @@ Risks kept open, each small:
 - A device already behind the cloud keeps its copy if the backup is no further on than the cloud, so
   the spec's "holds the reps 9 copy" relies on the next pull. A card already stranded by today's
   restore stays stranded. Adopting the cloud row there is a small follow-up.
-- A failed save reports `importFailedSignedIn`, which says the account could not be reached. Nothing
-  is restored, as it says, but the cause is local storage. Only a full device reaches this.
 - A card the database refuses on other grounds, for example a hand-edited stability, fails its batch of
   200, so that batch falls to the queue, where the refused card is evicted but stays on this device.
   Only a hand-edited file reaches this.
@@ -110,3 +116,4 @@ built" settles every call below on its recommendation. The original calls follow
 - 2026-11-02 The real sign-in case covers an older copy and a newer one. The reset, two-device and failure cases are proven against real Postgres through a stand-in client only. Recommended: accept; they are the same code path, and the triggers involved are the real ones.
 - 2026-11-02 The ja, zh-Hans and zh-Hant strings are mine and no native speaker has read them. Recommended: the usual translation check before merge (task 2.2).
 - 2026-11-02 The guest dialog stays hard-coded English. Recommended: leave it here and fix it in its own small change.
+- 2026-11-03 Final review (four reviewers on #2367): every finding fixed on the branch, none needed an owner call. Future-dated cards are left out, a queued copy of a pushed card is dropped after a successful push, a failed save has its own message (`importSaveFailedSignedIn`), and the spec now modifies `local-data-and-backup` instead of adding a second capability.

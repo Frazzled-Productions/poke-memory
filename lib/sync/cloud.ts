@@ -694,8 +694,11 @@ export function mergeCloudIntoLocalSilent(
  * True when `next` is further on than `base`: the two differ in a field the
  * regression trigger guards, and writing `next` over `base` would pass that
  * trigger. Mirrors `card_reviews_reject_regression` (migration 029); the
- * integration test backup-restore.test.ts checks every branch against the real
+ * integration test backup-restore.test.ts checks its cases against the real
  * trigger, so a change there fails the test rather than drifting from this.
+ * One difference: when both last-review dates are null, a lower
+ * `scheduled_days` is refused here but accepted by the trigger. That is the safe
+ * side, and a card with no last review is never pushed anyway.
  */
 export function isFurtherOn(next: CloudRow, base: CloudRow): boolean {
   const newLastReview = next.last_review;

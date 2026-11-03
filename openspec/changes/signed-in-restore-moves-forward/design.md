@@ -17,7 +17,7 @@ state is covered on one by `e2e/auth-real.spec.ts`.
   the cloud lacks is not added, and a grade still in the queue is overwritten on this device
   (`expected 3 to be 5`). After a reset the restored card stays on the device while the cloud has none
   (`expected '2026-10-02' to be null`), and the pre-reset trigger refuses it on every push.
-- **Expected behaviour:** the outcome is an open call. Under the recommendation, this device and the
+- **Expected behaviour:** as Fraser ruled on 2 November 2026 (move forward only), this device and the
   cloud agree after a restore, nothing in the cloud goes down, and later grades sync.
 - **Unchanged behaviour:**
   - WHEN a guest confirms a restore THEN the session and settings SHALL CONTINUE TO be replaced locally.

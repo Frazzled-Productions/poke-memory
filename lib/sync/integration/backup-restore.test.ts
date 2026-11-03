@@ -1,9 +1,8 @@
 /**
  * Integration test: a signed-in backup restore never lowers the cloud (#2218).
  *
- * This is the outcome RECOMMENDED in the OpenSpec change
- * signed-in-restore-moves-forward, which is waiting for the owner's decision.
- * If the owner picks another outcome, this file changes with it.
+ * This is the outcome the owner chose on 2 November 2026 for the OpenSpec change
+ * signed-in-restore-moves-forward: cards only move forward.
  *
  * Runs the real restore, real pullAndMerge and real push code over real Postgres
  * with every migration applied, so the regression trigger, the pre-reset trigger
