@@ -187,9 +187,9 @@ Evidence: `app/layout.tsx:256`; `components/pwa/StoragePersistenceRequester.tsx:
 
 `clearLocalProgress` SHALL remove every localStorage key starting `poke-memory:` except those starting
 `poke-memory:settings:` or `poke-memory:user-archive:`, and SHALL delete the IndexedDB review session,
-grade log and migration flag. A localStorage error SHALL NOT stop the IndexedDB deletes. It SHALL then
-dispatch same-tab `storage` events for the session and grade-log keys. It does not touch the cloud or the
-`offline-pack` store.
+grade log, migration flag and pending-grade queue. A localStorage error SHALL NOT stop the IndexedDB
+deletes. It SHALL then dispatch same-tab `storage` events for the session and grade-log keys. It does
+not touch the cloud or the `offline-pack` store.
 
 #### Scenario: Shared device
 
@@ -216,9 +216,20 @@ dispatch same-tab `storage` events for the session and grade-log keys. It does n
 - **WHEN** a reset finishes with Stats or Pasture subscribed
 - **THEN** they receive `storage` events for both keys and show the empty state without a reload
 
+#### Scenario: Queued grades at a reset
+
+- **WHEN** a reset runs with grades in the pending-grade queue
+- **THEN** the queue is in neither localStorage nor IndexedDB
+
+#### Scenario: App closed with a sync tag still registered
+
+- **WHEN** Background Sync fires after a reset
+- **THEN** the service worker finds an empty queue and sends nothing
+
 Looks wrong (#2337): the deletes do nothing while IndexedDB is off, and the data returns on reload.
 
-Evidence: `lib/storage/reset.ts:18-70`; `lib/storage/keys.ts:135`, `:147`; `lib/storage/reset.test.ts:117`, `:135`, `:155`, `:168`.
+Evidence: `lib/storage/reset.ts:22-75`; `lib/storage/keys.ts:43`, `:135`, `:147`; `app/sw.ts:544`, `:678`;
+`lib/storage/reset.test.ts:143`, `:161`, `:181`, `:233`.
 
 ### Requirement: Reset order depends on who is signed in (baseline)
 

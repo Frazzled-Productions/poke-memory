@@ -760,8 +760,13 @@ Two scenarios below look like bugs (#2231, #2334).
 
 #### Scenario: Queued rows at a reset
 
-- **WHEN** local is cleared with rows in the pending-queue mirror
-- **THEN** the mirror stays in IndexedDB, and the service worker can replay it
+- **WHEN** local is cleared, on this device or after a reset on another device, with rows in the pending-queue mirror
+- **THEN** the mirror is removed from IndexedDB with the localStorage copy, so the service worker has nothing to replay
+
+#### Scenario: Cloud reset fails with rows queued
+
+- **WHEN** the RPC errors with rows in the pending queue
+- **THEN** the queue stays in both localStorage and IndexedDB
 
 #### Scenario: Stale row dated the reset day
 
@@ -773,7 +778,7 @@ Two scenarios below look like bugs (#2231, #2334).
 - **WHEN** a pull's settings read fails after a reset elsewhere
 - **THEN** local is not cleared on this pull, the merge continues, and the next pull clears it
 
-Source: `db/migrations/026_reset_all_progress_cooldown.sql:28`, `db/migrations/026_reset_all_progress_cooldown.sql:45`, `db/migrations/026_reset_all_progress_cooldown.sql:54`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:25`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:68`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:133`, `lib/sync/reset.ts:50`, `lib/sync/pullAndMerge.ts:174`, `lib/sync/pullAndMerge.ts:624`, `lib/storage/reset.ts:18`, `lib/storage/reset.ts:49`, `lib/sync/pullAndMerge.test.ts:741`.
+Source: `db/migrations/026_reset_all_progress_cooldown.sql:28`, `db/migrations/026_reset_all_progress_cooldown.sql:45`, `db/migrations/026_reset_all_progress_cooldown.sql:54`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:25`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:68`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:133`, `lib/sync/reset.ts:50`, `lib/sync/pullAndMerge.ts:174`, `lib/sync/pullAndMerge.ts:624`, `lib/storage/reset.ts:22`, `lib/storage/reset.ts:53-58`, `lib/sync/pullAndMerge.test.ts:741`.
 
 ### Requirement: Deleting an account (baseline)
 
