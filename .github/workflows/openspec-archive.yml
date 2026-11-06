@@ -1,8 +1,10 @@
-# Archives every OpenSpec change on qa once its PR has merged (ops/standards/openspec-adoption,
+# Archives each OpenSpec change on qa once its build has merged (ops/standards/openspec-adoption,
 # GitHub-hosted variant: the repo is public, so the minutes are free). Work lands on qa; main only
 # takes promotions, so the bot archives on qa and its PR targets qa.
 # required-contexts must list exactly what the qa-staging ruleset requires, the two OpenSpec checks
 # included (ops/standards/openspec-adoption/README.md).
+# skip-not-started leaves a proposal with tasks and none ticked in place, naming it in the run log
+# (#2376, koinori #2591); a partly ticked change still fails loudly.
 name: OpenSpec archive
 
 on:
@@ -29,6 +31,7 @@ jobs:
     with:
       runs-on: '"ubuntu-latest"'
       base-branch: qa
+      skip-not-started: true
       required-contexts: |-
         test
         e2e
