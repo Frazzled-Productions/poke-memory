@@ -83,7 +83,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^5.0.5",
-    "browserslist": "^4.28.8",
+    "browserslist": "^4.29.5",
     "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
