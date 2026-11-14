@@ -175,33 +175,39 @@ async function syncCards(
           allOk = false;
           break outerLoop;
         }
-        // 23514 = check_violation from the regression trigger. One stale row
-        // in the batch aborts the entire Postgres statement, preventing 199
-        // valid rows from landing. Fall back to per-row upserts so a single
-        // rejected row cannot poison the batch (F23 / #1856).
+        // 23514 = check_violation from the regression trigger or a table CHECK.
+        // One stale or malformed row in the batch aborts the entire Postgres
+        // statement, preventing 199 valid rows from landing. Fall back to per-row
+        // upserts so a single rejected row cannot poison the batch (F23 / #1856).
         if (error.code === "23514") {
-          let batchHadGoodRow = false;
+          // Each row ends one of four ways: landed, rejected (a deliberate
+          // eviction, not a failure), structural (409, as for a whole batch) or
+          // unknown. Only an unknown failure fails the batch, because the client
+          // clears its queue on a 2xx and the row would stay off the cloud (#2206).
+          let rowUnknownFailure = false;
           for (const row of batch) {
             try {
               const { error: rowError } = await supabase
                 .from("card_reviews")
                 .upsert(row, { onConflict: CARD_REVIEWS_CONFLICT_COLS });
-              if (!rowError) {
-                batchHadGoodRow = true;
-              } else if (rowError.code !== "23514") {
-                // Unexpected error on an individual row - log but continue.
-                console.warn(
-                  `[sync/route] per-row upsert error (SQLSTATE ${rowError.code}): ${rowError.message}`
+              if (!rowError || rowError.code === "23514") continue;
+              if (isStructuralError(rowError)) {
+                console.error(
+                  `[sync/route] structural error on per-row upsert (SQLSTATE ${rowError.code}): ${rowError.message}`
                 );
+                structuralErrorCode = rowError.code;
+                break outerLoop;
               }
-              // 23514 on an individual row: silently skip (the cloud row is newer).
-            } catch {
-              // Best-effort: per-row network error, skip and continue.
+              console.warn(
+                `[sync/route] per-row upsert error (SQLSTATE ${rowError.code}): ${rowError.message}`
+              );
+              rowUnknownFailure = true;
+            } catch (err) {
+              console.warn("[sync/route] per-row upsert threw", err);
+              rowUnknownFailure = true;
             }
           }
-          // Count the batch as ok when at least one row landed; individual
-          // rejections are intentional evictions, not failures.
-          if (batchHadGoodRow) batchOk = true;
+          batchOk = !rowUnknownFailure;
           break; // per-row fallback is its own retry; exit the attempt loop.
         }
       } catch {
