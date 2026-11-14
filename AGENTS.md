@@ -2,8 +2,6 @@
 
 An Anki-style spaced-repetition app for learning Pokémon names and evolutions, with progress tracking of what the user knows. A Pokédex browser is a secondary surface.
 
-This repo also serves as a sandbox for practicing Claude Code sub-agent workflows - see the roster and playbook below. When choosing how to do work here, lean toward demonstrating sub-agent patterns over the fastest path, but only when the agent earns its keep.
-
 ## Stack
 - Next.js 16.2.6 (App Router)
 - React 19.2.6
