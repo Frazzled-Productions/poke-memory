@@ -61,7 +61,7 @@ CREATE POLICY "<name>_insert" ON <name>
 --   FOR DELETE USING (auth.uid() = user_id);
 ```
 
-Named per-verb policies (SELECT, INSERT, and optionally UPDATE/DELETE) beat a single `FOR ALL` - easier to audit and to drop selectively. The template above defaults to SELECT + INSERT as the safe baseline for append-only tables; add UPDATE/DELETE only if the table is genuinely mutable from the client. `ON DELETE CASCADE` ensures rows die with their user. Always combine `CREATE TABLE` + `ENABLE RLS` + policies in the same migration; an enabled-RLS-without-policies state silently blocks the client.
+Named per-verb policies (SELECT, INSERT, and optionally UPDATE/DELETE) beat a single `FOR ALL` - easier to audit and to drop selectively. The template above defaults to SELECT + INSERT as the safe baseline for append-only tables; add UPDATE/DELETE only if the table is genuinely mutable from the client. `ON DELETE CASCADE` ensures rows die with their user: `lib/sync/integration/account-erasure.test.ts` fails on a `user_id` column without it, and on a new `user_id` table missing from `USER_TABLES` in `lib/sync/integration/userRows.ts`, which brings the table under the erasure tests. Always combine `CREATE TABLE` + `ENABLE RLS` + policies in the same migration; an enabled-RLS-without-policies state silently blocks the client.
 
 For append-only tables (logs, daily markers, audit trails), omit the UPDATE and DELETE policies - `grade_log` and `streak_days` both had theirs **removed** in migration 018 as defence against client-side wipe bugs. See "Invariants on existing data" below for the designated escape hatch.
 
@@ -69,7 +69,7 @@ Reference shapes: `streak_days` (migration 001 plus the 018 lockdown) for an app
 
 ## Invariants on existing data
 
-If a column has a "this value only moves forward" semantic (review dates, counters, etc.) or a "one-way transition" semantic (boolean flags that should never flip back), add a `BEFORE UPDATE` trigger that `RAISE EXCEPTION ... USING ERRCODE = 'check_violation'` (errcode `23514`). Model: migration 002's `card_reviews_reject_regression_trigger` for lifecycle timestamps, migration 015 for monotonic counters, migration 016 for the same-date scheduling guard pattern, and migration 017 for one-way boolean flags. The client surfaces the error as a sync failure; users see "Sync failed" rather than silent data loss. Do not work around an existing trigger - a legitimate reset / delete-account flow goes through `reset_all_progress` (migration 018), which is a `SECURITY DEFINER` RPC.
+If a column has a "this value only moves forward" semantic (review dates, counters, etc.) or a "one-way transition" semantic (boolean flags that should never flip back), add a `BEFORE UPDATE` trigger that `RAISE EXCEPTION ... USING ERRCODE = 'check_violation'` (errcode `23514`). Model: migration 002's `card_reviews_reject_regression_trigger` for lifecycle timestamps, migration 015 for monotonic counters, migration 016 for the same-date scheduling guard pattern, and migration 017 for one-way boolean flags. The client surfaces the error as a sync failure; users see "Sync failed" rather than silent data loss. Do not work around an existing trigger - a legitimate reset goes through `reset_all_progress` (migration 018) and a delete through `delete_account` (migration 027), both `SECURITY DEFINER` RPCs.
 
 ## Apply the migration
 
