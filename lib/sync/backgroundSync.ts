@@ -9,7 +9,7 @@
  * When a grade push fails while offline, the caller registers the
  * `poke-memory:grade-sync` tag. The browser will fire a `sync` event in the
  * service worker once connectivity is restored - even if every app tab is
- * closed. The SW handler (`app/sw.ts`) then reads the persisted pending queue
+ * closed. The SW handler (`lib/pwa/swReplay.ts`) then reads the persisted pending queue
  * from IndexedDB and replays it against `/api/sync`.
  *
  * Anti-double-push: the SW checks for active window clients before pushing.

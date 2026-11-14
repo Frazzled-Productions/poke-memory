@@ -48,6 +48,7 @@ import {
   versionedCacheName,
 } from "@/lib/pwa/cacheStrategy";
 import { SW_IDB_OPEN_TIMEOUT_MS, openSwIdb } from "@/lib/pwa/swIdb";
+import { replayPendingGrades } from "@/lib/pwa/swReplay";
 import { buildOfflineAssetResponse } from "@/lib/pwa/rangeResponse";
 
 // SW_CACHE_VERSION and versionedCacheName are imported from lib/pwa/cacheStrategy.ts - 
@@ -85,13 +86,6 @@ const PENDING_QUEUE_KEY = "poke-memory:pending-grade-queue:v1";
  * lib/sync/backgroundSync.ts.
  */
 const BACKGROUND_SYNC_TAG = "poke-memory:grade-sync";
-
-/**
- * Message type sent to active window clients when the `sync` event fires while
- * the app is open. Must stay byte-identical to SW_REPLAY_MESSAGE in
- * lib/sync/backgroundSync.ts.
- */
-const SW_REPLAY_MESSAGE = "BACKGROUND_SYNC_REPLAY";
 
 /**
  * Minimal typing for the service-worker global scope.
@@ -587,134 +581,22 @@ async function clearPendingQueueFromIdb(): Promise<void> {
 }
 
 /**
- * How long (ms) the SW waits for a window client to ACK the
- * `BACKGROUND_SYNC_REPLAY` delegation message before falling through to the
- * direct-push path. 3 s is long enough for a frozen/backgrounded tab to
- * respond but short enough not to delay grade delivery meaningfully.
- */
-const CLIENT_ACK_TIMEOUT_MS = 3000;
-
-/**
- * Background Sync handler (#1054).
- *
- * Fires when the browser reconnects after offline grading, even if every app
- * tab has been closed. The handler:
- *
- *   1. Checks for active window clients. If any are present, posts
- *      `BACKGROUND_SYNC_REPLAY` to each one via a `MessageChannel` and waits
- *      up to `CLIENT_ACK_TIMEOUT_MS` for at least one ACK. On ACK the client
- *      has committed to running the pull-before-push sequence - the SW resolves
- *      without pushing. If no ACK arrives within the timeout (client frozen /
- *      backgrounded / not yet hydrated), the handler falls through to step 2.
- *
- *   2. When no clients are active, or no client ACK'd in time, reads the
- *      pending-grade queue from IndexedDB (stored as CloudRow[] by
- *      savePendingQueue) and POSTs it directly to `/api/sync`. Auth cookies are
- *      included automatically by the browser for same-origin SW fetches. On
- *      success the IDB queue is cleared; on failure the event's `waitUntil`
- *      promise rejects ONLY for transient failures (network error, 5xx) so the
- *      browser will retry. On permanent auth failures (401 / 403) the handler
- *      resolves so the browser does not loop endlessly (#1072 B2).
- *
- * Superuser write-guard: the guard runs in the client context (the hook passes
- * null client/userId when a superuser flag is on). In this SW path there is no
- * session context to inspect, but the `/api/sync` route handler re-authenticates
- * via session cookie and returns 401 for unauthenticated calls. A QA session
- * therefore produces no cloud writes via this path either - the IDB queue is
- * cleared by `enqueueGrade` (which calls `clearPendingQueue` when superuser is
- * active) before the tab is closed, so the queue is empty when the SW fires.
+ * Background Sync handler (#1054). The logic lives in lib/pwa/swReplay.ts so it
+ * can be unit-tested; this listener only supplies the worker's own globals.
+ * `fetch` goes through an arrow because calling the global as `deps.fetch()`
+ * would throw "Illegal invocation", and the handler would read that as a
+ * network error and retry.
  */
 self.addEventListener("sync", (event) => {
   if (event.tag !== BACKGROUND_SYNC_TAG) return;
 
   event.waitUntil(
-    (async () => {
-      // Step 1: delegate to any active window clients so they can honour the
-      // pull-before-push invariant. Using `includeUncontrolled: false` ensures
-      // we only message clients that are controlled by this worker (i.e. loaded
-      // from the same origin and SW scope).
-      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: false });
-
-      if (clients.length > 0) {
-        // Post to each active client via a MessageChannel so we can await an
-        // explicit ACK. The client's useOnlineReconnectSync sends back an ACK
-        // on the port before handling the pull-push sequence. If no client
-        // ACKs within CLIENT_ACK_TIMEOUT_MS (frozen / backgrounded / not yet
-        // hydrated), fall through to the direct-push path.
-        const acked = await new Promise<boolean>((resolveAck) => {
-          let settled = false;
-
-          const timeout = setTimeout(() => {
-            if (!settled) {
-              settled = true;
-              resolveAck(false);
-            }
-          }, CLIENT_ACK_TIMEOUT_MS);
-
-          for (const client of clients) {
-            const channel = new MessageChannel();
-            channel.port1.onmessage = () => {
-              if (!settled) {
-                settled = true;
-                clearTimeout(timeout);
-                resolveAck(true);
-              }
-            };
-            client.postMessage({ type: SW_REPLAY_MESSAGE }, [channel.port2]);
-          }
-        });
-
-        if (acked) {
-          // A live client has committed to running the pull-push sequence.
-          return;
-        }
-        // No ACK - fall through to direct push below.
-      }
-
-      // Step 2: no active clients, or no client ACK'd in time - push directly
-      // from the SW. The IDB queue was written as CloudRow[] by savePendingQueue
-      // so no conversion is needed before POSTing to /api/sync (#1072 B1).
-      const queue = await readPendingQueueFromIdb();
-      if (queue.length === 0) {
-        // Nothing to push; resolve so the sync event is not retried.
-        return;
-      }
-
-      // POST the queue to /api/sync. The route handler authenticates via
-      // session cookie (same-origin request; cookies are included by default).
-      let res: Response;
-      try {
-        res = await fetch("/api/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cards: queue }),
-          credentials: "include",
-        });
-      } catch {
-        // Network error (offline, DNS failure, etc.) - throw so the browser
-        // retries the sync event when connectivity is restored.
-        throw new Error("[sw-sync] network error posting to /api/sync");
-      }
-
-      if (res.status === 401 || res.status === 403) {
-        // Permanent auth failure: session cookie expired, user signed out, or
-        // cookie purged by ITP. Resolving (not throwing) prevents the Background
-        // Sync spec from retrying indefinitely - retrying a 401 is pointless and
-        // wastes battery. The queue is cleared so stale grades are not replayed
-        // against a future session (#1072 B2).
-        await clearPendingQueueFromIdb();
-        return;
-      }
-
-      if (!res.ok) {
-        // Transient server error (5xx, etc.): throw so the browser retries the
-        // sync event later.
-        throw new Error(`[sw-sync] /api/sync returned ${String(res.status)}`);
-      }
-
-      // All cards pushed successfully - clear the IDB queue.
-      await clearPendingQueueFromIdb();
-    })(),
+    replayPendingGrades({
+      clients: self.clients,
+      fetch: (url, init) => fetch(url, init),
+      readQueue: readPendingQueueFromIdb,
+      clearQueue: clearPendingQueueFromIdb,
+    }),
   );
 });
 
