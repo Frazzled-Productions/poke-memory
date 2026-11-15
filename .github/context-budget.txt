@@ -2,6 +2,7 @@
 # <path or GLOB:pattern or RULES_UNSCOPED><TAB><max lines>. Lower a number freely when you prune;
 # raise one only in the same PR, with a "# <old> -> <new> on <date>: <reason>" line directly above it.
 # Seeded 2026-10-23 at the real counts, with the OpenSpec adoption sections in AGENTS.md (#2167).
-AGENTS.md	229
+# 229 -> 167 on 2026-11-14: lowered (ops #527): the stall-watcher rule is in ~/.claude/CLAUDE.md and the OpenSpec reference is pointed to
+AGENTS.md	167
 CLAUDE.md	1
 GLOB:.claude/agents/*.md	1018
