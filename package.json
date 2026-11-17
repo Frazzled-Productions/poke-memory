@@ -45,7 +45,7 @@
   },
   "dependencies": {
     "@open-spaced-repetition/binding": "^0.5.0",
-    "@sentry/nextjs": "^11.1.0",
+    "@sentry/nextjs": "^11.13.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "@vercel/analytics": "^2.0.1",
@@ -68,8 +68,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "@serwist/build": "^9.5.11",
-    "@serwist/turbopack": "^9.5.11",
+    "@serwist/build": "^9.5.15",
+    "@serwist/turbopack": "^9.5.15",
     "@serwist/utils": "^9.5.13",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
