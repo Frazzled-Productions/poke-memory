@@ -29,5 +29,8 @@ const handler = new MessageHandler({
 });
 
 self.onmessage = (event: MessageEvent) => {
+  // A dedicated worker hears only the worker that spawned it, whose messages
+  // carry an empty origin; anything naming another origin is not ours.
+  if (event.origin !== "" && event.origin !== self.location.origin) return;
   handler.handle(event);
 };

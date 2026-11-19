@@ -384,7 +384,7 @@ fake `User` plus a fake data client (`DataClient`, `lib/db/client.ts`) whose
 |---|---|
 | **Trigger** | `pull_request` (opened, synchronize, reopened); push to `main`; weekly `schedule` (`0 9 * * 1` - Monday 09:00 UTC) |
 | **Job** | `analyze` |
-| **What it does** | Runs GitHub's CodeQL security scan over the `javascript-typescript` language pack with the `security-extended` query suite. No `autobuild` step - CodeQL v3 source-traces JS/TS without a build, keeping the scan fast; generated `.next/` output is out of scope. The weekly cron catches newly-published CVEs and dependency drift that no push would otherwise trigger. |
+| **What it does** | Runs GitHub's CodeQL security scan over the `javascript-typescript` language pack with the `security-extended` query suite. No `autobuild` step - CodeQL v3 source-traces JS/TS without a build, keeping the scan fast; generated `.next/` output is out of scope. The weekly cron catches newly-published CVEs and dependency drift that no push would otherwise trigger. `.github/codeql/codeql-config.yml` (`config-file`) skips `vendor/**`, third-party code copied unmodified (the FSRS wasm binding's browser glue). |
 | **Permissions** | `security-events: write` (uploads results to the Security tab), `contents: read`, `actions: read`. |
 | **Concurrency** | Scheduled runs get a per-`run_id` group with `cancel-in-progress: false`, so a push to `main` during the weekly window cannot cancel the scan. Push and PR runs share a per-event-type+ref group and may cancel stale siblings. |
 

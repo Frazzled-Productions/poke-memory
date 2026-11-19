@@ -28,7 +28,12 @@ export function generateChangelogModule() {
     // An absent CHANGELOG.md renders the page's empty state, as before.
   }
   const next = renderChangelogModule(markdown);
-  const current = fs.existsSync(OUTPUT) ? fs.readFileSync(OUTPUT, "utf8") : null;
+  let current = null;
+  try {
+    current = fs.readFileSync(OUTPUT, "utf8");
+  } catch {
+    // Not generated yet: write it.
+  }
   if (current !== next) fs.writeFileSync(OUTPUT, next);
 }
 

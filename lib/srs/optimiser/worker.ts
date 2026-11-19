@@ -13,5 +13,8 @@ const handle = createOptimiserHandler(
 );
 
 self.onmessage = (event: MessageEvent<OptimiserRequest>) => {
+  // A dedicated worker hears only its page, whose messages carry an empty
+  // origin; anything naming another origin is not ours.
+  if (event.origin !== "" && event.origin !== self.location.origin) return;
   void handle(event.data);
 };
