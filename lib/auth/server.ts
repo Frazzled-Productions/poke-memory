@@ -88,6 +88,9 @@ export function createAuth(env: AuthEnv) {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     trustedOrigins: trustedOriginsFor(env.DEPLOY_ENV),
+    // Supabase sessions did not lapse; Better Auth's default ends one after 7
+    // days without a visit. A year, renewed at most once a day of use.
+    session: { expiresIn: 365 * 24 * 60 * 60, updateAge: 24 * 60 * 60 },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: MIN_PASSWORD_LENGTH,

@@ -60,12 +60,21 @@ same account and data, and `guardAccountSwitch` SHALL archive and wipe nothing.
 #### Scenario: Reminders before signing in again
 
 - **WHEN** a subscribed player has not signed in again
-- **THEN** reminders still arrive, because subscriptions are copied with the user id
+- **THEN** reminders stop: the copied subscriptions were made with the old VAPID key, so pushes signed
+  with the new key do not reach them, until the player's next signed-in visit moves the subscription
+  onto the new key (push-notifications) and reminders resume
 
 #### Scenario: Background Sync replay with only the old session
 
 - **WHEN** the service worker replays queued grades and the browser holds only the old Supabase cookie
 - **THEN** the route answers 401 and the mirror is cleared, as for any expired session today
+
+#### Scenario: A week without a visit
+
+- **WHEN** a player signed in after the move does not open the app for 8 days
+- **THEN** they are still signed in: a session lasts 365 days and is renewed at most once a day of use
+  (`session.expiresIn` and `updateAge` in `lib/auth/server.ts`), where Better Auth's default would end
+  it after 7 days without a visit and Supabase sessions did not lapse
 
 Source (planned): design D6 "Sessions", decision 0018.
 

@@ -137,6 +137,22 @@ describe("username sign-up and sign-in", () => {
   });
 });
 
+describe("session lifetime", () => {
+  it("a new session lasts 365 days (Supabase sessions did not lapse after a week of inactivity)", async () => {
+    const before = Date.now();
+    await signUp("brock");
+    const { expiresAt } = row<{ expiresAt: string | number }>(`SELECT expiresAt FROM "session"`);
+    const ms = new Date(typeof expiresAt === "number" ? expiresAt : Date.parse(expiresAt)).getTime() - before;
+    const DAY = 24 * 60 * 60 * 1000;
+    expect(ms).toBeGreaterThan(364 * DAY);
+    expect(ms).toBeLessThanOrEqual(365 * DAY + 60_000);
+  });
+
+  it("is refreshed at most once a day", () => {
+    expect(auth.options.session).toMatchObject({ expiresIn: 365 * 24 * 60 * 60, updateAge: 24 * 60 * 60 });
+  });
+});
+
 describe("sign-out everywhere", () => {
   it("revoke-sessions (called by signOut) ends every session of the user, not only this device's", async () => {
     await signUp("lance");
