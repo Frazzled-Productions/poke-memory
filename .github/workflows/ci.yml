@@ -142,9 +142,13 @@ jobs:
           # (scripts/build-sw.mjs, #1752). It is gitignored, so the e2e job's
           # fresh checkout does not have it; without bundling it here `npm start`
           # would 404 on /sw/sw.js and the smoke SW assertion would fail.
+          # `public/fsrs/` is the same kind of output: the in-browser FSRS
+          # optimiser's worker bundles and wasm (scripts/build-fsrs-optimiser.mjs),
+          # which e2e/optimiser.spec.ts loads.
           path: |
             .next/
             public/sw/
+            public/fsrs/
           retention-days: 1
           include-hidden-files: true
 

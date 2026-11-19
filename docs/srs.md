@@ -6,6 +6,14 @@ Canonical reference for the SRS scheduler - algorithm, per-card state, queue pol
 
 FSRS via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Default parameters per FSRS, with a user-controlled `request_retention` knob (Settings → Recall target, 0.80–0.97, default 0.90). Per-user FSRS weight optimisation has shipped (#268) - the optimiser runs against the user's `grade_log` history and persists trained weights to `user_settings`.
 
+## Weight optimiser (in the browser)
+
+The optimiser runs in the signed-in user's browser on `/settings/optimiser` (D7 of `openspec/changes/move-to-cloudflare`); there is no server route. The Settings section links there with a plain `<a>`, because the page must be its own document load: it is served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (`next.config.ts`, plus `public/_headers` for the `/fsrs/*` assets on Workers), which the threaded wasm binding needs for a shared memory. Without cross-origin isolation or `SharedArrayBuffer` the page says the browser is not supported.
+
+- **Flow** (`components/settings/FsrsOptimiserPanel.tsx`): `pullGradeLog` and `pullSettings`, then the shared rules in `lib/srs/optimizer.ts` (`countOptimizableReviews` against `MIN_REVIEWS_FOR_OPTIMIZATION`, `optimizerCooldownRemainingMs` over the local and cloud `fsrsWeightsOptimizedAt`), then `gradeLogToOptimizerItems` into a Web Worker, then `pushSettings` with `fsrsWeights` + `fsrsWeightsOptimizedAt` and a local `saveSettings`. Paused while any superuser flag is on; signed-in only.
+- **Items are review prefixes (#2392)**: FSRS trains on the last review of each item with the earlier ones as history, so a card with n reviews gives n - 1 items. One item per card returned `NotEnoughData` for ordinary logs.
+- **Worker and wasm**: `lib/srs/optimiser/` (message protocol, worker, thread worker, loader) is bundled by `scripts/build-fsrs-optimiser.mjs` into `public/fsrs/` (gitignored; `npm run build` and `npm run dev` run it). The wasm is vendored in `vendor/fsrs-binding-wasm32-wasi/` (npm will not install that package: `cpu: wasm32`); the script pins its hash and its header says how to update it. Tests load the same wasm in Node (`lib/srs/optimizer.fit.test.ts`); weights match the old native binding to float32 precision.
+
 ## Anki-style learning steps layer
 
 Kept on top of FSRS. FSRS schedules graduated cards only; new and lapsed cards go through wall-clock learning steps via `learningStepsFor(difficulty)` / `relearningStepsFor(difficulty)` (`lib/srs/constants.ts`). The bands are:
