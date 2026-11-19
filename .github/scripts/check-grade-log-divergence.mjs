@@ -184,9 +184,9 @@
 //
 // Required env vars
 // -----------------
-//   SUPABASE_ACCESS_TOKEN - Management API personal access token (same
-//     secret already used by refresh-user-count.yml and migration-check).
-//   SUPABASE_PROJECT_REF  - project ref slug.
+//   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID - read by wrangler, which runs
+//     each query against the production D1 database (binding `DB`) through
+//     scripts/cloudflare/d1-query.mjs. The queries are SQLite (D1).
 //   DIVERGENCE_THRESHOLD  - optional, integer, default 0. Applied to all
 //     three queries independently: a query whose row count exceeds the threshold
 //     contributes to the alert. With the corrected metrics every flagged
@@ -209,6 +209,7 @@ import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { queryD1 } from "../../scripts/cloudflare/d1-query.mjs";
 
 const DEFAULT_THRESHOLD = 0;
 
@@ -267,7 +268,7 @@ const OPTION_C_LOWER_BOUND_DAYS_AGO = OPTION_A_LOWER_BOUND_DAYS_AGO;
 // window. A subject graded today and again 3 days ago should not flag,
 // because the recent grade means the card is still in-step.
 //
-// The `BOOL_OR(learning_step IS NULL)` clause is the
+// The `MAX(learning_step IS NULL) = 1` clause is the
 // graduation signal (#2096, replacing #1253's `MAX(grade) >= 4` proxy; see
 // "Graduation signal" in the header). A subject that never graduated keeps
 // `lastReview = null`, so `isSyncSafe()` blocks the per-grade upsert by
@@ -287,14 +288,14 @@ WITH gl_distinct AS (
     locale,
     MAX(entry_date) AS last_entry_date
   FROM grade_log
-  WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_A_LOWER_BOUND_DAYS_AGO} days')::date
+  WHERE entry_date >= date('now', '-${OPTION_A_LOWER_BOUND_DAYS_AGO} days')
   GROUP BY user_id, card_type, subject_key, locale
-  HAVING MAX(entry_date) <= (CURRENT_DATE - INTERVAL '${OPTION_A_UPPER_BOUND_DAYS_AGO} days')::date
-     AND BOOL_OR(learning_step IS NULL)
+  HAVING MAX(entry_date) <= date('now', '-${OPTION_A_UPPER_BOUND_DAYS_AGO} days')
+     AND MAX(learning_step IS NULL) = 1
 )
 SELECT
-  g.user_id::text AS user_id,
-  COUNT(*)::int AS missing_subjects
+  g.user_id AS user_id,
+  COUNT(*) AS missing_subjects
 FROM gl_distinct g
 LEFT JOIN card_reviews cr
   ON cr.user_id = g.user_id
@@ -338,14 +339,14 @@ WITH recent_grades AS (
     locale,
     COUNT(*) AS grade_count
   FROM grade_log
-  WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_B_LOWER_BOUND_DAYS_AGO} days')::date
+  WHERE entry_date >= date('now', '-${OPTION_B_LOWER_BOUND_DAYS_AGO} days')
   GROUP BY user_id, card_type, subject_key, locale
   HAVING COUNT(*) >= ${OPTION_B_MIN_GRADES}
-     AND MAX(entry_date) <= (CURRENT_DATE - INTERVAL '${OPTION_B_UPPER_BOUND_DAYS_AGO} days')::date
+     AND MAX(entry_date) <= date('now', '-${OPTION_B_UPPER_BOUND_DAYS_AGO} days')
 )
 SELECT
-  r.user_id::text AS user_id,
-  COUNT(*)::int AS stuck_subjects
+  r.user_id AS user_id,
+  COUNT(*) AS stuck_subjects
 FROM recent_grades r
 JOIN card_reviews cr
   ON cr.user_id = r.user_id
@@ -408,13 +409,13 @@ WITH gl_graduated AS (
     locale,
     MAX(entry_date) AS last_entry_date
   FROM grade_log
-  WHERE entry_date >= (CURRENT_DATE - INTERVAL '${OPTION_C_LOWER_BOUND_DAYS_AGO} days')::date
+  WHERE entry_date >= date('now', '-${OPTION_C_LOWER_BOUND_DAYS_AGO} days')
   GROUP BY user_id, card_type, subject_key, locale
-  HAVING BOOL_OR(learning_step IS NULL)
+  HAVING MAX(learning_step IS NULL) = 1
 )
 SELECT
-  g.user_id::text AS user_id,
-  COUNT(*)::int AS graduated_orphan_subjects
+  g.user_id AS user_id,
+  COUNT(*) AS graduated_orphan_subjects
 FROM gl_graduated g
 LEFT JOIN card_reviews cr
   ON cr.user_id = g.user_id
@@ -427,24 +428,8 @@ HAVING COUNT(*) > 0
 ORDER BY graduated_orphan_subjects DESC;
 `.trim();
 
-async function runQuery(projectRef, token, query) {
-  const url = `https://api.supabase.com/v1/projects/${projectRef}/database/query`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query }),
-  });
-  if (!res.ok) {
-    throw new Error(
-      `Supabase Management API responded ${res.status} ${res.statusText}: ${await res.text()}`,
-    );
-  }
-  const body = await res.json();
-  // The Management API returns either an array or { result: [...] }.
-  return Array.isArray(body) ? body : (body.result ?? []);
+function runQuery(query) {
+  return queryD1(query);
 }
 
 function maskUserId(id) {
@@ -608,24 +593,18 @@ function formatMarkdownReport(flaggedA, flaggedB, flaggedC, threshold) {
   lines.push("### Next steps");
   lines.push("");
   lines.push("1. Pull the affected user_ids from the workflow logs (full UUIDs are not logged here for privacy).");
-  lines.push("2. Inspect their `card_reviews` and `grade_log` directly via the Supabase dashboard.");
+  lines.push("2. Inspect their `card_reviews` and `grade_log` directly with `wrangler d1 execute DB --remote`.");
   lines.push("3. If sync truly is broken, ship a fix on the same beat as #584 (`docs/sync.md`).");
   lines.push("");
   return lines.join("\n");
 }
 
 async function main() {
-  const token = process.env.SUPABASE_ACCESS_TOKEN;
-  const projectRef = process.env.SUPABASE_PROJECT_REF;
   const thresholdRaw = process.env.DIVERGENCE_THRESHOLD;
   const threshold = thresholdRaw ? Number.parseInt(thresholdRaw, 10) : DEFAULT_THRESHOLD;
 
-  if (!token) {
-    console.error("SUPABASE_ACCESS_TOKEN is not set.");
-    process.exit(2);
-  }
-  if (!projectRef) {
-    console.error("SUPABASE_PROJECT_REF is not set.");
+  if (!process.env.CLOUDFLARE_API_TOKEN) {
+    console.error("CLOUDFLARE_API_TOKEN is not set.");
     process.exit(2);
   }
   if (!Number.isFinite(threshold) || threshold < 0) {
@@ -638,9 +617,9 @@ async function main() {
   // should bubble up as a workflow failure (the "check is broken"
   // signal), and serial execution makes the failing query obvious in
   // the workflow log.
-  const rowsA = await runQuery(projectRef, token, OPTION_A_QUERY);
-  const rowsB = await runQuery(projectRef, token, OPTION_B_QUERY);
-  const rowsC = await runQuery(projectRef, token, OPTION_C_QUERY);
+  const rowsA = runQuery(OPTION_A_QUERY);
+  const rowsB = runQuery(OPTION_B_QUERY);
+  const rowsC = runQuery(OPTION_C_QUERY);
 
   // Per-query threshold filter. All default to "any non-zero".
   const flaggedA = rowsA.filter((r) => Number(r.missing_subjects) > threshold);
@@ -719,7 +698,7 @@ async function main() {
 
 // Run only when executed directly (`node check-grade-log-divergence.mjs`), so
 // the integration test can import the query constants without calling the
-// Management API (#2096). A realpath failure (for example an argv[1] that is
+// database (#2096). A realpath failure (for example an argv[1] that is
 // not a file) means "not invoked directly", never a crash on import.
 function isInvokedDirectly() {
   try {
