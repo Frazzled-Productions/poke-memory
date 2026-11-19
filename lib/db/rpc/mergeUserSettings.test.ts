@@ -428,7 +428,7 @@ describe("the optimiser's weekly limit inside the merge", () => {
 
   it("re-sending the stored run (a full settings push) is accepted", async () => {
     seed({ ...BASE, ...run(RUN) });
-    await mergeUserSettings(d1, userId, { ...BASE, ...run(RUN), masteryRepetitions: 4 });
+    await mergeUserSettings(d1, userId, { ...BASE, ...run(RUN), masteryRepetitions: 4 } as Json);
     expect(stored()!.settings.masteryRepetitions).toBe(4);
   });
 });
