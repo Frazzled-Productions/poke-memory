@@ -61,7 +61,7 @@ describe("gradeLogToOptimizerItems", () => {
     expect(gradeLogToOptimizerItems(entries)).toEqual([]);
   });
 
-  it("produces one item with three reviews for a single card", () => {
+  it("produces prefix items ending in the full three-review history for a single card", () => {
     // Three reviews on different days. Timestamps are exactly 1 day apart.
     const DAY = 86_400_000;
     const t0 = Date.UTC(2026, 0, 1, 12, 0, 0);     // 2026-01-01
@@ -75,8 +75,10 @@ describe("gradeLogToOptimizerItems", () => {
     ];
 
     const items = gradeLogToOptimizerItems(entries);
-    expect(items).toHaveLength(1);
-    const reviews = items[0].reviews;
+    // One prefix item per review after the first (#2392); the last holds the
+    // full history.
+    expect(items).toHaveLength(2);
+    const reviews = items[1].reviews;
     expect(reviews).toHaveLength(3);
 
     // First review: deltaT must be 0.
@@ -101,7 +103,7 @@ describe("gradeLogToOptimizerItems", () => {
     ];
 
     const items = gradeLogToOptimizerItems(entries);
-    const ratings = items[0].reviews.map((r) => r.rating);
+    const ratings = items[items.length - 1].reviews.map((r) => r.rating);
     expect(ratings).toEqual([1, 2, 3, 4]);
   });
 
@@ -197,6 +199,47 @@ describe("gradeLogToOptimizerItems", () => {
   });
 });
 
+describe("gradeLogToOptimizerItems: one item per review prefix (#2392)", () => {
+  // The FSRS binding trains on the LAST review of each item, with the earlier
+  // reviews as its history (see FSRSBindingItem in the binding's typings). One
+  // item per card therefore trained on one review per card and returned
+  // NotEnoughData for ordinary logs; each review after the first is its own
+  // item instead.
+  it("emits a prefix item for every review after the first", () => {
+    const DAY = 86_400_000;
+    const t0 = Date.UTC(2026, 0, 1, 12, 0, 0);
+    const entries: GradeLogEntry[] = [
+      makeEntry(t0, 4, "42"),
+      makeEntry(t0 + DAY, 5, "42"),
+      makeEntry(t0 + 3 * DAY, 1, "42"),
+    ];
+    expect(gradeLogToOptimizerItems(entries)).toEqual([
+      { reviews: [{ rating: 3, deltaT: 0 }, { rating: 4, deltaT: 1 }] },
+      {
+        reviews: [
+          { rating: 3, deltaT: 0 },
+          { rating: 4, deltaT: 1 },
+          { rating: 1, deltaT: 2 },
+        ],
+      },
+    ]);
+  });
+
+  it("builds one item per fittable review across cards", () => {
+    const DAY = 86_400_000;
+    const t = Date.UTC(2026, 0, 1, 12, 0, 0);
+    const entries: GradeLogEntry[] = [];
+    // 3 cards x 4 reviews: 3 items each (the first review has no history).
+    for (const key of ["a", "b", "c"]) {
+      for (let i = 0; i < 4; i++) entries.push(makeEntry(t + i * DAY, 4, key));
+    }
+    entries.push(makeEntry(t, 4, "single"));
+    const items = gradeLogToOptimizerItems(entries);
+    expect(items).toHaveLength(9);
+    expect(items.map((i) => i.reviews.length).sort()).toEqual([2, 2, 2, 3, 3, 3, 4, 4, 4]);
+  });
+});
+
 describe("countOptimizableReviews (#1304)", () => {
   it("returns 0 for empty input", () => {
     expect(countOptimizableReviews([])).toBe(0);
@@ -256,7 +299,8 @@ describe("countOptimizableReviews (#1304)", () => {
     expect(fittableCount).toBe(220);   // single-review cards excluded
 
     const items = gradeLogToOptimizerItems(entries);
-    expect(items).toHaveLength(10);    // 13 single-review items dropped
+    // 21 prefix items per fittable card (#2392); single-review cards dropped.
+    expect(items).toHaveLength(10 * 21);
     // None of the items have a reviews array where every deltaT is 0 - that
     // would cause the Rust panic.
     for (const item of items) {

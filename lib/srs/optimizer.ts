@@ -21,7 +21,10 @@ export type FsrsRating = 1 | 2 | 3 | 4;
 /** A single review in the optimizer input shape. */
 export type OptimizerInputReview = { rating: FsrsRating; deltaT: number };
 
-/** All reviews for one card, in chronological order. */
+/**
+ * One training item: a review of a card (the last entry) with that card's
+ * earlier reviews as its history, in chronological order (#2392).
+ */
 export type OptimizerInputItem = { reviews: OptimizerInputReview[] };
 
 // Map our internal grade values (1/2/4/5) to FSRS native rating (1/2/3/4).
@@ -41,7 +44,11 @@ function toFsrsRating(grade: GradeLogEntry["grade"]): FsrsRating {
 /**
  * Group grade-log entries by (cardType, subjectKey, locale), sort each group
  * chronologically, compute deltaT in days between consecutive reviews
- * (first review deltaT = 0), and build the optimizer input items.
+ * (first review deltaT = 0), and build the optimizer input items: one item per
+ * review prefix (#2392). FSRS trains on the last review of each item, with the
+ * earlier reviews as its history, so a card with n reviews yields n - 1 items
+ * (reviews 1..2, 1..3, ..., 1..n). One item per card trained on a single review
+ * per card and made `computeParameters` return NotEnoughData on ordinary logs.
  *
  * Entries without a `subjectKey` are skipped - they are legacy entries from
  * before migration 013 and cannot be attributed to a specific card.
@@ -52,7 +59,7 @@ function toFsrsRating(grade: GradeLogEntry["grade"]): FsrsRating {
  * WASI binary to panic at the process level (not a catchable JS exception),
  * which surfaces as an unrecoverable 500 at /api/srs/optimize.
  *
- * Returns one item per card with >= 2 reviews on distinct days.
+ * Returns one item per review after the first, for cards with >= 2 reviews.
  */
 export function gradeLogToOptimizerItems(entries: GradeLogEntry[]): OptimizerInputItem[] {
   // Group by composite card key, skipping entries without subjectKey.
@@ -97,7 +104,11 @@ export function gradeLogToOptimizerItems(entries: GradeLogEntry[]): OptimizerInp
     // Drop it rather than risk a process-level Rust panic.
     if (!reviews.some((r) => r.deltaT > 0)) continue;
 
-    items.push({ reviews });
+    // Every non-first review has deltaT >= 1, so each prefix of length >= 2
+    // satisfies the binding's rule on its own.
+    for (let end = 2; end <= reviews.length; end++) {
+      items.push({ reviews: reviews.slice(0, end) });
+    }
   }
 
   return items;

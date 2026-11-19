@@ -33,6 +33,7 @@ import {
 } from "@open-spaced-repetition/binding";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import {
+  countOptimizableReviews,
   gradeLogToOptimizerItems,
   MIN_REVIEWS_FOR_OPTIMIZATION,
   OPTIMIZER_COOLDOWN_MS,
@@ -259,7 +260,8 @@ async function postHandler(): Promise<NextResponse> {
   // here with not_enough_reviews. The component maps that 422 to "sync first,
   // then try again", which is the correct recovery action.
   const optimizerItems = gradeLogToOptimizerItems(entries);
-  const reviewCount = optimizerItems.reduce((sum, item) => sum + item.reviews.length, 0);
+  // Items are review prefixes (#2392), so count reviews, not prefix lengths.
+  const reviewCount = countOptimizableReviews(entries);
   if (reviewCount < MIN_REVIEWS_FOR_OPTIMIZATION) {
     return NextResponse.json(
       { error: "not_enough_reviews", reviewCount },
