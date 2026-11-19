@@ -17,7 +17,7 @@
 
 - [ ] 3.1 `POST /api/db` with the validated wire format (design D5): tables, columns, operators and RPC names allowlisted; session required; `user_id` pinned. Verify: route tests for each operation, 401 without a session, 400 on unknown names, 403 on another user's id.
 - [ ] 3.2 `lib/db/client.ts`, the browser client with the supabase-js subset the app uses, returning `{ data, error, count }` with Postgres-style codes. Verify: contract tests run the same query through the client and the gateway against the D1 test database.
-- [ ] 3.3 RPCs in the Worker: `merge_user_settings` (deep merge keeping nulls, compare-and-swap, the migration 038 regression guard with `23514`), `reset_all_progress` (cooldown, tombstone), `delete_account` (data, Discord posts, Better Auth user). Verify: tests ported from the Postgres RPC integration tests, red first where behaviour is new.
+- [ ] 3.3 RPCs in the Worker: `merge_user_settings` (deep merge keeping nulls, compare-and-swap, the migration 038 regression guard with `23514`, the optimiser's weekly limit on `fsrsWeightsOptimizedAt`), `reset_all_progress` (cooldown, tombstone), `delete_account` (data, Discord posts, Better Auth user). Verify: tests ported from the Postgres RPC integration tests, red first where behaviour is new.
 - [ ] 3.4 Every browser call site moves from `lib/supabase/client.ts` to the new client (`lib/sync/**`, `lib/push/subscribe.ts`, components and pages). Verify: the existing sync tests pass unchanged apart from imports; a parity test runs `pullSession`, `pushSession`, `pushSingleCard` (including a `23514` rejection), settings, streak and grade-log legs against the D1 test database.
 - [ ] 3.5 Cross-user tests: user B can neither read nor change user A's rows through any table or RPC. Verify: `lib/db/crossUser.test.ts` green, and red when the pin in `scope.ts` is removed.
 
@@ -27,6 +27,7 @@
 - [ ] 4.2 bcrypt compatibility: copied `$2a$`/`$2b$` hashes verify with bcryptjs and are rehashed to scrypt on success. Verify: test with a known bcrypt hash; the stored hash changes prefix after sign-in.
 - [ ] 4.3 Per-IP throttle on username sign-up and sign-in from `rate_limit_buckets` in D1. Verify: test, the 6th attempt in the window is refused as today.
 - [ ] 4.4 Browser side: `lib/auth/client.ts`, `AuthContext` on `useSession`, `actions.ts`, `LinkIdentitiesSection`, `callback-complete` as the OAuth callback target, `requireAuth` from request headers, the mock-auth seam ported. Verify: existing component tests updated; e2e `auth.spec.ts` green on a local build with mock auth.
+- [ ] 4.6 Re-sign-in after the move: a device holding progress for the same user id is not shown the keep-local or keep-cloud picker; sign-out revokes every session; any `?error=` code shows the sign-in error. Verify: component and route tests for each.
 - [ ] 4.5 Account deletion removes the Better Auth user, sessions and accounts with the data. Verify: delete-account test checks every table is empty for that user.
 
 ## 5. Server routes and scheduled jobs
@@ -46,7 +47,7 @@
 ## 7. Analytics, Sentry and copy
 
 - [ ] 7.1 `0003_events.sql`, `POST /api/event`, `FunnelTracker` sending `app_open` there; Vercel Analytics and Speed Insights removed; the Cloudflare Web Analytics beacon when its token is set. Verify: events route tests (no personal fields stored, rate limit, bad body), layout test.
-- [ ] 7.2 Sentry environment from `DEPLOY_ENV`. Verify: `sentryPrivacy` tests updated.
+- [ ] 7.2 Sentry environment from `DEPLOY_ENV`; the `/test-error` page is a 404 when `DEPLOY_ENV` is `cloudflare-production`. Verify: `sentryPrivacy` and test-error tests updated.
 - [ ] 7.3 Privacy notice, terms, `docs/dpia.md`, `docs/cookies-pecr.md`, README, `docs/sync.md`, `docs/persistence.md`, `docs/nextjs.md`, AGENTS.md lines that name Supabase or Vercel. Verify: `grep -ri "supabase\|vercel"` over app, components, lib and docs lists only history and the cutover notes; privacy page test updated.
 - [ ] 7.4 One `changed` changelog fragment. Verify: `npm run lint:changelog`.
 
