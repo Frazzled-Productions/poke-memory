@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 3 November 2026
+          Last updated: 19 November 2026
         </p>
       </header>
 
@@ -90,7 +90,7 @@ export default async function PrivacyPage() {
             server we operate. Like every visitor, guests are covered by the
             technical error and performance diagnostics described in §3, which
             are sent to Sentry and contain no card progress. Pokémon sprites
-            are served as static files from the same Vercel infrastructure
+            are served as static files from the same Cloudflare infrastructure
             that hosts the app; no third-party image CDN is involved.
           </p>
 
@@ -99,8 +99,9 @@ export default async function PrivacyPage() {
           </h3>
           <p>
             When you sign in, via GitHub, Google, or a username and password you
-            create directly, your per-card review history is synchronised to a
-            Supabase Postgres database so you can continue across devices. This
+            create directly, your per-card review history is synchronised to our
+            database, held by Cloudflare in the EU, so you can continue across
+            devices. This
             is where personal data processing begins and this notice applies in
             full.
           </p>
@@ -138,19 +139,22 @@ export default async function PrivacyPage() {
           <p className="mt-2">
             Our review-history, settings, streak, and grade-log tables are
             keyed by your account&rsquo;s opaque user identifier (a UUID issued
-            by Supabase Auth). They do not contain your username, email
+            when your account was created). They do not contain your username, email
             address, or any profile information beyond that identifier.
           </p>
           <p className="mt-2">
-            Separately, Supabase Auth maintains your account record. If you sign
-            in via GitHub or Google, the OAuth provider returns a profile to
-            Supabase Auth that typically includes the email address and display
-            name associated with the account you signed in with; Supabase Auth
-            stores this on the account record so it can identify you on your next
-            sign-in. If you create a username and password account, Supabase Auth
-            stores your chosen username (which may be personal data if it
-            identifies you) and a synthetic internal email address that is not a
-            real address and is never shown to you or used to send you mail. In
+            Separately, our sign-in system (Better Auth, open-source software
+            running on our own server) maintains your account record in the same
+            database. If you sign in via GitHub or Google, the OAuth provider
+            returns a profile that typically includes the email address and
+            display name associated with the account you signed in with, and your
+            account identifier at that provider; we store these on the account
+            record so we can identify you on your next sign-in. If you create a
+            username and password account, we store your chosen username (which
+            may be personal data if it identifies you), a one-way hash of your
+            password (never the password itself), and a synthetic internal email
+            address that is not a real address and is never shown to you or used
+            to send you mail. In
             both cases this data is used only for authentication; it is never
             written into our review-history tables and is never used for
             marketing or tracking.
@@ -187,7 +191,8 @@ export default async function PrivacyPage() {
             <code>grade_log</code> table recording the card type, subject
             identifier, the grade you chose, the entry date, and the precise
             timestamp it occurred (<code>occurred_at</code>). This log is used
-            to compute per-user FSRS optimiser weights and review statistics. It
+            to compute per-user FSRS optimiser weights (the optimiser runs in
+            your browser, on your device) and review statistics. It
             is append-only: individual entries are never mutated or deleted
             except by a full progress reset.
           </p>
@@ -225,18 +230,20 @@ export default async function PrivacyPage() {
             Aggregate analytics (all users)
           </h3>
           <p>
-            Vercel Analytics and Speed Insights collect anonymous, aggregate
-            metrics: page path, referrer, country, device type, and Core Web
-            Vitals. This data does not include card progress, review history, or
-            any personally identifying information. It goes to Vercel&rsquo;s
-            infrastructure, not ours.
+            Cloudflare Web Analytics counts page views in aggregate: page path,
+            referrer, country, device type, and page-load performance. It sets
+            no cookie and stores nothing on your device, and this data does not
+            include card progress, review history, or any personally identifying
+            information. It is held by Cloudflare and shown to us only as totals.
           </p>
           <p className="mt-2">
-            On app open, a custom event is also sent to Vercel Analytics
+            On app open, the app also sends one event to our own server
             recording two bucketed, non-identifying properties: whether you are
             a new visitor, a returning guest, or signed in; and a coarse bucket
             for how many Pokémon you have mastered (0, 1&ndash;10, 11&ndash;50,
-            or 50+). No raw counts, user IDs, or card content are included.
+            or 50+). We keep only a count per day for each combination, in our
+            own database. No raw counts, user IDs, IP addresses, page addresses,
+            or card content are stored.
           </p>
 
           <h3 className="mb-1 mt-4 font-semibold text-zinc-700 dark:text-zinc-300">
@@ -265,8 +272,9 @@ export default async function PrivacyPage() {
             Authentication cookie (signed-in users only)
           </h3>
           <p>
-            When you sign in, Supabase Auth sets an HTTP-only session cookie
-            containing a signed JWT that keeps you authenticated across requests.
+            When you sign in, our sign-in system sets an HTTP-only session cookie,{" "}
+            <code>better-auth.session_token</code>, containing a signed session
+            token that keeps you authenticated across requests.
             This cookie is strictly necessary for the signed-in service to
             function; it is not used for tracking or advertising, and it is not
             set in guest mode. See §4 below for our PECR position on this cookie.
@@ -335,10 +343,11 @@ export default async function PrivacyPage() {
               in guest mode.
             </li>
             <li>
-              <strong>Supabase Auth session cookie (signed-in path only).</strong>{" "}
+              <strong>Session cookie (signed-in path only).</strong>{" "}
               When you sign in, via GitHub, Google, or username and password,
-              Supabase Auth sets an
-              HTTP-only session cookie containing a signed JWT. This cookie is strictly
+              our sign-in system sets an HTTP-only session cookie,{" "}
+              <code>better-auth.session_token</code>, containing a signed
+              session token. This cookie is strictly
               necessary to keep you authenticated across requests. It is not
               set in guest mode and is not used for advertising or tracking.
             </li>
@@ -349,13 +358,15 @@ export default async function PrivacyPage() {
           </h3>
           <p className="mb-3">
             We do not use tracking cookies, advertising cookies, or
-            third-party profiling cookies of any kind. Vercel Analytics and
-            Speed Insights are client-side scripts that collect aggregate,
-            anonymous metrics (page path, referrer, country, device type, Core
-            Web Vitals). They set no cookie and write nothing to{" "}
+            third-party profiling cookies of any kind. Cloudflare Web Analytics
+            is a client-side script that collects aggregate, anonymous metrics
+            (page path, referrer, country, device type, page-load performance).
+            It sets no cookie and writes nothing to{" "}
             <code>localStorage</code> or any other terminal-equipment storage,
-            so PECR Regulation 6 is not engaged, and they do not identify
-            individual users. The same is true of Sentry, our error
+            so PECR Regulation 6 is not engaged, and it does not identify
+            individual users. The daily app-open count sends a single message
+            to our own server and stores nothing on your device either. The
+            same is true of Sentry, our error
             monitoring service: it sets no cookie and stores nothing on your
             device, and its reports travel through a first-party route on our
             own domain (<code>/monitoring</code>).
@@ -368,10 +379,10 @@ export default async function PrivacyPage() {
             Under PECR, consent is only required for cookies and similar
             storage that are not strictly necessary. Every item of client-side
             storage used by this app is strictly necessary for the service to
-            function (the auth cookie and SRS state in local storage). Vercel
-            Analytics, Speed Insights and Sentry set no cookie and write
-            nothing to terminal-equipment storage, so PECR Regulation 6 is
-            not engaged by them at all. No consent banner is
+            function (the auth cookie and SRS state in local storage).
+            Cloudflare Web Analytics, the daily app-open count and Sentry set
+            no cookie and write nothing to terminal-equipment storage, so PECR
+            Regulation 6 is not engaged by them at all. No consent banner is
             required. We disclose this position here for transparency.
           </p>
         </section>
@@ -481,12 +492,20 @@ export default async function PrivacyPage() {
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 <tr>
-                  <td className="py-2 pr-4 font-medium">Vercel</td>
+                  <td className="py-2 pr-4 font-medium">Cloudflare, Inc.</td>
                   <td className="py-2 pr-4">
-                    Hosting and static asset delivery
+                    Hosting (Cloudflare Workers), our database (Cloudflare D1,
+                    EU jurisdiction), nightly backups (Cloudflare R2, EU
+                    jurisdiction) and aggregate page-view analytics (Cloudflare
+                    Web Analytics)
                   </td>
                   <td className="py-2">
-                    Aggregate, anonymous analytics only; no card data. Our{" "}
+                    For signed-in users: per-card review state, daily activity
+                    dates, grade event log, settings, push subscriptions,
+                    feedback, and your account record and sign-in sessions,
+                    stored in the EU. Backups are stored in the EU and kept for
+                    90 days. For all users: aggregate, anonymous page views
+                    with no cookie, and our daily app-open counts. Our{" "}
                     <code>/monitoring</code> route passes error reports
                     through to Sentry without storing them.
                   </td>
@@ -509,16 +528,6 @@ export default async function PrivacyPage() {
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 pr-4 font-medium">Supabase</td>
-                  <td className="py-2 pr-4">
-                    Postgres database for authenticated users
-                  </td>
-                  <td className="py-2">
-                    Per-card review state, daily activity dates, grade event
-                    log, settings, and auth session (authenticated users only)
-                  </td>
-                </tr>
-                <tr>
                   <td className="py-2 pr-4 font-medium">Discord</td>
                   <td className="py-2 pr-4">
                     Maintainer notification channel for bug-report triage
@@ -535,8 +544,8 @@ export default async function PrivacyPage() {
             </table>
           </div>
           <p className="mt-3">
-            Row-Level Security in Supabase ensures each user can only read and
-            write their own rows.
+            Every request is checked on our server, so each account can only
+            read and change its own rows.
           </p>
 
           <h3 className="mb-1 mt-6 font-semibold text-zinc-700 dark:text-zinc-300">
@@ -573,12 +582,12 @@ export default async function PrivacyPage() {
                     &ldquo;Continue with GitHub&rdquo;
                   </td>
                   <td className="py-2">
-                    The OAuth token exchange is handled server-side by Supabase
-                    Auth; the app itself never sees the OAuth token. The
-                    provider returns a profile (typically email and display
-                    name) to Supabase Auth, which holds it on your account
-                    record for authentication. Our own review-history tables
-                    store only the opaque user identifier.
+                    The OAuth token exchange is handled by our own server
+                    (Better Auth). The provider returns your account
+                    identifier at that provider and a profile (typically email
+                    and display name), which we keep on your account record
+                    for authentication. Our own review-history tables store
+                    only the opaque user identifier.
                   </td>
                 </tr>
                 <tr>
@@ -588,12 +597,12 @@ export default async function PrivacyPage() {
                     &ldquo;Continue with Google&rdquo;
                   </td>
                   <td className="py-2">
-                    The OAuth token exchange is handled server-side by Supabase
-                    Auth; the app itself never sees the OAuth token. The
-                    provider returns a profile (typically email and display
-                    name) to Supabase Auth, which holds it on your account
-                    record for authentication. Our own review-history tables
-                    store only the opaque user identifier.
+                    The OAuth token exchange is handled by our own server
+                    (Better Auth). The provider returns your account
+                    identifier at that provider and a profile (typically email
+                    and display name), which we keep on your account record
+                    for authentication. Our own review-history tables store
+                    only the opaque user identifier.
                   </td>
                 </tr>
               </tbody>
@@ -632,14 +641,19 @@ export default async function PrivacyPage() {
             7. International transfers
           </h2>
           <p>
-            The third-party services listed in §6 (Vercel; Sentry; Supabase if you
-            sign in by any method, including username and password; Discord for
-            bug-report triage notifications; and, if you sign in via GitHub or
-            Google, those providers) may process data outside the UK / EEA.
-            Vercel, Supabase, and Discord (our sub-processors) operate under
-            the EU Standard Contractual Clauses (SCCs), providing equivalent
-            safeguards via the UK International Data Transfer Agreement (IDTA)
-            addendum. Sentry stores our data in its EU region (Germany), which
+            The third-party services listed in §6 (Cloudflare; Sentry; Discord
+            for bug-report triage notifications; and, if you sign in via GitHub
+            or Google, those providers) may process data outside the UK / EEA.
+            Cloudflare stores our database and its backups in its EU
+            jurisdiction, but each request is handled in the Cloudflare data
+            centre nearest to you, which may be outside the UK / EEA, and
+            Cloudflare, Inc. is based in the United States. Our data processing
+            agreement with Cloudflare relies on the EU-US Data Privacy
+            Framework (including its UK Extension) and the EU Standard
+            Contractual Clauses (SCCs) with the UK International Data Transfer
+            Addendum. Discord (our sub-processor) operates under the EU SCCs,
+            providing equivalent safeguards via the UK International Data
+            Transfer Agreement (IDTA) addendum. Sentry stores our data in its EU region (Germany), which
             the UK treats as adequate under the UK adequacy regulations for the
             EEA. Sentry&rsquo;s contracting company, Functional Software, Inc.,
             is based in the United States, so its staff may access reports
@@ -672,9 +686,12 @@ export default async function PrivacyPage() {
               Your rights
             </a>
             ), all rows associated with your user identifier are permanently
-            deleted from Supabase via a cascading delete. There is currently no
-            separate point-in-time backup retained for this project, so deletion
-            is effectively immediate and permanent.
+            deleted from our database straight away. To protect against data
+            loss, we take a nightly backup of the database, kept for 90 days,
+            and Cloudflare keeps a 30-day restore history of it; both are then
+            automatically deleted, so your data can remain in a backup for up
+            to 90 days after deletion. Backups are only used to restore the
+            service after a failure.
           </p>
           <p className="mt-3">
             Feedback submissions are retained for 12 months from the date of
@@ -731,7 +748,7 @@ export default async function PrivacyPage() {
               reflects the data held in your browser&rsquo;s local storage, not
               necessarily the full authoritative copy in the cloud. If you are
               signed in and require a complete copy of the data we hold for you
-              in Supabase, please contact us at{" "}
+              in our database, please contact us at{" "}
               <a
                 href="mailto:privacy@pokememory.com"
                 className={inlineLink}

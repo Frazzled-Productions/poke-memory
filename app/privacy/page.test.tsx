@@ -205,9 +205,51 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 3 November 2026", async () => {
+    it("shows the last updated date as 19 November 2026", async () => {
       await renderPage();
-      expect(screen.getByText(/3 november 2026/i)).toBeTruthy();
+      expect(screen.getByText(/19 november 2026/i)).toBeTruthy();
+    });
+
+    it("names Cloudflare, not Supabase or Vercel, for hosting, data, backups and analytics (move-to-cloudflare)", async () => {
+      await renderPage();
+      const text = document.body.textContent ?? "";
+      expect(text).not.toMatch(/supabase|vercel|row-level security/i);
+      expect(screen.getByText("Cloudflare, Inc.")).toBeTruthy();
+      expect(text).toMatch(/Cloudflare D1,\s+EU jurisdiction/);
+      expect(text).toMatch(/Cloudflare R2, EU\s+jurisdiction/);
+      expect(text).toMatch(/Backups are stored in the EU and kept for\s+90 days/);
+      expect(text).toMatch(/Cloudflare Web Analytics counts page views in aggregate/);
+      expect(text).toMatch(/We keep only a count per day for each combination/);
+    });
+
+    it("describes the server-side per-account check and our own OAuth handling", async () => {
+      await renderPage();
+      const text = document.body.textContent ?? "";
+      expect(text).toMatch(/Every request is checked on our server, so each account can only\s+read and change its own rows\./);
+      expect(text).toMatch(/The OAuth token exchange is handled by our own server\s+\(Better Auth\)/);
+      expect(text).not.toMatch(/never sees the OAuth token/);
+    });
+
+    it("names the Better Auth session cookie as HTTP-only and strictly necessary", async () => {
+      await renderPage();
+      expect(screen.getAllByText("better-auth.session_token").length).toBe(2);
+      const cookies = document.getElementById("section-cookies")?.closest("section");
+      expect(cookies?.textContent).toMatch(/HTTP-only session cookie/);
+    });
+
+    it("discloses that deleted data can remain in backups for up to 90 days", async () => {
+      await renderPage();
+      const retention = document.getElementById("section-retention")?.closest("section");
+      expect(retention?.textContent).toMatch(/can remain in a backup for up\s+to 90 days after deletion/);
+      expect(retention?.textContent).not.toMatch(/no\s+separate point-in-time backup/);
+    });
+
+    it("covers transfers: EU storage, nearest data centre, US company", async () => {
+      await renderPage();
+      const transfers = document.getElementById("section-transfers")?.closest("section");
+      const text = transfers?.textContent ?? "";
+      expect(text).toMatch(/Cloudflare stores our database and its backups in its EU\s+jurisdiction/);
+      expect(text).toMatch(/Cloudflare, Inc\. is based in the United States/);
     });
 
     it("offers a complaints route to us before the ICO, with a 30-day acknowledgement", async () => {
