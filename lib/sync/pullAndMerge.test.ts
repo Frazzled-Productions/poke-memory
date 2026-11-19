@@ -755,6 +755,44 @@ describe("pullAndMerge", () => {
     expect(mockClearLocalProgress).toHaveBeenCalledOnce();
   });
 
+  // Cursors stored before the move to D1 hold PostgREST strings; D1 returns
+  // ISO with milliseconds and Z. The same instant must not read as newer.
+  const POSTGREST_VS_D1 = [
+    ["2026-05-13T15:00:00.789012+00:00", "2026-05-13T15:00:00.789Z"],
+    ["2026-05-13T15:00:00.78+00:00", "2026-05-13T15:00:00.780Z"],
+    ["2026-05-13T15:00:00+00:00", "2026-05-13T15:00:00.000Z"],
+  ] as const;
+
+  it.each(POSTGREST_VS_D1)(
+    "does NOT clear local when the stored cursor %s is the same instant as cloud's %s",
+    async (stored, cloud) => {
+      mockHasStoredSettings.mockReturnValue(true);
+      mockLoadSyncStatus.mockReturnValue({ ...baseSyncStatus, lastSeenResetAt: stored });
+      mockPullUserSettingsRow.mockResolvedValue({ settings: null, updatedAt: null, lastResetAt: cloud });
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(mockClearLocalProgress).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(POSTGREST_VS_D1)(
+    "does not apply cloud settings when lastSettingsPullAt %s is the same instant as cloud's %s",
+    async (stored, cloud) => {
+      mockHasStoredSettings.mockReturnValue(true);
+      mockLoadSyncStatus.mockReturnValue({ ...baseSyncStatus, lastSettingsPullAt: stored });
+      mockPullUserSettingsRow.mockResolvedValue({
+        settings: { ...DEFAULT_SETTINGS } as ReturnType<typeof loadSettings>,
+        updatedAt: cloud,
+        lastResetAt: null,
+      });
+
+      await pullAndMerge(fakeClient, fakeUserId);
+
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+    },
+  );
+
   it("does NOT clear local when cloud has no reset on record (lastResetAt null)", async () => {
     mockHasStoredSettings.mockReturnValue(true);
     mockLoadSyncStatus.mockReturnValue({ ...baseSyncStatus });

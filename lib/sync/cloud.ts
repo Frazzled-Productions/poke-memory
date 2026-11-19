@@ -1,3 +1,4 @@
+import { isLaterInstant } from "@/lib/sync/instant";
 import type { DataClient, DataClientError } from "@/lib/db/client";
 import type {
   ReviewableCard,
@@ -403,7 +404,7 @@ export function maxCloudUpdatedAt(rows: CloudRow[]): string {
   if (rows.length === 0) return new Date().toISOString();
   return rows.reduce<string>((max, r) => {
     if (!r.updated_at) return max;
-    return r.updated_at > max ? r.updated_at : max;
+    return isLaterInstant(r.updated_at, max) ? r.updated_at : max;
   }, rows[0].updated_at ?? new Date().toISOString());
 }
 
@@ -649,7 +650,7 @@ export function mergeCloudIntoLocalSilent(
 
     // Cloud row updated after the last pull - take cloud.
     // When updated_at is absent (legacy row), conservatively treat as newer.
-    if (!row.updated_at || row.updated_at > lastPullAt) {
+    if (!row.updated_at || isLaterInstant(row.updated_at, lastPullAt)) {
       return applyCloudRow(card, row);
     }
 

@@ -11,6 +11,7 @@ import {
   isStructuralError,
   buildBeaconPayload,
   CARD_REVIEWS_CONFLICT_COLS,
+  maxCloudUpdatedAt,
 } from "./cloud";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { CloudRow, SeedOpts } from "./cloud";
@@ -503,6 +504,16 @@ describe("seen_in_pasture (#350) round-trip", () => {
 
 // ─── mergeCloudIntoLocalSilent (#359) ─────────────────────────────────────
 
+describe("maxCloudUpdatedAt compares instants, not strings", () => {
+  it("picks the later instant when the strings sort the other way", () => {
+    const rows = [
+      makeCloudRow(1, null, null, "2026-05-13T11:00:00+01:00"),
+      makeCloudRow(2, null, null, "2026-05-13T10:30:00.000Z"),
+    ];
+    expect(maxCloudUpdatedAt(rows)).toBe("2026-05-13T10:30:00.000Z");
+  });
+});
+
 describe("mergeCloudIntoLocalSilent", () => {
   beforeEach(() => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -528,6 +539,17 @@ describe("mergeCloudIntoLocalSilent", () => {
     const local = makeCard(1, "2026-05-13", null);
     const row = makeCloudRow(1, null, null);
     const [merged] = mergeCloudIntoLocalSilent([local], [row], null);
+    expect(merged).toBe(local);
+  });
+
+  it.each([
+    ["2026-05-13T08:00:00.789012+00:00", "2026-05-13T08:00:00.789Z"],
+    ["2026-05-13T08:00:00.78+00:00", "2026-05-13T08:00:00.780Z"],
+    ["2026-05-13T08:00:00+00:00", "2026-05-13T08:00:00.000Z"],
+  ])("a PostgREST lastPullAt %s is the same instant as D1's %s: keep local", (lastPullAt, updatedAt) => {
+    const local = makeCard(1, "2026-05-12", "2026-05-12");
+    const row = makeCloudRow(1, "2026-05-01", "2026-05-01", updatedAt);
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], lastPullAt);
     expect(merged).toBe(local);
   });
 

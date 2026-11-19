@@ -1,5 +1,6 @@
 import type { DataClient } from "@/lib/db/client";
 import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib/sync/cloud";
+import { isLaterInstant } from "@/lib/sync/instant";
 import {
   pullUserSettingsRow,
   pullRegionalPrefs,
@@ -174,7 +175,7 @@ export async function pullAndMerge(
     if (
       pulledRow?.lastResetAt &&
       (syncStatus.lastSeenResetAt === null ||
-        pulledRow.lastResetAt > syncStatus.lastSeenResetAt)
+        isLaterInstant(pulledRow.lastResetAt, syncStatus.lastSeenResetAt))
     ) {
       await clearLocalProgress();
       // clearLocalProgress wiped sync-status:v1 under the poke-memory:*
@@ -206,7 +207,7 @@ export async function pullAndMerge(
       const cloudIsNewer =
         pulledRow.updatedAt !== null &&
         (syncStatus.lastSettingsPullAt === null ||
-          pulledRow.updatedAt > syncStatus.lastSettingsPullAt);
+          isLaterInstant(pulledRow.updatedAt, syncStatus.lastSettingsPullAt));
       // `user_settings.updated_at` is `NOT NULL DEFAULT now()` so this
       // branch is unreachable against real cloud data. It exists for the
       // schema-drift case `pullUserSettingsRow` coerces with `?? null`

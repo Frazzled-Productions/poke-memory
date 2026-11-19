@@ -193,7 +193,9 @@ Source (planned): `db/d1/migrations/0001_schema.sql`, `lib/db/errors.ts`, `lib/s
 repeat within 5 seconds, delete the user's `card_reviews`, `grade_log` and `streak_days` rows, and
 stamp `last_reset_at` and `updated_at`, keeping the settings. `resetAllProgressEverywhere` SHALL clear
 local only after it succeeds. A pull seeing a newer `last_reset_at` (or a null cursor) SHALL clear
-local before merging. Two scenarios look like bugs (#2231, #2334).
+local before merging. "Newer" compares instants, never strings: cursors stored before the move hold
+PostgREST text and D1 returns ISO with milliseconds and `Z`, as do the `lastPullAt` and
+`lastSettingsPullAt` comparisons. Two scenarios look like bugs (#2231, #2334).
 
 #### Scenario: Cloud reset fails
 
@@ -204,6 +206,12 @@ local before merging. Two scenarios look like bugs (#2231, #2334).
 
 - **WHEN** a pull sees a newer `last_reset_at`
 - **THEN** local progress is cleared before the merge and the new value is stored as `lastSeenResetAt`
+
+#### Scenario: First pull after the move to D1
+
+- **WHEN** a device stored `lastSeenResetAt` as `2026-05-13T15:00:00.78+00:00` before the move and the
+  pull reads `2026-05-13T15:00:00.780Z` from D1
+- **THEN** local progress is kept, and cards and settings are not treated as newer for that reason
 
 #### Scenario: Reset on this device, then a pull
 
