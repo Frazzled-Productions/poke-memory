@@ -65,6 +65,12 @@ interface TablePolicy {
   /** Columns an update may set. */
   update?: readonly string[];
   delete?: boolean;
+  /**
+   * Upserts are always ON CONFLICT DO NOTHING, whatever the request says: the
+   * table is append-only (Postgres 018 dropped grade_log's UPDATE and DELETE
+   * policies), so a repeated entry can never rewrite a stored one.
+   */
+  appendOnly?: boolean;
 }
 
 const CARD_WRITE_COLUMNS = [
@@ -95,9 +101,10 @@ const CARD_WRITE_COLUMNS = [
 const POLICY: Readonly<Record<GatewayTable, TablePolicy>> = {
   card_reviews: { select: true, upsert: CARD_WRITE_COLUMNS },
   user_settings: { select: true, update: ["timezone", "date_format", "push_notification_hour"] },
-  streak_days: { select: true, upsert: ["review_date"] },
+  streak_days: { select: true, upsert: ["review_date"], appendOnly: true },
   grade_log: {
     select: true,
+    appendOnly: true,
     upsert: ["occurred_at", "entry_date", "card_type", "grade", "subject_key", "locale", "learning_step", "step_started_at"],
   },
   push_subscriptions: { select: true, insert: ["endpoint", "p256dh", "auth_secret", "last_seen_at"], delete: true },
@@ -332,7 +339,7 @@ async function runWrite(db: D1DatabaseLike, userId: string, q: Record<string, un
       }
       await scoped.upsert(table, rows, {
         onConflict: q.onConflict as string | undefined,
-        ignoreDuplicates: bool(q.ignoreDuplicates, "ignoreDuplicates"),
+        ignoreDuplicates: bool(q.ignoreDuplicates, "ignoreDuplicates") || POLICY[table].appendOnly === true,
       });
       break;
     }

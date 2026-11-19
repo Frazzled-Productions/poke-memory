@@ -189,6 +189,21 @@ describe("Bob cannot write Alice's rows", () => {
     expect(d1.sqlite.prepare("SELECT count(*) AS n FROM grade_log WHERE user_id = ?").get(bob)).toEqual({ n: 1 });
   });
 
+  it("grade_log is append-only: a second upsert of the same entry cannot change the stored grade, with or without ignoreDuplicates", async () => {
+    const entry = { occurred_at: 5000, entry_date: TODAY, card_type: "name", subject_key: "25" };
+    expect((await asBob.from("grade_log").upsert({ ...entry, grade: 4 }, { onConflict: "user_id,occurred_at", ignoreDuplicates: true })).error).toBeNull();
+    expect((await asBob.from("grade_log").upsert({ ...entry, grade: 1 }, { onConflict: "user_id,occurred_at" })).error).toBeNull();
+    expect((await asBob.from("grade_log").upsert({ ...entry, grade: 2 }, { onConflict: "user_id,occurred_at", ignoreDuplicates: false })).error).toBeNull();
+    expect(d1.sqlite.prepare("SELECT grade FROM grade_log WHERE user_id = ? AND occurred_at = 5000").all(bob)).toEqual([{ grade: 4 }]);
+  });
+
+  it("streak_days: a second upsert of the same day leaves the stored row alone", async () => {
+    expect((await asBob.from("streak_days").upsert({ review_date: TODAY }, { onConflict: "user_id,review_date", ignoreDuplicates: true })).error).toBeNull();
+    const before = d1.sqlite.prepare("SELECT id, review_date FROM streak_days WHERE user_id = ?").all(bob);
+    expect((await asBob.from("streak_days").upsert({ review_date: TODAY }, { onConflict: "user_id,review_date" })).error).toBeNull();
+    expect(d1.sqlite.prepare("SELECT id, review_date FROM streak_days WHERE user_id = ?").all(bob)).toEqual(before);
+  });
+
   it("push_subscriptions: inserting with Alice's user_id or id is refused; Alice's endpoint becomes Bob's own row", async () => {
     const row = { endpoint: ENDPOINT, p256dh: "k2", auth_secret: "s2", last_seen_at: new Date().toISOString() };
     expect((await asBob.from("push_subscriptions").insert({ ...row, user_id: alice })).error?.code).toBe("42501");
