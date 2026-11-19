@@ -232,7 +232,9 @@ describe("Privacy Notice page", () => {
 
     it("names the Better Auth session cookie as HTTP-only and strictly necessary", async () => {
       await renderPage();
-      expect(screen.getAllByText("better-auth.session_token").length).toBe(2);
+      // On https (the live site) Better Auth adds the __Secure- prefix.
+      expect(screen.getAllByText("__Secure-better-auth.session_token").length).toBe(2);
+      expect(screen.queryByText("better-auth.session_token")).toBeNull();
       const cookies = document.getElementById("section-cookies")?.closest("section");
       expect(cookies?.textContent).toMatch(/HTTP-only session cookie/);
     });

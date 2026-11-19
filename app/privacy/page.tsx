@@ -273,7 +273,7 @@ export default async function PrivacyPage() {
           </h3>
           <p>
             When you sign in, our sign-in system sets an HTTP-only session cookie,{" "}
-            <code>better-auth.session_token</code>, containing a signed session
+            <code>__Secure-better-auth.session_token</code>, containing a signed session
             token that keeps you authenticated across requests.
             This cookie is strictly necessary for the signed-in service to
             function; it is not used for tracking or advertising, and it is not
@@ -346,7 +346,7 @@ export default async function PrivacyPage() {
               <strong>Session cookie (signed-in path only).</strong>{" "}
               When you sign in, via GitHub, Google, or username and password,
               our sign-in system sets an HTTP-only session cookie,{" "}
-              <code>better-auth.session_token</code>, containing a signed
+              <code>__Secure-better-auth.session_token</code>, containing a signed
               session token. This cookie is strictly
               necessary to keep you authenticated across requests. It is not
               set in guest mode and is not used for advertising or tracking.
