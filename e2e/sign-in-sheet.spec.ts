@@ -8,7 +8,7 @@
  * - Basic client-side validation fires for the username form.
  *
  * All tests run in guest mode (the default e2e storageState).
- * No real Supabase round-trip - the sign-up/sign-in actions need a live DB,
+ * No real auth round-trip - the sign-up/sign-in actions need a live DB,
  * so this spec only asserts the UI renders and validation fires correctly.
  */
 

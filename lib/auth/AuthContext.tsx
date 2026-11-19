@@ -1,11 +1,13 @@
 "use client";
-import { createContext, useContext, useEffect, useState } from "react";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { isMockAuthEnabled, createMockClient, MOCK_USER } from "@/lib/auth/mockAuth";
+import { authClient } from "@/lib/auth/client";
+import { toAppUser, type AppUser } from "@/lib/auth/types";
 
 type AuthContextValue = {
-  user: User | null;
+  user: AppUser | null;
   loading: boolean;
   supabase: SupabaseClient | null;
 };
@@ -32,35 +34,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     mockEnabled ? createMockClient() : tryCreateClient(),
   );
   // When the seam is on, start signed-in immediately with the fake user and
-  // no loading flicker - there is no async getUser round-trip to wait on.
-  const [user, setUser] = useState<User | null>(mockEnabled ? MOCK_USER : null);
-  const [loading, setLoading] = useState(mockEnabled ? false : supabase !== null);
+  // no loading flicker - there is no session round-trip to wait on.
+  const [user, setUser] = useState<AppUser | null>(mockEnabled ? MOCK_USER : null);
+  const [loading, setLoading] = useState(!mockEnabled);
 
-  useEffect(() => {
-    // The mock seam is fully synchronous: the fake user is already in state.
-    // Skip the getUser / onAuthStateChange wiring entirely.
-    if (mockEnabled) return;
-    if (!supabase) return;
-
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user ?? null);
-      setLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase, mockEnabled]);
+  const onSession = useCallback((next: AppUser | null) => {
+    setUser(next);
+    setLoading(false);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, loading, supabase }}>
+      {/* The mock seam is fully synchronous: the fake user is already in state. */}
+      {!mockEnabled && <SessionSync onSession={onSession} />}
       {children}
     </AuthContext.Provider>
   );
+}
+
+/**
+ * Follows Better Auth's session (useSession) and reports the signed-in user,
+ * with their linked accounts, as an AppUser; null when signed out. Reports
+ * again only when the signed-in user changes, not on every session refetch.
+ */
+function SessionSync({ onSession }: { onSession: (user: AppUser | null) => void }) {
+  const { data, isPending } = authClient.useSession();
+  const sessionUser = data?.user ?? null;
+  const latest = useRef(sessionUser);
+  useEffect(() => {
+    latest.current = sessionUser;
+  });
+  const userId = sessionUser?.id ?? null;
+
+  useEffect(() => {
+    if (isPending) return;
+    const current = latest.current;
+    if (!current) {
+      onSession(null);
+      return;
+    }
+    let cancelled = false;
+    authClient
+      .listAccounts()
+      .then(({ data: accounts }) => accounts ?? [])
+      .catch(() => [])
+      .then((accounts) => {
+        if (!cancelled) onSession(toAppUser(current, accounts));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPending, userId, onSession]);
+
+  return null;
 }
 
 export function useAuth() {

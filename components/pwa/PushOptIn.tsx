@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   hasLocalSubscription,
   isPushSupported,
@@ -53,7 +53,7 @@ export function PushOptIn({
   user,
   supabase,
 }: {
-  user: User;
+  user: { id: string };
   supabase: SupabaseClient;
 }) {
   const t = useTranslations("settings.pushOptIn");

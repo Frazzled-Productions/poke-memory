@@ -1,30 +1,45 @@
-"use server";
-import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+/**
+ * Sign-in, sign-up and sign-out from the browser, through Better Auth's client
+ * (design D6). These were Supabase server actions; the per-IP throttle now
+ * runs on the server in Better Auth's before hook (lib/auth/server.ts) and
+ * comes back here as the RATE_LIMITED error code.
+ *
+ * IMPORTANT: passwords are never logged. Do not add logging that captures them.
+ */
+import { authClient } from "./client";
 import type { AuthProvider } from "./types";
 import { normaliseUsername, validateUsername, syntheticEmail, MIN_PASSWORD_LENGTH } from "./username";
-import { hashIp } from "./rateLimitIp";
-import type { RateLimitAction } from "./rateLimitIp";
 
-export async function signIn(provider: AuthProvider) {
-  if (provider !== "github" && provider !== "google") redirect("/");
-  const supabase = await createClient();
-  const base = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const { data, error } = await supabase.auth.signInWithOAuth({
+/** Error code of the server's per-IP throttle (RATE_LIMITED_CODE in server.ts). */
+const RATE_LIMITED = "RATE_LIMITED";
+
+type ClientError = { status?: number; code?: string } | null | undefined;
+
+const isRateLimited = (error: ClientError) => error?.code === RATE_LIMITED || error?.status === 429;
+
+/**
+ * Starts a GitHub or Google sign-in: the browser goes to the provider, back to
+ * /api/auth/callback/<provider>, then to /auth/callback-complete, which sorts
+ * the first arrival by what data exists. Failures land on /?error=<code>.
+ */
+export async function signIn(provider: AuthProvider): Promise<void> {
+  if (provider !== "github" && provider !== "google") return;
+  await authClient.signIn.social({
     provider,
-    options: {
-      redirectTo: base + "/api/auth/callback",
-    },
+    callbackURL: "/auth/callback-complete",
+    errorCallbackURL: "/",
   });
-  if (error || !data.url) redirect("/");
-  redirect(data.url);
 }
 
-export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  redirect("/");
+/**
+ * Signs out on every device, as Supabase's signOut did: revokes all of the
+ * user's sessions, clears this browser's cookie, then reloads the home page.
+ */
+export async function signOut(): Promise<void> {
+  await authClient.revokeSessions().catch(() => undefined);
+  await authClient.signOut().catch(() => undefined);
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- a full reload clears signed-in state everywhere, as the old server redirect did
+  window.location.assign("/");
 }
 
 // ---------------------------------------------------------------------------
@@ -36,19 +51,13 @@ export type SignUpWithUsernameResult =
   | { ok: false; error: "username_too_short" | "username_too_long" | "username_invalid_chars" | "password_too_short" | "username_taken" | "signup_failed" | "rate_limited" };
 
 /**
- * Signs up a new user with a username + password.
+ * Signs up a new user with a username + password. The account's email is the
+ * synthetic one derived from the normalised username (never shown); the
+ * username lives on the Better Auth user (username column).
  *
- * Steps:
- *   1. Normalise + validate the username.
- *   2. Derive the synthetic email (never shown to the user).
- *   3. Call supabase.auth.signUp with the synthetic email + password.
- *      emailRedirectTo is omitted - email confirmation MUST be disabled in the
- *      Supabase dashboard ("Confirm email" toggle off) so the session is
- *      usable immediately without any email round-trip. See PR body for the
- *      one-off dashboard toggle the maintainer must flip.
- *   4. Insert the (username, user_id) row into public.usernames.
- *
- * IMPORTANT: password is never logged. Do not add logging that captures it.
+ * "Taken" comes from either of two signals: the username plugin's
+ * USERNAME_IS_ALREADY_TAKEN, or the unique synthetic email (USER_ALREADY_EXISTS
+ * and its variants), which can only clash for the same username.
  */
 export async function signUpWithUsername(
   rawUsername: string,
@@ -64,96 +73,22 @@ export async function signUpWithUsername(
     return { ok: false, error: "password_too_short" };
   }
 
-  // Per-IP throttle: check before any GoTrue call to prevent account-creation
-  // floods and username enumeration. Raw IP is never persisted; only the
-  // salted sha256 hash is written to public.rate_limit_buckets via the RPC.
-  const hdrs = await headers();
-  const rawIp = (hdrs.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
-  const ipHash = hashIp(rawIp);
-
-  const supabase = await createClient();
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: rlAllowed, error: rlError } = await (supabase as any).rpc(
-    "check_rate_limit",
-    { p_ip_hash: ipHash, p_action: "signup" as RateLimitAction },
-  );
-  if (rlError || rlAllowed === false) {
-    return { ok: false, error: "rate_limited" };
-  }
-
-  const email = syntheticEmail(normalised);
-
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-    email,
+  const { data, error } = await authClient.signUp.email({
+    email: syntheticEmail(normalised),
     password,
-    options: {
-      // Do NOT pass emailRedirectTo - the synthetic address cannot receive mail.
-      // Email confirmation must be disabled in the Supabase dashboard.
-      data: {
-        // Store username in user_metadata for display purposes (does not
-        // replace the primary lookup path through public.usernames).
-        username: normalised,
-      },
-    },
+    name: normalised,
+    username: normalised,
   });
 
-  if (signUpError) {
-    // Use GoTrue's canonical signal for an already-registered email rather than
-    // the human-readable message string, which can change across GoTrue versions.
-    // `code === "email_exists"` is the primary signal; `identities.length === 0`
-    // is the documented secondary indicator. Status 422 is GoTrue's general
-    // "Unprocessable Entity" and is intentionally excluded: it can cover
-    // non-duplicate rejections (e.g. a future password-strength rule) and would
-    // mislead the user into changing their username instead of their password.
-    // Cast signUpData.user via unknown so TS does not narrow 'identities' to
-    // never in the error branch (the Supabase SDK types differ between the
-    // error and success overloads of AuthResponse).
-    const maybeUser = signUpData.user as { identities?: unknown[] } | null;
-    const alreadyRegistered =
-      (signUpError as { code?: string }).code === "email_exists" ||
-      maybeUser?.identities?.length === 0;
-    if (alreadyRegistered) {
-      return { ok: false, error: "username_taken" };
-    }
-    return { ok: false, error: "signup_failed" };
+  if (error) {
+    if (isRateLimited(error)) return { ok: false, error: "rate_limited" };
+    const code = error.code ?? "";
+    const taken = code === "USERNAME_IS_ALREADY_TAKEN" || code.startsWith("USER_ALREADY_EXISTS");
+    return { ok: false, error: taken ? "username_taken" : "signup_failed" };
   }
 
-  const userId = signUpData.user?.id;
-  if (!userId) {
+  if (!data?.user?.id) {
     return { ok: false, error: "signup_failed" };
-  }
-
-  // If the Supabase dashboard has "Confirm email" enabled, the synthetic address
-  // cannot receive a confirmation mail, so the session will be null even when
-  // the auth.users row was created. Without a session there is no auth.uid(),
-  // which means the INSERT into public.usernames will be rejected by RLS, leaving
-  // an orphan auth.users row and surfacing a misleading "username_taken" error.
-  // Return signup_failed here and let the user (or the admin) investigate the
-  // dashboard misconfiguration rather than creating a confusing half-created account.
-  if (!signUpData.session) {
-    return { ok: false, error: "signup_failed" };
-  }
-
-  // Insert the username mapping. If the username row already exists (race),
-  // the PRIMARY KEY constraint returns a conflict error.
-  // Cast to any because Database is a stub (unknown) until types are generated
-  // from the live schema. Safe: the migration defines the exact shape.
-  // TODO: remove cast once `supabase gen types` is run after migration 035 is
-  // applied (tracked in the post-merge checklist for #1671).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: insertError } = await (supabase as any)
-    .from("usernames")
-    .insert({ username: normalised, user_id: userId });
-
-  if (insertError) {
-    // Postgres code 23505 = unique_violation: the username was claimed in a
-    // race (PK conflict) or the user already has a username (UNIQUE user_id
-    // constraint). Any other failure (transient DB error, future CHECK
-    // constraint) is surfaced as signup_failed so the user doesn't
-    // unnecessarily change their chosen username.
-    const isConflict = (insertError as { code?: string }).code === "23505";
-    return { ok: false, error: isConflict ? "username_taken" : "signup_failed" };
   }
 
   return { ok: true };
@@ -168,49 +103,22 @@ export type SignInWithUsernameResult =
   | { ok: false; error: "invalid_credentials" | "rate_limited" };
 
 /**
- * Signs in an existing user with a username + password.
- *
- * Because the synthetic email is derived deterministically from the username,
- * no pre-session lookup against public.usernames is strictly required for
- * sign-in. The derivation alone is sufficient.
- *
- * IMPORTANT: password is never logged. Do not add logging that captures it.
+ * Signs in an existing user with a username + password. One answer for an
+ * unknown username and a wrong password.
  */
 export async function signInWithUsername(
   rawUsername: string,
   password: string,
 ): Promise<SignInWithUsernameResult> {
   const normalised = normaliseUsername(rawUsername);
-  const usernameError = validateUsername(normalised);
-  if (usernameError) {
+  if (validateUsername(normalised)) {
     return { ok: false, error: "invalid_credentials" };
   }
 
-  // Per-IP throttle: looser cap for sign-in (10 / 10 min, 40 / 1 hr) since
-  // a failed sign-in creates no account; still guards against credential stuffing.
-  // TODO: apply check_rate_limit('signin'/'magiclink') when #1670 lands for the
-  // magic-link door as well.
-  const hdrs = await headers();
-  const rawIp = (hdrs.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
-  const ipHash = hashIp(rawIp);
-
-  const supabase = await createClient();
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: rlAllowed, error: rlError } = await (supabase as any).rpc(
-    "check_rate_limit",
-    { p_ip_hash: ipHash, p_action: "signin" as RateLimitAction },
-  );
-  if (rlError || rlAllowed === false) {
-    return { ok: false, error: "rate_limited" };
-  }
-
-  const email = syntheticEmail(normalised);
-
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await authClient.signIn.username({ username: normalised, password });
 
   if (error) {
-    return { ok: false, error: "invalid_credentials" };
+    return { ok: false, error: isRateLimited(error) ? "rate_limited" : "invalid_credentials" };
   }
 
   return { ok: true };

@@ -1,61 +1,37 @@
 import { randomUUID } from "node:crypto";
-import { test, expect } from "@playwright/test";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { syntheticEmail } from "@/lib/auth/username";
+import { test, expect, request as playwrightRequest, type APIRequestContext } from "@playwright/test";
 import { addOnboardingPreDismiss } from "./helpers/onboarding";
 
 /**
  * Real-auth E2E (#1710) - the durable guard for the username/password door.
  *
  * Unlike e2e/auth.spec.ts (which drives the test-only mock-auth seam against a
- * preview), this spec exercises REAL Supabase auth against a dedicated QA
- * project. It is the end-to-end regression net for #1709: sign-up succeeded
+ * preview), this spec exercises REAL Better Auth and the real data gateway on
+ * a local build of the Cloudflare Worker with a fresh local D1 (design D6,
+ * D11). It is the end-to-end regression net for #1709: sign-up succeeded
  * server-side but the signed-in UI never reflected it until the SignInSheet was
- * fixed to do a full navigation after the server action. A unit test guards the
- * fix; this spec guards the whole flow in a real browser against a real DB.
+ * fixed to do a full navigation after signing in. A unit test guards the fix;
+ * this spec guards the whole flow in a real browser against a real database.
  *
  * RUN MODEL
- *   - Built + served on localhost with the QA NEXT_PUBLIC_SUPABASE_* env baked
- *     in at build time (NEXT_PUBLIC_* are inlined by Next at build). No Vercel
- *     SSO is involved. CI wires this in the `e2e-real-auth` job in ci.yml.
+ *   - CI's `e2e-real-auth` job builds the Worker, applies every migration to a
+ *     local D1, writes a random BETTER_AUTH_SECRET to .dev.vars and serves the
+ *     Worker on http://localhost:8787 (`opennextjs-cloudflare preview`).
  *   - Runs chromium only (real auth does not need the mobile-safari matrix).
  *
- * EPHEMERAL USER + TEARDOWN
+ * EPHEMERAL USER, NO TEARDOWN
  *   - A unique username is generated per run (E2E_RUN_ID from CI, with a
- *     timestamp+random fallback for local runs) so concurrent / repeated runs
- *     never collide and no fixed account accretes data.
- *   - Teardown calls the authenticated `delete_account()` RPC (migration 027,
- *     SECURITY DEFINER, deletes auth.uid() and cascades to every data table).
- *     It needs ONLY the anon key: a fresh supabase-js client signs in as the
- *     ephemeral user and calls the RPC. No service-role secret is required.
- *   - Teardown runs in afterAll unconditionally (even if the test body failed)
- *     so a failure never leaves a QA user behind.
+ *     timestamp+random fallback for local runs) so repeated runs never collide.
+ *   - The account is created through Better Auth's own endpoints (the UI's
+ *     username sign-up), in the local D1 under the runner's .wrangler/ folder,
+ *     which goes with the runner: there is nothing to tear down.
  *
- * QA-vs-PROD SAFETY
- *   - The suite asserts the build's Supabase URL is the QA URL and is NOT the
- *     production URL before doing anything. Production secrets are never set in
- *     this job.
- *
- * KNOWN PREREQUISITE (maintainer action)
- *   - The QA project MUST have "Confirm email" DISABLED in its Auth settings.
- *     The username door derives a synthetic, non-routable email, so a
- *     confirmation mail can never be received; with confirmation enabled,
- *     signUp returns no session and sign-in can never complete. If that is the
- *     case this spec fails FAST with a clear message rather than a cryptic
- *     timeout. Production has it disabled; QA must match.
+ * SAFETY
+ *   - The suite refuses to run against anything but localhost, so it can never
+ *     create accounts on a deployed site.
  */
 
-// NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY are inlined into the client bundle at
-// build time, but the spec runs in the Playwright Node process, so it reads the
-// same names from its own environment. The `e2e-real-auth` CI job sets both for
-// the build step AND exports them to the Playwright step.
-const QA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const QA_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-// The production Supabase URL. Asserting the test URL differs from this is the
-// belt-and-braces guard that the job never points at production. Kept as a
-// substring check on the project ref so a trailing slash / path cannot defeat it.
-const PROD_SUPABASE_URL_REF = "nvxvvtvnthsgdxgksmju"; // poke-memory production project ref
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:8787";
 
 // A password comfortably above MIN_PASSWORD_LENGTH (8). Never logged.
 const E2E_PASSWORD = "e2e-real-auth-pw-2026";
@@ -63,13 +39,13 @@ const E2E_PASSWORD = "e2e-real-auth-pw-2026";
 /**
  * Per-run unique username. CI passes E2E_RUN_ID (the GitHub run id + attempt);
  * locally we fall back to a timestamp + random suffix. Lowercased and trimmed
- * to the username CHECK constraint ([a-z0-9_-]{3,30}).
+ * to the username rule ([a-z0-9_-]{3,30}).
  */
 function makeUsername(): string {
   const seed =
     process.env.E2E_RUN_ID ??
     `${Date.now().toString(36)}${randomUUID().replace(/-/g, "").slice(0, 6)}`;
-  // Strip to allowed chars, prefix with a fixed marker so QA rows are
+  // Strip to allowed chars, prefix with a fixed marker so test rows are
   // identifiable, and clamp to 30 chars.
   const cleaned = `e2e_${seed}`.toLowerCase().replace(/[^a-z0-9_-]/g, "");
   return cleaned.slice(0, 30);
@@ -77,69 +53,61 @@ function makeUsername(): string {
 
 const username = makeUsername();
 
-/** A fresh anon-key client used for the RLS round-trip and teardown. */
-let nodeClient: SupabaseClient | null = null;
+/**
+ * A Node-side HTTP client signed in as the ephemeral user through Better
+ * Auth's username sign-in; its cookie jar carries the session to the data
+ * gateway (POST /api/db), which runs each query pinned to that user.
+ */
+let api: APIRequestContext | null = null;
 
-test.describe("Real auth: username door against the QA database (#1710)", () => {
-  // Run serially: sign-up happens once, then the RLS round-trip reuses the same
-  // ephemeral user. Parallelism would race on the single account.
+async function signedInApi(): Promise<APIRequestContext> {
+  if (api) return api;
+  const context = await playwrightRequest.newContext({
+    baseURL: BASE_URL,
+    // Better Auth and the gateway both require a same-origin Origin header.
+    extraHTTPHeaders: { origin: new URL(BASE_URL).origin },
+  });
+  const res = await context.post("/api/auth/sign-in/username", {
+    data: { username, password: E2E_PASSWORD },
+  });
+  expect(res.status(), `sign-in as the ephemeral user failed: ${await res.text()}`).toBe(200);
+  api = context;
+  return context;
+}
+
+/** One gateway query (lib/db/gateway.ts wire format); returns its data. */
+async function gateway(query: Record<string, unknown>): Promise<unknown> {
+  const res = await (await signedInApi()).post("/api/db", { data: query });
+  const body = (await res.json()) as { data: unknown; error: { message: string } | null };
+  expect(body.error, `gateway ${String(query.kind)} failed: ${body.error?.message ?? ""}`).toBeNull();
+  expect(res.status()).toBe(200);
+  return body.data;
+}
+
+const cardKey = (subjectKey: string) => [
+  { column: "card_type", op: "eq", value: "name" },
+  { column: "subject_key", op: "eq", value: subjectKey },
+  { column: "locale", op: "eq", value: "en" },
+];
+
+test.describe("Real auth: username door against a local Worker and D1 (#1710)", () => {
+  // Run serially: sign-up happens once, then the data round-trip reuses the
+  // same ephemeral user. Parallelism would race on the single account.
   test.describe.configure({ mode: "serial" });
 
   test.beforeAll(() => {
-    // Fail fast and loud if the QA env is missing - this job must run with it.
-    if (!QA_URL || !QA_ANON_KEY) {
+    const host = new URL(BASE_URL).hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") {
       throw new Error(
-        "auth-real.spec requires NEXT_PUBLIC_SUPABASE_URL and " +
-          "NEXT_PUBLIC_SUPABASE_ANON_KEY to point at the QA Supabase project. " +
-          "These are set by the e2e-real-auth CI job from the QA_* GitHub secrets.",
+        `auth-real.spec refuses to run against ${BASE_URL}: it creates accounts and ` +
+          "must only ever run against a local Worker (CI's e2e-real-auth job).",
       );
     }
-    // QA-vs-prod safety: never target production.
-    if (QA_URL.includes(PROD_SUPABASE_URL_REF)) {
-      throw new Error(
-        "auth-real.spec refuses to run: NEXT_PUBLIC_SUPABASE_URL points at the " +
-          "PRODUCTION Supabase project. This spec creates and deletes accounts " +
-          "and must only ever run against QA.",
-      );
-    }
-    nodeClient = createClient(QA_URL, QA_ANON_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
   });
 
   test.afterAll(async () => {
-    // Teardown: sign in as the ephemeral user with a fresh anon-key client and
-    // call delete_account(). Runs even if the test body failed so no QA user
-    // accretes. Best-effort: log but do not throw, so a teardown hiccup does
-    // not mask the real test result.
-    if (!nodeClient || !QA_URL || !QA_ANON_KEY) return;
-    try {
-      const teardownClient = createClient(QA_URL, QA_ANON_KEY, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
-      const email = syntheticEmail(username);
-      const { error: signInErr } = await teardownClient.auth.signInWithPassword({
-        email,
-        password: E2E_PASSWORD,
-      });
-      if (signInErr) {
-        // The user may never have been created (sign-up failed). Nothing to clean.
-        console.warn(
-          `[auth-real teardown] could not sign in as '${username}' to delete - ` +
-            `likely never created: ${signInErr.message}`,
-        );
-        return;
-      }
-      const { error: rpcErr } = await teardownClient.rpc("delete_account");
-      if (rpcErr) {
-        console.error(
-          `[auth-real teardown] delete_account RPC failed for '${username}': ${rpcErr.message}`,
-        );
-      }
-      await teardownClient.auth.signOut();
-    } catch (err) {
-      console.error("[auth-real teardown] threw:", err);
-    }
+    await api?.dispose();
+    api = null;
   });
 
   test("sign up via the username door and the UI reflects the signed-in state", async ({
@@ -148,14 +116,8 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
     await addOnboardingPreDismiss(page);
     await page.goto("/");
 
-    // The guest AuthButton renders the "Sign in" trigger. If it is absent the
-    // build has no Supabase env - that means the QA env was NOT baked in, which
-    // is a hard failure for this job (do not silently skip).
     const signIn = page.getByRole("button", { name: "Sign in" });
-    await expect(
-      signIn,
-      "Sign in trigger missing - the build lacks NEXT_PUBLIC_SUPABASE_* (QA env not baked in)",
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(signIn, "Sign in trigger missing").toBeVisible({ timeout: 15_000 });
 
     await signIn.click();
 
@@ -167,13 +129,10 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
     await dialog.getByLabel("Password").fill(E2E_PASSWORD);
     await dialog.getByRole("button", { name: "Create account" }).click();
 
-    // The fix for #1709: the server action sets the session cookie and the
+    // The fix for #1709: Better Auth sets the session cookie and the
     // SignInSheet does a full navigation, so the signed-in UI ("Sign out")
     // appears WITHOUT a manual reload. This is the exact regression we guard.
-    //
-    // If the QA project has "Confirm email" ENABLED, signUp returns no session,
-    // signUpWithUsername returns signup_failed, and the inline error renders
-    // instead of the signed-in nav. Detect that and fail with a clear message.
+    // A sign-up error renders inline instead: fail with its text.
     const signOut = page.getByRole("button", { name: "Sign out" });
     const signupFailed = dialog.getByRole("alert");
 
@@ -188,13 +147,7 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
 
     if (await signupFailed.isVisible().catch(() => false)) {
       const msg = await signupFailed.textContent();
-      throw new Error(
-        `Sign-up failed: "${msg?.trim()}". The most likely cause is that the QA ` +
-          `Supabase project has "Confirm email" ENABLED. The username door uses a ` +
-          `synthetic, non-routable email, so a confirmation mail can never be ` +
-          `received and signUp returns no session. A maintainer must DISABLE ` +
-          `"Confirm email" in the QA project's Auth settings (production has it off).`,
-      );
+      throw new Error(`Sign-up failed: "${msg?.trim()}". Check the Worker log (/tmp/worker.log in CI).`);
     }
 
     // Signed-in UI is reflected: the "Sign out" control is present and the guest
@@ -203,106 +156,67 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
     await expect(page.getByRole("button", { name: "Sign in" })).toHaveCount(0);
   });
 
-  test("authenticated RLS round-trip: a card write reads back for the signed-in user", async () => {
-    // This asserts at least one authenticated write that round-trips through
-    // real RLS. We use a fresh anon-key client signed in as the ephemeral user
-    // rather than driving the grade through the UI: the insert+select is the
-    // exact RLS contract (the card_reviews policies are auth.uid() = user_id for
-    // both INSERT WITH CHECK and SELECT USING), and it avoids coupling the RLS
-    // assertion to per-grade sync debounce timing. The previous test already
-    // proved the UI sign-in path; this proves the data path.
-    if (!nodeClient) throw new Error("nodeClient not initialised");
-
-    const email = syntheticEmail(username);
-    const { data: signInData, error: signInErr } =
-      await nodeClient.auth.signInWithPassword({
-        email,
-        password: E2E_PASSWORD,
-      });
-    expect(
-      signInErr,
-      `sign-in as the ephemeral user failed: ${signInErr?.message ?? ""}`,
-    ).toBeNull();
-    const userId = signInData.user?.id;
-    expect(userId, "signed-in session has no user id").toBeTruthy();
-
-    // Write a minimal, valid graduated card row. A fresh INSERT does not fire
-    // the BEFORE UPDATE regression trigger, and the row satisfies the
-    // firstSeen/lastReview invariant (both set = graduated). The RLS INSERT
-    // policy passes only because user_id = auth.uid() from the session JWT.
+  test("authenticated data round-trip: a card write reads back for the signed-in user", async () => {
+    // At least one authenticated write that round-trips through the gateway and
+    // the scope helper (which pins every row to the session user, as RLS did).
+    // Driven from Node rather than the UI so the assertion does not couple to
+    // per-grade sync debounce timing; the previous test proved the UI sign-in.
+    //
+    // A minimal, valid graduated card row: a fresh INSERT does not fire the
+    // BEFORE UPDATE regression trigger, and firstSeen/lastReview are both set.
     const SUBJECT_KEY = "1"; // Bulbasaur
-    const cardRow = {
-      user_id: userId,
-      card_type: "name",
-      subject_key: SUBJECT_KEY,
-      locale: "en",
-      stability: 10,
-      difficulty: 5,
-      elapsed_days: 1,
-      scheduled_days: 21,
-      reps: 3,
-      lapses: 0,
-      fsrs_state: "review",
-      due_date: "2099-01-01",
-      last_review: "2026-01-01",
-      first_seen: "2025-12-01",
-      hidden_since: null,
-      seen_in_pasture: false,
-      updated_at: new Date().toISOString(),
-    };
+    await gateway({
+      kind: "upsert",
+      table: "card_reviews",
+      rows: {
+        card_type: "name",
+        subject_key: SUBJECT_KEY,
+        locale: "en",
+        stability: 10,
+        difficulty: 5,
+        elapsed_days: 1,
+        scheduled_days: 21,
+        reps: 3,
+        lapses: 0,
+        fsrs_state: "review",
+        due_date: "2099-01-01",
+        last_review: "2026-01-01",
+        first_seen: "2025-12-01",
+        hidden_since: null,
+        seen_in_pasture: false,
+      },
+      onConflict: "user_id,card_type,subject_key,locale",
+    });
 
-    const { error: writeErr } = await nodeClient
-      .from("card_reviews")
-      .upsert(cardRow, { onConflict: "user_id,card_type,subject_key,locale" });
-    expect(
-      writeErr,
-      `authenticated card_reviews write failed: ${writeErr?.message ?? ""}`,
-    ).toBeNull();
-
-    // Read it back. The SELECT policy (auth.uid() = user_id) returns only this
-    // user's row, so a successful read of the just-written row proves the full
-    // authenticated round-trip end to end.
-    const { data: readBack, error: readErr } = await nodeClient
-      .from("card_reviews")
-      .select("subject_key, reps, scheduled_days, fsrs_state")
-      .eq("card_type", "name")
-      .eq("subject_key", SUBJECT_KEY)
-      .eq("locale", "en")
-      .single();
-    expect(
-      readErr,
-      `read-back of the written card failed: ${readErr?.message ?? ""}`,
-    ).toBeNull();
+    // Read it back; only this user's rows are visible to their session.
+    const readBack = await gateway({
+      kind: "select",
+      table: "card_reviews",
+      columns: ["subject_key", "reps", "scheduled_days", "fsrs_state"],
+      filters: cardKey(SUBJECT_KEY),
+      single: "one",
+    });
     expect(readBack).toMatchObject({
       subject_key: SUBJECT_KEY,
       reps: 3,
       scheduled_days: 21,
       fsrs_state: "review",
     });
-
-    await nodeClient.auth.signOut();
   });
 
   test("signed-in backup restore moves cards forward and never lowers the cloud (#2218)", async ({
     page,
   }, testInfo) => {
     // The one path the integration suite cannot reach: a real browser, a real
-    // session cookie, real PostgREST and real RLS. Runs after the round-trip test,
+    // session cookie, the real gateway and D1. Runs after the round-trip test,
     // which leaves Bulbasaur (subject "1") in the cloud at reps 3.
     testInfo.setTimeout(90_000);
-    if (!nodeClient) throw new Error("nodeClient not initialised");
-
-    const { data: signInData, error: signInErr } = await nodeClient.auth.signInWithPassword({
-      email: syntheticEmail(username),
-      password: E2E_PASSWORD,
-    });
-    expect(signInErr, signInErr?.message ?? "").toBeNull();
-    const userId = signInData.user?.id;
 
     // Ivysaur (subject "2") is further on in the cloud than in the backup below.
-    const { error: seedErr } = await nodeClient.from("card_reviews").upsert(
-      {
-        user_id: userId,
+    await gateway({
+      kind: "upsert",
+      table: "card_reviews",
+      rows: {
         card_type: "name",
         subject_key: "2",
         locale: "en",
@@ -319,19 +233,18 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
         hidden_since: null,
         seen_in_pasture: false,
       },
-      { onConflict: "user_id,card_type,subject_key,locale" },
-    );
-    expect(seedErr, seedErr?.message ?? "").toBeNull();
+      onConflict: "user_id,card_type,subject_key,locale",
+    });
 
     const cloudReps = async (subjectKey: string) => {
-      const { data } = await nodeClient!
-        .from("card_reviews")
-        .select("reps")
-        .eq("card_type", "name")
-        .eq("subject_key", subjectKey)
-        .eq("locale", "en")
-        .single();
-      return data?.reps;
+      const row = (await gateway({
+        kind: "select",
+        table: "card_reviews",
+        columns: ["reps"],
+        filters: cardKey(subjectKey),
+        single: "one",
+      })) as { reps: number } | null;
+      return row?.reps;
     };
 
     await addOnboardingPreDismiss(page);
@@ -435,7 +348,5 @@ test.describe("Real auth: username door against the QA database (#1710)", () => 
       }, subjectKey);
     await expect.poll(() => localReps("1"), { timeout: 20_000 }).toBe(8);
     await expect.poll(() => localReps("2"), { timeout: 20_000 }).toBe(9);
-
-    await nodeClient.auth.signOut();
   });
 });

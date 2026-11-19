@@ -569,13 +569,12 @@ describe("SignInSheet - pseudo-locale (no English-leak)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Successful auth must navigate so the server-action session is picked up.
+// Successful auth must navigate so the new session is picked up everywhere.
 //
-// signUpWithUsername / signInWithUsername are server actions that set the
-// Supabase session in cookies server-side; the browser client's
-// onAuthStateChange does NOT fire for that out-of-band write, so the sheet must
-// force a full navigation to reflect the signed-in state (#1671 regression -
-// previously the sheet just closed and the UI stayed signed-out).
+// signUpWithUsername / signInWithUsername set the Better Auth session cookie;
+// a full navigation re-reads it and runs the sign-in side effects (SignInPull
+// etc.) (#1671 regression - previously the sheet just closed and the UI stayed
+// signed-out).
 // ---------------------------------------------------------------------------
 
 describe("SignInSheet - successful auth navigates", () => {

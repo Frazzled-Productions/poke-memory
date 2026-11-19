@@ -96,9 +96,8 @@ describe("assertMockAuthNotInProduction - build-time guard (SECURITY)", () => {
 });
 
 describe("MOCK_USER", () => {
-  it("is a hard-coded, obviously-fake authenticated user", () => {
+  it("is a hard-coded, obviously-fake signed-in user", () => {
     expect(MOCK_USER.id).toBe("e2e00000-0000-4000-8000-000000000751");
-    expect(MOCK_USER.aud).toBe("authenticated");
     expect(MOCK_USER.email).toContain(".test");
     // The avatar + display-name metadata mirror GitHub OAuth so AuthButton
     // renders its signed-in branch normally.
