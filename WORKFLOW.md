@@ -553,9 +553,9 @@ in-memory fixture.
 |---|---|
 | **Trigger** | Monthly `schedule` (`23 5 3 * *` - 05:23 UTC on the 3rd); `workflow_dispatch`. Gated `if: github.repository == 'Frazzled-Productions/poke-memory'`. |
 | **Job** | `restore` |
-| **What it does** | Proves the nightly D1 backup restores (move-to-cloudflare, design D10). Downloads the newest object under `d1/` in the R2 bucket `poke-memory-backups` (EU endpoint, AWS CLI) and fails if it is over 72h old (the nightly backup has stopped); applies `db/d1/migrations` to a fresh local D1, executes the backup into it, and runs `scripts/cloudflare/check-restore.mjs`, which fails if any table's row count differs from the `-- rows <table>: <count>` header. The file format (data-only INSERTs in dependency order after that header) is documented in that script. |
+| **What it does** | Proves the nightly D1 backup restores (move-to-cloudflare, design D10). Downloads the newest object under `d1/` in the R2 bucket `poke-memory-backups` (Cloudflare REST API with the EU jurisdiction header) and fails if it is more than three days old (the nightly backup has stopped); applies `db/d1/migrations` to a fresh local D1, executes the backup into it, and runs `scripts/cloudflare/check-restore.mjs`, which fails if any table's row count differs from the `-- rows <table>: <count>` header. The file format (data-only INSERTs in dependency order after that header) is documented in that script. |
 | **Privacy** | The backup holds personal data and the logs are public: it stays in the runner's temporary folder, is never uploaded as an artifact, and the load step hides wrangler's output (an error would quote a row). Only table names and counts are logged. |
-| **Required secrets** | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (an R2 API token with read access to the bucket, an owner step), `CLOUDFLARE_ACCOUNT_ID` (var). Without them the run is skipped with a notice. |
+| **Required secrets** | `CLOUDFLARE_API_TOKEN` (has Workers R2 Storage Write) and `CLOUDFLARE_ACCOUNT_ID` (var). Without them the run is skipped with a notice. |
 | **Health watch** | Registered in `cron-health-monitor.yml` at 840h. |
 | **Required check** | No - cron, not a PR gate. |
 | **Concurrency** | `group: restore-test` with `cancel-in-progress: false`. |
