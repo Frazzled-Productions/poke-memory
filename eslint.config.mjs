@@ -22,6 +22,10 @@ const eslintConfig = defineConfig([
     // `next build`; gitignored). It is minified esbuild output, so linting it
     // flags spurious errors (e.g. no-this-alias on the bundled runtime), #1752.
     "public/sw/**",
+    // Generated FSRS optimiser bundles (scripts/build-fsrs-optimiser.mjs;
+    // gitignored) and the vendored, unmodified wasm binding loaders.
+    "public/fsrs/**",
+    "vendor/**",
   ]),
   // Baseline for adopting ESLint into CI (#614). The react-hooks plugin v7
   // (bundled with eslint-config-next 16) ships several new rules at `error`
