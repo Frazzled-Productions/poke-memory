@@ -55,3 +55,11 @@ next-env.d.ts
 /tools/art/.venv/
 /tools/art/out/
 __pycache__/
+
+# generated from CHANGELOG.md by scripts/generate-changelog-module.mjs (Workers have no filesystem)
+/lib/changelog/changelog.generated.ts
+
+# Cloudflare: OpenNext build output and wrangler local state (D1, R2)
+/.open-next/
+/.wrangler/
+/.dev.vars*

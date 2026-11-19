@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { withSentryConfig } from "@sentry/nextjs/config";
 import pkg from "./package.json";
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
 
 // SECURITY: fail the build loudly if the test-only mock-auth seam (issue #751)
@@ -10,8 +11,20 @@ import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
 // - it turns a silent misconfiguration into a hard build failure.
 assertMockAuthNotInProduction();
 
+// `next dev` gets the Worker bindings (D1 `DB`, R2 `BACKUPS`, vars) from
+// wrangler.jsonc through a local Miniflare, so getCloudflareContext() works in
+// dev as it does on Workers (decision 0018). Only in dev: the production build
+// and vitest must not start Miniflare.
+if (process.env.NODE_ENV === "development") {
+  void initOpenNextCloudflareForDev();
+}
+
 const nextConfig: NextConfig = {
-  cacheComponents: true,
+  // Off for the Cloudflare move (decision 0018, design D1): on
+  // @opennextjs/cloudflare every Cache Components page hangs until OpenNext
+  // PR #1318 lands (unmerged, and with it a render mismatch is still logged).
+  // Turn it back on only once that fix is released and tested on Workers.
+  cacheComponents: false,
   // The FSRS optimizer route loads @open-spaced-repetition/binding which
   // ships a native Node.js binary (.node). Mark it (and its platform-specific
   // sub-package) as server-external so Next.js/Turbopack does not attempt to

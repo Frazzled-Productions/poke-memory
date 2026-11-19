@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseChangelog } from "./parse";
 
@@ -249,21 +248,22 @@ describe("parseChangelog", () => {
 
 describe("getChangelog", () => {
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.doUnmock("./changelog.generated");
   });
 
-  it("returns an empty list when CHANGELOG.md is absent rather than throwing", async () => {
-    // Bust the module-level cache so the readFileSync mock takes effect.
+  it("returns an empty list when CHANGELOG.md was absent at generation rather than throwing", async () => {
     vi.resetModules();
-    const spy = vi.spyOn(fs, "readFileSync").mockImplementation(() => {
-      const err = new Error("ENOENT: no such file or directory") as Error & {
-        code: string;
-      };
-      err.code = "ENOENT";
-      throw err;
-    });
+    vi.doMock("./changelog.generated", () => ({ CHANGELOG_MD: "" }));
     const mod = await import("./parse");
     expect(mod.getChangelog()).toEqual([]);
-    expect(spy).toHaveBeenCalled();
+  });
+
+  it("parses the inlined CHANGELOG.md", async () => {
+    vi.resetModules();
+    vi.doMock("./changelog.generated", () => ({
+      CHANGELOG_MD: "## [1.2.3] - 2026-11-19\n\n### Fixed\n\n- A fix.\n",
+    }));
+    const mod = await import("./parse");
+    expect(mod.getChangelog()[0]?.sections).toEqual([{ kind: "Fixed", bullets: ["A fix."] }]);
   });
 });

@@ -1,0 +1,16 @@
+{
+  // Type-checks the Worker entry against the Workers runtime types. The root
+  // tsconfig (Next.js, DOM types) excludes worker/.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true
+  },
+  "include": ["index.ts"]
+}
