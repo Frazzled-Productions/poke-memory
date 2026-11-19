@@ -222,7 +222,9 @@ Worker `poke-memory-preview` (own D1 database and bucket, seeded with test data 
 `scripts/cloudflare/seed-preview.mjs`), aliased `pr-<number>`, and comments its URL. With no
 `CLOUDFLARE_API_TOKEN` secret the jobs skip with a notice. Until cutover the Worker is only reachable
 at `poke-memory.frasers-account.workers.dev`. The Vercel-specific workflows (`qa-preview-deploy`,
-`vercel-preview-on-ready`, `vercel-failure-autofix`, `stale-preview-check`) and `vercel.json` go;
+`vercel-preview-on-ready`, `vercel-failure-autofix`, `stale-preview-check`) go, and `vercel.json` keeps
+only `"git": { "deploymentEnabled": false }` until the 14-day fallback ends, so a still-connected Vercel
+Git integration cannot rebuild production from the qa-to-main promotion;
 `e2e.yml` runs the auth specs against the preview version URL instead of a `vercel[bot]` deployment.
 `migration-check.yml` checks D1 migrations apply cleanly to a fresh local D1 instead of Supabase parity;
 `integration-tests.yml` runs the D1 suite instead of Postgres.

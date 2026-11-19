@@ -106,21 +106,24 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
   announced, per decision 0018; the fragment says the app moved host and the optimiser runs on the
   device). Release: the first qa-to-main promotion after this lands is the cutover (Open call 1).
 - **CI and GitHub Actions:** new `deploy.yml`; `e2e.yml` targets the preview Worker; `migration-check.yml`
-  and `integration-tests.yml` use D1; the Vercel workflows and `vercel.json` go; the scoped-query rule
+  and `integration-tests.yml` use D1; the Vercel workflows go and `vercel.json` keeps only every Git deployment turned off until the
+  14-day fallback ends; the scoped-query rule
   joins `npm run lint`. Every workflow change gets a `workflow-expert` review.
 
 ## Removes
 
 - `@supabase/supabase-js`, `@supabase/ssr`, `lib/supabase/**`, the `supabase-keys` capability and its
   key fallbacks, `/api/auth/callback` (`exchangeCodeForSession`).
-- `@vercel/analytics`, `@vercel/speed-insights`, `vercel.json`, `scripts/vercel-ignored-build.sh` and its
+- `@vercel/analytics`, `@vercel/speed-insights`, `scripts/vercel-ignored-build.sh` and its
   test, and the workflows `qa-preview-deploy`, `vercel-preview-on-ready`, `vercel-failure-autofix`,
   `stale-preview-check`.
 - `/api/srs/optimize` and the native `@open-spaced-repetition/binding` (with its `serverExternalPackages`
   entry).
 - The Postgres integration suite (`lib/sync/integration/**` on `postgres:15`), replaced by the D1 suite.
 - `maxDuration` exports (ignored by Workers).
-- After the 14-day fallback, in the cutover issue: `db/migrations/`, `docs/supabase-capacity.md`.
+- After the 14-day fallback, in the cutover issue: `db/migrations/`, `docs/supabase-capacity.md`,
+  `vercel.json` (kept until then with every Git deployment off, so a still-connected Vercel project
+  cannot rebuild production from the promotion).
 
 ## Out of scope
 
