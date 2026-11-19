@@ -17,8 +17,8 @@ const auth = vi.hoisted(() => ({
 const superuser = vi.hoisted(() => ({ anyFlagOn: false }));
 const mocks = vi.hoisted(() => ({
   pullGradeLog: vi.fn(),
-  pullSettings: vi.fn(),
-  pushSettings: vi.fn(),
+  pullSettingsOrFailure: vi.fn(),
+  pushSettingsWithCode: vi.fn(),
   loadSettings: vi.fn(),
   saveSettings: vi.fn(),
   isOptimiserSupported: vi.fn(),
@@ -31,8 +31,8 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
 }));
 vi.mock("@/lib/sync/gradeLog", () => ({ pullGradeLog: mocks.pullGradeLog }));
 vi.mock("@/lib/sync/settings", () => ({
-  pullSettings: mocks.pullSettings,
-  pushSettings: mocks.pushSettings,
+  pullSettingsOrFailure: mocks.pullSettingsOrFailure,
+  pushSettingsWithCode: mocks.pushSettingsWithCode,
 }));
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: mocks.loadSettings,
@@ -60,8 +60,8 @@ beforeEach(() => {
   superuser.anyFlagOn = false;
   mocks.isOptimiserSupported.mockReturnValue(true);
   mocks.pullGradeLog.mockResolvedValue(LOG);
-  mocks.pullSettings.mockResolvedValue({});
-  mocks.pushSettings.mockResolvedValue(true);
+  mocks.pullSettingsOrFailure.mockResolvedValue({ settings: {} });
+  mocks.pushSettingsWithCode.mockResolvedValue({ ok: true, code: null });
   mocks.loadSettings.mockReturnValue({ retentionTarget: 0.9 });
   mocks.runOptimiserInWorker.mockResolvedValue(WEIGHTS);
 });
@@ -107,6 +107,15 @@ describe("FsrsOptimiserPanel states", () => {
     expect(await screen.findByTestId("fsrs-optimiser-run")).toBeInTheDocument();
   });
 
+  it("cloud settings read fails: error state, and no fit can start", async () => {
+    signIn();
+    mocks.pullSettingsOrFailure.mockResolvedValueOnce(null);
+    renderWithIntl(<FsrsOptimiserPanel />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't load your reviews.");
+    expect(screen.queryByTestId("fsrs-optimiser-run")).toBeNull();
+    expect(mocks.runOptimiserInWorker).not.toHaveBeenCalled();
+  });
+
   it("fewer than the minimum reviews: not enough reviews, with the count", async () => {
     signIn();
     mocks.pullGradeLog.mockResolvedValueOnce(LOG.slice(0, 50));
@@ -131,7 +140,7 @@ describe("FsrsOptimiserPanel states", () => {
   it("cooldown from another device's run (the cloud copy is newer)", async () => {
     signIn();
     mocks.loadSettings.mockReturnValue({ retentionTarget: 0.9, fsrsWeightsOptimizedAt: daysAgo(30) });
-    mocks.pullSettings.mockResolvedValueOnce({ fsrsWeightsOptimizedAt: daysAgo(6) });
+    mocks.pullSettingsOrFailure.mockResolvedValueOnce({ settings: { fsrsWeightsOptimizedAt: daysAgo(6) } });
     renderWithIntl(<FsrsOptimiserPanel />);
     expect(await screen.findByTestId("fsrs-optimiser-cooldown")).toHaveTextContent(
       "Next optimisation in 1 day",
@@ -168,8 +177,8 @@ describe("FsrsOptimiserPanel run", () => {
 
     finish(WEIGHTS);
     expect(await screen.findByTestId("fsrs-optimiser-success")).toBeInTheDocument();
-    const patch = mocks.pushSettings.mock.calls[0][2];
-    expect(mocks.pushSettings).toHaveBeenCalledWith(CLIENT, USER.id, {
+    const patch = mocks.pushSettingsWithCode.mock.calls[0][2];
+    expect(mocks.pushSettingsWithCode).toHaveBeenCalledWith(CLIENT, USER.id, {
       fsrsWeights: WEIGHTS,
       fsrsWeightsOptimizedAt: expect.any(String),
     });
@@ -186,7 +195,7 @@ describe("FsrsOptimiserPanel run", () => {
     expect(await screen.findByTestId("fsrs-optimiser-error")).toHaveTextContent(
       "There isn't enough variety in your reviews yet.",
     );
-    expect(mocks.pushSettings).not.toHaveBeenCalled();
+    expect(mocks.pushSettingsWithCode).not.toHaveBeenCalled();
     expect(mocks.saveSettings).not.toHaveBeenCalled();
   });
 
@@ -204,12 +213,26 @@ describe("FsrsOptimiserPanel run", () => {
 
   it("save fails: error, and the weights are not kept locally", async () => {
     signIn();
-    mocks.pushSettings.mockResolvedValueOnce(false);
+    mocks.pushSettingsWithCode.mockResolvedValueOnce({ ok: false, code: "HTTP_500" });
     renderWithIntl(<FsrsOptimiserPanel />);
     await userEvent.click(await screen.findByTestId("fsrs-optimiser-run"));
     expect(await screen.findByTestId("fsrs-optimiser-error")).toHaveTextContent(
       "The weights were fitted but couldn't be saved.",
     );
+    expect(mocks.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it("save refused by the weekly limit (23514): the weekly limit state, not the save error", async () => {
+    signIn();
+    mocks.pushSettingsWithCode.mockResolvedValueOnce({ ok: false, code: "23514" });
+    // Another device saved a run a moment ago: the re-read cloud row shows it.
+    mocks.pullSettingsOrFailure
+      .mockResolvedValueOnce({ settings: {} })
+      .mockResolvedValue({ settings: { fsrsWeightsOptimizedAt: daysAgo(0) } });
+    renderWithIntl(<FsrsOptimiserPanel />);
+    await userEvent.click(await screen.findByTestId("fsrs-optimiser-run"));
+    expect(await screen.findByTestId("fsrs-optimiser-cooldown")).toHaveTextContent("Next optimisation in 7 days");
+    expect(screen.queryByTestId("fsrs-optimiser-error")).toBeNull();
     expect(mocks.saveSettings).not.toHaveBeenCalled();
   });
 
@@ -224,7 +247,7 @@ describe("FsrsOptimiserPanel run", () => {
     finish(WEIGHTS);
     expect(await screen.findByTestId("fsrs-optimiser-paused")).toBeInTheDocument();
     await waitFor(() => expect(mocks.runOptimiserInWorker).toHaveBeenCalled());
-    expect(mocks.pushSettings).not.toHaveBeenCalled();
+    expect(mocks.pushSettingsWithCode).not.toHaveBeenCalled();
     expect(mocks.saveSettings).not.toHaveBeenCalled();
   });
 });

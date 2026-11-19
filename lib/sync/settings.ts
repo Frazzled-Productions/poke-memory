@@ -31,14 +31,27 @@ export async function pushSettings(
   userId: string,
   patch: Partial<UserSettings>,
 ): Promise<boolean> {
+  return (await pushSettingsWithCode(client, userId, patch)).ok;
+}
+
+/**
+ * `pushSettings` with the error code of a refused merge (null when the request
+ * threw or gave none), for a caller that must tell the optimiser's weekly
+ * limit (23514) from any other failure.
+ */
+export async function pushSettingsWithCode(
+  client: DataClient,
+  userId: string,
+  patch: Partial<UserSettings>,
+): Promise<{ ok: boolean; code: string | null }> {
   try {
     const { error } = await client.rpc("merge_user_settings", {
       p_user_id: userId,
       p_patch: patch,
     });
-    return !error;
+    return error ? { ok: false, code: error.code } : { ok: true, code: null };
   } catch {
-    return false;
+    return { ok: false, code: null };
   }
 }
 
@@ -228,13 +241,36 @@ export async function pullUserSettingsRow(
   client: DataClient,
   userId: string,
 ): Promise<UserSettingsRow | null> {
+  const result = await readUserSettingsRow(client, userId);
+  return result === "failed" ? null : result;
+}
+
+/**
+ * The JSONB settings blob, or `null` only when the fetch failed: an account
+ * with no row, or an empty blob, gives `{ settings: null }`. Use this when "no
+ * settings" and "could not tell" must not be confused, which `pullSettings`
+ * cannot show.
+ */
+export async function pullSettingsOrFailure(
+  client: DataClient,
+  userId: string,
+): Promise<{ settings: UserSettings | null } | null> {
+  const result = await readUserSettingsRow(client, userId);
+  return result === "failed" ? null : { settings: result?.settings ?? null };
+}
+
+async function readUserSettingsRow(
+  client: DataClient,
+  userId: string,
+): Promise<UserSettingsRow | null | "failed"> {
   try {
     const { data, error } = await client
       .from("user_settings")
       .select("settings, updated_at, last_reset_at")
       .eq("user_id", userId)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error) return "failed";
+    if (!data) return null;
     // updated_at + last_reset_at are typed string | undefined because the
     // actual failure mode this layer guards against is schema drift / missing
     // keys in the response, not a NULL column value. The `?? null` coercion
@@ -254,7 +290,7 @@ export async function pullUserSettingsRow(
       lastResetAt: row.last_reset_at ?? null,
     };
   } catch {
-    return null;
+    return "failed";
   }
 }
 

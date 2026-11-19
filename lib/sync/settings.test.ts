@@ -7,6 +7,9 @@ import {
   pushRegionalPrefs,
   pullRegionalPrefs,
   pullLastResetAt,
+  pullSettingsOrFailure,
+  pullUserSettingsRow,
+  pushSettingsWithCode,
   mergeRemovedLocales,
   mergeLearnedLocales,
 } from "./settings";
@@ -426,6 +429,50 @@ describe("pullLastResetAt (#2218)", () => {
     });
     const client = { from } as unknown as DataClient;
     expect(await pullLastResetAt(client, "user-1")).toBeNull();
+  });
+});
+
+describe("pullSettingsOrFailure (optimiser weekly limit)", () => {
+  it("returns the settings blob", async () => {
+    const { client } = makeClientWithMaybeSingle({ settings: { fsrsWeightsOptimizedAt: "2026-11-10T09:00:00.000Z" } });
+    expect(await pullSettingsOrFailure(client, "user-1")).toEqual({
+      settings: { fsrsWeightsOptimizedAt: "2026-11-10T09:00:00.000Z" },
+    });
+  });
+
+  it("returns settings: null for an account with no row", async () => {
+    const { client } = makeClientWithMaybeSingle(null);
+    expect(await pullSettingsOrFailure(client, "user-1")).toEqual({ settings: null });
+  });
+
+  it("returns null, not 'no settings', when the read fails or throws", async () => {
+    const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
+    expect(await pullSettingsOrFailure(client, "user-1")).toBeNull();
+    const from = vi.fn(() => {
+      throw new Error("network");
+    });
+    expect(await pullSettingsOrFailure({ from } as unknown as DataClient, "user-1")).toBeNull();
+  });
+
+  it("leaves pullUserSettingsRow unchanged: null for both no row and a failed read", async () => {
+    expect(await pullUserSettingsRow(makeClientWithMaybeSingle(null).client, "user-1")).toBeNull();
+    expect(await pullUserSettingsRow(makeClientWithMaybeSingle(null, { message: "boom" }).client, "user-1")).toBeNull();
+  });
+});
+
+describe("pushSettingsWithCode", () => {
+  it("passes the refused merge's code through", async () => {
+    const { client } = makeClientWithRpc({ code: "23514", message: "weekly limit" });
+    expect(await pushSettingsWithCode(client, "user-1", {})).toEqual({ ok: false, code: "23514" });
+  });
+
+  it("ok on success, and code null when the client throws", async () => {
+    expect(await pushSettingsWithCode(makeClientWithRpc().client, "user-1", {})).toEqual({ ok: true, code: null });
+    const rpc = vi.fn().mockRejectedValue(new Error("network"));
+    expect(await pushSettingsWithCode({ rpc } as unknown as DataClient, "user-1", {})).toEqual({
+      ok: false,
+      code: null,
+    });
   });
 });
 

@@ -14,7 +14,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadSettings, saveSettings } from "@/lib/settings/persistence";
 import { pullGradeLog } from "@/lib/sync/gradeLog";
-import { pullSettings, pushSettings } from "@/lib/sync/settings";
+import { pullSettingsOrFailure, pushSettingsWithCode } from "@/lib/sync/settings";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import {
   countOptimizableReviews,
@@ -81,14 +81,15 @@ export function FsrsOptimiserPanel() {
   useEffect(() => {
     if (!canLoad || userId === null || db === null) return;
     let cancelled = false;
-    void Promise.all([pullGradeLog(db, userId), pullSettings(db, userId)]).then(
+    void Promise.all([pullGradeLog(db, userId), pullSettingsOrFailure(db, userId)]).then(
       ([entries, cloud]) => {
         if (cancelled) return;
-        if (entries === null) {
+        // An unreadable last-run date must not let a fit start (weekly limit).
+        if (entries === null || cloud === null) {
           setLoaded("error");
           return;
         }
-        const optimizedAt = latest(loadSettings().fsrsWeightsOptimizedAt, cloud?.fsrsWeightsOptimizedAt);
+        const optimizedAt = latest(loadSettings().fsrsWeightsOptimizedAt, cloud.settings?.fsrsWeightsOptimizedAt);
         setLoaded({
           entries,
           count: countOptimizableReviews(entries),
@@ -125,7 +126,15 @@ export function FsrsOptimiserPanel() {
     }
     setRun({ kind: "saving" });
     const patch = { fsrsWeights: weights, fsrsWeightsOptimizedAt: new Date().toISOString() };
-    if (!(await pushSettings(db, userId, patch))) {
+    const saved = await pushSettingsWithCode(db, userId, patch);
+    if (saved.code === "23514") {
+      // Another device or page saved a run this week: re-read to show the limit.
+      setRun({ kind: "idle" });
+      setLoaded(null);
+      setReloadKey((k) => k + 1);
+      return;
+    }
+    if (!saved.ok) {
       setRun({ kind: "error", reason: "save" });
       return;
     }
