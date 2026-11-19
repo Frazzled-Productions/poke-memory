@@ -1,53 +1,56 @@
 /**
- * Tests for POST /api/discord/digest (#1653).
+ * Tests for POST /api/discord/digest (#1653) on the D1 test database.
  *
- * Covers:
- *   - 503 on missing env vars
- *   - 401 on missing / bad bearer token
- *   - window_days parsing and clamping
- *   - Empty-week branch (0 submissions): still posts a zero-count digest
- *   - Populated branch: correct category grouping (total, auth, guest)
- *   - CRITICAL: query never selects or sends `message` or `user_id`
- *   - 502 on DB query error
- *   - 502 on Discord webhook error
- *
- * PII note: the route uses TWO queries to avoid selecting user_id into JS:
- *   1. SELECT id, category, created_at for all rows.
- *   2. SELECT id, category filtered by user_id IS NOT NULL (server-side filter only).
- * The mock reflects this two-query design.
+ * Covers: 503 on missing configuration, 401 on a missing / bad bearer,
+ * window_days parsing and clamping (and no body at all, as the Cron Trigger
+ * sends), the empty week, category grouping (total, auth, guest), the
+ * CRITICAL guarantees that neither the message nor user_id reach Discord,
+ * 502 on a database or webhook error, and the outbound gate (design D2).
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// Mock the Supabase admin client.
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(),
-}));
+const { getCloudflareContext } = vi.hoisted(() => ({ getCloudflareContext: vi.fn() }));
+vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext }));
 
 import { POST } from "./route";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { forUser } from "@/lib/db/scope";
+import { insertFeedback } from "@/lib/db/system";
+import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
+import { spyD1 } from "@/lib/db/testing/spyD1";
 
-const mockCreateAdminClient = vi.mocked(createAdminClient);
-
-// ── Environment helpers ──────────────────────────────────────────────────────
-
-function setRequiredEnv() {
-  process.env.CRON_SHARED_SECRET = "test-secret-abc123";
-  process.env.DISCORD_DIGEST_WEBHOOK_URL = "https://discord.com/api/webhooks/test/digest";
-  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://abc123.supabase.co";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
-}
-
-function clearEnv() {
-  delete process.env.CRON_SHARED_SECRET;
-  delete process.env.DISCORD_DIGEST_WEBHOOK_URL;
-  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-}
-
-// ── Request helpers ──────────────────────────────────────────────────────────
-
+const WEBHOOK = "https://discord.com/api/webhooks/test/digest";
 const VALID_BEARER = "Bearer test-secret-abc123";
+const NOW = new Date("2026-11-16T09:00:00.000Z");
+
+let d1: SqliteD1;
+let env: Record<string, unknown>;
+let alice: string;
+const fetchMock = vi.fn<typeof fetch>();
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  vi.stubGlobal("fetch", fetchMock);
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+  for (const level of ["error", "info"] as const) vi.spyOn(console, level).mockImplementation(() => {});
+  d1 = createSqliteD1();
+  alice = createTestUser(d1);
+  env = {
+    DB: d1,
+    DEPLOY_ENV: "cloudflare-production",
+    CRON_SHARED_SECRET: "test-secret-abc123",
+    DISCORD_DIGEST_WEBHOOK_URL: WEBHOOK,
+  };
+  getCloudflareContext.mockImplementation(async () => ({ env }));
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  d1.close();
+});
 
 function makeRequest(body: unknown = { window_days: 7 }, authHeader: string | null = VALID_BEARER): Request {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -55,335 +58,129 @@ function makeRequest(body: unknown = { window_days: 7 }, authHeader: string | nu
   return new Request("http://localhost/api/discord/digest", {
     method: "POST",
     headers,
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
   });
 }
 
-/**
- * Build a mock Supabase admin client for the two-query digest design.
- *
- * The route fires two parallel queries via Promise.all:
- *   Query 1: .from("feedback").select("id, category, created_at").gte(...)
- *   Query 2: .from("feedback").select("id, category").gte(...).not(...)
- *
- * allRows:   rows returned by query 1 (all in window, no user_id).
- * authRows:  rows returned by query 2 (authenticated subset, id+category only).
- * queryError: if set, both queries return an error (simulates a DB failure).
- */
-function buildAdminMock(
-  allRows: Array<Record<string, unknown>>,
-  authRows: Array<Record<string, unknown>> = [],
-  queryError?: unknown,
-) {
-  // Each call sequence: .from("feedback").select(...).gte(...)[.not(...)]
-  // We track how many times .select() has been called to distinguish the two queries.
-  let selectCallCount = 0;
-  const selectChains: Array<ReturnType<typeof vi.fn>> = [];
+const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000).toISOString();
 
-  const notChain1 = vi.fn(() =>
-    Promise.resolve({ data: queryError ? null : authRows, error: queryError ?? null }),
-  );
-  const gteChain1 = vi.fn(() => Promise.resolve({ data: queryError ? null : allRows, error: queryError ?? null }));
-  const gteChain2 = vi.fn(() => ({ not: notChain1 }));
-
-  const selectChain = vi.fn(() => {
-    selectCallCount++;
-    if (selectCallCount === 1) {
-      // First select call: all-rows query (select id, category, created_at)
-      return { gte: gteChain1 };
-    } else {
-      // Second select call: auth-rows query (select id, category, then .not())
-      return { gte: gteChain2 };
-    }
-  });
-  selectChains.push(selectChain);
-
-  const fromFn = vi.fn(() => ({ select: selectChain }));
-  return { client: { from: fromFn }, fromFn, selectChain, gteChain1, gteChain2, notChain1 };
-}
-
-// ── fetch mock ───────────────────────────────────────────────────────────────
-
-let fetchMock: ReturnType<typeof vi.fn>;
-
-beforeEach(() => {
-  fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
-  vi.stubGlobal("fetch", fetchMock);
-  setRequiredEnv();
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  clearEnv();
-  vi.clearAllMocks();
-});
-
-// ── 503 Misconfiguration ─────────────────────────────────────────────────────
-
-describe("POST /api/discord/digest - misconfiguration", () => {
-  it("returns 503 when CRON_SHARED_SECRET is missing", async () => {
-    delete process.env.CRON_SHARED_SECRET;
-    const res = await POST(makeRequest());
-    expect(res.status).toBe(503);
-    const b = (await res.json()) as { ok: boolean; error: string };
-    expect(b.ok).toBe(false);
-    expect(b.error).toBe("misconfigured");
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("returns 503 when DISCORD_DIGEST_WEBHOOK_URL is missing", async () => {
-    delete process.env.DISCORD_DIGEST_WEBHOOK_URL;
-    const res = await POST(makeRequest());
-    expect(res.status).toBe(503);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("returns 503 when SUPABASE_SERVICE_ROLE_KEY is missing", async () => {
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const res = await POST(makeRequest());
-    expect(res.status).toBe(503);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-});
-
-// ── 401 Auth ─────────────────────────────────────────────────────────────────
-
-describe("POST /api/discord/digest - auth", () => {
-  it("returns 401 when Authorization header is missing", async () => {
-    const adminMock = buildAdminMock([], []);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-    const res = await POST(makeRequest({ window_days: 7 }, null));
-    expect(res.status).toBe(401);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("returns 401 for a wrong bearer token", async () => {
-    const adminMock = buildAdminMock([], []);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-    const res = await POST(makeRequest({ window_days: 7 }, "Bearer wrong-secret"));
-    expect(res.status).toBe(401);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-});
-
-// ── Empty-week branch ─────────────────────────────────────────────────────────
-
-describe("POST /api/discord/digest - empty week", () => {
-  it("posts a zero-count digest embed when there are no submissions", async () => {
-    const adminMock = buildAdminMock([], []);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-
-    const res = await POST(makeRequest({ window_days: 7 }));
-    expect(res.status).toBe(200);
-    const b = (await res.json()) as { ok: boolean; total: number };
-    expect(b.ok).toBe(true);
-    expect(b.total).toBe(0);
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://discord.com/api/webhooks/test/digest");
-
-    const payload = JSON.parse(init.body as string) as {
-      embeds: Array<{ title: string; color: number; fields: Array<{ name: string; value: string }> }>;
-    };
-    expect(payload.embeds[0].title).toBe("Weekly feedback digest");
-    expect(payload.embeds[0].color).toBe(0x3498db);
-
-    const totalField = payload.embeds[0].fields.find((f) => f.name === "Total");
-    expect(totalField?.value).toBe("0");
-  });
-});
-
-// ── Populated branch (category grouping) ──────────────────────────────────────
-
-describe("POST /api/discord/digest - populated week", () => {
-  // All-rows result: id, category, created_at only (no user_id).
-  const ALL_ROWS = [
-    // Bugs: 3 total (id-1, id-2 authenticated; id-3 guest)
-    { id: "id-1", category: "bug",     created_at: "2026-06-02T10:00:00Z" },
-    { id: "id-2", category: "bug",     created_at: "2026-06-03T10:00:00Z" },
-    { id: "id-3", category: "bug",     created_at: "2026-06-04T10:00:00Z" },
-    // Features: 1 authenticated
-    { id: "id-4", category: "feature", created_at: "2026-06-05T10:00:00Z" },
-    // Other: 1 guest
-    { id: "id-5", category: "other",   created_at: "2026-06-06T10:00:00Z" },
-  ];
-
-  // Auth-rows result: rows where user_id IS NOT NULL, selected by server-side filter.
-  // user_id never appears in JS; only id+category are projected.
-  const AUTH_ROWS = [
-    { id: "id-1", category: "bug" },
-    { id: "id-2", category: "bug" },
-    { id: "id-4", category: "feature" },
-  ];
-
-  it("groups counts by category correctly", async () => {
-    const adminMock = buildAdminMock(ALL_ROWS, AUTH_ROWS);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-
-    const res = await POST(makeRequest({ window_days: 7 }));
-    expect(res.status).toBe(200);
-    const b = (await res.json()) as { ok: boolean; total: number };
-    expect(b.ok).toBe(true);
-    expect(b.total).toBe(5);
-
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const payload = JSON.parse(init.body as string) as {
-      embeds: Array<{ fields: Array<{ name: string; value: string }> }>;
-    };
-    const fields = payload.embeds[0].fields;
-    const findField = (name: string) => fields.find((f) => f.name === name)!;
-
-    expect(findField("Total").value).toBe("5");
-    // Bug: 3 total, 2 auth, 1 guest.
-    expect(findField("Bug").value).toBe("3 (2 auth, 1 guest)");
-    // Feature: 1 total, 1 auth, 0 guest.
-    expect(findField("Feature").value).toBe("1 (1 auth, 0 guest)");
-    // Other: 1 total, 0 auth, 1 guest.
-    expect(findField("Other").value).toBe("1 (0 auth, 1 guest)");
-  });
-
-  // PII defence-in-depth: user_id must NEVER appear in any SELECT string.
-  it("CRITICAL: SELECT strings never contain user_id", async () => {
-    const adminMock = buildAdminMock(ALL_ROWS, AUTH_ROWS);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-
-    await POST(makeRequest({ window_days: 7 }));
-
-    // All select() calls must not include user_id in the projected columns.
-    const selectCalls = (adminMock.selectChain.mock.calls as unknown as string[][]).map((c) => c[0]);
-    for (const selectStr of selectCalls) {
-      expect(selectStr).not.toContain("user_id");
-    }
-
-    // First query selects id, category, created_at for all rows.
-    expect(selectCalls[0]).toContain("id");
-    expect(selectCalls[0]).toContain("category");
-    expect(selectCalls[0]).toContain("created_at");
-
-    // Second query selects id, category (no created_at needed) for auth rows.
-    expect(selectCalls[1]).toContain("id");
-    expect(selectCalls[1]).toContain("category");
-
-    // Neither query selects message.
-    for (const selectStr of selectCalls) {
-      expect(selectStr).not.toContain("message");
-    }
-  });
-
-  // CRITICAL: Discord payload must NEVER include message or user_id values.
-  it("CRITICAL: Discord webhook payload contains NO message field", async () => {
-    const adminMock = buildAdminMock(ALL_ROWS, AUTH_ROWS);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-
-    await POST(makeRequest({ window_days: 7 }));
-
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const payloadStr = init.body as string;
-    expect(payloadStr).not.toContain('"message"');
-  });
-
-  it("CRITICAL: Discord webhook payload contains NO user_id field or user UUIDs", async () => {
-    const adminMock = buildAdminMock(ALL_ROWS, AUTH_ROWS);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-
-    await POST(makeRequest({ window_days: 7 }));
-
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const payloadStr = init.body as string;
-    // user_id key must not appear in the Discord payload.
-    expect(payloadStr).not.toContain('"user_id"');
-  });
-});
-
-// ── window_days parsing / clamping ────────────────────────────────────────────
-
-describe("POST /api/discord/digest - window_days", () => {
-  it("defaults to 7 when window_days is missing from the body", async () => {
-    const adminMock = buildAdminMock([], []);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-
-    const res = await POST(makeRequest({}));
-    expect(res.status).toBe(200);
-    const b = (await res.json()) as { ok: boolean; windowDays: number };
-    expect(b.windowDays).toBe(7);
-  });
-
-  it("clamps window_days above 90 to 90", async () => {
-    const adminMock = buildAdminMock([], []);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-
-    const res = await POST(makeRequest({ window_days: 999 }));
-    const b = (await res.json()) as { ok: boolean; windowDays: number };
-    expect(b.windowDays).toBe(90);
-  });
-
-  it("clamps window_days below 1 to 1", async () => {
-    const adminMock = buildAdminMock([], []);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-
-    const res = await POST(makeRequest({ window_days: 0 }));
-    const b = (await res.json()) as { ok: boolean; windowDays: number };
-    expect(b.windowDays).toBe(1);
-  });
-
-  it("defaults to 7 when the body is invalid JSON", async () => {
-    const adminMock = buildAdminMock([], []);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      authorization: VALID_BEARER,
-    };
-    const req = new Request("http://localhost/api/discord/digest", {
-      method: "POST",
-      headers,
-      body: "not-json",
+/** A feedback row `age` days old, from a signed-in user or a guest. */
+async function feedback(category: "bug" | "feature" | "other", signedIn: boolean, age: number) {
+  if (signedIn) {
+    await forUser(d1, alice).insert("feedback", {
+      category,
+      message: "secret message text",
+      created_at: daysAgo(age),
     });
-    const res = await POST(req);
-    // Should succeed with default window.
-    expect(res.status).toBe(200);
-    const b = (await res.json()) as { ok: boolean; windowDays: number };
-    expect(b.windowDays).toBe(7);
+  } else {
+    // Guests have no user, so they are inserted through the system query.
+    await insertFeedback(d1, { user_id: null, category, message: "secret message text", page: null, app_version: null });
+  }
+}
+
+function payload() {
+  const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+  return { url, raw: init.body as string, embed: JSON.parse(init.body as string).embeds[0] as {
+    title: string;
+    color: number;
+    fields: Array<{ name: string; value: string }>;
+  } };
+}
+const field = (name: string) => payload().embed.fields.find((f) => f.name === name)?.value;
+
+describe("POST /api/discord/digest - gates", () => {
+  it("returns 503 when CRON_SHARED_SECRET is missing", async () => {
+    delete env.CRON_SHARED_SECRET;
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ ok: false, error: "misconfigured" });
+  });
+
+  it("returns 503 in production when DISCORD_DIGEST_WEBHOOK_URL is missing", async () => {
+    delete env.DISCORD_DIGEST_WEBHOOK_URL;
+    expect((await POST(makeRequest())).status).toBe(503);
+  });
+
+  it("returns 401 when the Authorization header is missing or wrong", async () => {
+    expect((await POST(makeRequest({}, null))).status).toBe(401);
+    expect((await POST(makeRequest({}, "Bearer wrong-secret-xyz789"))).status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
-// ── Error handling ────────────────────────────────────────────────────────────
+describe("POST /api/discord/digest - digest", () => {
+  it("posts a zero-count digest embed when there are no submissions", async () => {
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, total: 0, windowDays: 7 });
+    expect(payload().url).toBe(WEBHOOK);
+    expect(payload().embed.title).toBe("Weekly feedback digest");
+    expect(payload().embed.color).toBe(0x3498db);
+    expect(field("Total")).toBe("0");
+  });
 
-describe("POST /api/discord/digest - error handling", () => {
-  it("returns 502 when the DB query errors", async () => {
-    const adminMock = buildAdminMock([], [], { message: "DB error" });
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
+  it("groups counts by category, authenticated against guest, inside the window only", async () => {
+    await feedback("bug", true, 1);
+    await feedback("bug", true, 2);
+    await feedback("bug", false, 0);
+    await feedback("feature", true, 6);
+    await feedback("other", false, 0);
+    await feedback("bug", true, 8); // outside the 7-day window
 
-    const res = await POST(makeRequest({ window_days: 7 }));
+    const res = await POST(makeRequest());
+    expect(await res.json()).toEqual({ ok: true, total: 5, windowDays: 7 });
+    expect(field("Total")).toBe("5");
+    expect(field("Bug")).toBe("3 (2 auth, 1 guest)");
+    expect(field("Feature")).toBe("1 (1 auth, 0 guest)");
+    expect(field("Other")).toBe("1 (0 auth, 1 guest)");
+  });
+
+  it("CRITICAL: the Discord payload holds neither the message nor any user id", async () => {
+    await feedback("bug", true, 1);
+    await POST(makeRequest());
+    const { raw } = payload();
+    expect(raw).not.toContain("secret message text");
+    expect(raw).not.toContain('"message"');
+    expect(raw).not.toContain('"user_id"');
+    expect(raw).not.toContain(alice);
+  });
+
+  it.each([
+    ["a missing window_days", {}, 7],
+    ["no body at all (the Cron Trigger)", undefined, 7],
+    ["an invalid JSON body", "not json", 7],
+    ["window_days above 90", { window_days: 365 }, 90],
+    ["window_days below 1", { window_days: 0 }, 1],
+  ])("handles %s", async (_label, body, expected) => {
+    const res = await POST(makeRequest(body));
+    expect(((await res.json()) as { windowDays: number }).windowDays).toBe(expected);
+  });
+
+  it("returns 502 when the database query fails", async () => {
+    env.DB = spyD1(d1, {
+      before: () => {
+        throw new Error("D1_ERROR: down");
+      },
+    });
+    const res = await POST(makeRequest());
     expect(res.status).toBe(502);
-    const b = (await res.json()) as { ok: boolean; error: string };
-    expect(b.ok).toBe(false);
-    expect(b.error).toBe("query_failed");
+    expect(await res.json()).toEqual({ ok: false, error: "query_failed" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("returns 502 when Discord webhook returns non-2xx", async () => {
-    const adminMock = buildAdminMock([], []);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-    fetchMock.mockResolvedValue(new Response("Bad Request", { status: 400 }));
-
-    const res = await POST(makeRequest({ window_days: 7 }));
-    expect(res.status).toBe(502);
-    const b = (await res.json()) as { ok: boolean; error: string };
-    expect(b.ok).toBe(false);
-    expect(b.error).toBe("webhook_error");
+  it("returns 502 when the Discord webhook returns non-2xx or the fetch throws", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("nope", { status: 500 }));
+    expect(await (await POST(makeRequest())).json()).toEqual({ ok: false, error: "webhook_error", status: 500 });
+    fetchMock.mockRejectedValueOnce(new Error("network"));
+    expect(await (await POST(makeRequest())).json()).toEqual({ ok: false, error: "webhook_fetch_failed" });
   });
 
-  it("returns 502 when the Discord fetch throws", async () => {
-    const adminMock = buildAdminMock([], []);
-    mockCreateAdminClient.mockReturnValue(adminMock.client as unknown as ReturnType<typeof createAdminClient>);
-    fetchMock.mockRejectedValue(new Error("ECONNREFUSED"));
-
-    const res = await POST(makeRequest({ window_days: 7 }));
-    expect(res.status).toBe(502);
-    const b = (await res.json()) as { ok: boolean; error: string };
-    expect(b.ok).toBe(false);
-    expect(b.error).toBe("webhook_fetch_failed");
+  it("outside production reads and returns the counts but posts nothing, with no webhook needed", async () => {
+    await feedback("bug", false, 0);
+    env.DEPLOY_ENV = "cloudflare-preview";
+    delete env.DISCORD_DIGEST_WEBHOOK_URL;
+    const res = await POST(makeRequest());
+    expect(await res.json()).toEqual({ ok: true, total: 1, windowDays: 7, posted: false });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

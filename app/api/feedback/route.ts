@@ -1,20 +1,25 @@
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
-import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { hashIp } from "@/lib/auth/rateLimitIp";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
-import type { RateLimitAction } from "@/lib/auth/rateLimitIp";
-import { supabaseSecretKey } from "@/lib/supabase/keys";
+import { requireAuth } from "@/lib/auth/requireAuth";
+import { getEnv } from "@/lib/db/env";
+import { checkRateLimit, discordPostStore, insertFeedback, type FeedbackCategory } from "@/lib/db/system";
+import { postBugNotification } from "@/lib/discord/notify";
 
 /**
  * POST /api/feedback (#1621)
  *
  * Accepts in-app bug reports and feature requests from both guest and
- * authenticated users. Writes via the service-role admin client so the
- * endpoint works regardless of RLS state on the `feedback` table.
+ * authenticated users. Writes through lib/db/system (a guest row has no user,
+ * so it cannot go through forUser).
  *
  * `user_id` is derived from the server-validated session - NEVER from the
  * request body - to prevent callers from spoofing another user's id.
+ *
+ * A bug report also goes to the maintainers' Discord (#1653): the route sends
+ * it itself after responding, through ctx.waitUntil, in place of the Postgres
+ * trigger of migration 042 (design D3). Outside production nothing is sent.
  *
  * Input shape:
  *   { category: 'bug' | 'feature' | 'other', message: string, page?: string, appVersion?: string }
@@ -37,14 +42,17 @@ type FeedbackBody = {
   appVersion?: unknown;
 };
 
-export async function POST(request: Request) {
-  // --- Env guard ---
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = supabaseSecretKey();
-  if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json({ ok: false, error: "misconfigured" }, { status: 500 });
+/** The session user's id, or null for a guest (or any session error). */
+async function sessionUserId(request: Request): Promise<string | null> {
+  try {
+    const auth = await requireAuth(request);
+    return auth instanceof NextResponse ? null : auth.user.id;
+  } catch {
+    return null;
   }
+}
 
+export async function POST(request: Request) {
   // --- Parse body ---
   const parsed = await parseJsonBody<FeedbackBody>(request);
   if (parsed instanceof NextResponse) return parsed;
@@ -57,7 +65,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const category = body.category;
+  const category = body.category as FeedbackCategory;
 
   // --- Validate message ---
   if (typeof body.message !== "string" || body.message.trim().length === 0) {
@@ -79,68 +87,57 @@ export async function POST(request: Request) {
       ? body.appVersion.slice(0, FIELD_MAX_LENGTH)
       : null;
 
+  const env = await getEnv();
+
   // --- Resolve user_id from server-validated session (never from request body) ---
-  let userId: string | null = null;
-  // Also obtain the anonymous Supabase client for rate-limit checks.
-  let rateLimitSupabase: Awaited<ReturnType<typeof createServerSupabaseClient>> | null = null;
-  try {
-    const supabase = await createServerSupabaseClient();
-    rateLimitSupabase = supabase;
-    const { data } = await supabase.auth.getUser();
-    userId = data.user?.id ?? null;
-  } catch {
-    // Guest or session error - proceed with null user_id.
-    userId = null;
-  }
+  const userId = await sessionUserId(request);
 
-  // --- Per-IP rate limit: mirrors the check in lib/auth/actions.ts (F28/F32) ---
-  if (rateLimitSupabase !== null) {
-    try {
-      const rawIp = (request.headers.get("x-forwarded-for") ?? "unknown")
-        .split(",")[0]
-        .trim();
-      const ipHash = hashIp(rawIp);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: rlAllowed, error: rlError } = await (rateLimitSupabase as any).rpc(
-        "check_rate_limit",
-        { p_ip_hash: ipHash, p_action: "feedback" as RateLimitAction },
-      );
-      if (rlAllowed === false) {
-        return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
-      }
-      if (rlError) {
-        // Rate-limit check failure is non-fatal: log and continue so the endpoint
-        // stays available when the RPC is transiently unavailable (e.g. unknown
-        // action branch not yet deployed). Only an explicit false blocks the request.
-        console.warn("[feedback] rate-limit check error, proceeding", rlError);
-      }
-    } catch {
-      // Unexpected throw (e.g. network error) - also non-fatal.
-      console.warn("[feedback] rate-limit check failed, proceeding");
+  // --- Per-IP rate limit (rate_limit_buckets, migrations 041 and 045; F28/F32) ---
+  try {
+    // Cloudflare sets CF-Connecting-IP; X-Forwarded-For is client-settable there.
+    const rawIp = request.headers.get("cf-connecting-ip")?.trim() || "unknown";
+    if (!(await checkRateLimit(env.DB, hashIp(rawIp), "feedback"))) {
+      return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
     }
+  } catch (err) {
+    // Rate-limit check failure is non-fatal: log and continue so the endpoint
+    // stays available. Only an explicit refusal blocks the request.
+    console.warn("[feedback] rate-limit check failed, proceeding", err);
   }
 
-  // --- Insert via admin client (service-role, bypasses RLS) ---
-  const admin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
+  // --- Insert ---
+  let inserted: { id: string; created_at: string };
   try {
-    const { error } = await admin.from("feedback").insert({
+    inserted = await insertFeedback(env.DB, {
       user_id: userId,
       category,
       message,
       page,
       app_version: appVersion,
     });
-
-    if (error) {
-      console.error("[feedback] insert error", error);
-      return NextResponse.json({ ok: false }, { status: 500 });
-    }
   } catch (err) {
-    console.error("[feedback] unexpected error", err);
+    console.error("[feedback] insert error", err);
     return NextResponse.json({ ok: false }, { status: 500 });
+  }
+
+  // --- Discord bug notification, after the response (was the 042 trigger) ---
+  if (category === "bug") {
+    const notification = postBugNotification(env, discordPostStore(env.DB), {
+      id: inserted.id,
+      category,
+      page,
+      app_version: appVersion,
+      created_at: inserted.created_at,
+      authenticated: userId !== null,
+    }).catch((err) => console.error("[feedback] Discord notification threw", err));
+    try {
+      const { ctx } = await getCloudflareContext({ async: true });
+      ctx.waitUntil(notification);
+    } catch (err) {
+      // No Worker context (should not happen on the Worker): send inline.
+      console.warn("[feedback] no ctx.waitUntil; sending the notification inline", err);
+      await notification;
+    }
   }
 
   return NextResponse.json({ ok: true });
