@@ -58,6 +58,11 @@ check (`CRON_SHARED_SECRET`, now a Worker secret instead of a Vault secret):
 The scheduled handler calls each route through the Worker's own fetch handler (no network hop), awaits
 it with `ctx.waitUntil`, and logs the status. A failing route does not stop the others.
 
+Outbound sends (Web Push, Discord) happen only when `DEPLOY_ENV` is `cloudflare-production`
+(`lib/outbound.ts`); anywhere else the routes do their reads and log what they would have sent. The
+preview Worker has no Cron Triggers and no VAPID private key or Discord webhook, so a preview loaded
+with rehearsal data can never message a real person.
+
 ### D3. Data: one D1 database, schema translated from Postgres
 
 `db/d1/migrations/0001_schema.sql` is the final state of Postgres migrations 001 to 051 in SQLite
@@ -224,7 +229,7 @@ migrations and fixtures, then imported into a local D1 and compared.
 ## Migration Plan
 
 Built and tested on `poke-memory-preview` and `poke-memory.frasers-account.workers.dev` before any
-cutover. Cutover (a separate, owner-run step in #OWNER_ISSUE): two copy rehearsals, a short write
+cutover. Cutover (a separate, owner-run step in #2393): two copy rehearsals, a short write
 freeze, copy, row-count check, DNS switch, smoke test; Vercel and Supabase read-only for 14 days, then a
 final dump to R2 and deletion. Rollback inside the window: point DNS back to Vercel; writes made on
 Cloudflare in between are lost unless copied back (accepted: the window is short and the user count small).
