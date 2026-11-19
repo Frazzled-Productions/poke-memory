@@ -6,6 +6,7 @@
 #   auto-release.yml commits the version bump and CHANGELOG.md to `main` with `[skip ci]`, which
 #   suppresses the push event; the Release it then creates with the bot App token is not
 #   suppressed, so the released version (and its What's new section) is what ends up deployed.
+#   A release deploys the tip of `main`, never the tag itself.
 # - Pull request into `qa`, or the qa-to-main promotion PR (so `qa` itself gets a preview to QA
 #   before promoting, which qa-preview-deploy.yml used to fire on Vercel): build, apply D1
 #   migrations to the preview database, seed it with the two test users
@@ -55,6 +56,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # A release deploys the tip of `main`, not the tag: the tip always contains the newest
+          # release, so a re-published or older Release can never roll production back.
+          ref: ${{ github.event_name == 'release' && 'main' || '' }}
           persist-credentials: false
 
       - name: Check Cloudflare is set up
