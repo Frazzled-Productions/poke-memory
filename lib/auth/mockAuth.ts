@@ -26,7 +26,8 @@
  * unreachable in production builds.
  */
 
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppUser } from "./types";
 import { readLocalStorage } from "../storage/readLocalStorage";
 
 /** Public env var that opts a build into the mock-auth seam. */
@@ -88,10 +89,8 @@ export function assertMockAuthNotInProduction(): void {
  * identifiable. The metadata mirrors what GitHub OAuth populates so the
  * `AuthButton` avatar and display-name code paths render normally.
  */
-export const MOCK_USER: User = {
+export const MOCK_USER: AppUser = {
   id: "e2e00000-0000-4000-8000-000000000751",
-  aud: "authenticated",
-  role: "authenticated",
   email: "e2e-trainer@poke-memory.test",
   app_metadata: { provider: "github", providers: ["github"] },
   user_metadata: {
@@ -102,7 +101,6 @@ export const MOCK_USER: User = {
   },
   identities: [],
   created_at: "2024-01-01T00:00:00.000Z",
-  updated_at: "2024-01-01T00:00:00.000Z",
 };
 
 /**

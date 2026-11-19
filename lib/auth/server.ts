@@ -82,6 +82,9 @@ export function createAuth(env: AuthEnv) {
         allowDifferentEmails: true,
       },
     },
+    // OAuth failures land on the home page as /?error=<code>, which shows the
+    // sign-in failed banner (app/page.tsx).
+    onAPIError: { errorURL: new URL("/", env.BETTER_AUTH_URL).toString() },
     advanced: {
       // Same shape as the user ids copied from Supabase.
       database: { generateId: () => crypto.randomUUID() },

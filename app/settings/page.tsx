@@ -2110,7 +2110,7 @@ export default function SettingsPage() {
 
                 {/* Manage sign-in methods - for signed-in users */}
                 {user && supabase && (
-                  <LinkIdentitiesSection user={user} supabase={supabase} />
+                  <LinkIdentitiesSection user={user} />
                 )}
               </CollapsibleSection>
               )}

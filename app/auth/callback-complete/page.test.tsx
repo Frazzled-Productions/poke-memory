@@ -149,6 +149,7 @@ vi.mock("@/lib/review/seedOpts", () => ({
 // ---------------------------------------------------------------------------
 
 import CallbackCompletePage from "./page";
+import { loadSyncStatus } from "@/lib/sync/persistence";
 
 // ---------------------------------------------------------------------------
 // Shared test fixtures
@@ -414,5 +415,44 @@ describe("CallbackCompletePage - conflict UI baseline (anyFlagOn false)", () => 
     expect(screen.getByRole("button", { name: "Keep local" })).toBeInTheDocument();
     // The paused variant must NOT appear.
     expect(screen.queryByRole("button", { name: "Sync paused (superuser)" })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Re-sign-in on a device that already belongs to this user (design D6: after
+// the move to Cloudflare no sessions are copied, so every player signs in once
+// more). ownerUserId lives in localStorage (KEY_SYNC_STATUS) and survives the
+// move; when it is this user's id there is nothing to sort: no picker, and
+// SignInPull pulls and merges as on any sign-in.
+// ---------------------------------------------------------------------------
+
+describe("CallbackCompletePage - returning player on their own device", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: FAKE_USER, loading: false, supabase: FAKE_CLIENT });
+    mockUseSuperuser.mockReturnValue({ anyFlagOn: false });
+    mockLoadSession.mockResolvedValue({ cards: [makeReviewedCard()], limits: { dailyNewCards: 10 } });
+    mockHasCloudData.mockResolvedValue(true);
+    mockPullSession.mockResolvedValue([makeCloudRow()]);
+  });
+
+  it("goes home without the keep-local / keep-cloud picker when the device's owner is this user", async () => {
+    vi.mocked(loadSyncStatus).mockReturnValue({ ownerUserId: FAKE_USER.id } as ReturnType<typeof loadSyncStatus>);
+
+    renderWithIntl(<CallbackCompletePage />);
+
+    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith("/"));
+    expect(screen.queryByRole("button", { name: "Keep local" })).toBeNull();
+    expect(mockPullSession).not.toHaveBeenCalled();
+    expect(mockPushSession).not.toHaveBeenCalled();
+  });
+
+  it("still shows the picker when the device's data belongs to nobody yet (guest progress)", async () => {
+    vi.mocked(loadSyncStatus).mockReturnValue({ ownerUserId: null } as ReturnType<typeof loadSyncStatus>);
+
+    renderWithIntl(<CallbackCompletePage />);
+
+    expect(await screen.findByRole("button", { name: "Keep local" })).toBeInTheDocument();
+    expect(mockRouterReplace).not.toHaveBeenCalled();
   });
 });

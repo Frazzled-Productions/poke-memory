@@ -103,6 +103,14 @@ export default function CallbackCompletePage() {
     setStatus({ kind: "loading" });
     async function resolve() {
       if (!supabase || !user) return;
+      // A returning player on a device that already holds their data: nothing
+      // to sort. ownerUserId is stamped by an earlier sign-in and kept in
+      // localStorage (so it survives the move to Cloudflare, where everyone
+      // signs in once more); SignInPull pulls and merges as on any sign-in.
+      if (loadSyncStatus().ownerUserId === user.id) {
+        router.replace("/");
+        return;
+      }
       const localSession = await loadSession();
       const hasLocal =
         localSession !== null &&

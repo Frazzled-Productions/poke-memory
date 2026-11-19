@@ -39,7 +39,6 @@ export function AuthButton() {
     (meta.user_name as string | undefined) ??
     (meta.full_name as string | undefined) ??
     (meta.name as string | undefined) ??
-    (meta.email as string | undefined) ??
     "User avatar";
 
   return (

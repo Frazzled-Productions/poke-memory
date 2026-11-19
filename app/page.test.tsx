@@ -117,3 +117,42 @@ describe("Practice page (Home) - layout shell", () => {
     expect(screen.getByTestId("practice-sidebar")).toBeInTheDocument();
   });
 });
+
+/**
+ * jsdom cannot render async server components, so find AuthErrorBanner in the
+ * tree Home returns, call it with the page's searchParams and render its output.
+ */
+async function renderBanner(searchParams: { error?: string }) {
+  type El = { type?: unknown; props?: { children?: unknown; searchParams?: unknown } };
+  const find = (node: unknown): El | null => {
+    if (Array.isArray(node)) {
+      for (const child of node) {
+        const hit = find(child);
+        if (hit) return hit;
+      }
+      return null;
+    }
+    if (!node || typeof node !== "object") return null;
+    const el = node as El;
+    if (typeof el.type === "function" && el.type.name === "AuthErrorBanner") return el;
+    return find(el.props?.children);
+  };
+  const banner = find(Home({ searchParams: Promise.resolve(searchParams) }));
+  if (!banner) throw new Error("AuthErrorBanner not found in Home");
+  const output = await (banner.type as (p: unknown) => Promise<React.ReactElement | null>)(banner.props);
+  return render(<>{output}</>);
+}
+
+describe("Practice page (Home) - sign-in error banner", () => {
+  it.each(["auth", "access_denied", "state_mismatch"])("alerts for ?error=%s (Better Auth sends its own codes)", async (error) => {
+    await renderBanner({ error });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Sign-in failed. Please try again.");
+  });
+
+  it("shows no alert without an error", async () => {
+    await renderBanner({});
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});

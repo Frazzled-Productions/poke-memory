@@ -136,6 +136,22 @@ describe("username sign-up and sign-in", () => {
   });
 });
 
+describe("sign-out everywhere", () => {
+  it("revoke-sessions (called by signOut) ends every session of the user, not only this device's", async () => {
+    await signUp("lance");
+    const phone = await signIn("lance");
+    const laptop = await signIn("lance");
+    const other = await signUp("karen");
+    expect(row<{ n: number }>(`SELECT COUNT(*) AS n FROM "session"`).n).toBe(4);
+
+    expect((await post("/revoke-sessions", {}, { cookie: phone.cookie })).status).toBe(200);
+
+    expect(await auth.api.getSession({ headers: new Headers({ cookie: laptop.cookie! }) })).toBeNull();
+    expect(await auth.api.getSession({ headers: new Headers({ cookie: phone.cookie! }) })).toBeNull();
+    expect((await auth.api.getSession({ headers: new Headers({ cookie: other.cookie! }) }))?.user.username).toBe("karen");
+  });
+});
+
 describe("per-IP throttle (rate_limit_buckets)", () => {
   it("refuses the 11th sign-in from one IP in 10 minutes with RATE_LIMITED, and leaves other IPs alone", async () => {
     for (let i = 0; i < 10; i++) expect((await signIn("nobody", "wrong password", "198.51.100.1")).status).toBe(401);
@@ -233,6 +249,14 @@ describe("OAuth", () => {
     expect(url.host).toBe("github.com");
     expect(url.searchParams.get("client_id")).toBe("test-github-client");
     expect(url.searchParams.get("redirect_uri")).toBe(`${BASE}/api/auth/callback/github`);
+  });
+
+  it("sends an OAuth callback failure to the home page as /?error=<code>", async () => {
+    const res = await auth.handler(new Request(`${BASE}/api/auth/callback/github?code=x&state=unknown-state`));
+    expect(res.status).toBe(302);
+    const location = new URL(res.headers.get("location")!);
+    expect(`${location.origin}${location.pathname}`).toBe(`${BASE}/`);
+    expect(location.searchParams.get("error")).toBeTruthy();
   });
 
   it("does not store OAuth access, refresh or id tokens", async () => {
