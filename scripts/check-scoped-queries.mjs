@@ -59,6 +59,9 @@ export const ALLOWED_PATHS = [
   "scripts/refresh-user-count.mjs",
   "scripts/check-migrations.mjs",
   ".github/scripts/check-grade-log-divergence.mjs",
+  // The grade_log divergence monitor reads across users by design (an operator
+  // check run by a workflow with wrangler, never by the app); its test seeds D1.
+  "scripts/check-grade-log-divergence.test.ts",
 ];
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"]);

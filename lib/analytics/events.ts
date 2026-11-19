@@ -10,6 +10,7 @@
 /** The only event name the app sends and the endpoint accepts. */
 export const EVENT_NAMES = ["app_open"] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
+import { countEvent } from "@/lib/db/events";
 
 export const USER_TYPES = ["new", "returning_guest", "signed_in"] as const;
 export type UserType = (typeof USER_TYPES)[number];
@@ -30,9 +31,6 @@ export type EventEnv = {
 
 const MAX_BODY_BYTES = 200;
 
-const UPSERT =
-  "INSERT INTO events (day, name, user_type, progress_bucket, count) VALUES (?1, ?2, ?3, ?4, 1) " +
-  "ON CONFLICT (day, name, user_type, progress_bucket) DO UPDATE SET count = count + 1";
 
 function isOneOf<T extends string>(allowed: readonly T[], value: unknown): value is T {
   return typeof value === "string" && (allowed as readonly string[]).includes(value);
@@ -100,9 +98,7 @@ export async function handleEvent(
 
   const day = now.toISOString().slice(0, 10);
   try {
-    await env.DB.prepare(UPSERT)
-      .bind(day, event.name, event.props.userType, event.props.progressBucket)
-      .run();
+    await countEvent(env.DB, day, event.name, event.props.userType, event.props.progressBucket);
   } catch {
     return reply(503);
   }

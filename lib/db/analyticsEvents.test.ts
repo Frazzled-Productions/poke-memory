@@ -15,7 +15,7 @@ import {
   handleEvent,
   sendEvent,
   type EventEnv,
-} from "./events";
+} from "@/lib/analytics/events";
 
 const APP = "https://pokememory.com";
 const NOW = new Date("2026-11-19T21:30:00Z");
