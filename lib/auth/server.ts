@@ -33,7 +33,8 @@ export type AuthEnv = Pick<
   | "GOOGLE_CLIENT_ID"
   | "GOOGLE_CLIENT_SECRET"
   | "RATE_LIMIT_SALT"
->;
+> &
+  Partial<Pick<AppEnv, "DEPLOY_ENV">>;
 
 /** Better Auth endpoints behind the per-IP throttle, and their bucket. */
 const THROTTLED_PATHS: Readonly<Record<string, RateLimitAction>> = {
@@ -50,12 +51,43 @@ function withoutOAuthTokens<T extends Record<string, unknown>>(account: T): T {
   return { ...account, accessToken: null, refreshToken: null, idToken: null };
 }
 
+/**
+ * The GitHub login as the display username (Better Auth keeps only the
+ * profile's name, email and avatar). It is the handle on the Journey trainer
+ * card (user_metadata.user_name, lib/auth/types.ts), as it was under the old
+ * auth. Only used when Better Auth creates a user from a GitHub sign-in, so
+ * such a user has no username; the username plugin leaves a display username
+ * without a username unchecked.
+ */
+export function githubProfileToUser(profile: { login?: string | null }): { displayUsername?: string } {
+  return profile.login ? { displayUsername: profile.login } : {};
+}
+
+/** The preview Worker's base URL and its per-PR version aliases (design D11). */
+const PREVIEW_BASE_ORIGIN = "https://poke-memory-preview.frasers-account.workers.dev";
+const PREVIEW_ALIAS_ORIGIN = /^https:\/\/pr-\d+-poke-memory-preview\.frasers-account\.workers\.dev$/;
+
+/**
+ * Origins trusted besides BETTER_AUTH_URL's. Only on the preview Worker: its
+ * base URL and the version alias the request came from
+ * (https://pr-<n>-poke-memory-preview.frasers-account.workers.dev), so sign-in
+ * works on a PR's own alias. Anywhere else, none.
+ */
+export function trustedOriginsFor(deployEnv: string | undefined): string[] | ((request?: Request) => string[]) {
+  if (deployEnv !== "cloudflare-preview") return [];
+  return (request?: Request) => {
+    const origin = request?.headers.get("origin");
+    return origin && PREVIEW_ALIAS_ORIGIN.test(origin) ? [PREVIEW_BASE_ORIGIN, origin] : [PREVIEW_BASE_ORIGIN];
+  };
+}
+
 export function createAuth(env: AuthEnv) {
   if (!env.BETTER_AUTH_SECRET) throw new Error("BETTER_AUTH_SECRET is not set");
   return betterAuth({
     database: env.DB as never,
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
+    trustedOrigins: trustedOriginsFor(env.DEPLOY_ENV),
     emailAndPassword: {
       enabled: true,
       minPasswordLength: MIN_PASSWORD_LENGTH,
@@ -71,7 +103,11 @@ export function createAuth(env: AuthEnv) {
       }),
     ],
     socialProviders: {
-      github: { clientId: env.GITHUB_CLIENT_ID ?? "", clientSecret: env.GITHUB_CLIENT_SECRET ?? "" },
+      github: {
+        clientId: env.GITHUB_CLIENT_ID ?? "",
+        clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+        mapProfileToUser: githubProfileToUser,
+      },
       google: { clientId: env.GOOGLE_CLIENT_ID ?? "", clientSecret: env.GOOGLE_CLIENT_SECRET ?? "" },
     },
     account: {

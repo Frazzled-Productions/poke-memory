@@ -5,9 +5,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import bcrypt from "bcryptjs";
+import { parseAdditionalUserInputFromProviderProfile } from "better-auth/db";
 import { forUser } from "@/lib/db/scope";
 import { createSqliteD1, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
-import { createAuth, type Auth, type AuthEnv } from "./server";
+import { createAuth, githubProfileToUser, trustedOriginsFor, type Auth, type AuthEnv } from "./server";
 import { syntheticEmail } from "./username";
 
 const BASE = "http://localhost:3000";
@@ -282,5 +283,70 @@ describe("OAuth", () => {
     const created = row<{ id: string }>(`SELECT id FROM account WHERE userId = ?`, userId);
     await ctx.internalAdapter.updateAccount(created.id, { accessToken: "new-access-secret" });
     expect(row<{ accessToken: unknown }>(`SELECT accessToken FROM account WHERE userId = ?`, userId).accessToken).toBeNull();
+  });
+});
+
+describe("GitHub login as the display username", () => {
+  it("maps the GitHub profile's login onto displayUsername", () => {
+    expect(githubProfileToUser({ login: "Misty-W" })).toEqual({ displayUsername: "Misty-W" });
+    expect(githubProfileToUser({ login: "" })).toEqual({});
+  });
+
+  it("is wired into the GitHub provider", () => {
+    expect(auth.options.socialProviders.github.mapProfileToUser).toBe(githubProfileToUser);
+  });
+
+  it("a user created with a GitHub login and no username passes the username plugin and keeps the login", async () => {
+    // The OAuth sign-up path: the mapped profile goes through Better Auth's
+    // field filter, then createUser (oauth2/link-account in better-auth).
+    const fields = parseAdditionalUserInputFromProviderProfile(auth.options, githubProfileToUser({ login: "Misty-W" }), "create");
+    expect(fields).toEqual({ displayUsername: "Misty-W" });
+    const ctx = await auth.$context;
+    const created = await ctx.internalAdapter.createUser(
+      { name: "Misty", email: "misty@example.com", emailVerified: true, ...fields },
+      { method: "oauth", oauth: { providerId: "github" } },
+    );
+    const stored = row<{ username: string | null; displayUsername: string | null }>(
+      `SELECT username, displayUsername FROM "user" WHERE id = ?`,
+      created.id,
+    );
+    expect(stored).toEqual({ username: null, displayUsername: "Misty-W" });
+  });
+});
+
+describe("trusted origins", () => {
+  const ALIAS = "https://pr-42-poke-memory-preview.frasers-account.workers.dev";
+  const BASE_PREVIEW = "https://poke-memory-preview.frasers-account.workers.dev";
+  const from = (origin: string) => new Request(`${BASE_PREVIEW}/api/auth/sign-in/social`, { method: "POST", headers: { origin } });
+
+  it("on the preview Worker, trusts the base preview URL and a pr-<n> version alias", async () => {
+    const trusted = trustedOriginsFor("cloudflare-preview");
+    expect(trusted).toBeTypeOf("function");
+    const list = trusted as (request?: Request) => string[];
+    expect(list(from(ALIAS))).toEqual([BASE_PREVIEW, ALIAS]);
+    expect(list(undefined)).toEqual([BASE_PREVIEW]);
+  });
+
+  it("on the preview Worker, refuses look-alikes of the alias", () => {
+    const list = trustedOriginsFor("cloudflare-preview") as (request?: Request) => string[];
+    for (const origin of [
+      `${ALIAS}.evil.example`,
+      "https://pr-x-poke-memory-preview.frasers-account.workers.dev",
+      "http://pr-42-poke-memory-preview.frasers-account.workers.dev",
+      "https://pr-42-poke-memory-preview.evil.workers.dev",
+      "https://pr-42-poke-memory.frasers-account.workers.dev",
+    ]) {
+      expect(list(from(origin))).toEqual([BASE_PREVIEW]);
+    }
+  });
+
+  it("trusts no extra origin outside the preview Worker", () => {
+    expect(trustedOriginsFor("cloudflare-production")).toEqual([]);
+    expect(trustedOriginsFor(undefined)).toEqual([]);
+  });
+
+  it("is wired into Better Auth from DEPLOY_ENV", () => {
+    expect(createAuth({ ...env(), DEPLOY_ENV: "cloudflare-production" }).options.trustedOrigins).toEqual([]);
+    expect(createAuth({ ...env(), DEPLOY_ENV: "cloudflare-preview" }).options.trustedOrigins).toBeTypeOf("function");
   });
 });

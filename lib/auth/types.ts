@@ -15,7 +15,7 @@ export type AppUser = {
     name?: string;
     full_name?: string;
     avatar_url?: string;
-    /** Not stored by Better Auth (the GitHub login); kept for the mock seam. */
+    /** OAuth accounts: the GitHub login (Better Auth's displayUsername), the trainer card handle. */
     user_name?: string;
     preferred_username?: string;
   };
@@ -31,6 +31,8 @@ export type SessionUserLike = {
   name?: string | null;
   image?: string | null;
   username?: string | null;
+  /** The username plugin's display name; for a GitHub account, its login (lib/auth/server.ts). */
+  displayUsername?: string | null;
   createdAt: Date | string;
 };
 
@@ -52,6 +54,9 @@ export function toAppUser(user: SessionUserLike, accounts: readonly LinkedAccoun
       ...(user.username ? { username: user.username } : {}),
       ...(name ? { name, full_name: name } : {}),
       ...(user.image ? { avatar_url: user.image } : {}),
+      // A username account's displayUsername is its username; only an OAuth
+      // account's (the GitHub login) is a separate handle.
+      ...(!user.username && user.displayUsername ? { user_name: user.displayUsername } : {}),
     },
     app_metadata: { provider: providers[0], providers },
     identities,

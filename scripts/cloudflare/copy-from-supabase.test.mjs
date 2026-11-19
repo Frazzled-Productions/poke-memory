@@ -246,8 +246,14 @@ describe("convert and import", () => {
       name: "Misty Waterflower",
       image: "https://avatars.example.test/u/2",
       username: null,
+      // The GitHub login, for the Journey trainer card handle (Better Auth does not store it).
+      displayUsername: "misty",
     });
-    expect(users[BROCK]).toMatchObject({ name: "Brock Harrison", createdAt: "2025-08-01T09:00:00.000Z" });
+    expect(users[BROCK]).toMatchObject({
+      name: "Brock Harrison",
+      createdAt: "2025-08-01T09:00:00.000Z",
+      displayUsername: null,
+    });
     expect(users[JESSIE]).toMatchObject({ name: "Jessie O'Hara", emailVerified: 0 });
   });
 

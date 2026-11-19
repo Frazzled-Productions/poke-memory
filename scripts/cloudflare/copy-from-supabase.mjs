@@ -17,7 +17,8 @@
 //   "user"     one per auth.users row: the SAME id, email, name (raw_user_meta_data full_name,
 //              name or user_name, else the username), emailVerified from email_confirmed_at,
 //              image from avatar_url, createdAt/updatedAt, username and displayUsername from
-//              public.usernames.
+//              public.usernames; a GitHub user without a username gets their GitHub login
+//              (raw_user_meta_data user_name) as displayUsername, the trainer card handle.
 //   "account"  auth.identities for github and google (providerId as is, accountId = the
 //              provider's user id), and a "credential" account for every user with an
 //              encrypted_password (the bcrypt hash as is; accountId = the user id).
@@ -559,6 +560,11 @@ export function convert(source, { migrationsDir = D1_MIGRATIONS_DIR } = {}) {
   // Users.
   const usernames = new Map();
   for (const row of rowsOf("public.usernames")) usernames.set(row.user_id, row.username);
+  const githubUserIds = new Set(
+    rowsOf("auth.identities")
+      .filter((i) => i.provider === "github")
+      .map((i) => i.user_id),
+  );
   const users = rowsOf("auth.users");
   const userIds = new Set();
   const userCols = ["id", "name", "email", "emailVerified", "image", "createdAt", "updatedAt", "username", "displayUsername"];
@@ -570,6 +576,8 @@ export function convert(source, { migrationsDir = D1_MIGRATIONS_DIR } = {}) {
     const username = usernames.get(u.id) ?? null;
     const email = nonEmptyString(u.email) ?? `${username ?? u.id}@${INTERNAL_DOMAIN}`;
     const name = nonEmptyString(meta.full_name, meta.name, meta.user_name, username) ?? "";
+    const githubLogin = githubUserIds.has(u.id) ? nonEmptyString(meta.user_name) : null;
+    const displayUsername = username ?? githubLogin;
     const createdAt = toIsoTimestamp(u.created_at);
     const updatedAt = u.updated_at ? toIsoTimestamp(u.updated_at) : createdAt;
     userLines.push(
@@ -582,7 +590,7 @@ export function convert(source, { migrationsDir = D1_MIGRATIONS_DIR } = {}) {
         literal({ text: createdAt }),
         literal({ text: updatedAt }),
         literal(username ? { text: username } : null),
-        literal(username ? { text: username } : null),
+        literal(displayUsername ? { text: displayUsername } : null),
       ]),
     );
   }

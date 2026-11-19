@@ -29,4 +29,21 @@ describe("toAppUser", () => {
     expect(user.identities.map((i) => i.provider)).toEqual(["github", "google"]);
     expect(user.app_metadata).toEqual({ provider: "github", providers: ["github", "google"] });
   });
+
+  it("exposes a GitHub account's login (displayUsername) as user_name, for the trainer card handle", () => {
+    const user = toAppUser(
+      { id: "u3", email: "brock@example.com", name: "Brock", displayUsername: "Brock-H", createdAt: "2026-03-01T00:00:00.000Z" },
+      [{ providerId: "github", accountId: "789" }],
+    );
+    expect(user.user_metadata).toEqual({ name: "Brock", full_name: "Brock", user_name: "Brock-H" });
+  });
+
+  it("does not expose displayUsername as user_name for a username account", () => {
+    const user = toAppUser(
+      { id: "u1", email: null, name: "ash", username: "ash", displayUsername: "ash", createdAt: "2026-01-02T00:00:00.000Z" },
+      [{ providerId: "credential", accountId: "u1" }],
+    );
+    expect(user.user_metadata.user_name).toBeUndefined();
+    expect(user.user_metadata.username).toBe("ash");
+  });
 });
