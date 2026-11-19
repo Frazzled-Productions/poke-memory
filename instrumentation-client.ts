@@ -23,8 +23,12 @@ Sentry.init({
   dataCollection: SENTRY_DATA_COLLECTION,
   beforeSend: scrubSentryEvent,
 
-  // Keep the v10 environment names (vercel-production / vercel-preview).
-  environment: sentryEnvironment(process.env.NEXT_PUBLIC_VERCEL_ENV),
+  // cloudflare-production / cloudflare-preview from DEPLOY_ENV, else the v10
+  // Vercel names (lib/observability/sentryPrivacy.ts).
+  environment: sentryEnvironment(
+    process.env.NEXT_PUBLIC_DEPLOY_ENV,
+    process.env.NEXT_PUBLIC_VERCEL_ENV,
+  ),
 
   // Capture a small fraction of page-load and navigation transactions.
   // Override at deploy time via NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE env var
