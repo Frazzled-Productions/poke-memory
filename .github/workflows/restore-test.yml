@@ -1,9 +1,13 @@
 name: Restore test
 
 # Proof that the nightly D1 backup can be restored (OpenSpec change move-to-cloudflare,
-# design D10). Manual only for now: the monthly schedule is off until the owner decides on it, because
-# a run copies the full production backup (personal data) to a GitHub-hosted runner, a transfer the
-# privacy notice does not disclose. Run it from the Actions tab when a restore check is wanted. POST /api/cron/backup writes every table as SQL INSERTs to the R2 bucket
+# design D10). Manual only for now: the monthly schedule is off until the owner decides on it,
+# because a run copies the full production backup (personal data) to a GitHub-hosted runner, a
+# transfer the privacy notice does not disclose. Run it from the Actions tab when a restore check is
+# wanted; GitHub only dispatches a workflow whose file is on the default branch, so it cannot run
+# until this file reaches main.
+#
+# POST /api/cron/backup writes every table as SQL INSERTs to the R2 bucket
 # `poke-memory-backups` (EU jurisdiction) at d1/YYYY-MM-DD.sql each night at 02:00 UTC. This job:
 #
 #   1. downloads the newest object under d1/ (and fails if it is more than 3 days old, which means

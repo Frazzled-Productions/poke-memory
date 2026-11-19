@@ -551,13 +551,13 @@ fake `User` plus a fake data client (`DataClient`, `lib/db/client.ts`) whose
 
 | | |
 |---|---|
-| **Trigger** | `workflow_dispatch` only. The monthly `schedule` is off until the owner decides on it: a run copies the full production backup (personal data) to a GitHub-hosted runner, a transfer the privacy notice does not disclose. Gated `if: github.repository == 'Frazzled-Productions/poke-memory'`. |
+| **Trigger** | `workflow_dispatch` only. The monthly `schedule` is off until the owner decides on it: a run copies the full production backup (personal data) to a GitHub-hosted runner, a transfer the privacy notice does not disclose. GitHub dispatches it only once the file is on `main`. Gated `if: github.repository == 'Frazzled-Productions/poke-memory'`. |
 | **Job** | `restore` |
 | **What it does** | Proves the nightly D1 backup restores (move-to-cloudflare, design D10). Downloads the newest object under `d1/` in the R2 bucket `poke-memory-backups` (Cloudflare REST API with the EU jurisdiction header) and fails if it is more than three days old (the nightly backup has stopped); applies `db/d1/migrations` to a fresh local D1, executes the backup into it, and runs `scripts/cloudflare/check-restore.mjs`, which fails if any table's row count differs from the `-- rows <table>: <count>` header. The file format (INSERTs in dependency order after that header, between dropping and recreating the triggers so rows restore exactly as stored) is documented in that script. |
 | **Privacy** | The backup holds personal data and the logs are public: it stays in the runner's temporary folder, is never uploaded as an artifact, and the load step hides wrangler's output (an error would quote a row). Only table names and counts are logged. |
 | **Required secrets** | `CLOUDFLARE_API_TOKEN` (has Workers R2 Storage Write) and `CLOUDFLARE_ACCOUNT_ID` (var). Without them the run is skipped with a notice. |
 | **Health watch** | None while it is manual-only; it goes back into `cron-health-monitor.yml` at 840h with its schedule. |
-| **Required check** | No - cron, not a PR gate. |
+| **Required check** | No - manual, not a PR gate. |
 | **Concurrency** | `group: restore-test` with `cancel-in-progress: false`. |
 
 ---
