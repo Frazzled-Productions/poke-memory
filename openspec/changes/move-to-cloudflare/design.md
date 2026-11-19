@@ -186,7 +186,11 @@ cross-origin isolation or wasm threads sees a plain "not supported in this brows
 
 ### D8. Push, Discord and Sentry on Workers
 
-`web-push` and `@sentry/nextjs` run under `nodejs_compat` (trial). VAPID keys become Worker secrets; the private key is required only in production (elsewhere the send
+`web-push` and `@sentry/nextjs` run under `nodejs_compat` (trial). VAPID keys become Worker secrets: a new key pair, because Vercel never returns its stored secrets
+(owner ruling, 19 November 2026, 21:30). Existing browser subscriptions belong to the old public key, so
+on app start a signed-in player with notification permission whose subscription carries a different key is
+re-subscribed with the current key automatically (no prompt on the same origin). The private key is
+required only in production (elsewhere the send
 routes compute targets and log counts without failing).
 Sentry environment names change from `vercel-production`/`vercel-preview` to `cloudflare-production`/
 `cloudflare-preview` from a `DEPLOY_ENV` var; the privacy scrubbing (`lib/observability/sentryPrivacy.ts`)

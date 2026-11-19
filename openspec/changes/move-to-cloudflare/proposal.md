@@ -182,3 +182,8 @@ assume.
 - 2026-11-19 Open call 5: deleted data can stay in the 90-day backups (and D1's 30-day history), which
   the privacy notice now says instead of "deleted immediately and permanently". Assumed: disclose it, as
   decision 0018's backups make it true.
+- 2026-11-19 Fraser (about 21:30): new secrets are generated rather than copied, because Vercel stores the
+  app's environment values as sensitive and never returns them. A new VAPID key pair, so existing push
+  subscriptions stop at cutover; the build re-subscribes a signed-in player with permission automatically
+  on their next visit. Discord webhooks, the Sentry auth token and the GitHub and Google client secrets
+  are his steps (#2393).
