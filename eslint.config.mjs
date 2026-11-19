@@ -22,6 +22,9 @@ const eslintConfig = defineConfig([
     // `next build`; gitignored). It is minified esbuild output, so linting it
     // flags spurious errors (e.g. no-this-alias on the bundled runtime), #1752.
     "public/sw/**",
+    // Cloudflare build output and wrangler's local state (decision 0018).
+    ".open-next/**",
+    ".wrangler/**",
   ]),
   // Baseline for adopting ESLint into CI (#614). The react-hooks plugin v7
   // (bundled with eslint-config-next 16) ships several new rules at `error`
