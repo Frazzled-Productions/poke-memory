@@ -1,16 +1,32 @@
 /**
  * Pure helpers for the FSRS per-user weight optimizer (#268).
  *
- * No React, no DOM - importable from both client and server contexts.
- * The native `@open-spaced-repetition/binding` module is intentionally NOT
- * imported here; it is imported only in the API route so the native binary
- * stays out of the client bundle.
+ * No React, no DOM - importable from the page, the optimiser Web Worker
+ * (`lib/srs/optimiser/`) and tests. The FSRS binding itself is loaded only by
+ * the worker.
  */
 
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 
 export const MIN_REVIEWS_FOR_OPTIMIZATION = 200;
 export const OPTIMIZER_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Milliseconds left in the weekly optimiser cooldown, or 0 when a run is
+ * allowed. Takes every known "last optimised" timestamp (this device's
+ * settings and the cloud copy) and counts from the latest, so a run on another
+ * device also starts the week. Missing or unparseable timestamps are ignored.
+ */
+export function optimizerCooldownRemainingMs(
+  optimizedAt: ReadonlyArray<string | undefined>,
+  nowMs: number,
+): number {
+  const latest = Math.max(
+    ...optimizedAt.map((iso) => (iso === undefined ? NaN : Date.parse(iso))).filter(Number.isFinite),
+  );
+  if (!Number.isFinite(latest)) return 0;
+  return Math.max(0, OPTIMIZER_COOLDOWN_MS - (nowMs - latest));
+}
 
 /**
  * FSRS-native rating (1-4). Our internal grades are 1/2/4/5; the mapping at
@@ -57,7 +73,7 @@ function toFsrsRating(grade: GradeLogEntry["grade"]): FsrsRating {
  * requires at least one review with delta_t > 0 per item, and a card seen
  * only once has no such review. Passing a single-review item causes the Rust
  * WASI binary to panic at the process level (not a catchable JS exception),
- * which surfaces as an unrecoverable 500 at /api/srs/optimize.
+ * which surfaced as an unrecoverable 500 at the old server route.
  *
  * Returns one item per review after the first, for cards with >= 2 reviews.
  */
@@ -121,7 +137,7 @@ export function gradeLogToOptimizerItems(entries: GradeLogEntry[]): OptimizerInp
  *
  * Used by `countFittableReviews` to mirror the filter in
  * `gradeLogToOptimizerItems` so the Settings-page eligibility count and the
- * server-side gate agree on what "optimisable" means.
+ * optimiser page's gate agree on what "optimisable" means.
  */
 function isFittableGroup(cardEntries: GradeLogEntry[]): boolean {
   if (cardEntries.length < 2) return false;
@@ -142,8 +158,8 @@ function isFittableGroup(cardEntries: GradeLogEntry[]): boolean {
  * Count how many reviews belong to fittable cards - cards with at least two
  * reviews on distinct UTC days. This mirrors the filter applied in
  * `gradeLogToOptimizerItems`, so the eligibility count shown on the Settings
- * page and the server-side gate in `/api/srs/optimize` agree on what counts
- * as "optimisable". Single-review cards are excluded because the FSRS binding
+ * page and the gate on the optimiser page agree on what counts as
+ * "optimisable". Single-review cards are excluded because the FSRS binding
  * requires at least one review with delta_t > 0 per item.
  */
 export function countOptimizableReviews(entries: GradeLogEntry[]): number {

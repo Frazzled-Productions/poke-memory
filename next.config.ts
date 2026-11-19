@@ -70,6 +70,29 @@ const nextConfig: NextConfig = {
         source: "/sw/sw.js.map",
         headers: [{ key: "Cache-Control", value: "no-cache" }],
       },
+      // The FSRS optimiser page runs the threaded wasm binding, which needs a
+      // shared WebAssembly.Memory and so a cross-origin-isolated page (D7 of
+      // openspec/changes/move-to-cloudflare). Only this path is isolated, so
+      // cross-origin resources elsewhere keep loading. Link to it with a plain
+      // <a>, not next/link: isolation is set per document load.
+      {
+        source: "/settings/optimiser",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+        ],
+      },
+      // Its worker scripts and wasm (scripts/build-fsrs-optimiser.mjs). A
+      // dedicated worker started from an isolated page needs its own COEP.
+      // On Workers static assets these come from public/_headers instead,
+      // because assets are served before the Next server sees the request.
+      {
+        source: "/fsrs/:path*",
+        headers: [
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+        ],
+      },
     ];
   },
   images: {

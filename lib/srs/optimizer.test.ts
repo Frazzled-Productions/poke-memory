@@ -3,6 +3,8 @@ import {
   gradeLogToOptimizerItems,
   countOptimizableReviews,
   MIN_REVIEWS_FOR_OPTIMIZATION,
+  OPTIMIZER_COOLDOWN_MS,
+  optimizerCooldownRemainingMs,
 } from "./optimizer";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 
@@ -23,6 +25,32 @@ function makeEntry(
 describe("MIN_REVIEWS_FOR_OPTIMIZATION", () => {
   it("is 200", () => {
     expect(MIN_REVIEWS_FOR_OPTIMIZATION).toBe(200);
+  });
+});
+
+describe("optimizerCooldownRemainingMs", () => {
+  const now = Date.UTC(2026, 10, 19, 12, 0, 0);
+  const daysAgo = (d: number) => new Date(now - d * 86_400_000).toISOString();
+
+  it("is 0 when the optimiser has never run", () => {
+    expect(optimizerCooldownRemainingMs([], now)).toBe(0);
+    expect(optimizerCooldownRemainingMs([undefined, undefined], now)).toBe(0);
+  });
+
+  it("counts the week from the last run", () => {
+    expect(optimizerCooldownRemainingMs([daysAgo(2)], now)).toBe(5 * 86_400_000);
+    expect(optimizerCooldownRemainingMs([daysAgo(7)], now)).toBe(0);
+    expect(optimizerCooldownRemainingMs([daysAgo(30)], now)).toBe(0);
+  });
+
+  it("uses the latest of several timestamps (local and cloud)", () => {
+    expect(optimizerCooldownRemainingMs([daysAgo(10), daysAgo(1), undefined], now)).toBe(
+      OPTIMIZER_COOLDOWN_MS - 86_400_000,
+    );
+  });
+
+  it("ignores unparseable timestamps", () => {
+    expect(optimizerCooldownRemainingMs(["not a date"], now)).toBe(0);
   });
 });
 

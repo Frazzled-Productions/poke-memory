@@ -41,7 +41,8 @@ no-throw + FSRS-bounds/pairing assertions as the seed grows.
 
 While any flag is on, all cloud writes are suppressed (`usePerGradeSync.enqueueGrade`,
 `useSyncOnUnload`, `AutoSyncOnChange` short-circuit via `null` client/userId; the FSRS optimizer
-button and the `SyncStatusLine` Retry link render disabled with a "Sync paused (superuser)" label).
+button and the `SyncStatusLine` Retry link render disabled with a "Sync paused (superuser)" label,
+and `/settings/optimiser` shows a paused state and saves nothing).
 Any future write-triggering button takes the same `superuserPaused` prop. Background pulls
 (`SyncOnVisible`, `SignInPull`) stay enabled - reads can't corrupt the cloud. Do not work around
 this guard.

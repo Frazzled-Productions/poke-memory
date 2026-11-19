@@ -289,7 +289,37 @@
       "lowStorageProceed": "仍然下載"
     },
     "optimizerCooldown": "{count, plural, other {下次最佳化還需 # 天}}",
-    "optimizerRetryAfter": "{count, plural, other {請在 # 天後重試。}}",
+    "optimiser": {
+      "heading": "個人化我的複習計畫",
+      "signInPrompt": "登入後即可使用個人化複習計畫。",
+      "intro": "根據你的完整複習紀錄,讓複習計畫貼合你的記憶。",
+      "notEnoughIntro": "需要足夠的複習紀錄才能有意義地調整權重。",
+      "optimiseNow": "立即最佳化",
+      "availableAfter": "約 {min, number} 次複習後可用。你目前有 {count, number} 次。",
+      "pausedButton": "同步已暫停(超級使用者)",
+      "pausedTitle": "超級使用者旗標開啟期間暫停最佳化。",
+      "lastOptimised": "上次最佳化:{date}",
+      "page": {
+        "description": "這會根據你自己的複習紀錄擬合排程器的權重。它在此瀏覽器中執行,可能需要一分鐘左右。",
+        "backToSettings": "返回設定",
+        "loading": "正在載入你的複習紀錄…",
+        "signedOut": "登入後即可個人化你的複習計畫。最佳化工具使用儲存在你帳戶中的複習紀錄。",
+        "paused": "超級使用者旗標開啟期間暫停最佳化。關閉這些旗標後即可執行。",
+        "unsupported": "此瀏覽器無法執行最佳化工具。請嘗試最新版的 Chrome、Edge、Firefox 或 Safari。",
+        "notEnough": "你有 {count, number} 次複習可供最佳化工具使用,大約需要 {min, number} 次。",
+        "ready": "{count, plural, other {有 # 次複習可供使用。}}",
+        "fitting": "正在擬合你的權重…可能需要一分鐘左右。",
+        "progress": "已完成 {percent, number}%",
+        "saving": "正在儲存新的權重…",
+        "success": "完成。你的複習計畫現在使用根據你的複習擬合的權重。",
+        "errorNotEnoughData": "你的複習紀錄還不夠多樣。繼續學習,幾週後再試。",
+        "errorLoad": "無法載入你的複習紀錄。請檢查網路連線後重試。",
+        "errorSave": "權重已擬合,但無法儲存。請檢查網路連線後重試。",
+        "errorFailed": "無法最佳化。請稍後再試。",
+        "errorDetail": "詳情:{detail}",
+        "tryAgain": "重試"
+      }
+    },
     "backup": {
       "heading": "備份",
       "exportLabel": "匯出進度",

@@ -990,13 +990,6 @@ export default function SettingsPage() {
                   optimizableReviewCount={optimizableReviewCount}
                   isSignedIn={user !== null}
                   superuserPaused={anyFlagOn}
-                  onOptimized={(optimizedAt, weights) => {
-                    setSettings((prev) =>
-                      prev !== null
-                        ? { ...prev, fsrsWeights: weights, fsrsWeightsOptimizedAt: optimizedAt }
-                        : prev,
-                    );
-                  }}
                 />
 
                 {/* "Mark Pokémon I already know" quickstart (#1084) */}

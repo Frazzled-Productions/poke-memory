@@ -990,7 +990,7 @@ test.describe("Settings page", () => {
 
     // Guest state: sign-in prompt is visible
     await expect(
-      page.getByText("Sign in to enable personalized scheduling."),
+      page.getByText("Sign in to enable personalised scheduling."),
     ).toBeVisible();
 
     // Guest state: the optimize button is NOT rendered
