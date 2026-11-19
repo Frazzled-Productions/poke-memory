@@ -39,6 +39,9 @@
   "r2_buckets": [
     { "binding": "BACKUPS", "bucket_name": "poke-memory-backups", "jurisdiction": "eu" }
   ],
+  // App-open counter limit (lib/analytics/events.ts), keyed by event name, never by IP.
+  // Namespace ids are unique per account: the company site uses 1001 and 1002.
+  "ratelimits": [{ "name": "EVENT_LIMITER", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } }],
   // Both crons map to app routes through cronRoutesFor() in lib/cron/schedule.ts.
   "triggers": { "crons": ["0 * * * *", "*/30 * * * *"] },
   "vars": {
@@ -64,6 +67,7 @@
       "r2_buckets": [
         { "binding": "BACKUPS", "bucket_name": "poke-memory-backups-preview", "jurisdiction": "eu" }
       ],
+      "ratelimits": [{ "name": "EVENT_LIMITER", "namespace_id": "1004", "simple": { "limit": 60, "period": 60 } }],
       // No Cron Triggers at all: the preview database holds rehearsal copies of
       // real data, so it must never send pushes or Discord messages (D2). Outbound
       // sends are also gated on DEPLOY_ENV by lib/outbound.ts.
