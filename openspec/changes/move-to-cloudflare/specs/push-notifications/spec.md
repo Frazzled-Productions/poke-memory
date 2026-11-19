@@ -24,6 +24,58 @@ of every UTC hour, through the Worker's own fetch handler, with an empty JSON bo
 
 Source (planned): design D2, `worker/index.ts`, `lib/cron/schedule.ts`, `wrangler.jsonc`.
 
+### Requirement: A subscription on the old VAPID key moves to the new one on load
+
+Once per page load for a signed-in user, the app SHALL move this browser's push subscription onto the
+current VAPID key when it was made with another one (`options.applicationServerKey` differs from
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY`): unsubscribe, delete the old row, subscribe again with no permission
+prompt and store the new endpoint as `subscribeToPush` does. It SHALL act only when permission is
+already "granted", the browser is online and no superuser flag is on.
+
+#### Scenario: Subscription on the old key
+
+- **WHEN** a signed-in player whose permission is granted loads the app online with a subscription
+  made with the old public key
+- **THEN** the old subscription is unsubscribed and its row deleted, a new subscription on the current
+  key is made with no permission prompt, and its endpoint is stored as a new row
+
+#### Scenario: Subscription already on the current key
+
+- **WHEN** the subscription's key equals `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+- **THEN** nothing changes, in the browser or in `push_subscriptions`
+
+#### Scenario: Permission not granted
+
+- **WHEN** Notification permission is "default" or "denied"
+- **THEN** nothing changes and no permission prompt is shown
+
+#### Scenario: Superuser flag on
+
+- **WHEN** any superuser flag is on
+- **THEN** the check does not run, so no row is written or deleted
+
+#### Scenario: Offline
+
+- **WHEN** the browser is offline at load
+- **THEN** nothing changes, and the check runs again on a later load
+
+#### Scenario: Subscribing again fails
+
+- **WHEN** the new subscribe call fails after the old subscription was removed
+- **THEN** the old row is still deleted, since its key no longer signs, and Settings shows reminders
+  off so the player can turn them on again
+
+#### Scenario: Guest
+
+- **WHEN** nobody is signed in
+- **THEN** the check does not run
+
+Why: the key pair is new at cutover (owner ruling, 19 November 2026: the old private key could not be
+read back from Vercel), so subscriptions on the old public key would otherwise get no more pushes.
+
+Source: `lib/push/subscribe.ts` (`reconcileVapidKey`), `components/sync/SignInPull.tsx`;
+tests `components/pwa/reconcileVapidKey.test.tsx`, `components/sync/SignInPull.test.tsx`.
+
 ## RENAMED Requirements
 
 - FROM: `### Requirement: Cross-user reads go through service-role functions`
@@ -151,8 +203,8 @@ Cites: `lib/push/subscribe.ts:103-108`, `components/pwa/PushOptIn.tsx:152`, plan
 - **THEN** the bytes are the right length and round-trip (`components/pwa/subscribeHelpers.test.tsx:23-34`)
 
 #### Scenario: Existing subscription after the move
-- **WHEN** a device subscribed before the move turns reminders on again
-- **THEN** it keeps working, because the VAPID key pair moved to Worker secrets unchanged
+- **WHEN** a device subscribed before the move loads the app signed in, with permission granted
+- **THEN** it keeps working, because its subscription moves to the new VAPID key on load ("A subscription on the old VAPID key moves to the new one on load")
 
 Cites: `lib/push/subscribe.ts:110-209`, planned `lib/db/client.ts`.
 

@@ -84,8 +84,9 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
   running, done, not enough reviews, weekly limit, unsupported browser, error), translated in all four
   locales and the pseudo-locale. The privacy notice is English only, as today.
 - **Push notifications and the service worker (offline):** reminders and nudges send from the same
-  routes, triggered by the Worker's schedule at the same UTC hours. The existing VAPID key pair moves to
-  Worker secrets so current subscriptions keep working. The service worker's `/api/sync` replay and
+  routes, triggered by the Worker's schedule at the same UTC hours. The VAPID key pair is new and lives in
+  Worker secrets (owner ruling, 19 November 2026: the old private key could not be read back); each
+  signed-in browser with permission granted moves its subscription to the new key on its next load. The service worker's `/api/sync` replay and
   `/api/push/resubscribe` keep their URLs and use the Better Auth cookie (same origin, credentials
   included). `/api/db` and `/api/auth/*` are under `/api/`, which the service worker never caches
   (`lib/pwa/cacheStrategy.ts:128`).

@@ -147,58 +147,19 @@ export async function subscribeToPush(
   try {
     subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
-      // PushManager.subscribe wants `BufferSource`. The Uint8Array we built
-      // is backed by a generic ArrayBufferLike that TS won't narrow to
-      // ArrayBuffer; slicing into a fresh ArrayBuffer fixes the type and
-      // is a tiny copy for the 65-byte VAPID key.
-      const keyBytes = urlBase64ToUint8Array(vapidPublicKey);
-      const keyBuffer = new ArrayBuffer(keyBytes.byteLength);
-      new Uint8Array(keyBuffer).set(keyBytes);
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: keyBuffer,
+        applicationServerKey: vapidKeyBuffer(vapidPublicKey),
       });
     }
   } catch {
     return { ok: false, reason: "subscribe-failed" };
   }
 
-  // Extract the keys we need to persist. `getKey` returns ArrayBuffer; we
-  // base64url-encode for cross-origin transport and database storage.
-  const p256dhBuf = subscription.getKey("p256dh");
-  const authBuf = subscription.getKey("auth");
-  if (!p256dhBuf || !authBuf) {
+  if (!subscription.getKey("p256dh") || !subscription.getKey("auth")) {
     return { ok: false, reason: "subscribe-failed" };
   }
-  const p256dh = arrayBufferToBase64Url(p256dhBuf);
-  const auth = arrayBufferToBase64Url(authBuf);
-
-  // Persist via delete-then-insert. push_subscriptions is append-only for the
-  // browser (docs/persistence.md): the data gateway (lib/db/gateway.ts)
-  // allows select, insert and delete on it but no update or upsert, as the
-  // RLS policies of migration 028 did. Removing the existing row first and
-  // inserting a fresh one stays inside those operations. The cost is that a
-  // returning subscriber gets a new `created_at`; we don't surface that
-  // value anywhere user-facing, so the trade is fine.
-  try {
-    const { error: deleteError } = await client
-      .from("push_subscriptions")
-      .delete()
-      .eq("user_id", userId)
-      .eq("endpoint", subscription.endpoint);
-    if (deleteError) return { ok: false, reason: "persist-failed" };
-
-    const { error: insertError } = await client
-      .from("push_subscriptions")
-      .insert({
-        user_id: userId,
-        endpoint: subscription.endpoint,
-        p256dh,
-        auth_secret: auth,
-        last_seen_at: new Date().toISOString(),
-      });
-    if (insertError) return { ok: false, reason: "persist-failed" };
-  } catch {
+  if (!(await persistSubscription(client, userId, subscription))) {
     return { ok: false, reason: "persist-failed" };
   }
 
@@ -396,6 +357,129 @@ export async function reconcileSubscription(
   } catch {
     return "disabled";
   }
+}
+
+/**
+ * Stores a browser subscription as this user's row for its endpoint: the keys
+ * base64url-encoded, by delete-then-insert. push_subscriptions is append-only
+ * for the browser (docs/persistence.md): the data gateway (lib/db/gateway.ts)
+ * allows select, insert and delete on it but no update or upsert, as the RLS
+ * policies of migration 028 did. Removing the existing row first and
+ * inserting a fresh one stays inside those operations. The cost is that a
+ * returning subscriber gets a new `created_at`; we don't surface that value
+ * anywhere user-facing, so the trade is fine. False when the subscription
+ * has no keys or either write fails.
+ */
+async function persistSubscription(
+  client: DataClient,
+  userId: string,
+  subscription: PushSubscription,
+): Promise<boolean> {
+  const p256dhBuf = subscription.getKey("p256dh");
+  const authBuf = subscription.getKey("auth");
+  if (!p256dhBuf || !authBuf) return false;
+  try {
+    const { error: deleteError } = await client
+      .from("push_subscriptions")
+      .delete()
+      .eq("user_id", userId)
+      .eq("endpoint", subscription.endpoint);
+    if (deleteError) return false;
+
+    const { error: insertError } = await client
+      .from("push_subscriptions")
+      .insert({
+        user_id: userId,
+        endpoint: subscription.endpoint,
+        p256dh: arrayBufferToBase64Url(p256dhBuf),
+        auth_secret: arrayBufferToBase64Url(authBuf),
+        last_seen_at: new Date().toISOString(),
+      });
+    return !insertError;
+  } catch {
+    return false;
+  }
+}
+
+/** The current VAPID public key as the buffer PushManager.subscribe takes. */
+function vapidKeyBuffer(vapidPublicKey: string): ArrayBuffer {
+  // PushManager.subscribe wants `BufferSource`. The Uint8Array is backed by a
+  // generic ArrayBufferLike that TS won't narrow to ArrayBuffer; copying into
+  // a fresh ArrayBuffer fixes the type and is a tiny copy for the 65-byte key.
+  const keyBytes = urlBase64ToUint8Array(vapidPublicKey);
+  const keyBuffer = new ArrayBuffer(keyBytes.byteLength);
+  new Uint8Array(keyBuffer).set(keyBytes);
+  return keyBuffer;
+}
+
+function sameBytes(a: ArrayBuffer, b: ArrayBuffer): boolean {
+  if (a.byteLength !== b.byteLength) return false;
+  const x = new Uint8Array(a);
+  const y = new Uint8Array(b);
+  return x.every((byte, i) => byte === y[i]);
+}
+
+/** Outcome of `reconcileVapidKey`; only `"resubscribed"` and `"failed"` changed anything. */
+export type VapidReconcileResult =
+  | "unsupported"
+  | "no-vapid-key"
+  | "not-granted"
+  | "offline"
+  | "no-local"
+  | "unknown-key"
+  | "current"
+  | "resubscribed"
+  | "failed";
+
+/**
+ * Moves this browser's push subscription onto the current VAPID key
+ * (move-to-cloudflare: the key pair is new at cutover, because the old
+ * private key could not be read back, so a subscription made with the old
+ * public key gets no more pushes).
+ *
+ * Runs once per load for a signed-in user (SignInPull), never while a
+ * superuser flag is on (the caller checks). Acts only when Notification
+ * permission is already "granted", the browser is online, and the local
+ * subscription's `options.applicationServerKey` differs from
+ * NEXT_PUBLIC_VAPID_PUBLIC_KEY. Then it unsubscribes, deletes the old row,
+ * subscribes again with the current key (no permission prompt: permission is
+ * already granted on this origin, and Notification.requestPermission is not
+ * called) and stores the new endpoint as subscribeToPush does. If subscribing
+ * again fails the old row is still deleted, since its key no longer signs;
+ * Settings then shows reminders off (reconcileSubscription: "no-local").
+ */
+export async function reconcileVapidKey(client: DataClient, userId: string): Promise<VapidReconcileResult> {
+  if (!isPushSupported()) return "unsupported";
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (!vapidPublicKey) return "no-vapid-key";
+  if (Notification.permission !== "granted") return "not-granted";
+  if (navigator.onLine === false) return "offline";
+
+  let registration: ServiceWorkerRegistration;
+  let subscription: PushSubscription | null;
+  try {
+    registration = await navigator.serviceWorker.ready;
+    subscription = await registration.pushManager.getSubscription();
+  } catch {
+    return "no-local";
+  }
+  if (!subscription) return "no-local";
+
+  const subscribedKey = subscription.options?.applicationServerKey ?? null;
+  if (!subscribedKey) return "unknown-key";
+  const currentKey = vapidKeyBuffer(vapidPublicKey);
+  if (sameBytes(subscribedKey, currentKey)) return "current";
+
+  const oldEndpoint = subscription.endpoint;
+  let fresh: PushSubscription;
+  try {
+    await subscription.unsubscribe();
+    await client.from("push_subscriptions").delete().eq("user_id", userId).eq("endpoint", oldEndpoint);
+    fresh = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: currentKey });
+  } catch {
+    return "failed";
+  }
+  return (await persistSubscription(client, userId, fresh)) ? "resubscribed" : "failed";
 }
 
 /**
