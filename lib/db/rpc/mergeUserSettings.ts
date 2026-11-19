@@ -15,6 +15,7 @@
  */
 import type { D1DatabaseLike } from "../d1";
 import { DbError, toDbError } from "../errors";
+import { OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
@@ -212,6 +213,24 @@ export function assertNoSettingsRegression(oldSettings: Json, newSettings: Json)
   }
 }
 
+/**
+ * The optimiser's weekly limit (srs-scheduling, move-to-cloudflare): a merge
+ * that moves `fsrsWeightsOptimizedAt` later than the stored run by less than
+ * OPTIMIZER_COOLDOWN_MS is refused with 23514, so a second device or a stale
+ * page cannot save a second run within a week. Re-sending the stored run (a
+ * full settings push) and the first run are allowed. Instants are compared,
+ * not strings.
+ */
+export function assertOptimiserCooldown(oldSettings: Json, newSettings: Json): void {
+  const oldAt = isObject(oldSettings) ? pgText(oldSettings.fsrsWeightsOptimizedAt) : null;
+  const newAt = isObject(newSettings) ? pgText(newSettings.fsrsWeightsOptimizedAt) : null;
+  if (oldAt === null || newAt === null) return;
+  const delta = Date.parse(newAt) - Date.parse(oldAt);
+  if (delta > 0 && delta < OPTIMIZER_COOLDOWN_MS) {
+    throw new DbError("23514", "user_settings: the optimiser already ran this week");
+  }
+}
+
 /** The next updated_at: now, or 1 ms after the stored value if the clock is behind it. */
 function nextTimestamp(previous: string | null): string {
   const now = Date.now();
@@ -255,6 +274,7 @@ export async function mergeUserSettings(
       const stored = JSON.parse(row.settings) as Json;
       const merged = jsonDeepMerge(stored, patchObject);
       assertNoSettingsRegression(stored, merged);
+      assertOptimiserCooldown(stored, merged);
       const updated = await db
         .prepare("UPDATE user_settings SET settings = ?, updated_at = ? WHERE user_id = ? AND updated_at = ?")
         .bind(JSON.stringify(merged), nextTimestamp(row.updated_at), userId, row.updated_at)

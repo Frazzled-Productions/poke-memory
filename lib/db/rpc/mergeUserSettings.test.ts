@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "../testing/sqliteD1";
 import type { D1DatabaseLike, D1PreparedStatementLike } from "../d1";
 import { DbError } from "../errors";
+import { OPTIMIZER_COOLDOWN_MS } from "@/lib/srs/optimizer";
 import { diffSettings } from "@/lib/settings/lastPushedSnapshot";
 import { DEFAULT_SETTINGS, type UserSettings } from "@/lib/settings/persistence";
 import {
@@ -389,6 +390,46 @@ describe("038 guard inside the merge", () => {
   it("the insert path is not guarded (the trigger was BEFORE UPDATE only)", async () => {
     await mergeUserSettings(d1, userId, { onboarding: { welcomeDismissed: false } });
     expect(stored()!.settings).toEqual({ onboarding: { welcomeDismissed: false } });
+  });
+});
+
+describe("the optimiser's weekly limit inside the merge", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const RUN = "2026-11-10T09:00:00.000Z";
+  const after = (ms: number) => new Date(Date.parse(RUN) + ms).toISOString();
+  const run = (at: string) => ({ fsrsWeights: [0.1, 0.2], fsrsWeightsOptimizedAt: at });
+
+  it("a second run less than a week after the stored one is refused with 23514 and the row is unchanged", async () => {
+    seed({ ...BASE, ...run(RUN) });
+    const before = stored();
+    await expect(mergeUserSettings(d1, userId, run(after(3 * DAY)))).rejects.toMatchObject({ code: "23514" });
+    await expect(mergeUserSettings(d1, userId, run(after(OPTIMIZER_COOLDOWN_MS - 1)))).rejects.toMatchObject({
+      code: "23514",
+    });
+    expect(stored()).toEqual(before);
+  });
+
+  it("a run a week or more after the stored one is accepted", async () => {
+    seed({ ...BASE, ...run(RUN) });
+    await mergeUserSettings(d1, userId, run(after(OPTIMIZER_COOLDOWN_MS)));
+    expect(stored()!.settings.fsrsWeightsOptimizedAt).toBe(after(OPTIMIZER_COOLDOWN_MS));
+  });
+
+  it("the first run is accepted, with or without a row", async () => {
+    await mergeUserSettings(d1, userId, run(RUN));
+    expect(stored()!.settings.fsrsWeightsOptimizedAt).toBe(RUN);
+    const other = createTestUser(d1);
+    d1.sqlite
+      .prepare("INSERT INTO user_settings (user_id, settings, updated_at) VALUES (?, ?, ?)")
+      .run(other, JSON.stringify(BASE), "2026-11-01T00:00:00.000Z");
+    await mergeUserSettings(d1, other, run(RUN));
+    expect(stored(other)!.settings.fsrsWeightsOptimizedAt).toBe(RUN);
+  });
+
+  it("re-sending the stored run (a full settings push) is accepted", async () => {
+    seed({ ...BASE, ...run(RUN) });
+    await mergeUserSettings(d1, userId, { ...BASE, ...run(RUN), masteryRepetitions: 4 });
+    expect(stored()!.settings.masteryRepetitions).toBe(4);
   });
 });
 
