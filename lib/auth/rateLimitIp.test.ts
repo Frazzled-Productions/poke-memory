@@ -72,4 +72,11 @@ describe("hashIp", () => {
     expect(result).toHaveLength(64);
     expect(result).toMatch(/^[0-9a-f]{64}$/);
   });
+
+  it("uses an explicit salt (the Worker secret) over process.env", async () => {
+    vi.stubEnv("RATE_LIMIT_SALT", "env-salt");
+    const { hashIp } = await import("./rateLimitIp");
+    expect(hashIp("10.0.0.1", "worker-salt")).not.toBe(hashIp("10.0.0.1"));
+    expect(hashIp("10.0.0.1", "env-salt")).toBe(hashIp("10.0.0.1"));
+  });
 });
