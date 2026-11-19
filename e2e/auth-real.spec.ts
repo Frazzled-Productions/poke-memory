@@ -37,18 +37,18 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:8787";
 const E2E_PASSWORD = "e2e-real-auth-pw-2026";
 
 /**
- * Per-run unique username. CI passes E2E_RUN_ID (the GitHub run id + attempt);
- * locally we fall back to a timestamp + random suffix. Lowercased and trimmed
- * to the username rule ([a-z0-9_-]{3,30}).
+ * Per-worker unique username: CI's E2E_RUN_ID (the GitHub run id + attempt),
+ * or a timestamp locally, plus a random suffix. The suffix matters on a retry:
+ * Playwright re-runs the whole serial group in a fresh worker against the same
+ * D1, and a username the first try created would be "already taken".
+ * Lowercased and trimmed to the username rule ([a-z0-9_-]{3,30}).
  */
 function makeUsername(): string {
-  const seed =
-    process.env.E2E_RUN_ID ??
-    `${Date.now().toString(36)}${randomUUID().replace(/-/g, "").slice(0, 6)}`;
+  const seed = `${process.env.E2E_RUN_ID ?? Date.now().toString(36)}_${randomUUID().replace(/-/g, "").slice(0, 6)}`;
   // Strip to allowed chars, prefix with a fixed marker so test rows are
-  // identifiable, and clamp to 30 chars.
+  // identifiable, and clamp to 30 chars from the end so the suffix survives.
   const cleaned = `e2e_${seed}`.toLowerCase().replace(/[^a-z0-9_-]/g, "");
-  return cleaned.slice(0, 30);
+  return cleaned.length > 30 ? `e2e_${cleaned.slice(-26)}` : cleaned;
 }
 
 const username = makeUsername();
@@ -307,6 +307,9 @@ test.describe("Real auth: username door against a local Worker and D1 (#1710)", 
       confirmation = d.message();
       void d.accept();
     });
+    // A restore ends with window.location.reload() (app/settings/page.tsx): read
+    // this device's copy only once that reload has loaded, or the read races it.
+    const reloaded = page.waitForEvent("load", { timeout: 30_000 });
     const [fileChooser] = await Promise.all([
       page.waitForEvent("filechooser"),
       page.getByRole("button", { name: /^import$/i }).click(),
@@ -323,6 +326,7 @@ test.describe("Real auth: username door against a local Worker and D1 (#1710)", 
     expect(await cloudReps("2")).toBe(9);
 
     // This device agrees with the cloud after the reload: the older copy did not stick.
+    await reloaded;
     const localReps = (subjectKey: string) =>
       page.evaluate(async (key) => {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
