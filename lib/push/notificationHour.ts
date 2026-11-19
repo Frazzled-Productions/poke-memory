@@ -4,24 +4,14 @@
  * Extracted so they can be unit-tested without touching the network, the DB,
  * or the Node.js route runtime.
  *
- * The send-daily route fires (currently) once per day at 08:00 UTC via
- * pg_cron. When the phase-2 migration (031) flips the cron to hourly, the
- * route will fire once per hour and `shouldSendToUser` will gate each call
- * correctly using the user's local preferred hour converted to UTC.
- *
- * IMPORTANT - interim behaviour (this PR):
- * The cron is STILL daily (0 8 * * *). Users with no preference (NULL →
- * effective UTC hour 8) continue to receive their notification exactly as
- * before. Users who set a non-8-UTC-equivalent preferred hour will be
- * DORMANT until the phase-2 cron change is applied post-promotion. This is
- * safe: no user receives a duplicate notification; no existing user loses
- * their notification.
+ * The send-daily route fires every hour (the Worker's Cron Trigger,
+ * lib/cron/schedule.ts); `shouldSendToUser` gates each run using the user's
+ * local preferred hour converted to UTC.
  */
 
 /**
- * Default send hour in UTC. Used when the user has not set a preference.
- * Must match the current cron schedule (0 8 * * *) so existing users keep
- * their 08:00 UTC notification with no observable change.
+ * Default send hour in UTC. Used when the user has not set a preference, so
+ * those users keep the 08:00 UTC notification the first daily schedule sent.
  */
 export const PUSH_DEFAULT_HOUR_UTC = 8;
 
@@ -112,7 +102,7 @@ export function shouldSendToUser(
 
   let effectiveUtcHour: number;
   if (pushNotificationHour === null) {
-    // No preference: use the default, which aligns with the current cron.
+    // No preference: use the default hour.
     effectiveUtcHour = PUSH_DEFAULT_HOUR_UTC;
   } else {
     effectiveUtcHour = localHourToUtcHour(pushNotificationHour, timezone, now);
