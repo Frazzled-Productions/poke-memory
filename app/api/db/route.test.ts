@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
+import { seedBugReportWithDiscordPost } from "@/lib/db/testing/gatewayClient";
 
 const { requireAuth, getDb, waitUntil, deleteDiscordPosts } = vi.hoisted(() => ({
   requireAuth: vi.fn(),
@@ -123,8 +124,7 @@ describe("each operation through the route", () => {
   });
 
   it("delete_account hands the Discord post deletes to waitUntil", async () => {
-    d1.sqlite.prepare(`INSERT INTO feedback (id, user_id, category, message) VALUES ('f1', ?, 'bug', 'x')`).run(alice);
-    d1.sqlite.prepare(`INSERT INTO feedback_discord_posts (feedback_id, discord_message_id) VALUES ('f1', 'm1')`).run();
+    seedBugReportWithDiscordPost(d1, alice, "f1", "m1");
     const res = await POST(post({ kind: "rpc", name: "delete_account" }));
     expect(res.status).toBe(200);
     expect(deleteDiscordPosts).toHaveBeenCalledWith([{ feedbackId: "f1", discordMessageId: "m1" }]);

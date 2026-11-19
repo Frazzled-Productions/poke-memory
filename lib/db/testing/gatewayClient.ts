@@ -14,6 +14,7 @@
 import { createDataClient, type DataClient } from "../client";
 import type { D1DatabaseLike } from "../d1";
 import { handleGatewayRequest } from "../gateway";
+import type { SqliteD1 } from "./sqliteD1";
 
 export interface GatewayTestOptions {
   /** Return true to fail this request with a network error. */
@@ -38,4 +39,22 @@ export function createGatewayTestClient(
     });
   };
   return createDataClient({ fetch: shim });
+}
+
+/**
+ * Seeds a bug report with its Discord post for `userId`, for tests outside
+ * lib/db that cannot hold SQL (scripts/check-scoped-queries.mjs).
+ */
+export function seedBugReportWithDiscordPost(
+  d1: SqliteD1,
+  userId: string,
+  feedbackId: string,
+  discordMessageId: string,
+): void {
+  d1.sqlite
+    .prepare(`INSERT INTO feedback (id, user_id, category, message) VALUES (?, ?, 'bug', 'test')`)
+    .run(feedbackId, userId);
+  d1.sqlite
+    .prepare(`INSERT INTO feedback_discord_posts (feedback_id, discord_message_id) VALUES (?, ?)`)
+    .run(feedbackId, discordMessageId);
 }
