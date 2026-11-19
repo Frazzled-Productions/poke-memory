@@ -46,6 +46,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseMigrationTriggers } from "../../lib/db/migrationTriggers.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const D1_MIGRATIONS_DIR = path.join(REPO_ROOT, "db", "d1", "migrations");
@@ -517,17 +518,8 @@ function nonEmptyString(...candidates) {
  * in migration order. A later DROP TRIGGER removes one.
  */
 export function migrationTriggers(migrationsDir = D1_MIGRATIONS_DIR) {
-  const triggers = new Map();
   const files = readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort();
-  for (const file of files) {
-    const sql = readFileSync(path.join(migrationsDir, file), "utf8");
-    const pattern = /CREATE\s+TRIGGER\s+(?:IF\s+NOT\s+EXISTS\s+)?("?)(\w+)\1[\s\S]*?\bEND\s*;|DROP\s+TRIGGER\s+(?:IF\s+EXISTS\s+)?("?)(\w+)\3\s*;/gi;
-    for (const m of sql.matchAll(pattern)) {
-      if (m[2]) triggers.set(m[2], m[0]);
-      else triggers.delete(m[4]);
-    }
-  }
-  return [...triggers.entries()];
+  return parseMigrationTriggers(files.map((file) => readFileSync(path.join(migrationsDir, file), "utf8")));
 }
 
 // ── The conversion ─────────────────────────────────────────────────────────

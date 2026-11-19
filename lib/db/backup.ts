@@ -11,15 +11,21 @@
  *   ... one `-- rows <table>: <count>` line for every table, empty ones too
  *   INSERT INTO "user" ("id", "name", ...) VALUES (...);
  *
- * Data only (no CREATE, DROP, PRAGMA or transaction statements): a restore
- * applies db/d1/migrations to a fresh database first, then runs the file with
- * `wrangler d1 execute --file`. Tables come in BACKUP_TABLE_ORDER, parents
- * first. Restored rows pass through today's triggers; the only one that
- * changes a value is push_subscriptions' last_seen_at stamp (049), which
- * becomes the restore time.
+ *   DROP TRIGGER IF EXISTS "card_reviews_reject_regression_trigger";
+ *   ... every trigger, then one INSERT per row ...
+ *   CREATE TRIGGER card_reviews_reject_regression_trigger ... END;
+ *
+ * A restore applies db/d1/migrations to a fresh database first, then runs the
+ * file with `wrangler d1 execute --file`. Tables come in BACKUP_TABLE_ORDER,
+ * parents first. The file drops the database's triggers before the rows and
+ * recreates them verbatim after, so rows go back exactly as stored: rows the
+ * copy from Supabase kept with triggers bypassed (more than 10 push rows for
+ * one user, a streak date in the future) are neither trimmed nor refused, and
+ * push_subscriptions.last_seen_at keeps its value. No PRAGMA or transaction
+ * statements.
  */
 import type { D1DatabaseLike, R2BucketLike } from "./d1";
-import { backupTables, readTablePages } from "./system/backup";
+import { backupTables, databaseTriggers, readTablePages } from "./system/backup";
 
 export const BACKUP_PREFIX = "d1/";
 export const BACKUP_RETENTION_DAYS = 90;
@@ -70,11 +76,21 @@ export async function dumpDatabase(db: D1DatabaseLike, now: Date = new Date()): 
       counts[table] += rows.length;
     });
   }
+  const triggers = await databaseTriggers(db);
   const header = [
     `-- poke-memory D1 backup ${now.toISOString()}`,
     ...tables.map((t) => `-- rows ${t}: ${counts[t]}`),
   ];
-  return { sql: [...header, ...statements].join("\n") + "\n", counts };
+  return {
+    sql:
+      [
+        ...header,
+        ...triggers.map((t) => `DROP TRIGGER IF EXISTS ${quoteIdentifier(t.name)};`),
+        ...statements,
+        ...triggers.map((t) => `${t.sql};`),
+      ].join("\n") + "\n",
+    counts,
+  };
 }
 
 export function backupKey(now: Date): string {

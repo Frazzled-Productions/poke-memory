@@ -1,23 +1,27 @@
 #!/usr/bin/env node
 // Restore check for the nightly D1 backup (OpenSpec change move-to-cloudflare, design D10), run
-// by .github/workflows/restore-test.yml (by hand; its schedule is off) after it has loaded the newest backup into a fresh
-// local D1. Compares the row count of every table named in the backup's header with the restored
+// by .github/workflows/restore-test.yml (by hand; its schedule is off) after it has loaded the
+// newest backup into a fresh local D1. Compares the row count of every table named in the backup's header with the restored
 // database and exits 1 on any difference.
 //
 // Backup file format (written by POST /api/cron/backup to R2 at d1/YYYY-MM-DD.sql):
 //
-//   -- poke-memory D1 backup
-//   -- created: 2026-11-20T02:00:03.120Z
+//   -- poke-memory D1 backup 2026-11-20T02:00:03.120Z
 //   -- rows user: 21
 //   -- rows card_reviews: 4812
 //   -- ... one `-- rows <table>: <count>` line for EVERY table in the dump, including empty ones
+//   DROP TRIGGER IF EXISTS "card_reviews_reject_regression_trigger";
+//   ... every trigger ...
 //   INSERT INTO "user" ("id", "name", ...) VALUES (...);
 //   ...
+//   CREATE TRIGGER card_reviews_reject_regression_trigger ... END;
+//   ... every trigger, verbatim ...
 //
-// - Data only: no CREATE, DROP or PRAGMA. The restore applies db/d1/migrations to a fresh local D1
-//   first, then executes the file, so the schema (and every trigger) is today's.
+// - No CREATE TABLE or PRAGMA. The restore applies db/d1/migrations to a fresh local D1 first,
+//   then executes the file. It drops the database's triggers before the rows and recreates them
+//   verbatim after, so rows go back exactly as stored (lib/db/backup.ts).
 // - One INSERT per row, tables in dependency order (parents before children, `user` first), so
-//   the foreign keys and the tombstone triggers accept the rows as they did when they were written.
+//   the foreign keys accept the rows.
 // - wrangler's own `d1_migrations` table and SQLite/D1 internal tables (`sqlite_*`, `_cf_*`) are not
 //   dumped: the migrations recreate the first, and the others are not ours.
 //

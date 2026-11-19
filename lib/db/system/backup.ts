@@ -52,11 +52,28 @@ export async function backupTables(db: D1DatabaseLike): Promise<{ tables: string
   return { tables: [...listed, ...unlisted], unlisted };
 }
 
+/**
+ * The database's triggers (those db/d1/migrations created) as name and
+ * verbatim CREATE TRIGGER text, in creation order. SQLite's and Cloudflare's
+ * own are skipped. The Worker has no filesystem, so the backup reads them
+ * here rather than from the migration files.
+ */
+export async function databaseTriggers(db: D1DatabaseLike): Promise<{ name: string; sql: string }[]> {
+  return all<{ name: string; sql: string }>(
+    db,
+    `SELECT name, sql FROM sqlite_master
+      WHERE type = 'trigger' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE '\\_cf\\_%' ESCAPE '\\'
+      ORDER BY rowid`,
+  );
+}
+
 const PAGE_SIZE = 1000;
+const ROWID_COLUMN = "_backup_rowid";
 
 /**
- * Reads one table page by page in rowid order, calling `onPage` with the
- * column names and each page's rows (values as stored). `table` must come
+ * Reads one table page by page in rowid order (keyset paging on rowid, so a
+ * large table costs no more per page than a small one), calling `onPage` with
+ * the column names and each page's rows (values as stored). `table` must come
  * from backupTables.
  */
 export async function readTablePages(
@@ -65,18 +82,22 @@ export async function readTablePages(
   onPage: (columns: string[], rows: unknown[][]) => void,
 ): Promise<void> {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(table)) throw new DbError("42P01", `bad table name: ${table}`);
-  for (let offset = 0; ; offset += PAGE_SIZE) {
+  let after = -Infinity;
+  for (;;) {
     let page: unknown[][];
     try {
       page = await db
-        .prepare(`SELECT * FROM "${table}" ORDER BY rowid LIMIT ? OFFSET ?`)
-        .bind(PAGE_SIZE, offset)
+        .prepare(`SELECT rowid AS "${ROWID_COLUMN}", * FROM "${table}" WHERE rowid > ? ORDER BY rowid LIMIT ?`)
+        .bind(Number.isFinite(after) ? after : Number.MIN_SAFE_INTEGER, PAGE_SIZE)
         .raw({ columnNames: true });
     } catch (err) {
       throw new DbError("XX000", `reading ${table} failed`, { cause: err });
     }
-    const [columns, ...rows] = page as [string[], ...unknown[][]];
-    if (rows.length > 0) onPage(columns, rows);
-    if (rows.length < PAGE_SIZE) return;
+    const [header, ...withRowid] = page as [string[], ...unknown[][]];
+    if (withRowid.length > 0) {
+      after = Number(withRowid[withRowid.length - 1][0]);
+      onPage(header.slice(1), withRowid.map((row) => row.slice(1)));
+    }
+    if (withRowid.length < PAGE_SIZE) return;
   }
 }

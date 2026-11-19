@@ -2,11 +2,14 @@
  * The nightly backup (design D10) with a fake R2 bucket, and a restore of the
  * file into a fresh migrated database with the row counts compared.
  */
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { R2BucketLike } from "./d1";
 import { BACKUP_RETENTION_DAYS, backupKey, dumpDatabase, pruneBackups, runBackup, sqlLiteral } from "./backup";
 import { forUser } from "./scope";
-import { BACKUP_TABLE_ORDER, backupTables } from "./system/backup";
+import { BACKUP_TABLE_ORDER, backupTables, readTablePages } from "./system/backup";
+import { parseMigrationTriggers } from "./migrationTriggers.mjs";
 import { discordPostStore, insertFeedback } from "./system/feedback";
 import { checkRateLimit } from "./rateLimit";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "./testing/sqliteD1";
@@ -43,6 +46,14 @@ function fakeBucket(pageSize = 1000) {
 }
 
 const NOW = new Date("2026-11-20T02:00:03.120Z");
+
+function migrationTexts(): string[] {
+  const dir = join(process.cwd(), "db", "d1", "migrations");
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .map((f) => readFileSync(join(dir, f), "utf8"));
+}
 
 let d1: SqliteD1;
 beforeEach(() => {
@@ -119,16 +130,18 @@ describe("dumpDatabase", () => {
     // Same pattern as scripts/cloudflare/check-restore.mjs.
     const rowsLine = /^-- rows ([A-Za-z_][A-Za-z0-9_]*): (\d+)\s*$/;
     expect(lines.filter((l) => rowsLine.test(l))).toHaveLength(BACKUP_TABLE_ORDER.length);
-    // Data only: one INSERT per row after the header (a multi-line value spans lines).
+    // One INSERT per row after the header (a multi-line value spans lines).
     const inserts = lines.filter((l) => l.startsWith("INSERT INTO "));
     expect(inserts).toHaveLength(Object.values(counts).reduce((a, b) => a + b, 0));
-    expect(sql).not.toMatch(/\b(CREATE|DROP|PRAGMA|BEGIN|COMMIT)\b/);
+    // No schema beyond the triggers it drops and recreates, and no PRAGMA or transaction.
+    expect(lines.filter((l) => /^(CREATE|DROP)\b/.test(l)).every((l) => /^(DROP TRIGGER IF EXISTS|CREATE TRIGGER) /.test(l))).toBe(true);
+    expect(sql).not.toMatch(/\b(PRAGMA|BEGIN TRANSACTION|COMMIT)\b/);
   });
 
   it("an empty database still lists every table with 0 rows", async () => {
     const { sql } = await dumpDatabase(d1, NOW);
     expect(sql).toContain("-- rows user: 0\n");
-    expect(sql).not.toContain("INSERT");
+    expect(sql).not.toContain("INSERT INTO");
   });
 
   it("restores into a fresh migrated database with the same rows in every table", async () => {
@@ -142,15 +155,112 @@ describe("dumpDatabase", () => {
         const n = (fresh.sqlite.prepare(`SELECT count(*) AS n FROM "${table}"`).get() as { n: number }).n;
         expect(n, table).toBe(counts[table]);
       }
-      // Values survive the round trip (push_subscriptions.last_seen_at aside:
-      // its insert trigger stamps the restore time).
-      for (const table of BACKUP_TABLE_ORDER.filter((t) => t !== "push_subscriptions")) {
+      // Values survive the round trip, push_subscriptions.last_seen_at included:
+      // the file restores with the triggers off.
+      for (const table of BACKUP_TABLE_ORDER) {
         const read = (db: SqliteD1) => db.sqlite.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all();
         expect(read(fresh), table).toEqual(read(d1));
       }
     } finally {
       fresh.close();
     }
+  });
+});
+
+describe("dumpDatabase restores faithfully, triggers bypassed as the copy left them", () => {
+  /** Rows today's triggers would trim or refuse, written with the triggers off (as the copy did). */
+  function seedTriggerBypassingRows(db: SqliteD1, userId: string): void {
+    const triggers = db.sqlite
+      .prepare(`SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('push_subscriptions', 'streak_days')`)
+      .all() as { name: string; sql: string }[];
+    for (const t of triggers) db.sqlite.exec(`DROP TRIGGER "${t.name}"`);
+    const push = db.sqlite.prepare(
+      "INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth_secret, last_seen_at) VALUES (?, ?, 'p', 's', ?)",
+    );
+    for (let i = 0; i < 11; i++) {
+      push.run(userId, `https://fcm.googleapis.com/fcm/send/${i}`, `2026-11-${String(i + 1).padStart(2, "0")}T08:00:00.000Z`);
+    }
+    db.sqlite.prepare("INSERT INTO streak_days (user_id, review_date) VALUES (?, '2099-01-01')").run(userId);
+    for (const t of triggers) db.sqlite.exec(t.sql);
+  }
+
+  it("11 push rows for one user and a 2099 streak date restore with identical counts and values", async () => {
+    const alice = createTestUser(d1, { username: "alice_1" });
+    seedTriggerBypassingRows(d1, alice);
+    const { sql, counts } = await dumpDatabase(d1, NOW);
+    expect(counts).toMatchObject({ push_subscriptions: 11, streak_days: 1 });
+
+    const fresh = createSqliteD1();
+    try {
+      fresh.sqlite.exec(sql);
+      for (const table of BACKUP_TABLE_ORDER) {
+        const read = (db: SqliteD1) => db.sqlite.prepare(`SELECT * FROM "${table}" ORDER BY rowid`).all();
+        expect(read(fresh), table).toEqual(read(d1));
+      }
+    } finally {
+      fresh.close();
+    }
+  });
+
+  it("drops the database's triggers before the rows and recreates them verbatim after", async () => {
+    const { sql } = await dumpDatabase(d1, NOW);
+    const triggers = d1.sqlite
+      .prepare("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' ORDER BY rowid")
+      .all() as { name: string; sql: string }[];
+    expect(triggers.map((t) => t.name).sort()).toEqual(parseMigrationTriggers(migrationTexts()).map(([n]) => n).sort());
+    for (const t of triggers) expect(sql).toContain(`DROP TRIGGER IF EXISTS "${t.name}";`);
+    for (const t of triggers) expect(sql).toContain(`${t.sql};`);
+
+    const fresh = createSqliteD1();
+    try {
+      fresh.sqlite.exec(sql);
+      const after = fresh.sqlite
+        .prepare("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' ORDER BY name")
+        .all();
+      expect(after).toEqual(
+        d1.sqlite.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' ORDER BY name").all(),
+      );
+    } finally {
+      fresh.close();
+    }
+  });
+
+  it("pages by rowid, so a table larger than a page is read whole and in order", async () => {
+    const alice = createTestUser(d1, { username: "alice_1" });
+    const insert = d1.sqlite.prepare(
+      "INSERT INTO grade_log (user_id, occurred_at, entry_date, card_type, grade, subject_key) VALUES (?, ?, '2026-11-19', 'name', 4, '1')",
+    );
+    for (let i = 0; i < 2501; i++) insert.run(alice, 1_000 + i);
+    d1.sqlite.prepare("DELETE FROM grade_log WHERE occurred_at % 7 = 0").run();
+    const pages: number[] = [];
+    const seen: number[] = [];
+    await readTablePages(d1, "grade_log", (columns, rows) => {
+      pages.push(rows.length);
+      const at = columns.indexOf("occurred_at");
+      for (const row of rows) seen.push(row[at] as number);
+      expect(columns).not.toContain("_backup_rowid");
+    });
+    const expected = (d1.sqlite.prepare("SELECT occurred_at FROM grade_log ORDER BY rowid").all() as { occurred_at: number }[]).map((r) => r.occurred_at);
+    expect(seen).toEqual(expected);
+    expect(pages.length).toBe(3);
+  });
+
+  it("pages with WHERE rowid > ?, not OFFSET", async () => {
+    const queries: string[] = [];
+    const spy = new Proxy(d1, {
+      get(target, prop, receiver) {
+        if (prop === "prepare") {
+          return (query: string) => {
+            queries.push(query);
+            return target.prepare(query);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    await readTablePages(spy, "user", () => {});
+    expect(queries.some((q) => /WHERE rowid > \?/.test(q))).toBe(true);
+    expect(queries.some((q) => /OFFSET/i.test(q))).toBe(false);
   });
 });
 

@@ -329,6 +329,13 @@ on one.
 - **WHEN** a backup file is restored into a fresh test database
 - **THEN** every table has the same row count as the source
 
+#### Scenario: Rows today's triggers would refuse
+
+- **WHEN** the database holds rows the copy kept with triggers bypassed, such as 11 push subscriptions
+  for one user or a streak date in 2099
+- **THEN** the file drops the triggers before its rows and recreates them verbatim after, so the
+  restore keeps every such row, with identical counts and values
+
 #### Scenario: No R2 read token yet
 
 - **WHEN** the restore job runs before its token is set
