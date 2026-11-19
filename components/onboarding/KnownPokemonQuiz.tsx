@@ -107,7 +107,7 @@ function KnownPokemonCard({ card, selected, onToggle }: KnownPokemonCardProps) {
 
 type Props = {
   /**
-   * Authenticated Supabase client, or null for guest mode / superuser
+   * Authenticated data client, or null for guest mode / superuser
    * write-guard. Forwarded to `usePerGradeSync` directly so the quiz honours
    * the same null-guard semantics as `ReviewSession`.
    */

@@ -113,7 +113,10 @@ behaviours that passed unit tests, CI, and review).
 ### State coverage
 
 When a fresh preview can't reach a data-dependent state, drive it via QA-seed scenarios (#1326) or
-superuser flags (see [superuser.md](superuser.md)). Verify locale switched, seed applied, empty
+superuser flags (see [superuser.md](superuser.md)). Signed-in test accounts on the preview Worker
+come from `scripts/cloudflare/seed-preview.mjs` (two fixed test users with some progress, written
+to the preview D1 database; never a copy of real data). The Supabase-era `qa:seed-cloud` seeder
+was removed with Supabase (move-to-cloudflare). Verify locale switched, seed applied, empty
 branch, eyeballing exempted surfaces too (memory: `feedback_verify_core_mechanics_by_running_app`).
 
 ### Locale coverage

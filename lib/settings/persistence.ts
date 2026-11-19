@@ -304,7 +304,7 @@ export type UserSettings = {
   /**
    * Practice scope (#333). Persisted from `components/review/ScopeControl`.
    * `EMPTY_SCOPE` ({ gens: [], types: [], presets: [] }) means "no
-   * restriction". Carried into Supabase by the existing settings JSONB
+   * restriction". Carried to the cloud by the existing settings JSONB
    * sync (LWW), so scope follows the user across devices for free.
    *
    * Schema lives in `lib/review/scope.ts` next to the scope helpers.
@@ -1152,7 +1152,7 @@ export function loadSettings(): UserSettings {
 /**
  * Fires on every successful `saveSettings` write. The detail carries the
  * settings object that was just persisted. Consumed by
- * `components/sync/AutoSyncOnChange.tsx` to push the change to Supabase
+ * `components/sync/AutoSyncOnChange.tsx` to push the change to the cloud
  * without waiting for the next manual Sync (#319).
  */
 export const SETTINGS_SAVED_EVENT = "poke-memory:settings-saved";

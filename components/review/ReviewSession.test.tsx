@@ -6145,7 +6145,7 @@ describe("undo hold wiring for signed-in users (#2052)", () => {
       writable: true,
     });
     upserts = [];
-    // Recording fake Supabase: every cloud write lands in `upserts`.
+    // Recording fake data client: every cloud write lands in `upserts`.
     mockAuthValue.current = {
       user: { id: "user-1" },
       db: {

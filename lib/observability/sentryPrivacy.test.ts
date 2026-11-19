@@ -53,8 +53,6 @@ describe("every Sentry.init takes its environment from DEPLOY_ENV", () => {
     vi.resetModules();
     vi.unstubAllEnvs();
     vi.stubEnv("SENTRY_ENVIRONMENT", undefined);
-    vi.stubEnv("VERCEL_ENV", undefined);
-    vi.stubEnv("NEXT_PUBLIC_VERCEL_ENV", undefined);
   });
 
   it.each(INIT_MODULES)("%s on the preview Worker", async (_name, load) => {
@@ -66,14 +64,13 @@ describe("every Sentry.init takes its environment from DEPLOY_ENV", () => {
     vi.unstubAllEnvs();
   });
 
-  it.each(INIT_MODULES)("%s falls back to the Vercel name without it", async (_name, load) => {
+  it.each(INIT_MODULES)("%s falls back to NODE_ENV without it", async (_name, load) => {
     vi.stubEnv("DEPLOY_ENV", undefined);
     vi.stubEnv("NEXT_PUBLIC_DEPLOY_ENV", undefined);
-    vi.stubEnv("VERCEL_ENV", "production");
-    vi.stubEnv("NEXT_PUBLIC_VERCEL_ENV", "production");
+    vi.stubEnv("NODE_ENV", "development");
     await load();
     const options = mockInit.mock.calls[0][0] as Record<string, unknown>;
-    expect(options.environment).toBe("vercel-production");
+    expect(options.environment).toBe("development");
     vi.unstubAllEnvs();
   });
 });
@@ -168,27 +165,12 @@ describe("stripUrlQueryAndFragment", () => {
 
 describe("sentryEnvironment", () => {
   it("uses DEPLOY_ENV as is on Cloudflare", () => {
-    expect(sentryEnvironment("cloudflare-production", undefined, "production")).toBe(
-      "cloudflare-production",
-    );
-    expect(sentryEnvironment("cloudflare-preview", undefined, "production")).toBe(
-      "cloudflare-preview",
-    );
+    expect(sentryEnvironment("cloudflare-production", "production")).toBe("cloudflare-production");
+    expect(sentryEnvironment("cloudflare-preview", "production")).toBe("cloudflare-preview");
   });
 
-  it("prefers DEPLOY_ENV over a Vercel env", () => {
-    expect(sentryEnvironment("cloudflare-production", "production", "production")).toBe(
-      "cloudflare-production",
-    );
-  });
-
-  it("keeps the v10 vercel-* names when there is no DEPLOY_ENV", () => {
-    expect(sentryEnvironment(undefined, "production", "production")).toBe("vercel-production");
-    expect(sentryEnvironment("", "preview", "production")).toBe("vercel-preview");
-  });
-
-  it("falls back to NODE_ENV when there is neither", () => {
-    expect(sentryEnvironment(undefined, undefined, "development")).toBe("development");
-    expect(sentryEnvironment("", "", "test")).toBe("test");
+  it("falls back to NODE_ENV without DEPLOY_ENV", () => {
+    expect(sentryEnvironment(undefined, "development")).toBe("development");
+    expect(sentryEnvironment("", "test")).toBe("test");
   });
 });

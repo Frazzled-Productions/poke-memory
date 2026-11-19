@@ -4,7 +4,7 @@
  * Verifies that all user-facing strings flow through useTranslations() and
  * render the correct values in English and Japanese.
  *
- * The page has heavy dependencies on localStorage, Supabase, and animated
+ * The page has heavy dependencies on localStorage, the auth context, and animated
  * child components. All of these are mocked so the tests are fast and focused
  * purely on the i18n wiring.
  */

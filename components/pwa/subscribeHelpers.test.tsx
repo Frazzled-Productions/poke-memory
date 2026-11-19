@@ -47,7 +47,7 @@ describe("urlBase64ToUint8Array", () => {
 // ---------------------------------------------------------------------------
 
 /**
- * A minimal Supabase client stub.
+ * A minimal data client stub.
  */
 function makeMockClient(opts: {
   selectData?: { endpoint: string } | null;

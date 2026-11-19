@@ -14,7 +14,7 @@
  *   1. `NEXT_PUBLIC_E2E_AUTH_MOCK` must be exactly `"1"`.
  *   2. `process.env.NODE_ENV` must NOT be `"production"`.
  *
- * Both conditions are checked by `isMockAuthEnabled()`. Production Vercel
+ * Both conditions are checked by `isMockAuthEnabled()`. Production
  * builds run with `NODE_ENV === "production"`, so even if the flag were ever
  * set there the seam would stay inert. As defence-in-depth,
  * `assertMockAuthNotInProduction()` is invoked from `next.config.ts` and fails

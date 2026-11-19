@@ -52,10 +52,8 @@ export const ALLOWED_PATHS = [
   // This rule and its test hold the patterns as data.
   "scripts/check-scoped-queries.mjs",
   "scripts/check-scoped-queries.test.mjs",
-  // The Postgres-era suites and scripts. They talk to Supabase/Postgres, not
-  // D1, and are removed with db/migrations/ after the 14-day fallback (design D3).
-  "lib/sync/integration/",
-  "scripts/qa-seed-cloud.ts",
+  // The Postgres-era scripts. They talk to Postgres, not D1, and are removed
+  // with db/migrations/ after the 14-day fallback (design D3).
   "scripts/refresh-user-count.mjs",
   "scripts/check-migrations.mjs",
   ".github/scripts/check-grade-log-divergence.mjs",

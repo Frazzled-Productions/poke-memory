@@ -19,7 +19,7 @@
  * arguments when a superuser flag is on, using the same stub pattern that
  * AutoSyncOnChange.test.tsx and useSignInPull.test.tsx use.
  *
- * Out of scope: real Supabase sessions, OAuth redirects, or the content of
+ * Out of scope: real sessions, OAuth redirects, or the content of
  * the superuser Developer panel UI.
  */
 

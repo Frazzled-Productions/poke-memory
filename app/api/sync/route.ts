@@ -34,7 +34,7 @@ const MAX_GRADE_LOG_ENTRIES = 200;
 //      a non-2xx as a failure and keeps the unsynced queue intact.
 //
 // To make path #2 reliable each batch is retried up to BATCH_RETRIES times
-// before being declared failed, so a transient Supabase blip does not turn
+// before being declared failed, so a transient database blip does not turn
 // into a user-visible "Sync failed" banner. Structural errors (42xxx, 23505,
 // 23503) break out of the retry loop immediately and return HTTP 409 (#1358).
 //

@@ -58,7 +58,7 @@ describe("sql-table", () => {
     " * Upserts a single card into card_reviews.",
     "/* SELECT * FROM card_reviews */",
     'it("upserts into card_reviews with the correct onConflict columns", () => {});',
-    "const { data } = await supabase.from(\"card_reviews\").select();",
+    "const { data } = await client.from(\"card_reviews\").select();",
     "const label = 'Sign in to your account from any device';",
     "const text = `Pulled from user settings`;",
     "await forUser(db, id).update('user_settings', { settings }, []);",

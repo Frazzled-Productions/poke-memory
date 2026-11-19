@@ -87,7 +87,7 @@ describe("findUnorderedRanges (fixtures)", () => {
   });
 });
 
-describe("paginated Supabase queries are ordered", () => {
+describe("paginated cloud queries are ordered", () => {
   const root = join(__dirname, "..", "..");
   const files = [...walk(join(root, "lib")), ...walk(join(root, "app", "api"))];
 

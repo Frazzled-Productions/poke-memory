@@ -78,7 +78,7 @@ describe("resetAllProgress - cooldown error path", () => {
 
   it("returns false when the RPC returns the cooldown SQLSTATE P0001", async () => {
     // PostgreSQL RAISE EXCEPTION ... USING ERRCODE = 'P0001' surfaces through
-    // Supabase/PostgREST as a PostgrestError with code 'P0001'. The function
+    // the gateway as a DbError with code 'P0001'. The function
     // must surface this as a failure without throwing.
     const cooldownError = {
       code: "P0001",

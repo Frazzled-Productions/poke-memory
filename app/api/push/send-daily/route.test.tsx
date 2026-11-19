@@ -103,7 +103,7 @@ const ALL_ENABLED_SETTINGS: Record<string, unknown> = {
 };
 
 /**
- * Build a thenable-style Supabase mock that returns the given fixtures.
+ * Build a thenable-style mock (the former Postgres RPC shapes) that returns the given fixtures.
  * Since #1100 the route reads through two SECURITY DEFINER RPCs (migration
  * 046) and only the dead-endpoint DELETE still goes through `.from()`:
  *

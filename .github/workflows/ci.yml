@@ -252,7 +252,7 @@ jobs:
     # Cloudflare account, no secrets and no QA project. The database lives in the
     # runner's .wrangler/ folder and goes with it, so nothing needs tearing down,
     # and the job runs on fork and Dependabot PRs too (it used to skip them for
-    # want of the QA Supabase secrets).
+    # want of the QA project's secrets).
     #
     # Builds its OWN Worker: the shared `next-build` artifact from the `test` job
     # is a plain `next build`, not the Worker bundle.

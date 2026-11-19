@@ -621,7 +621,7 @@ export function buildSessionQueues(
   today: string,
   eligibleCardIds?: ReadonlySet<number>,
   /** Per-user salt for `stableShuffleForDay`. Authenticated users pass their
-   *  Supabase `user.id`; guests pass the stable per-device value from
+   *  account `user.id`; guests pass the stable per-device value from
    *  `getOrCreateClientSalt()`. Omitting it (or passing `""`) reproduces the
    *  legacy behaviour - same shuffle for all users on the same day. */
   userSalt: string | number = "",

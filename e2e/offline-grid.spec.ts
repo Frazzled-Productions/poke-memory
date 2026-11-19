@@ -37,7 +37,7 @@
  * - serviceWorkers: 'allow' (the default). Never use page.route stubs for
  *   SW-mediated fetches - the SW bypasses them (#1650 / AGENTS.md).
  * - Requires a production build (the SW only registers in production). The
- *   e2e CI job runs against a Vercel preview (production build), so the SW is
+ *   e2e CI job runs against a production build, so the SW is
  *   active. Locally, the spec will be skipped unless PLAYWRIGHT_BASE_URL points
  *   at a preview/prod build.
  */
@@ -51,7 +51,7 @@ import { addOnboardingPreDismiss } from "./helpers/onboarding";
 // against a local dev server (next dev), so this describe block restricts
 // itself to chromium and documents the production-build dependency.
 //
-// The spec will pass in CI (Vercel preview = production build) and locally
+// The spec will pass in CI (a production build) and locally
 // when PLAYWRIGHT_BASE_URL points at a preview or production deployment.
 // ---------------------------------------------------------------------------
 

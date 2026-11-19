@@ -24,7 +24,7 @@ import {
 import type { ReactElement } from "react";
 import { waitFor, fireEvent, act, cleanup } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { User } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/types";
 import type { DataClient } from "@/lib/db/client";
 import {
   DEFAULT_SETTINGS,
@@ -79,7 +79,7 @@ import { PushOptIn } from "@/components/pwa/PushOptIn";
 // Shared fixtures
 // ---------------------------------------------------------------------------
 
-const FAKE_USER = { id: "00000000-0000-0000-0000-000000000001" } as User;
+const FAKE_USER = { id: "00000000-0000-0000-0000-000000000001" } as AppUser;
 const FAKE_CLIENT = {} as DataClient;
 
 function setNotificationPermission(value: NotificationPermission) {

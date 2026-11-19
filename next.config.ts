@@ -28,20 +28,11 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version ?? "dev",
   },
-  // /whats-new reads CHANGELOG.md via fs at render time. The path is dynamic
-  // (process.cwd() + filename), which @vercel/nft may not statically trace, so
-  // include it explicitly so the file ships with the deployment in any
-  // output mode.
-  //
-  // The service worker is NO LONGER a route: it is built to a static
+  // The service worker is not a route: it is built to a static
   // `public/sw/sw.js` asset by `scripts/build-sw.mjs` (post-`next build`) and
-  // served by Vercel's CDN, so there is no serverless function and therefore
-  // no file-trace gap to patch (the previous `/sw/[path]` entry that forced
-  // `next/dist/server/config.js` into the function bundle is gone, #1752,
-  // superseding the #1751 hotfix for #1749).
-  outputFileTracingIncludes: {
-    "/whats-new": ["./CHANGELOG.md"],
-  },
+  // served from the Worker's static assets (#1752). /whats-new needs no file
+  // either: CHANGELOG.md is inlined into a module at build time
+  // (scripts/generate-changelog-module.mjs), since Workers have no filesystem.
   // Headers for the statically-generated service-worker script (built to
   // public/sw/ by scripts/build-sw.mjs).
   //

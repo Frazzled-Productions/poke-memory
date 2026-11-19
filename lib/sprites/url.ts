@@ -4,7 +4,7 @@
  * - `spriteVariantUrl` - returns the pre-generated WebP path for a given
  *   species ID and render width. These are static files committed under
  *   `public/sprites/pokemon/webp/<id>/<width>.webp` and served directly
- *   without any Vercel Image Optimisation transformation.
+ *   without any image optimisation transformation.
  *
  * - `spriteGridSrcSet` - returns a DPR-aware `srcset` string for the Pokédex
  *   grid tile (64 CSS px). Uses the 64 px WebP for 1x, 120 px for 2x, and

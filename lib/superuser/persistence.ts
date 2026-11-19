@@ -115,7 +115,7 @@ export function anyFlagTrue(flags: SuperuserFlags): boolean {
 // Also returns true while the cleanup-pending marker is set (#1854 F16): this
 // keeps cloud writes suppressed from the moment flags are persisted as all-off
 // until exitCleanup completes successfully, preventing QA-seeded data from
-// reaching Supabase during a degraded or in-progress cleanup.
+// reaching the cloud during a degraded or in-progress cleanup.
 export function isAnyFlagOn(): boolean {
   const cleanupPending = readLocalStorage(
     KEY_SUPERUSER_CLEANUP_PENDING,

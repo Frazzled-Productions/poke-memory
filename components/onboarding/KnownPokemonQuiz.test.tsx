@@ -82,7 +82,7 @@ vi.mock("@/lib/gradelog/persistence", async () => {
 });
 
 // Stub the per-grade sync hook so we can verify enqueueGrade is called once
-// per applied card without standing up a real Supabase client.
+// per applied card without standing up a real data client.
 const enqueueGradeSpy = vi.fn();
 
 vi.mock("@/lib/sync/usePerGradeSync", () => ({

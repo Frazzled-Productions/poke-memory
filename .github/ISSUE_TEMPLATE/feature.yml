@@ -63,7 +63,7 @@ body:
         - sync / persistence
         - SRS scheduler
         - PokéAPI / sprites
-        - Supabase schema or RLS
+        - database schema or access rules
         - workflow / CI / repo automation
         - docs
         - other / not sure

@@ -73,7 +73,7 @@ type StreakDayRow = { user_id: string; review_date: string };
 const POSTGREST_MAX_ROWS = 1000;
 
 /**
- * Builds a Supabase admin-client mock covering the two RPCs the route
+ * Builds a mock (the former Postgres RPC shapes) covering the two RPCs the route
  * calls (get_push_targets, get_push_streak_days)
  * plus the dead-endpoint DELETE.
  */

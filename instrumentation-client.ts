@@ -23,16 +23,13 @@ Sentry.init({
   dataCollection: SENTRY_DATA_COLLECTION,
   beforeSend: scrubSentryEvent,
 
-  // cloudflare-production / cloudflare-preview from DEPLOY_ENV, else the v10
-  // Vercel names (lib/observability/sentryPrivacy.ts).
-  environment: sentryEnvironment(
-    process.env.NEXT_PUBLIC_DEPLOY_ENV,
-    process.env.NEXT_PUBLIC_VERCEL_ENV,
-  ),
+  // cloudflare-production / cloudflare-preview from DEPLOY_ENV, else NODE_ENV
+  // (lib/observability/sentryPrivacy.ts).
+  environment: sentryEnvironment(process.env.NEXT_PUBLIC_DEPLOY_ENV),
 
   // Capture a small fraction of page-load and navigation transactions.
   // Override at deploy time via NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE env var
-  // (must carry the NEXT_PUBLIC_ prefix so Vercel inlines it into the browser
+  // (must carry the NEXT_PUBLIC_ prefix so `next build` inlines it into the browser
   // bundle; the non-public SENTRY_TRACES_SAMPLE_RATE is only available
   // server-side and is always undefined in the browser).
   tracesSampleRate:

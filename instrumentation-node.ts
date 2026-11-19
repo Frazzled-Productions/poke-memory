@@ -26,10 +26,10 @@ Sentry.init({
   dataCollection: SENTRY_DATA_COLLECTION,
   beforeSend: scrubSentryEvent,
 
-  // cloudflare-production / cloudflare-preview from DEPLOY_ENV, else the v10
-  // Vercel names (lib/observability/sentryPrivacy.ts).
+  // cloudflare-production / cloudflare-preview from DEPLOY_ENV, else NODE_ENV
+  // (lib/observability/sentryPrivacy.ts).
   environment: process.env.SENTRY_ENVIRONMENT ??
-    sentryEnvironment(process.env.DEPLOY_ENV, process.env.VERCEL_ENV),
+    sentryEnvironment(process.env.DEPLOY_ENV),
 
   // Capture a small fraction of transactions for performance monitoring.
   // Override at deploy time via SENTRY_TRACES_SAMPLE_RATE env var.

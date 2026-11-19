@@ -257,7 +257,7 @@ describe("pullSettingsWithTimestamp", () => {
   });
 
   it("coerces a missing updated_at key to null rather than propagating undefined", async () => {
-    // If Supabase ever omits the key (e.g. schema drift), undefined must not
+    // If the database ever omits the key (e.g. schema drift), undefined must not
     // leak into pullAndMerge where `undefined !== null` would be mistaken for
     // a real newer timestamp, causing the cursor to stall and re-apply forever.
     const { client } = makeClientWithMaybeSingle({ settings: SAMPLE });

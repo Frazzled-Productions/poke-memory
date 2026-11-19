@@ -17,8 +17,8 @@
  *   without a cold-start network round-trip. (#1803)
  * - Runtime-caches sprites cache-first and navigations/seed data
  *   stale-while-revalidate (was network-first with a 10 s timeout before #1803),
- *   per the policy in `lib/pwa/cacheStrategy.ts`. Cross-origin requests (Supabase
- *   sync) are never cached, so the best-effort sync model is unchanged.
+ *   per the policy in `lib/pwa/cacheStrategy.ts`. Cross-origin requests are
+ *   never cached, so the best-effort sync model is unchanged.
  * - Versions every cache via `SW_CACHE_VERSION`. Bumping it changes every
  *   cache name, so a deploy that needs a clean slate orphans the old caches;
  *   the `ExpirationPlugin` and the client update prompt handle the rest.
@@ -229,7 +229,7 @@ declare const self: ServiceWorkerScope;
 /**
  * `dpl`-stripping cache-key normalisation plugin for the `/_next/image` route.
  *
- * In production on Vercel, Next.js appends `&dpl=<NEXT_DEPLOYMENT_ID>` to
+ * When a deployment id is set (NEXT_DEPLOYMENT_ID), Next.js appends `&dpl=<NEXT_DEPLOYMENT_ID>` to
  * every `/_next/image?...` request URL (confirmed in
  * `node_modules/next/dist/shared/lib/image-loader.js`, line 106):
  *

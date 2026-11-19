@@ -100,7 +100,7 @@ export type PracticeScope = {
 
 /**
  * Pre-#333 storage key. The scope is now folded into `UserSettings` and
- * synced with the rest of settings via Supabase. The legacy key is read
+ * synced with the rest of settings via the cloud sync. The legacy key is read
  * once by `loadSettings` on first run after deploy and then cleared - see
  * `readLegacyScope` / `clearLegacyScope` below.
  */

@@ -1798,7 +1798,7 @@ describe("SettingsPage - statutory trading disclosure in About section (#1565 Pa
 // and the amber border when sync has failed.
 // ---------------------------------------------------------------------------
 
-/** A minimal Supabase-shaped user fixture for account-block tests. */
+/** A minimal AppUser-shaped fixture for account-block tests. */
 function makeUser(overrides?: Record<string, unknown>) {
   return {
     id: "user-123",

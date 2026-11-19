@@ -3,7 +3,7 @@ import { pullPushSubscriptionCount } from "./pushSubscriptions";
 import type { DataClient } from "@/lib/db/client";
 
 // ---------------------------------------------------------------------------
-// Minimal Supabase client mock factory
+// Minimal data client mock factory
 // ---------------------------------------------------------------------------
 
 type MockQueryBuilder = {
@@ -56,7 +56,7 @@ describe("pullPushSubscriptionCount", () => {
     expect(result).toBe(0);
   });
 
-  it("returns 0 when count is null but error is null (Supabase returns null count for empty set)", async () => {
+  it("returns 0 when count is null but error is null (the client returns null count for an empty set)", async () => {
     const { client } = makeMockClient({ count: null, error: null });
 
     const result = await pullPushSubscriptionCount(client, FAKE_USER_ID);
@@ -64,9 +64,9 @@ describe("pullPushSubscriptionCount", () => {
     expect(result).toBe(0);
   });
 
-  // ─── error path: Supabase error ──────────────────────────────────────────
+  // ─── error path: database error ──────────────────────────────────────────
 
-  it("returns null when Supabase returns an error object", async () => {
+  it("returns null when the client returns an error object", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { client } = makeMockClient({ count: null, error: { message: "DB error", code: "PGRST" } });
 
@@ -79,7 +79,7 @@ describe("pullPushSubscriptionCount", () => {
 
   // ─── error path: thrown exception ────────────────────────────────────────
 
-  it("returns null when the Supabase call throws (network error)", async () => {
+  it("returns null when the client call throws (network error)", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const builder = {

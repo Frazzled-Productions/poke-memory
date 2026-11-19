@@ -386,7 +386,7 @@ describe("hidden_since (#333) round-trip", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
-  it("pushSession sends hidden_since to Supabase", async () => {
+  it("pushSession sends hidden_since to the cloud", async () => {
     const client = makeDataClient();
     const card = makeCard(11, "2026-05-01", "2026-05-08", "2026-05-09");
     const ok = await pushSession(client, "user-1", [card]);
@@ -411,7 +411,7 @@ describe("hidden_since (#333) round-trip", () => {
     expect(batchArg[0].hidden_since).toBeNull();
   });
 
-  it("pushSingleCard sends hidden_since to Supabase", async () => {
+  it("pushSingleCard sends hidden_since to the cloud", async () => {
     const client = makeDataClient();
     const card = makeCard(13, "2026-05-01", "2026-05-08", "2026-05-09");
     const ok = await pushSingleCard(client, "user-1", card);
@@ -449,7 +449,7 @@ describe("seen_in_pasture (#350) round-trip", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
-  it("pushSession sends seen_in_pasture=true to Supabase", async () => {
+  it("pushSession sends seen_in_pasture=true to the cloud", async () => {
     const client = makeDataClient();
     const card = makeCard(31, "2026-05-01", "2026-05-08", null, true);
     const ok = await pushSession(client, "user-1", [card]);
@@ -472,7 +472,7 @@ describe("seen_in_pasture (#350) round-trip", () => {
     expect(batchArg[0].seen_in_pasture).toBe(false);
   });
 
-  it("pushSingleCard sends seen_in_pasture=true to Supabase", async () => {
+  it("pushSingleCard sends seen_in_pasture=true to the cloud", async () => {
     const client = makeDataClient();
     const card = makeCard(33, "2026-05-01", "2026-05-08", null, true);
     const ok = await pushSingleCard(client, "user-1", card);

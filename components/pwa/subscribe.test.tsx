@@ -168,7 +168,7 @@ function makeClient(): {
     failDelete: false,
   };
   function makeDeleteChain() {
-    // Supabase delete().eq().eq() returns a thenable on each chain step. We
+    // The data client's delete().eq().eq() returns a thenable on each chain step. We
     // model it as a builder whose `.eq` returns the same shape and which
     // resolves when awaited, regardless of how many .eq calls were chained.
     const filters: Array<{ col: string; val: unknown }> = [];
@@ -311,7 +311,7 @@ describe("subscribeToPush", () => {
     expect(call.rows.endpoint).toBe("https://push.example/existing");
   });
 
-  it("returns persist-failed when the Supabase delete errors", async () => {
+  it("returns persist-failed when the database delete errors", async () => {
     const registration = makeRegistration(null);
     Object.defineProperty(navigator, "serviceWorker", {
       value: { ready: Promise.resolve(registration) },
@@ -325,7 +325,7 @@ describe("subscribeToPush", () => {
     expect(harness.insertCalls).toHaveLength(0);
   });
 
-  it("returns persist-failed when the Supabase insert errors", async () => {
+  it("returns persist-failed when the database insert errors", async () => {
     const registration = makeRegistration(null);
     Object.defineProperty(navigator, "serviceWorker", {
       value: { ready: Promise.resolve(registration) },

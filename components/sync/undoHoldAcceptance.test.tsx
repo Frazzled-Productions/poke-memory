@@ -1,10 +1,10 @@
 /**
- * #2052 acceptance scenarios, end to end over an in-memory fake Supabase.
+ * #2052 acceptance scenarios, end to end over an in-memory fake cloud database.
  *
  * Real: usePerGradeSync (the hold), AutoSyncOnChange (the grade-log push
  * listener), appendGradeEntry / removeGradeEntry (with fake IndexedDB),
  * pushSingleCard / pushGradeLog, pullAndMerge, the session store.
- * Fake: the Supabase client (tables in memory, the migration 002 regression
+ * Fake: the data client (tables in memory, the migration 002 regression
  * trigger emulated on card_reviews, ON CONFLICT DO NOTHING on grade_log) and
  * the seed loader (empty seed: the merge only needs the cards we save).
  *
@@ -44,12 +44,12 @@ import { nextReview, type Grade, type ReviewState } from "@/lib/srs/scheduler";
 import { __resetForTests } from "@/lib/idb/db";
 
 // ---------------------------------------------------------------------------
-// In-memory fake Supabase
+// In-memory fake cloud database
 // ---------------------------------------------------------------------------
 
 type Row = Record<string, unknown>;
 
-class FakeSupabase {
+class FakeCloud {
   cardReviews = new Map<string, Row>();
   gradeLog = new Map<number, Row>();
   /** Every card_reviews upsert that reached the "server", in order. */
@@ -193,7 +193,7 @@ function fsrsFields(s: ReviewState) {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe("#2052 acceptance: undo leaves no trace in the cloud", () => {
-  let cloud: FakeSupabase;
+  let cloud: FakeCloud;
   let now: Date;
   let pre: ReviewableCard;
 
@@ -237,7 +237,7 @@ describe("#2052 acceptance: undo leaves no trace in the cloud", () => {
     window.localStorage.clear();
     now = new Date();
     pre = baseCard(preGradeState(now));
-    cloud = new FakeSupabase();
+    cloud = new FakeCloud();
     clientHolder.client = cloud as unknown as DataClient;
     // The cloud already holds the pre-grade state, written 2 days ago; this
     // device pulled it 1 day ago (so local and cloud agree at the start).
