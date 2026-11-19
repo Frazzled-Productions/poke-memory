@@ -1,6 +1,6 @@
 ---
 description: Take ONE linear change from issue to a correctly-formed qa PR - issue-first, branch off qa, implement, run the pre-PR gate, open a Closes-#N PR into qa, dispatch code-reviewer, enable auto-merge.
-allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, Agent, EnterWorktree, mcp__supabase__apply_migration]
+allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, Agent, EnterWorktree]
 ---
 
 # Ship

@@ -46,7 +46,7 @@ Custom agents live in `.claude/agents/`. Invoke via the Agent tool with `subagen
 | [next16-expert](.claude/agents/next16-expert.md) | Next.js 16 API, caching, routing, rendering questions | Yes |
 | [pokeapi-expert](.claude/agents/pokeapi-expert.md) | PokéAPI endpoint selection, schemas, caching strategy - low-frequency: the dataset is build-time-seeded, so invoke only when changing the seed script or adding a data category | Yes |
 | [srs-expert](.claude/agents/srs-expert.md) | Spaced-repetition algorithm design and scheduler-code review (data-coder implements) | No |
-| [supabase-expert](.claude/agents/supabase-expert.md) | Supabase Auth + RLS + schema design for persisted user data (currently FSRS scheduling state on `card_reviews`, plus `streak_days`, `user_settings`, `grade_log`) | Yes |
+| [supabase-expert](.claude/agents/supabase-expert.md) | Schema and authorisation design for persisted user data on Cloudflare D1 (migrations in `db/d1/migrations/`, the per-user scope helper `lib/db/scope.ts`, cross-user queries in `lib/db/system.ts`, Better Auth tables; currently FSRS scheduling state on `card_reviews`, plus `streak_days`, `user_settings`, `grade_log`). The name is kept from before the move to Cloudflare | Yes |
 | [researcher](.claude/agents/researcher.md) | Generalist investigation that doesn't fit a specialist | Yes |
 | [ui-coder](.claude/agents/ui-coder.md) | Pages, layouts, components, styling | No |
 | [data-coder](.claude/agents/data-coder.md) | API routes, Server Actions, persistence, integrations | No |
@@ -73,7 +73,7 @@ Moved out of `AGENTS.md` (2026-10-14). Default routing for which agent edits wha
 | Server Actions | data-coder (implementation), ui-coder (call sites) |
 | SRS scheduler | srs-expert designs the algorithm; data-coder implements + persists |
 | PokéAPI integration | pokeapi-expert designs endpoints/caching; data-coder implements |
-| Supabase schema / RLS | supabase-expert designs; data-coder implements |
+| D1 schema / scope helper (`db/d1/migrations/`, `lib/db/**`) | supabase-expert designs; data-coder implements |
 | Privacy notice / Terms / `docs/` compliance files (`dpia.md`, `childrens-code-assessment.md`, `cookies-pecr.md`); any third-party SDK/service install that could collect, transmit, or log personal data (analytics, error monitoring, messaging, A/B testing) | privacy-expert advises (read-only); ui-coder edits the `/privacy` and `/terms` pages, orchestrator edits the `docs/` compliance files |
 | Multi-locale work (`pokemonNameLocale`, `appLocale`, transliteration, message catalogs, locale routing, locale-aware sync, adding a new locale) | i18n-expert advises (read-only); data-coder implements settings/sync/seed changes, ui-coder implements rendering, catalogs, and `<lang>` placement |
 | Onboarding / discoverability surfaces (`components/onboarding/**`, empty states, locked-state UI, first-contact flows, nav affordances) | ux-advisor advises (read-only); ui-coder implements |
@@ -125,7 +125,7 @@ When *not* to use a sub-agent: small one-off edits, single-file changes, or anyt
 
 **`ux-advisor` before writing onboarding/discoverability code.** On the same design-time pattern as `workflow-expert` before GitHub Actions, invoke `ux-advisor` on the brief **before** dispatching the implementer for any change that adds a user-facing feature, changes how something is displayed, or changes how something is accessed/discovered. The planner's testability + first-contact UX pre-flight (#1276) names this hook; any discoverability gap `ux-advisor` cannot resolve from the existing code becomes a `[USER-DECISION]` open question or a dedicated acceptance criterion. At review time, `code-reviewer` raises a new surface with no declared discovery path as a Concern (the "Discoverability" check in its step-3 list); the check lives in the agent definition.
 
-**Service Worker cache changes (#1247).** vitest cannot surface failures that only manifest under the deployed CDN's URL shape (versioned cache buckets, Vercel `dpl` image params, cache-tag expiry branches). Treat `code-reviewer` as a blocking gate, not advisory, for any change under `app/sw.ts`, `app/sw/**`, or `lib/pwa/**`. See retros #1166 and #1168 for the cases that prompted this.
+**Service Worker cache changes (#1247).** vitest cannot surface failures that only manifest under the deployed CDN's URL shape (versioned cache buckets, host-added image query params such as Vercel's former `dpl`, cache-tag expiry branches). Treat `code-reviewer` as a blocking gate, not advisory, for any change under `app/sw.ts`, `app/sw/**`, or `lib/pwa/**`. See retros #1166 and #1168 for the cases that prompted this.
 
 **Orchestration entrypoints - `/batch-issues` and `/ship`.** Two local slash-commands run the playbook end-to-end so the gate, the in-session `code-reviewer` pass, the issue-first cross-check, and branch-off-`qa` are not re-derived by hand each time:
 
@@ -315,8 +315,8 @@ The functional Playwright projects are `chromium`, `mobile-safari`, `desktop-web
 `e2e/auth.spec.ts` exercises the **signed-in** UI in a real browser without a
 real OAuth handshake (issue #751, Option 2 of #742). It relies on a test-only
 seam in `lib/auth/mockAuth.ts` that makes `AuthProvider` return a hard-coded
-fake `User` plus a fake `SupabaseClient` whose `.from()` calls resolve from an
-in-memory fixture.
+fake `User` plus a fake data client (`DataClient`, `lib/db/client.ts`) whose
+`.from()` calls resolve from an in-memory fixture.
 
 - **Activation**: the seam activates only when `NEXT_PUBLIC_E2E_AUTH_MOCK === "1"`
   AND `process.env.NODE_ENV !== "production"`. Both conditions are checked by
@@ -668,7 +668,7 @@ If `issues` events are recent but `push` events stopped 15+ minutes ago, the thr
 These do **not** recover dispatch during an active throttle window:
 
 - `gh pr close <N> && gh pr reopen <N>` - `pull_request: reopened` is also suppressed.
-- Pushing an empty commit to the PR branch - `push` events are suppressed, so `pull_request: synchronize` does not fire. Vercel picks up the commit but GitHub Actions does not.
+- Pushing an empty commit to the PR branch - `push` events are suppressed, so `pull_request: synchronize` does not fire. (At the time Vercel still picked up the commit; since the move to Cloudflare the preview deploy is a GitHub Actions job too, so nothing does.)
 
 ### Recovery procedure
 
