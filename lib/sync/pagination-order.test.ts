@@ -102,7 +102,6 @@ describe("paginated Supabase queries are ordered", () => {
         "lib/sync/gradeLog.ts",
         "app/api/export/route.ts",
         "app/api/push/send-daily/route.ts",
-        "app/api/srs/optimize/route.ts",
       ]),
     );
   });

@@ -6,3 +6,10 @@
   Service-Worker-Allowed: /
 /sw/sw.js.map
   Cache-Control: no-cache
+
+# Cloudflare Workers static-asset headers. Mirrors the /fsrs/* rule in
+# next.config.ts headers(), which the Next server applies only to requests it
+# handles; static assets are served before it runs.
+/fsrs/*
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin

@@ -25,6 +25,10 @@ const eslintConfig = defineConfig([
     // Cloudflare build output and wrangler's local state (decision 0018).
     ".open-next/**",
     ".wrangler/**",
+    // Generated FSRS optimiser bundles (scripts/build-fsrs-optimiser.mjs;
+    // gitignored) and the vendored, unmodified wasm binding loaders.
+    "public/fsrs/**",
+    "vendor/**",
   ]),
   // Baseline for adopting ESLint into CI (#614). The react-hooks plugin v7
   // (bundled with eslint-config-next 16) ships several new rules at `error`

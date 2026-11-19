@@ -15,8 +15,8 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
  *
  * Two error-body shapes exist among the callers: routes with an `ok`
  * envelope (`/api/sync`, `/api/push/resubscribe`) return
- * `{ ok: false, error: "unauthorized" }`; the rest (`/api/export`,
- * `/api/srs/optimize`) return `{ error: "unauthorized" }`. Pass
+ * `{ ok: false, error: "unauthorized" }`; the rest (`/api/export`) return
+ * `{ error: "unauthorized" }`. Pass
  * `withOkField: true` for the former.
  */
 export async function requireAuth(

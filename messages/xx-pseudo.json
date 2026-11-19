@@ -289,7 +289,37 @@
       "lowStorageProceed": "[Download anyway]"
     },
     "optimizerCooldown": "[{count, plural, one {Next optimisation in # day} other {Next optimisation in # days}}]",
-    "optimizerRetryAfter": "[{count, plural, one {Try again in # day.} other {Try again in # days.}}]",
+    "optimiser": {
+      "heading": "[Personalise my schedule]",
+      "signInPrompt": "[Sign in to enable personalised scheduling.]",
+      "intro": "[Tune scheduling to your memory using your full review history.]",
+      "notEnoughIntro": "[We need enough review history to tune the weights meaningfully.]",
+      "optimiseNow": "[Optimise now]",
+      "availableAfter": "[Available after about {min, number} reviews. You have {count, number}.]",
+      "pausedButton": "[Sync paused (superuser)]",
+      "pausedTitle": "[Optimisation is paused while a superuser flag is on.]",
+      "lastOptimised": "[Last optimised: {date}]",
+      "page": {
+        "description": "[This fits the scheduler's weights to your own review history. It runs in this browser and can take a minute.]",
+        "backToSettings": "[Back to settings]",
+        "loading": "[Loading your reviews…]",
+        "signedOut": "[Sign in to personalise your schedule. The optimiser uses the review history saved to your account.]",
+        "paused": "[Optimisation is paused while a superuser flag is on. Turn the flags off to run it.]",
+        "unsupported": "[This browser can't run the optimiser. Try a recent version of Chrome, Edge, Firefox or Safari.]",
+        "notEnough": "[You have {count, number} reviews the optimiser can use. It needs about {min, number}.]",
+        "ready": "[{count, plural, one {# review is ready to use.} other {# reviews are ready to use.}}]",
+        "fitting": "[Fitting your weights… this can take a minute.]",
+        "progress": "[{percent, number}% done]",
+        "saving": "[Saving your new weights…]",
+        "success": "[Done. Your schedule now uses weights fitted to your reviews.]",
+        "errorNotEnoughData": "[There isn't enough variety in your reviews yet. Keep studying and try again in a few weeks.]",
+        "errorLoad": "[Couldn't load your reviews. Check your connection and try again.]",
+        "errorSave": "[The weights were fitted but couldn't be saved. Check your connection and try again.]",
+        "errorFailed": "[Couldn't optimise. Try again later.]",
+        "errorDetail": "[Details: {detail}]",
+        "tryAgain": "[Try again]"
+      }
+    },
     "backup": {
       "heading": "[Backup]",
       "exportLabel": "[Export progress]",

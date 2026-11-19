@@ -7,9 +7,9 @@
   },
   "scripts": {
     "preinstall": "node scripts/check-node-version.mjs",
-    "dev": "node scripts/generate-changelog-module.mjs && next dev",
+    "dev": "node scripts/generate-changelog-module.mjs && node scripts/build-fsrs-optimiser.mjs && next dev",
     "prebuild": "node scripts/check-node-version.mjs",
-    "build": "node scripts/generate-changelog-module.mjs && next build && node scripts/build-sw.mjs",
+    "build": "node scripts/generate-changelog-module.mjs && node scripts/build-fsrs-optimiser.mjs && next build && node scripts/build-sw.mjs",
     "start": "next start",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
@@ -52,7 +52,9 @@
     "lint:scoped-queries": "node scripts/check-scoped-queries.mjs"
   },
   "dependencies": {
-    "@open-spaced-repetition/binding": "^0.5.0",
+    "@emnapi/core": "^1.11.3",
+    "@emnapi/runtime": "^1.11.3",
+    "@napi-rs/wasm-runtime": "^1.2.7",
     "@opennextjs/cloudflare": "^1.20.17",
     "@sentry/nextjs": "^11.1.0",
     "@supabase/ssr": "^0.12.7",

@@ -289,7 +289,37 @@
       "lowStorageProceed": "仍然下载"
     },
     "optimizerCooldown": "{count, plural, other {下次优化还需 # 天}}",
-    "optimizerRetryAfter": "{count, plural, other {请在 # 天后重试。}}",
+    "optimiser": {
+      "heading": "个性化我的复习计划",
+      "signInPrompt": "登录后即可使用个性化复习计划。",
+      "intro": "根据你的完整复习记录,让复习计划贴合你的记忆。",
+      "notEnoughIntro": "需要足够的复习记录才能有意义地调整权重。",
+      "optimiseNow": "立即优化",
+      "availableAfter": "约 {min, number} 次复习后可用。你目前有 {count, number} 次。",
+      "pausedButton": "同步已暂停(超级用户)",
+      "pausedTitle": "超级用户标志开启期间暂停优化。",
+      "lastOptimised": "上次优化:{date}",
+      "page": {
+        "description": "这会根据你自己的复习记录拟合调度器的权重。它在此浏览器中运行,可能需要一分钟左右。",
+        "backToSettings": "返回设置",
+        "loading": "正在加载你的复习记录…",
+        "signedOut": "登录后即可个性化你的复习计划。优化器使用保存在你账户中的复习记录。",
+        "paused": "超级用户标志开启期间暂停优化。关闭这些标志后即可运行。",
+        "unsupported": "此浏览器无法运行优化器。请尝试最新版的 Chrome、Edge、Firefox 或 Safari。",
+        "notEnough": "你有 {count, number} 次复习可供优化器使用,大约需要 {min, number} 次。",
+        "ready": "{count, plural, other {有 # 次复习可供使用。}}",
+        "fitting": "正在拟合你的权重…可能需要一分钟左右。",
+        "progress": "已完成 {percent, number}%",
+        "saving": "正在保存新的权重…",
+        "success": "完成。你的复习计划现在使用根据你的复习拟合的权重。",
+        "errorNotEnoughData": "你的复习记录还不够多样。继续学习,几周后再试。",
+        "errorLoad": "无法加载你的复习记录。请检查网络连接后重试。",
+        "errorSave": "权重已拟合,但无法保存。请检查网络连接后重试。",
+        "errorFailed": "无法优化。请稍后再试。",
+        "errorDetail": "详情:{detail}",
+        "tryAgain": "重试"
+      }
+    },
     "backup": {
       "heading": "备份",
       "exportLabel": "导出进度",

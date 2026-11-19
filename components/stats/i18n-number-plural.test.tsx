@@ -278,7 +278,6 @@ const defaultOptimizerProps = {
   optimizableReviewCount: 300,
   isSignedIn: true,
   superuserPaused: false,
-  onOptimized: vi.fn(),
 };
 
 describe("FsrsOptimizerSection - cooldown locale coverage (#1408)", () => {

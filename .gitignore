@@ -23,6 +23,10 @@
 # regenerated on every build incl. CI/Vercel, so not committed, #1752)
 /public/sw/
 
+# generated FSRS optimiser worker bundles + wasm (scripts/build-fsrs-optimiser.mjs,
+# run by `npm run build` and `npm run dev`)
+/public/fsrs/
+
 # production
 /build
 

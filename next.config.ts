@@ -25,24 +25,6 @@ const nextConfig: NextConfig = {
   // PR #1318 lands (unmerged, and with it a render mismatch is still logged).
   // Turn it back on only once that fix is released and tested on Workers.
   cacheComponents: false,
-  // The FSRS optimizer route loads @open-spaced-repetition/binding which
-  // ships a native Node.js binary (.node). Mark it (and its platform-specific
-  // sub-package) as server-external so Next.js/Turbopack does not attempt to
-  // bundle them - they are loaded at runtime by Node's native addon loader.
-  serverExternalPackages: [
-    "@open-spaced-repetition/binding",
-    "@open-spaced-repetition/binding-android-arm64",
-    "@open-spaced-repetition/binding-darwin-arm64",
-    "@open-spaced-repetition/binding-darwin-x64",
-    "@open-spaced-repetition/binding-linux-arm64-gnu",
-    "@open-spaced-repetition/binding-linux-arm64-musl",
-    "@open-spaced-repetition/binding-linux-x64-gnu",
-    "@open-spaced-repetition/binding-linux-x64-musl",
-    "@open-spaced-repetition/binding-wasm32-wasi",
-    "@open-spaced-repetition/binding-win32-arm64-msvc",
-    "@open-spaced-repetition/binding-win32-ia32-msvc",
-    "@open-spaced-repetition/binding-win32-x64-msvc",
-  ],
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version ?? "dev",
   },
@@ -82,6 +64,29 @@ const nextConfig: NextConfig = {
       {
         source: "/sw/sw.js.map",
         headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+      // The FSRS optimiser page runs the threaded wasm binding, which needs a
+      // shared WebAssembly.Memory and so a cross-origin-isolated page (D7 of
+      // openspec/changes/move-to-cloudflare). Only this path is isolated, so
+      // cross-origin resources elsewhere keep loading. Link to it with a plain
+      // <a>, not next/link: isolation is set per document load.
+      {
+        source: "/settings/optimiser",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+        ],
+      },
+      // Its worker scripts and wasm (scripts/build-fsrs-optimiser.mjs). A
+      // dedicated worker started from an isolated page needs its own COEP.
+      // On Workers static assets these come from public/_headers instead,
+      // because assets are served before the Next server sees the request.
+      {
+        source: "/fsrs/:path*",
+        headers: [
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+        ],
       },
     ];
   },
