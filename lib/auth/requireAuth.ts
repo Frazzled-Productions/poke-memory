@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Shared `getUser()` + 401 guard for authenticated API routes.
@@ -20,9 +21,14 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
  * `withOkField: true` for the former.
  */
 export async function requireAuth(
-  supabase: SupabaseClient,
+  source: SupabaseClient | Request,
   options: { withOkField?: boolean } = {},
 ): Promise<{ user: User } | NextResponse> {
+  // TEMPORARY adapter (cf-routes): routes call requireAuth(request, options),
+  // the signature the Better Auth version of this file takes. Replaced
+  // wholesale by the cf-auth change at merge.
+  const supabase =
+    source instanceof Request ? ((await createClient()) as unknown as SupabaseClient) : source;
   const {
     data: { user },
     error: authError,

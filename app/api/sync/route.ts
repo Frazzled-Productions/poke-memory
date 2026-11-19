@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { requireAuth } from "@/lib/auth/requireAuth";
+import { getDb } from "@/lib/db/env";
+import { toDbError } from "@/lib/db/errors";
+import { forUser, type ScopedDb } from "@/lib/db/scope";
 import type { CloudRow } from "@/lib/sync/cloud";
 import { CARD_REVIEWS_CONFLICT_COLS, isStructuralError } from "@/lib/sync/cloud";
 import {
@@ -36,6 +37,11 @@ const MAX_GRADE_LOG_ENTRIES = 200;
 // before being declared failed, so a transient Supabase blip does not turn
 // into a user-visible "Sync failed" banner. Structural errors (42xxx, 23505,
 // 23503) break out of the retry loop immediately and return HTTP 409 (#1358).
+//
+// The service worker's Background Sync replay (app/sw.ts) posts the same
+// { cards } body here, so the request and response shapes must not change.
+// Every read and write goes through forUser (lib/db/scope.ts), pinned to the
+// session user.
 export async function POST(request: Request) {
   const parsed = await parseJsonBody<BeaconPayload>(request);
   if (parsed instanceof NextResponse) return parsed;
@@ -45,13 +51,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_payload" }, { status: 400 });
   }
 
-  // Cast to untyped SupabaseClient - Database is a stub type (unknown) in this
-  // repo, which causes the typed upsert to expect never[]. The untyped client
-  // matches the pattern used throughout lib/sync/cloud.ts.
-  const supabase = (await createClient()) as unknown as SupabaseClient;
-  const auth = await requireAuth(supabase, { withOkField: true });
+  const auth = await requireAuth(request, { withOkField: true });
   if (auth instanceof NextResponse) return auth;
-  const { user } = auth;
+  const db = forUser(await getDb(), auth.user.id);
 
   // Grade-log leg (#2052). The pagehide beacon is the only place a committed
   // held grade's grade_log row can leave the device once the page is going
@@ -60,42 +62,33 @@ export async function POST(request: Request) {
   // waits on it; it is awaited only after the card leg has produced its
   // response (including on every early return, via `finally`). It never
   // rejects and never changes the response status.
-  const gradeLogDone = upsertGradeLog(supabase, user.id, payload.gradeLog);
+  const gradeLogDone = upsertGradeLog(db, payload.gradeLog);
   try {
-    return await syncCards(supabase, user.id, payload.cards);
+    return await syncCards(db, payload.cards);
   } finally {
     await gradeLogDone;
   }
 }
 
 /** Upserts the beacon's grade-log entries. Best-effort: never throws. */
-async function upsertGradeLog(
-  supabase: SupabaseClient,
-  userId: string,
-  raw: unknown,
-): Promise<void> {
+async function upsertGradeLog(db: ScopedDb, raw: unknown): Promise<void> {
   if (!Array.isArray(raw)) return;
   const entries = raw.filter(isGradeLogEntry).slice(0, MAX_GRADE_LOG_ENTRIES);
   if (entries.length === 0) return;
   try {
-    const { error } = await supabase.from("grade_log").upsert(
-      entries.map((e) => toGradeLogDbRow(userId, e)),
+    await db.upsert(
+      "grade_log",
+      entries.map((e) => toGradeLogDbRow(db.userId, e)),
       { onConflict: GRADE_LOG_CONFLICT_COLS, ignoreDuplicates: true },
     );
-    if (error) {
-      console.warn(`[sync/route] grade_log upsert failed (SQLSTATE ${error.code}): ${error.message}`);
-    }
   } catch (err) {
-    console.warn("[sync/route] grade_log upsert threw", err);
+    const error = toDbError(err);
+    console.warn(`[sync/route] grade_log upsert failed (SQLSTATE ${error.code}): ${error.message}`);
   }
 }
 
 /** The card_reviews leg: the primary contract, with retries and structural-error handling. */
-async function syncCards(
-  supabase: SupabaseClient,
-  userId: string,
-  rows: CloudRow[],
-): Promise<NextResponse> {
+async function syncCards(db: ScopedDb, rows: CloudRow[]): Promise<NextResponse> {
   if (rows.length === 0) {
     return NextResponse.json({ ok: true });
   }
@@ -103,7 +96,7 @@ async function syncCards(
   // BATCH is sized larger than the 100 reviews/day soft cap as a defensive
   // measure - guards against future limit changes without requiring code updates.
   const BATCH = 200;
-  // Bounded retry to absorb transient Supabase failures. A permanent failure
+  // Bounded retry to absorb transient database failures. A permanent failure
   // (RLS regression, constraint violation) will still bubble up after the
   // attempts are exhausted, but with N=3 a flaky network blip on a single
   // batch is unlikely to surface to the user as a sync failure.
@@ -122,7 +115,7 @@ async function syncCards(
   /** Build a single DB row from a CloudRow, ready for upsert. */
   function toDbRow(r: CloudRow) {
     return {
-      user_id: userId,
+      user_id: db.userId,
       card_type: r.card_type,
       subject_key: r.subject_key,
       // Migration 029 field - coalesce absent key to "en" for pre-migration clients
@@ -152,61 +145,61 @@ async function syncCards(
     };
   }
 
+  /** One upsert; null on success, otherwise the error with its Postgres-style code. */
+  async function tryUpsert(batch: ReturnType<typeof toDbRow> | ReturnType<typeof toDbRow>[]) {
+    try {
+      await db.upsert("card_reviews", batch, { onConflict: CARD_REVIEWS_CONFLICT_COLS });
+      return null;
+    } catch (err) {
+      return toDbError(err);
+    }
+  }
+
   outerLoop:
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH).map(toDbRow);
     let batchOk = false;
     for (let attempt = 0; attempt < BATCH_RETRIES; attempt++) {
-      try {
-        const { error } = await supabase
-          .from("card_reviews")
-          .upsert(batch, { onConflict: CARD_REVIEWS_CONFLICT_COLS });
-        if (!error) {
-          batchOk = true;
-          break;
-        }
-        if (isStructuralError(error)) {
-          // Structural errors are never transient - do not retry. Log for error
-          // monitoring and break both loops to return a 409 immediately.
-          console.error(
-            `[sync/route] structural error on card_reviews upsert (SQLSTATE ${error.code}): ${error.message}`
-          );
-          structuralErrorCode = error.code;
-          allOk = false;
-          break outerLoop;
-        }
-        // 23514 = check_violation from the regression trigger. One stale row
-        // in the batch aborts the entire Postgres statement, preventing 199
-        // valid rows from landing. Fall back to per-row upserts so a single
-        // rejected row cannot poison the batch (F23 / #1856).
-        if (error.code === "23514") {
-          let batchHadGoodRow = false;
-          for (const row of batch) {
-            try {
-              const { error: rowError } = await supabase
-                .from("card_reviews")
-                .upsert(row, { onConflict: CARD_REVIEWS_CONFLICT_COLS });
-              if (!rowError) {
-                batchHadGoodRow = true;
-              } else if (rowError.code !== "23514") {
-                // Unexpected error on an individual row - log but continue.
-                console.warn(
-                  `[sync/route] per-row upsert error (SQLSTATE ${rowError.code}): ${rowError.message}`
-                );
-              }
-              // 23514 on an individual row: silently skip (the cloud row is newer).
-            } catch {
-              // Best-effort: per-row network error, skip and continue.
-            }
-          }
-          // Count the batch as ok when at least one row landed; individual
-          // rejections are intentional evictions, not failures.
-          if (batchHadGoodRow) batchOk = true;
-          break; // per-row fallback is its own retry; exit the attempt loop.
-        }
-      } catch {
-        // Network-level error - fall through to retry.
+      const error = await tryUpsert(batch);
+      if (!error) {
+        batchOk = true;
+        break;
       }
+      // isStructuralError reads only `code`, the same Postgres-style codes DbError carries.
+      if (isStructuralError(error as unknown as Parameters<typeof isStructuralError>[0])) {
+        // Structural errors are never transient - do not retry. Log for error
+        // monitoring and break both loops to return a 409 immediately.
+        console.error(
+          `[sync/route] structural error on card_reviews upsert (SQLSTATE ${error.code}): ${error.message}`
+        );
+        structuralErrorCode = error.code;
+        allOk = false;
+        break outerLoop;
+      }
+      // 23514 = check_violation from the regression trigger. One stale row
+      // in the batch aborts the whole atomic batch, preventing 199 valid rows
+      // from landing. Fall back to per-row upserts so a single rejected row
+      // cannot poison the batch (F23 / #1856).
+      if (error.code === "23514") {
+        let batchHadGoodRow = false;
+        for (const row of batch) {
+          const rowError = await tryUpsert(row);
+          if (!rowError) {
+            batchHadGoodRow = true;
+          } else if (rowError.code !== "23514") {
+            // Unexpected error on an individual row - log but continue.
+            console.warn(
+              `[sync/route] per-row upsert error (SQLSTATE ${rowError.code}): ${rowError.message}`
+            );
+          }
+          // 23514 on an individual row: silently skip (the cloud row is newer).
+        }
+        // Count the batch as ok when at least one row landed; individual
+        // rejections are intentional evictions, not failures.
+        if (batchHadGoodRow) batchOk = true;
+        break; // per-row fallback is its own retry; exit the attempt loop.
+      }
+      // Any other error may be transient - fall through to retry.
       if (attempt < BATCH_RETRIES - 1) {
         await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
       }

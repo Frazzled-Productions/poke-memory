@@ -1,37 +1,53 @@
 /**
- * Tests for POST /api/sync
- *
- * Verifies auth rejection, malformed/oversized request handling, partial-payload
- * behaviour, and the upsert path. The route does not call revalidateTag - it is
- * a write-only beacon endpoint with no cache-invalidation side effects, and these
- * tests confirm that absence.
+ * Tests for POST /api/sync on D1 (design D4): auth rejection, malformed
+ * request handling, partial payloads, batching, retries and structural
+ * errors, against the D1 test database through forUser. The service worker's
+ * Background Sync replay (app/sw.ts) posts the same { cards } body, so the
+ * request and response shapes are pinned here.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { NextResponse } from "next/server";
 
-// ---------------------------------------------------------------------------
-// Module mocks - hoisted so vi.mock runs before imports.
-// ---------------------------------------------------------------------------
-
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn(),
+const { getCloudflareContext, requireAuth } = vi.hoisted(() => ({
+  getCloudflareContext: vi.fn(),
+  requireAuth: vi.fn(),
 }));
+vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext }));
+vi.mock("@/lib/auth/requireAuth", () => ({ requireAuth }));
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
 
-vi.mock("next/cache", () => ({
-  revalidateTag: vi.fn(),
-}));
-
-// ---------------------------------------------------------------------------
-// Imports after mocks.
-// ---------------------------------------------------------------------------
 import { POST } from "./route";
-import { createClient } from "@/lib/supabase/server";
 import { revalidateTag } from "next/cache";
-import { CARD_REVIEWS_CONFLICT_COLS } from "@/lib/sync/cloud";
+import { forUser } from "@/lib/db/scope";
+import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
+import { spyD1, type SpiedD1, type SpyHooks } from "@/lib/db/testing/spyD1";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+let d1: SqliteD1;
+let db: SpiedD1;
+let alice: string;
+let bob: string;
+let sessionUser: string | null;
+
+function useDb(hooks: SpyHooks = {}) {
+  db = spyD1(d1, hooks);
+  getCloudflareContext.mockResolvedValue({ env: { DB: db }, ctx: { waitUntil: vi.fn() } });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  d1 = createSqliteD1();
+  alice = createTestUser(d1);
+  bob = createTestUser(d1);
+  sessionUser = alice;
+  useDb();
+  requireAuth.mockImplementation(async (_request: Request, options: { withOkField?: boolean } = {}) =>
+    sessionUser
+      ? { user: { id: sessionUser } }
+      : NextResponse.json(options.withOkField ? { ok: false, error: "unauthorized" } : { error: "unauthorized" }, { status: 401 }),
+  );
+});
+afterEach(() => d1.close());
 
 /** Minimal valid CloudRow for use in request bodies. */
 function makeCard(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -54,7 +70,6 @@ function makeCard(overrides: Record<string, unknown> = {}): Record<string, unkno
   };
 }
 
-/** Build a synthetic Request with a JSON body. */
 function makeRequest(body: unknown): Request {
   return new Request("http://localhost/api/sync", {
     method: "POST",
@@ -63,7 +78,6 @@ function makeRequest(body: unknown): Request {
   });
 }
 
-/** Build a synthetic Request with a raw (non-JSON) body. */
 function makeRawRequest(body: string): Request {
   return new Request("http://localhost/api/sync", {
     method: "POST",
@@ -72,264 +86,183 @@ function makeRawRequest(body: string): Request {
   });
 }
 
-function makeSupabaseMock(overrides: {
-  user?: { id: string } | null;
-} = {}) {
-  const upsertMock = vi.fn().mockResolvedValue({ error: null });
+const cardsOf = (userId: string) =>
+  forUser(d1, userId).select("card_reviews", { order: [{ column: "subject_key" }, { column: "locale" }] });
+const cardWrites = () => db.calls.filter((c) => c.table === "card_reviews");
 
-  const fromMock = vi.fn(() => ({
-    upsert: upsertMock,
-  }));
-
-  const client = {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: overrides.user !== undefined ? overrides.user : { id: "user-xyz-789" } },
-        error: overrides.user === null ? new Error("no session") : null,
-      }),
-    },
-    from: fromMock,
-  };
-
-  (createClient as ReturnType<typeof vi.fn>).mockResolvedValue(client);
-  return { client, fromMock, upsertMock };
+/** Runs POST with fake timers so the 100 ms retry delays pass at once. */
+async function postWithTimers(body: unknown) {
+  vi.useFakeTimers();
+  try {
+    const pending = POST(makeRequest(body));
+    await vi.runAllTimersAsync();
+    return await pending;
+  } finally {
+    vi.useRealTimers();
+  }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe("POST /api/sync", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  // -------------------------------------------------------------------------
-  // Auth rejection
-  // -------------------------------------------------------------------------
-
-  it("returns 401 when the user is not authenticated", async () => {
-    makeSupabaseMock({ user: null });
-
+  it("returns 401 when the user is not authenticated, and writes nothing", async () => {
+    sessionUser = null;
     const res = await POST(makeRequest({ cards: [makeCard()] }));
-    const body = await res.json();
-
     expect(res.status).toBe(401);
-    expect(body.ok).toBe(false);
-    expect(body.error).toBe("unauthorized");
+    expect(await res.json()).toEqual({ ok: false, error: "unauthorized" });
+    expect(requireAuth).toHaveBeenCalledWith(expect.any(Request), { withOkField: true });
+    expect(db.calls).toEqual([]);
   });
 
-  it("does not attempt an upsert when unauthenticated", async () => {
-    const { upsertMock } = makeSupabaseMock({ user: null });
-
-    await POST(makeRequest({ cards: [makeCard()] }));
-
-    expect(upsertMock).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------------------------
-  // Malformed / invalid request body
-  // -------------------------------------------------------------------------
-
-  it("returns 400 for non-JSON body", async () => {
+  it("returns 400 for a non-JSON body", async () => {
     const res = await POST(makeRawRequest("not-json{{"));
-    const body = await res.json();
-
     expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
-    expect(body.error).toBe("invalid_json");
+    expect(await res.json()).toEqual({ ok: false, error: "invalid_json" });
   });
 
-  it("returns 400 when cards field is missing from payload", async () => {
-    // The route validates the payload before touching Supabase - no mock needed.
-    const res = await POST(makeRequest({ notCards: [] }));
-    const body = await res.json();
+  it.each([[{ notCards: [] }], [{ cards: "not-an-array" }], [{ cards: null }]])(
+    "returns 400 invalid_payload for %j",
+    async (body) => {
+      const res = await POST(makeRequest(body));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ ok: false, error: "invalid_payload" });
+    },
+  );
 
-    expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
-    expect(body.error).toBe("invalid_payload");
-  });
-
-  it("returns 400 when cards is not an array", async () => {
-    const res = await POST(makeRequest({ cards: "not-an-array" }));
-    const body = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
-    expect(body.error).toBe("invalid_payload");
-  });
-
-  it("returns 400 when cards is null", async () => {
-    const res = await POST(makeRequest({ cards: null }));
-    const body = await res.json();
-
-    expect(res.status).toBe(400);
-    expect(body.ok).toBe(false);
-    expect(body.error).toBe("invalid_payload");
-  });
-
-  // -------------------------------------------------------------------------
-  // Partial-payload / edge-case behaviour
-  // -------------------------------------------------------------------------
-
-  it("returns 200 with ok:true when cards array is empty (no upsert needed)", async () => {
-    const { upsertMock } = makeSupabaseMock();
-
+  it("returns 200 with ok:true for an empty cards array, touching no table", async () => {
     const res = await POST(makeRequest({ cards: [] }));
-    const body = await res.json();
-
     expect(res.status).toBe(200);
-    expect(body.ok).toBe(true);
-    // No DB call should be made for an empty payload.
-    expect(upsertMock).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ ok: true });
+    expect(db.calls).toEqual([]);
   });
 
-  it("omits seen_in_pasture from the upsert row when the field is null on the card", async () => {
-    const { upsertMock } = makeSupabaseMock();
-
-    const card = makeCard({ seen_in_pasture: null });
-    await POST(makeRequest({ cards: [card] }));
-
-    const [upsertRows] = upsertMock.mock.calls[0];
-    expect(upsertRows[0]).not.toHaveProperty("seen_in_pasture");
+  it("writes the card for the session user, with the database's updated_at", async () => {
+    const res = await POST(makeRequest({ cards: [makeCard({ updated_at: "1999-01-01T00:00:00.000Z" })] }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const [row] = await cardsOf(alice);
+    expect(row).toMatchObject({
+      user_id: alice,
+      card_type: "name",
+      subject_key: "1",
+      locale: "en",
+      stability: 1.5,
+      reps: 1,
+      due_date: "2026-05-20",
+      last_review: "2026-05-17",
+      seen_in_pasture: false,
+      hidden_since: null,
+    });
+    // updated_at is never taken from the client (migration 043, F22 / #1856).
+    expect(row.updated_at).not.toBe("1999-01-01T00:00:00.000Z");
   });
 
-  it("includes seen_in_pasture in the upsert row when the field is present", async () => {
-    const { upsertMock } = makeSupabaseMock();
-
-    const card = makeCard({ seen_in_pasture: true });
-    await POST(makeRequest({ cards: [card] }));
-
-    const [upsertRows] = upsertMock.mock.calls[0];
-    expect(upsertRows[0].seen_in_pasture).toBe(true);
+  it("keeps the stored seen_in_pasture when the card sends null, and writes it when present", async () => {
+    await POST(makeRequest({ cards: [makeCard({ seen_in_pasture: true })] }));
+    expect((await cardsOf(alice))[0].seen_in_pasture).toBe(true);
+    // A later card without the field must not trip the one-way guard (017).
+    const res = await POST(makeRequest({ cards: [makeCard({ seen_in_pasture: null, reps: 2 })] }));
+    expect(res.status).toBe(200);
+    expect((await cardsOf(alice))[0]).toMatchObject({ seen_in_pasture: true, reps: 2 });
   });
 
-  it("coalesces hidden_since to null when absent from the card", async () => {
-    const { upsertMock } = makeSupabaseMock();
-
-    // Omit hidden_since entirely to simulate an old-client payload.
-    const { hidden_since: _omit, ...cardWithoutHiddenSince } = makeCard() as {
-      hidden_since: unknown;
-      [key: string]: unknown;
-    };
-
-    await POST(makeRequest({ cards: [cardWithoutHiddenSince] }));
-
-    const [upsertRows] = upsertMock.mock.calls[0];
-    expect(upsertRows[0].hidden_since).toBeNull();
+  it("coalesces a missing hidden_since to null and a missing locale to en", async () => {
+    await POST(makeRequest({ cards: [makeCard({ hidden_since: "2026-05-01" })] }));
+    const { hidden_since: _h, ...oldClientCard } = makeCard({ reps: 2 });
+    await POST(makeRequest({ cards: [oldClientCard] }));
+    expect((await cardsOf(alice))[0]).toMatchObject({ hidden_since: null, locale: "en" });
   });
 
-  it("injects user_id into each upserted row and omits updated_at (server trigger handles it)", async () => {
-    const { upsertMock } = makeSupabaseMock({ user: { id: "user-xyz-789" } });
-
+  it("upserts on (user_id, card_type, subject_key, locale): a resend updates, a new locale inserts", async () => {
     await POST(makeRequest({ cards: [makeCard()] }));
-
-    const [upsertRows] = upsertMock.mock.calls[0];
-    expect(upsertRows[0].user_id).toBe("user-xyz-789");
-    // updated_at must NOT be sent from the client - the card_reviews_set_updated_at_trigger
-    // (migration 043) stamps it server-side to preserve the lastPullAt clock-skew anchor
-    // documented in docs/sync.md (F22 / #1856).
-    expect(upsertRows[0]).not.toHaveProperty("updated_at");
+    await POST(makeRequest({ cards: [makeCard({ reps: 2 }), makeCard({ locale: "ja" })] }));
+    const rows = await cardsOf(alice);
+    expect(rows.map((r) => [r.locale, r.reps])).toEqual([
+      ["en", 2],
+      ["ja", 1],
+    ]);
   });
 
-  it("upserts into card_reviews with the correct onConflict columns", async () => {
-    const { upsertMock, fromMock } = makeSupabaseMock();
-
-    await POST(makeRequest({ cards: [makeCard()] }));
-
-    // The route must target the card_reviews table.
-    expect(fromMock).toHaveBeenCalledWith("card_reviews");
-    // The composite conflict key must match the DB unique constraint (migration 029 adds locale).
-    expect(upsertMock).toHaveBeenCalledWith(
-      expect.any(Array),
-      { onConflict: CARD_REVIEWS_CONFLICT_COLS },
-    );
-  });
-
-  // -------------------------------------------------------------------------
-  // Batching behaviour (oversized payload)
-  // -------------------------------------------------------------------------
-
-  it("splits a payload larger than 200 cards into multiple upsert batches", async () => {
-    const { upsertMock } = makeSupabaseMock();
-
-    // 201 cards - should trigger two batches: 200 + 1.
-    const cards = Array.from({ length: 201 }, (_, i) =>
-      makeCard({ subject_key: String(i + 1) })
-    );
-
+  it("splits a payload larger than 200 cards into two batches", async () => {
+    const cards = Array.from({ length: 201 }, (_, i) => makeCard({ subject_key: String(i + 1) }));
     const res = await POST(makeRequest({ cards }));
-    const body = await res.json();
-
     expect(res.status).toBe(200);
-    expect(body.ok).toBe(true);
-    expect(upsertMock).toHaveBeenCalledTimes(2);
-
-    const [firstBatch] = upsertMock.mock.calls[0];
-    const [secondBatch] = upsertMock.mock.calls[1];
-    expect(firstBatch).toHaveLength(200);
-    expect(secondBatch).toHaveLength(1);
+    expect(await cardsOf(alice)).toHaveLength(201);
+    expect([...new Set(cardWrites().map((c) => c.batchSize))]).toEqual([200, 1]);
   });
 
-  // -------------------------------------------------------------------------
-  // Upsert failure / partial failure
-  // -------------------------------------------------------------------------
+  it("falls back to per-row upserts on a 23514 so one stale row does not block the rest", async () => {
+    await POST(makeRequest({ cards: [makeCard({ subject_key: "1", reps: 5 })] }));
+    const res = await POST(
+      makeRequest({ cards: [makeCard({ subject_key: "1", reps: 2 }), makeCard({ subject_key: "2" })] }),
+    );
+    expect(res.status).toBe(200);
+    const rows = await cardsOf(alice);
+    expect(rows.map((r) => [r.subject_key, r.reps])).toEqual([
+      ["1", 5],
+      ["2", 1],
+    ]);
+  });
 
-  it("returns 502 when all upsert attempts fail for a batch", async () => {
-    // Make every upsert attempt return an error so all BATCH_RETRIES exhaust.
-    const { fromMock } = makeSupabaseMock();
-    const upsertMock = vi.fn().mockResolvedValue({ error: new Error("db error") });
-    fromMock.mockReturnValue({ upsert: upsertMock });
-
-    // Use fake timers to avoid the 100 ms retry delay in tests.
-    vi.useFakeTimers();
-    const postPromise = POST(makeRequest({ cards: [makeCard()] }));
-    await vi.runAllTimersAsync();
-    const res = await postPromise;
-    vi.useRealTimers();
-
-    const body = await res.json();
-
+  it("returns 502 partial_failure when every attempt fails, after three tries", async () => {
+    useDb({
+      before: ({ table }) => {
+        if (table === "card_reviews") throw new Error("D1_ERROR: network connection lost");
+      },
+    });
+    const res = await postWithTimers({ cards: [makeCard()] });
     expect(res.status).toBe(502);
-    expect(body.ok).toBe(false);
-    expect(body.error).toBe("partial_failure");
+    expect(await res.json()).toEqual({ ok: false, error: "partial_failure" });
+    expect(cardWrites()).toHaveLength(3);
   });
 
-  it("returns 200 when upsert eventually succeeds after a transient failure", async () => {
-    const { fromMock } = makeSupabaseMock();
-    // First attempt fails, second succeeds.
-    const upsertMock = vi
-      .fn()
-      .mockResolvedValueOnce({ error: new Error("transient") })
-      .mockResolvedValue({ error: null });
-    fromMock.mockReturnValue({ upsert: upsertMock });
-
-    vi.useFakeTimers();
-    const postPromise = POST(makeRequest({ cards: [makeCard()] }));
-    await vi.runAllTimersAsync();
-    const res = await postPromise;
-    vi.useRealTimers();
-
-    const body = await res.json();
-
+  it("returns 200 when the upsert succeeds after a transient failure", async () => {
+    let failures = 1;
+    useDb({
+      before: ({ table }) => {
+        if (table === "card_reviews" && failures-- > 0) throw new Error("D1_ERROR: transient");
+      },
+    });
+    const res = await postWithTimers({ cards: [makeCard()] });
     expect(res.status).toBe(200);
-    expect(body.ok).toBe(true);
-    // Confirm the route retried - upsert was called more than once.
-    expect(upsertMock.mock.calls.length).toBeGreaterThan(1);
+    expect(cardWrites().length).toBeGreaterThan(1);
+    expect(await cardsOf(alice)).toHaveLength(1);
   });
 
-  // -------------------------------------------------------------------------
-  // No cache-invalidation side effects
-  // -------------------------------------------------------------------------
+  it("returns 409 at once for a structural error, without retrying", async () => {
+    useDb({
+      before: ({ table }) => {
+        if (table === "card_reviews") throw new Error("D1_ERROR: table card_reviews has no column named x");
+      },
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await POST(makeRequest({ cards: [makeCard()] }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ ok: false, error: "structural_error", code: "42703" });
+    expect(cardWrites()).toHaveLength(1);
+  });
 
   it("does not invoke revalidateTag - the sync route is write-only with no cache side effects", async () => {
-    // Regression guard: if someone adds a revalidateTag call to the sync
-    // route, this assertion fails and forces an explicit decision.
-    makeSupabaseMock();
-
     const res = await POST(makeRequest({ cards: [makeCard()] }));
-
     expect(res.status).toBe(200);
     expect(vi.mocked(revalidateTag)).not.toHaveBeenCalled();
+  });
+
+  describe("two users", () => {
+    it("user B's sync never writes or changes user A's cards, even naming A's id", async () => {
+      await POST(makeRequest({ cards: [makeCard({ reps: 3 })] }));
+      sessionUser = bob;
+      const res = await POST(makeRequest({ cards: [makeCard({ reps: 1, user_id: alice })] }));
+      // user_id in the body is ignored: the session user is pinned.
+      expect(res.status).toBe(200);
+      expect((await cardsOf(alice)).map((r) => r.reps)).toEqual([3]);
+      expect((await cardsOf(bob)).map((r) => [r.user_id, r.reps])).toEqual([[bob, 1]]);
+    });
+
+    it("the same card key for two users is two rows", async () => {
+      await POST(makeRequest({ cards: [makeCard()] }));
+      sessionUser = bob;
+      await POST(makeRequest({ cards: [makeCard({ reps: 4 })] }));
+      expect((await cardsOf(alice))[0].reps).toBe(1);
+      expect((await cardsOf(bob))[0].reps).toBe(4);
+    });
   });
 });
