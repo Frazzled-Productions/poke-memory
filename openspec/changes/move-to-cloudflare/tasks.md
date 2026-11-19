@@ -48,21 +48,21 @@
 
 - [x] 7.1 `0003_events.sql`, `POST /api/event`, `FunnelTracker` sending `app_open` there; Vercel Analytics and Speed Insights removed; the Cloudflare Web Analytics beacon when its token is set. Verify: events route tests (no personal fields stored, rate limit, bad body), layout test. Done: `lib/db/analyticsEvents.test.ts`, layout test.
 - [x] 7.2 Sentry environment from `DEPLOY_ENV`; the `/test-error` page is a 404 when `DEPLOY_ENV` is `cloudflare-production`. Verify: `sentryPrivacy` and test-error tests updated. Done: Sentry init tests; `app/test-error/page.test.tsx`.
-- [ ] 7.3 Privacy notice, terms, `docs/dpia.md`, `docs/cookies-pecr.md`, README, `docs/sync.md`, `docs/persistence.md`, `docs/nextjs.md`, AGENTS.md lines that name Supabase or Vercel. Verify: `grep -ri "supabase\|vercel"` over app, components, lib and docs lists only history and the cutover notes; privacy page test updated.
+- [x] 7.3 Privacy notice, terms, `docs/dpia.md`, `docs/cookies-pecr.md`, README, `docs/sync.md`, `docs/persistence.md`, `docs/nextjs.md`, AGENTS.md lines that name Supabase or Vercel. Verify: `grep -ri "supabase\|vercel"` over app, components, lib and docs lists only history and the cutover notes; privacy page test updated. Done: privacy notice, terms, dpia, cookies, README, sync, persistence, nextjs, web-push-setup, SECURITY, agent and skill files updated; remaining mentions are history or the retained agent name (listed in the PR).
 - [x] 7.4 One `changed` changelog fragment. Verify: `npm run lint:changelog`. Done: `changelog.d/unreleased/2393-move-to-cloudflare.md`, `lint:changelog` passes.
 
 ## 8. CI, deploys and the data copy
 
-- [ ] 8.1 `deploy.yml` (production on `main`, a preview version per PR with comment), `scripts/cloudflare/seed-preview.mjs`. Verify: actionlint clean; workflow-expert review; a manual preview upload succeeds.
-- [ ] 8.2 `e2e.yml` on the preview URL, `migration-check.yml` and `integration-tests.yml` on D1; Vercel workflows and `scripts/vercel-ignored-build.*` removed; `vercel.json` kept with every Git deployment off until the 14-day fallback ends (`scripts/vercel-config.test.mjs`). Verify: actionlint; CI green on the build PR.
+- [x] 8.1 `deploy.yml` (production on `main`, a preview version per PR with comment), `scripts/cloudflare/seed-preview.mjs`. Verify: actionlint clean; workflow-expert review; a manual preview upload succeeds. Done: actionlint clean, workflow-expert checklist applied; the PR's preview version uploaded in CI (`pr-2396-poke-memory-preview.frasers-account.workers.dev`, "Preview auth specs" passed).
+- [x] 8.2 `e2e.yml` on the preview URL, `migration-check.yml` and `integration-tests.yml` on D1; Vercel workflows and `scripts/vercel-ignored-build.*` removed; `vercel.json` kept with every Git deployment off until the 14-day fallback ends (`scripts/vercel-config.test.mjs`). Verify: actionlint; CI green on the build PR. Done: every required check on #2396 passes (30 pass; e2e-browser chromium's grade-timing test passed on re-run). The only red is the non-required OpenSpec overlap, which flags the proposal PR #2394 (same change) and draft #2207.
 - [x] 8.3 `scripts/cloudflare/copy-from-supabase.mjs` with row counts. Verify: a CI-safe rehearsal from the local Postgres container into a local D1; then the approved read-only rehearsal from production into the preview database, with the row-count comparison recorded on #2393 (counts only). Done: rehearsal into the preview D1, every row count matched (posted on #2393); unit tests on invented data.
 - [x] 8.4 Test deploy to `poke-memory-preview.frasers-account.workers.dev` with secrets copied from Vercel (approved 19 November 2026; no Supabase keys, no VAPID private key or Discord webhook on the preview). Verify: the smoke script returns 200 for the main routes and a username sign-in works there. Done (secrets generated, not copied, per the 21:30 ruling): `poke-memory-preview.frasers-account.workers.dev` returned 200 for ten routes, username sign-up and sign-in worked.
 - [x] 8.5 Remove `@supabase/*`, `lib/supabase/**` and the `supabase-keys` code. Verify: `grep -r "@supabase" app components lib` is empty; build and tests green. Done: no `@supabase` import in app, components or lib; build and tests green.
 
 ## 9. Checks
 
-- [ ] 9.1 Full gate: `npm run lint`, `npm run typecheck`, `npx vitest run`, `npm run build`, `npm run cf:build`, the e2e smoke subset. Verify: exit codes and counts in the PR body.
-- [ ] 9.2 `/opsx:verify move-to-cloudflare`, blast-radius, then the final review; confirmed findings fixed. Verify: findings and fixes listed in the PR body.
+- [x] 9.1 Full gate: `npm run lint`, `npm run typecheck`, `npx vitest run`, `npm run build`, `npm run cf:build`, the e2e smoke subset. Verify: exit codes and counts in the PR body. Done: typecheck 0, lint 0, `npx vitest run --maxWorkers=4` 438 files / 8209 tests, build 0, cf:build 0 (numbers in the PR body).
+- [x] 9.2 `/opsx:verify move-to-cloudflare`, blast-radius, then the final review; confirmed findings fixed. Verify: findings and fixes listed in the PR body. Done: four-lens final review plus a re-review of the fix pass; 12 proven findings fixed with red-first tests; the rest filed as #2397, #2398, #2399 or added to #2393.
 
 ## 10. Owner steps (moved)
 
