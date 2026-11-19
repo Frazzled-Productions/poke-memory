@@ -1,14 +1,23 @@
 name: Integration Tests
 
-# Runs DB-backed integration tests (migration apply, RLS isolation, regression
-# trigger) against a local Postgres service container.  No Supabase API calls,
-# no branch quota, $0 cost.  See lib/sync/integration/ for the test suite.
+# Runs the D1 database suite in full: the schema and trigger tests, the scope
+# helper and cross-user tests, the data gateway contract tests and the sync
+# parity tests, all against node:sqlite with db/d1/migrations applied through
+# the D1 test shim (lib/db/testing/sqliteD1.ts), plus the grade_log divergence
+# monitor's SQL. No database service, no Cloudflare account, $0 cost. Until the
+# move to Cloudflare (move-to-cloudflare, design D11) this ran the Postgres
+# suite in lib/sync/integration/ against a postgres:15 service container.
+#
+# Why it is separate from ci.yml's `test` job, which runs the same vitest
+# `node` project: on a PR `test` runs only `--changed` tests, picked by the
+# import graph. A migration is SQL read from disk, not imported, so a change to
+# db/d1/migrations/** would select none of the tests that apply it. This
+# workflow runs the whole suite whenever the cloud-write surface changes.
 #
 # Trigger (#611): the suite runs automatically on PRs that touch the
-# cloud-write surface - lib/sync/**, app/api/sync/**, db/migrations/**,
-# lib/gradelog/**, the grade_log divergence monitor script (#2096), or this
-# workflow file itself.  Path filtering keeps spend
-# bounded: only relevant PRs trigger a run.
+# cloud-write surface (see the `cloud_write` filter below) or this workflow
+# file itself. Path filtering keeps spend bounded: only relevant PRs trigger a
+# run.
 #
 # The `integration-tests` PR label remains an explicit opt-in escape hatch for
 # changes that fall outside the path filter but still need DB-level
@@ -60,13 +69,16 @@ jobs:
           filters: |
             cloud_write:
               - 'lib/sync/**'
+              - 'lib/db/**'
               - 'app/api/sync/**'
-              - 'db/migrations/**'
+              - 'app/api/db/**'
+              - 'db/d1/**'
               - 'lib/gradelog/**'
               # The divergence monitor's SQL is tested against the migrated
-              # schema by lib/sync/integration/grade-log-divergence.test.ts
-              # (#2096), so a change to the script alone must run the suite.
+              # schema by scripts/check-grade-log-divergence.test.ts (#2096),
+              # so a change to the script alone must run the suite.
               - '.github/scripts/check-grade-log-divergence.mjs'
+              - 'scripts/check-grade-log-divergence.test.ts'
               - '.github/workflows/integration-tests.yml'
 
       - name: Decide
@@ -94,22 +106,10 @@ jobs:
     permissions:
       contents: read
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: poke_memory_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
@@ -118,10 +118,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Run integration tests
-        env:
-          DATABASE_URL: postgres://postgres:testpass@localhost:5432/poke_memory_test
-        run: npm run test:integration
+      - name: Run the D1 suite
+        run: npx vitest run --project node lib/db lib/sync scripts/check-grade-log-divergence.test.ts
 
   # Aggregator (#1738): a thin, always-reporting job so `integration` can be a
   # required status check on the qa-staging ruleset without blocking PRs that
