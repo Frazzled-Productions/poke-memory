@@ -55,8 +55,11 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
   run from the Worker's schedule.
 - `srs-scheduling`: the optimiser runs in the browser on its own page.
 - `pwa-and-whats-new`: the changelog is read from a generated module.
-- `local-data-and-backup`: the privacy page names Cloudflare instead of Supabase and Vercel.
+- `local-data-and-backup`: a privacy-notice requirement: Cloudflare instead of Supabase and Vercel,
+  data at rest in the EU, deleted data can remain in backups for up to 90 days.
 - `supabase-keys`: removed (no Supabase keys remain).
+- `new-card-order`, `journey-badges-and-sharing`, `settings-onboarding-and-i18n`, `stats-and-streaks`:
+  requirements that named Supabase, RLS or the old clients now name the gateway and D1; behaviour unchanged.
 
 ## Also touches
 
@@ -169,3 +172,12 @@ assume.
   is `cloudflare-production`; the preview Worker has no Cron Triggers and no VAPID private key or
   Discord webhook. The rehearsal leaves real data in the preview database until Fraser decides to wipe
   and reseed it (Open call 4 then applies).
+- 2026-11-19 Spec review findings folded in (no owner call needed): the settings field is
+  `fsrsWeightsOptimizedAt`; VAPID required only in production; IPs from `CF-Connecting-IP`; the
+  `usernames` table moves onto Better Auth's `user`; sign-out revokes all sessions; the Discord embed's
+  dashboard link becomes the row id; the copy keeps timestamps and skips unknown push hosts; the
+  optimiser's five-minute lock goes. Dependency: `harden-push-delivery` must archive before this change,
+  because this delta modifies a requirement that change adds (its last task is in #2378).
+- 2026-11-19 Open call 5: deleted data can stay in the 90-day backups (and D1's 30-day history), which
+  the privacy notice now says instead of "deleted immediately and permanently". Assumed: disclose it, as
+  decision 0018's backups make it true.

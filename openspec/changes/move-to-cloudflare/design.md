@@ -82,6 +82,8 @@ JS for fidelity):
   same `23514` code.
 - The Discord notify trigger on feedback insert and delete (042, 051): the feedback route and the
   retention job call the notify logic directly with `ctx.waitUntil`, instead of `pg_net` from a trigger.
+  The bug embed's Supabase dashboard link becomes the feedback row id; the rest of the message is the
+  same.
 - `reset_all_progress` (018, 026 cooldown, 022 tombstone) and `delete_account` (027): JavaScript in
   `lib/db/rpc/`, each one D1 `batch()` (atomic), user id from the session only.
 
@@ -124,8 +126,8 @@ unknown tables, columns, operators and RPC names are refused. Results come back 
 count }` like supabase-js. Upserts run as one D1 `batch()` (atomic, like one Postgres statement).
 
 The RPCs the browser may call: `reset_all_progress`, `delete_account`, `merge_user_settings`. Other
-tables the browser never touched directly (`feedback`, `feedback_discord_posts`, `rate_limit_buckets`,
-`usernames`) are not on the gateway.
+tables the browser never touched directly (`feedback`, `feedback_discord_posts`, `rate_limit_buckets`)
+are not on the gateway.
 
 Alternatives: one route per operation (more churn and more test rewrites for the same security); a
 PostgREST-compatible endpoint behind supabase-js itself (keeps a Supabase dependency named for a
@@ -153,7 +155,20 @@ bcrypt hashes fade out.
 user id, so nothing is archived or merged differently.
 
 **Per-IP throttle:** username sign-up and sign-in keep the existing per-IP buckets
-(`rate_limit_buckets`, now in D1), applied in a Better Auth `before` hook.
+(`rate_limit_buckets`, now in D1), applied in a Better Auth `before` hook. The IP comes from
+`CF-Connecting-IP` (set by Cloudflare), never the first `X-Forwarded-For` value, which a client can set;
+the feedback limit uses the same header.
+
+**Usernames:** the `usernames` table goes; the username lives on Better Auth's `user` row (`username`
+column, format checked by triggers in `0002_auth.sql`).
+
+**Privacy defaults:** sessions store no IP address or user agent; OAuth tokens are not kept in plain
+text. Sign-out revokes all of the player's sessions, as Supabase's did. OAuth failures land on
+`/?error=<code>`, and the home page shows its sign-in error for any code.
+
+**Re-sign-in after the move:** a player whose device already holds progress for the same user id is
+not asked to pick local or cloud; it behaves like an ordinary sign-in on their own device (pull and
+merge).
 
 ### D7. The optimiser in the browser
 
@@ -164,12 +179,15 @@ working). The Settings section links there; the page reads the grade log through
 items (one item per review prefix, see #2392), runs `computeParameters`, and saves the weights with the
 existing settings push. The weekly limit (`OPTIMIZER_COOLDOWN_MS`) and the minimum review count stay
 in the shared `lib/srs/optimizer.ts` and are now checked in the browser and again in the settings merge
-(`fsrsOptimizedAt` may not move forward less than a week after the stored one). A browser without
+(`fsrsWeightsOptimizedAt` may not move forward less than a week after the stored one). The old route's
+five-minute in-progress lock goes: the run happens on the player's own device. The page reads the
+last-run date from the cloud settings row, as the route did, and the player's locale.. A browser without
 cross-origin isolation or wasm threads sees a plain "not supported in this browser" message.
 
 ### D8. Push, Discord and Sentry on Workers
 
-`web-push` and `@sentry/nextjs` run under `nodejs_compat` (trial). VAPID keys become Worker secrets.
+`web-push` and `@sentry/nextjs` run under `nodejs_compat` (trial). VAPID keys become Worker secrets; the private key is required only in production (elsewhere the send
+routes compute targets and log counts without failing).
 Sentry environment names change from `vercel-production`/`vercel-preview` to `cloudflare-production`/
 `cloudflare-preview` from a `DEPLOY_ENV` var; the privacy scrubbing (`lib/observability/sentryPrivacy.ts`)
 is unchanged. `maxDuration` exports are dropped (Workers ignore them; Cron Triggers allow 15 minutes).
@@ -208,7 +226,9 @@ at `poke-memory.frasers-account.workers.dev`. The Vercel-specific workflows (`qa
 `scripts/cloudflare/copy-from-supabase.mjs` reads a Postgres connection (`DATABASE_URL`, read-only) and
 writes one SQL file for `wrangler d1 execute --file`: app tables row for row, `auth.users` to `user`
 (same id, email, `username` from `usernames`), `auth.identities` to `account` (GitHub and Google, keyed
-by the provider's user id), bcrypt hashes to `credential` accounts, no sessions. It then prints row
+by the provider's user id), bcrypt hashes to `credential` accounts, no sessions. Timestamps are kept as
+they are (the push subscription triggers must not rewrite `last_seen_at` or trim rows on import), and
+push rows on an unknown host are skipped and counted, since the D1 CHECK applies to copied rows. It then prints row
 counts per table for the check. Rehearsed in CI against the local Postgres container loaded with the
 migrations and fixtures, then imported into a local D1 and compared.
 
