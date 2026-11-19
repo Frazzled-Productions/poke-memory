@@ -1,19 +1,18 @@
 /**
- * Tests for GET /api/export
- *
- * Verifies authentication guard, CSV shape, Pokémon name resolution,
- * and Supabase error handling.
+ * Tests for GET /api/export on D1: authentication guard, CSV shape, Pokémon
+ * name resolution, database error handling and two-user isolation, against
+ * the D1 test database through forUser.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { NextResponse } from "next/server";
 
-// ---------------------------------------------------------------------------
-// Module mocks - factories must not reference outer variables (hoisting rule).
-// ---------------------------------------------------------------------------
-
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn(),
+const { getCloudflareContext, requireAuth } = vi.hoisted(() => ({
+  getCloudflareContext: vi.fn(),
+  requireAuth: vi.fn(),
 }));
+vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext }));
+vi.mock("@/lib/auth/requireAuth", () => ({ requireAuth }));
 
 // Minimal seed data so name resolution is deterministic in tests without
 // pulling in the full generated.json.
@@ -27,73 +26,55 @@ vi.mock("@/lib/pokemon/seed", () => ({
   SEED_EVOLUTION_CARDS: [],
 }));
 
-// ---------------------------------------------------------------------------
-// Import after mocks.
-// ---------------------------------------------------------------------------
 import { GET } from "./route";
-import { createClient } from "@/lib/supabase/server";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+import { forUser } from "@/lib/db/scope";
+import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
+import { spyD1 } from "@/lib/db/testing/spyD1";
 
 type GradeLogRow = {
   occurred_at: number;
   entry_date: string;
   card_type: string;
   grade: number;
-  subject_key: string | null;
+  subject_key: string;
 };
 
-function makeGradeLogRows(partial: Partial<GradeLogRow>[] = []): GradeLogRow[] {
-  return partial.map((r, i) => ({
-    occurred_at: 1_000_000 + i,
-    entry_date: "2026-01-01",
-    card_type: "name",
-    grade: 4,
-    subject_key: "1",
-    ...r,
-  }));
+let d1: SqliteD1;
+let alice: string;
+let bob: string;
+let sessionUser: string | null;
+let occurred = 1_000_000;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  d1 = createSqliteD1();
+  alice = createTestUser(d1);
+  bob = createTestUser(d1);
+  sessionUser = alice;
+  getCloudflareContext.mockResolvedValue({ env: { DB: d1 } });
+  requireAuth.mockImplementation(async () =>
+    sessionUser ? { user: { id: sessionUser } } : NextResponse.json({ error: "unauthorized" }, { status: 401 }),
+  );
+});
+afterEach(() => d1.close());
+
+async function seedGradeLog(userId: string, partial: Partial<GradeLogRow>[]) {
+  if (partial.length === 0) return;
+  await forUser(d1, userId).insert(
+    "grade_log",
+    partial.map((r) => ({
+      occurred_at: occurred++,
+      entry_date: "2026-01-01",
+      card_type: "name",
+      grade: 4,
+      subject_key: "1",
+      locale: "en",
+      ...r,
+    })),
+  );
 }
 
-function makeSupabaseMock(overrides: {
-  gradeLogData?: GradeLogRow[] | null;
-  gradeLogError?: unknown;
-  user?: { id: string } | null;
-} = {}) {
-  // The grade_log query chains: .select().eq().order().order().range(from, to)
-  // fetchAllPages calls .range(from, to) as the terminal method.
-  // Return data with length < pageSize (1000) so fetchAllPages stops after one call.
-  const rangeMock = vi.fn().mockResolvedValue({
-    data: overrides.gradeLogData !== undefined ? overrides.gradeLogData : makeGradeLogRows(),
-    error: overrides.gradeLogError ?? null,
-  });
-
-  const gradeLogChain = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    range: rangeMock,
-  };
-
-  const fromMock = vi.fn((table: string) => {
-    if (table === "grade_log") return gradeLogChain;
-    throw new Error(`Unexpected table: ${table}`);
-  });
-
-  const client = {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: overrides.user !== undefined ? overrides.user : { id: "user-test-123" } },
-        error: overrides.user === null ? new Error("no session") : null,
-      }),
-    },
-    from: fromMock,
-  };
-
-  (createClient as ReturnType<typeof vi.fn>).mockResolvedValue(client);
-  return { client, fromMock, rangeMock };
-}
+const request = () => new Request("http://localhost/api/export");
 
 /** Reads the response body text and splits into lines, stripping empty lines. */
 async function csvLines(response: Response): Promise<string[]> {
@@ -101,221 +82,127 @@ async function csvLines(response: Response): Promise<string[]> {
   return text.split("\r\n").filter((l) => l !== "");
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe("GET /api/export", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("returns 401 when the user is not authenticated", async () => {
-    makeSupabaseMock({ user: null });
-
-    const response = await GET();
-
+    sessionUser = null;
+    const response = await GET(request());
     expect(response.status).toBe(401);
-    const body = await response.json() as { error: string };
-    expect(body.error).toBe("unauthorized");
+    expect(await response.json()).toEqual({ error: "unauthorized" });
   });
 
-  it("returns 503 when the Supabase query errors", async () => {
-    makeSupabaseMock({ gradeLogError: new Error("db error"), gradeLogData: null });
-
-    const response = await GET();
-
+  it("returns 503 when the database query fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    getCloudflareContext.mockResolvedValue({
+      env: {
+        DB: spyD1(d1, {
+          before: () => {
+            throw new Error("D1_ERROR: unavailable");
+          },
+        }),
+      },
+    });
+    const response = await GET(request());
     expect(response.status).toBe(503);
-    const body = await response.json() as { error: string };
-    expect(body.error).toBe("service_unavailable");
+    expect(await response.json()).toEqual({ error: "service_unavailable" });
   });
 
-  it("returns a CSV with the correct Content-Type header", async () => {
-    makeSupabaseMock({ gradeLogData: [] });
+  it("returns 503 when there is no D1 binding", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    getCloudflareContext.mockResolvedValue({ env: {} });
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+  });
 
-    const response = await GET();
-
+  it("returns a CSV with the correct Content-Type and a dated attachment filename", async () => {
+    const response = await GET(request());
     expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toContain("text/csv");
-  });
-
-  it("sets Content-Disposition attachment header with a dated filename", async () => {
-    makeSupabaseMock({ gradeLogData: [] });
-
-    const response = await GET();
-    const disposition = response.headers.get("Content-Disposition") ?? "";
-
-    expect(disposition).toMatch(/attachment;\s*filename="poke-memory-reviews-\d{4}-\d{2}-\d{2}\.csv"/);
+    expect(response.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
+    expect(response.headers.get("Content-Disposition")).toMatch(
+      /^attachment; filename="poke-memory-reviews-\d{4}-\d{2}-\d{2}\.csv"$/,
+    );
   });
 
   it("returns an empty CSV (header only) when there are no grade_log rows", async () => {
-    makeSupabaseMock({ gradeLogData: [] });
-
-    const response = await GET();
-    const lines = await csvLines(response);
-
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toBe("date,pokemon,card_type,grade,grade_label");
+    const lines = await csvLines(await GET(request()));
+    expect(lines).toEqual(["date,pokemon,card_type,grade,grade_label"]);
   });
 
   it("resolves species subject_key to a Pokémon display name", async () => {
-    makeSupabaseMock({
-      gradeLogData: makeGradeLogRows([
-        { card_type: "name", subject_key: "25", grade: 4, entry_date: "2026-03-10" },
-      ]),
-    });
-
-    const response = await GET();
-    const lines = await csvLines(response);
-
-    // lines[0] is the header; lines[1] is the data row.
+    await seedGradeLog(alice, [{ card_type: "name", subject_key: "25", grade: 4, entry_date: "2026-03-10" }]);
+    const lines = await csvLines(await GET(request()));
     expect(lines).toHaveLength(2);
-    expect(lines[1]).toContain("Pikachu");
-    expect(lines[1]).toContain("name");
-    expect(lines[1]).toContain("Good");
+    expect(lines[1]).toBe("2026-03-10,Pikachu,name,4,Good");
   });
 
   it("resolves evolution-edge subject_key to a 'From -> To' label", async () => {
-    makeSupabaseMock({
-      gradeLogData: makeGradeLogRows([
-        { card_type: "evolution-edge", subject_key: "133>>>134", grade: 5 },
-      ]),
-    });
-
-    const response = await GET();
-    const lines = await csvLines(response);
-
-    expect(lines[1]).toContain("Eevee -> Vaporeon");
-    expect(lines[1]).toContain("evolution");
-    expect(lines[1]).toContain("Easy");
+    await seedGradeLog(alice, [{ card_type: "evolution-edge", subject_key: "133>>>134", grade: 5 }]);
+    const lines = await csvLines(await GET(request()));
+    expect(lines[1]).toBe("2026-01-01,Eevee -> Vaporeon,evolution,5,Easy");
   });
 
   it("maps reverse-evolution-edge card_type to 'reverse-evolution' in the CSV", async () => {
-    makeSupabaseMock({
-      gradeLogData: makeGradeLogRows([
-        { card_type: "reverse-evolution-edge", subject_key: "133>>>134", grade: 2 },
-      ]),
-    });
-
-    const response = await GET();
-    const lines = await csvLines(response);
-
-    expect(lines[1]).toContain("reverse-evolution");
-    expect(lines[1]).toContain("Hard");
+    await seedGradeLog(alice, [{ card_type: "reverse-evolution-edge", subject_key: "133>>>134", grade: 2 }]);
+    const lines = await csvLines(await GET(request()));
+    expect(lines[1]).toContain(",reverse-evolution,2,Hard");
   });
 
   it("falls back to subject_key verbatim for unknown species IDs", async () => {
-    makeSupabaseMock({
-      gradeLogData: makeGradeLogRows([
-        { card_type: "name", subject_key: "99999999" }, // not in mocked seed
-      ]),
-    });
-
-    const response = await GET();
-    const lines = await csvLines(response);
-
+    await seedGradeLog(alice, [{ card_type: "name", subject_key: "99999999" }]);
+    const lines = await csvLines(await GET(request()));
     expect(lines[1]).toContain("99999999");
   });
 
-  it("outputs an empty pokemon field when subject_key is null", async () => {
-    makeSupabaseMock({
-      gradeLogData: makeGradeLogRows([
-        { card_type: "name", subject_key: null },
-      ]),
-    });
-
-    const response = await GET();
-    const lines = await csvLines(response);
-
-    // null subject_key resolves to "" - the pokemon column is empty.
-    const fields = lines[1].split(",");
-    // date,pokemon,card_type,grade,grade_label → index 1 is pokemon
-    expect(fields[1]).toBe("");
+  it("includes all four grade labels: Again, Hard, Good, Easy", async () => {
+    await seedGradeLog(alice, [{ grade: 1 }, { grade: 2 }, { grade: 4 }, { grade: 5 }]);
+    const lines = await csvLines(await GET(request()));
+    expect(lines.slice(1).map((l) => l.split(",")[4])).toEqual(["Again", "Hard", "Good", "Easy"]);
   });
 
-  it("includes all four grade labels: Again, Hard, Good, Easy", async () => {
-    makeSupabaseMock({
-      gradeLogData: makeGradeLogRows([
-        { grade: 1 },
-        { grade: 2 },
-        { grade: 4 },
-        { grade: 5 },
-      ]),
-    });
+  it("orders rows by entry_date, then occurred_at", async () => {
+    await seedGradeLog(alice, [
+      { entry_date: "2026-02-01", occurred_at: 5, subject_key: "1" },
+      { entry_date: "2026-01-01", occurred_at: 9, subject_key: "25" },
+      { entry_date: "2026-01-01", occurred_at: 7, subject_key: "133" },
+    ]);
+    const lines = await csvLines(await GET(request()));
+    expect(lines.slice(1).map((l) => l.split(",")[1])).toEqual(["Eevee", "Pikachu", "Bulbasaur"]);
+  });
 
-    const response = await GET();
-    const lines = await csvLines(response);
-
-    const dataLines = lines.slice(1);
-    expect(dataLines.some((l) => l.includes("Again"))).toBe(true);
-    expect(dataLines.some((l) => l.includes("Hard"))).toBe(true);
-    expect(dataLines.some((l) => l.includes("Good"))).toBe(true);
-    expect(dataLines.some((l) => l.includes("Easy"))).toBe(true);
+  it("exports every row, past the old 1000-row page size", async () => {
+    await seedGradeLog(alice, Array.from({ length: 1205 }, () => ({})));
+    const lines = await csvLines(await GET(request()));
+    expect(lines).toHaveLength(1206);
   });
 
   it("sets Cache-Control: no-store on the response", async () => {
-    makeSupabaseMock({ gradeLogData: [] });
-
-    const response = await GET();
-
+    const response = await GET(request());
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
   it("escapes a field value that contains a double-quote (RFC 4180)", async () => {
-    makeSupabaseMock({
-      // Inject a custom subject_key that will fail species parsing (non-numeric)
-      // and be used verbatim - the verbatim value contains a double-quote to
-      // test csvField quoting.
-      gradeLogData: makeGradeLogRows([
-        { card_type: "name", subject_key: 'say "hello"' },
-      ]),
-    });
-
-    const response = await GET();
-    const lines = await csvLines(response);
-
-    // The field with a double-quote must be wrapped and inner quotes doubled.
+    await seedGradeLog(alice, [{ card_type: "name", subject_key: 'say "hello"' }]);
+    const lines = await csvLines(await GET(request()));
     expect(lines[1]).toContain('"say ""hello"""');
   });
 
   it("escapes a field value that contains a carriage return (RFC 4180)", async () => {
-    makeSupabaseMock({
-      gradeLogData: makeGradeLogRows([
-        { card_type: "name", subject_key: "foo\rbar" },
-      ]),
-    });
-
-    const response = await GET();
-    const lines = await csvLines(response);
-
-    // A field with \r must be wrapped in double-quotes per RFC 4180.
+    await seedGradeLog(alice, [{ card_type: "name", subject_key: "foo\rbar" }]);
+    const lines = await csvLines(await GET(request()));
     expect(lines[1]).toContain('"foo\rbar"');
   });
 
   it("prepends a UTF-8 BOM to the CSV output", async () => {
-    makeSupabaseMock({ gradeLogData: [] });
-
-    const response = await GET();
-
-    // Read as raw bytes: UTF-8 BOM is the three-byte sequence EF BB BF.
-    // response.text() strips the BOM per the Encoding spec, so we check
-    // the ArrayBuffer directly.
-    const buf = await response.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    expect(bytes[0]).toBe(0xef);
-    expect(bytes[1]).toBe(0xbb);
-    expect(bytes[2]).toBe(0xbf);
+    const bytes = new Uint8Array(await (await GET(request())).arrayBuffer());
+    expect([bytes[0], bytes[1], bytes[2]]).toEqual([0xef, 0xbb, 0xbf]);
   });
 
-  it("returns 503 when Supabase client construction fails", async () => {
-    (createClient as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("Your project's URL and Key are required"),
-    );
-
-    const response = await GET();
-
-    expect(response.status).toBe(503);
-    const body = await response.json() as { error: string };
-    expect(body.error).toBe("service_unavailable");
+  it("two users: each export holds only the session user's rows", async () => {
+    await seedGradeLog(alice, [{ subject_key: "25" }]);
+    await seedGradeLog(bob, [{ subject_key: "133" }, { subject_key: "134" }]);
+    const aliceLines = await csvLines(await GET(request()));
+    sessionUser = bob;
+    const bobLines = await csvLines(await GET(request()));
+    expect(aliceLines.slice(1).map((l) => l.split(",")[1])).toEqual(["Pikachu"]);
+    expect(bobLines.slice(1).map((l) => l.split(",")[1])).toEqual(["Eevee", "Vaporeon"]);
   });
 });
