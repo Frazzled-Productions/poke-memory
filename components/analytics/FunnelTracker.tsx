@@ -1,7 +1,9 @@
 "use client";
 
 /**
- * FunnelTracker: fires a single `app_open` custom event on first mount.
+ * FunnelTracker: sends a single `app_open` event on first mount to the app's
+ * own `POST /api/event`, which keeps only a daily count per bucket pair
+ * (lib/analytics/events.ts, design D9 of move-to-cloudflare).
  *
  * Properties emitted:
  *   - `userType`: "new" | "returning_guest" | "signed_in"
@@ -29,16 +31,16 @@
  * The event fires once, after auth loading completes, and is not repeated on
  * subsequent renders. The component renders nothing.
  *
- * Superuser note: the event fires normally under superuser mode. No cloud
- * write occurs (track() is a client-side beacon, not a Supabase write), so
- * the sync write-guard does not apply. Analytics data will be present but
+ * Superuser note: the event fires normally under superuser mode. No sync
+ * write occurs (sendEvent() is a beacon to the anonymous daily count, not a
+ * write to the player's data), so the sync write-guard does not apply. Analytics data will be present but
  * may reflect the artificial superuser state (acceptable for a QA tool).
  *
  * #1667
  */
 
 import { useEffect, useRef } from "react";
-import { track } from "@vercel/analytics";
+import { sendEvent, type ProgressBucket, type UserType } from "@/lib/analytics/events";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { readMasteredCountCache } from "@/lib/profile/masteredCountCache";
 import {
@@ -58,13 +60,6 @@ import {
   KEY_OFFLINE_DOWNLOADED_AT,
   KEY_OFFLINE_MANIFEST,
 } from "@/lib/storage/keys";
-
-// -----------------------------------------------------------------
-// Types
-// -----------------------------------------------------------------
-
-type UserType = "new" | "returning_guest" | "signed_in";
-type ProgressBucket = "0" | "1-10" | "11-50" | "50+";
 
 // -----------------------------------------------------------------
 // Pure helpers (exported for unit tests)
@@ -183,7 +178,7 @@ export function FunnelTracker() {
     const totalMastered = readTotalMasteredCount();
     const progressBucket: ProgressBucket = toProgressBucket(totalMastered);
 
-    track("app_open", { userType, progressBucket });
+    sendEvent("app_open", { userType, progressBucket });
   }, [loading, user]);
 
   return null;
