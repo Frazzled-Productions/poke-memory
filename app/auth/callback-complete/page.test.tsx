@@ -455,4 +455,18 @@ describe("CallbackCompletePage - returning player on their own device", () => {
     expect(await screen.findByRole("button", { name: "Keep local" })).toBeInTheDocument();
     expect(mockRouterReplace).not.toHaveBeenCalled();
   });
+
+  it("judges by the owner on arrival: a pull stamping this user meanwhile does not hide a guest's picker", async () => {
+    // On arrival the session is still loading and the device holds guest data.
+    vi.mocked(loadSyncStatus).mockReturnValue({ ownerUserId: null } as ReturnType<typeof loadSyncStatus>);
+    mockUseAuth.mockReturnValue({ user: FAKE_USER, loading: true, supabase: FAKE_CLIENT });
+    const { rerender } = renderWithIntl(<CallbackCompletePage />);
+
+    // Meanwhile SignInPull's pull finishes and stamps this user as the owner.
+    vi.mocked(loadSyncStatus).mockReturnValue({ ownerUserId: FAKE_USER.id } as ReturnType<typeof loadSyncStatus>);
+    mockUseAuth.mockReturnValue({ user: FAKE_USER, loading: false, supabase: FAKE_CLIENT });
+    rerender(<CallbackCompletePage />);
+
+    expect(await screen.findByRole("button", { name: "Keep local" })).toBeInTheDocument();
+  });
 });

@@ -93,6 +93,10 @@ export default function CallbackCompletePage() {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [pending, setPending] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  // Whose data this device held on arrival, read before any effect runs:
+  // SignInPull's pull stamps ownerUserId when it finishes, which could
+  // otherwise make a guest's first sign-in look like a returning player's.
+  const [ownerAtArrival] = useState(() => loadSyncStatus().ownerUserId);
 
   useEffect(() => {
     if (loading) return;
@@ -107,7 +111,7 @@ export default function CallbackCompletePage() {
       // to sort. ownerUserId is stamped by an earlier sign-in and kept in
       // localStorage (so it survives the move to Cloudflare, where everyone
       // signs in once more); SignInPull pulls and merges as on any sign-in.
-      if (loadSyncStatus().ownerUserId === user.id) {
+      if (ownerAtArrival === user.id) {
         router.replace("/");
         return;
       }
@@ -235,7 +239,7 @@ export default function CallbackCompletePage() {
     }
     void resolve();
     return () => { cancelled = true; };
-  }, [loading, user, supabase, router, retryCount, seed]);
+  }, [loading, user, supabase, router, retryCount, seed, ownerAtArrival]);
 
   async function applyCloud(data: {
     cloudRows: CloudRow[];
