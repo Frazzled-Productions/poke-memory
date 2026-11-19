@@ -4,7 +4,7 @@ Canonical reference for choosing where new persisted data lives - a column on an
 
 ## Tables today
 
-Every table in `public`, as created by `db/migrations/`. All nine have RLS enabled. `scripts/persistence-tables.test.mjs` fails if this list drifts from the `CREATE TABLE` / `DROP TABLE` statements in the migrations, so add a row here in the same PR as the migration. Before designing a new table, find the closest precedent below and extend its pattern rather than reinventing one.
+Every app table, as created by `db/migrations/` (the Postgres history) and translated into `db/d1/migrations/0001_schema.sql` for Cloudflare D1. Better Auth's tables (`0002_auth.sql`) and the anonymous daily `events` counts (`0003_events.sql`) are not app tables and are not listed. There is no row-level security on D1: every per-user query goes through the scope helper (`forUser`, `lib/db/scope.ts`), and `npm run lint` fails a raw query on a per-user table outside `lib/db/`. `scripts/persistence-tables.test.mjs` fails if this list drifts from the `CREATE TABLE` / `DROP TABLE` statements in the migrations, so add a row here in the same PR as the migration. Before designing a new table, find the closest precedent below and extend its pattern rather than reinventing one.
 
 <!-- persistence-tables:start -->
 | Table | Migration | Shape and precedent |
@@ -13,14 +13,14 @@ Every table in `public`, as created by `db/migrations/`. All nine have RLS enabl
 | `streak_days` | 001 | One row per day reviewed; append-only, client-synced. |
 | `user_settings` | 001 | One row per user (`user_id` is the PK); `settings` JSONB plus scalar columns such as `timezone` (019). |
 | `grade_log` | 006 | Append-only per-grade event log; `UNIQUE (user_id, occurred_at)` is the cross-device dedup key. |
-| `push_subscriptions` | 028 | One row per (user, browser endpoint); client SELECT / INSERT / DELETE policies, no UPDATE. Precedent for a create-or-delete, never-mutated table. Migration 049: a `NOT VALID` check on the endpoint host, and a `BEFORE INSERT` trigger that keeps an account to 10 rows. |
-| `feedback` | 034 | Write-once, append-only; written only by the service-role Route Handler (`app/api/feedback`), no client policies. `user_id` is **nullable** (guest feedback), and a pg_cron job purges rows after 12 months. |
+| `push_subscriptions` | 028 | One row per (user, browser endpoint); the client may select, insert and delete (through the data gateway), never update. Precedent for a create-or-delete, never-mutated table. Migration 049: a `NOT VALID` check on the endpoint host, and a `BEFORE INSERT` trigger that keeps an account to 10 rows. |
+| `feedback` | 034 | Write-once, append-only; written only by the server-side Route Handler (`app/api/feedback`), not on the data gateway. `user_id` is **nullable** (guest feedback), and a scheduled job (`POST /api/cron/feedback-retention`) purges rows after 12 months. |
 | `usernames` | 035 | Uniqueness-constraint table (`username` is the PK, `UNIQUE (user_id)`); owner-only INSERT policy (the public SELECT policy was dropped in 044). |
-| `rate_limit_buckets` | 041 | Service-role-only internal table with **no `user_id`**: keyed on a salted `ip_hash` because callers are pre-session. No client policies; every write goes through the `check_rate_limit` SECURITY DEFINER RPC, and pg_cron purges rows after 2 hours. |
-| `feedback_discord_posts` | 051 | Service-role-only internal table with **no `user_id`** and no message text: maps a feedback id to its Discord bug-notification message id. No foreign key to `feedback`, so the mapping outlives the row until the AFTER DELETE trigger has had the route delete the Discord post (ops #405). No client policies. |
+| `rate_limit_buckets` | 041 | Server-only internal table with **no `user_id`**: keyed on a salted `ip_hash` because callers are pre-session. Not on the data gateway; every write goes through the server's rate-limit check, and a scheduled job (`POST /api/cron/rate-limit-cleanup`) purges rows after 2 hours. |
+| `feedback_discord_posts` | 051 | Server-only internal table with **no `user_id`** and no message text: maps a feedback id to its Discord bug-notification message id. No foreign key to `feedback`, so the mapping outlives the row until the code that deleted the feedback (retention job or account deletion) has deleted the Discord post (ops #405). Not on the data gateway. |
 <!-- persistence-tables:end -->
 
-**Foreign keys.** Every table with a `user_id` column references `auth.users(id) ON DELETE CASCADE`, so account deletion erases the user's rows. The exceptions to "every row belongs to a user" are deliberate: `feedback.user_id` is nullable, so the cascade only applies where a user is attached (guest rows rely on the 12-month purge), and `rate_limit_buckets` has no user link at all (041 explains why a FK is inapplicable before a session exists), and neither has `feedback_discord_posts` (051: it must outlive the feedback row it points to). The new-table checklist below still requires the FK for any per-user table.
+**Foreign keys.** In Postgres every table with a `user_id` column referenced `auth.users(id) ON DELETE CASCADE`; on D1, account deletion (`delete_account`, `lib/db/rpc/`) deletes the user's rows from every table in one atomic `batch()`. The exceptions to "every row belongs to a user" are deliberate: `feedback.user_id` is nullable, so the cascade only applies where a user is attached (guest rows rely on the 12-month purge), and `rate_limit_buckets` has no user link at all (041 explains why a FK is inapplicable before a session exists), and neither has `feedback_discord_posts` (051: it must outlive the feedback row it points to). The new-table checklist below still requires every per-user table to be deleted with the account.
 
 ## Decide where the data lives
 
@@ -30,52 +30,39 @@ Every table in `public`, as created by `db/migrations/`. All nine have RLS enabl
 
 ## New table checklist
 
-A new migration `db/migrations/NNN_<snake_case_name>.sql` MUST contain:
+A new migration `db/d1/migrations/NNNN_<snake_case_name>.sql` (SQLite, the rules in the header of `0001_schema.sql`: uuid and timestamps as TEXT, JSON as TEXT with `json_valid`, booleans as 0/1) MUST contain:
 
 ```sql
 CREATE TABLE <name> (
-  id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  id      TEXT PRIMARY KEY,           -- a UUID set by the server
+  user_id TEXT NOT NULL,
   -- your columns, ideally with CHECK constraints on enum-like text fields
-  --   e.g. card_type text NOT NULL CHECK (card_type IN ('name','evolution','reverse'))
+  --   e.g. card_type TEXT NOT NULL CHECK (card_type IN ('name','evolution','reverse'))
   -- and a UNIQUE constraint that doubles as the upsert / dedup key
   --   e.g. UNIQUE (user_id, occurred_at)
-);
+) STRICT;
 
 CREATE INDEX <name>_user_<hot_col> ON <name> (user_id, <hot_col> DESC);
-
-ALTER TABLE <name> ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "<name>_select" ON <name>
-  FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "<name>_insert" ON <name>
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
--- UPDATE and DELETE policies are intentionally omitted for append-only tables.
--- Add them ONLY if the table is genuinely mutable from the client. For
--- progress-wipe flows (delete account, reset all progress) use a SECURITY
--- DEFINER RPC like `reset_all_progress` (migration 018) instead of opening
--- a DELETE policy, which keeps the destructive path centralised and auditable.
--- CREATE POLICY "<name>_update" ON <name>
---   FOR UPDATE USING (auth.uid() = user_id);
--- CREATE POLICY "<name>_delete" ON <name>
---   FOR DELETE USING (auth.uid() = user_id);
 ```
 
-Named per-verb policies (SELECT, INSERT, and optionally UPDATE/DELETE) beat a single `FOR ALL` - easier to audit and to drop selectively. The template above defaults to SELECT + INSERT as the safe baseline for append-only tables; add UPDATE/DELETE only if the table is genuinely mutable from the client. `ON DELETE CASCADE` ensures rows die with their user. Always combine `CREATE TABLE` + `ENABLE RLS` + policies in the same migration; an enabled-RLS-without-policies state silently blocks the client.
+Then, in the same PR:
 
-For append-only tables (logs, daily markers, audit trails), omit the UPDATE and DELETE policies - `grade_log` and `streak_days` both had theirs **removed** in migration 018 as defence against client-side wipe bugs. See "Invariants on existing data" below for the designated escape hatch.
+- **Allowlist it** in `lib/db/tables.ts` (columns, type conversion, and which operations the data gateway allows). For append-only tables allow `select` and `insert` only; for progress-wipe flows (delete account, reset all progress) use an RPC in `lib/db/rpc/` like `reset_all_progress` instead of allowing `delete`, which keeps the destructive path centralised and auditable.
+- **Delete it with the account**: add the table to `delete_account` (`lib/db/rpc/`) and, if it holds progress, to `reset_all_progress`.
+- **Prove the scope**: a two-user test (`lib/db/crossUser.test.ts`) that user B can neither read nor change user A's rows.
+- **Apply it locally**: `npm run db:migrate:local`.
 
-Reference shapes: `streak_days` (migration 001 plus the 018 lockdown) for an append-only monotonic table, `grade_log` (migration 006 plus 018) for an indexed event log.
+For append-only tables (logs, daily markers, audit trails), never allow `update` or `delete` from the client - `grade_log` and `streak_days` both had theirs **removed** in Postgres migration 018 as defence against client-side wipe bugs. See "Invariants on existing data" below for the designated escape hatch.
+
+Reference shapes: `streak_days` for an append-only monotonic table, `grade_log` for an indexed event log (both in `0001_schema.sql`).
 
 ## Invariants on existing data
 
-If a column has a "this value only moves forward" semantic (review dates, counters, etc.) or a "one-way transition" semantic (boolean flags that should never flip back), add a `BEFORE UPDATE` trigger that `RAISE EXCEPTION ... USING ERRCODE = 'check_violation'` (errcode `23514`). Model: migration 002's `card_reviews_reject_regression_trigger` for lifecycle timestamps, migration 015 for monotonic counters, migration 016 for the same-date scheduling guard pattern, and migration 017 for one-way boolean flags. The client surfaces the error as a sync failure; users see "Sync failed" rather than silent data loss. Do not work around an existing trigger - a legitimate reset / delete-account flow goes through `reset_all_progress` (migration 018), which is a `SECURITY DEFINER` RPC.
+If a column has a "this value only moves forward" semantic (review dates, counters, etc.) or a "one-way transition" semantic (boolean flags that should never flip back), add a `BEFORE UPDATE` trigger that aborts with `RAISE(ABORT, ...)`, which the data gateway returns as `check_violation` (`23514`, `lib/db/errors.ts`). Model: the `card_reviews` regression trigger in `0001_schema.sql`, ported from migration 002's `card_reviews_reject_regression_trigger` for lifecycle timestamps, migration 015 for monotonic counters, migration 016 for the same-date scheduling guard pattern, and migration 017 for one-way boolean flags. The client surfaces the error as a sync failure; users see "Sync failed" rather than silent data loss. Do not work around an existing trigger - a legitimate reset / delete-account flow goes through `reset_all_progress` (first migration 018, now a server-side RPC in `lib/db/rpc/`).
 
 ## Apply the migration
 
-Apply the migration to the live Supabase projects **before merging** the PR that adds it - typically right after opening the PR. Apply it to **both** projects: prod via `mcp__supabase__apply_migration(name, query)` **and** QA via `mcp__supabase-qa__apply_migration(name, query)`, with `name` matching the filename's `<NNN>_<name>` part (drop the number and the `.sql` extension). The `migration-check.yml` workflow fails the PR's required CI check until file-vs-applied parity holds, so applying *after* merge is not an option: the PR can't merge without the migration already in place.
-
-**Env-to-branch parity (#1806).** `migration-check.yml` asserts **QA** parity on PRs whose base is `qa` (the staging DB is the migration rehearsal) and **prod** parity on push to `main` (promotion proves it against prod). Practically: apply to QA before the qa-targeted PR can go green, and have prod applied before the `qa -> main` promotion. The same env-driven `scripts/check-migrations.mjs` runs against whichever project the trigger selects; the check reads `SUPABASE_ACCESS_TOKEN` (account-scoped, reused for both projects) plus `QA_SUPABASE_PROJECT_REF` (QA) or `SUPABASE_PROJECT_REF` (prod). A Supabase Management-API token is account-level, so no separate QA token exists - only the QA ref is a distinct secret. A migration missing from the target project fails the check loudly (it does not silently pass), which is the drift that bit QA on 2026-06-08 (#1798/#1806). QA's ledger was reconciled (001-041) on 2026-06-08 so the check starts from parity.
+Apply it locally with `npm run db:migrate:local` and run the tests against it. `migration-check.yml` checks that every file in `db/d1/migrations/` applies cleanly to a fresh local D1. Production and preview databases are not migrated by hand: the deploy workflow applies pending D1 migrations before it deploys the Worker (production on push to `main`; each PR's preview Worker has its own database). Migrations therefore go live with the code that needs them, so a migration must not break the client still running in open browsers (see the two-phase rollout below).
 
 ## Wire cross-device sync
 
@@ -83,7 +70,7 @@ If the new table needs to follow users across devices: add `lib/sync/<feature>.t
 
 ## Constraint-affecting migrations (two-phase rollout)
 
-A migration that changes a **primary key** or any **unique constraint that a client `onConflict` clause names** is backward-incompatible with the currently-deployed client, and the usual "apply the migration before merge" rule (see [Apply the migration](#apply-the-migration)) makes the hazard worse rather than better: the constraint flips on prod while the old client is still live, and every upsert that targets the old constraint shape fails.
+A migration that changes a **primary key** or any **unique constraint that a client `onConflict` clause names** is backward-incompatible with the currently-deployed client, and applying the migration in the same deploy as the new client (see [Apply the migration](#apply-the-migration)) does not make it safe: the constraint flips on prod while open browsers still run the old client, and every upsert that targets the old constraint shape fails.
 
 This is exactly what happened in #1344. Migration 029 widened the `card_reviews` PK from `(user_id, card_type, subject_key)` to `(user_id, card_type, subject_key, locale)` and was applied to prod before the matching 4-column-`onConflict` client (#1307) shipped. For ~19 hours every `card_reviews` upsert failed with `ERROR: there is no unique or exclusion constraint matching the ON CONFLICT specification` (SQLSTATE **42P10**) - silently, because sync is best-effort - producing the #584-shape `grade_log`-vs-`card_reviews` divergence the monitor caught days later.
 
@@ -92,7 +79,7 @@ This is exactly what happened in #1344. Migration 029 widened the `card_reviews`
 **Required process: a three-migration transitional sequence.** Any such change MUST roll out in this order - the constraining step is never applied before the matching client is live in prod:
 
 1. **Add** a new `UNIQUE` index on the **new** column set `(a, b, c, d)` *alongside* the existing PK `(a, b, c)`. Both constraints coexist; the deployed client's `onConflict (a, b, c)` still resolves to the old PK, so nothing breaks.
-2. **Ship and deploy the client** that sends the new `onConflict (a, b, c, d)`, and wait until it is actually live in production - the `qa → main` promotion plus the Vercel production deploy, not merely a merge to `qa`. Only the production client matters here, because only the production client issues the upserts the constraint must accept.
+2. **Ship and deploy the client** that sends the new `onConflict (a, b, c, d)`, and wait until it is actually live in production - the `qa → main` promotion plus the production Worker deploy, not merely a merge to `qa`. Only the production client matters here, because only the production client issues the upserts the constraint must accept.
 3. **Only then** drop the old PK and promote the new unique index to be the primary key (a third migration).
 
 The matching deploy-ordering rule, the full incident write-up, and the [Client-cannot-regress checklist](sync.md#client-cannot-regress-checklist) item live in [docs/sync.md - Constraint-affecting migration ordering](sync.md#constraint-affecting-migration-ordering). Surfacing 42P10 as a loud, alertable failure rather than a silent swallow is tracked separately in #1358.

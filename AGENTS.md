@@ -58,8 +58,8 @@ Declare-a-discovery-path, reach-existing-users, and mock-up-on-visual-surface-pr
 
 ### Next.js caching and page params
 
-Cache Components is on; `params`/`searchParams` are Promises. Settled rules (`updateTag` vs
-`revalidateTag(tag, 'max')`, `cacheTag`, `PageProps`): **[docs/nextjs.md](docs/nextjs.md)**.
+Cache Components is off on Workers (until OpenNext PR #1318); `params`/`searchParams` are still Promises.
+Settled rules (`updateTag` vs `revalidateTag(tag, 'max')`, `cacheTag`, `PageProps`): **[docs/nextjs.md](docs/nextjs.md)**.
 
 ### Superuser mode (READ when adding user-facing features)
 
@@ -70,20 +70,20 @@ Canonical reference: **[docs/superuser.md](docs/superuser.md)** - a QA cheat (ty
 - **Sync write-guard**: while any flag is on, all cloud writes are suppressed and write-triggering buttons take the `superuserPaused` prop; background pulls stay enabled. Do not work around it.
 - **Exit cleanup** (`SuperuserContext.exitCleanup`): signed-in force-pull + merge, guest destructive-reset confirm. Don't skip the prompt or the pull.
 
-### Sync (READ FIRST when touching `lib/sync/`, `app/api/sync/route.ts`, `db/migrations/`)
+### Sync (READ FIRST when touching `lib/sync/`, `lib/db/`, `app/api/sync/route.ts`, `db/d1/migrations/`)
 
-Canonical reference: **[docs/sync.md](docs/sync.md)** - read before touching anything that pushes to Supabase. Headline rules:
+Canonical reference: **[docs/sync.md](docs/sync.md)** - read before touching anything that pushes to the cloud database (Cloudflare D1, through the scope helper `lib/db/scope.ts`). Headline rules:
 
 - **Pull before push.** Any orchestrator merging cloud and local cards pulls and merges before pushing; if `pullSession` fails, do not push. Pushing on stale local state wiped 2497 of 2513 cloud rows (#293). The push-only retry path (`useRetryPush`) is the deliberate exception.
-- **`card_reviews_reject_regression_trigger`** (migration 002, extended 015/016/017) blocks regressions at the DB layer. Don't work around it. Only `reset_all_progress` (migration 018, SECURITY DEFINER RPC) bypasses the per-column guards.
+- **`card_reviews_reject_regression_trigger`** (migration 002, extended 015/016/017) blocks regressions at the DB layer. Don't work around it. Only `reset_all_progress` (migration 018, now an RPC in `lib/db/rpc/`) bypasses the per-column guards.
 - **Cards are the primary contract.** Per-grade upsert + unload beacon drive the user-visible sync status. Every other leg (`pushSettings`, `pushStreak`, `pushGradeLog`, `pushRegionalPrefs`, the regional-prefs leg in `pullAndMerge`) is best-effort: `console.warn` and continue, never flip the overall sync into error.
-- **Backups: daily on, PITR deferred** (#298). Daily-only restore is coarse (whole-database, up to ~24h loss), so treat any production sync change as one-way until PITR.
+- **Backups: nightly to R2 (90 days) plus D1 Time Travel (30 days).** Both restore the whole database for every user, so treat any production sync change as one-way.
 
 ### Adding a feature that needs to persist data
 
 Decision tree (JSONB on `user_settings` vs. column on `card_reviews` vs. new table) + new-table checklist: **[docs/persistence.md](docs/persistence.md)**. Card-shaped persistence keyed by `(user_id, card_type, subject_key)`: **[docs/card-identity.md](docs/card-identity.md)**. Tables today: `card_reviews`, `streak_days`, `user_settings`, `grade_log`, `push_subscriptions`, `feedback`, `usernames`, `rate_limit_buckets`, `feedback_discord_posts` (shapes, precedents and FK exceptions in the doc; a test keeps both lists in step with `db/migrations/`). Two runtime reminders:
 
-- **Apply the migration BEFORE merging the PR**, to **both** Supabase projects (prod `mcp__supabase__apply_migration` and QA `mcp__supabase-qa__apply_migration`; name without the `0NN_` prefix). `migration-check.yml` asserts QA parity on qa-based PRs and prod parity on push to `main` (#1806) - mechanics in [docs/persistence.md](docs/persistence.md#apply-the-migration).
+- **D1 migrations live in `db/d1/migrations/`**: apply locally with `npm run db:migrate:local`; the deploy workflow applies them before deploying the Worker, so they go live with the code (never break the client still open in browsers). Add each new table to `lib/db/tables.ts`, `delete_account` and a two-user test - [docs/persistence.md](docs/persistence.md#apply-the-migration).
 - **Wire cross-device sync** via `lib/sync/<feature>.ts` exporting `push` / `pull` (+ `merge`); pull as a best-effort leg in `pullAndMerge`, push wherever the data is written.
 
 
@@ -131,7 +131,7 @@ When a change visibly affects any of the six README screenshot surfaces (`app/pa
 
 ### Writing, versioning, branching, stack
 
-- **Writing:** Poké-specific out-of-scope identifiers to leave alone: PokéAPI fields, FSRS (`optimizer`), shipped Supabase column names.
+- **Writing:** Poké-specific out-of-scope identifiers to leave alone: PokéAPI fields, FSRS (`optimizer`), shipped database column names.
 - **Versioning:** SemVer, `package.json`-as-single-source, changelog fragments, owner approval for a non-patch bump: `ops/standards/process.md` → Versioning & release. Poke-memory wiring: the daily `auto-release.yml` cron assembles `changelog.d/unreleased/*.md` fragments (`kind: minor-bump` → minor; otherwise patch) and tags; a `minor-bump` fragment needs the owner-applied `version-bump:approved` label (`version-bump-gate.yml`). Fragment format and the release pipeline live in [WORKFLOW.md](WORKFLOW.md) and `changelog.d/README.md`.
 - **Branching:** Two-long-lived-branch model (#806): `ops/standards/process.md` → Branching model; diagram and rulesets in [WORKFLOW.md](WORKFLOW.md). Poke-memory specifics: the source-gate check is named `Restrict main PR source` (overridden by the owner-applied `hotfix` label); `qa`'s required checks are `test` + `e2e` (no strict-up-to-date); every PR-producing path targets `qa`.
 - **Stack decisions:** Vendor screening (`[USER-DECISION]`, default-to-blocker, no-beta, single-vendor): `ops/standards/conventions.md` → Stack / vendor screening. Poké-specific: plan persistence shape for plausible future scope (per-card analytics, friends/social).
@@ -147,8 +147,8 @@ Backlog labels, user-owns-priorities, the pre-PR gate, and the pre-push spelling
 
 ### Privacy
 
-- **Guest**: all card/session data stays in the browser (localStorage), never transmitted to a server we control; only technical error diagnostics (no progress or account data) go to Sentry (below). Sprites are self-hosted static files. Vercel Analytics + Speed Insights collect anonymous aggregate metrics only (no card progress or PII); both render unconditionally in the root layout.
-- **Authenticated (Supabase sync)**: on GitHub sign-in, per-card FSRS review history is stored in Supabase Postgres and we **are a data controller** - GDPR/UK-GDPR applies (privacy notice, lawful basis, Supabase standard DPA). RLS scopes every user to their own rows. Sub-processors: Supabase (authenticated data), Vercel Analytics (aggregate telemetry), Sentry (EU region, all users incl. guests: error reports + ~10% traces, no name/email/account ID/IP attached, no cookies or bodies, no Replay, 90-day retention, legitimate interests; #2103). Sign-out does **not** clear localStorage - local data is preserved so users can continue as guests.
+- **Guest**: all card/session data stays in the browser (localStorage), never transmitted to a server we control; only technical error diagnostics (no progress or account data) go to Sentry (below). Sprites are self-hosted static files. Cloudflare Web Analytics counts aggregate page views without cookies (beacon only when `NEXT_PUBLIC_CF_BEACON_TOKEN` is set at build); `app_open` is counted per day in our own `events` table (`POST /api/event`, no IP or user id).
+- **Authenticated (cloud sync)**: on sign-in (GitHub, Google or username), per-card FSRS review history is stored in Cloudflare D1 (EU jurisdiction) and we **are a data controller** - GDPR/UK-GDPR applies (privacy notice, lawful basis, Cloudflare DPA). The scope helper pins every query to the session user. Sub-processors: Cloudflare (hosting, D1, R2 backups 90 days, Web Analytics), Sentry (EU region, all users incl. guests: error reports + ~10% traces, no name/email/account ID/IP attached, no cookies or bodies, no Replay, 90-day retention, legitimate interests; #2103). Sign-out does **not** clear localStorage - local data is preserved so users can continue as guests.
 
 ## OpenSpec
 

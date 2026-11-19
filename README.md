@@ -98,17 +98,17 @@ Your favourite Pokémon (search all 1025), an app colour theme from any Pokémon
 Sign in with GitHub or Google (the **Sign in** button in the nav) to sync your review history across devices. Once signed in, every grade is pushed to the cloud immediately (with a short debounce to coalesce rapid re-grades), and a safety-net beacon flushes any unsent grades on tab close.
 
 - **Guest mode** - no account needed; everything stays in your browser.
-- **Sign in** - ties your session to a GitHub or Google account via Supabase Auth; data stored in Postgres.
+- **Sign in** - ties your session to a GitHub or Google account, or a username and password, via Better Auth; data stored in Cloudflare D1 in the EU.
 - **Conflict picker** - if you have local progress *and* cloud progress when you sign in, you'll be asked which to keep.
 - **Auto-pull on focus** - returning to a tab that's been in the background for ≥ 30 seconds silently pulls the latest cloud state and updates Stats and Pokédex without a page reload.
 - Signing out leaves your local `localStorage` intact; you can continue as a guest without losing anything.
 
-> **Note:** Supabase project URL and anon key must be configured (see `.env.local.example`). GitHub and Google OAuth redirect URIs must be added in the Supabase dashboard.
+> **Note:** Better Auth needs its secret and the GitHub and Google client credentials (see `.env.local.example`), and each provider needs the callback URL `<origin>/api/auth/callback/github` or `<origin>/api/auth/callback/google` registered. Locally, create the D1 tables with `npm run db:migrate:local`.
 
 ## Privacy
 
-- **Guest mode**: your card and session data stays in your browser - nothing is transmitted to any server we control. Sprites are self-hosted on the same Vercel deployment. Anonymous, aggregate telemetry (URL path, referrer, country, device type, Core Web Vitals) is collected by Vercel Analytics and Speed Insights; it does not include card progress, review history, or any personally identifying information.
-- **Signed in**: your per-card FSRS state (stability, difficulty, scheduledDays, reps, lapses, fsrsState, due date, last review, first seen) is stored in Supabase Postgres, accessible only to you via Row-Level Security. Signing out leaves local progress intact.
+- **Guest mode**: your card and session data stays in your browser - nothing is transmitted to any server we control. Sprites are self-hosted on the same Cloudflare Worker. Anonymous, aggregate page views (URL path, referrer, country, device type, page-load performance) are counted by Cloudflare Web Analytics without cookies, and one `app_open` event with two coarse buckets is counted per day in our own database; neither includes card progress, review history, or any personally identifying information.
+- **Signed in**: your per-card FSRS state (stability, difficulty, scheduledDays, reps, lapses, fsrsState, due date, last review, first seen) is stored in Cloudflare D1 in the EU; every request is checked on the server so each account can only read and change its own rows. Nightly backups are kept in the EU for 90 days. Signing out leaves local progress intact.
 
 ## Run locally
 
@@ -158,15 +158,15 @@ npx playwright install          # one-time browser install
 npm run test:e2e                # runs against http://localhost:3000
 ```
 
-E2E smoke tests run automatically against Vercel preview deployments in CI.
+E2E smoke tests run automatically in CI; the sign-in specs run against each pull request's preview Worker version.
 
 ## Stack
 
-- **Framework** - Next.js 16 (App Router, Cache Components)
+- **Framework** - Next.js 16 (App Router; Cache Components off on Workers, see `docs/nextjs.md`)
 - **UI** - React 19, Tailwind CSS 4
 - **Language** - TypeScript 6
-- **Sync** - Supabase (Auth + Postgres with RLS)
-- **Hosting** - Vercel (auto-deploys on every push to `main`)
+- **Sync** - Cloudflare D1 (EU jurisdiction) through a per-account scope helper, Better Auth for sign-in
+- **Hosting** - Cloudflare Workers via OpenNext (deploys on every push to `main`; a preview version per pull request)
 - **Testing** - vitest for unit/component, Playwright for E2E
 
 ### Dependency overrides
