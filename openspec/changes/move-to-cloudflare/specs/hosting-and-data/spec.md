@@ -200,8 +200,9 @@ Source (planned): design D5, `lib/db/client.ts`, `app/api/db/route.ts`.
 
 The gateway SHALL accept only the tables `card_reviews`, `user_settings`, `streak_days`, `grade_log`
 and `push_subscriptions`; per table only the operations its row-level security policies allowed; the
-allowlisted columns and filter operators (`eq`, `in`, `gte`, `not`, `order`, `range`, `limit`); and the
-RPCs `reset_all_progress`, `delete_account` and `merge_user_settings`.
+allowlisted columns, the filter operators `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `is` and
+`not-is`, with `order`, `range` and `limit`; and the RPCs `reset_all_progress`, `delete_account` and
+`merge_user_settings`. Upserts on `grade_log` and `streak_days` SHALL never update a stored row.
 
 #### Scenario: Table not on the gateway
 
@@ -211,7 +212,14 @@ RPCs `reset_all_progress`, `delete_account` and `merge_user_settings`.
 #### Scenario: Update on push subscriptions
 
 - **WHEN** a signed-in browser sends an `update` on `push_subscriptions`
-- **THEN** the answer is 400, as no update policy existed under row-level security
+- **THEN** the answer is 403 with `42501`, as no update policy existed under row-level security
+
+#### Scenario: A repeated grade
+
+- **WHEN** a browser upserts a `grade_log` entry that is already stored, with a different grade and
+  without `ignoreDuplicates`
+- **THEN** the stored grade is unchanged: the upsert runs as `ON CONFLICT DO NOTHING` whatever the
+  request asks, as `grade_log` had no update policy
 
 #### Scenario: Unknown RPC
 
@@ -224,7 +232,7 @@ Source (planned): design D5, `lib/db/tables.ts`, `app/api/db/route.ts`.
 
 A request with no session SHALL answer 401 with an error code outside classes 22, 23 and 42. An
 unknown table, column, operator or RPC SHALL answer 400 with a class 42 code. A row naming another
-user SHALL answer 403 with `42501`. Guard and unique failures SHALL pass through as `23514` and `23505`.
+user, or an operation the table does not allow, SHALL answer 403 with `42501`. Guard and unique failures SHALL pass through as `23514` and `23505`.
 
 #### Scenario: Guest request
 
