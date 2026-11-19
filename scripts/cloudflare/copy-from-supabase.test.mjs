@@ -205,7 +205,7 @@ describe("convert and import", () => {
 
   it("writes every row, and the counts match the manifest", () => {
     const { d1, manifest } = imported();
-    const target = Object.fromEntries(manifest.tables.map((t) => [t.table, count(d1, t.table)]));
+    const target = d1.sqlite.prepare(countsQuery(manifest.tables.map((t) => t.table))).get();
     expect(target).toEqual({
       user: 4,
       account: 4, // github, google, two credential accounts
@@ -466,7 +466,7 @@ describe("compareCounts", () => {
 
   it("builds one read-only count query", () => {
     expect(countsQuery(["user", "feedback"])).toBe(
-      `SELECT 'user' AS name, count(*) AS n FROM "user" UNION ALL SELECT 'feedback' AS name, count(*) AS n FROM "feedback"`,
+      `SELECT (SELECT count(*) FROM "user") AS "user", (SELECT count(*) FROM "feedback") AS "feedback"`,
     );
   });
 });

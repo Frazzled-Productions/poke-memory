@@ -15,9 +15,12 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-/** One read-only statement counting every table in the manifest. */
+/**
+ * One read-only statement counting every table in the manifest: a single row, one column per
+ * table (D1 refuses a compound SELECT with many UNION ALL terms).
+ */
 export function countsQuery(tables) {
-  return tables.map((t) => `SELECT '${t}' AS name, count(*) AS n FROM "${t}"`).join(" UNION ALL ");
+  return `SELECT ${tables.map((t) => `(SELECT count(*) FROM "${t}") AS "${t}"`).join(", ")}`;
 }
 
 /**
@@ -56,10 +59,16 @@ export function wranglerCounts({ database, env, remote, tables }) {
   if (!database) throw new Error("--database is required without --target");
   const args = ["wrangler", "d1", "execute", database, remote ? "--remote" : "--local", "--json", "--command", countsQuery(tables)];
   if (env) args.push("--env", env);
-  const stdout = execFileSync("npx", args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+  let stdout;
+  try {
+    stdout = execFileSync("npx", args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+  } catch (err) {
+    // With --json, wrangler writes its error to stdout; it holds no row data.
+    throw new Error(`wrangler d1 execute failed: ${String(err.stdout ?? err.message).trim()}`);
+  }
   const parsed = JSON.parse(stdout);
-  const results = Array.isArray(parsed) ? parsed.flatMap((p) => p.results ?? []) : parsed.results ?? [];
-  return Object.fromEntries(results.map((r) => [r.name, Number(r.n)]));
+  const [row] = Array.isArray(parsed) ? parsed.flatMap((p) => p.results ?? []) : parsed.results ?? [];
+  return Object.fromEntries(Object.entries(row ?? {}).map(([table, n]) => [table, Number(n)]));
 }
 
 function parseArgs(argv) {
