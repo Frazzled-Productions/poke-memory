@@ -23,6 +23,35 @@ const eslintConfig = defineConfig([
     // flags spurious errors (e.g. no-this-alias on the bundled runtime), #1752.
     "public/sw/**",
   ]),
+  // Cross-user database access (decision 0018, design D4): lib/db/system runs
+  // queries across every user's rows, so only the cron, push-send, Discord and
+  // feedback routes (and lib/db itself) may import it. Everything else reads
+  // and writes per-user rows through forUser (lib/db/scope.ts).
+  // lib/db/system/importRestriction.test.ts lints fixtures against this rule.
+  {
+    files: ["**/*.{ts,tsx,js,jsx,mjs,cjs}"],
+    ignores: [
+      "app/api/cron/**",
+      "app/api/push/send-*/**",
+      "app/api/discord/**",
+      "app/api/feedback/**",
+      "lib/db/**",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "(^|/)db/system(\\.ts)?(/.*)?$",
+              message:
+                "lib/db/system reads across users: only app/api/cron, app/api/push/send-*, app/api/discord, app/api/feedback and lib/db may import it. Use forUser (lib/db/scope.ts) for per-user rows (design D4).",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Baseline for adopting ESLint into CI (#614). The react-hooks plugin v7
   // (bundled with eslint-config-next 16) ships several new rules at `error`
   // that flag deliberate, tested patterns across the existing sync / review /
