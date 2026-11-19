@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import type { UnsyncedSnapshot } from "@/lib/sync/usePerGradeSync";
 import { buildBeaconPayload } from "@/lib/sync/cloud";
 import { loadSyncStatus, saveSyncStatus, savePendingQueue, clearPendingQueue } from "@/lib/sync/persistence";
@@ -39,7 +39,7 @@ import { registerBackgroundSync } from "@/lib/sync/backgroundSync";
  * `useOnlineReconnectSync` on-reconnect path remains the fallback.
  */
 export function useSyncOnUnload(
-  client: SupabaseClient | null,
+  client: DataClient | null,
   userId: string | null,
   getUnsynced: (final: boolean) => UnsyncedSnapshot,
 ): void {

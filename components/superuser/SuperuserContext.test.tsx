@@ -18,7 +18,7 @@ const { mockAuthValue } = vi.hoisted(() => ({
       id: string;
       user_metadata: Record<string, unknown>;
     },
-    supabase: { auth: {} } as null | { auth: unknown },
+    db: { auth: {} } as null | { auth: unknown },
     loading: false,
   },
 }));
@@ -146,7 +146,7 @@ describe("SuperuserProvider.exitCleanup - signed-in branch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthValue.user = { id: "user-123", user_metadata: {} };
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
   });
 
   it("pulls all five tables and applies them cloud-authoritative when the last flag flips off", async () => {

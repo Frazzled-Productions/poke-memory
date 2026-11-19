@@ -1,8 +1,8 @@
 /**
  * Client-agnostic paginated fetch helper.
  *
- * PostgREST silently truncates single-request reads at the project's
- * `max_rows` cap (1000 by default). This helper issues sequential
+ * The data gateway caps one read at 1000 rows (MAX_SELECT_ROWS in
+ * lib/db/gateway.ts, as PostgREST's `max_rows` did). This helper issues sequential
  * `.range()` requests until a short page is returned, collecting all
  * rows across pages.
  *
@@ -14,9 +14,9 @@
  * page requests (#2053). `lib/sync/pagination-order.test.ts` enforces this.
  *
  * @param fetchPage  Callback that receives `(from, to)` inclusive row
- *                   indices and returns a PostgREST-style `{ data, error }`.
+ *                   indices and returns a `{ data, error }` result.
  * @param pageSize   Number of rows per page. Defaults to 1000 (the
- *                   PostgREST cap), so a single page of exactly 1000
+ *                   gateway's cap), so a single page of exactly 1000
  *                   triggers a follow-up request to confirm there are no
  *                   more rows.
  * @returns          All rows collected across pages, or `null` if any

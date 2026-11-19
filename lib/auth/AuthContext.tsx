@@ -2,12 +2,19 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { createDataClient, type DataClient } from "@/lib/db/client";
 import { isMockAuthEnabled, createMockClient, MOCK_USER } from "@/lib/auth/mockAuth";
 
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
-  supabase: SupabaseClient | null;
+  /**
+   * The data client (lib/db/client.ts): every cloud read and write goes
+   * through it to POST /api/db, scoped to the session user on the server.
+   */
+  db: DataClient | null;
+  /** Auth calls only (identity linking); goes with the Better Auth change. */
+  authClient: SupabaseClient | null;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -28,9 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // every production build - it short-circuits on `NODE_ENV === "production"`
   // - so this branch is dead code in production. See lib/auth/mockAuth.ts.
   const [mockEnabled] = useState(() => isMockAuthEnabled());
-  const [supabase] = useState(() =>
-    mockEnabled ? createMockClient() : tryCreateClient(),
-  );
+  const [supabase] = useState(() => (mockEnabled ? null : tryCreateClient()));
+  const [db] = useState<DataClient>(() => (mockEnabled ? createMockClient() : createDataClient()));
   // When the seam is on, start signed-in immediately with the fake user and
   // no loading flicker - there is no async getUser round-trip to wait on.
   const [user, setUser] = useState<User | null>(mockEnabled ? MOCK_USER : null);
@@ -57,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, mockEnabled]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, supabase }}>
+    <AuthContext.Provider value={{ user, loading, db, authClient: supabase }}>
       {children}
     </AuthContext.Provider>
   );

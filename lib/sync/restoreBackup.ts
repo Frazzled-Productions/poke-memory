@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import type { ValidatedBackup } from "@/lib/backup/io";
 import { planSignedInRestore, pullSession, pushSession } from "@/lib/sync/cloud";
 import { pullLastResetAt } from "@/lib/sync/settings";
@@ -57,7 +57,7 @@ function isFutureDated(card: ReviewableCard, latest: string): boolean {
  * retry and its eviction of refused cards.
  */
 export async function restoreBackupSignedIn(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   data: ValidatedBackup,
 ): Promise<SignedInRestoreResult> {

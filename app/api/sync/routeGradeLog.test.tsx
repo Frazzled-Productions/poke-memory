@@ -12,7 +12,7 @@ vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
 import { POST } from "./route";
 import { createClient } from "@/lib/supabase/server";
 import { GRADE_LOG_CONFLICT_COLS, toGradeLogDbRow, pushGradeLog } from "@/lib/sync/gradeLog";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 const USER_ID = "user-xyz-789";
 
@@ -198,7 +198,7 @@ describe("POST /api/sync - gradeLog leg (#2052)", () => {
           return { error: null };
         },
       }),
-    } as unknown as SupabaseClient;
+    } as unknown as DataClient;
     await pushGradeLog(client, USER_ID, [ENTRY as never]);
     expect(seen[0]).toEqual([toGradeLogDbRow(USER_ID, ENTRY as never)]);
   });

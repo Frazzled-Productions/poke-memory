@@ -56,7 +56,7 @@ import { AuthProvider, useAuth } from "@/lib/auth/AuthContext";
 // ---------------------------------------------------------------------------
 
 function AuthConsumer() {
-  const { user, loading, supabase } = useAuth();
+  const { user, loading, authClient: supabase } = useAuth();
   return (
     <div>
       <span data-testid="loading">{String(loading)}</span>

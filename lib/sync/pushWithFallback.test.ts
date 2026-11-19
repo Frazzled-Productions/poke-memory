@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import type { ReviewableCard } from "@/lib/review/session";
 import { pushWithFallback } from "./pushWithFallback";
 import { pushSingleCard } from "@/lib/sync/cloud";
@@ -29,7 +29,7 @@ vi.mock("@/lib/review/session", () => ({
   todayString: vi.fn(() => "2026-07-14"),
 }));
 
-const client = {} as SupabaseClient;
+const client = {} as DataClient;
 const userId = "user-1";
 
 function card(subjectKey: string, lastReview: string | null): ReviewableCard {

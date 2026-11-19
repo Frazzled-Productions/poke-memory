@@ -12,7 +12,7 @@
  */
 import { render, renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 vi.mock("@/lib/pokemon/seed-async", () => ({
   loadSeed: vi.fn(async () => ({ seedPokemon: [], seedEvolutionCards: [] })),
@@ -22,7 +22,7 @@ const CURRENT_USER = { id: "00000000-0000-0000-0000-0000000000aa" };
 const clientHolder = vi.hoisted(() => ({ client: null as unknown }));
 
 vi.mock("@/lib/auth/AuthContext", () => ({
-  useAuth: () => ({ user: CURRENT_USER, supabase: clientHolder.client }),
+  useAuth: () => ({ user: CURRENT_USER, db: clientHolder.client }),
 }));
 vi.mock("@/lib/superuser/SuperuserContext", () => ({
   useSuperuser: () => ({ unlocked: false, flags: {}, anyFlagOn: false, setFlag: vi.fn() }),
@@ -238,7 +238,7 @@ describe("#2052 acceptance: undo leaves no trace in the cloud", () => {
     now = new Date();
     pre = baseCard(preGradeState(now));
     cloud = new FakeSupabase();
-    clientHolder.client = cloud as unknown as SupabaseClient;
+    clientHolder.client = cloud as unknown as DataClient;
     // The cloud already holds the pre-grade state, written 2 days ago; this
     // device pulled it 1 day ago (so local and cloud agree at the start).
     cloud.seedCard({
@@ -260,7 +260,7 @@ describe("#2052 acceptance: undo leaves no trace in the cloud", () => {
 
   it("grade -> undo -> pullAndMerge: the log lacks the entry AND the card is at its pre-grade state", async () => {
     render(<AutoSyncOnChange />);
-    const hook = renderHook(() => usePerGradeSync(cloud as unknown as SupabaseClient, CURRENT_USER.id));
+    const hook = renderHook(() => usePerGradeSync(cloud as unknown as DataClient, CURRENT_USER.id));
 
     const { appended } = await grade(hook, 5, pre);
     // The entry is in the LOCAL log while undoable (sidebar/stats read it)...
@@ -273,7 +273,7 @@ describe("#2052 acceptance: undo leaves no trace in the cloud", () => {
     expect(cloud.cardUpserts).toEqual([]);
     expect(cloud.gradeLog.size).toBe(0);
 
-    expect(await pullAndMerge(cloud as unknown as SupabaseClient, CURRENT_USER.id)).toBe("ok");
+    expect(await pullAndMerge(cloud as unknown as DataClient, CURRENT_USER.id)).toBe("ok");
 
     // AC3: the undone grade does not reappear in the local grade log.
     expect(await loadGradeLog()).toEqual([]);
@@ -285,7 +285,7 @@ describe("#2052 acceptance: undo leaves no trace in the cloud", () => {
 
   it("grade Easy -> undo -> grade Again: the cloud sees only Again, with no rejection", async () => {
     render(<AutoSyncOnChange />);
-    const hook = renderHook(() => usePerGradeSync(cloud as unknown as SupabaseClient, CURRENT_USER.id));
+    const hook = renderHook(() => usePerGradeSync(cloud as unknown as DataClient, CURRENT_USER.id));
 
     const easy = await grade(hook, 5, pre);
     await undo(hook, easy.appended);
@@ -311,7 +311,7 @@ describe("#2052 acceptance: undo leaves no trace in the cloud", () => {
 
   it("fast undo (entry still being appended) removes the entry and never pushes it", async () => {
     render(<AutoSyncOnChange />);
-    const hook = renderHook(() => usePerGradeSync(cloud as unknown as SupabaseClient, CURRENT_USER.id));
+    const hook = renderHook(() => usePerGradeSync(cloud as unknown as DataClient, CURRENT_USER.id));
 
     const graded = baseCard(nextReview(pre.state, 1, now));
     const token = hook.result.current.enqueueGrade(graded, { hold: true });
@@ -337,7 +337,7 @@ describe("#2052 acceptance: undo leaves no trace in the cloud", () => {
 
   it("control: a grade that is NOT undone reaches the cloud once committed", async () => {
     render(<AutoSyncOnChange />);
-    const hook = renderHook(() => usePerGradeSync(cloud as unknown as SupabaseClient, CURRENT_USER.id));
+    const hook = renderHook(() => usePerGradeSync(cloud as unknown as DataClient, CURRENT_USER.id));
 
     const { appended } = await grade(hook, 4, pre);
     await act(async () => { await sleep(400); });

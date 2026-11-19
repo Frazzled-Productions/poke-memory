@@ -397,7 +397,7 @@ function GenerationBreakdown({ stats }: { stats: MasterySnapshot }) {
 
 export default function JourneyPage() {
   const t = useTranslations("journey");
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const { flags, anyFlagOn } = useSuperuser();
   const partner = usePartner();
   const { seed } = useSeed();
@@ -497,9 +497,9 @@ export default function JourneyPage() {
       // Use local cards by default; may be replaced by cloud cards below.
       let finalCards = sessionCards;
 
-      if (supabase !== null && user !== null && !anyFlagOn) {
+      if (db !== null && user !== null && !anyFlagOn) {
         try {
-          const cloudRows = await pullSession(supabase, user.id);
+          const cloudRows = await pullSession(db, user.id);
           if (cloudRows !== null) {
             const opts = seedOptsFromSettings(settings);
             const cloudCards = applyCloudAuthoritative(
@@ -557,7 +557,7 @@ export default function JourneyPage() {
     }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageVersion, anyFlagOn, supabase, user, seed]);
+  }, [storageVersion, anyFlagOn, db, user, seed]);
 
   // Provide the full snapshot input to the shared DashboardSnapshotContext.
   // Journey reads only the mastery axis from the returned snapshot (#1139,

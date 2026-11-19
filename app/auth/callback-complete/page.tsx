@@ -86,7 +86,7 @@ function summariseCloudCards(rows: CloudRow[]) {
 
 export default function CallbackCompletePage() {
   const router = useRouter();
-  const { user, loading, supabase } = useAuth();
+  const { user, loading, db } = useAuth();
   const { anyFlagOn } = useSuperuser();
   const { seed } = useSeed();
   const tAuth = useTranslations("auth");
@@ -98,20 +98,20 @@ export default function CallbackCompletePage() {
     if (loading) return;
     if (seed === null) return;
     if (!user) { router.replace("/"); return; }
-    if (!supabase) { router.replace("/"); return; }
+    if (!db) { router.replace("/"); return; }
     let cancelled = false;
     setStatus({ kind: "loading" });
     async function resolve() {
-      if (!supabase || !user) return;
+      if (!db || !user) return;
       const localSession = await loadSession();
       const hasLocal =
         localSession !== null &&
         localSession.cards.some((c) => c.state.lastReview !== null);
       let cloudRows: CloudRow[] | null = null;
       try {
-        const hasCloud = await hasCloudData(supabase, user.id);
+        const hasCloud = await hasCloudData(db, user.id);
         if (hasCloud) {
-          cloudRows = await pullSession(supabase, user.id);
+          cloudRows = await pullSession(db, user.id);
           if (cloudRows === null) {
             if (!cancelled) setStatus({ kind: "error" });
             return;
@@ -151,7 +151,7 @@ export default function CallbackCompletePage() {
           if (!cancelled) router.replace("/");
           return;
         }
-        const ok = await pushSession(supabase, user.id, localSession!.cards);
+        const ok = await pushSession(db, user.id, localSession!.cards);
         const prev = loadSyncStatus();
         // Stamp ownerUserId to mark this device's data as belonging to this user
         // (guest-claim path: owner was null, now becomes user.id). (#1712)
@@ -174,10 +174,10 @@ export default function CallbackCompletePage() {
         // Brand-new device with cloud-only data. Pull everything cloud has
         // and apply it as the truth - no conflict to resolve.
         const [settingsRow, cloudStreak, cloudGradeLog, cloudPrefs] = await Promise.all([
-          pullUserSettingsRow(supabase, user.id).catch(() => null),
-          pullStreak(supabase, user.id).catch(() => null),
-          pullGradeLog(supabase, user.id).catch(() => null),
-          pullRegionalPrefs(supabase, user.id).catch(() => null),
+          pullUserSettingsRow(db, user.id).catch(() => null),
+          pullStreak(db, user.id).catch(() => null),
+          pullGradeLog(db, user.id).catch(() => null),
+          pullRegionalPrefs(db, user.id).catch(() => null),
         ]);
         if (cancelled) return;
         await applyCloud({
@@ -196,10 +196,10 @@ export default function CallbackCompletePage() {
       // before transitioning so neither branch needs another round-trip.
       try {
         const [settingsRow, cloudStreak, cloudGradeLog, cloudPrefs, localStreak, localGradeLog] = await Promise.all([
-          pullUserSettingsRow(supabase, user.id).catch(() => null),
-          pullStreak(supabase, user.id).catch(() => null),
-          pullGradeLog(supabase, user.id).catch(() => null),
-          pullRegionalPrefs(supabase, user.id).catch(() => null),
+          pullUserSettingsRow(db, user.id).catch(() => null),
+          pullStreak(db, user.id).catch(() => null),
+          pullGradeLog(db, user.id).catch(() => null),
+          pullRegionalPrefs(db, user.id).catch(() => null),
           Promise.resolve(loadStreakData()),
           loadGradeLog(),
         ]);
@@ -227,7 +227,7 @@ export default function CallbackCompletePage() {
     }
     void resolve();
     return () => { cancelled = true; };
-  }, [loading, user, supabase, router, retryCount, seed]);
+  }, [loading, user, db, router, retryCount, seed]);
 
   async function applyCloud(data: {
     cloudRows: CloudRow[];
@@ -305,11 +305,11 @@ export default function CallbackCompletePage() {
     // anyFlagOn is true, but guard here too so the function is safe even if
     // called programmatically.
     if (anyFlagOn) return;
-    if (status.kind !== "conflict" || !user || !supabase || pending) return;
+    if (status.kind !== "conflict" || !user || !db || pending) return;
     setPending(true);
     try {
       const data = status.data;
-      const cardsOk = await pushSession(supabase, user.id, data.localCards);
+      const cardsOk = await pushSession(db, user.id, data.localCards);
 
       // Auxiliary tables are best-effort: a failure shouldn't block the
       // "your local progress is now the source of truth" outcome. We log
@@ -319,11 +319,11 @@ export default function CallbackCompletePage() {
       const localStreak = loadStreakData();
       const localGradeLog = await loadGradeLog();
       const auxPushes = await Promise.all([
-        pushSettings(supabase, user.id, localSettings).catch((e) => {
+        pushSettings(db, user.id, localSettings).catch((e) => {
           console.warn("[callback-complete] keep-local settings push failed", e);
           return false;
         }),
-        pushRegionalPrefs(supabase, user.id, {
+        pushRegionalPrefs(db, user.id, {
           timezone: localSettings.timezone,
           dateFormat: localSettings.dateFormat,
           pushNotificationHour: localSettings.pushNotificationHour,
@@ -331,11 +331,11 @@ export default function CallbackCompletePage() {
           console.warn("[callback-complete] keep-local regional prefs push failed", e);
           return false;
         }),
-        pushStreak(supabase, user.id, localStreak).catch((e) => {
+        pushStreak(db, user.id, localStreak).catch((e) => {
           console.warn("[callback-complete] keep-local streak push failed", e);
           return false;
         }),
-        pushGradeLog(supabase, user.id, localGradeLog).catch((e) => {
+        pushGradeLog(db, user.id, localGradeLog).catch((e) => {
           console.warn("[callback-complete] keep-local grade-log push failed", e);
           return false;
         }),

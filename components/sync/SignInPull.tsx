@@ -10,10 +10,10 @@ import { useSignInPull } from "@/lib/sync/useSignInPull";
  * Parallel to <SyncOnVisible /> - same architecture, different trigger.
  */
 export function SignInPull() {
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const { anyFlagOn } = useSuperuser();
   // Mirror the OnlineReconnectSync pattern: pulls are allowed while superuser
   // flags are on, but the push-back inside pullAndMerge must be suppressed.
-  useSignInPull(supabase, user?.id ?? null, anyFlagOn);
+  useSignInPull(db, user?.id ?? null, anyFlagOn);
   return null;
 }

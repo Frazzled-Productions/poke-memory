@@ -84,12 +84,12 @@ vi.mock("@/lib/sync/persistence", () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-const MOCK_SUPABASE = {} as import("@supabase/supabase-js").SupabaseClient;
+const MOCK_DB = {} as import("@/lib/db/client").DataClient;
 const MOCK_USER_ID = "user-abc-123";
 
 function defaultProps() {
   return {
-    supabase: MOCK_SUPABASE,
+    db: MOCK_DB,
     userId: MOCK_USER_ID,
   };
 }

@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor, act } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 // ---------------------------------------------------------------------------
 // Configurable mock factories - declared before vi.mock calls so hoisting
@@ -39,7 +39,7 @@ vi.mock("next/navigation", () => ({
 const mockUseAuth = vi.fn(() => ({
   user: null as null | { id: string },
   loading: true,
-  supabase: null as null | SupabaseClient,
+  db: null as null | DataClient,
 }));
 vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
@@ -154,7 +154,7 @@ import CallbackCompletePage from "./page";
 // Shared test fixtures
 // ---------------------------------------------------------------------------
 
-const FAKE_CLIENT = {} as unknown as SupabaseClient;
+const FAKE_CLIENT = {} as unknown as DataClient;
 const FAKE_USER = { id: "00000000-0000-0000-0000-000000000001" };
 
 /** A minimal ReviewableCard with a non-null lastReview (counts as "reviewed"). */
@@ -235,7 +235,7 @@ const makeCloudRow = () => ({
 describe("CallbackCompletePage - loading state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseAuth.mockReturnValue({ user: null, loading: true, supabase: null });
+    mockUseAuth.mockReturnValue({ user: null, loading: true, db: null });
     mockUseSuperuser.mockReturnValue({ anyFlagOn: false });
   });
 
@@ -265,7 +265,7 @@ describe("CallbackCompletePage - F11 Path A: superuser skips auto-push", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Signed-in, seed loaded.
-    mockUseAuth.mockReturnValue({ user: FAKE_USER, loading: false, supabase: FAKE_CLIENT });
+    mockUseAuth.mockReturnValue({ user: FAKE_USER, loading: false, db: FAKE_CLIENT });
     // Superuser flag active.
     mockUseSuperuser.mockReturnValue({ anyFlagOn: true });
     // Local session has a reviewed card.
@@ -304,7 +304,7 @@ describe("CallbackCompletePage - F11 Path A: superuser skips auto-push", () => {
 describe("CallbackCompletePage - F11 Path B: conflict UI with superuser flag on", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseAuth.mockReturnValue({ user: FAKE_USER, loading: false, supabase: FAKE_CLIENT });
+    mockUseAuth.mockReturnValue({ user: FAKE_USER, loading: false, db: FAKE_CLIENT });
     mockUseSuperuser.mockReturnValue({ anyFlagOn: true });
 
     // Local session has a reviewed card.
@@ -387,7 +387,7 @@ describe("CallbackCompletePage - F11 Path B: conflict UI with superuser flag on"
 describe("CallbackCompletePage - conflict UI baseline (anyFlagOn false)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseAuth.mockReturnValue({ user: FAKE_USER, loading: false, supabase: FAKE_CLIENT });
+    mockUseAuth.mockReturnValue({ user: FAKE_USER, loading: false, db: FAKE_CLIENT });
     mockUseSuperuser.mockReturnValue({ anyFlagOn: false });
 
     mockLoadSession.mockResolvedValue({

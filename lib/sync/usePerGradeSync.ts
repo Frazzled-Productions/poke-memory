@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import type { ReviewableCard } from "@/lib/review/session";
 import { pushSingleCard, isSyncSafe, type PushSingleCardResult } from "@/lib/sync/cloud";
 import {
@@ -106,7 +106,7 @@ const PERSIST_DEBOUNCE_MS = 500;
  * the queue as a committed grade and drained.
  */
 export function usePerGradeSync(
-  client: SupabaseClient | null,
+  client: DataClient | null,
   userId: string | null,
   options?: { onCommitted?: (token: number) => void },
 ): {

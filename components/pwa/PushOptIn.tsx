@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import {
   hasLocalSubscription,
   isPushSupported,
@@ -51,10 +52,10 @@ type ErrorReason =
 
 export function PushOptIn({
   user,
-  supabase,
+  db,
 }: {
   user: User;
-  supabase: SupabaseClient;
+  db: DataClient;
 }) {
   const t = useTranslations("settings.pushOptIn");
   const { anyFlagOn } = useSuperuser();
@@ -100,7 +101,7 @@ export function PushOptIn({
         return;
       }
       // Local subscription exists - reconcile against the server row.
-      const reconcileResult = await reconcileSubscription(supabase, user.id);
+      const reconcileResult = await reconcileSubscription(db, user.id);
       if (!cancelled) {
         // "disabled" means the local subscription has no server row and we
         // could not re-insert it - flip the toggle off so the user is aware.
@@ -112,7 +113,7 @@ export function PushOptIn({
     return () => {
       cancelled = true;
     };
-  // supabase and user.id are stable for the lifetime of the component.
+  // db and user.id are stable for the lifetime of the component.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -133,7 +134,7 @@ export function PushOptIn({
     if (anyFlagOn) return;
     setStatus("subscribing");
     setError(null);
-    const result = await subscribeToPush(supabase, user.id);
+    const result = await subscribeToPush(db, user.id);
     if (typeof Notification !== "undefined") {
       setPermission(Notification.permission);
     }
@@ -143,13 +144,13 @@ export function PushOptIn({
       setError(result.reason);
     }
     setStatus("ready");
-  }, [anyFlagOn, supabase, user.id]);
+  }, [anyFlagOn, db, user.id]);
 
   const onUnsubscribe = useCallback(async () => {
     if (anyFlagOn) return;
     setStatus("unsubscribing");
     setError(null);
-    const result = await unsubscribeFromPush(supabase, user.id);
+    const result = await unsubscribeFromPush(db, user.id);
     if (result.ok) {
       setSubscribed(false);
       // Consent hygiene (#1950): reset the dependent streak-nudge opt-in so
@@ -161,7 +162,7 @@ export function PushOptIn({
       setError(result.reason);
     }
     setStatus("ready");
-  }, [anyFlagOn, supabase, user.id]);
+  }, [anyFlagOn, db, user.id]);
 
   if (!visible) return null;
 

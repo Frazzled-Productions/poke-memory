@@ -38,7 +38,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { loadSettings } from "@/lib/settings/persistence";
 import type { ReviewableCard, NameReviewCard } from "@/lib/review/session";
@@ -111,7 +111,7 @@ type Props = {
    * write-guard. Forwarded to `usePerGradeSync` directly so the quiz honours
    * the same null-guard semantics as `ReviewSession`.
    */
-  client: SupabaseClient | null;
+  client: DataClient | null;
   /** Authenticated user id, or null in the same cases as `client`. */
   userId: string | null;
   /**

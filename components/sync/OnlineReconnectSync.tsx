@@ -11,14 +11,14 @@ import { useOnlineReconnectSync } from "@/lib/sync/useOnlineReconnectSync";
  * remote changes first).
  *
  * Passes `null` for client and userId when any superuser flag is on, honouring
- * the sync write-guard - QA sessions never leak fake state into Supabase.
+ * the sync write-guard - QA sessions never leak fake state into the cloud.
  */
 export function OnlineReconnectSync() {
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const { anyFlagOn } = useSuperuser();
 
   // Mirror the superuser write-guard used by AutoSyncOnChange and ReviewSession.
-  const client = anyFlagOn ? null : supabase;
+  const client = anyFlagOn ? null : db;
   const userId = anyFlagOn ? null : user?.id ?? null;
 
   useOnlineReconnectSync(client, userId);

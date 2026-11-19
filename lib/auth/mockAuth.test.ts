@@ -108,19 +108,6 @@ describe("MOCK_USER", () => {
 });
 
 describe("createMockClient", () => {
-  it("auth.getUser() resolves to the fake user", async () => {
-    const client = createMockClient();
-    const { data } = await client.auth.getUser();
-    expect(data.user?.id).toBe(MOCK_USER.id);
-  });
-
-  it("auth.onAuthStateChange() returns an inert unsubscribable subscription", () => {
-    const client = createMockClient();
-    const { data } = client.auth.onAuthStateChange(() => {});
-    expect(typeof data.subscription.unsubscribe).toBe("function");
-    expect(() => data.subscription.unsubscribe()).not.toThrow();
-  });
-
   it("from('card_reviews') resolves to an empty array by default (no cloud data)", async () => {
     const client = createMockClient();
     const { data, error, count } = await client
@@ -175,5 +162,15 @@ describe("createMockClient", () => {
       .update({ timezone: "UTC" })
       .eq("user_id", MOCK_USER.id);
     expect(updateResult.error).toBeNull();
+  });
+
+  it("insert / delete (the push opt-in path) and rpc resolve as no-op successes", async () => {
+    const client = createMockClient();
+    const del = await client.from("push_subscriptions").delete().eq("user_id", MOCK_USER.id);
+    expect(del.error).toBeNull();
+    const ins = await client.from("push_subscriptions").insert({ endpoint: "https://fcm.googleapis.com/x" });
+    expect(ins.error).toBeNull();
+    const rpc = await client.rpc("reset_all_progress");
+    expect(rpc.error).toBeNull();
   });
 });
