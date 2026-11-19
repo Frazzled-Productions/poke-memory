@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Restore check for the nightly D1 backup (OpenSpec change move-to-cloudflare, design D10), run
-// monthly by .github/workflows/restore-test.yml after it has loaded the newest backup into a fresh
+// by .github/workflows/restore-test.yml (by hand; its schedule is off) after it has loaded the newest backup into a fresh
 // local D1. Compares the row count of every table named in the backup's header with the restored
 // database and exits 1 on any difference.
 //

@@ -310,8 +310,9 @@ Source (planned): design D2, proposal Clarifications (19 November 2026, about 20
 
 `POST /api/cron/backup`, at 02:00 UTC, SHALL write every table as SQL `INSERT` statements to the R2
 bucket `poke-memory-backups` (EU jurisdiction) at `d1/YYYY-MM-DD.sql`, then delete objects older than
-90 days. The preview Worker SHALL use its own bucket. A monthly GitHub Actions job SHALL restore the
-latest file into a local D1 and check row counts.
+90 days. The preview Worker SHALL use its own bucket. A GitHub Actions job, run by hand, SHALL restore
+the latest file into a local D1 and check row counts. It SHALL have no schedule until the owner decides
+on one.
 
 #### Scenario: Nightly run
 
@@ -330,8 +331,14 @@ latest file into a local D1 and check row counts.
 
 #### Scenario: No R2 read token yet
 
-- **WHEN** the monthly restore job runs before its token is set
+- **WHEN** the restore job runs before its token is set
 - **THEN** it skips with a notice instead of failing
+
+#### Scenario: No schedule yet
+
+- **WHEN** a month passes with no one running the restore job
+- **THEN** it has not run, so no production backup has been copied to a GitHub-hosted runner (a
+  transfer the privacy notice does not disclose), and the cron health monitor raises no issue about it
 
 Source (planned): design D10, `app/api/cron/backup/route.ts`.
 

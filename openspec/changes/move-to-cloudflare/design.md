@@ -208,8 +208,10 @@ event name. Page views come from Cloudflare Web Analytics when a beacon token is
 
 `POST /api/cron/backup` (02:00 UTC) writes every table as SQL `INSERT` statements to R2
 (`poke-memory-backups`, EU jurisdiction) at `d1/YYYY-MM-DD.sql`, then deletes objects older than 90 days.
-D1 Time Travel covers 30 days on top. A monthly GitHub Actions job restores the latest file into a local
-D1 and checks row counts (it needs an R2 read token, an owner step). The preview Worker has its own
+D1 Time Travel covers 30 days on top. A GitHub Actions job restores the latest file into a local D1 and
+checks row counts (it needs an R2 read token, an owner step). It runs by hand only: a monthly schedule
+waits on an owner decision, because a run copies the full production backup to a GitHub-hosted runner,
+which the privacy notice does not disclose. The preview Worker has its own
 bucket.
 
 ### D11. Previews and deploys

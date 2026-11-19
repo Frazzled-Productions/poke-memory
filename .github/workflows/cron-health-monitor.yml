@@ -70,8 +70,9 @@ jobs:
             "refresh-user-count.yml|Refresh User Count|48"
             "monitor-grade-log-divergence.yml|Monitor Grade-Log Divergence|48"
             "pokeapi-species-monitor.yml|PokéAPI Species Monitor|840"
-            "restore-test.yml|Restore Test|840"
           )
+          # restore-test.yml is manual-only while its schedule is off (move-to-cloudflare), so it
+          # has no scheduled runs to watch; add it back here with its schedule.
 
           NOW=$(date -u +%s)
 
