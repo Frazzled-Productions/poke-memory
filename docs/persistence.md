@@ -62,7 +62,11 @@ If a column has a "this value only moves forward" semantic (review dates, counte
 
 ## Apply the migration
 
-Apply it locally with `npm run db:migrate:local` and run the tests against it. `migration-check.yml` checks that every file in `db/d1/migrations/` applies cleanly to a fresh local D1. Production and preview databases are not migrated by hand: the deploy workflow applies pending D1 migrations before it deploys the Worker (production on push to `main`; each PR's preview Worker has its own database). Migrations therefore go live with the code that needs them, so a migration must not break the client still running in open browsers (see the two-phase rollout below).
+Migrations are new files in `db/d1/migrations/` (`NNNN_name.sql`, SQLite). Nothing is applied by hand: `deploy.yml` runs `wrangler d1 migrations apply DB` against the preview database on every PR into `qa` (before uploading that PR's preview version) and against production on every deploy from `main`, immediately before the new Worker goes live. wrangler records each applied file by name in the database's `d1_migrations` table, so a file runs once per database.
+
+**Append-only.** Never edit, rename or delete a migration that is already on `qa`: a database that has applied it will never see the change. Put the fix in a new file. `migration-check.yml` enforces this and also applies every migration to a fresh local D1 (`wrangler d1 migrations apply DB --local`), so a migration that does not parse under D1 fails the PR. Run the whole D1 suite locally before pushing one (see [docs/testing.md](testing.md#integration-vitest--d1-on-nodesqlite)): the PR's `test` job only runs tests the import graph links to your change, and a migration is SQL read from disk.
+
+**The old client is live for a moment.** Production applies the migration and then deploys the Worker in the same job, so the previous Worker serves requests against the new schema for the minute in between, and longer if the deploy step fails. A migration must therefore work with the client already in production; the two-phase rule below still applies.
 
 ## Wire cross-device sync
 

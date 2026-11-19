@@ -1,0 +1,112 @@
+name: Restore test
+
+# Monthly proof that the nightly D1 backup can be restored (OpenSpec change move-to-cloudflare,
+# design D10). POST /api/cron/backup writes every table as SQL INSERTs to the R2 bucket
+# `poke-memory-backups` (EU jurisdiction) at d1/YYYY-MM-DD.sql each night at 02:00 UTC. This job:
+#
+#   1. downloads the newest object under d1/ (and fails if it is more than 3 days old, which means
+#      the nightly backup has stopped);
+#   2. applies db/d1/migrations to a fresh local D1, then executes the backup file into it;
+#   3. fails if any table's row count differs from the count in the file's header.
+#
+# The file format (data-only INSERTs in dependency order after a `-- rows <table>: <count>` header
+# line per table) is documented in scripts/cloudflare/check-restore.mjs, which does step 3.
+#
+# Needs an R2 API token with read access to the bucket (an owner step): the R2_ACCESS_KEY_ID and
+# R2_SECRET_ACCESS_KEY secrets plus the CLOUDFLARE_ACCOUNT_ID variable. Without them the run skips
+# with a notice and passes. The backup holds personal data and this repo's logs are public: it is
+# written only to the runner's temporary folder, never uploaded as an artifact, and no step prints
+# its contents (only table names and row counts are logged).
+#
+# Watched by cron-health-monitor.yml (monthly, 840h).
+
+on:
+  schedule:
+    # 05:23 UTC on the 3rd of each month, well after that night's 02:00 backup.
+    - cron: "23 5 3 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: restore-test
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    if: github.repository == 'Frazzled-Productions/poke-memory'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check R2 access is set up
+        id: ready
+        env:
+          HAS_KEYS: ${{ secrets.R2_ACCESS_KEY_ID != '' && secrets.R2_SECRET_ACCESS_KEY != '' && vars.CLOUDFLARE_ACCOUNT_ID != '' }}
+        run: |
+          if [ "$HAS_KEYS" = "true" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY secrets or CLOUDFLARE_ACCOUNT_ID variable, so the restore test is skipped."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download the newest backup
+        if: steps.ready.outputs.ok == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          # R2 does not accept the default checksum headers newer AWS CLIs send.
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          # EU-jurisdiction buckets have their own endpoint.
+          R2_ENDPOINT: https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.eu.r2.cloudflarestorage.com
+          BUCKET: poke-memory-backups
+        run: |
+          set -euo pipefail
+          newest=$(aws s3api list-objects-v2 --endpoint-url "$R2_ENDPOINT" --bucket "$BUCKET" --prefix d1/ \
+            --query 'Contents[].[LastModified, Key]' --output text | sort | tail -n 1)
+          if [ -z "$newest" ] || [ "$newest" = "None" ]; then
+            echo "::error::No backup found under d1/ in ${BUCKET}. The nightly backup is not running."
+            exit 1
+          fi
+          modified=$(cut -f1 <<< "$newest")
+          key=$(cut -f2 <<< "$newest")
+          age_hours=$(( ( $(date -u +%s) - $(date -u -d "$modified" +%s) ) / 3600 ))
+          echo "Newest backup: ${key} (${modified}, ${age_hours}h old)"
+          if [ "$age_hours" -gt 72 ]; then
+            echo "::error::The newest backup (${key}) is ${age_hours}h old. The nightly backup has stopped."
+            exit 1
+          fi
+          aws s3api get-object --endpoint-url "$R2_ENDPOINT" --bucket "$BUCKET" --key "$key" \
+            "$RUNNER_TEMP/backup.sql" > /dev/null
+
+      - if: steps.ready.outputs.ok == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: "npm"
+      - if: steps.ready.outputs.ok == 'true'
+        run: npm ci
+
+      - name: Restore into a fresh local D1
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          set -euo pipefail
+          npx wrangler d1 migrations apply DB --local --persist-to "$RUNNER_TEMP/d1"
+          # All output is dropped: this repo's Actions logs are public, and an error from a
+          # failing INSERT would quote the row, which is personal data.
+          if ! npx wrangler d1 execute DB --local --persist-to "$RUNNER_TEMP/d1" --yes \
+            --file "$RUNNER_TEMP/backup.sql" > /dev/null 2>&1; then
+            echo "::error::The backup did not load into a fresh D1 with today's migrations (output hidden because it can contain personal data). Reproduce locally: download the same object and run wrangler d1 execute DB --local --file on it."
+            exit 1
+          fi
+
+      - name: Compare row counts with the backup header
+        if: steps.ready.outputs.ok == 'true'
+        run: node scripts/cloudflare/check-restore.mjs "$RUNNER_TEMP/backup.sql" "$RUNNER_TEMP/d1"

@@ -19,8 +19,8 @@
  * set there the seam would stay inert. As defence-in-depth,
  * `assertMockAuthNotInProduction()` is invoked from `next.config.ts` and fails
  * the build loudly if both the flag and a production `NODE_ENV` are present at
- * build time. The flag is never set in any production Vercel environment - it
- * is set only by `e2e.yml`, only against preview deployments.
+ * build time. The flag is never set in any deployed build - `deploy.yml`'s
+ * `preview-e2e` job sets it only on the Playwright runner.
  *
  * See `lib/auth/mockAuth.test.ts` for the assertion proving the seam is
  * unreachable in production builds.

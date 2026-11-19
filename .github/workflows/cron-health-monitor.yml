@@ -70,6 +70,7 @@ jobs:
             "refresh-user-count.yml|Refresh User Count|48"
             "monitor-grade-log-divergence.yml|Monitor Grade-Log Divergence|48"
             "pokeapi-species-monitor.yml|PokéAPI Species Monitor|840"
+            "restore-test.yml|Restore Test|840"
           )
 
           NOW=$(date -u +%s)

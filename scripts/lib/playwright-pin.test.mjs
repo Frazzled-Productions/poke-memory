@@ -53,7 +53,7 @@ describe("findImageTagDrift", () => {
 
   it("passes when every tag matches the locked version", () => {
     const files = [
-      { path: ".github/workflows/e2e.yml", text: `jobs:\n${image("1.63.0")}` },
+      { path: ".github/workflows/deploy.yml", text: `jobs:\n${image("1.63.0")}` },
       { path: "WORKFLOW.md", text: "no tag here" },
     ];
     expect(findImageTagDrift(files, "1.63.0")).toEqual([]);
@@ -80,14 +80,14 @@ describe("findImageTagDrift", () => {
   it("reports major.minor and major-only tags as mismatches instead of ignoring them", () => {
     const files = [
       {
-        path: ".github/workflows/e2e.yml",
+        path: ".github/workflows/deploy.yml",
         text: `${image("1.63")}\n${image("1")}`,
       },
     ];
     const errors = findImageTagDrift(files, "1.63.0");
     expect(errors).toHaveLength(2);
-    expect(errors[0]).toMatch(/e2e\.yml:1 pins playwright:v1\.63,/);
-    expect(errors[1]).toMatch(/e2e\.yml:2 pins playwright:v1,/);
+    expect(errors[0]).toMatch(/deploy\.yml:1 pins playwright:v1\.63,/);
+    expect(errors[1]).toMatch(/deploy\.yml:2 pins playwright:v1,/);
   });
 });
 
@@ -115,7 +115,7 @@ describe("findMissingPins", () => {
   it("fails when tags exist elsewhere but ci.yml has lost its pin", () => {
     const errors = findMissingPins([
       { path: ".github/workflows/ci.yml", text: "runs-on: ubuntu-latest" },
-      { ...ciPin, path: ".github/workflows/e2e.yml" },
+      { ...ciPin, path: ".github/workflows/deploy.yml" },
     ]);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatch(

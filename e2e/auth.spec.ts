@@ -14,8 +14,10 @@ test.beforeEach(async ({ page }) => {
  * nav, the conflict picker, and the visible superuser cloud-write-guard
  * surfaces.
  *
- * The seam (`lib/auth/mockAuth.ts`) is activated by `NEXT_PUBLIC_E2E_AUTH_MOCK=1`,
- * set ONLY against preview deployments by `e2e.yml`. It is provably unreachable
+ * The seam (`lib/auth/mockAuth.ts`) is activated by `NEXT_PUBLIC_E2E_AUTH_MOCK=1`
+ * in a non-production build (`deploy.yml`'s `preview-e2e` job runs this spec
+ * against each PR's preview version, where the signed-in specs skip themselves
+ * because that is a production build). It is provably unreachable
  * in production builds - `isMockAuthEnabled()` short-circuits on
  * `NODE_ENV === "production"`, and `next.config.ts` fails the build loudly if
  * the flag is ever set in a production build. See `lib/auth/mockAuth.test.ts`.
