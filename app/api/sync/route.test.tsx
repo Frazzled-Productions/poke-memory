@@ -29,7 +29,7 @@ let alice: string;
 let bob: string;
 let sessionUser: string | null;
 
-function useDb(hooks: SpyHooks = {}) {
+function installDb(hooks: SpyHooks = {}) {
   db = spyD1(d1, hooks);
   getCloudflareContext.mockResolvedValue({ env: { DB: db }, ctx: { waitUntil: vi.fn() } });
 }
@@ -40,7 +40,7 @@ beforeEach(() => {
   alice = createTestUser(d1);
   bob = createTestUser(d1);
   sessionUser = alice;
-  useDb();
+  installDb();
   requireAuth.mockImplementation(async (_request: Request, options: { withOkField?: boolean } = {}) =>
     sessionUser
       ? { user: { id: sessionUser } }
@@ -203,7 +203,7 @@ describe("POST /api/sync", () => {
   });
 
   it("returns 502 partial_failure when every attempt fails, after three tries", async () => {
-    useDb({
+    installDb({
       before: ({ table }) => {
         if (table === "card_reviews") throw new Error("D1_ERROR: network connection lost");
       },
@@ -216,7 +216,7 @@ describe("POST /api/sync", () => {
 
   it("returns 200 when the upsert succeeds after a transient failure", async () => {
     let failures = 1;
-    useDb({
+    installDb({
       before: ({ table }) => {
         if (table === "card_reviews" && failures-- > 0) throw new Error("D1_ERROR: transient");
       },
@@ -228,7 +228,7 @@ describe("POST /api/sync", () => {
   });
 
   it("returns 409 at once for a structural error, without retrying", async () => {
-    useDb({
+    installDb({
       before: ({ table }) => {
         if (table === "card_reviews") throw new Error("D1_ERROR: table card_reviews has no column named x");
       },

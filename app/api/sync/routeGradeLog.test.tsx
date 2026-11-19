@@ -64,14 +64,14 @@ let alice: string;
 let bob: string;
 let sessionUser: string | null;
 
-function useDb(hooks: SpyHooks = {}) {
+function installDb(hooks: SpyHooks = {}) {
   db = spyD1(d1, hooks);
   getCloudflareContext.mockResolvedValue({ env: { DB: db }, ctx: { waitUntil: vi.fn() } });
 }
 
 /** Fails or holds back the statements of one table. */
 function failTable(table: string, error: Error) {
-  useDb({
+  installDb({
     before: (s) => {
       if (s.table === table) throw error;
     },
@@ -89,7 +89,7 @@ beforeEach(() => {
   alice = createTestUser(d1);
   bob = createTestUser(d1);
   sessionUser = alice;
-  useDb();
+  installDb();
   requireAuth.mockImplementation(async () =>
     sessionUser ? { user: { id: sessionUser } } : NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 }),
   );
@@ -231,7 +231,7 @@ describe("POST /api/sync - gradeLog leg (#2052)", () => {
     const gate = new Promise<void>((r) => {
       release = r;
     });
-    useDb({
+    installDb({
       before: async (s) => {
         if (s.table === "grade_log") await gate;
       },

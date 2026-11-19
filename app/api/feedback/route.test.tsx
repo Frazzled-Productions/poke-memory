@@ -59,7 +59,7 @@ afterEach(() => {
   d1.close();
 });
 
-function useDb(hooks: SpyHooks) {
+function installDb(hooks: SpyHooks) {
   env.DB = spyD1(d1, hooks);
 }
 
@@ -162,7 +162,7 @@ describe("POST /api/feedback - stored row", () => {
 
 describe("POST /api/feedback - error handling", () => {
   it("returns 500 { ok: false } when the insert fails", async () => {
-    useDb({
+    installDb({
       before: (s) => {
         if (s.table === "feedback") throw new Error("D1_ERROR: down");
       },
@@ -197,7 +197,7 @@ describe("POST /api/feedback - rate limit (#1883)", () => {
   });
 
   it("proceeds (fail-open) when the rate-limit check fails", async () => {
-    useDb({
+    installDb({
       before: (s) => {
         if (s.table === "rate_limit_buckets") throw new Error("D1_ERROR: down");
       },

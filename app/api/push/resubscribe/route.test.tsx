@@ -27,7 +27,7 @@ let alice: string;
 let bob: string;
 let sessionUser: string | null;
 
-function useDb(hooks: SpyHooks = {}) {
+function installDb(hooks: SpyHooks = {}) {
   db = spyD1(d1, hooks);
   getCloudflareContext.mockResolvedValue({ env: { DB: db } });
 }
@@ -38,7 +38,7 @@ beforeEach(() => {
   alice = createTestUser(d1);
   bob = createTestUser(d1);
   sessionUser = alice;
-  useDb();
+  installDb();
   requireAuth.mockImplementation(async (_request: Request, options: { withOkField?: boolean } = {}) =>
     sessionUser
       ? { user: { id: sessionUser } }
@@ -106,7 +106,7 @@ describe("POST /api/push/resubscribe", () => {
   });
 
   it("returns 500 delete_failed when the delete fails", async () => {
-    useDb({
+    installDb({
       before: (s) => {
         if (s.sql.startsWith("DELETE")) throw new Error("D1_ERROR: down");
       },
@@ -117,7 +117,7 @@ describe("POST /api/push/resubscribe", () => {
   });
 
   it("returns 500 insert_failed when the insert fails", async () => {
-    useDb({
+    installDb({
       before: (s) => {
         if (s.sql.startsWith("INSERT")) throw new Error("D1_ERROR: down");
       },
