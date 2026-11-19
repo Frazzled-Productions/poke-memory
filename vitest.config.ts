@@ -1,6 +1,11 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 import coverageFloor from "./coverage-floor.json";
+import { generateChangelogModule } from "./scripts/generate-changelog-module.mjs";
+
+// lib/changelog/changelog.generated.ts is gitignored build output (Workers
+// have no filesystem, decision 0018); generate it so a clean checkout tests.
+generateChangelogModule();
 
 const alias = { "@": path.resolve(__dirname, ".") };
 

@@ -1,0 +1,8 @@
+# Cloudflare static-asset headers (Workers assets). Mirrors the headers() block
+# in next.config.ts, which Workers assets do not apply to public/ files: the
+# service worker must always revalidate (#1749) and claim the whole site.
+/sw/sw.js
+  Cache-Control: no-cache
+  Service-Worker-Allowed: /
+/sw/sw.js.map
+  Cache-Control: no-cache

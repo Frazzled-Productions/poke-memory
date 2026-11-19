@@ -7,12 +7,17 @@
   },
   "scripts": {
     "preinstall": "node scripts/check-node-version.mjs",
-    "dev": "next dev",
+    "dev": "node scripts/generate-changelog-module.mjs && next dev",
     "prebuild": "node scripts/check-node-version.mjs",
-    "build": "next build && node scripts/build-sw.mjs",
+    "build": "node scripts/generate-changelog-module.mjs && next build && node scripts/build-sw.mjs",
     "start": "next start",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "cf:upload-preview": "opennextjs-cloudflare upload --env preview --preview-alias pr-$PR_NUMBER",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "check:bundle": "node scripts/check-bundle-size.mjs",
-    "lint": "eslint && npm run lint:em-dash && npm run lint:i18n && npm run lint:pseudo-locale && npm run lint:changelog && npm run lint:agents-size && npm run lint:playwright-pin && npm run lint:skills-layout && npm run lint:workflow-markers",
+    "lint": "eslint && npm run lint:em-dash && npm run lint:i18n && npm run lint:pseudo-locale && npm run lint:changelog && npm run lint:agents-size && npm run lint:playwright-pin && npm run lint:skills-layout && npm run lint:workflow-markers && npm run lint:scoped-queries",
     "lint:em-dash": "node scripts/check-no-em-dash.mjs",
     "lint:i18n": "node scripts/lint-i18n.mjs",
     "lint:pseudo-locale": "node scripts/generate-pseudo-locale.mjs --check",
@@ -41,20 +46,24 @@
     "test:integration": "VITEST_INTEGRATION=1 vitest run --project integration",
     "test:e2e": "playwright test --project=chromium --project=mobile-safari --project=desktop-webkit --project=mobile-chrome",
     "test:visual": "playwright test --project=visual-chromium --project=visual-webkit",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/generate-changelog-module.mjs && tsc --noEmit && tsc --noEmit -p worker/tsconfig.json",
     "qa:seed-cloud": "node scripts/run-qa-seed-cloud.mjs",
-    "pre-pr": "node scripts/pre-pr.mjs"
+    "pre-pr": "node scripts/pre-pr.mjs",
+    "lint:scoped-queries": "node scripts/check-scoped-queries.mjs"
   },
   "dependencies": {
     "@open-spaced-repetition/binding": "^0.5.0",
+    "@opennextjs/cloudflare": "^1.20.17",
     "@sentry/nextjs": "^11.1.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "bcryptjs": "^3.0.3",
+    "better-auth": "^1.7.22",
     "esbuild-wasm": "^0.28.2",
     "idb": "^8.0.3",
-    "next": "16.4.2",
+    "next": "16.4.6",
     "next-intl": "^4.14.9",
     "react": "19.3.1",
     "react-dom": "19.3.1",
@@ -69,6 +78,7 @@
     "browserslist": "$browserslist"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261112.1",
     "@playwright/test": "^1.63.0",
     "@serwist/build": "^9.5.11",
     "@serwist/turbopack": "^9.5.13",
@@ -86,7 +96,7 @@
     "browserslist": "^4.28.8",
     "esbuild": "^0.28.2",
     "eslint": "^9",
-    "eslint-config-next": "16.4.2",
+    "eslint-config-next": "16.4.6",
     "fake-indexeddb": "^6.2.6",
     "jsdom": "^29.1.1",
     "pg": "^8.23.1",
@@ -95,6 +105,7 @@
     "typescript": "^6",
     "vitest": "^5.0.2",
     "wait-on": "^9.5.1",
-    "wanakana": "^5.3.1"
+    "wanakana": "^5.3.1",
+    "wrangler": "^4.161.0"
   }
 }

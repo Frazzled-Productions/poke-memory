@@ -1,0 +1,79 @@
+// Cloudflare Worker for Poké Memory (decision 0018; openspec/changes/move-to-cloudflare/design.md).
+//
+// Secrets are NOT in this file (the repo is public). Set each per environment
+// with `npx wrangler secret put <NAME> [--env preview]`; for `wrangler dev`,
+// put local test values in a gitignored `.dev.vars`:
+//   BETTER_AUTH_SECRET                       Better Auth session signing (D6)
+//   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET   GitHub OAuth app (D6)
+//   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET   Google OAuth client (D6)
+//   CRON_SHARED_SECRET                       bearer for the cron routes (D2)
+//   VAPID_PRIVATE_KEY, VAPID_SUBJECT         Web Push signing (D8)
+//   DISCORD_NOTIFY_WEBHOOK_URL               feedback notify (042, 051)
+//   DISCORD_DIGEST_WEBHOOK_URL               weekly digest (042)
+//   RATE_LIMIT_SALT                          per-IP bucket hashing (041)
+//   SENTRY_TRACES_SAMPLE_RATE (optional)     server trace sampling
+// Build-time values (CI environment, inlined by `next build`, not Worker
+// secrets): NEXT_PUBLIC_SENTRY_DSN, NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+// NEXT_PUBLIC_SITE_URL, NEXT_PUBLIC_CF_BEACON_TOKEN, SENTRY_AUTH_TOKEN,
+// SENTRY_ORG, SENTRY_PROJECT.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "poke-memory",
+  // Custom entry: wraps .open-next/worker.js and adds scheduled() (design D2).
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "poke-memory" }],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "poke-memory",
+      "database_id": "7c8bb1fd-212a-46b9-8027-611ec095213f",
+      "migrations_dir": "db/d1/migrations"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "BACKUPS", "bucket_name": "poke-memory-backups", "jurisdiction": "eu" }
+  ],
+  // Both crons map to app routes through cronRoutesFor() in lib/cron/schedule.ts.
+  "triggers": { "crons": ["0 * * * *", "*/30 * * * *"] },
+  "vars": {
+    "DEPLOY_ENV": "cloudflare-production",
+    "BETTER_AUTH_URL": "https://poke-memory.frasers-account.workers.dev"
+  },
+  "env": {
+    // Per-PR versions (design D11): its own Worker, D1 database and bucket.
+    // d1_databases, r2_buckets, services and vars do not inherit, so each is
+    // repeated here; triggers DO inherit, so they are emptied explicitly.
+    "preview": {
+      "name": "poke-memory-preview",
+      "preview_urls": true,
+      "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "poke-memory-preview" }],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "poke-memory-preview",
+          "database_id": "77adf699-88e9-4f04-af67-f65e7cf09d36",
+          "migrations_dir": "db/d1/migrations"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "BACKUPS", "bucket_name": "poke-memory-backups-preview", "jurisdiction": "eu" }
+      ],
+      // No Cron Triggers at all: the preview database holds rehearsal copies of
+      // real data, so it must never send pushes or Discord messages (D2). Outbound
+      // sends are also gated on DEPLOY_ENV by lib/outbound.ts.
+      "triggers": { "crons": [] },
+      "vars": {
+        "DEPLOY_ENV": "cloudflare-preview",
+        // Version aliases (pr-<n>-poke-memory-preview...) differ from this base
+        // URL; the auth set-up decides how OAuth callbacks reach an alias.
+        "BETTER_AUTH_URL": "https://poke-memory-preview.frasers-account.workers.dev"
+      }
+    }
+  }
+}

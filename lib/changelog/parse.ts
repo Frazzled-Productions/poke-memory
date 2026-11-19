@@ -1,5 +1,4 @@
-import fs from "node:fs";
-import path from "node:path";
+import { CHANGELOG_MD } from "./changelog.generated";
 
 export type ChangelogSectionKind =
   | "Added"
@@ -142,18 +141,11 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
 let cached: ChangelogRelease[] | null = null;
 
 export function getChangelog(): ChangelogRelease[] {
-  if (cached && process.env.NODE_ENV !== "development") return cached;
-  const filePath = path.join(process.cwd(), "CHANGELOG.md");
-  let markdown: string;
-  try {
-    markdown = fs.readFileSync(filePath, "utf8");
-  } catch {
-    // CHANGELOG.md may be absent in some build/test environments. Fall back
-    // to an empty list so the page renders its graceful empty state instead
-    // of surfacing a 500.
-    cached = [];
-    return cached;
-  }
-  cached = parseChangelog(markdown);
+  if (cached) return cached;
+  // CHANGELOG.md is inlined at build time (scripts/generate-changelog-module.mjs)
+  // because a Cloudflare Worker cannot read files. An empty string (no
+  // CHANGELOG.md when the module was generated) parses to an empty list, so
+  // the page renders its graceful empty state instead of a 500.
+  cached = parseChangelog(CHANGELOG_MD);
   return cached;
 }
