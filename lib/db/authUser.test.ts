@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { deleteAuthUser } from "./authUsers";
+import { deleteAuthUser } from "./authUser";
 import { forUser } from "./scope";
 import { TABLES, type ScopedTableName } from "./tables";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "./testing/sqliteD1";
@@ -69,7 +69,7 @@ describe("deleteAuthUser", () => {
     const tables = Object.keys(TABLES) as ScopedTableName[];
     for (const table of tables) expect(await forUser(d1, alice).count(table)).toBe(1);
 
-    expect(await deleteAuthUser(d1, alice)).toBe(true);
+    await deleteAuthUser(d1, alice);
 
     for (const table of tables) {
       expect(await forUser(d1, alice).count(table), table).toBe(0);
@@ -82,7 +82,8 @@ describe("deleteAuthUser", () => {
     expect(count(`SELECT COUNT(*) AS n FROM account WHERE userId = ?`, bob)).toBe(2);
   });
 
-  it("returns false for an unknown user", async () => {
-    expect(await deleteAuthUser(d1, "00000000-0000-4000-8000-000000000000")).toBe(false);
+  it("is a no-op for an unknown user", async () => {
+    await deleteAuthUser(d1, "00000000-0000-4000-8000-000000000000");
+    expect(count(`SELECT COUNT(*) AS n FROM "user" WHERE id = ?`, alice)).toBe(1);
   });
 });
