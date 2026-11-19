@@ -11,11 +11,11 @@ import { useVisibilityPull } from "@/lib/sync/useVisibilityPull";
  * Must be wrapped in <Suspense> at the call site (usePathname requirement).
  */
 export function SyncOnVisible() {
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const { anyFlagOn } = useSuperuser();
   const pathname = usePathname();
   // Mirror the OnlineReconnectSync pattern: pulls are allowed while superuser
   // flags are on, but the push-back inside pullAndMerge must be suppressed.
-  useVisibilityPull(supabase, user?.id ?? null, pathname, anyFlagOn);
+  useVisibilityPull(db, user?.id ?? null, pathname, anyFlagOn);
   return null;
 }

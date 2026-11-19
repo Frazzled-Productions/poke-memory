@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { pullPushSubscriptionCount } from "./pushSubscriptions";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 // ---------------------------------------------------------------------------
 // Minimal Supabase client mock factory
@@ -24,7 +24,7 @@ function makeMockClient(result: { count: number | null; error: unknown }) {
 
   const client = {
     from: vi.fn().mockReturnValue(builder),
-  } as unknown as SupabaseClient;
+  } as unknown as DataClient;
 
   return { client, builder };
 }
@@ -90,7 +90,7 @@ describe("pullPushSubscriptionCount", () => {
     builder.select.mockReturnValue(builder);
     const client = {
       from: vi.fn().mockReturnValue(builder),
-    } as unknown as SupabaseClient;
+    } as unknown as DataClient;
 
     const result = await pullPushSubscriptionCount(client, FAKE_USER_ID);
 

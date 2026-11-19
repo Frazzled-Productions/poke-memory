@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import {
   GRADE_LOG_REPUSH_BATCH_SIZE,
@@ -29,7 +29,7 @@ const OLD = NOW - HELD_COPY_STALE_MS - 1_000;
 function entry(occurredAt: number, over: Partial<GradeLogEntry> = {}): GradeLogEntry {
   return { occurredAt, date: "2026-09-29", cardType: "name", grade: 4, subjectKey: "25", ...over };
 }
-const client = {} as SupabaseClient;
+const client = {} as DataClient;
 
 beforeEach(() => {
   resetRejectedGradeLogRepush();

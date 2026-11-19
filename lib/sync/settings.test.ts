@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import {
   pullSettings,
   pullSettingsWithTimestamp,
@@ -11,19 +11,20 @@ import {
   mergeLearnedLocales,
 } from "./settings";
 import type { UserSettings } from "@/lib/settings/persistence";
-import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 import { DEFAULT_LABS_FLAGS } from "@/lib/labs/flags";
+
+type MergeUserSettingsArgs = { p_user_id: string; p_patch: Record<string, unknown> };
 
 function makeClientWithRpc(error: null | object = null) {
   const rpc = vi.fn().mockResolvedValue({ error });
-  return { client: { rpc } as unknown as SupabaseClient, rpc };
+  return { client: { rpc } as unknown as DataClient, rpc };
 }
 
 function makeClientWithUpdate(error: null | object = null) {
   const eq = vi.fn().mockResolvedValue({ error });
   const update = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ update });
-  return { client: { from } as unknown as SupabaseClient, update, eq };
+  return { client: { from } as unknown as DataClient, update, eq };
 }
 
 function makeClientWithMaybeSingle(data: unknown, error: null | object = null) {
@@ -31,7 +32,7 @@ function makeClientWithMaybeSingle(data: unknown, error: null | object = null) {
   const eq = vi.fn().mockReturnValue({ maybeSingle });
   const select = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ select });
-  return { client: { from } as unknown as SupabaseClient, maybeSingle };
+  return { client: { from } as unknown as DataClient, maybeSingle };
 }
 
 const SAMPLE: UserSettings = {
@@ -127,7 +128,7 @@ describe("pushSettings", () => {
     expect(args.p_patch).toEqual(SAMPLE);
   });
 
-  it("returns false on supabase error", async () => {
+  it("returns false on a database error", async () => {
     const { client } = makeClientWithRpc({ message: "boom" });
     expect(await pushSettings(client, "user-1", SAMPLE)).toBe(false);
   });
@@ -227,7 +228,7 @@ describe("pullSettings", () => {
     expect(await pullSettings(client, "user-1")).toBeNull();
   });
 
-  it("returns null on supabase error", async () => {
+  it("returns null on a database error", async () => {
     const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
     expect(await pullSettings(client, "user-1")).toBeNull();
   });
@@ -293,7 +294,7 @@ describe("pushRegionalPrefs", () => {
     expect(eq).toHaveBeenCalledWith("user_id", "user-1");
   });
 
-  it("returns false on supabase error", async () => {
+  it("returns false on a database error", async () => {
     const { client } = makeClientWithUpdate({ message: "boom" });
     expect(await pushRegionalPrefs(client, "user-1", { timezone: null, dateFormat: null, pushNotificationHour: null })).toBe(false);
   });
@@ -362,7 +363,7 @@ describe("pullRegionalPrefs", () => {
     expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
   });
 
-  it("returns null on supabase error", async () => {
+  it("returns null on a database error", async () => {
     const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
     expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
   });
@@ -423,7 +424,7 @@ describe("pullLastResetAt (#2218)", () => {
     const from = vi.fn(() => {
       throw new Error("network");
     });
-    const client = { from } as unknown as SupabaseClient;
+    const client = { from } as unknown as DataClient;
     expect(await pullLastResetAt(client, "user-1")).toBeNull();
   });
 });

@@ -1,7 +1,6 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
+import { createDataClient, type DataClient } from "@/lib/db/client";
 import { isMockAuthEnabled, createMockClient, MOCK_USER } from "@/lib/auth/mockAuth";
 import { authClient } from "@/lib/auth/client";
 import { toAppUser, type AppUser } from "@/lib/auth/types";
@@ -9,30 +8,21 @@ import { toAppUser, type AppUser } from "@/lib/auth/types";
 type AuthContextValue = {
   user: AppUser | null;
   loading: boolean;
-  supabase: SupabaseClient | null;
+  /**
+   * The data client (lib/db/client.ts): every cloud read and write goes
+   * through it to POST /api/db, scoped to the session user on the server.
+   */
+  db: DataClient | null;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-// Returns null when the Supabase env vars are absent (e.g. CI builds,
-// local dev without credentials). In that case the AuthProvider renders
-// children normally with no auth state, so the rest of the app works.
-function tryCreateClient(): ReturnType<typeof createClient> | null {
-  try {
-    return createClient();
-  } catch {
-    return null;
-  }
-}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Test-only mock-auth seam (issue #751). `isMockAuthEnabled()` is false in
   // every production build - it short-circuits on `NODE_ENV === "production"`
   // - so this branch is dead code in production. See lib/auth/mockAuth.ts.
   const [mockEnabled] = useState(() => isMockAuthEnabled());
-  const [supabase] = useState(() =>
-    mockEnabled ? createMockClient() : tryCreateClient(),
-  );
+  const [db] = useState<DataClient>(() => (mockEnabled ? createMockClient() : createDataClient()));
   // When the seam is on, start signed-in immediately with the fake user and
   // no loading flicker - there is no session round-trip to wait on.
   const [user, setUser] = useState<AppUser | null>(mockEnabled ? MOCK_USER : null);
@@ -44,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, supabase }}>
+    <AuthContext.Provider value={{ user, loading, db }}>
       {/* The mock seam is fully synchronous: the fake user is already in state. */}
       {!mockEnabled && <SessionSync onSession={onSession} />}
       {children}

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import type { UserSettings } from "@/lib/settings/persistence";
 import {
   validateLearningLocales,
@@ -7,7 +7,6 @@ import {
 import type { AppLocale } from "@/i18n/locales";
 import { DEFAULT_LOCALE } from "@/i18n/locales";
 import type { DateFormat } from "@/lib/utils/format-date";
-import type { MergeUserSettingsRpc } from "@/lib/supabase/rpc-types";
 
 // Settings sync is best-effort. pushSettings routes through the
 // merge_user_settings RPC (migration 011/014), which atomically merges a JSONB
@@ -28,15 +27,15 @@ import type { MergeUserSettingsRpc } from "@/lib/supabase/rpc-types";
  * Other callers (sign-in, force-pull) intentionally push the full object.
  */
 export async function pushSettings(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   patch: Partial<UserSettings>,
 ): Promise<boolean> {
   try {
-    const { error } = await (client.rpc as unknown as MergeUserSettingsRpc)(
-      "merge_user_settings",
-      { p_user_id: userId, p_patch: patch },
-    );
+    const { error } = await client.rpc("merge_user_settings", {
+      p_user_id: userId,
+      p_patch: patch,
+    });
     return !error;
   } catch {
     return false;
@@ -75,7 +74,7 @@ export type RegionalPrefs = {
  * safe to execute concurrently.
  */
 export async function pushRegionalPrefs(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   prefs: RegionalPrefs,
 ): Promise<boolean> {
@@ -104,7 +103,7 @@ export async function pushRegionalPrefs(
  * are null.
  */
 export async function pullRegionalPrefs(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<RegionalPrefs | null> {
   try {
@@ -149,7 +148,7 @@ function validatePushNotificationHour(value: number | null | undefined): number 
 // pushRegionalPrefs (which does not write to the settings column) or a
 // default-only scaffolding row does not overwrite real local choices.
 export async function pullSettings(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<UserSettings | null> {
   const result = await pullSettingsWithTimestamp(client, userId);
@@ -175,7 +174,7 @@ export type PulledSettings = {
  * `last_reset_at` populated - see migration 022).
  */
 export async function pullSettingsWithTimestamp(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<PulledSettings | null> {
   const row = await pullUserSettingsRow(client, userId);
@@ -199,7 +198,7 @@ export type UserSettingsRow = {
  * `pullUserSettingsRow` cannot show.
  */
 export async function pullLastResetAt(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<{ lastResetAt: string | null } | null> {
   try {
@@ -226,7 +225,7 @@ export async function pullLastResetAt(
  * Returns `null` only when the row doesn't exist or the fetch failed.
  */
 export async function pullUserSettingsRow(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<UserSettingsRow | null> {
   try {

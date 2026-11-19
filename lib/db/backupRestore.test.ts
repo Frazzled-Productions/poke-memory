@@ -1,34 +1,19 @@
 /**
- * Integration test: a signed-in backup restore never lowers the cloud (#2218).
+ * A signed-in backup restore never lowers the cloud (#2218), on D1.
  *
- * This is the outcome the owner chose on 2 November 2026 for the OpenSpec change
- * signed-in-restore-moves-forward: cards only move forward.
- *
- * Runs the real restore, real pullAndMerge and real push code over real Postgres
- * with every migration applied, so the regression trigger, the pre-reset trigger
- * and reset_all_progress are the real ones. Everything else is a stand-in. The
- * real sign-in case, with RLS and a real browser, is in e2e/auth-real.spec.ts:
- *   - `cloudAs` below answers the few PostgREST calls the sync code makes, by
- *     running plain SQL, and returns rows through to_jsonb so dates and timestamps
- *     have PostgREST's shape. It does not run under the `authenticated` role, so
- *     RLS is not exercised here (rls.test.ts covers that).
- *   - The browser is an in-memory localStorage; IndexedDB is reported unavailable,
- *     so the session takes its localStorage fallback path.
- *
- * Run with: VITEST_INTEGRATION=1 npm run test:integration
+ * Ported from the Postgres suite (lib/sync/integration/backup-restore.test.ts):
+ * runs the real restore, real pullAndMerge and real push code through the real
+ * data client and gateway over the D1 test database, so the regression
+ * trigger, the pre-reset trigger, reset_all_progress and the settings guard
+ * are the real ones. The browser is an in-memory localStorage; IndexedDB is
+ * reported unavailable, so the session takes its localStorage fallback path.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import pg from "pg";
-import { randomUUID } from "node:crypto";
-import {
-  createTestDatabase,
-  dropTestDatabase,
-  applyPreMigrationFixture,
-  insertAuthUser,
-} from "./setup";
-import { applyMigrations } from "./applyMigrations";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { createSqliteD1, createTestUser, type SqliteD1 } from "./testing/sqliteD1";
+import { createGatewayTestClient } from "./testing/gatewayClient";
+import type { DataClient } from "./client";
+import { mergeUserSettings } from "./rpc/mergeUserSettings";
 import { restoreBackupSignedIn } from "@/lib/sync/restoreBackup";
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 import { isFurtherOn, pushSingleCard, type CloudRow } from "@/lib/sync/cloud";
@@ -40,6 +25,7 @@ import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { initialReviewState, type ReviewState } from "@/lib/srs/scheduler";
 import { isoDate } from "@/lib/utils/format-date";
 import { Subject } from "@/lib/cards/subjectKey";
+import { forUser } from "./scope";
 
 vi.mock("@/lib/idb/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/idb/db")>()),
@@ -61,10 +47,7 @@ vi.mock("@/lib/pokemon/seed-async", async (importOriginal) => {
   };
 });
 
-const SKIP = process.env.VITEST_INTEGRATION !== "1";
-
-let pool: pg.Pool;
-let dbName: string;
+let d1: SqliteD1;
 
 // ─── Dates ────────────────────────────────────────────────────────────────────
 
@@ -72,110 +55,17 @@ function daysAgo(n: number): string {
   return isoDate(new Date(Date.now() - n * 86_400_000));
 }
 
-// ─── The cloud: a pg-backed stand-in for the calls the sync code makes ────────
+// ─── The cloud: the real data client and gateway over D1 ──────────────────────
 
 type CloudFailure = "pull" | "push" | "settings-read";
 
-function cloudAs(userId: string, fail?: CloudFailure): SupabaseClient {
-  async function asUser<T>(fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
-    const c = await pool.connect();
-    try {
-      await c.query("BEGIN");
-      const claims = JSON.stringify({ sub: userId, role: "authenticated" });
-      await c.query(`SELECT set_config('request.jwt.claims', $1, true)`, [claims]);
-      const out = await fn(c);
-      await c.query("COMMIT");
-      return out;
-    } catch (err) {
-      await c.query("ROLLBACK");
-      throw err;
-    } finally {
-      c.release();
-    }
-  }
-
-  const refuse = (e: unknown) => {
-    const { code, message } = e as { code?: string; message?: string };
-    return { data: null, error: { code: code ?? "XX000", message: message ?? "failed" } };
-  };
-
-  function from(table: string) {
-    const filters: [string, unknown][] = [];
-    let columns = "*";
-    let orderBy: string[] = [];
-    let page: [number, number] | null = null;
-    let single = false;
-    let upserting: { rows: Record<string, unknown>[]; conflict: string[] } | null = null;
-
-    async function run(): Promise<{ data: unknown; error: unknown }> {
-      if (table !== "card_reviews" && table !== "user_settings") {
-        return { data: null, error: { message: `${table} is not served by this stand-in` } };
-      }
-      if (upserting) {
-        if (fail === "push") return { data: null, error: { message: "network down" } };
-        const { rows, conflict } = upserting;
-        const cols = Object.keys(rows[0]);
-        const values = rows
-          .map((_, r) => `(${cols.map((_, i) => `$${r * cols.length + i + 1}`).join(",")})`)
-          .join(",");
-        const updates = cols
-          .filter((col) => !conflict.includes(col))
-          .map((col) => `${col} = EXCLUDED.${col}`)
-          .join(",");
-        const sql =
-          `INSERT INTO ${table} (${cols.join(",")}) VALUES ${values} ` +
-          `ON CONFLICT (${conflict.join(",")}) DO UPDATE SET ${updates}`;
-        try {
-          await asUser((c) => c.query(sql, rows.flatMap((row) => cols.map((col) => row[col]))));
-          return { data: null, error: null };
-        } catch (e) {
-          return refuse(e);
-        }
-      }
-      if (fail === "pull" || (fail === "settings-read" && table === "user_settings")) {
-        return { data: null, error: { message: "network down" } };
-      }
-      const where = filters.map(([col], i) => `${col} = $${i + 1}`).join(" AND ");
-      const sql =
-        `SELECT to_jsonb(t) AS row FROM (SELECT ${columns} FROM ${table} WHERE ${where}` +
-        (orderBy.length ? ` ORDER BY ${orderBy.join(",")}` : "") +
-        (page ? ` LIMIT ${page[1] - page[0] + 1} OFFSET ${page[0]}` : "") +
-        `) t`;
-      const { rows } = await pool.query(sql, filters.map(([, v]) => v));
-      const data = rows.map((r: { row: unknown }) => r.row);
-      return { data: single ? (data[0] ?? null) : data, error: null };
-    }
-
-    const query = {
-      select(cols: string) { columns = cols; return query; },
-      eq(col: string, val: unknown) { filters.push([col, val]); return query; },
-      order(col: string) { orderBy = [...orderBy, col]; return query; },
-      range(a: number, b: number) { page = [a, b]; return query; },
-      maybeSingle() { single = true; return query; },
-      upsert(rows: unknown, opts: { onConflict: string }) {
-        upserting = {
-          rows: (Array.isArray(rows) ? rows : [rows]) as Record<string, unknown>[],
-          conflict: opts.onConflict.split(","),
-        };
-        return query;
-      },
-      then<A, B>(ok: (v: { data: unknown; error: unknown }) => A, no: (e: unknown) => B) {
-        return run().then(ok, no);
-      },
-    };
-    return query;
-  }
-
-  const rpc = async (name: string) => {
-    try {
-      await asUser((c) => c.query(`SELECT public.${name}()`));
-      return { data: null, error: null };
-    } catch (e) {
-      return refuse(e);
-    }
-  };
-
-  return { from, rpc } as unknown as SupabaseClient;
+function cloudAs(userId: string, fail?: CloudFailure): DataClient {
+  return createGatewayTestClient(d1, userId, {
+    fail: (q) =>
+      (fail === "push" && q.kind === "upsert") ||
+      (fail === "pull" && q.kind === "select") ||
+      (fail === "settings-read" && q.kind === "select" && q.table === "user_settings"),
+  });
 }
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -211,12 +101,14 @@ function backupOf(cards: ReviewableCard[]) {
 }
 
 async function readRow(userId: string, id: number): Promise<CloudRow | null> {
-  const { rows } = await pool.query(
-    `SELECT to_jsonb(t) AS row FROM card_reviews t
-      WHERE user_id = $1 AND card_type = 'name' AND subject_key = $2 AND locale = 'en'`,
-    [userId, Subject.forSpecies(id)],
-  );
-  return (rows[0]?.row as CloudRow | undefined) ?? null;
+  const [row] = await forUser(d1, userId).select("card_reviews", {
+    filters: [
+      { column: "card_type", op: "eq", value: "name" },
+      { column: "subject_key", op: "eq", value: Subject.forSpecies(id) },
+      { column: "locale", op: "eq", value: "en" },
+    ],
+  });
+  return (row as CloudRow | undefined) ?? null;
 }
 
 async function localCard(id: number): Promise<ReviewableCard | undefined> {
@@ -226,9 +118,7 @@ async function localCard(id: number): Promise<ReviewableCard | undefined> {
 
 // A user, a device with some history on it and a cloud that has moved on.
 async function newUser(): Promise<string> {
-  const userId = randomUUID();
-  await insertAuthUser(pool, userId);
-  return userId;
+  return createTestUser(d1);
 }
 
 /** Puts `cards` in the cloud through the real push path, then on this device through a real pull. */
@@ -261,29 +151,19 @@ function freshDevice() {
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
-beforeAll(async () => {
-  if (SKIP) return;
-  ({ pool, dbName } = await createTestDatabase());
-  await applyPreMigrationFixture(pool);
-  await applyMigrations(pool);
-});
-
-afterAll(async () => {
-  if (SKIP) return;
-  await dropTestDatabase(pool, dbName);
-});
-
 beforeEach(() => {
-  if (!SKIP) freshDevice();
+  d1 = createSqliteD1();
+  freshDevice();
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  d1.close();
 });
 
 // ─── The outcome ──────────────────────────────────────────────────────────────
 
-describe.skipIf(SKIP)("signed-in backup restore moves cards forward only", () => {
+describe("signed-in backup restore moves cards forward only", () => {
   it("an older backup changes nothing: the cloud row and this device both stay ahead", async () => {
     const userId = await newUser();
     await signedInWith(userId, [card(1, reviewed(9, 2))]);
@@ -433,7 +313,7 @@ describe.skipIf(SKIP)("signed-in backup restore moves cards forward only", () =>
 
 // ─── isFurtherOn must keep matching the real trigger ──────────────────────────
 
-describe.skipIf(SKIP)("isFurtherOn against card_reviews_reject_regression", () => {
+describe("isFurtherOn against card_reviews_reject_regression", () => {
   const BASE: Partial<CloudRow> = {
     stability: 5,
     difficulty: 5,
@@ -495,27 +375,25 @@ describe.skipIf(SKIP)("isFurtherOn against card_reviews_reject_regression", () =
 
 // ─── Why settings stay out of a signed-in restore ─────────────────────────────
 
-describe.skipIf(SKIP)("restoring older settings, as the database stands", () => {
+describe("restoring older settings, as the database stands", () => {
   it("one lowered guarded field gets the whole patch refused, later changes included", async () => {
     const userId = await newUser();
-    await pool.query(`INSERT INTO user_settings (user_id, settings) VALUES ($1, $2)`, [
-      userId,
-      JSON.stringify({ typedEntryOnboardingShown: true, maxNewPerDay: 10 }),
-    ]);
-    const merge = (patch: object) =>
-      pool.query(`SELECT merge_user_settings($1::uuid, $2::jsonb)`, [userId, JSON.stringify(patch)]);
-
-    await expect(merge({ typedEntryOnboardingShown: false, maxNewPerDay: 20 })).rejects.toMatchObject({
-      code: "23514",
-    });
-    const { rows } = await pool.query(`SELECT settings FROM user_settings WHERE user_id = $1`, [userId]);
-    expect(rows[0].settings.maxNewPerDay).toBe(10);
+    d1.sqlite
+      .prepare("INSERT INTO user_settings (user_id, settings) VALUES (?, ?)")
+      .run(userId, JSON.stringify({ typedEntryOnboardingShown: true, maxNewPerDay: 10 }));
+    await expect(
+      mergeUserSettings(d1, userId, { typedEntryOnboardingShown: false, maxNewPerDay: 20 }),
+    ).rejects.toMatchObject({ code: "23514" });
+    const row = d1.sqlite.prepare("SELECT settings FROM user_settings WHERE user_id = ?").get(userId) as {
+      settings: string;
+    };
+    expect(JSON.parse(row.settings).maxNewPerDay).toBe(10);
   });
 });
 
 // ─── Why replacing the cloud is not on offer without a new bypass ─────────────
 
-describe.skipIf(SKIP)("replacing the cloud from a backup, as the database stands", () => {
+describe("replacing the cloud from a backup, as the database stands", () => {
   it("resetting first and then pushing the backup is refused by the pre-reset trigger", async () => {
     const userId = await newUser();
     const client = cloudAs(userId);

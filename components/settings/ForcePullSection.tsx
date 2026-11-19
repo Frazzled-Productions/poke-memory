@@ -6,11 +6,12 @@
  * Moved from app/stats/page.tsx to Settings "Data & backup" section (#1732 / #1729).
  * Primary home is now Settings; Stats shows only a link to /settings.
  *
- * Visible only when the user is signed in (supabase !== null && userId is set)
+ * Visible only when the user is signed in (db !== null && userId is set)
  * and superuser mode is off. The calling page enforces this gate.
  */
 
 import { useState } from "react";
+import type { DataClient } from "@/lib/db/client";
 import { useTranslations } from "next-intl";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import { pullSession, applyCloudAuthoritative, maxCloudUpdatedAt } from "@/lib/sync/cloud";
@@ -30,11 +31,11 @@ import { colStack, mutedText } from "@/lib/utils/class-names";
 type ForcePullStatus = "idle" | "pulling" | "success" | "error";
 
 interface ForcePullSectionProps {
-  supabase: import("@supabase/supabase-js").SupabaseClient;
+  db: DataClient;
   userId: string;
 }
 
-export function ForcePullSection({ supabase, userId }: ForcePullSectionProps) {
+export function ForcePullSection({ db, userId }: ForcePullSectionProps) {
   const t = useTranslations("stats");
   const { seed } = useSeed();
   const [status, setStatus] = useState<ForcePullStatus>("idle");
@@ -52,11 +53,11 @@ export function ForcePullSection({ supabase, userId }: ForcePullSectionProps) {
         cloudStreak,
         cloudGradeLog,
       ] = await Promise.all([
-        pullSession(supabase, userId),
-        pullSettingsWithTimestamp(supabase, userId).catch(() => null),
-        pullRegionalPrefs(supabase, userId).catch(() => null),
-        pullStreak(supabase, userId).catch(() => null),
-        pullGradeLog(supabase, userId).catch(() => null),
+        pullSession(db, userId),
+        pullSettingsWithTimestamp(db, userId).catch(() => null),
+        pullRegionalPrefs(db, userId).catch(() => null),
+        pullStreak(db, userId).catch(() => null),
+        pullGradeLog(db, userId).catch(() => null),
       ]);
 
       if (cloudRows === null) {

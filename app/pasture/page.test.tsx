@@ -70,7 +70,7 @@ vi.mock("@/lib/settings/persistence", () => ({
 }));
 
 vi.mock("@/lib/auth/AuthContext", () => ({
-  useAuth: () => ({ user: null, supabase: null, loading: false }),
+  useAuth: () => ({ user: null, db: null, loading: false }),
 }));
 
 vi.mock("@/lib/superuser/SuperuserContext", () => ({

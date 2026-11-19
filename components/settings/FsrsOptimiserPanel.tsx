@@ -61,7 +61,7 @@ function latest(a: string | undefined, b: string | undefined): string | undefine
 
 export function FsrsOptimiserPanel() {
   const t = useTranslations("settings");
-  const { user, loading: authLoading, supabase } = useAuth();
+  const { user, loading: authLoading, db } = useAuth();
   const { anyFlagOn } = useSuperuser();
   // Feature detection reads browser globals: null on the server render.
   const supported = useSyncExternalStore(subscribeNever, isOptimiserSupported, () => null);
@@ -76,12 +76,12 @@ export function FsrsOptimiserPanel() {
   }, [anyFlagOn]);
 
   const userId = user?.id ?? null;
-  const canLoad = userId !== null && supabase !== null && !anyFlagOn && supported === true;
+  const canLoad = userId !== null && db !== null && !anyFlagOn && supported === true;
 
   useEffect(() => {
-    if (!canLoad || userId === null || supabase === null) return;
+    if (!canLoad || userId === null || db === null) return;
     let cancelled = false;
-    void Promise.all([pullGradeLog(supabase, userId), pullSettings(supabase, userId)]).then(
+    void Promise.all([pullGradeLog(db, userId), pullSettings(db, userId)]).then(
       ([entries, cloud]) => {
         if (cancelled) return;
         if (entries === null) {
@@ -100,10 +100,10 @@ export function FsrsOptimiserPanel() {
     return () => {
       cancelled = true;
     };
-  }, [canLoad, userId, supabase, reloadKey]);
+  }, [canLoad, userId, db, reloadKey]);
 
   async function handleOptimise(data: Loaded) {
-    if (userId === null || supabase === null) return;
+    if (userId === null || db === null) return;
     setRun({ kind: "fitting", percent: null });
     let weights: number[];
     try {
@@ -125,7 +125,7 @@ export function FsrsOptimiserPanel() {
     }
     setRun({ kind: "saving" });
     const patch = { fsrsWeights: weights, fsrsWeightsOptimizedAt: new Date().toISOString() };
-    if (!(await pushSettings(supabase, userId, patch))) {
+    if (!(await pushSettings(db, userId, patch))) {
       setRun({ kind: "error", reason: "save" });
       return;
     }
@@ -148,7 +148,7 @@ export function FsrsOptimiserPanel() {
     if (authLoading || supported === null) {
       return <p className={mutedText}>{t("optimiser.page.loading")}</p>;
     }
-    if (user === null || supabase === null) {
+    if (user === null || db === null) {
       return <p className={mutedText} data-testid="fsrs-optimiser-signed-out">{t("optimiser.page.signedOut")}</p>;
     }
     if (anyFlagOn) {

@@ -156,7 +156,7 @@ function isFiltered(filters: PastureFilters): boolean {
 
 export default function PasturePage() {
   const t = useTranslations("pasture");
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const { flags, anyFlagOn } = useSuperuser();
   const { seed } = useSeed();
   const [session, setSession] = useState<SavedSession | null>(null);
@@ -283,7 +283,7 @@ export default function PasturePage() {
       // cleanup is pending), skip the cloud write. seen_in_pasture is one-way
       // at the DB layer (regression trigger raises 23514 on any attempt to
       // unset it), so a wrongly-pushed value cannot be undone.
-      const syncClient = anyFlagOn ? null : supabase;
+      const syncClient = anyFlagOn ? null : db;
       if (syncClient && user?.id) {
         const updatedCard = updated.cards.find((c) => c.id === cardId);
         if (updatedCard) {
@@ -295,7 +295,7 @@ export default function PasturePage() {
         }
       }
     },
-    [session, supabase, user?.id, anyFlagOn],
+    [session, db, user?.id, anyFlagOn],
   );
 
   if (!loaded) {

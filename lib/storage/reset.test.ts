@@ -94,7 +94,7 @@ async function seedPendingQueue(): Promise<void> {
 function makeRpcClient(rpcError: null | object = null) {
   return {
     rpc: vi.fn().mockResolvedValue({ error: rpcError, data: null }),
-  } as unknown as import("@supabase/supabase-js").SupabaseClient;
+  } as unknown as import("@/lib/db/client").DataClient;
 }
 
 describe("clearLocalProgress", () => {

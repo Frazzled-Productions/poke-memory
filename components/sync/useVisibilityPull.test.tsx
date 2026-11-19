@@ -14,7 +14,7 @@
 
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ import {
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-const FAKE_CLIENT = {} as unknown as SupabaseClient;
+const FAKE_CLIENT = {} as unknown as DataClient;
 const FAKE_USER = "00000000-0000-0000-0000-000000000000";
 const NON_BLOCKED_PATH = "/pokedex";
 
@@ -211,11 +211,11 @@ describe("useVisibilityPull", () => {
 
     // Start with null client; the handler should read the latest value.
     const { rerender } = renderHook(
-      ({ cl, uid, path }: { cl: SupabaseClient | null; uid: string | null; path: string }) =>
+      ({ cl, uid, path }: { cl: DataClient | null; uid: string | null; path: string }) =>
         useVisibilityPull(cl, uid, path),
       {
         initialProps: {
-          cl: null as SupabaseClient | null,
+          cl: null as DataClient | null,
           uid: null as string | null,
           path: NON_BLOCKED_PATH,
         },

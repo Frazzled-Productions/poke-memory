@@ -8,7 +8,7 @@
  * project picks it up.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import {
   isPushSupported,
   isStandalone,
@@ -155,7 +155,7 @@ function makeRegistration(initial: FakeSubscription | null) {
 }
 
 function makeClient(): {
-  client: SupabaseClient;
+  client: DataClient;
   insertCalls: unknown[];
   deleteCalls: { filters: Array<{ col: string; val: unknown }> }[];
   failInsert?: boolean;
@@ -200,7 +200,7 @@ function makeClient(): {
       },
       delete: () => makeDeleteChain(),
     }),
-  } as unknown as SupabaseClient;
+  } as unknown as DataClient;
   return Object.assign(state, { client });
 }
 

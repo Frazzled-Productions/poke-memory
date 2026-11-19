@@ -17,7 +17,7 @@ vi.mock("@/lib/auth/requireAuth", () => ({ requireAuth }));
 
 import { POST } from "./route";
 import { toGradeLogDbRow, pushGradeLog } from "@/lib/sync/gradeLog";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { forUser } from "@/lib/db/scope";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
 import { spyD1, type SpiedD1, type SpyHooks } from "@/lib/db/testing/spyD1";
@@ -207,7 +207,7 @@ describe("POST /api/sync - gradeLog leg (#2052)", () => {
           return { error: null };
         },
       }),
-    } as unknown as SupabaseClient;
+    } as unknown as DataClient;
     await pushGradeLog(client, alice, [ENTRY as never]);
     expect(seen[0]).toEqual([toGradeLogDbRow(alice, ENTRY as never)]);
   });

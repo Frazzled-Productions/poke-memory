@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { planSignedInRestore, type CloudRow } from "@/lib/sync/cloud";
 import { restoreBackupSignedIn } from "./restoreBackup";
 import { initialReviewState, type ReviewState } from "@/lib/srs/scheduler";
@@ -34,7 +34,7 @@ vi.mock("@/lib/review/persistence", async (importOriginal) => ({
   saveSession: mocks.saveSession,
 }));
 
-const client = {} as SupabaseClient;
+const client = {} as DataClient;
 
 function reviewed(reps: number, lastReview: string): Partial<ReviewState> {
   return {

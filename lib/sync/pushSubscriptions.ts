@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 /**
  * Push subscriptions cross-device sync (#1056).
@@ -20,7 +20,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Returns the number of push subscription rows the authenticated caller
- * currently owns. The result is server-side, RLS-filtered to the calling
+ * currently owns. The result is server-side, scoped to the calling
  * user. Returns null on any error so callers can distinguish "no data" (0)
  * from "we don't know" (null).
  *
@@ -28,7 +28,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * a console.warn - they must not flip overall sync into the error state.
  */
 export async function pullPushSubscriptionCount(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<number | null> {
   try {

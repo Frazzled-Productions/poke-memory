@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { isKnownPushEndpoint } from "@/lib/push/endpoints";
 
 /**
@@ -89,7 +89,7 @@ export type UnsubscribeResult =
 /**
  * Requests notification permission, creates a PushManager subscription
  * against the configured VAPID public key, then persists the resulting
- * endpoint + keys to Supabase under the caller's user_id.
+ * endpoint + keys to the cloud under the caller's user_id.
  *
  * Behaviour notes:
  * - Permission is requested via `Notification.requestPermission()`. On iOS
@@ -109,7 +109,7 @@ export type UnsubscribeResult =
  *   on 410/404).
  */
 export async function subscribeToPush(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<SubscribeResult> {
   if (!isPushSupported()) return { ok: false, reason: "unsupported" };
@@ -164,7 +164,7 @@ export async function subscribeToPush(
   }
 
   // Extract the keys we need to persist. `getKey` returns ArrayBuffer; we
-  // base64url-encode for cross-origin transport and Supabase storage.
+  // base64url-encode for cross-origin transport and database storage.
   const p256dhBuf = subscription.getKey("p256dh");
   const authBuf = subscription.getKey("auth");
   if (!p256dhBuf || !authBuf) {
@@ -173,15 +173,11 @@ export async function subscribeToPush(
   const p256dh = arrayBufferToBase64Url(p256dhBuf);
   const auth = arrayBufferToBase64Url(authBuf);
 
-  // Persist via delete-then-insert. Migration 028 deliberately omits an
-  // UPDATE policy on push_subscriptions (per docs/persistence.md's
-  // append-only baseline). Postgres treats INSERT ... ON CONFLICT DO UPDATE
-  // as an UPDATE for RLS purposes, so a Supabase-client `.upsert(...)` on the
-  // (user_id, endpoint) conflict key would silently fail every time a device
-  // re-subscribes after the first one - the conflict branch is denied by RLS.
-  // Removing the existing row first and inserting a fresh one keeps the
-  // operation inside the SELECT/INSERT/DELETE policies that DO exist, and
-  // sidesteps the missing UPDATE policy entirely. The cost is that a
+  // Persist via delete-then-insert. push_subscriptions is append-only for the
+  // browser (docs/persistence.md): the data gateway (lib/db/gateway.ts)
+  // allows select, insert and delete on it but no update or upsert, as the
+  // RLS policies of migration 028 did. Removing the existing row first and
+  // inserting a fresh one stays inside those operations. The cost is that a
   // returning subscriber gets a new `created_at`; we don't surface that
   // value anywhere user-facing, so the trade is fine.
   try {
@@ -211,8 +207,8 @@ export async function subscribeToPush(
 
 /**
  * Tears down the push subscription on both sides: deletes every
- * `push_subscriptions` row for the user_id (the SELECT-only RLS policy
- * prevents wiping other users' rows), then unsubscribes the local
+ * `push_subscriptions` row for the user_id (the gateway pins every query to
+ * the session user, so no one else's rows can go), then unsubscribes the local
  * PushManager so the OS stops keeping the channel open.
  *
  * Note: we delete ALL rows for the user_id rather than just the row
@@ -222,7 +218,7 @@ export async function subscribeToPush(
  * tries (and fails) to push to until 410 cleans them up.
  */
 export async function unsubscribeFromPush(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<UnsubscribeResult> {
   if (!isPushSupported()) return { ok: false, reason: "unsupported" };
@@ -260,7 +256,7 @@ export async function unsubscribeFromPush(
 /**
  * Reports whether the local PushManager already has an active subscription
  * for this device. Used by the Settings UI to render the toggle in the
- * correct initial state without needing to round-trip to Supabase.
+ * correct initial state without needing to round-trip to the cloud.
  */
 export async function hasLocalSubscription(): Promise<boolean> {
   if (!isPushSupported()) return false;
@@ -311,11 +307,11 @@ export type ReconcileResult =
  * The caller (PushOptIn) should flip the toggle off when `"disabled"` is
  * returned so the user can see that reminders have stopped and opt back in.
  *
- * RLS note: the SELECT and INSERT policies on `push_subscriptions` are keyed
- * on `auth.uid()`, so a user only sees and inserts their own rows.
+ * Scope note: the gateway pins every read and write to the session user
+ * (lib/db/scope.ts), so a user only sees and inserts their own rows.
  */
 export async function reconcileSubscription(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<ReconcileResult> {
   if (!isPushSupported()) return "no-local";
@@ -377,9 +373,8 @@ export async function reconcileSubscription(
   const auth = arrayBufferToBase64Url(authBuf);
 
   try {
-    // Delete-then-insert matches the pattern in subscribeToPush: there is no
-    // UPDATE policy on push_subscriptions, so ON CONFLICT DO UPDATE would be
-    // denied by RLS on re-insert.
+    // Delete-then-insert matches the pattern in subscribeToPush: the gateway
+    // allows no update or upsert on push_subscriptions.
     await client
       .from("push_subscriptions")
       .delete()

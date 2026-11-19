@@ -6,7 +6,7 @@
  */
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 vi.mock("@/lib/sync/cloud", () => ({
   pushSingleCard: vi.fn(async () => "ok"),
@@ -45,7 +45,7 @@ import {
 import { isCloudPushHeld, type GradeLogEntry } from "@/lib/gradelog/persistence";
 import type { ReviewableCard } from "@/lib/review/session";
 
-const CLIENT = {} as unknown as SupabaseClient;
+const CLIENT = {} as unknown as DataClient;
 const TAB = getTabId();
 const USER = "00000000-0000-0000-0000-000000000000";
 
@@ -420,9 +420,9 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
   it("sync lost mid-hold (superuser toggled): commit clears the slot but pushes nothing", async () => {
     const onCommitted = vi.fn();
     const { result, rerender } = renderHook(
-      ({ client, uid }: { client: SupabaseClient | null; uid: string | null }) =>
+      ({ client, uid }: { client: DataClient | null; uid: string | null }) =>
         usePerGradeSync(client, uid, { onCommitted }),
-      { initialProps: { client: CLIENT as SupabaseClient | null, uid: USER as string | null } },
+      { initialProps: { client: CLIENT as DataClient | null, uid: USER as string | null } },
     );
     act(() => {
       const t = result.current.enqueueGrade(makeCard(1), { hold: true });
@@ -479,9 +479,9 @@ describe("usePerGradeSync - undo hold (#2052)", () => {
 
   it("sign-out mid-hold: commit also clears the persisted held copy (no push to another account later)", () => {
     const { result, rerender } = renderHook(
-      ({ client, uid }: { client: SupabaseClient | null; uid: string | null }) =>
+      ({ client, uid }: { client: DataClient | null; uid: string | null }) =>
         usePerGradeSync(client, uid),
-      { initialProps: { client: CLIENT as SupabaseClient | null, uid: USER as string | null } },
+      { initialProps: { client: CLIENT as DataClient | null, uid: USER as string | null } },
     );
     act(() => {
       result.current.enqueueGrade(makeCard(1), { hold: true });
@@ -570,13 +570,13 @@ describe("usePerGradeSync - mount seeding (#2052)", () => {
 
   it("a live hold's copy is not seeded when the client changes mid-hold", async () => {
     const { result, rerender } = renderHook(
-      ({ client }: { client: SupabaseClient }) => usePerGradeSync(client, USER),
+      ({ client }: { client: DataClient }) => usePerGradeSync(client, USER),
       { initialProps: { client: CLIENT } },
     );
     act(() => {
       result.current.enqueueGrade(makeCard(1), { hold: true });
     });
-    rerender({ client: {} as unknown as SupabaseClient });
+    rerender({ client: {} as unknown as DataClient });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(250);
     });

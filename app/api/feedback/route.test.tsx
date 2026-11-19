@@ -26,6 +26,7 @@ import { forUser } from "@/lib/db/scope";
 import { discordPostStore, feedbackForDigest } from "@/lib/db/system";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
 import { spyD1, type SpyHooks } from "@/lib/db/testing/spyD1";
+import { rateLimitIpHashes } from "@/lib/db/testing/rows";
 
 const WEBHOOK = "https://discord.com/api/webhooks/123/abc";
 
@@ -202,8 +203,7 @@ describe("POST /api/feedback - rate limit (#1883)", () => {
     env.RATE_LIMIT_SALT = "worker-salt";
     try {
       expect((await POST(makeRequest({ category: "other", message: "x" }, "203.0.113.10"))).status).toBe(200);
-      const row = d1.sqlite.prepare("SELECT ip_hash FROM rate_limit_buckets").get() as { ip_hash: string };
-      expect(row.ip_hash).toBe(hashIp("203.0.113.10", "worker-salt"));
+      expect(rateLimitIpHashes(d1)).toEqual([hashIp("203.0.113.10", "worker-salt")]);
     } finally {
       vi.unstubAllEnvs();
     }

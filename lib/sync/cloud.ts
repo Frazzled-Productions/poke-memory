@@ -1,4 +1,4 @@
-import type { SupabaseClient, PostgrestError } from "@supabase/supabase-js";
+import type { DataClient, DataClientError } from "@/lib/db/client";
 import type {
   ReviewableCard,
   BuildSessionOpts,
@@ -34,7 +34,7 @@ export type SeedOpts = BuildSessionOpts;
  * Must exactly match the table's PRIMARY KEY: (user_id, card_type, subject_key, locale).
  * Migration 029 widened the PK from 3 columns to 4 (adding locale). Exporting
  * this constant - and importing it at every upsert call site (cloud.ts + route.ts)
- * - means the integration test in lib/sync/integration/onconflict-pk-parity.test.ts
+ * - means the parity test in lib/db/clientGateway.test.ts
  * mechanically catches any future PK change that is not matched by a client update.
  * That is the safeguard that would have caught the #1344 silent-outage shape at CI time.
  */
@@ -42,7 +42,7 @@ export const CARD_REVIEWS_CONFLICT_COLS =
   "user_id,card_type,subject_key,locale" as const;
 
 /**
- * Returns true when a PostgrestError code indicates a structural (non-transient)
+ * Returns true when an error code indicates a structural (non-transient)
  * failure on the card_reviews write path (#1358).
  *
  * Structural codes:
@@ -66,7 +66,7 @@ export const CARD_REVIEWS_CONFLICT_COLS =
  * (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs) must warn-and-
  * continue regardless of error code.
  */
-export function isStructuralError(error: PostgrestError | null): boolean {
+export function isStructuralError(error: DataClientError | null): boolean {
   if (!error) return false;
   const code = error.code;
   if (typeof code !== "string") return false;
@@ -148,7 +148,7 @@ export type CloudRow = {
  * cloud. Used by the conflict-picker to decide whether to show a merge prompt.
  */
 export async function hasCloudData(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<boolean> {
   try {
@@ -208,7 +208,7 @@ export function toCloudRows(cards: ReviewableCard[]): CloudRow[] {
  * no failures). The caller should not interpret true as "something was written".
  */
 export async function pushSession(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   cards: ReviewableCard[],
 ): Promise<boolean> {
@@ -285,7 +285,7 @@ export type PushSingleCardResult = "ok" | "failed" | "rejected";
  * Never throws.
  */
 export async function pushSingleCard(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   card: ReviewableCard,
 ): Promise<PushSingleCardResult> {
@@ -360,11 +360,11 @@ export async function pushSingleCard(
  * learningStep and stepStartedAt are not stored in the cloud; the caller
  * is responsible for reconstructing in-memory state from the seed.
  *
- * Paginates in PAGE-sized chunks to avoid the Supabase default max_rows cap
- * of 1000, which would silently truncate a full ~1482-card corpus.
+ * Paginates in PAGE-sized chunks under the gateway's 1000-row cap, which
+ * would otherwise truncate a full ~1482-card corpus.
  */
 export async function pullSession(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<CloudRow[] | null> {
   try {

@@ -38,7 +38,7 @@ vi.mock("@/lib/storage/reset", () => ({
 // guest path where the reset button is visible.
 // ---------------------------------------------------------------------------
 
-const mockUseAuth = vi.fn(() => ({ user: null, loading: false, supabase: null }));
+const mockUseAuth = vi.fn(() => ({ user: null, loading: false, db: null }));
 vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
 }));
@@ -71,7 +71,7 @@ afterEach(() => {
   // Restore to online so other tests aren't affected.
   setOnline(true);
   // Restore to guest so tests that check the reset button see it.
-  mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
+  mockUseAuth.mockReturnValue({ user: null, loading: false, db: null });
 });
 
 describe("Error page - online variant", () => {
@@ -316,7 +316,7 @@ describe("Error page - Traditional Chinese locale", () => {
 
 describe("Error page - Reset local practice data button (guest user)", () => {
   it("renders the Reset local practice data button when online and guest", () => {
-    mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
+    mockUseAuth.mockReturnValue({ user: null, loading: false, db: null });
     setOnline(true);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
@@ -326,7 +326,7 @@ describe("Error page - Reset local practice data button (guest user)", () => {
   });
 
   it("does NOT render the Reset button in the offline variant", () => {
-    mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
+    mockUseAuth.mockReturnValue({ user: null, loading: false, db: null });
     setOnline(false);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
@@ -336,7 +336,7 @@ describe("Error page - Reset local practice data button (guest user)", () => {
   });
 
   it("calls clearLocalProgress and reloads on confirm", async () => {
-    mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
+    mockUseAuth.mockReturnValue({ user: null, loading: false, db: null });
     const { clearLocalProgress } = await import("@/lib/storage/reset");
     const mockClear = vi.mocked(clearLocalProgress);
     mockClear.mockResolvedValue(undefined);
@@ -369,7 +369,7 @@ describe("Error page - Reset local practice data button (guest user)", () => {
   });
 
   it("does NOT call clearLocalProgress when user cancels the confirm dialog", async () => {
-    mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
+    mockUseAuth.mockReturnValue({ user: null, loading: false, db: null });
     const { clearLocalProgress } = await import("@/lib/storage/reset");
     const mockClear = vi.mocked(clearLocalProgress);
     mockClear.mockClear();
@@ -392,7 +392,7 @@ describe("Error page - Reset local practice data button (guest user)", () => {
 describe("Error page - signed-in user (reset button hidden)", () => {
   it("does NOT render the Reset local practice data button for a signed-in user", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockUseAuth.mockReturnValue({ user: { id: "abc" } as any, loading: false, supabase: null });
+    mockUseAuth.mockReturnValue({ user: { id: "abc" } as any, loading: false, db: null });
     setOnline(true);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
@@ -403,7 +403,7 @@ describe("Error page - signed-in user (reset button hidden)", () => {
 
   it("renders the signed-in heal hint instead of the reset button", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockUseAuth.mockReturnValue({ user: { id: "abc" } as any, loading: false, supabase: null });
+    mockUseAuth.mockReturnValue({ user: { id: "abc" } as any, loading: false, db: null });
     setOnline(true);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
@@ -418,7 +418,7 @@ describe("Error page - auth loading (indeterminate state)", () => {
     // While auth resolves (~100–500 ms), a signed-in user must not see the
     // destructive guest-only reset button. Neither UI branch should render
     // until auth settles (#1506 fix).
-    mockUseAuth.mockReturnValue({ user: null, loading: true, supabase: null });
+    mockUseAuth.mockReturnValue({ user: null, loading: true, db: null });
     setOnline(true);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
@@ -431,7 +431,7 @@ describe("Error page - auth loading (indeterminate state)", () => {
   });
 
   it("shows the reset button once auth resolves as guest", () => {
-    mockUseAuth.mockReturnValue({ user: null, loading: false, supabase: null });
+    mockUseAuth.mockReturnValue({ user: null, loading: false, db: null });
     setOnline(true);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 
@@ -442,7 +442,7 @@ describe("Error page - auth loading (indeterminate state)", () => {
 
   it("shows the signed-in hint once auth resolves as signed-in", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockUseAuth.mockReturnValue({ user: { id: "abc" } as any, loading: false, supabase: null });
+    mockUseAuth.mockReturnValue({ user: { id: "abc" } as any, loading: false, db: null });
     setOnline(true);
     renderWithIntl(<ErrorPage error={fakeError} reset={noop} />);
 

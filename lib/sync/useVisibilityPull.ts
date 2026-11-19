@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
 import { isSessionActive } from "@/lib/review/sessionActive";
@@ -21,7 +21,7 @@ const HIDDEN_THRESHOLD_MS = 30_000;
  * (same pattern as useSyncOnUnload).
  */
 export function useVisibilityPull(
-  client: SupabaseClient | null,
+  client: DataClient | null,
   userId: string | null,
   pathname: string,
   /**

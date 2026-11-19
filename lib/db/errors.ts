@@ -18,6 +18,9 @@
  *   22P02 invalid_text_representation  a value of the wrong type
  *   22007 invalid_datetime_format       an unparseable date or timestamp
  *   54000 program_limit_exceeded more than D1's 100 bound parameters
+ *   40001 serialization_failure  the settings merge lost its compare-and-swap
+ *                                five times (lib/db/rpc/mergeUserSettings.ts)
+ *   P0001 raise_exception        reset_all_progress cooldown (migration 026)
  *   XX000 internal_error         anything else
  */
 
@@ -34,6 +37,8 @@ export type DbErrorCode =
   | "22P02"
   | "22007"
   | "54000"
+  | "40001"
+  | "P0001"
   | "XX000";
 
 export interface DbErrorJson {

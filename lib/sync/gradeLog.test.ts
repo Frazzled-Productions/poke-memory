@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import {
   mergeGradeLog,
   pullGradeLog,
@@ -14,7 +14,7 @@ import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 function makeClientWithUpsert(error: null | object = null) {
   const upsert = vi.fn().mockResolvedValue({ error });
   const from = vi.fn().mockReturnValue({ upsert });
-  return { client: { from } as unknown as SupabaseClient, upsert, from };
+  return { client: { from } as unknown as DataClient, upsert, from };
 }
 
 function makeClientWithOrderedSelect(data: unknown, error: null | object = null) {
@@ -27,7 +27,7 @@ function makeClientWithOrderedSelect(data: unknown, error: null | object = null)
   const eq = vi.fn().mockReturnValue({ order });
   const select = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ select });
-  return { client: { from } as unknown as SupabaseClient, order, range };
+  return { client: { from } as unknown as DataClient, order, range };
 }
 
 function makeEntry(occurredAt: number, overrides: Partial<GradeLogEntry> = {}): GradeLogEntry {
@@ -120,7 +120,7 @@ describe("pushGradeLog", () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
-  it("returns false on supabase error", async () => {
+  it("returns false on a database error", async () => {
     const { client } = makeClientWithUpsert({ message: "boom" });
     expect(await pushGradeLog(client, "u", [makeEntry(1)])).toBe(false);
   });
@@ -149,7 +149,7 @@ describe("pullGradeLog", () => {
     expect(result?.[1].subjectKey).toBeUndefined();
   });
 
-  it("returns null on supabase error", async () => {
+  it("returns null on a database error", async () => {
     const { client } = makeClientWithOrderedSelect(null, { message: "boom" });
     expect(await pullGradeLog(client, "u")).toBeNull();
   });
@@ -316,7 +316,7 @@ describe("pushGradeLogDetailed (#2117)", () => {
   const entries = [makeEntry(1, { date: "2026-05-12", grade: 4, cardType: "name", subjectKey: "1" })];
   function clientResolving(value: unknown) {
     const upsert = vi.fn().mockResolvedValue(value);
-    return { from: vi.fn().mockReturnValue({ upsert }) } as unknown as SupabaseClient;
+    return { from: vi.fn().mockReturnValue({ upsert }) } as unknown as DataClient;
   }
 
   it("ok on success and for an empty batch", async () => {
@@ -350,7 +350,7 @@ describe("pushGradeLogDetailed (#2117)", () => {
   });
 
   it("failed when the client throws; pushGradeLog stays boolean", async () => {
-    const c = { from: () => { throw new Error("boom"); } } as unknown as SupabaseClient;
+    const c = { from: () => { throw new Error("boom"); } } as unknown as DataClient;
     expect(await pushGradeLogDetailed(c, "u", entries)).toBe("failed");
     expect(await pushGradeLog(c, "u", entries)).toBe(false);
   });

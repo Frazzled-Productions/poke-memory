@@ -9,7 +9,7 @@
  *  - the signed-in user as an AppUser with linked accounts (listAccounts)
  *  - sign-in and sign-out through session changes
  *  - a session refetch for the same user does not reload accounts
- *  - the client field: present, or null when createClient() throws
+ *  - the data client field (db) is always present
  *  - the mock-auth seam: MOCK_USER with no session lookup
  */
 
@@ -52,25 +52,19 @@ vi.mock("@/lib/auth/client", () => ({
   },
 }));
 
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: vi.fn(),
-}));
-
-import { createClient } from "@/lib/supabase/client";
-const mockCreateClient = vi.mocked(createClient);
 
 import { AuthProvider, useAuth } from "@/lib/auth/AuthContext";
 import { MOCK_USER } from "@/lib/auth/mockAuth";
 
 function AuthConsumer() {
-  const { user, loading, supabase } = useAuth();
+  const { user, loading, db } = useAuth();
   return (
     <div>
       <span data-testid="loading">{String(loading)}</span>
       <span data-testid="user">{user ? user.id : "null"}</span>
       <span data-testid="providers">{user ? user.identities.map((i) => i.provider).join(",") : ""}</span>
       <span data-testid="username">{user?.user_metadata.username ?? ""}</span>
-      <span data-testid="supabase">{supabase ? "present" : "null"}</span>
+      <span data-testid="db">{db ? "present" : "null"}</span>
     </div>
   );
 }
@@ -97,8 +91,6 @@ describe("AuthProvider", () => {
     vi.unstubAllEnvs();
     mockListAccounts.mockReset();
     mockUseSessionCalls.mockReset();
-    mockCreateClient.mockReset();
-    mockCreateClient.mockReturnValue({} as ReturnType<typeof createClient>);
     sessionStore.set({ data: null, isPending: true });
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -165,17 +157,9 @@ describe("AuthProvider", () => {
     expect(mockListAccounts).toHaveBeenCalledTimes(1);
   });
 
-  it("exposes the supabase client in context when createClient succeeds", () => {
+  it("exposes the data client in context", () => {
     renderWithProvider();
-    expect(screen.getByTestId("supabase").textContent).toBe("present");
-  });
-
-  it("renders children with supabase: null when createClient throws", () => {
-    mockCreateClient.mockImplementation(() => {
-      throw new Error("Missing env vars");
-    });
-    renderWithProvider();
-    expect(screen.getByTestId("supabase").textContent).toBe("null");
+    expect(screen.getByTestId("db").textContent).toBe("present");
   });
 
   it("with the mock-auth seam, starts signed in as MOCK_USER and never reads the session", () => {

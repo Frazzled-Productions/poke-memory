@@ -12,7 +12,7 @@ import zhHans from "@/messages/zh-Hans.json";
 import zhHant from "@/messages/zh-Hant.json";
 
 const auth = vi.hoisted(() => ({
-  value: { user: null as { id: string } | null, loading: false, supabase: null as object | null },
+  value: { user: null as { id: string } | null, loading: false, db: null as object | null },
 }));
 const superuser = vi.hoisted(() => ({ anyFlagOn: false }));
 const mocks = vi.hoisted(() => ({
@@ -51,12 +51,12 @@ const WEIGHTS = Array.from({ length: 21 }, (_, i) => i / 10);
 const daysAgo = (d: number) => new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString();
 
 function signIn() {
-  auth.value = { user: USER, loading: false, supabase: CLIENT };
+  auth.value = { user: USER, loading: false, db: CLIENT };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  auth.value = { user: null, loading: false, supabase: CLIENT };
+  auth.value = { user: null, loading: false, db: CLIENT };
   superuser.anyFlagOn = false;
   mocks.isOptimiserSupported.mockReturnValue(true);
   mocks.pullGradeLog.mockResolvedValue(LOG);
@@ -68,7 +68,7 @@ beforeEach(() => {
 
 describe("FsrsOptimiserPanel states", () => {
   it("shows loading while auth resolves", () => {
-    auth.value = { user: null, loading: true, supabase: CLIENT };
+    auth.value = { user: null, loading: true, db: CLIENT };
     renderWithIntl(<FsrsOptimiserPanel />);
     expect(screen.getByText("Loading your reviews…")).toBeInTheDocument();
   });

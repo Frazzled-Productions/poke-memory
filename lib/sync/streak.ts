@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 
 // Streak sync is best-effort: failures are surfaced as `false` (push) or `null`
@@ -16,7 +16,7 @@ export const STREAK_DAYS_CONFLICT_COLS = "user_id,review_date" as const;
 
 
 export async function pushStreak(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   dates: string[],
 ): Promise<boolean> {
@@ -36,11 +36,11 @@ export async function pushStreak(
 }
 
 export async function pullStreak(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<string[] | null> {
   try {
-    // Paginate to avoid the PostgREST 1000-row cap. streak_days grows one
+    // Paginate under the gateway's 1000-row cap. streak_days grows one
     // row per review day (fuse is ~2.7 years at daily use), so truncation
     // is a long-horizon risk worth guarding now. Ordered by review_date (the
     // UNIQUE (user_id, review_date) constraint) so offset pages are stable (#2053).

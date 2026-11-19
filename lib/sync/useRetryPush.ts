@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import {
   loadSyncStatus,
   saveSyncStatus,
@@ -30,7 +30,7 @@ export type RetryState = "idle" | "retrying" | "success" | "error";
  * not read useSuperuser() directly.
  */
 export function useRetryPush(
-  client: SupabaseClient | null,
+  client: DataClient | null,
   userId: string | null,
 ): { retryState: RetryState; retryNow: () => void } {
   const [retryState, setRetryState] = useState<RetryState>("idle");

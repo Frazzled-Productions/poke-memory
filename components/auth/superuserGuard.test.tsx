@@ -25,13 +25,13 @@
 
 import { render, screen, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 // ---------------------------------------------------------------------------
 // Shared fake auth objects
 // ---------------------------------------------------------------------------
 
-const FAKE_CLIENT = {} as unknown as SupabaseClient;
+const FAKE_CLIENT = {} as unknown as DataClient;
 const FAKE_USER = { id: "00000000-0000-0000-0000-000000000001" };
 
 // ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ vi.mock("@/lib/settings/lastPushedSnapshot", () => ({
 // Auth: signed-in by default; tests override per scenario.
 const mockUseAuth = vi.fn(() => ({
   user: FAKE_USER as ReturnType<typeof import("@/lib/auth/AuthContext").useAuth>["user"],
-  supabase: FAKE_CLIENT,
+  db: FAKE_CLIENT,
 }));
 vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
@@ -107,7 +107,7 @@ describe("AutoSyncOnChange - superuser write guard", () => {
     // Reset to signed-in, no flags.
     mockUseAuth.mockReturnValue({
       user: FAKE_USER as ReturnType<typeof import("@/lib/auth/AuthContext").useAuth>["user"],
-      supabase: FAKE_CLIENT,
+      db: FAKE_CLIENT,
     });
     mockUseSuperuser.mockReturnValue({ anyFlagOn: false });
   });
@@ -177,7 +177,7 @@ describe("AutoSyncOnChange - superuser write guard", () => {
     // User is still "signed in" from the auth context perspective.
     mockUseAuth.mockReturnValue({
       user: FAKE_USER as ReturnType<typeof import("@/lib/auth/AuthContext").useAuth>["user"],
-      supabase: FAKE_CLIENT,
+      db: FAKE_CLIENT,
     });
 
     render(<AutoSyncOnChange />);
@@ -414,7 +414,7 @@ describe("useSyncOnUnload - null guard (ReviewSession superuser path)", () => {
 // ---------------------------------------------------------------------------
 // Section 3 - Pasture handleMarkSeen (F12)
 //
-// The pasture guard pattern is: const syncClient = anyFlagOn ? null : supabase;
+// The pasture guard pattern is: const syncClient = anyFlagOn ? null : db;
 // We test this directly by asserting that pushSingleCard is not called when
 // anyFlagOn is true, matching the contract that handleMarkSeen uses.
 // ---------------------------------------------------------------------------
