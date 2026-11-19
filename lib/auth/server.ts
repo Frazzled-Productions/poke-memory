@@ -106,7 +106,7 @@ export function createAuth(env: AuthEnv) {
         const ip = ctx.headers?.get("cf-connecting-ip") ?? "unknown";
         let allowed: boolean;
         try {
-          allowed = await checkRateLimit(env.DB, hashIp(ip, env.RATE_LIMIT_SALT || undefined), action);
+          allowed = await checkRateLimit(env.DB, hashIp(ip, env.RATE_LIMIT_SALT), action);
         } catch {
           allowed = false; // Fail closed, as the old RPC error path did.
         }

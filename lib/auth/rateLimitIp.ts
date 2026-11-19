@@ -5,9 +5,11 @@
  * rate_limit_buckets (D1; lib/db/rateLimit.ts). The raw IP is never persisted
  * or logged.
  *
- * The salt is the RATE_LIMIT_SALT Worker secret (passed in from the Worker env,
- * else read from process.env). If it is absent (local dev / CI) a hard-coded
- * dev-salt is used. Production MUST set it:
+ * The salt is the RATE_LIMIT_SALT Worker secret, passed in by the caller from
+ * the Worker env (getEnv()); process.env is never read, so every caller hashes
+ * the same way whether or not OpenNext has copied the env into process.env yet.
+ * If it is absent (local dev / CI) a hard-coded dev-salt is used. Production
+ * MUST set it:
  *   openssl rand -base64 32 | wrangler secret put RATE_LIMIT_SALT
  */
 
@@ -30,6 +32,6 @@ export type RateLimitAction = (typeof RATE_LIMIT_ACTIONS)[number];
  *
  * The raw IP is never stored or logged by this function or its callers.
  */
-export function hashIp(rawIp: string, salt: string = process.env.RATE_LIMIT_SALT ?? "dev-salt"): string {
-  return createHash("sha256").update(salt + rawIp).digest("hex"); // 64-char hex
+export function hashIp(rawIp: string, salt: string | undefined): string {
+  return createHash("sha256").update((salt || "dev-salt") + rawIp).digest("hex"); // 64-char hex
 }

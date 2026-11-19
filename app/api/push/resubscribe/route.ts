@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { requireAuth } from "@/lib/auth/requireAuth";
+import { getDb } from "@/lib/db/env";
+import { forUser } from "@/lib/db/scope";
 import { isKnownPushEndpoint } from "@/lib/push/endpoints";
 
 /**
@@ -17,8 +17,9 @@ import { isKnownPushEndpoint } from "@/lib/push/endpoints";
  * credentials by default). The route rejects 401 for unauthenticated callers.
  *
  * DB operations mirror `subscribeToPush` in `lib/push/subscribe.ts`:
- * delete-then-insert keeps the operation inside the SELECT/INSERT/DELETE RLS
- * policies (there is no UPDATE policy on `push_subscriptions`).
+ * delete-then-insert of the (user_id, endpoint) row, through forUser
+ * (lib/db/scope.ts) so both are pinned to the session user. The database
+ * stamps last_seen_at on insert (migration 049's trigger).
  */
 export async function POST(request: Request) {
   const parsed = await parseJsonBody<{ endpoint?: unknown; p256dh?: unknown; auth?: unknown }>(request);
@@ -34,34 +35,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_payload" }, { status: 400 });
   }
 
-  const supabase = (await createClient()) as unknown as SupabaseClient;
-  const authResult = await requireAuth(supabase, { withOkField: true });
+  const authResult = await requireAuth(request, { withOkField: true });
   if (authResult instanceof NextResponse) return authResult;
-  const { user } = authResult;
+  const db = forUser(await getDb(), authResult.user.id);
 
   // Delete any existing row for this (user_id, endpoint) pair and re-insert.
   // Matching the delete-then-insert pattern from lib/push/subscribe.ts::subscribeToPush.
-  const { error: deleteError } = await supabase
-    .from("push_subscriptions")
-    .delete()
-    .eq("user_id", user.id)
-    .eq("endpoint", endpoint);
-
-  if (deleteError) {
+  try {
+    await db.delete("push_subscriptions", [{ column: "endpoint", op: "eq", value: endpoint }]);
+  } catch {
     return NextResponse.json({ ok: false, error: "delete_failed" }, { status: 500 });
   }
 
-  const { error: insertError } = await supabase
-    .from("push_subscriptions")
-    .insert({
-      user_id: user.id,
+  try {
+    await db.insert("push_subscriptions", {
       endpoint,
       p256dh,
       auth_secret: auth,
       last_seen_at: new Date().toISOString(),
     });
-
-  if (insertError) {
+  } catch {
     return NextResponse.json({ ok: false, error: "insert_failed" }, { status: 500 });
   }
 

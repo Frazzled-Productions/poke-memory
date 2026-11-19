@@ -11,8 +11,9 @@
  * `learningLocales` in settings. New multi-language breakdown tests verify
  * the per-locale due accumulation and copy formatting.
  *
- * `web-push` and the Supabase service-role client are mocked at module
- * level so the test never touches the network and never sends a real push.
+ * `web-push` and the lib/db/system queries are mocked at module level so
+ * the test never touches the network and never sends a real push;
+ * send-daily.d1.test.tsx runs the route against the D1 test database.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -24,9 +25,17 @@ vi.mock("web-push", () => ({
   },
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(),
+const { getCloudflareContext, system } = vi.hoisted(() => ({
+  getCloudflareContext: vi.fn(),
+  system: {
+    getPushTargets: vi.fn(),
+    getPushDueCards: vi.fn(),
+    getPushStreakDays: vi.fn(),
+    deleteDeadPushSubscriptions: vi.fn(),
+  },
 }));
+vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext }));
+vi.mock("@/lib/db/system", () => system);
 
 // Pin the timezone helper so tests are deterministic regardless of system
 // clock. The route calls todayInTimezone(tz) per user; returning the same
@@ -35,13 +44,11 @@ vi.mock("@/lib/utils/format-date", () => ({
   todayInTimezone: () => "2026-05-20",
 }));
 
-import { POST, buildDailyMessage, maxDuration, type LocaleDueMap } from "./route";
+import { POST, buildDailyMessage, type LocaleDueMap } from "./route";
 import webpush from "web-push";
-import { createClient } from "@supabase/supabase-js";
 
 const mockSendNotification = vi.mocked(webpush.sendNotification);
 const mockSetVapidDetails = vi.mocked(webpush.setVapidDetails);
-const mockCreateClient = vi.mocked(createClient);
 
 /** Convenience: a request with the right Bearer header. */
 function makeRequest(secret = "secret-value"): Request {
@@ -183,6 +190,65 @@ function buildAdminMock(opts: {
   return { client: { rpc, from }, deleteCalls };
 }
 
+const DB = { name: "test-d1" };
+let testEnv: Record<string, unknown>;
+
+type RpcResult = { data: unknown; error: unknown };
+type RpcBuilder = {
+  order: (column: string, options?: { ascending?: boolean }) => RpcBuilder;
+  range: (from: number, to: number) => Promise<RpcResult>;
+};
+type FixtureClient = {
+  rpc: (fn: string, args?: Record<string, unknown>) => unknown;
+  from: (table: string) => unknown;
+};
+
+function unwrap<T>({ data, error }: RpcResult): T {
+  if (error) throw error;
+  return data as T;
+}
+
+/** Reads every page of a fixture RPC, as the D1 query returns every row at once. */
+async function readAllPages<T>(builder: () => RpcBuilder, columns: [string, string]): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const page = unwrap<T[]>(await builder().order(columns[0]).order(columns[1]).range(from, from + 999));
+    rows.push(...page);
+    if (page.length < 1000) return rows;
+  }
+}
+
+/**
+ * Wires the mocked lib/db/system functions to the fixture. The fixture still
+ * speaks in terms of the Postgres RPCs those functions port (046, 047); the
+ * queries themselves are tested against D1 in lib/db/system/push.test.ts.
+ */
+function installSystem(admin: { client: FixtureClient }) {
+  system.getPushTargets.mockImplementation(async () =>
+    unwrap(await (admin.client.rpc("get_push_targets") as Promise<RpcResult>)),
+  );
+  system.getPushDueCards.mockImplementation(async (_db: unknown, userIds: string[], today: string) =>
+    readAllPages(
+      () => admin.client.rpc("get_push_due_cards", { user_ids: userIds, today_input: today }) as RpcBuilder,
+      ["user_id", "due_date"],
+    ),
+  );
+  system.getPushStreakDays.mockImplementation(async (_db: unknown, userIds: string[]) =>
+    readAllPages(
+      () => admin.client.rpc("get_push_streak_days", { user_ids: userIds }) as RpcBuilder,
+      ["user_id", "review_date"],
+    ),
+  );
+  system.deleteDeadPushSubscriptions.mockImplementation(async (_db: unknown, ids: string[]) => {
+    const table = admin.client.from("push_subscriptions") as {
+      delete: (o: unknown) => { in: (c: string, v: unknown[]) => Promise<{ error: unknown; count: number | null }> };
+    };
+    const { error, count } = await table.delete({ count: "exact" }).in("id", ids);
+    if (error) throw error;
+    return count ?? ids.length;
+  });
+}
+
 /**
  * Builds an array of due rows where each row is a `name` card with a
  * sequential subject_key, first_seen=null (not started today), locale="en".
@@ -216,12 +282,15 @@ function makeLocaleDueMap(entries: Record<string, number>): LocaleDueMap {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.CRON_SHARED_SECRET = "secret-value";
+  testEnv = {
+    DB,
+    DEPLOY_ENV: "cloudflare-production",
+    CRON_SHARED_SECRET: "secret-value",
+    VAPID_PRIVATE_KEY: "vapid-priv",
+    VAPID_SUBJECT: "mailto:test@example.com",
+  };
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = "vapid-pub";
-  process.env.VAPID_PRIVATE_KEY = "vapid-priv";
-  process.env.VAPID_SUBJECT = "mailto:test@example.com";
-  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
+  getCloudflareContext.mockImplementation(async () => ({ env: testEnv }));
   // Pin the system clock to 08:00 UTC so the per-user hour gate
   // (shouldSendToUser) passes for NULL-preference users (default = 8).
   // Tests that need a different UTC hour override via vi.setSystemTime locally.
@@ -397,7 +466,7 @@ describe("buildDailyMessage - multi-language breakdown (#1504)", () => {
 
 describe("POST /api/push/send-daily - auth and config gates", () => {
   it("returns 503 when CRON_SHARED_SECRET is unset", async () => {
-    delete process.env.CRON_SHARED_SECRET;
+    delete testEnv.CRON_SHARED_SECRET;
     const res = await POST(makeRequest());
     expect(res.status).toBe(503);
     const body = (await res.json()) as { error: string };
@@ -405,7 +474,7 @@ describe("POST /api/push/send-daily - auth and config gates", () => {
   });
 
   it("returns 503 when VAPID_PRIVATE_KEY is unset", async () => {
-    delete process.env.VAPID_PRIVATE_KEY;
+    delete testEnv.VAPID_PRIVATE_KEY;
     const res = await POST(makeRequest());
     expect(res.status).toBe(503);
   });
@@ -446,7 +515,7 @@ describe("POST /api/push/send-daily - auth and config gates", () => {
 describe("POST /api/push/send-daily - happy path", () => {
   it("returns 200 and sends zero notifications when no subscriptions exist", async () => {
     const admin = buildAdminMock({ subscriptions: [] });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean; sent: number };
@@ -460,7 +529,7 @@ describe("POST /api/push/send-daily - happy path", () => {
     );
   });
 
-  it("reads via the get_push_targets / get_push_due_cards RPCs, not raw table SELECTs (#1100)", async () => {
+  it("reads through getPushTargets / getPushDueCards in lib/db/system (#1100)", async () => {
     const admin = buildAdminMock({
       subscriptions: [
         {
@@ -474,19 +543,15 @@ describe("POST /api/push/send-daily - happy path", () => {
       settings: [{ user_id: "user-a", timezone: "UTC", settings: ALL_ENABLED_SETTINGS }],
       due: dueRowsFor({ "user-a": 2 }),
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
-    expect(admin.client.rpc).toHaveBeenCalledWith("get_push_targets");
-    expect(admin.client.rpc).toHaveBeenCalledWith("get_push_due_cards", {
-      user_ids: ["user-a"],
-      today_input: "2026-05-20",
-    });
-    // The only .from() access left is the dead-endpoint DELETE, which this
-    // happy path never reaches.
-    expect(admin.client.from).not.toHaveBeenCalled();
+    expect(system.getPushTargets).toHaveBeenCalledWith(DB);
+    expect(system.getPushDueCards).toHaveBeenCalledWith(DB, ["user-a"], "2026-05-20");
+    // The only write is the dead-endpoint delete, which this happy path never reaches.
+    expect(system.deleteDeadPushSubscriptions).not.toHaveBeenCalled();
   });
 
   it("returns 502 when the get_push_due_cards RPC errors", async () => {
@@ -503,7 +568,7 @@ describe("POST /api/push/send-daily - happy path", () => {
       settings: [{ user_id: "user-a", timezone: "UTC", settings: ALL_ENABLED_SETTINGS }],
       dueError: { message: "boom" },
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     expect(res.status).toBe(502);
     const body = (await res.json()) as { ok: boolean; error: string };
@@ -514,7 +579,7 @@ describe("POST /api/push/send-daily - happy path", () => {
 
   it("returns 502 when the get_push_targets RPC errors", async () => {
     const admin = buildAdminMock({ subsError: { message: "boom" } });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     expect(res.status).toBe(502);
     const body = (await res.json()) as { ok: boolean; error: string };
@@ -536,7 +601,7 @@ describe("POST /api/push/send-daily - happy path", () => {
       settings: [{ user_id: "user-a", timezone: "Europe/London", settings: ALL_ENABLED_SETTINGS }],
       due: dueRowsFor({ "user-a": 3 }),
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({
       statusCode: 201,
       body: "",
@@ -589,7 +654,7 @@ describe("POST /api/push/send-daily - happy path", () => {
       }],
       due: [], // no due cards
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
     const body = (await res.json()) as { sent: number };
@@ -629,7 +694,7 @@ describe("POST /api/push/send-daily - happy path", () => {
       }],
       due: [],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     const res = await POST(makeRequest());
@@ -663,7 +728,7 @@ describe("POST /api/push/send-daily - dead-endpoint cleanup", () => {
       due: dueRowsFor({ "user-a": 1 }),
       deleteCount: 1,
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const gone = { statusCode: 410, body: "Gone", headers: {} };
     mockSendNotification.mockRejectedValueOnce(gone);
 
@@ -690,7 +755,7 @@ describe("POST /api/push/send-daily - dead-endpoint cleanup", () => {
       due: dueRowsFor({ "user-a": 2 }),
       deleteCount: 1,
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockRejectedValueOnce({ statusCode: 404, body: "", headers: {} });
 
     const res = await POST(makeRequest());
@@ -713,7 +778,7 @@ describe("POST /api/push/send-daily - dead-endpoint cleanup", () => {
       settings: [{ user_id: "user-a", timezone: "UTC", settings: ALL_ENABLED_SETTINGS }],
       due: dueRowsFor({ "user-a": 1 }),
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockRejectedValueOnce({ statusCode: 500, body: "", headers: {} });
 
     const res = await POST(makeRequest());
@@ -751,7 +816,7 @@ describe("POST /api/push/send-daily - card-type filtering (#1153)", () => {
         { user_id: "user-a", card_type: "cry",                    subject_key: "1",   first_seen: null, locale: "en" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -788,7 +853,7 @@ describe("POST /api/push/send-daily - card-type filtering (#1153)", () => {
         { user_id: "user-a", card_type: "reverse",  subject_key: "2", first_seen: null, locale: "en" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -823,7 +888,7 @@ describe("POST /api/push/send-daily - card-type filtering (#1153)", () => {
         { user_id: "user-a", card_type: "name", subject_key: "10098", first_seen: null, locale: "en" }, // alt-form - excluded
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -859,7 +924,7 @@ describe("POST /api/push/send-daily - card-type filtering (#1153)", () => {
         { user_id: "user-a", card_type: "evolution-edge", subject_key: "26>>>10023",    first_seen: null, locale: "en" }, // post-evo alt-form - excluded
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -917,7 +982,7 @@ describe("POST /api/push/send-daily - card-type filtering (#1153)", () => {
         { user_id: "user-a", card_type: "reverse-evolution-edge", subject_key: "4>>>5", first_seen: null, locale: "en" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -966,7 +1031,7 @@ describe("POST /api/push/send-daily - new-card estimate (#1153)", () => {
         { user_id: "user-a", card_type: "name", subject_key: "3", first_seen: null, locale: "en" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1007,7 +1072,7 @@ describe("POST /api/push/send-daily - new-card estimate (#1153)", () => {
       }],
       due,
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1055,7 +1120,7 @@ describe("POST /api/push/send-daily - new-card estimate (#1153)", () => {
       }],
       due,
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1089,7 +1154,7 @@ describe("POST /api/push/send-daily - new-card estimate (#1153)", () => {
       }],
       due: [],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1120,7 +1185,7 @@ describe("POST /api/push/send-daily - new-card estimate (#1153)", () => {
       }],
       due: [],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1150,7 +1215,7 @@ describe("POST /api/push/send-daily - new-card estimate (#1153)", () => {
       }],
       due: [],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1180,7 +1245,7 @@ describe("POST /api/push/send-daily - new-card estimate (#1153)", () => {
       }],
       due: [],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
 
     await POST(makeRequest());
     expect(mockSendNotification).not.toHaveBeenCalled();
@@ -1206,7 +1271,7 @@ describe("POST /api/push/send-daily - new-card estimate (#1153)", () => {
       }],
       due: [],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1254,7 +1319,7 @@ describe("POST /api/push/send-daily - practice scope filtering (#1159)", () => {
         { user_id: "user-a", card_type: "name", subject_key: "252", first_seen: null, locale: "en" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1296,7 +1361,7 @@ describe("POST /api/push/send-daily - practice scope filtering (#1159)", () => {
         { user_id: "user-a", card_type: "name", subject_key: "252", first_seen: null, locale: "en" }, // Gen 3 - excluded
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1342,7 +1407,7 @@ describe("POST /api/push/send-daily - practice scope filtering (#1159)", () => {
         { user_id: "user-a", card_type: "name",    subject_key: "4",   first_seen: null, locale: "en" }, // not hearted
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1385,7 +1450,7 @@ describe("POST /api/push/send-daily - practice scope filtering (#1159)", () => {
           { user_id: "user-a", card_type: "name", subject_key: "94", first_seen: "2026-01-01", locale: "en" },
         ],
       });
-      mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+      installSystem(admin);
       mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
       await POST(makeRequest());
       return mockSendNotification.mock.calls.map((c) => c[1]);
@@ -1426,7 +1491,7 @@ describe("POST /api/push/send-daily - practice scope filtering (#1159)", () => {
         { user_id: "user-a", card_type: "name", subject_key: "6", first_seen: null, locale: "en" }, // Charizard (Fire/Flying) - kept
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1468,7 +1533,7 @@ describe("POST /api/push/send-daily - practice scope filtering (#1159)", () => {
         { user_id: "user-a", card_type: "evolution-edge", subject_key: "5>>>6",   first_seen: null, locale: "en" }, // kept
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1509,7 +1574,7 @@ describe("POST /api/push/send-daily - practice scope filtering (#1159)", () => {
         { user_id: "user-a", card_type: "name", subject_key: "155", first_seen: null, locale: "en" }, // Gen 2 - excluded
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     const res = await POST(makeRequest());
@@ -1546,7 +1611,7 @@ describe("POST /api/push/send-daily - per-user notification-hour gate (#1315)", 
       }],
       due: dueRowsFor({ "user-a": 1 }),
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     const res = await POST(makeRequest());
@@ -1566,7 +1631,7 @@ describe("POST /api/push/send-daily - per-user notification-hour gate (#1315)", 
       }],
       due: dueRowsFor({ "user-a": 1 }),
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
 
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
@@ -1584,7 +1649,7 @@ describe("POST /api/push/send-daily - per-user notification-hour gate (#1315)", 
       }],
       due: dueRowsFor({ "user-a": 3 }),
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
 
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
@@ -1604,7 +1669,7 @@ describe("POST /api/push/send-daily - per-user notification-hour gate (#1315)", 
       }],
       due: dueRowsFor({ "user-a": 2 }),
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     const res = await POST(makeRequest());
@@ -1624,7 +1689,7 @@ describe("POST /api/push/send-daily - per-user notification-hour gate (#1315)", 
       ],
       due: dueRowsFor({ "user-a": 5, "user-b": 3 }),
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
@@ -1666,7 +1731,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
         { user_id: "user-a", card_type: "name", subject_key: "7", first_seen: null, locale: "en" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1707,7 +1772,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
       }],
       due: [...jaDue, ...enDue],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1740,7 +1805,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
         { user_id: "user-a", card_type: "name", subject_key: "3", first_seen: null, locale: "zh-Hans" }, // not in learning set
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1772,7 +1837,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
         { user_id: "user-a", card_type: "name", subject_key: "1", first_seen: null, locale: "zh-Hans" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1817,7 +1882,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
         // no en due rows
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1856,7 +1921,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
         { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "en" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1877,7 +1942,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
         { user_id: "user-a", card_type: "name", subject_key: "7", first_seen: null, locale: "en" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1905,7 +1970,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
         { user_id: "user-a", card_type: "name", subject_key: "4", first_seen: null, locale: "en" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1933,7 +1998,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
         { user_id: "user-a", card_type: "name", subject_key: "7", first_seen: null, locale: "en" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     await POST(makeRequest());
@@ -1975,7 +2040,7 @@ describe("POST /api/push/send-daily - learningLocales filter (#1504, supersedes 
         { user_id: "user-b", card_type: "name", subject_key: "3", first_seen: null, locale: "ja" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     const res = await POST(makeRequest());
@@ -2019,12 +2084,8 @@ describe("POST /api/push/send-daily - delivery limits", () => {
     });
   }
 
-  it("declares a 300 second limit", () => {
-    expect(maxDuration).toBe(300);
-  });
-
   it("a first send that never settles does not stop the second or the response", async () => {
-    mockCreateClient.mockReturnValue(twoDevices().client as unknown as ReturnType<typeof createClient>);
+    installSystem(twoDevices());
     mockSendNotification.mockImplementationOnce(() => new Promise(() => {}));
     mockSendNotification.mockResolvedValueOnce({ statusCode: 201, body: "", headers: {} });
 
@@ -2042,7 +2103,7 @@ describe("POST /api/push/send-daily - delivery limits", () => {
 
   it("Gone: a dead row is still cleared when another send hangs", async () => {
     const admin = twoDevices();
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockImplementationOnce(() => new Promise(() => {}));
     mockSendNotification.mockRejectedValueOnce({ statusCode: 410, body: "", headers: {} });
 
@@ -2054,7 +2115,7 @@ describe("POST /api/push/send-daily - delivery limits", () => {
   });
 
   it("Server error from a push service: the other device is still sent to", async () => {
-    mockCreateClient.mockReturnValue(twoDevices().client as unknown as ReturnType<typeof createClient>);
+    installSystem(twoDevices());
     mockSendNotification.mockRejectedValueOnce({ statusCode: 500, body: "", headers: {} });
     mockSendNotification.mockResolvedValueOnce({ statusCode: 201, body: "", headers: {} });
 
@@ -2074,7 +2135,7 @@ describe("POST /api/push/send-daily - delivery limits", () => {
       }
       return read(fn, args);
     }) as typeof read;
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
@@ -2096,7 +2157,7 @@ describe("POST /api/push/send-daily - delivery limits", () => {
       due: dueRowsFor({ "user-a": 1 }),
       deleteCount: 1,
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockImplementationOnce(() => {
       vi.setSystemTime(Date.now() + 241_000);
       return Promise.reject({ statusCode: 410, body: "", headers: {} });

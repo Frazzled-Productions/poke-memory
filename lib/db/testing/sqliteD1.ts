@@ -21,7 +21,9 @@ import { fileURLToPath } from "node:url";
 import { DatabaseSync, type SQLInputValue, type StatementSync } from "node:sqlite";
 import type { D1DatabaseLike, D1PreparedStatementLike, D1ResultLike } from "../d1";
 
-export const D1_MIGRATIONS_DIR = fileURLToPath(new URL("../../../db/d1/migrations", import.meta.url));
+// Resolved with path, not new URL(rel, base): under vitest's jsdom environment
+// the global URL resolves a relative path against http://localhost:3000.
+export const D1_MIGRATIONS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../db/d1/migrations");
 
 export interface SqliteD1 extends D1DatabaseLike {
   /** The underlying database, for test set-up and assertions. */

@@ -28,3 +28,18 @@ export function isAuthorized(
     return false;
   }
 }
+
+/**
+ * The guard every cron route starts with (design D2): 503 when
+ * CRON_SHARED_SECRET is not configured, an empty 401 when the bearer does not
+ * match, otherwise null and the route carries on.
+ */
+export function cronGuard(request: Request, secret: string | undefined): Response | null {
+  if (!secret) {
+    return Response.json({ ok: false, error: "misconfigured" }, { status: 503 });
+  }
+  if (!isAuthorized(request.headers.get("authorization"), secret)) {
+    return new Response(null, { status: 401 });
+  }
+  return null;
+}

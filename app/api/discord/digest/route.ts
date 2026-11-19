@@ -1,32 +1,34 @@
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { isAuthorized } from "@/lib/auth/bearerAuth";
-import { supabaseSecretKey } from "@/lib/supabase/keys";
+import { getEnv } from "@/lib/db/env";
+import { feedbackForDigest } from "@/lib/db/system";
+import { outboundAllowed } from "@/lib/outbound";
 
 /**
  * POST /api/discord/digest (#1653)
  *
- * Called by the `feedback-discord-digest` pg_cron job (migration 042) weekly
- * on Mondays at 09:00 UTC. Queries the `feedback` table for the past N days
- * (default 7), groups rows by category and authenticated status, and posts
- * a summary embed to the maintainer's Discord channel.
+ * Called weekly on Mondays at 09:00 UTC by the Worker's Cron Trigger
+ * (lib/cron/schedule.ts; was the `feedback-discord-digest` pg_cron job of
+ * migration 042). Reads the `feedback` table in D1 for the past N days
+ * (default 7), groups rows by category and authenticated status, and posts a
+ * summary embed to the maintainer's Discord channel.
  *
  * AUTH MODEL
  *   Bearer token via `Authorization: Bearer <CRON_SHARED_SECRET>`.
  *
- * BODY (from pg_cron job)
+ * BODY (optional)
  *   { "window_days": 7 }
- *   window_days is clamped to 1-90 (server-side); values outside the range
- *   fall back to 7.
+ *   window_days is clamped to 1-90 (server-side); a missing body (the Cron
+ *   Trigger sends none) or a value outside the range falls back to 7.
  *
  * QUERY CONTRACT
- *   Two queries: (1) SELECT id, category, created_at for all rows in the
- *   window; (2) SELECT id, category filtered by user_id IS NOT NULL (filter
- *   only - user_id never appears in the JS SELECT list). NEVER select or
- *   send message or user_id.
+ *   One query (feedbackForDigest in lib/db/system): id, category and whether
+ *   user_id is set, for every row in the window. NEVER select or send message
+ *   or user_id.
  *
  * DISCORD WEBHOOK
- *   URL read from DISCORD_DIGEST_WEBHOOK_URL env (server-side only).
+ *   URL read from the DISCORD_DIGEST_WEBHOOK_URL Worker secret. Outside
+ *   production nothing is posted; the counts are logged and returned.
  */
 
 /** Discord embed colour for digest (blue). */
@@ -39,20 +41,13 @@ type CategoryStats = {
   guest: number;
 };
 
-/** DB row shape for the all-rows digest query (user_id is never selected). */
-type FeedbackRow = {
-  id: string;
-  category: string;
-  created_at: string;
-};
-
 export async function POST(request: Request) {
-  const sharedSecret = process.env.CRON_SHARED_SECRET;
-  const webhookUrl = process.env.DISCORD_DIGEST_WEBHOOK_URL;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = supabaseSecretKey();
+  const env = await getEnv();
+  const sharedSecret = env.CRON_SHARED_SECRET;
+  const webhookUrl = env.DISCORD_DIGEST_WEBHOOK_URL;
+  const sending = outboundAllowed(env);
 
-  if (!sharedSecret || !webhookUrl || !supabaseUrl || !serviceRoleKey) {
+  if (!sharedSecret || (sending && !webhookUrl)) {
     return NextResponse.json(
       { ok: false, error: "misconfigured" },
       { status: 503 },
@@ -75,45 +70,15 @@ export async function POST(request: Request) {
     // Missing / malformed body - default window is fine.
   }
 
-  // Service-role client: reads across all users without RLS.
-  const admin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
 
-  // Compute the window start timestamp.
-  const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
-
-  // PII defence-in-depth: user_id is NEVER selected into JavaScript.
-  //
-  // Two queries derive the auth/guest split without touching user_id in the
-  // SELECT list:
-  //   1. All rows in the window (id, category, created_at) for totals.
-  //   2. Authenticated rows only (user_id IS NOT NULL via .not() filter), also
-  //      selecting id + category so we can cross-reference per category.
-  //
-  // The .not("user_id", "is", null) PostgREST filter becomes a WHERE clause;
-  // user_id is never projected into JS memory.
-
-  const [allResult, authResult] = await Promise.all([
-    admin
-      .from("feedback")
-      .select("id, category, created_at")
-      .gte("created_at", since),
-    admin
-      .from("feedback")
-      .select("id, category")
-      .gte("created_at", since)
-      .not("user_id", "is", null),
-  ]);
-
-  if (allResult.error || authResult.error) {
-    const err = allResult.error ?? authResult.error;
+  let rows: Awaited<ReturnType<typeof feedbackForDigest>>;
+  try {
+    rows = await feedbackForDigest(env.DB, since);
+  } catch (err) {
     console.error("[discord/digest] query error", err);
     return NextResponse.json({ ok: false, error: "query_failed" }, { status: 502 });
   }
-
-  const rows = (allResult.data ?? []) as FeedbackRow[];
-  const authIds = new Set((authResult.data ?? []).map((r) => (r as { id: string }).id));
   const total = rows.length;
 
   // Group by category, accumulating authenticated vs guest counts.
@@ -125,7 +90,7 @@ export async function POST(request: Request) {
     }
     const stats = byCategory.get(cat)!;
     stats.total += 1;
-    if (authIds.has(row.id)) {
+    if (row.authenticated) {
       stats.authenticated += 1;
     } else {
       stats.guest += 1;
@@ -169,10 +134,15 @@ export async function POST(request: Request) {
     timestamp: new Date().toISOString(),
   };
 
+  if (!sending) {
+    console.info(`[discord/digest] would post a digest of ${total} row(s) over ${windowDays} day(s); outbound off`);
+    return NextResponse.json({ ok: true, total, windowDays, posted: false });
+  }
+
   // If no feedback this week, still post (zero-count digest is useful signal).
   let discordRes: Response;
   try {
-    discordRes = await fetch(webhookUrl, {
+    discordRes = await fetch(webhookUrl!, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ embeds: [embed] }),

@@ -9,8 +9,9 @@
  * genuinely-at-risk streak filter (including the
  * honesty case where a protection token would auto-bridge the gap).
  *
- * `web-push` and the Supabase service-role client are mocked at module level
- * so the test never touches the network and never sends a real push.
+ * `web-push` and the lib/db/system queries are mocked at module level so the
+ * test never touches the network and never sends a real push;
+ * send-streak-nudge.d1.test.tsx runs the route against the D1 test database.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -22,21 +23,27 @@ vi.mock("web-push", () => ({
   },
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(),
+const { getCloudflareContext, system } = vi.hoisted(() => ({
+  getCloudflareContext: vi.fn(),
+  system: {
+    getPushTargets: vi.fn(),
+    getPushDueCards: vi.fn(),
+    getPushStreakDays: vi.fn(),
+    deleteDeadPushSubscriptions: vi.fn(),
+  },
 }));
+vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext }));
+vi.mock("@/lib/db/system", () => system);
 
 // `todayInTimezone` is deliberately NOT mocked (#2073): the timezone tests
 // below depend on the real local-day maths. Determinism comes from
 // `vi.setSystemTime` in beforeEach.
 
-import { POST, buildStreakNudgeMessage, maxDuration, STREAK_NUDGE_LOCAL_HOUR } from "./route";
+import { POST, buildStreakNudgeMessage, STREAK_NUDGE_LOCAL_HOUR } from "./route";
 import webpush from "web-push";
-import { createClient } from "@supabase/supabase-js";
 
 const mockSendNotification = vi.mocked(webpush.sendNotification);
 const mockSetVapidDetails = vi.mocked(webpush.setVapidDetails);
-const mockCreateClient = vi.mocked(createClient);
 
 function makeRequest(secret = "secret-value"): Request {
   return new Request("http://localhost/api/push/send-streak-nudge", {
@@ -153,6 +160,65 @@ function buildAdminMock(opts: {
   return { client: { rpc, from }, deleteCalls, streakDayPages };
 }
 
+const DB = { name: "test-d1" };
+let testEnv: Record<string, unknown>;
+
+type RpcResult = { data: unknown; error: unknown };
+type RpcBuilder = {
+  order: (column: string, options?: { ascending?: boolean }) => RpcBuilder;
+  range: (from: number, to: number) => Promise<RpcResult>;
+};
+type FixtureClient = {
+  rpc: (fn: string, args?: Record<string, unknown>) => unknown;
+  from: (table: string) => unknown;
+};
+
+function unwrap<T>({ data, error }: RpcResult): T {
+  if (error) throw error;
+  return data as T;
+}
+
+/** Reads every page of a fixture RPC, as the D1 query returns every row at once. */
+async function readAllPages<T>(builder: () => RpcBuilder, columns: [string, string]): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const page = unwrap<T[]>(await builder().order(columns[0]).order(columns[1]).range(from, from + 999));
+    rows.push(...page);
+    if (page.length < 1000) return rows;
+  }
+}
+
+/**
+ * Wires the mocked lib/db/system functions to the fixture. The fixture still
+ * speaks in terms of the Postgres RPCs those functions port (046, 047); the
+ * queries themselves are tested against D1 in lib/db/system/push.test.ts.
+ */
+function installSystem(admin: { client: FixtureClient }) {
+  system.getPushTargets.mockImplementation(async () =>
+    unwrap(await (admin.client.rpc("get_push_targets") as Promise<RpcResult>)),
+  );
+  system.getPushDueCards.mockImplementation(async (_db: unknown, userIds: string[], today: string) =>
+    readAllPages(
+      () => admin.client.rpc("get_push_due_cards", { user_ids: userIds, today_input: today }) as RpcBuilder,
+      ["user_id", "due_date"],
+    ),
+  );
+  system.getPushStreakDays.mockImplementation(async (_db: unknown, userIds: string[]) =>
+    readAllPages(
+      () => admin.client.rpc("get_push_streak_days", { user_ids: userIds }) as RpcBuilder,
+      ["user_id", "review_date"],
+    ),
+  );
+  system.deleteDeadPushSubscriptions.mockImplementation(async (_db: unknown, ids: string[]) => {
+    const table = admin.client.from("push_subscriptions") as {
+      delete: (o: unknown) => { in: (c: string, v: unknown[]) => Promise<{ error: unknown; count: number | null }> };
+    };
+    const { error, count } = await table.delete({ count: "exact" }).in("id", ids);
+    if (error) throw error;
+    return count ?? ids.length;
+  });
+}
+
 /** `count` consecutive "YYYY-MM-DD" dates ending on `endDate` (inclusive). */
 function consecutiveDatesEnding(endDate: string, count: number): string[] {
   const end = Date.parse(`${endDate}T00:00:00Z`);
@@ -178,12 +244,15 @@ function optedInTarget(overrides: Partial<TargetRow> = {}): TargetRow {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.CRON_SHARED_SECRET = "secret-value";
+  testEnv = {
+    DB,
+    DEPLOY_ENV: "cloudflare-production",
+    CRON_SHARED_SECRET: "secret-value",
+    VAPID_PRIVATE_KEY: "vapid-priv",
+    VAPID_SUBJECT: "mailto:test@example.com",
+  };
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = "vapid-pub";
-  process.env.VAPID_PRIVATE_KEY = "vapid-priv";
-  process.env.VAPID_SUBJECT = "mailto:test@example.com";
-  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
+  getCloudflareContext.mockImplementation(async () => ({ env: testEnv }));
   // Pin the clock to STREAK_NUDGE_LOCAL_HOUR UTC (UTC timezone in the
   // fixtures above, so local hour === UTC hour). Tests that need a different
   // hour override via vi.setSystemTime locally.
@@ -216,13 +285,13 @@ describe("buildStreakNudgeMessage", () => {
 
 describe("POST /api/push/send-streak-nudge - auth and config gates", () => {
   it("returns 503 when CRON_SHARED_SECRET is unset", async () => {
-    delete process.env.CRON_SHARED_SECRET;
+    delete testEnv.CRON_SHARED_SECRET;
     const res = await POST(makeRequest());
     expect(res.status).toBe(503);
   });
 
   it("returns 503 when VAPID_PRIVATE_KEY is unset", async () => {
-    delete process.env.VAPID_PRIVATE_KEY;
+    delete testEnv.VAPID_PRIVATE_KEY;
     const res = await POST(makeRequest());
     expect(res.status).toBe(503);
   });
@@ -249,7 +318,7 @@ describe("POST /api/push/send-streak-nudge - auth and config gates", () => {
 describe("POST /api/push/send-streak-nudge - happy path", () => {
   it("returns 200 and sends zero notifications when no subscriptions exist", async () => {
     const admin = buildAdminMock({ targets: [] });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean; sent: number };
@@ -261,7 +330,7 @@ describe("POST /api/push/send-streak-nudge - happy path", () => {
 
   it("returns 502 when get_push_targets errors", async () => {
     const admin = buildAdminMock({ targetsError: { message: "boom" } });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     expect(res.status).toBe(502);
     const body = (await res.json()) as { ok: boolean; error: string };
@@ -276,7 +345,7 @@ describe("POST /api/push/send-streak-nudge - happy path", () => {
         { user_id: "user-a", review_date: "2026-05-19" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     const res = await POST(makeRequest());
@@ -284,10 +353,8 @@ describe("POST /api/push/send-streak-nudge - happy path", () => {
     const body = (await res.json()) as { ok: boolean; sent: number };
     expect(body.sent).toBe(1);
     expect(mockSendNotification).toHaveBeenCalledTimes(1);
-    expect(admin.client.rpc).toHaveBeenCalledWith("get_push_targets");
-    expect(admin.client.rpc).toHaveBeenCalledWith("get_push_streak_days", {
-      user_ids: ["user-a"],
-    });
+    expect(system.getPushTargets).toHaveBeenCalledWith(DB);
+    expect(system.getPushStreakDays).toHaveBeenCalledWith(DB, ["user-a"]);
   });
 });
 
@@ -298,7 +365,7 @@ describe("POST /api/push/send-streak-nudge - opt-in gate", () => {
     const admin = buildAdminMock({
       targets: [optedInTarget({ settings: { streakNudgeEnabled: false } })],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(0);
@@ -307,7 +374,7 @@ describe("POST /api/push/send-streak-nudge - opt-in gate", () => {
 
   it("skips a user with no settings row at all (default false)", async () => {
     const admin = buildAdminMock({ targets: [optedInTarget({ settings: null })] });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(0);
@@ -326,7 +393,7 @@ describe("POST /api/push/send-streak-nudge - late-hour fan-out", () => {
         { user_id: "user-a", review_date: "2026-05-19" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(0);
@@ -347,7 +414,7 @@ describe("POST /api/push/send-streak-nudge - collision guard", () => {
         { user_id: "user-a", review_date: "2026-05-19" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(0);
@@ -363,7 +430,7 @@ describe("POST /api/push/send-streak-nudge - collision guard", () => {
         { user_id: "user-a", review_date: "2026-05-19" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
@@ -382,7 +449,7 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #
         { user_id: "user-a", review_date: "2026-05-20" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(0);
@@ -400,7 +467,7 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #
         { user_id: "user-a", review_date: "2026-05-20" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     await POST(makeRequest());
     expect(mockSendNotification).not.toHaveBeenCalled();
   });
@@ -416,7 +483,7 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #
         { user_id: "user-a", review_date: "2026-09-15" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
@@ -432,7 +499,7 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #
         { user_id: "user-a", review_date: "2026-09-16" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(0);
@@ -450,7 +517,7 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #
         { user_id: "user-a", review_date: "2026-09-16" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(0);
@@ -466,7 +533,7 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #
         { user_id: "user-a", review_date: "2026-09-15" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
@@ -486,7 +553,7 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #
         { user_id: "user-a", review_date: "2026-05-19" },
       ],
     });
-    mockCreateClient.mockReturnValue(atRisk.client as unknown as ReturnType<typeof createClient>);
+    installSystem(atRisk);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
     const sentBody = (await (await POST(makeRequest())).json()) as { sent: number };
     expect(sentBody.sent).toBe(1);
@@ -499,7 +566,7 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #
         { user_id: "user-a", review_date: "2026-05-20" },
       ],
     });
-    mockCreateClient.mockReturnValue(reviewed.client as unknown as ReturnType<typeof createClient>);
+    installSystem(reviewed);
     const skippedBody = (await (await POST(makeRequest())).json()) as { sent: number };
     expect(skippedBody.sent).toBe(0);
     expect(mockSendNotification).not.toHaveBeenCalled();
@@ -507,7 +574,7 @@ describe("POST /api/push/send-streak-nudge - reviewed-today gate (streak_days, #
 
   it("never calls get_push_reviewed_today (the UTC last_review RPC)", async () => {
     const admin = buildAdminMock({ targets: [optedInTarget()] });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     await POST(makeRequest());
     expect(admin.client.rpc).not.toHaveBeenCalledWith("get_push_reviewed_today", expect.anything());
   });
@@ -521,7 +588,7 @@ describe("POST /api/push/send-streak-nudge - at-risk streak gate", () => {
       targets: [optedInTarget()],
       streakDays: [{ user_id: "user-a", review_date: "2026-05-01" }],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(0);
@@ -542,7 +609,7 @@ describe("POST /api/push/send-streak-nudge - at-risk streak gate", () => {
         { user_id: "user-a", review_date: "2026-05-19" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     const body = (await res.json()) as { sent: number };
     expect(body.sent).toBe(0);
@@ -554,7 +621,7 @@ describe("POST /api/push/send-streak-nudge - at-risk streak gate", () => {
       targets: [optedInTarget()],
       streakDaysError: { message: "boom" },
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     const res = await POST(makeRequest());
     expect(res.status).toBe(502);
     const body = (await res.json()) as { error: string };
@@ -588,7 +655,7 @@ describe("POST /api/push/send-streak-nudge - streak_days pagination (#2115)", ()
       ],
       streakDays,
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
 
     const res = await POST(makeRequest());
@@ -601,26 +668,6 @@ describe("POST /api/push/send-streak-nudge - streak_days pagination (#2115)", ()
     expect(mockSendNotification).toHaveBeenCalledTimes(1);
     expect(mockSendNotification.mock.calls[0][0].endpoint).toBe("https://fcm.googleapis.com/fcm/send/a");
 
-    expect(admin.streakDayPages.map((p) => [p.from, p.to])).toEqual([
-      [0, 999],
-      [1000, 1999],
-    ]);
-  });
-
-  it("orders every page by the unique key (user_id, review_date) so offset pages are stable", async () => {
-    const admin = buildAdminMock({
-      targets: [optedInTarget()],
-      streakDays: [{ user_id: "user-a", review_date: "2026-05-19" }],
-    });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
-    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
-
-    await POST(makeRequest());
-    expect(admin.streakDayPages).toHaveLength(1);
-    expect(admin.streakDayPages[0].orders).toEqual([
-      { column: "user_id", ascending: true },
-      { column: "review_date", ascending: true },
-    ]);
   });
 
   it("returns 502 when a later page errors rather than acting on partial data", async () => {
@@ -634,40 +681,15 @@ describe("POST /api/push/send-streak-nudge - streak_days pagination (#2115)", ()
       streakDays: full,
       streakDaysErrorFromOffset: POSTGREST_MAX_ROWS,
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(502);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("streak_days_query_failed");
     expect(mockSendNotification).not.toHaveBeenCalled();
-    // Page 1 succeeded (full), page 2 was requested and failed.
-    expect(admin.streakDayPages.map((p) => [p.from, p.to])).toEqual([
-      [0, 999],
-      [1000, 1999],
-    ]);
   });
 
-  it("tolerates a row duplicated across a page boundary (non-atomic pages)", async () => {
-    // 1000 days ending yesterday fill page one; a second copy of the last date
-    // lands on page two, as if a concurrent write shifted the boundary.
-    const dates = consecutiveDatesEnding("2026-05-19", POSTGREST_MAX_ROWS);
-    const streakDays: StreakDayRow[] = [
-      ...dates.map((review_date) => ({ user_id: "user-a", review_date })),
-      { user_id: "user-a", review_date: "2026-05-19" },
-    ];
-    const admin = buildAdminMock({ targets: [optedInTarget()], streakDays });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
-    mockSendNotification.mockResolvedValue({ statusCode: 201, body: "", headers: {} });
-
-    const res = await POST(makeRequest());
-    expect(res.status).toBe(200);
-    expect(admin.streakDayPages).toHaveLength(2);
-    expect(mockSendNotification).toHaveBeenCalledTimes(1);
-    const payload = JSON.parse(mockSendNotification.mock.calls[0][1] as string) as { body: string };
-    // Streak length is 1000 (localised as "1,000"), not inflated by the duplicate.
-    expect(payload.body).toContain("1,000 days");
-  });
 });
 
 // ─── Dead-endpoint cleanup ──────────────────────────────────────────────────
@@ -682,7 +704,7 @@ describe("POST /api/push/send-streak-nudge - dead-endpoint cleanup", () => {
       ],
       deleteCount: 1,
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockRejectedValue(
       Object.assign(new Error("Gone"), { statusCode: 410 }),
     );
@@ -702,7 +724,7 @@ describe("POST /api/push/send-streak-nudge - dead-endpoint cleanup", () => {
         { user_id: "user-a", review_date: "2026-05-19" },
       ],
     });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockRejectedValue(
       Object.assign(new Error("Server error"), { statusCode: 500 }),
     );
@@ -725,13 +747,9 @@ describe("POST /api/push/send-streak-nudge - delivery limits", () => {
   const atRisk = () =>
     consecutiveDatesEnding("2026-05-19", 5).map((review_date) => ({ user_id: "user-a", review_date }));
 
-  it("declares a 300 second limit", () => {
-    expect(maxDuration).toBe(300);
-  });
-
   it("a first send that never settles does not stop the second or the response", async () => {
     const admin = buildAdminMock({ targets: twoDevices(), streakDays: atRisk() });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockImplementationOnce(() => new Promise(() => {}));
     mockSendNotification.mockResolvedValueOnce({ statusCode: 201, body: "", headers: {} });
 
@@ -749,7 +767,7 @@ describe("POST /api/push/send-streak-nudge - delivery limits", () => {
 
   it("Server error from a push service: the other device is still sent to", async () => {
     const admin = buildAdminMock({ targets: twoDevices(), streakDays: atRisk() });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockRejectedValueOnce({ statusCode: 500, body: "", headers: {} });
     mockSendNotification.mockResolvedValueOnce({ statusCode: 201, body: "", headers: {} });
 
@@ -765,7 +783,7 @@ describe("POST /api/push/send-streak-nudge - delivery limits", () => {
       if (fn === "get_push_streak_days") vi.setSystemTime(Date.now() + 245_000);
       return read(fn, args);
     }) as typeof read;
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
 
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
@@ -779,7 +797,7 @@ describe("POST /api/push/send-streak-nudge - delivery limits", () => {
       optedInTarget({ subscription_id: `sub-${i}`, endpoint: `https://fcm.googleapis.com/fcm/send/${i}` }),
     );
     const admin = buildAdminMock({ targets, streakDays: atRisk() });
-    mockCreateClient.mockReturnValue(admin.client as unknown as ReturnType<typeof createClient>);
+    installSystem(admin);
     mockSendNotification.mockImplementationOnce(() => {
       vi.setSystemTime(Date.now() + 241_000);
       return Promise.reject({ statusCode: 410, body: "", headers: {} });
