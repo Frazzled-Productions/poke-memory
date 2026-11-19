@@ -145,7 +145,7 @@ Issues sit on the [project board](https://github.com/orgs/Frazzled-Productions/p
 
 ### Commands
 
-The `/go`, `/continue`, `/split`, `/replan`, `/fix` and `/resolve` comment commands were removed with their workflows; nothing responds to them. The only surviving comment command is `/preview` on a PR (OWNER / MEMBER / COLLABORATOR), handled by `vercel-preview-on-ready.yml`, which is currently disabled.
+The `/go`, `/continue`, `/split`, `/replan`, `/fix` and `/resolve` comment commands were removed with their workflows; nothing responds to them. The last one, `/preview`, went with `vercel-preview-on-ready.yml` in the move to Cloudflare: `deploy.yml` now uploads a preview version for every PR into `qa` (and the promotion PR) without being asked.
 
 ### Backlog ownership
 
@@ -161,7 +161,7 @@ The `/go`, `/continue`, `/split`, `/replan`, `/fix` and `/resolve` comment comma
 `main` is strict and production-tracked; `qa` is the integration branch where batch work is bundled and QA-tested before promotion (#806).
 
 ```
-Batch PRs ─▶ qa ─▶ (preview deploy + maintainer QA) ─▶ qa→main PR ─▶ main ─▶ release + production
+Batch PRs ─▶ qa ─▶ qa→main PR (preview version + maintainer QA) ─▶ main ─▶ release + production
 ```
 
 | Branch | Ruleset | Who PRs into it |
@@ -174,9 +174,9 @@ Batch PRs ─▶ qa ─▶ (preview deploy + maintainer QA) ─▶ qa→main PR 
 **The flow:**
 
 1. `/batch-issues` opens each batch PR against `qa` and drains them straight in (no rebase tax).
-2. At end of drain it fires `qa-preview-deploy.yml` (a Vercel preview of `qa`) and opens a **draft** `qa -> main` PR carrying every `Closes #N`.
+2. At end of drain it opens a **draft** `qa -> main` PR carrying every `Closes #N`. `deploy.yml` uploads a preview version of `qa` for it and comments the URL, refreshed on every later push to `qa`.
 3. The maintainer tests the preview, marks the draft ready, and merges `qa -> main`. The full required suite runs against strict `main`.
-4. The merge triggers `auto-release.yml`: it cuts the release, pushes the `[skip ci]` release commit to `main` (Vercel deploys production), then resets `qa` to `main` so the next batch starts clean.
+4. The merge triggers `auto-release.yml`: it cuts the release, pushes the `[skip ci]` release commit to `main` and publishes the GitHub Release (which `deploy.yml` deploys to production; the merge itself deployed already), then resets `qa` to `main` so the next batch starts clean.
 
 **Batch-drain pre-flight: aggregate coverage check.** Diff coverage is gated per-PR, but a set of PRs that each clear the 90% patch bar individually can still leave the *aggregate* `qa -> main` diff below the bar - a UI-heavy PR with E2E but thin unit coverage is the usual culprit. This surfaces as a failed `qa -> main` promotion needing a dedicated catch-up PR. To catch it before the drain rather than after, run the diff-coverage gate against the whole `qa`-vs-`main` diff before initiating a batch drain:
 
@@ -202,7 +202,7 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 | | |
 |---|---|
 | **Trigger** | `pull_request` (any), push to `main` |
-| **Jobs** | `changes` (path classification), `test` (`typecheck && build && test`), `e2e-browser` (Playwright matrix - `chromium` + `mobile-safari` legs run in parallel inside the official Playwright container), `e2e` (aggregator over the matrix legs), `em-dash` (`npm run lint:em-dash` on every PR, independent of `changes`, so docs-only PRs are gated too; #2134) |
+| **Jobs** | `changes` (path classification), `test` (`typecheck && build && test`), `e2e-browser` (Playwright matrix - `chromium` + `mobile-safari` legs run in parallel inside the official Playwright container), `e2e-real-auth` (`e2e/auth-real.spec.ts`, the username door end to end, against a local build of the Worker served by `opennextjs-cloudflare preview` with a fresh local D1 and a random per-run `BETTER_AUTH_SECRET` in `.dev.vars`; no secrets, so it also runs on fork and Dependabot PRs), `e2e` (aggregator over the matrix legs and `e2e-real-auth`), `em-dash` (`npm run lint:em-dash` on every PR, independent of `changes`, so docs-only PRs are gated too; #2134) |
 | **What it does** | `test` runs `npm ci && npm run typecheck && npm run build && npm test`. `e2e-browser` runs the Playwright smoke suite split by browser project so the two projects run as parallel matrix legs (#643). The `changes` job classifies the PR so `test`/`e2e` inner steps no-op on docs-only changes; `.claude/skills/**` is re-included as code so the skills layout lint runs (#1992), though today the fast path never applies because the `code` filter sets no `predicate-quantifier` (#2200). |
 | **Required checks** | `test` and `e2e` are `ci.yml`'s two required status checks (not the workflow name `CI`); `main`'s full required set also includes `Check version bump approval` and `Restrict main PR source` (see Branching model). `e2e` is a thin aggregator over the `e2e-browser` matrix, so the required-check name stays stable when matrix legs are added or renamed. The `qa` ruleset requires only `test` + `e2e`. `main-protection` enforces strict-up-to-date; the bot app bypasses for auto-merges. |
 | **Concurrency** | Cancels concurrent runs on the same ref - only the latest push on a branch completes. |
@@ -251,31 +251,33 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 
 ---
 
-### `migration-check.yml` - Migration drift check
+### `migration-check.yml` - Migration check
 
 | | |
 |---|---|
-| **Trigger** | `pull_request` touching `db/migrations/**`, `scripts/check-migrations.mjs`, or the workflow file itself; push to `main` |
+| **Trigger** | `pull_request` touching `db/d1/migrations/**`, `wrangler.jsonc`, or the workflow file itself |
 | **Job** | `check` |
-| **What it does** | Runs `scripts/check-migrations.mjs`, which lists files in `db/migrations/` (excluding the bootstrap `001_initial_sync_schema.sql`), calls the Supabase Management API to list applied migrations, and exits non-zero if any committed file is not in the applied list. **Env-to-branch parity (#1806):** a PR whose base is `qa` is checked against the **QA** project (staging rehearsal); a push to `main` (and a PR into `main`) is checked against **prod**. Routing is purely on `github.event_name` + `pull_request.base.ref` (secrets can't be read in `if:`), so the matching secret set is injected per step. |
-| **Required secrets** | `SUPABASE_ACCESS_TOKEN` (Supabase Management-API PAT, account-scoped so it reads BOTH projects) plus the per-project ref: `SUPABASE_PROJECT_REF` (prod, e.g. `nvxvvtvnthsgdxgksmju`) or `QA_SUPABASE_PROJECT_REF` (QA). No separate QA token - the PAT is account-level. The relevant ref must be set before the matching trigger can run; without it the script exits 2 with a clear error (the loud failure mode during the secrets-provisioning window). |
-| **Fork PRs** | Skipped (`github.event_name == 'push' || head.repo.fork == false` guard - the push path is gated in explicitly because a bare fork check is falsy on push). No secrets exposed. |
-| **Required check** | No - informational. Failure flags the gap; the recovery action is to run `mcp__supabase__apply_migration` against the named file. |
+| **What it does** | Two D1 checks (move-to-cloudflare, design D11). (1) **Append-only:** fails when the PR edits, renames or deletes a file in `db/d1/migrations/` that already exists on its base branch; wrangler records applied migrations by file name, so a change to an applied file would never reach a database that has it, and the fix belongs in a new file. (2) **Applies cleanly:** `wrangler d1 migrations apply DB --local` on a fresh local D1 (Miniflare's SQLite). There is no parity check any more: `deploy.yml` applies the migrations itself before every production deploy and preview upload. Replaced the Supabase parity check (#1806) and `scripts/check-migrations.mjs`. |
+| **Required secrets** | None. Runs on fork and Dependabot PRs too. |
+| **Required check** | No - informational. |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
 
 ---
 
-### `e2e.yml` - E2E
+### `deploy.yml` - Deploy
 
 | | |
 |---|---|
-| **Trigger** | `deployment_status` (Vercel webhook) |
-| **Gate** | Runs only when: deployment state is `success`, environment is not `Production`, and creator is `vercel[bot]` |
-| **Job** | `playwright` |
-| **What it does** | Installs chromium + webkit, runs Playwright smoke tests against the Vercel preview URL (`deployment_status.target_url`), uploads the HTML report as an artifact (14-day retention) |
-| **Required check** | No - non-blocking. Promote to required once flake rate is proven stable. |
-| **Concurrency** | Serialized per deployment ID (`cancel-in-progress: false`) |
-| **Scope** | Guest-mode flows, plus signed-in UI flows via the mock-auth seam (see below). Page loads, navigation, card flip, grade buttons, key sections on Stats / Pokédex / Settings; the signed-in avatar / sign-out / nav, the conflict picker, and the superuser cloud-write-guard surfaces. |
+| **Trigger** | push to `main`; `release: published`; `pull_request` into `qa` or `main` (the promotion PR), ignoring changes confined to `**/*.md`, `docs/**` and `openspec/**` |
+| **Jobs** | `production` (push and release), `preview` (pull request), `preview-e2e` (check name `Preview auth specs`, after `preview`) |
+| **What it does** | Cloudflare Workers deploys with OpenNext and wrangler (move-to-cloudflare, design D11; modelled on the company site's). **`production`:** `npm ci`, `npm test`, `npm run cf:build` with the `NEXT_PUBLIC_*` repo variables and `NEXT_PUBLIC_DEPLOY_ENV=cloudflare-production`, `wrangler d1 migrations apply DB --remote`, `npm run cf:deploy` (Worker `poke-memory`). The release trigger exists because the release commit carries `[skip ci]`, which suppresses its push event; the Release that `auto-release.yml` publishes with the bot App token is not suppressed, so the released version is what ends up live. **`preview`:** builds with `NEXT_PUBLIC_DEPLOY_ENV=cloudflare-preview` (no analytics beacon), applies the migrations to the preview database (`--env preview`), loads `scripts/cloudflare/seed-preview.mjs` (two test users with cards, settings, streak and grade log; idempotent, only those two ids), uploads a version of the separate Worker `poke-memory-preview` aliased `pr-<number>` (`npm run cf:upload-preview`), and posts or edits one PR comment with the URL. **`preview-e2e`:** runs `e2e/auth.spec.ts` (chromium + mobile-safari, pinned Playwright image) against that URL; replaced `e2e.yml`, which waited for a Vercel `deployment_status`. |
+| **Skips** | With no `CLOUDFLARE_API_TOKEN` secret (Dependabot, or not set up yet), no `wrangler.jsonc`, or one still holding `REPLACE_WITH_` placeholders, both jobs pass with a notice and deploy nothing; `preview-e2e` then skips. |
+| **Fork PRs** | `pull_request`, never `pull_request_target`: a fork PR gets no secrets, and the `preview` job also skips forks outright (`head.repo.fork == false`). The Cloudflare token is set only on the wrangler steps, never on `npm ci` or the Next.js build. |
+| **Idempotency** | One preview comment per PR, found again by the `<!-- poke-memory-preview -->` marker on its first line, authored by `github-actions[bot]` (#2124), and edited in place. |
+| **Required secrets / vars** | Secrets: `CLOUDFLARE_API_TOKEN`; optional `PREVIEW_TEST_PASSWORD` (the test users' password; without it they get a random one nobody knows) and `SENTRY_AUTH_TOKEN` (source maps). Variables: `CLOUDFLARE_ACCOUNT_ID`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_CF_BEACON_TOKEN`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`. |
+| **Required check** | No. None of the three jobs is named `e2e`, which is `ci.yml`'s required aggregator. |
+| **Concurrency** | Production runs share one `deploy-production` group and never cancel (an older build cannot finish after a newer one); each PR has its own group, and a newer push cancels its older preview. |
+| **Preview scope** | Only `e2e/auth.spec.ts` runs against the preview (#829): the full suite against a remote preview chronically timed out, and guest-mode smoke is covered by the required `e2e-browser` check on a local build. Signed-in specs skip themselves there because the mock-auth seam is never live in a production build (see Mock-auth seam below). |
 
 The functional Playwright projects are `chromium`, `mobile-safari`, `desktop-webkit`, and `mobile-chrome` (see `playwright.config.ts`). `ci.yml`'s `e2e-browser` matrix runs `chromium` + `mobile-safari`; `desktop-webkit` and `mobile-chrome` widen local and dispatch coverage for Safari-desktop and Chrome-mobile quirks. All four functional projects ignore `e2e/visual.spec.ts`, and `npm run test:e2e` names the four functional projects explicitly - so a developer run on macOS never compares against Linux-generated baselines. The visual snapshot spec runs only under the `visual-chromium` / `visual-webkit` projects via `npm run test:visual`, driven by `visual-regression.yml` below.
 
@@ -322,13 +324,13 @@ in-memory fixture.
 - **Deployment wiring**: `NEXT_PUBLIC_*` vars are inlined at **build time** when
   accessed as a literal static member expression (`process.env.NEXT_PUBLIC_…`);
   `isMockAuthEnabled()` and `assertMockAuthNotInProduction()` use that literal
-  form so a production bundle dead-code-eliminates the mock branch. The seam is
-  enabled by setting `NEXT_PUBLIC_E2E_AUTH_MOCK=1` in the Vercel project's
-  **Preview** environment scope (Preview only - **never** Production).
-  `e2e.yml` also sets the var on the Playwright runner as a documented
-  companion; the specs in `e2e/auth.spec.ts` detect at runtime whether the seam
-  is live and skip themselves if it is not, so a preview built without the
-  Preview-scoped var simply skips the auth specs rather than failing.
+  form so a production bundle dead-code-eliminates the mock branch. Every
+  deployed build (production and the per-PR preview Worker) is a production
+  build, so the seam is never live there; `deploy.yml`'s `preview-e2e` job sets
+  the var only on the Playwright runner as a documented companion, and the specs
+  in `e2e/auth.spec.ts` detect at runtime whether the seam is live and skip
+  themselves if it is not. (On Vercel it was set in the Preview environment
+  scope, which a production `next build` also ignored.)
 - **Production safety**: the seam is provably unreachable in production.
   `isMockAuthEnabled()` short-circuits on `NODE_ENV === "production"`, and
   `next.config.ts` calls `assertMockAuthNotInProduction()` which fails the
@@ -394,7 +396,7 @@ in-memory fixture.
 |---|---|
 | **Trigger** | `pull_request` (opened, synchronize, reopened, labeled); `workflow_dispatch` |
 | **Jobs** | `decide` (gate), `integration`, `integration-gate` (aggregator) |
-| **What it does** | The `decide` job runs on every PR and uses `dorny/paths-filter` to check whether the PR touches the cloud-write surface (`lib/sync/**`, `app/api/sync/**`, `db/migrations/**`, `lib/gradelog/**`, or this workflow file). If a path matches, the PR carries the `integration-tests` label, or the run is a manual dispatch, the `integration` job runs the DB-backed suite (`npm run test:integration`) against a `postgres:15` service container - migration apply, RLS isolation, and the regression trigger. No Supabase API calls, no branch quota. The `integration-gate` aggregator then reports a single stable status (skipped `integration` == pass). |
+| **What it does** | The `decide` job runs on every PR and uses `dorny/paths-filter` to check whether the PR touches the cloud-write surface (`lib/sync/**`, `lib/db/**`, `app/api/sync/**`, `app/api/db/**`, `db/d1/**`, `lib/gradelog/**`, the grade_log divergence monitor script and its test, or this workflow file). If a path matches, the PR carries the `integration-tests` label, or the run is a manual dispatch, the `integration` job runs the whole D1 suite (`npx vitest run --project node lib/db lib/sync scripts/check-grade-log-divergence.test.ts`): schema and trigger tests, scope helper and cross-user tests, gateway contract and sync parity tests, all on node:sqlite through the D1 test shim, with no database service. It is separate from `ci.yml`'s `test` because that runs only `--changed` tests picked by the import graph, and a migration is SQL read from disk, so a migration change selects none of the tests that apply it. Until the move to Cloudflare it ran the Postgres suite (`lib/sync/integration/`) against a `postgres:15` service container. |
 | **Why a gate job** | A bare `on.pull_request.paths:` filter would also filter out `labeled` events on PRs that don't touch the paths, breaking the label escape hatch. The cheap `decide` job combines "paths OR label" so the opt-in label still works. |
 | **Required check** | Yes (#1738) - `integration-gate` is a required status check on the `qa-staging` ruleset. It is a thin always-reporting aggregator over `decide` + `integration`: a PR outside the path filter resolves to skipped == pass and is not blocked; a real `integration` failure fails the gate. Modelled on `ci.yml`'s `e2e` aggregator so the required-check name stays stable. |
 | **Concurrency** | Cancels concurrent runs on the same ref. |
@@ -464,57 +466,11 @@ in-memory fixture.
 | | |
 |---|---|
 | **Trigger** | `schedule: '0 10 * * 1'` (weekly, Monday 10:00 UTC); `workflow_dispatch` |
-| **What it does** | For each cron-driven workflow (`auto-release`, `refresh-user-count`, `monitor-grade-log-divergence`, and `pokeapi-species-monitor`), calls `gh run list --workflow=<file> --event schedule --branch <default-branch>` and checks (a) a scheduled run exists within the expected interval (48h for the daily workflows, 840h for `pokeapi-species-monitor`) and (b) the most recent completed run succeeded - any non-`success`/`skipped` conclusion (`failure`, `timed_out`, `startup_failure`, `cancelled`) counts as unhealthy. On a stale or unhealthy workflow it opens or updates a per-workflow tracking issue. If the `gh run list` call itself errors (transient GitHub API failure), that workflow is skipped for the run rather than treated as stale, so an outage cannot spam a tracking issue for every monitored workflow at once. |
+| **What it does** | For each cron-driven workflow (`auto-release`, `refresh-user-count`, `monitor-grade-log-divergence`, `pokeapi-species-monitor` and `restore-test`), calls `gh run list --workflow=<file> --event schedule --branch <default-branch>` and checks (a) a scheduled run exists within the expected interval (48h for the daily workflows, 840h for the monthly `pokeapi-species-monitor` and `restore-test`) and (b) the most recent completed run succeeded - any non-`success`/`skipped` conclusion (`failure`, `timed_out`, `startup_failure`, `cancelled`) counts as unhealthy. On a stale or unhealthy workflow it opens or updates a per-workflow tracking issue. If the `gh run list` call itself errors (transient GitHub API failure), that workflow is skipped for the run rather than treated as stale, so an outage cannot spam a tracking issue for every monitored workflow at once. |
 | **Dedup** | A `<!-- cron-health-monitor:{file} -->` HTML marker keyed by workflow filename gives each watched workflow its own tracking issue. Re-runs edit that issue in place and add a re-check comment rather than opening duplicates. When a workflow recovers, the monitor closes its tracking issue automatically. |
 | **Why schedule?** | The monitor runs on GitHub's internal cron queue, independently of the workflows it watches - so it still fires even if those workflows have stopped. It cannot detect its own staleness, but the blast radius of one un-monitored monitor is small. |
 | **Permissions** | `contents: read`, `actions: read`, `issues: write`. `GITHUB_TOKEN` only - no Claude, no App token, no app checkout. |
 | **Why monitor cron workflows?** | GitHub disables scheduled workflows after 60 days of repo inactivity, and a malformed cron or an expired secret can silently stop a workflow firing - none of which produces an alert on its own. `pr-check-monitor` watches open PRs; this watches the schedule-driven workflows themselves. |
-
----
-
-### `vercel-preview-on-ready.yml` - Vercel Preview on Ready
-
-| | |
-|---|---|
-| **Status** | **Disabled** (`disabled_manually`). Under the qa staging flow, QA happens on the bundled `qa` branch via `qa-preview-deploy.yml`, so per-PR previews are redundant and were retired to stay within Vercel's deploy rate limit (#814). **Keep it disabled unless per-PR previews are wanted again**: since #2020 the gate no longer waits for an auto-review verdict, so re-enabling (`gh workflow enable "Vercel Preview on Ready"`) fires a preview on every green CI run of every non-`qa` PR head SHA - the deploy volume that hit Vercel's rate limit (#814). |
-| **Trigger** | `workflow_run` on `CI` (`completed`); `issue_comment: created` (for `/preview` only) |
-| **Gate** | Fires the Vercel Deploy Hook when the `test` check is `success` on the PR's HEAD SHA. The former second condition (a bot-authored `auto-review` LGTM on the same SHA) was removed in #2020: `auto-review.yml` was its only writer, so after 2026-08-16 the gate could never open. Only comments authored by `poke-memory-bot[bot]` count for the idempotency marker (#1859). |
-| **Manual override** | A `/preview` PR comment from OWNER / MEMBER / COLLABORATOR bypasses the CI gate and fires the hook unconditionally - for mid-iteration peeks before CI is green. The association is checked at the job trigger as well as in the override step (#1859). |
-| **Fork guard** | `workflow_run` arm requires `head_repository.fork == false`; the `issue_comment` arm requires OWNER / MEMBER / COLLABORATOR for `/preview` (#1859), an exact `/preview` command (not a prefix), and a same-repo PR head (`isCrossRepository == false`). |
-| **Concurrency** | Keyed on the PR number for both arms (head SHA as fallback), so a `/preview` and a CI completion on one PR queue rather than race past the fired-marker dedup. |
-| **Idempotency** | Posts `<!-- vercel-preview-fired:<sha> -->` on the PR after a successful fire; subsequent re-evaluations at the same SHA are no-ops. |
-| **Why two triggers** | `workflow_run` drives the automatic path; `issue_comment` exists only for the `/preview` override. |
-| **qa promotion PRs** | Skipped - a `qa -> main` PR's head branch is `qa`, and its preview is handled by `qa-preview-deploy.yml`. Firing here too would double-deploy `qa`. |
-| **Required secrets** | `VERCEL_DEPLOY_HOOK_URL`, `BOT_APP_PRIVATE_KEY`, `BOT_APP_ID` (var). |
-| **Context** | `vercel.json` sets `git.deploymentEnabled = { "**": false, "main": true }`, so non-`main` branches do not auto-deploy. This workflow is the path that creates preview deployments for batch / feature PRs. Production deploys on `main` are unaffected. `e2e.yml` triggers on the `deployment_status` that Vercel fires when the gated preview deploys, so it inherits the gate. |
-
----
-
-### `qa-preview-deploy.yml` - QA Preview Deploy
-
-| | |
-|---|---|
-| **Trigger** | `workflow_dispatch` only |
-| **Job** | `deploy` |
-| **What it does** | Fires the Vercel Deploy Hook with `?ref=qa`, creating a preview deployment of the `qa` staging branch. Invoked by the `/batch-issues` skill at the end of its queue drain (`gh workflow run "QA Preview Deploy"`), or manually from the Actions tab. |
-| **Why a dedicated workflow** | The deploy-hook URL is a repo secret, so the deploy must be fired server-side, not from the local `/batch-issues` session. `?ref=qa` is hardcoded - dispatching from the default branch would otherwise resolve `github.ref` to `main`. |
-| **Required secrets** | `VERCEL_DEPLOY_HOOK_URL`. |
-| **Concurrency** | `group: qa-preview-deploy` with `cancel-in-progress: false`. |
-
----
-
-### `stale-preview-check.yml` - Stale qa preview check
-
-| | |
-|---|---|
-| **Trigger** | `schedule` (daily `30 8 * * *` cron, 08:30 UTC, after the auto-release window) and `workflow_dispatch`. |
-| **Job** | `check` |
-| **What it does** | Compares `origin/qa`'s tip SHA with the head SHA of the most recent `QA Preview Deploy` run. When they diverge and an open `qa -> main` promotion PR exists, upserts a marker comment on that PR (HTML marker `<!-- stale-preview-check -->`) linking to the `QA Preview Deploy` dispatch URL. When the preview catches up, removes the marker comment. |
-| **Why a dedicated workflow** | The `/batch-issues` skill's wrap-up rule "re-fire the preview after any qa-landing mini-batch work" only fires inside an active session. When mini-batch work lands on `qa` outside a session (a manual PR, an `/auto` run, a follow-up direct push), nobody re-fires the deploy and the maintainer QAs against a stale preview. This cron catches that gap. (#1333.) |
-| **Permissions** | `contents: read`, `pull-requests: write`, `actions: read` - the third is required so `gh run list --workflow="QA Preview Deploy"` can read past run metadata under `GITHUB_TOKEN`. |
-| **Idempotency** | The marker comment is upserted (patched in place) rather than appended, so a missed cron tick does not produce a stack of duplicate comments. |
-| **Required secrets** | None (uses `GITHUB_TOKEN`). |
-| **Concurrency** | Default; no concurrency group. The work is cheap (a few API calls) and runs once per day. |
 
 ---
 
@@ -546,7 +502,7 @@ in-memory fixture.
 | **qa reset** | On a `qa -> main` trigger only (`github.event_name == 'pull_request'`), a final step force-updates `qa` to `main` (`git push origin +HEAD:refs/heads/qa`) so the next batch run starts from a clean integration branch. `schedule`/`workflow_dispatch` runs never reset `qa` (it may hold in-progress batch work); when they cut a release they merge `main` into `qa` instead (next row). The reset and the backmerge are mutually exclusive by their `if:`s. |
 | **qa backmerge (#2058)** | Every other path that lands a commit on `main` merges `main` back into `qa` straight after its push, via the shared `.github/scripts/backmerge-main-into-qa.sh` (merge, never reset; no-op when `main` is already an ancestor of `qa`; a conflict fails the step with an `::error::` naming the files and leaves `qa` untouched; a merge that would change `.github/workflows/**` on `qa` fails fast without pushing, because the poke-memory-bot App has no `workflows` permission and GitHub refuses workflow-file updates from it (a maintainer merges and pushes by hand, or the App is granted `workflows: write` and `BACKMERGE_ALLOW_WORKFLOW_CHANGES=1` is set); only a non-fast-forward rejection (`qa` moved mid-run) is retried, from a fresh fetch after a 5s backoff, up to 3 attempts, and any other rejection fails at once; the caller's HEAD is restored on exit; tested by `scripts/backmerge-main-into-qa.test.mjs`). The producers: the `schedule`/`workflow_dispatch` release commit (the "Backmerge release into qa" step), a hotfix or Dependabot PR merged into `main` (the `backmerge-hotfix` job), and `refresh-user-count.yml`'s stats commit. **Rule: every new workflow that pushes to `main` must call this script straight after its push**, or `qa` drifts behind `main` (#1959, #1989, #2044). |
 | **qa drift guard** | The daily safety net behind both the reset and every backmerge. The reset step is gated on `success()`, so a failed prior step (e.g. a `cut-release` crash) skips it, leaving `qa` un-reset (#1659/#1664); a backmerge can fail on a conflict or on a workflow-file change the App may not push. The sibling `qa-drift-check` job runs on the daily `schedule`/`workflow_dispatch` (not `pull_request`, to avoid racing the reset), checks `git merge-base --is-ancestor origin/main origin/qa`, and opens/updates a marker-keyed (`<!-- qa-drift-check -->`) tracking issue when `main` is not an ancestor of `qa`. The issue lists the `main`-only commits (their subjects name the cause: a failed backmerge via `.github/scripts/backmerge-main-into-qa.sh`, a skipped reset, or a hand push to `main`) and only offers a reset of `qa` when it cannot discard work (`qa` has no commits of its own, or `git merge-tree` shows they add nothing `main` lacks); otherwise it prescribes merging `main` into `qa` (#2058). It is **alert-only** (no auto-reset): `qa` may carry un-promoted batch work a force-reset would destroy, so reconciliation stays human-in-the-loop. The issue auto-closes once `qa` is back in sync. Permissions: `contents: read` + `issues: write` (uses `GITHUB_TOKEN`, no App token / push). |
-| **Vercel interaction** | The release commit touches `package.json` and `CHANGELOG.md`, neither of which is on the `SKIP_PATHS` list in `scripts/vercel-ignored-build.sh` (a skip-list since #2017: only docs, CI, test and tooling paths skip the build) - so Vercel rebuilds and the in-app version banner (`NEXT_PUBLIC_APP_VERSION`) updates. |
+| **Deploy interaction** | The release commit carries `[skip ci]`, so its push does not run `deploy.yml`; publishing the GitHub Release with the bot App token does (`release: published`), so production is rebuilt with the bumped `package.json` and the new `CHANGELOG.md` section, and the in-app version banner (`NEXT_PUBLIC_APP_VERSION`) and What's new update. |
 | **Prerequisite** | The `poke-memory-bot` App must be a bypass actor on **both** the `main-protection` ruleset (to land the release commit on `main`) and the `qa-staging` ruleset (to force-push the qa reset and push the backmerges). It has no `workflows` permission, so it cannot push a backmerge that changes `.github/workflows/**` (see the qa backmerge row). If a push step fails with a protected-branch error, that is the missing setup. |
 | **Concurrency** | `group: auto-release` with `cancel-in-progress: false` - back-to-back merges queue rather than collapse. |
 
@@ -559,7 +515,7 @@ in-memory fixture.
 | **Trigger** | Daily `schedule` (`0 8 * * *` - 08:00 UTC); `workflow_dispatch` (with an optional `threshold` input overriding the default divergence threshold of 0) |
 | **Job** | `check` |
 | **What it does** | Runs `.github/scripts/check-grade-log-divergence.mjs`, which flags users whose `grade_log` shows activity but whose `card_reviews` table is missing the corresponding rows - the #584 sync-break signature. Only subjects that actually graduated count as orphans (a `grade_log` row with `learning_step IS NULL`, the post-grade step, #2096), and every query joins on `locale`. The SQL is tested against the migrated schema by `lib/sync/integration/grade-log-divergence.test.ts`. If divergence is detected, the workflow updates the open tracking issue whose body starts with `<!-- monitor:grade-log-divergence -->` on line 1 (refreshed body and title plus a recurrence comment), or opens one titled `[monitoring] grade_log divergence detected (N users)`, labelled `monitoring` and `area:workflow`, when none exists (#2010). The lookup is `.github/scripts/find-marker-issue.mjs --author github-actions` (tested by `scripts/find-marker-issue.test.mjs`), so an issue someone else opens with the same first line is ignored; a failed lookup, or hitting the 100-issue list limit, fails the step. The body is overwritten on every alerting run, so human notes belong in comments, and removing the `monitoring` label makes the next alert open a new issue. It never auto-closes: the 4-day look-back means "no longer firing" can just mean "aged out". The `monitoring` label is self-healing - created with `gh label create ... || true`. |
-| **Required secrets** | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`. |
+| **Required secrets** | `CLOUDFLARE_API_TOKEN` (secret) and `CLOUDFLARE_ACCOUNT_ID` (variable): the three queries run against the production D1 database through `wrangler d1 execute --remote` (`scripts/cloudflare/d1-query.mjs`); their SQL is tested on node:sqlite by `scripts/check-grade-log-divergence.test.ts`. Without the token the check is skipped with a notice. |
 | **Cron-only** | Does not fire on push, so the workflow file landing in a PR will not raise an alert on the PR itself - the first real run is the next 08:00 UTC tick after merge. |
 | **Concurrency** | `group: monitor-grade-log-divergence` with `cancel-in-progress: false`. |
 
@@ -572,7 +528,7 @@ in-memory fixture.
 | **Trigger** | Daily `schedule` (`17 6 * * *` - 06:17 UTC); `workflow_dispatch` |
 | **Job** | `refresh` |
 | **What it does** | Runs `scripts/refresh-user-count.mjs` to refresh `.github/stats/users.json`, the source for the README user-count Shields.io badge (#400). If the file changed, it commits as `chore(stats): refresh user count [skip ci]` and pushes directly to `main` (the badge reads the file from `main`). The commit is authored by the `poke-memory-bot` App identity, so it lands despite branch protection; the `[skip ci]` marker stops the push retriggering any push-triggered workflow. A final step then merges `main` into `qa` with `.github/scripts/backmerge-main-into-qa.sh` (the same App token is the `qa-staging` bypass actor), so the stats commit never leaves `qa` behind `main` (#1989, #2058). If that backmerge fails the run goes red even though the stats commit already landed on `main`, deliberately, so the stranded `qa` is seen the same day. |
-| **Required secrets** | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `BOT_APP_PRIVATE_KEY`, `BOT_APP_ID` (var). |
+| **Required secrets** | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (var; the count is Better Auth's `user` table in production D1, read with wrangler; without the token the refresh is skipped with a notice), `BOT_APP_PRIVATE_KEY`, `BOT_APP_ID` (var). |
 | **Concurrency** | `group: refresh-user-count` with `cancel-in-progress: false`. Deliberately not the `auto-release` group: a group holds at most one pending run and a newer pending run cancels it, so sharing could silently drop a queued release. A collision needs a manual dispatch (the crons are 06:17 and 09:00 UTC) and is self-healing via `qa-drift-check` rather than impossible: the losing push to `main` fails non-fast-forward, the backmerge retries when `qa` moves, and if a promotion's "Reset qa to main" force-push erases a concurrent stats backmerge, the daily drift check reports `qa` behind `main`. |
 
 ---
@@ -591,9 +547,24 @@ in-memory fixture.
 
 ---
 
+### `restore-test.yml` - Restore test
+
+| | |
+|---|---|
+| **Trigger** | Monthly `schedule` (`23 5 3 * *` - 05:23 UTC on the 3rd); `workflow_dispatch`. Gated `if: github.repository == 'Frazzled-Productions/poke-memory'`. |
+| **Job** | `restore` |
+| **What it does** | Proves the nightly D1 backup restores (move-to-cloudflare, design D10). Downloads the newest object under `d1/` in the R2 bucket `poke-memory-backups` (EU endpoint, AWS CLI) and fails if it is over 72h old (the nightly backup has stopped); applies `db/d1/migrations` to a fresh local D1, executes the backup into it, and runs `scripts/cloudflare/check-restore.mjs`, which fails if any table's row count differs from the `-- rows <table>: <count>` header. The file format (data-only INSERTs in dependency order after that header) is documented in that script. |
+| **Privacy** | The backup holds personal data and the logs are public: it stays in the runner's temporary folder, is never uploaded as an artifact, and the load step hides wrangler's output (an error would quote a row). Only table names and counts are logged. |
+| **Required secrets** | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (an R2 API token with read access to the bucket, an owner step), `CLOUDFLARE_ACCOUNT_ID` (var). Without them the run is skipped with a notice. |
+| **Health watch** | Registered in `cron-health-monitor.yml` at 840h. |
+| **Required check** | No - cron, not a PR gate. |
+| **Concurrency** | `group: restore-test` with `cancel-in-progress: false`. |
+
+---
+
 ### Removed workflows
 
-Deleted on 2026-08-16 with the rest of the Claude automation (#2003 / #2004): `auto-issue`, `auto-pr`, `auto-review`, `auto-resolve`, `auto-retro`, `auto-retro-harvest`, `auto-backlog-groom`, `auto-deep-audit`, `auto-workflow-suggest`, `auto-app-suggest`, `auto-codequality-suggest`, `auto-digest-fanout`, `issue-overlap-scan`, `settings-coverage-audit`. Deleted in #2022 as dead leftovers: `ci-failure-autofix` and `vercel-failure-autofix` (gated on `auto/issue-*` branches nothing creates, posting `/fix` comments nothing reads), and the `extract-linked-issues.sh` helper only `auto-review.yml` called. Their catalog entries are in git history before those PRs.
+Deleted on 2026-08-16 with the rest of the Claude automation (#2003 / #2004): `auto-issue`, `auto-pr`, `auto-review`, `auto-resolve`, `auto-retro`, `auto-retro-harvest`, `auto-backlog-groom`, `auto-deep-audit`, `auto-workflow-suggest`, `auto-app-suggest`, `auto-codequality-suggest`, `auto-digest-fanout`, `issue-overlap-scan`, `settings-coverage-audit`. Deleted in #2022 as dead leftovers: `ci-failure-autofix` and `vercel-failure-autofix` (gated on `auto/issue-*` branches nothing creates, posting `/fix` comments nothing reads), and the `extract-linked-issues.sh` helper only `auto-review.yml` called. Deleted in the move to Cloudflare (move-to-cloudflare): `qa-preview-deploy`, `vercel-preview-on-ready` and `stale-preview-check` (Vercel deploy hooks; `deploy.yml` previews every PR, including the promotion PR, which refreshes on each push to `qa`), and `e2e.yml` (its auth specs became `deploy.yml`'s `preview-e2e` job), with `vercel.json` and `scripts/vercel-ignored-build.sh`. Their catalog entries are in git history before those PRs.
 
 ---
 
@@ -641,7 +612,7 @@ Current budgets, defined as the `BUDGETS` constant in `e2e/perf-budget.spec.ts`:
 
 **Ratchet down only.** When a perf-improving change lowers the measured time meaningfully, lower the budget in the same PR so future regressions are caught at the new baseline. **Never** raise a budget to make a red run pass - investigate the cause first. A deliberate, justified regression (e.g. a feature that materially expands the seed payload) is the only case for raising a budget, and the PR description must explain why.
 
-The spec body is gated on `PERF_BUDGET=1`. Without the env var, `test.skip(...)` short-circuits the test, so the spec is invisible to `ci.yml`'s `e2e-browser` matrix and to `e2e.yml`'s preview run. The dedicated `perf-budget.yml` workflow is the only place it executes in CI; it runs the same pinned `mcr.microsoft.com/playwright:v1.63.0-noble` image as the other Playwright jobs for parity, builds locally, serves via `npm start`, and runs the spec on chromium and mobile-safari in parallel matrix legs. A `changes` filter mirrors the `e2e-browser` pattern so docs-only PRs report a no-op skip rather than burning the full 10–15 min build per leg.
+The spec body is gated on `PERF_BUDGET=1`. Without the env var, `test.skip(...)` short-circuits the test, so the spec is invisible to `ci.yml`'s `e2e-browser` matrix and to `deploy.yml`'s preview auth specs. The dedicated `perf-budget.yml` workflow is the only place it executes in CI; it runs the same pinned `mcr.microsoft.com/playwright:v1.63.0-noble` image as the other Playwright jobs for parity, builds locally, serves via `npm start`, and runs the spec on chromium and mobile-safari in parallel matrix legs. A `changes` filter mirrors the `e2e-browser` pattern so docs-only PRs report a no-op skip rather than burning the full 10–15 min build per leg.
 
 **Status: non-required initially.** Per #1268, the check runs on every PR but does not gate merge. Promotion to required happens after one week of stable baseline - add the `perf-budget` aggregator job (the single stable check-name produced by this workflow; the matrix legs themselves render as `Perf budget (chromium)` and `Perf budget (mobile-safari)`) to the `qa-staging` and `main-protection` rulesets' required-checks list when the baseline has held without spurious failures. The aggregator mirrors `ci.yml`'s `e2e` pattern so the required-check name stays stable regardless of how the matrix evolves. No spec or workflow change is needed at promotion time.
 

@@ -22,7 +22,7 @@ Batch PRs do **not** target `main`. They target **`qa`**, an integration branch 
 
 - `qa` requires `test` + `e2e` to pass before merge but **not** strict-up-to-date, so batch PRs merge back-to-back with no rebase tax.
 - `main` keeps its strict ruleset and only accepts PRs from `qa` (the `Restrict main PR source` check enforces this; a `hotfix` label is the documented bypass).
-- After the drain, `/batch-issues` fires a Vercel preview deploy of `qa` and opens a **draft** `qa -> main` PR. The maintainer tests the preview, then marks the PR ready and merges it.
+- After the drain, `/batch-issues` opens a **draft** `qa -> main` PR; `deploy.yml` uploads a preview version of `qa` for it and comments the URL. The maintainer tests the preview, then marks the PR ready and merges it.
 - Merging `qa -> main` triggers `auto-release.yml`, which cuts the release, deploys production, and resets `qa` to `main`.
 
 See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
@@ -83,7 +83,7 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
 
    Skip the staleness check for trivial issues (typo fixes, doc tweaks, one-liner workflow changes) - they are exempt under the same rule that lets them skip the planner.
 
-7. **Pre-existing CI noise + stale-preview pre-flight.** Two advisory checks so this session is not blamed for unrelated red signals or a stale preview:
+7. **Pre-existing CI noise pre-flight.** An advisory check so this session is not blamed for unrelated red signals:
 
    ```bash
    # 6a. Workflows whose LATEST qa run is a failure (genuinely red NOW). Querying
@@ -98,12 +98,9 @@ See [WORKFLOW.md](../../WORKFLOW.md) "Branching model" for the full picture.
                   recent_failures:(map(select(.conclusion=="failure"))|length)})
            | map(select(.latest=="failure"))'
 
-   # 6b. Preview-deploy freshness - is the last QA Preview Deploy behind origin/qa?
-   gh run list --workflow="QA Preview Deploy" --limit 1 --json headSha --jq '.[0].headSha'
-   git rev-parse origin/qa
    ```
 
-   For each workflow surfaced by 6a, check that a tracking issue already exists; if not, file one (`priority:later` by default) so the noise is captured and the session does not silently inherit blame. Carry the list into the Wrap-up handoff so the maintainer sees "known noise" annotated separately from "introduced by this batch". The freshness check (6b) is a hint for the Wrap-up `Fire qa preview deploy` step - if the SHAs already diverge before this session even starts, the maintainer needs to know this batch is not the first to land work since the last preview.
+   For each workflow surfaced by 6a, check that a tracking issue already exists; if not, file one (`priority:later` by default) so the noise is captured and the session does not silently inherit blame. Carry the list into the Wrap-up handoff so the maintainer sees "known noise" annotated separately from "introduced by this batch".
 
 8. **Triage the backlog.** Not every open issue produces a PR. Classify each issue from step 1 into one of:
 
@@ -179,7 +176,7 @@ For each batch, in order:
    - **Multi-site domain-concept audit (when applicable).** If the work touches a domain concept that is rendered or computed at multiple sites - Pokémon names, dates, mastery counts, sprite URLs, locale-aware text, ARIA labels, anything per the `dry-single-source` memory - the prompt must include: "Before implementing, grep the whole repo for every existing call site of this concept and list them as either in-scope or explicitly out-of-scope-with-rationale in the PR body. A fix that only patches the site QA flagged is the failure mode #1259/#1311/#1318/#1329 went through four rounds to escape." (memory: `feedback_agent_fix_full_audit`.)
    - "Branch off the latest `origin/qa` and open the PR against `qa` - batch work lands on the `qa` staging branch, never `main` directly. (memory: `feedback_rebase_before_pr`.)"
    - "Reference the issue in commit messages (`closes #N`). Note this does not auto-close the issue on merge into `qa` - the `qa -> main` promotion PR does that - but it keeps the linkage visible."
-   - "If your change adds a Supabase migration, call `mcp__supabase__apply_migration` with the stripped name (no `0NN_` prefix) **before** opening the PR - the `migration-check.yml` check fails until file-vs-applied parity holds." (See AGENTS.md "Adding a feature that needs to persist data".)
+   - "If your change adds a migration, add a NEW file under `db/d1/migrations/` (never edit one already on `qa`; `migration-check.yml` fails on that) and run the whole D1 suite locally (`npx vitest run --project node lib/db lib/sync`). `deploy.yml` applies it; nothing is applied by hand." (See AGENTS.md "Adding a feature that needs to persist data".)
    - "Add a `changelog.d/unreleased/<issue-number>-<slug>.md` fragment unless the change is internal-only (agent roster, workflow tweaks not visible to users). The frontmatter `kind` MUST be one of the EXACT values `added` / `changed` / `removed` / `deprecated` / `fixed` / `security` (NOT `fix`, NOT `change`), and the body must be `- ` bullet line(s). A wrong `kind` passes `eslint`/`typecheck`/`build`/`test` but fails CI's `lint:changelog` (the local `npm run lint` chain catches it only if the FULL chain is run) - 2026-06-11 #1846 shipped `kind: fix` and went red on CI."
    - "After ANY change to `messages/en.json` - adding, renaming, OR editing the text of an existing key - do both before pushing: (1) propagate the same change to `messages/ja.json`, `messages/zh-Hans.json`, `messages/zh-Hant.json` so the `lint:i18n` key-parity gate stays green, and (2) run `npm run generate:pseudo-locale` and commit the regenerated `messages/xx-pseudo.json` so the `lint:pseudo-locale` gate stays green. Editing an existing string's *value* (not just keys) still requires the pseudo-locale regen. The 2026-06-07 mastery batch tripped `lint:pseudo-locale` three times for missing this regen - each was caught by local lint but cost a gate cycle." (AGENTS.md "Message-catalogue completeness gate"; memory: `feedback_regenerate_pseudo_locale_on_catalogue_change`.)
    - "Run the build gate as the SEPARATE commands `npm run lint`, `npm run typecheck`, `npm run build`, `npm test`, `npm run test:coverage` (each with a one-line status after it), NOT the bundled `npm run pre-pr` - a single long blocking command emits nothing to your own transcript until it returns, which is indistinguishable from a stall to the orchestrator watching you. If anything fails, fix and retry up to twice, then stop and report. The `test:coverage` step catches global-floor breaches before push (#1123). The 90% per-diff patch-coverage gate then runs in CI - **immediately after `test:coverage`, run `npm run test:diff-coverage` (MANDATORY, not optional) while `coverage/coverage-final.json` is still present** to catch per-diff breaches locally before push; green-locally-then-red-on-CI-diff-coverage bit #1642 / #1646. Same two-attempt budget. (`npm run pre-pr` stays the canonical gate for a human running it locally; the step-by-step form is for agent-run visibility - 2026-06-07 retro.)" (AGENTS.md "Pre-PR build gate" - #1649.)
@@ -229,13 +226,7 @@ Once a batch's PRs are all open and reviewed in-session, merge them into `qa`:
 
 After every batch is merged into `qa` and the queue is drained:
 
-1. **Fire the `qa` preview deploy:**
-
-   ```bash
-   gh workflow run "QA Preview Deploy" --ref qa
-   ```
-
-   **Always pass `--ref qa`.** Without it, `gh workflow run` dispatches against the default branch and deploys a stale SHA - the canonical session shipped a preview on an old release commit and the maintainer would have QA'd the wrong build. Confirm it dispatched AND targets the current tip: `gh run list --workflow="QA Preview Deploy" --limit 1 --json headSha,headBranch` and assert `headSha` equals `git rev-parse origin/qa`. Then poll the deploy to `READY` via `mcp__claude_ai_Vercel__get_deployment` (or the GitHub deployments API) so the URL handed off in step 6 is live, not still building.
+1. **Get the `qa` preview.** Open the draft `qa -> main` promotion PR now (the command and body rules are in step 3; if one is already open, use it). `deploy.yml` uploads a preview version of `qa` for that PR (Worker `poke-memory-preview`, alias `pr-<number>`, its own seeded database) and posts the URL as a PR comment, edited in place on every later push to `qa`. Wait for the comment to name the current tip: its SHA must equal `git rev-parse origin/qa` (`gh run list --workflow=Deploy --branch qa --limit 1 --json headSha,conclusion`). With no `CLOUDFLARE_API_TOKEN` secret the job skips with a notice and there is no preview.
 
    **Then verify the batch's headline user-facing mechanics on the preview - do not assume green CI means they work (AGENTS.md "Mandatory coverage rules").** For each core user-facing change in the batch, exercise it on the preview *in its relevant state*: switch `appLocale` and `pokemonNameLocale` and check names/labels on **every** surface (grid AND detail, not just one), apply the #1326 QA-seed scenarios to populate data-dependent sections and also check their empty branch, etc. Drive this with Playwright against the preview URL if you can't inspect visually. The #1302/#1327 batch passed all CI and still shipped three broken headline behaviours because nothing exercised them in the broken locale/state - this step is the backstop. (memory: `feedback_verify_core_mechanics_by_running_app`.)
 
@@ -243,10 +234,10 @@ After every batch is merged into `qa` and the queue is drained:
 
    - When the maintainer surfaces a preview-QA gap, file it as a new issue (`priority:later` by default, `priority:next` if clearly higher; never `priority:now` without explicit direction) so it is tracked even if it is not implemented this session.
    - For follow-ups the maintainer wants implemented inline, run them through the per-batch Implementation playbook (one Agent per issue, brief template from step 2, in-session `code-reviewer` pass, merge into `qa`).
-   - **After any mini-batch work lands on `qa`, return to step 1 and re-fire the preview deploy** so the next QA round is against the new `qa` tip, not the pre-mini-batch one. This is the rule the canonical session missed: #1329 + Context refactor landed on `qa` and no fresh preview was dispatched until the maintainer asked.
+   - **After any mini-batch work lands on `qa`, return to step 1 and wait for the refreshed preview comment** so the next QA round is against the new `qa` tip, not the pre-mini-batch one (#1329 + Context refactor were QA'd on a stale preview before this was a rule).
    - Loop steps 1-2 zero or more times until the maintainer reports preview QA is clean.
 
-3. **Open the `qa -> main` promotion PR as a draft.** Only after step 2 reports a clean QA round. A PR merged into `qa` does **not** auto-close its `closes #N` issue - GitHub only auto-closes on the default branch. So the promotion PR must carry every issue number the batch resolved (including any from mini-batch rounds):
+3. **Finish the `qa -> main` promotion PR (opened as a draft in step 1).** Only after step 2 reports a clean QA round, make sure its body is complete. A PR merged into `qa` does **not** auto-close its `closes #N` issue - GitHub only auto-closes on the default branch. So the promotion PR must carry every issue number the batch resolved (including any from mini-batch rounds):
 
    ```bash
    gh pr create --base main --head qa --draft \
@@ -254,7 +245,7 @@ After every batch is merged into `qa` and the queue is drained:
      --body "<body>"
    ```
 
-   The body must list `Closes #N` for every issue resolved in the batch (one per line), followed by a one-line summary per merged PR. Merging this PR closes all those issues, triggers `auto-release.yml` (release + production deploy), and resets `qa` to `main`.
+   The body must list `Closes #N` for every issue resolved in the batch (one per line), followed by a one-line summary per merged PR. Merging this PR closes all those issues, deploys production (`deploy.yml`), triggers `auto-release.yml` (release, then a redeploy with the bumped version), and resets `qa` to `main`.
 
    Leave it as a **draft** - the maintainer marks it ready after QA. Do not merge it yourself.
 
@@ -297,7 +288,7 @@ After every batch is merged into `qa` and the queue is drained:
    - Coverage ratchet applied (old → new floor per metric); link to the commit.
    - Retro punch list - at minimum, list the proposed improvements and whether each landed in this session or was deferred (with the deferral issue number).
    - Pre-existing red CI inherited from step 7 of Pre-flight, with the tracking issue link for each.
-   - Next steps for the maintainer: "Test the `qa` preview deploy. When satisfied, mark draft PR #N ready and merge it - that cuts the release, deploys production, and resets `qa`. If the batch carries a `minor-bump` fragment, apply `version-bump:approved` to the promotion PR first."
+   - Next steps for the maintainer: "Test the `qa` preview version linked on the promotion PR. When satisfied, mark draft PR #N ready and merge it - that cuts the release, deploys production, and resets `qa`. If the batch carries a `minor-bump` fragment, apply `version-bump:approved` to the promotion PR first."
    - **Analysis/Exploration** issues run - which umbrella issues got a report comment, and how many follow-up issues each filed (the umbrellas stay open for the user to review and close).
    - Any `[USER-DECISION]` items still awaiting a choice.
    - **Blocked** issues skipped, with the reason.
@@ -320,7 +311,7 @@ Hard-won rules from the 2026-06-02 drain. Apply them from the start of every run
 - **Never** promote issues between priority labels without explicit user direction - the user owns priorities. (See AGENTS.md "Backlog / process".)
 - **Ask before mutating shared GitHub state** outside this skill's documented operations: title/label changes on existing issues, branch ops on someone else's PR, etc. (memory: `feedback_ask_before_mutating_github`.)
 - **Don't rationalize** sub-agent decisions if the user pushes back mid-run; evaluate honestly. (memory: `feedback_dont_rationalize_downstream`.)
-- **Never merge the `qa -> main` PR yourself.** The maintainer's QA of the preview deploy is the gate between batch work and production. Open it as a draft and stop.
+- **Never merge the `qa -> main` PR yourself.** The maintainer's QA of the preview version is the gate between batch work and production. Open it as a draft and stop.
 - **Graceful-exit on halt.** If the run halts for any reason - CI failures, user interruption, an unfixable conflict - before reaching Wrap-up:
   1. Commit any in-progress work as `WIP: halted run on #N` and push, per AGENTS.md "Graceful exit on halt".
   2. Do not skip hooks (`--no-verify`) or `--force` past failures.
