@@ -27,8 +27,8 @@
 - [ ] 4.2 bcrypt compatibility: copied `$2a$`/`$2b$` hashes verify with bcryptjs and are rehashed to scrypt on success. Verify: test with a known bcrypt hash; the stored hash changes prefix after sign-in.
 - [ ] 4.3 Per-IP throttle on username sign-up and sign-in from `rate_limit_buckets` in D1. Verify: test, the 6th attempt in the window is refused as today.
 - [ ] 4.4 Browser side: `lib/auth/client.ts`, `AuthContext` on `useSession`, `actions.ts`, `LinkIdentitiesSection`, `callback-complete` as the OAuth callback target, `requireAuth` from request headers, the mock-auth seam ported. Verify: existing component tests updated; e2e `auth.spec.ts` green on a local build with mock auth.
-- [ ] 4.6 Re-sign-in after the move: a device holding progress for the same user id is not shown the keep-local or keep-cloud picker; sign-out revokes every session; any `?error=` code shows the sign-in error. Verify: component and route tests for each.
 - [ ] 4.5 Account deletion removes the Better Auth user, sessions and accounts with the data. Verify: delete-account test checks every table is empty for that user.
+- [ ] 4.6 Re-sign-in after the move: a device holding progress for the same user id is not shown the keep-local or keep-cloud picker; sign-out revokes every session; any `?error=` code shows the sign-in error. Verify: component and route tests for each.
 
 ## 5. Server routes and scheduled jobs
 
