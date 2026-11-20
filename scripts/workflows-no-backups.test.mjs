@@ -7,7 +7,9 @@
 //
 // The same goes for reading production data at all (owner ruling 20 November 2026, design D13): the
 // user-count badge and the grade_log divergence check run in the Worker, so no workflow may query the
-// production D1, and only the deploy workflow may hold the Cloudflare token, which can write D1.
+// production D1, and only the deploy workflow may hold the Cloudflare token, which can write D1. The
+// preview token has its own name and lives only in the trusted preview upload workflow (change
+// preview-deploy-guard, koinori #2925 F3 and F4).
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -63,8 +65,10 @@ const DATA_READ_PATTERNS = [
   { name: "the removed monitor scripts", re: /refresh-user-count\.mjs|check-grade-log-divergence\.mjs/ },
 ];
 
-/** The only workflow allowed to hold CLOUDFLARE_API_TOKEN: it deploys and applies migrations. */
+/** The only workflow allowed to read the production token: it deploys and applies migrations. */
 const TOKEN_HOLDERS = ["deploy.yml"];
+/** The only workflow allowed to read the preview token (F4: a name of its own, never the production one). */
+const PREVIEW_TOKEN_HOLDERS = ["preview-upload.yml"];
 
 function dataReads(text) {
   return DATA_READ_PATTERNS.filter(({ re }) => re.test(text)).map(({ name }) => name);
@@ -96,14 +100,38 @@ describe("no workflow reads production data", () => {
   it("only the deploy workflow holds the Cloudflare token", () => {
     const holders = readdirSync(WORKFLOWS)
       .filter((f) => /\.ya?ml$/.test(f))
-      .filter((f) => /CLOUDFLARE_API_TOKEN/.test(readFileSync(join(WORKFLOWS, f), "utf8")));
+      .filter((f) => /secrets\.CLOUDFLARE_API_TOKEN\b/.test(readFileSync(join(WORKFLOWS, f), "utf8")));
     expect(holders).toEqual(TOKEN_HOLDERS);
+  });
+
+  it("only the preview upload workflow holds the preview token", () => {
+    const holders = readdirSync(WORKFLOWS)
+      .filter((f) => /\.ya?ml$/.test(f))
+      .filter((f) => /secrets\.CLOUDFLARE_PREVIEW_API_TOKEN\b/.test(readFileSync(join(WORKFLOWS, f), "utf8")));
+    expect(holders).toEqual(PREVIEW_TOKEN_HOLDERS);
   });
 });
 
 // Deploy guard (Fraser's ruling of 19 November 2026, ops #610): only `main` may use the token that
 // writes the live D1 and the production Worker. It lives in the GitHub environment `Production`,
 // whose deployment branch rule admits only `main`; there is no repository-level copy.
+/** The job ids under `jobs:` in `text`. */
+function jobNames(text) {
+  const lines = text.split("\n");
+  const start = lines.findIndex((l) => l === "jobs:");
+  if (start === -1) return [];
+  return lines
+    .slice(start + 1)
+    .map((l) => /^ {2}([\w-]+):\s*$/.exec(l))
+    .filter(Boolean)
+    .map((m) => m[1]);
+}
+
+/** Whether a workflow runs on pull requests (pull_request or pull_request_target). */
+function onPullRequest(text) {
+  return /^ {2}pull_request(_target)?:/m.test(text) || /^on:.*\bpull_request/m.test(text);
+}
+
 /** The block of `jobs:` in `text` for job `name`, up to the next job. */
 function jobBlock(text, name) {
   const lines = text.split("\n");
@@ -123,8 +151,13 @@ describe("deploy guard", () => {
     expect(production).toMatch(/^ {4}if: .*github\.ref == 'refs\/heads\/main'/m);
   });
 
-  it("runs the preview job in the Preview environment, which holds no Cloudflare token", () => {
-    expect(jobBlock(deploy, "preview")).toMatch(/^ {4}environment: Preview$/m);
+  it("builds the pull request preview with no environment and no secret", () => {
+    const preview = jobBlock(deploy, "preview");
+    expect(preview).not.toBe("");
+    expect(preview).not.toMatch(/^\s+environment:/m);
+    expect(preview).not.toMatch(/\$\{\{[^}]*secrets\./);
+    expect(preview).toMatch(/actions\/upload-artifact@/);
+    expect(preview).toMatch(/^ {10}name: preview-bundle$/m);
   });
 
   it("is not started by a published Release, whose tag ref the environment refuses", () => {
@@ -148,3 +181,74 @@ describe("production Worker address", () => {
     expect(preview).toMatch(/^ {6}"workers_dev": true,$/m);
   });
 });
+
+// Preview guard (koinori #2925 F3 and F4; change preview-deploy-guard). A pull request can edit its own
+// workflow and wrangler.jsonc, so no pull_request job may name the Preview environment or a
+// Cloudflare secret. The preview is uploaded by preview-upload.yml, a workflow_run workflow that GitHub
+// always runs from the default branch, with wrangler.jsonc from the PR's base branch, so the preview
+// bindings are never the PR's.
+describe("preview guard", () => {
+  const files = readdirSync(WORKFLOWS).filter((f) => /\.ya?ml$/.test(f));
+  const text = (f) => readFileSync(join(WORKFLOWS, f), "utf8");
+
+  it("recognises a pull request job that reaches for the preview environment or a token", () => {
+    const old = [
+      "on:\n  pull_request:\n    branches: [qa]\njobs:\n  preview:\n    environment: Preview\n    runs-on: ubuntu-latest",
+      "on:\n  pull_request:\njobs:\n  preview:\n    steps:\n      - env:\n          T: ${{ secrets.CLOUDFLARE_PREVIEW_API_TOKEN }}",
+    ];
+    for (const yml of old) expect(pullRequestOffenders("old.yml", yml), yml).not.toEqual([]);
+    const production = "on:\n  pull_request:\njobs:\n  production:\n    environment: Production\n    steps:\n      - env:\n          T: ${{ secrets.CLOUDFLARE_API_TOKEN }}";
+    expect(pullRequestOffenders("deploy.yml", production)).toEqual([]);
+  });
+
+  it("no pull_request job names the Preview environment or a Cloudflare secret", () => {
+    const offenders = files.flatMap((f) => pullRequestOffenders(f, text(f)));
+    expect(offenders).toEqual([]);
+  });
+
+  it("uploads preview versions only from preview-upload.yml", () => {
+    const uploaders = files.filter((f) => /versions upload|cf:upload-preview|--preview-alias/.test(text(f)));
+    expect(uploaders).toEqual(["preview-upload.yml"]);
+  });
+
+  it("runs the upload on workflow_run of Deploy, in Preview, on a GitHub-hosted runner", () => {
+    const upload = text("preview-upload.yml");
+    expect(upload).toMatch(/^ {2}workflow_run:$/m);
+    expect(upload).toMatch(/^ {4}workflows: \[Deploy\]$/m);
+    expect(onPullRequest(upload)).toBe(false);
+    const job = jobBlock(upload, "upload");
+    expect(job).toMatch(/^ {4}environment: Preview$/m);
+    expect(job).toMatch(/^ {4}runs-on: ubuntu-latest$/m);
+    expect(job).toMatch(/github\.event\.workflow_run\.event == 'pull_request'/);
+    expect(job).toMatch(/github\.event\.workflow_run\.conclusion == 'success'/);
+    expect(job).toMatch(/github\.event\.workflow_run\.head_repository\.full_name == github\.repository/);
+    expect(job).toMatch(/contains\(fromJSON\('\["qa","main"\]'\), github\.event\.workflow_run\.pull_requests\[0\]\.base\.ref\)/);
+  });
+
+  it("checks out only the pull request's base branch, never its head, and names the trusted config", () => {
+    const upload = text("preview-upload.yml");
+    const refs = [...upload.matchAll(/^ {10}ref: (.*)$/gm)].map((m) => m[1]);
+    expect(refs.length).toBeGreaterThan(0);
+    for (const ref of refs) expect(ref).toBe("${{ github.event.workflow_run.pull_requests[0].base.ref }}");
+    expect(upload).not.toMatch(/^ {10}ref: .*head/m);
+    for (const line of upload.split("\n").filter((l) => /npx wrangler /.test(l))) {
+      expect(line, line).toMatch(/--config wrangler\.jsonc/);
+    }
+    expect(upload).toMatch(/--no-bundle/);
+    expect(upload).toMatch(/find "\$BUNDLE" -type l/);
+  });
+});
+
+/** The jobs in a pull_request workflow that name the Preview environment or a Cloudflare secret. */
+function pullRequestOffenders(file, yml) {
+  if (!onPullRequest(yml)) return [];
+  return jobNames(yml).flatMap((name) => {
+    const job = jobBlock(yml, name);
+    // The production job is refused on any ref but main by its environment (deploy guard above).
+    if (/^ {4}environment: Production$/m.test(job)) return [];
+    const hits = [];
+    if (/environment:\s*["']?preview\b/i.test(job)) hits.push("the Preview environment");
+    if (/secrets\.CLOUDFLARE_/.test(job)) hits.push("a Cloudflare secret");
+    return hits.length ? [`${file} ${name}: ${hits.join(", ")}`] : [];
+  });
+}
