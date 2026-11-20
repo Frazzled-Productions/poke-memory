@@ -4,11 +4,9 @@
 
 The app SHALL build with `@opennextjs/cloudflare` into one Worker, `poke-memory`, with
 `cacheComponents: false`. Pages that were partially prerendered SHALL render per request, and nothing
-SHALL revalidate at runtime, so the incremental cache is the static-assets cache with no R2 or KV cache.
+SHALL revalidate at runtime, so the incremental cache is the static-assets cache.
 `/test-error` SHALL be `force-dynamic`. Since the cutover (#2393) the Worker SHALL be reachable only at
-`pokememory.com`, a Worker Custom Domain attached in Cloudflare and not listed as a route in
-`wrangler.jsonc`; its workers.dev address SHALL be off. The preview Worker SHALL keep its workers.dev
-address.
+`pokememory.com`, with its workers.dev address off.
 
 #### Scenario: A page that used to be prerendered
 
@@ -30,6 +28,16 @@ address.
 - **WHEN** someone opens `poke-memory.frasers-account.workers.dev` after a production deploy
 - **THEN** Cloudflare does not serve the app there, while `https://pokememory.com` still answers 200
 
+#### Scenario: A deploy and the custom domain
+
+- **WHEN** `deploy.yml` deploys `poke-memory`
+- **THEN** the `pokememory.com` Worker Custom Domain, attached in Cloudflare and not listed as a route in `wrangler.jsonc`, is left as it is, so a deploy never re-takes DNS
+
+#### Scenario: The preview address
+
+- **WHEN** a version of `poke-memory-preview` is uploaded
+- **THEN** it keeps its workers.dev address, because `env.preview` sets `workers_dev: true`
+
 #### Scenario: Config drifts back
 
 - **WHEN** a change sets the top-level `workers_dev` to true, or drops `workers_dev: true` from `env.preview`
@@ -39,19 +47,21 @@ Source: design D1, `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc`; ch
 
 ### Requirement: Main deploys production and each pull request gets a preview
 
-`.github/workflows/deploy.yml` SHALL, on a push to `main` or a dispatch on `main`, build, apply D1
-migrations and deploy `poke-memory`, in the GitHub environment `Production`, whose deployment branch
-rule admits only `main` and which alone holds `CLOUDFLARE_API_TOKEN` and `SENTRY_AUTH_TOKEN`. There
-SHALL be no repository-level Cloudflare token. A published Release SHALL NOT start a deploy;
-`auto-release.yml` SHALL dispatch `deploy.yml` on `main` whenever it pushed a release commit. On a pull
-request the preview job SHALL run in the environment `Preview`, and with a token it SHALL upload a
-version of the separate Worker `poke-memory-preview`, which has its own D1 database and bucket, alias it
-`pr-<number>` and comment its URL. Without a token the jobs SHALL skip with a notice.
+`.github/workflows/deploy.yml` SHALL build, apply D1 migrations and deploy `poke-memory` on a push or
+dispatch on `main`, from the GitHub environment `Production`, which admits only `main` and alone holds
+the Cloudflare and Sentry tokens. A published Release SHALL NOT deploy; `auto-release.yml` SHALL
+dispatch the deploy after its release commit. Pull request previews SHALL run in the environment
+`Preview`, and without a token the jobs SHALL skip with a notice.
 
 #### Scenario: Pull request opened
 
 - **WHEN** a pull request is opened and the `Preview` environment holds a token
-- **THEN** a preview version is uploaded and its `pr-<number>` URL is commented on the PR
+- **THEN** a version of the separate Worker `poke-memory-preview`, with its own D1 database and bucket, is uploaded, aliased `pr-<number>`, and its URL is commented on the PR
+
+#### Scenario: A job outside Production
+
+- **WHEN** any job not in the `Production` environment reads `secrets.CLOUDFLARE_API_TOKEN`
+- **THEN** it gets nothing, because there is no repository-level copy
 
 #### Scenario: No token
 
