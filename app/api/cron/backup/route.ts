@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cronGuard } from "@/lib/auth/bearerAuth";
-import { runBackup } from "@/lib/db/backup";
+import { runBackup, sendBackupAlert } from "@/lib/db/backup";
 import { getEnv } from "@/lib/db/env";
 
 /**
@@ -12,24 +12,33 @@ import { getEnv } from "@/lib/db/env";
  * monthly restore check and restoring: lib/db/backup.ts.
  *
  * Bearer CRON_SHARED_SECRET, constant time. Responds with the key, size and
- * row counts (counts only, never data).
+ * row counts (counts only, never data). A failure (503 misconfigured, 502 the
+ * export failed) logs "d1-backup: export FAILED: ..." and emails that line
+ * through Resend (sendBackupAlert, design D10).
  */
 export async function POST(request: Request) {
   const env = await getEnv();
   const refused = cronGuard(request, env.CRON_SHARED_SECRET);
   if (refused) return refused;
+  const now = new Date();
+  const fail = async (reason: string) => {
+    const line = `d1-backup: export FAILED: ${reason}`;
+    console.error(line);
+    await sendBackupAlert(env, "export", line, now);
+  };
   if (!env.BACKUPS || !env.D1_BACKUP_PREFIX) {
+    await fail("the BACKUPS binding or the D1_BACKUP_PREFIX variable is missing (wrangler.jsonc)");
     return NextResponse.json({ ok: false, error: "misconfigured" }, { status: 503 });
   }
 
   try {
-    const result = await runBackup(env.DB, env.BACKUPS, env.D1_BACKUP_PREFIX);
+    const result = await runBackup(env.DB, env.BACKUPS, env.D1_BACKUP_PREFIX, now);
     console.info(
       `d1-backup: export ok, ${result.key} (${result.bytes} bytes), counts ${JSON.stringify(result.counts)}; pruned ${result.pruned.length} old backup(s)`,
     );
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
-    console.error(`d1-backup: export FAILED: ${err instanceof Error ? err.message : String(err)}`);
+    await fail(err instanceof Error ? err.message : String(err));
     return NextResponse.json({ ok: false, error: "backup_failed" }, { status: 502 });
   }
 }

@@ -11,6 +11,8 @@
 //   DISCORD_NOTIFY_WEBHOOK_URL               feedback notify (042, 051)
 //   DISCORD_DIGEST_WEBHOOK_URL               weekly digest (042)
 //   RATE_LIMIT_SALT                          per-IP bucket hashing (041)
+//   RESEND_API_KEY                           alert emails (lib/alertEmail.ts; D10, D13),
+//                                            production only; without it they log "alert not sent"
 //   SENTRY_TRACES_SAMPLE_RATE (optional)     server trace sampling
 // Build-time values (CI environment, inlined by `next build`, not Worker
 // secrets): NEXT_PUBLIC_SENTRY_DSN, NEXT_PUBLIC_VAPID_PUBLIC_KEY,
@@ -45,12 +47,14 @@
   // Namespace ids are unique per account: the company site uses 1001 and 1002.
   "ratelimits": [{ "name": "EVENT_LIMITER", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } }],
   // The first two map to app routes through cronRoutesFor() in lib/cron/schedule.ts (the 02:00
-  // firing of the hourly one runs the backup export); "0 4 1 * *" is the monthly restore check,
+  // firing of the hourly one runs the backup export, the 08:00 one the grade_log divergence check); "0 4 1 * *" is the monthly restore check,
   // run by worker/index.ts.
   "triggers": { "crons": ["0 * * * *", "*/30 * * * *", "0 4 1 * *"] },
   "vars": {
     "DEPLOY_ENV": "cloudflare-production",
     "D1_BACKUP_PREFIX": "d1/poke-memory",
+    // The alert sender: pokememory.com is not verified in Resend, frazzledproductions.com is (D13).
+    "RESEND_FROM": "Poké Memory <hello@frazzledproductions.com>",
     "BETTER_AUTH_URL": "https://poke-memory.frasers-account.workers.dev"
   },
   "env": {

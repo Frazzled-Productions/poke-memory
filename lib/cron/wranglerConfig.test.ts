@@ -79,3 +79,13 @@ describe("wrangler.jsonc backups bucket (design D10)", () => {
     expect(config.env.preview.vars?.D1_BACKUP_PREFIX).toBeUndefined();
   });
 });
+
+describe("wrangler.jsonc alert sender (design D13)", () => {
+  it("production sends alerts from a frazzledproductions.com address, the domain verified in Resend", () => {
+    expect(config.vars?.RESEND_FROM).toBe("Poké Memory <hello@frazzledproductions.com>");
+  });
+
+  it("the preview Worker has no alert sender (it runs no crons and gets no Resend key)", () => {
+    expect(config.env.preview.vars?.RESEND_FROM).toBeUndefined();
+  });
+});

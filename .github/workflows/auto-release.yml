@@ -31,7 +31,6 @@ name: Auto Release
 #   * the release commit on the schedule / workflow_dispatch path (the
 #     "Backmerge release into qa" step; there is no reset on that path)
 #   * a hotfix or Dependabot PR merged into `main` (`backmerge-hotfix` job)
-#   * refresh-user-count.yml's daily stats commit (its own backmerge step)
 # A new push-to-main producer must call the same script.
 #
 # One-time bootstrap: if no `v0.1.0` tag exists when this workflow first runs,
@@ -387,7 +386,7 @@ jobs:
           $MAIN_ONLY
 
           **Likely causes (match the commits above; see #2058):**
-          - **A backmerge into qa failed.** Every path that lands a commit on main outside a promotion merges main back into qa via \`.github/scripts/backmerge-main-into-qa.sh\`: a hotfix or Dependabot PR merged into main (the \`backmerge-hotfix\` job in \`auto-release.yml\`), a \`chore(release)\` commit from the scheduled or manual release (the "Backmerge release into qa" step), and a \`chore(stats): refresh user count\` commit (\`refresh-user-count.yml\`). The usual failures are a merge conflict, such as \`package.json\` after two same-day Dependabot merges (#2044), and a change to \`.github/workflows/**\`, which the poke-memory-bot App may not push (it has no \`workflows\` permission). Check the latest failed run of \`auto-release.yml\` or \`refresh-user-count.yml\`.
+          - **A backmerge into qa failed.** Every path that lands a commit on main outside a promotion merges main back into qa via \`.github/scripts/backmerge-main-into-qa.sh\`: a hotfix or Dependabot PR merged into main (the \`backmerge-hotfix\` job in \`auto-release.yml\`), and a \`chore(release)\` commit from the scheduled or manual release (the "Backmerge release into qa" step). The usual failures are a merge conflict, such as \`package.json\` after two same-day Dependabot merges (#2044), and a change to \`.github/workflows/**\`, which the poke-memory-bot App may not push (it has no \`workflows\` permission). Check the latest failed run of \`auto-release.yml\`.
           - **"Reset qa to main" was skipped after a \`qa -> main\` promotion** because an earlier step in the release job failed. Fingerprint: the promotion's \`Merge pull request ... from .../qa\` commit (and usually a \`chore(release)\` commit) in the list above.
           - **A commit was pushed to main by hand** (admin bypass). Nothing backmerges that automatically.
 

@@ -1,12 +1,13 @@
 /**
  * Cross-user database work for the scheduled jobs, the push sends, the
- * Discord notifications and the feedback route (decision 0018, design D4).
+ * Discord notifications, the feedback route and the public user count
+ * (decision 0018, design D4 and D13).
  * Each function does one named job; nothing here takes a session.
  *
  * Per-user requests use forUser (lib/db/scope.ts) instead. ESLint
  * (no-restricted-imports in eslint.config.mjs) only lets app/api/cron/**,
- * app/api/push/send-*, app/api/discord/**, app/api/feedback/** and lib/db
- * import this module.
+ * app/api/push/send-*, app/api/discord/**, app/api/feedback/**,
+ * app/api/stats/users and lib/db import this module.
  */
 export {
   getPushTargets,
@@ -31,3 +32,10 @@ export { checkRateLimit, RATE_LIMIT_CAPS } from "./rateLimit";
 export { deleteExpiredRateLimitBuckets, RATE_LIMIT_RETENTION_MS } from "./system/rateLimit";
 export { reconcileGradeLogOrphans, RECONCILE_LIMIT, type ReconcileResult } from "./system/gradeLog";
 export { backupTables, readTablePages, BACKUP_TABLE_ORDER } from "./system/backup";
+export {
+  checkGradeLogDivergence,
+  divergenceReport,
+  divergenceSummary,
+  type DivergenceResult,
+} from "./system/gradeLogDivergence";
+export { countUsers } from "./system/stats";

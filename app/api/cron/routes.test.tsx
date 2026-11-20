@@ -15,6 +15,7 @@ import { POST as feedbackRetention } from "./feedback-retention/route";
 import { POST as reconcileGradeLog } from "./reconcile-grade-log/route";
 import { POST as rateLimitCleanup } from "./rate-limit-cleanup/route";
 import { POST as backup } from "./backup/route";
+import { POST as gradeLogDivergence } from "./grade-log-divergence/route";
 import { POST as sendDaily } from "../push/send-daily/route";
 import { POST as sendStreakNudge } from "../push/send-streak-nudge/route";
 import { POST as discordDigest } from "../discord/digest/route";
@@ -104,7 +105,13 @@ const CRON_HANDLERS: Record<string, (request: Request) => Promise<Response>> = {
   [CRON_ROUTES.reconcileGradeLog]: reconcileGradeLog,
   [CRON_ROUTES.rateLimitCleanup]: rateLimitCleanup,
   [CRON_ROUTES.backup]: backup,
+  [CRON_ROUTES.gradeLogDivergence]: gradeLogDivergence,
 };
+
+const RESEND = "https://api.resend.com/emails";
+/** The Resend calls fetchMock saw, as parsed JSON bodies. */
+const resendCalls = () =>
+  fetchMock.mock.calls.filter(([url]) => String(url) === RESEND).map(([, init]) => JSON.parse(String(init?.body)));
 
 describe("cron routes: the bearer gate", () => {
   it.each(Object.entries(CRON_HANDLERS))("%s refuses a missing or wrong bearer with an empty 401", async (path, handler) => {
@@ -227,6 +234,99 @@ describe("POST /api/cron/backup", () => {
     };
     expect((await backup(post(CRON_ROUTES.backup))).status).toBe(502);
     expect(console.error).toHaveBeenCalledWith("d1-backup: export FAILED: R2 unavailable");
+    expect(console.error).toHaveBeenCalledWith("d1-backup: alert not sent: no RESEND_API_KEY");
+    expect(resendCalls()).toEqual([]);
+  });
+
+  it("emails one alert through Resend when the export fails, and still answers 502", async () => {
+    env.RESEND_API_KEY = "re_test";
+    env.RESEND_FROM = "Poké Memory <hello@frazzledproductions.com>";
+    bucket.put = async () => {
+      throw new Error("R2 unavailable");
+    };
+    expect((await backup(post(CRON_ROUTES.backup))).status).toBe(502);
+    const [call] = fetchMock.mock.calls;
+    expect(new Headers(call[1]?.headers).get("authorization")).toBe("Bearer re_test");
+    expect(resendCalls()).toEqual([
+      {
+        from: "Poké Memory <hello@frazzledproductions.com>",
+        to: ["hello@frazzledproductions.com"],
+        subject: "Poké Memory: D1 export FAILED",
+        text: expect.stringMatching(/^d1-backup: export FAILED: R2 unavailable\n/),
+      },
+    ]);
+  });
+
+  it("emails an alert when the bucket or prefix is missing on a scheduled run (503)", async () => {
+    env.RESEND_API_KEY = "re_test";
+    delete env.BACKUPS;
+    expect((await backup(post(CRON_ROUTES.backup))).status).toBe(503);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/^d1-backup: export FAILED: the BACKUPS binding or the D1_BACKUP_PREFIX/));
+    expect(resendCalls().map((c) => c.subject)).toEqual(["Poké Memory: D1 export FAILED"]);
+  });
+
+  it("sends no alert when the export succeeds", async () => {
+    env.RESEND_API_KEY = "re_test";
+    expect((await backup(post(CRON_ROUTES.backup))).status).toBe(200);
+    expect(resendCalls()).toEqual([]);
+  });
+});
+
+describe("POST /api/cron/grade-log-divergence (design D13)", () => {
+  async function gradedToday(userId: string, learningStep: number | null = null) {
+    await forUser(d1, userId).insert("grade_log", {
+      occurred_at: 1,
+      entry_date: new Date().toISOString().slice(0, 10),
+      card_type: "name",
+      grade: 4,
+      subject_key: "25",
+      locale: "en",
+      learning_step: learningStep,
+    });
+  }
+
+  it("answers ok and sends nothing when nothing diverges", async () => {
+    env.RESEND_API_KEY = "re_test";
+    await gradedToday(alice, 0); // still in learning step 0: not an orphan
+    const res = await gradeLogDivergence(post(CRON_ROUTES.gradeLogDivergence));
+    expect(await res.json()).toEqual({ ok: true, diverged: false, users: 0 });
+    expect(console.info).toHaveBeenCalledWith(expect.stringMatching(/^grade-log-divergence: ok, Option A 0, Option B 0, Option C 0/));
+    expect(resendCalls()).toEqual([]);
+  });
+
+  it("emails the masked report on divergence, never a full user id", async () => {
+    env.RESEND_API_KEY = "re_test";
+    await gradedToday(alice); // graduated (learning_step NULL) with no card_reviews row: Option C
+    const res = await gradeLogDivergence(post(CRON_ROUTES.gradeLogDivergence));
+    expect(await res.json()).toEqual({ ok: true, diverged: true, users: 1 });
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/^grade-log-divergence: DIVERGED, Option A 0, Option B 0, Option C 1/));
+    const [mail] = resendCalls();
+    expect(resendCalls()).toHaveLength(1);
+    expect(mail.to).toEqual(["hello@frazzledproductions.com"]);
+    expect(mail.subject).toBe("Poké Memory: grade_log divergence (1 user)");
+    expect(mail.text).toContain(alice.slice(0, 8));
+    expect(mail.text).toContain("Option C");
+    expect(mail.text).not.toContain(alice);
+    expect(JSON.stringify(await (await gradeLogDivergence(post(CRON_ROUTES.gradeLogDivergence))).json())).not.toContain(alice);
+  });
+
+  it("logs 'alert not sent' on divergence without the key, and still answers", async () => {
+    await gradedToday(alice);
+    const res = await gradeLogDivergence(post(CRON_ROUTES.gradeLogDivergence));
+    expect(await res.json()).toEqual({ ok: true, diverged: true, users: 1 });
+    expect(console.error).toHaveBeenCalledWith("grade-log-divergence: alert not sent: no RESEND_API_KEY");
+  });
+
+  it("logs FAILED, emails an alert and answers 502 when a query fails", async () => {
+    env.RESEND_API_KEY = "re_test";
+    env.DB = {
+      prepare() {
+        throw new Error("D1 unavailable");
+      },
+    };
+    expect((await gradeLogDivergence(post(CRON_ROUTES.gradeLogDivergence))).status).toBe(502);
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/^grade-log-divergence: FAILED: .*D1 unavailable/));
+    expect(resendCalls().map((c) => c.subject)).toEqual(["Poké Memory: grade_log divergence check FAILED"]);
   });
 });
 
@@ -239,6 +339,7 @@ describe("every route through runCronRoutes (worker/index.ts)", () => {
       ...cronRoutesFor(HOURLY_CRON, new Date("2026-11-15T04:00:00Z")),
       ...cronRoutesFor(HOURLY_CRON, new Date("2026-11-16T02:00:00Z")),
       ...cronRoutesFor(HOURLY_CRON, new Date("2026-11-16T03:00:00Z")),
+      ...cronRoutesFor(HOURLY_CRON, new Date("2026-11-16T08:00:00Z")),
       ...cronRoutesFor(HALF_HOURLY_CRON, new Date("2026-11-16T03:30:00Z")),
     ]);
     expect([...scheduled].sort()).toEqual([...all].sort());

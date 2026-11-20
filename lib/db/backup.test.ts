@@ -5,7 +5,7 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { R2BucketLike } from "./d1";
 import {
   BACKUP_RETENTION_DAYS,
@@ -518,7 +518,34 @@ describe("runRestoreCheck (the Worker's monthly Cron Trigger)", () => {
     await expect(runRestoreCheck({ BACKUPS: fakeBucket(), D1_BACKUP_PREFIX: PREFIX }, CHECK_AT, out)).rejects.toThrow(
       /no latest\.json/,
     );
-    expect(out.lines).toEqual([expect.stringMatching(/^error d1-backup: restore-check FAILED: no latest\.json at d1\/poke-memory\/latest\.json/)]);
+    expect(out.lines).toEqual([
+      expect.stringMatching(/^error d1-backup: restore-check FAILED: no latest\.json at d1\/poke-memory\/latest\.json/),
+      "error d1-backup: alert not sent: no RESEND_API_KEY",
+    ]);
+  });
+
+  it("emails one alert through Resend on failure, then still rethrows", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response('{"id":"x"}', { status: 200 }));
+    const out = sink();
+    const env = { BACKUPS: fakeBucket(), D1_BACKUP_PREFIX: PREFIX, RESEND_API_KEY: "re_test" };
+    await expect(runRestoreCheck(env, CHECK_AT, out, fetch)).rejects.toThrow(/no latest\.json/);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = fetch.mock.calls[0];
+    expect(String(url)).toBe("https://api.resend.com/emails");
+    const body = JSON.parse(String(init?.body));
+    expect(body.to).toEqual(["hello@frazzledproductions.com"]);
+    expect(body.subject).toBe("Poké Memory: D1 restore-check FAILED");
+    expect(body.text).toMatch(/^d1-backup: restore-check FAILED: no latest\.json/);
+    expect(out.lines).toHaveLength(1);
+  });
+
+  it("sends no alert when the check passes", async () => {
+    await seed(d1);
+    const bucket = fakeBucket();
+    await runBackup(d1, bucket, PREFIX, new Date("2026-11-30T02:00:00.000Z"));
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    await runRestoreCheck({ BACKUPS: bucket, D1_BACKUP_PREFIX: PREFIX, RESEND_API_KEY: "re_test" }, CHECK_AT, sink(), fetch);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("fails without the BACKUPS binding or the prefix (the preview Worker has neither)", async () => {

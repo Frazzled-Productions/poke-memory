@@ -67,12 +67,11 @@ jobs:
           # tidy-up, which is exactly the noise this monitor exists to prevent.
           WORKFLOWS=(
             "auto-release.yml|Auto Release|48"
-            "refresh-user-count.yml|Refresh User Count|48"
-            "monitor-grade-log-divergence.yml|Monitor Grade-Log Divergence|48"
             "pokeapi-species-monitor.yml|PokéAPI Species Monitor|840"
           )
-          # The backup restore check is not a workflow: it runs inside Cloudflare as the production
-          # Worker's monthly Cron Trigger (move-to-cloudflare, design D10).
+          # The backup restore check, the user-count badge and the grade_log divergence check are
+          # not workflows: they run inside Cloudflare in the production Worker (move-to-cloudflare,
+          # design D10 and D13), and a failure emails an alert from there.
 
           NOW=$(date -u +%s)
 

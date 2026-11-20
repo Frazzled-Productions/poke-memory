@@ -47,6 +47,16 @@ describe("cronRoutesFor (design D2 table)", () => {
     ]);
   });
 
+  it("08:00 every day: the grade_log divergence check (design D13)", () => {
+    for (const day of ["2026-11-16", "2026-11-22"]) {
+      expect(cronRoutesFor(HOURLY_CRON, new Date(`${day}T08:00:00Z`))).toEqual([
+        ...HOURLY,
+        CRON_ROUTES.gradeLogDivergence,
+      ]);
+      expect(cronRoutesFor(HOURLY_CRON, new Date(`${day}T07:00:00Z`))).toEqual(HOURLY);
+    }
+  });
+
   it("02:00 every day: nightly backup", () => {
     expect(cronRoutesFor(HOURLY_CRON, new Date("2026-11-18T02:00:00Z"))).toEqual([
       ...HOURLY,
@@ -63,7 +73,7 @@ describe("cronRoutesFor (design D2 table)", () => {
 
 describe("cronRoutesFor: non-matching hours and days", () => {
   it("digest only on Monday at 09:00", () => {
-    expect(cronRoutesFor(HOURLY_CRON, new Date("2026-11-16T08:00:00Z"))).toEqual(HOURLY);
+    expect(cronRoutesFor(HOURLY_CRON, new Date("2026-11-16T07:00:00Z"))).toEqual(HOURLY);
     expect(cronRoutesFor(HOURLY_CRON, new Date("2026-11-16T10:00:00Z"))).toEqual(HOURLY);
     expect(cronRoutesFor(HOURLY_CRON, new Date("2026-11-17T09:00:00Z"))).toEqual(HOURLY);
   });
@@ -74,7 +84,7 @@ describe("cronRoutesFor: non-matching hours and days", () => {
   });
 
   it("an ordinary hour runs only the hourly pair", () => {
-    for (const hour of [0, 1, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]) {
+    for (const hour of [0, 1, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]) {
       const at = new Date(Date.UTC(2026, 10, 16, hour, 0));
       expect(cronRoutesFor(HOURLY_CRON, at)).toEqual(HOURLY);
     }

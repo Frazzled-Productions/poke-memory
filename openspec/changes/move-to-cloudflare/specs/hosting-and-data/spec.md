@@ -274,6 +274,11 @@ NOT stop the others.
 - **WHEN** the hourly trigger fires at 04:00 UTC on a Sunday
 - **THEN** `POST /api/cron/reconcile-grade-log` runs with the two push routes
 
+#### Scenario: 08:00 every day
+
+- **WHEN** the hourly trigger fires at 08:00 UTC on any day
+- **THEN** `POST /api/cron/grade-log-divergence` runs with the two push routes
+
 #### Scenario: Every 30 minutes
 
 - **WHEN** the `*/30` trigger fires at 14:30 or 15:00 UTC
@@ -333,6 +338,11 @@ dated more than 90 days ago. Only the production Worker SHALL have the bucket bi
 - **WHEN** the run finds a dump dated 91 days ago
 - **THEN** it and its manifest are deleted, and one dated 90 days ago stays, as does `latest.json`
 
+#### Scenario: The export fails
+
+- **WHEN** the write to R2 fails, or the bucket binding or prefix is missing
+- **THEN** the route logs `d1-backup: export FAILED: <reason>`, emails that line (see "Backup and monitor failures email an alert") and answers 502, or 503 for the missing binding
+
 #### Scenario: Round trip
 
 - **WHEN** a dump is gunzipped and restored into a fresh migrated test database
@@ -384,8 +394,8 @@ rethrow on failure.
 
 - **WHEN** the dump's SHA-256 differs from the manifest, it does not decompress, or a table's rows differ
   from the manifest's count
-- **THEN** the check logs `d1-backup: restore-check FAILED:` with every problem found and the invocation
-  fails
+- **THEN** the check logs `d1-backup: restore-check FAILED:` with every problem found, emails that line,
+  and the invocation fails
 
 Source (planned): design D10, owner ruling 20 November 2026, `lib/db/backup.ts`, `worker/index.ts`.
 
@@ -400,6 +410,95 @@ No GitHub workflow SHALL read, write or list the backups or dump the database to
 - **THEN** `scripts/workflows-no-backups.test.mjs` fails
 
 Source (planned): design D10, owner ruling 20 November 2026, `scripts/workflows-no-backups.test.mjs`.
+
+### Requirement: Backup and monitor failures email an alert
+
+A failed backup export, restore check or divergence check, and a detected divergence, SHALL each send
+one email through the Resend REST API with the Worker secret `RESEND_API_KEY`, from `RESEND_FROM`
+(`Poké Memory <hello@frazzledproductions.com>`, production only) to `hello@frazzledproductions.com`,
+holding counts, keys and 8-character user id prefixes only. Sending SHALL never throw, and the task
+SHALL still log its FAILED line and rethrow or answer its error status.
+
+#### Scenario: The restore check fails with the key set
+
+- **WHEN** the monthly restore check finds no `latest.json` and `RESEND_API_KEY` is set
+- **THEN** one email goes to Resend with the subject `Poké Memory: D1 restore-check FAILED` and the FAILED line as its text, and the invocation still fails
+
+#### Scenario: No key yet
+
+- **WHEN** a task fails before the cutover has set `RESEND_API_KEY`
+- **THEN** the Worker logs `d1-backup: alert not sent: no RESEND_API_KEY` (or the monitor's tag), sends nothing, and the task still fails
+
+#### Scenario: Resend refuses or is unreachable
+
+- **WHEN** Resend answers an error status, or the request throws
+- **THEN** the Worker logs `alert not sent: <reason>` and the task's own failure is unchanged
+
+#### Scenario: A healthy night
+
+- **WHEN** the export and the restore check pass
+- **THEN** no email is sent
+
+Source (planned): design D10 and D13, owner ruling 20 November 2026, `lib/alertEmail.ts`, `lib/db/backup.ts`, `app/api/cron/backup/route.ts`.
+
+### Requirement: The grade_log divergence check runs in the Worker
+
+`POST /api/cron/grade-log-divergence`, at 08:00 UTC daily, SHALL run the three divergence queries
+(Options A, B and C, `lib/db/system/gradeLogDivergence.ts`) through the D1 binding and alert on any
+user above the threshold of 0, answering counts only and logging one line.
+
+#### Scenario: Nothing diverges
+
+- **WHEN** every graded subject has its `card_reviews` row, or is still in its learning steps
+- **THEN** the route answers `{ ok: true, diverged: false, users: 0 }`, logs `grade-log-divergence: ok` and sends nothing
+
+#### Scenario: A graduated orphan
+
+- **WHEN** a user graduated a card today and has no `card_reviews` row for it
+- **THEN** the route answers `{ ok: true, diverged: true, users: 1 }`, logs `grade-log-divergence: DIVERGED`, and emails a report naming Option C with the user's 8-character id prefix, never the full id
+
+#### Scenario: A query fails
+
+- **WHEN** a divergence query throws
+- **THEN** the route logs `grade-log-divergence: FAILED: <reason>`, emails that line and answers 502
+
+Source (planned): design D13, `app/api/cron/grade-log-divergence/route.ts`, `lib/db/system/gradeLogDivergence.ts`.
+
+### Requirement: The user-count badge is served by the Worker
+
+`GET /api/stats/users` SHALL answer the number of accounts as Shields.io endpoint JSON
+(`schemaVersion` 1, `label` "users", `message` the count, `color` "blue", `cacheSeconds` 3600) with
+`Cache-Control: public, max-age=3600`, and nothing else about any account. The README user-count badge
+SHALL read it. When the count fails it SHALL answer 503 with `Cache-Control: no-store`.
+
+#### Scenario: Two accounts
+
+- **WHEN** the database holds two accounts
+- **THEN** the route answers `message: "2"` and the badge shows "users 2"
+
+#### Scenario: The database is unavailable
+
+- **WHEN** the count throws
+- **THEN** the route answers 503, uncached, and logs `[stats/users] count failed`
+
+Source (planned): design D13, `app/api/stats/users/route.ts`, `lib/db/system/stats.ts`, `README.md`.
+
+### Requirement: No GitHub workflow reads production data
+
+No GitHub workflow SHALL query the production D1 database, and only `deploy.yml` SHALL hold
+`CLOUDFLARE_API_TOKEN`, which can write D1.
+
+#### Scenario: A workflow queries production
+
+- **WHEN** a pull request adds a workflow step that runs `wrangler d1 execute --remote` without `--env preview`, calls the D1 REST query API, or runs the removed monitor scripts or their query helper
+- **THEN** `scripts/workflows-no-backups.test.mjs` fails
+
+#### Scenario: Another workflow takes the token
+
+- **WHEN** a workflow other than `deploy.yml` names `CLOUDFLARE_API_TOKEN`
+- **THEN** `scripts/workflows-no-backups.test.mjs` fails
+
+Source (planned): design D13, owner ruling 20 November 2026, `scripts/workflows-no-backups.test.mjs`.
 
 ### Requirement: Main deploys production and each pull request gets a preview
 

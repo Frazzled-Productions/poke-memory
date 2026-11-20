@@ -18,6 +18,9 @@ interface WorkerEnv {
   CRON_SHARED_SECRET?: string;
   BACKUPS?: R2Bucket;
   D1_BACKUP_PREFIX?: string;
+  /** The failed restore check emails hello@frazzledproductions.com (lib/alertEmail.ts). */
+  RESEND_API_KEY?: string;
+  RESEND_FROM?: string;
 }
 
 const handler = openNextHandler as ExportedHandler<WorkerEnv>;
@@ -29,7 +32,8 @@ export default {
 
   async scheduled(controller, env, ctx) {
     if (controller.cron === RESTORE_CHECK_CRON) {
-      // Logs "d1-backup: restore-check ..." and rethrows on failure, so the invocation fails.
+      // Logs "d1-backup: restore-check ...", emails an alert and rethrows on failure, so the
+      // invocation fails.
       await runRestoreCheck(env, new Date(controller.scheduledTime));
       return;
     }

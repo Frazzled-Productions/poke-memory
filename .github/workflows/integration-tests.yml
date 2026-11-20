@@ -74,11 +74,6 @@ jobs:
               - 'app/api/db/**'
               - 'db/d1/**'
               - 'lib/gradelog/**'
-              # The divergence monitor's SQL is tested against the migrated
-              # schema by scripts/check-grade-log-divergence.test.ts (#2096),
-              # so a change to the script alone must run the suite.
-              - '.github/scripts/check-grade-log-divergence.mjs'
-              - 'scripts/check-grade-log-divergence.test.ts'
               - '.github/workflows/integration-tests.yml'
 
       - name: Decide
@@ -119,7 +114,7 @@ jobs:
       - run: npm ci
 
       - name: Run the D1 suite
-        run: npx vitest run --project node lib/db lib/sync scripts/check-grade-log-divergence.test.ts
+        run: npx vitest run --project node lib/db lib/sync
 
   # Aggregator (#1738): a thin, always-reporting job so `integration` can be a
   # required status check on the qa-staging ruleset without blocking PRs that

@@ -109,7 +109,18 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
   and `integration-tests.yml` use D1; the Vercel workflows go and `vercel.json` keeps only every Git deployment turned off until the
   14-day fallback ends; the scoped-query rule
   joins `npm run lint`. No workflow touches the backups: the restore check runs in the Worker, and
-  `scripts/workflows-no-backups.test.mjs` fails on any workflow that names the bucket or calls R2. Every workflow change gets a `workflow-expert` review.
+  `scripts/workflows-no-backups.test.mjs` fails on any workflow that names the bucket or calls R2. No
+  workflow reads production data either (design D13): `refresh-user-count.yml` and
+  `monitor-grade-log-divergence.yml` go, `cron-health-monitor.yml` stops watching them, and only
+  `deploy.yml` may hold the Cloudflare token.
+- **README user-count badge:** reads `GET /api/stats/users` on the Worker instead of a JSON file a
+  workflow committed to `main` daily (design D13); `auto-release.yml` and the backmerge script lose
+  their mention of that stats commit.
+- **Operator alerts:** a failed backup export or restore check, and a grade_log divergence, email
+  hello@frazzledproductions.com through Resend (`RESEND_API_KEY`, a new production Worker secret at
+  the cutover, #2393). No privacy-notice change: the email carries counts, keys and 8-character id
+  prefixes to the company's own inbox (an internal operations message), and Resend is already the
+  company's mail processor; flagged for the privacy check in #2393. Every workflow change gets a `workflow-expert` review.
 
 ## Removes
 
@@ -126,6 +137,9 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
   and the local-database option of `scripts/cloudflare/d1-query.mjs`: the restore check runs inside the
   Worker instead (owner ruling 20 November 2026). The preview Worker's backups bucket binding
   (`poke-memory-backups-preview`) goes too.
+- `refresh-user-count.yml`, `monitor-grade-log-divergence.yml`, `scripts/refresh-user-count.mjs`,
+  `.github/scripts/check-grade-log-divergence.mjs` (its queries move to `lib/db/system/`),
+  `scripts/cloudflare/d1-query.mjs` and its test, and `.github/stats/users.json` (design D13).
 - After the 14-day fallback, in the cutover issue: `db/migrations/`, `docs/supabase-capacity.md`,
   `vercel.json` (kept until then with every Git deployment off, so a still-connected Vercel project
   cannot rebuild production from the promotion).
@@ -201,3 +215,10 @@ assume.
   Trigger, the GitHub restore job is removed and a test fails if a workflow touches the backups. The
   preview Worker loses its bucket binding (deploy guard). Settles the question of a GitHub restore
   schedule (#2393): there is none.
+- 2026-11-20 Fraser (about 09:45 UTC, ops #610): no GitHub runner may read user data, so the user-count
+  badge and the grade_log divergence monitor move into the production Worker (design D13), and every
+  backup export and restore check failure, and a divergence, emails an alert through the Resend REST API
+  with the Worker secret `RESEND_API_KEY` (set at the cutover) to hello@frazzledproductions.com; with no
+  key it logs "alert not sent: no RESEND_API_KEY", and the FAILED line and rethrow stay. The sender is a
+  frazzledproductions.com address because pokememory.com is not verified in Resend (coordinator note,
+  20 November 2026).

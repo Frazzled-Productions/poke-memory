@@ -1,7 +1,7 @@
 # poke-memory
 
 [![Release](https://img.shields.io/github/v/release/Frazzled-Productions/poke-memory)](https://github.com/Frazzled-Productions/poke-memory/releases)
-[![Users](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFrazzled-Productions%2Fpoke-memory%2Fmain%2F.github%2Fstats%2Fusers.json)](https://github.com/Frazzled-Productions/poke-memory/blob/main/.github/stats/users.json)
+[![Users](https://img.shields.io/endpoint?url=https%3A%2F%2Fpokememory.com%2Fapi%2Fstats%2Fusers)](https://pokememory.com)
 
 <p align="center">
   <img src="public/sprites/pokemon/25.png" width="110" alt="Pikachu" />

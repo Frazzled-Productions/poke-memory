@@ -1,4 +1,13 @@
-#!/usr/bin/env node
+// Run by the production Worker, not by GitHub (design D13; owner ruling 20 November 2026): the daily
+// `POST /api/cron/grade-log-divergence` (08:00 UTC, lib/cron/schedule.ts) runs the three queries
+// through the D1 binding and, on divergence, emails the report below to the company address through
+// Resend (lib/alertEmail.ts). It used to be `.github/scripts/check-grade-log-divergence.mjs`, run by
+// the `monitor-grade-log-divergence.yml` workflow against production with wrangler and filing a
+// GitHub issue; no runner reads player data any more. The report carries counts and 8-character user
+// id prefixes only. The SQL is tested on node:sqlite by gradeLogDivergence.test.ts.
+//
+// Only importable from the cron, push-send, Discord and feedback routes (ESLint
+// no-restricted-imports in eslint.config.mjs).
 //
 // Monitor: grade_log vs card_reviews divergence (closes #607, #1047, #1221, #1357)
 //
@@ -181,37 +190,12 @@
 // grade_log carries the same `locale` column (migration 029), so every query
 // groups and joins on locale too. Without it, a card_reviews row in one
 // locale would mask a missing row for the same subject in another.
-//
-// Required env vars
-// -----------------
-//   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID - read by wrangler, which runs
-//     each query against the production D1 database (binding `DB`) through
-//     scripts/cloudflare/d1-query.mjs. The queries are SQLite (D1).
-//   DIVERGENCE_THRESHOLD  - optional, integer, default 0. Applied to all
-//     three queries independently: a query whose row count exceeds the threshold
-//     contributes to the alert. With the corrected metrics every flagged
-//     subject is a real signal, so the default is 0. The env var remains
-//     an escape hatch for temporarily muting a known-noisy run, but it
-//     should not normally be set above 0.
-//
-// Output contract
-// ---------------
-//   * If neither query produces rows: writes "OK" to stdout, exit 0.
-//   * If either query produces rows: writes a JSON object to stdout with
-//     metadata for both queries, writes a Markdown body to disk for the
-//     workflow to pick up via `--body-file`, and exit 0. We never exit
-//     non-zero on "found drift" - the workflow needs to continue so it can
-//     open the alert issue.
-//   * Hard errors (auth, query failure): exit non-zero so the workflow run
-//     itself is marked failed and we get a "check is broken" signal.
 
-import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { queryD1 } from "../../scripts/cloudflare/d1-query.mjs";
+import type { D1DatabaseLike } from "../d1";
+import { all } from "./query";
 
-const DEFAULT_THRESHOLD = 0;
+/** Every flagged subject is a real signal, so any non-zero count alerts. */
+export const DEFAULT_THRESHOLD = 0;
 
 // Option A persistence window (#1221). We look at grade_log entries
 // whose entry_date sits between LOWER_BOUND_DAYS_AGO and
@@ -428,11 +412,41 @@ HAVING COUNT(*) > 0
 ORDER BY graduated_orphan_subjects DESC;
 `.trim();
 
-function runQuery(query) {
-  return queryD1(query);
+type Row = Record<string, unknown>;
+
+export interface DivergenceResult {
+  threshold: number;
+  /** Option A: graduated subjects 2 to 4 days old with no card_reviews row, per user. */
+  optionA: Row[];
+  /** Option B: card_reviews rows stuck at reps 0 or no last_review despite 3+ grades, per user. */
+  optionB: Row[];
+  /** Option C: graduated subjects with no card_reviews row, no grace, per user. */
+  optionC: Row[];
+  /** Users flagged by any option. */
+  users: number;
 }
 
-function maskUserId(id) {
+/**
+ * Runs the three queries one after another, so a failure names the query that broke, and keeps the
+ * users above `threshold` (applied to each query on its own).
+ */
+export async function checkGradeLogDivergence(
+  db: D1DatabaseLike,
+  threshold: number = DEFAULT_THRESHOLD,
+): Promise<DivergenceResult> {
+  const optionA = (await all<Row>(db, OPTION_A_QUERY)).filter((r) => Number(r.missing_subjects) > threshold);
+  const optionB = (await all<Row>(db, OPTION_B_QUERY)).filter((r) => Number(r.stuck_subjects) > threshold);
+  const optionC = (await all<Row>(db, OPTION_C_QUERY)).filter((r) => Number(r.graduated_orphan_subjects) > threshold);
+  const users = new Set([...optionA, ...optionB, ...optionC].map((r) => r.user_id)).size;
+  return { threshold, optionA, optionB, optionC, users };
+}
+
+/** The one-line log summary: counts only. */
+export function divergenceSummary(result: DivergenceResult): string {
+  return `Option A ${result.optionA.length}, Option B ${result.optionB.length}, Option C ${result.optionC.length} user(s) above threshold ${result.threshold}`;
+}
+
+function maskUserId(id: unknown): string {
   return typeof id === "string" && id.length >= 8 ? id.slice(0, 8) : "????????";
 }
 
@@ -440,8 +454,8 @@ function maskUserId(id) {
 // formatters so the assembled body can include only the sections that
 // fired. The top-level `formatMarkdownReport` glues them together with
 // a shared header.
-function formatOptionASection(rows) {
-  const lines = [];
+function formatOptionASection(rows: Row[]): string {
+  const lines: string[] = [];
   lines.push("### Option A - `card_reviews` row never written");
   lines.push("");
   lines.push(
@@ -477,8 +491,8 @@ function formatOptionASection(rows) {
   return lines.join("\n");
 }
 
-function formatOptionBSection(rows) {
-  const lines = [];
+function formatOptionBSection(rows: Row[]): string {
+  const lines: string[] = [];
   lines.push("### Option B - `card_reviews` row exists but is stuck");
   lines.push("");
   lines.push(
@@ -512,8 +526,8 @@ function formatOptionBSection(rows) {
   return lines.join("\n");
 }
 
-function formatOptionCSection(rows) {
-  const lines = [];
+function formatOptionCSection(rows: Row[]): string {
+  const lines: string[] = [];
   lines.push("### Option C - graduated subject with no `card_reviews` row (no grace)");
   lines.push("");
   lines.push(
@@ -544,11 +558,11 @@ function formatOptionCSection(rows) {
   return lines.join("\n");
 }
 
-function formatMarkdownReport(flaggedA, flaggedB, flaggedC, threshold) {
-  const lines = [];
+function formatMarkdownReport(flaggedA: Row[], flaggedB: Row[], flaggedC: Row[], threshold: number): string {
+  const lines: string[] = [];
   lines.push("## grade_log vs card_reviews divergence detected");
   lines.push("");
-  const firedParts = [];
+  const firedParts: string[] = [];
   if (flaggedA.length > 0) firedParts.push(`**Option A**: ${flaggedA.length} user(s)`);
   if (flaggedB.length > 0) firedParts.push(`**Option B**: ${flaggedB.length} user(s)`);
   if (flaggedC.length > 0) firedParts.push(`**Option C**: ${flaggedC.length} user(s)`);
@@ -585,136 +599,19 @@ function formatMarkdownReport(flaggedA, flaggedB, flaggedC, threshold) {
   lines.push("");
   lines.push(`Current threshold: \`> ${threshold}\` subjects (applied to each`);
   lines.push("query independently). With the corrected metrics every flagged");
-  lines.push("subject is a real signal, so the default is `0` - alert on any");
-  lines.push("non-zero count. The `DIVERGENCE_THRESHOLD` env var on the");
-  lines.push("`monitor-grade-log-divergence` workflow can temporarily mute a");
-  lines.push("known-noisy run, but it should not normally be set above `0`.");
+  lines.push("subject is a real signal, so the threshold is `0` - alert on any");
+  lines.push("non-zero count. This email is sent each day the divergence persists.");
   lines.push("");
   lines.push("### Next steps");
   lines.push("");
-  lines.push("1. Pull the affected user_ids from the workflow logs (full UUIDs are not logged here for privacy).");
-  lines.push("2. Inspect their `card_reviews` and `grade_log` directly with `wrangler d1 execute DB --remote`.");
+  lines.push("1. Find the affected user_ids from the prefixes above (full UUIDs are never emailed or logged, for privacy).");
+  lines.push("2. Inspect their `card_reviews` and `grade_log` directly with `wrangler d1 execute DB --remote` on an owner's machine.");
   lines.push("3. If sync truly is broken, ship a fix on the same beat as #584 (`docs/sync.md`).");
   lines.push("");
   return lines.join("\n");
 }
 
-async function main() {
-  const thresholdRaw = process.env.DIVERGENCE_THRESHOLD;
-  const threshold = thresholdRaw ? Number.parseInt(thresholdRaw, 10) : DEFAULT_THRESHOLD;
-
-  if (!process.env.CLOUDFLARE_API_TOKEN) {
-    console.error("CLOUDFLARE_API_TOKEN is not set.");
-    process.exit(2);
-  }
-  if (!Number.isFinite(threshold) || threshold < 0) {
-    console.error(`Invalid DIVERGENCE_THRESHOLD: ${thresholdRaw}`);
-    process.exit(2);
-  }
-
-  // Run each query independently so a failure in one does not mask
-  // the others. We do NOT Promise.all here: a fault in any query
-  // should bubble up as a workflow failure (the "check is broken"
-  // signal), and serial execution makes the failing query obvious in
-  // the workflow log.
-  const rowsA = runQuery(OPTION_A_QUERY);
-  const rowsB = runQuery(OPTION_B_QUERY);
-  const rowsC = runQuery(OPTION_C_QUERY);
-
-  // Per-query threshold filter. All default to "any non-zero".
-  const flaggedA = rowsA.filter((r) => Number(r.missing_subjects) > threshold);
-  const flaggedB = rowsB.filter((r) => Number(r.stuck_subjects) > threshold);
-  const flaggedC = rowsC.filter((r) => Number(r.graduated_orphan_subjects) > threshold);
-
-  // Always emit a one-line summary to stderr so the workflow log shows
-  // what we saw, regardless of whether we're alerting.
-  console.error(
-    `[divergence-check] Option A: ${rowsA.length} user(s) with subjects ≥${OPTION_A_UPPER_BOUND_DAYS_AGO}d old missing a card_reviews row (${flaggedA.length} above threshold). Option B: ${rowsB.length} user(s) with stuck card_reviews rows despite ≥${OPTION_B_MIN_GRADES} grades ≥${OPTION_B_UPPER_BOUND_DAYS_AGO}d old (${flaggedB.length} above threshold). Option C: ${rowsC.length} user(s) with graduated orphans within ${OPTION_C_LOWER_BOUND_DAYS_AGO}d, no grace (${flaggedC.length} above threshold).`,
-  );
-
-  if (flaggedA.length === 0 && flaggedB.length === 0 && flaggedC.length === 0) {
-    console.log("OK");
-    return;
-  }
-
-  // Write the markdown body to disk so the workflow can `--body-file` it.
-  // Fall back to a freshly-created, unpredictably-named temp directory rather
-  // than a hardcoded path in the world-writable /tmp - a fixed name there is a
-  // symlink-clobber target (CodeQL js/insecure-temporary-file). mkdtempSync
-  // creates the dir mode 0700 with a random suffix.
-  const bodyPath =
-    process.env.DIVERGENCE_BODY_PATH ??
-    join(mkdtempSync(join(tmpdir(), "divergence-")), "body.md");
-  writeFileSync(bodyPath, formatMarkdownReport(flaggedA, flaggedB, flaggedC, threshold), "utf8");
-
-  // Log the masked summary to stdout - the workflow grep / wc -l doesn't
-  // rely on this, but the JSON shape is useful for manual inspection.
-  // `user_count` is the union of users flagged by any query, so the
-  // workflow's issue title reflects the total breadth of the alert.
-  const flaggedUserIds = new Set([
-    ...flaggedA.map((r) => r.user_id),
-    ...flaggedB.map((r) => r.user_id),
-    ...flaggedC.map((r) => r.user_id),
-  ]);
-  console.log(
-    JSON.stringify(
-      {
-        threshold,
-        option_a: {
-          upper_bound_days_ago: OPTION_A_UPPER_BOUND_DAYS_AGO,
-          lower_bound_days_ago: OPTION_A_LOWER_BOUND_DAYS_AGO,
-          user_count: flaggedA.length,
-          users: flaggedA.map((r) => ({
-            user_id_prefix: maskUserId(r.user_id),
-            missing_subjects: Number(r.missing_subjects),
-          })),
-        },
-        option_b: {
-          upper_bound_days_ago: OPTION_B_UPPER_BOUND_DAYS_AGO,
-          lower_bound_days_ago: OPTION_B_LOWER_BOUND_DAYS_AGO,
-          min_grades: OPTION_B_MIN_GRADES,
-          user_count: flaggedB.length,
-          users: flaggedB.map((r) => ({
-            user_id_prefix: maskUserId(r.user_id),
-            stuck_subjects: Number(r.stuck_subjects),
-          })),
-        },
-        option_c: {
-          lower_bound_days_ago: OPTION_C_LOWER_BOUND_DAYS_AGO,
-          user_count: flaggedC.length,
-          users: flaggedC.map((r) => ({
-            user_id_prefix: maskUserId(r.user_id),
-            graduated_orphan_subjects: Number(r.graduated_orphan_subjects),
-          })),
-        },
-        user_count: flaggedUserIds.size,
-        body_path: bodyPath,
-      },
-      null,
-      2,
-    ),
-  );
-}
-
-// Run only when executed directly (`node check-grade-log-divergence.mjs`), so
-// the integration test can import the query constants without calling the
-// database (#2096). A realpath failure (for example an argv[1] that is
-// not a file) means "not invoked directly", never a crash on import.
-function isInvokedDirectly() {
-  try {
-    return (
-      process.argv[1] !== undefined &&
-      realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
-    );
-  } catch {
-    return false;
-  }
-}
-const invokedDirectly = isInvokedDirectly();
-
-if (invokedDirectly) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+/** The alert email's body (Markdown, readable as plain text): masked ids and counts only. */
+export function divergenceReport(result: DivergenceResult): string {
+  return formatMarkdownReport(result.optionA, result.optionB, result.optionC, result.threshold);
 }

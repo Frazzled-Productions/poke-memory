@@ -33,7 +33,6 @@ Automations that post a comment or tracking issue dedupe on an HTML-comment mark
 | `<!-- poke-memory-preview -->` | `deploy.yml` (`preview` job) | One preview-URL comment per PR, edited in place on each push |
 | `<!-- qa-drift-check -->` | `auto-release.yml` | Tracking issue opened on qa/main drift, closed when healthy |
 | `<!-- cron-health-monitor:<file> -->` | `cron-health-monitor.yml` | One tracking issue per failing scheduled workflow |
-| `<!-- monitor:grade-log-divergence -->` | `monitor-grade-log-divergence.yml` (via `find-marker-issue.mjs`) | One tracking issue, updated in place |
 | `<!-- pokeapi-species-monitor -->` | `pokeapi-species-monitor.yml` | One tracking issue, updated in place |
 
 ## Required checks

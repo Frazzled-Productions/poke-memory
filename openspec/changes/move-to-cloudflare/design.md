@@ -55,6 +55,7 @@ check (`CRON_SHARED_SECRET`, now a Worker secret instead of a Vault secret):
 | grade_log orphan reconcile, Sunday 04:00 (032) | Sunday 04:00 | `POST /api/cron/reconcile-grade-log` |
 | rate-limit bucket clean-up, every 30 minutes (041) | every 30 minutes | `POST /api/cron/rate-limit-cleanup` |
 | (new) nightly backup | 02:00 | `POST /api/cron/backup` |
+| (was the `monitor-grade-log-divergence` workflow) grade_log divergence check (D13) | 08:00 | `POST /api/cron/grade-log-divergence` |
 
 The scheduled handler calls each route through the Worker's own fetch handler (no network hop), awaits
 it with `ctx.waitUntil`, and logs the status. A failing route does not stop the others.
@@ -223,8 +224,8 @@ other machine ever holds a backup (owner ruling 20 November 2026; the pattern is
   it names, and fails unless the dump's SHA-256 matches, it decompresses, every table holds the
   manifest's number of `INSERT` lines (an empty table has none, so absent counts as 0) and the export is
   at most 3 days old. It logs one `d1-backup: restore-check ok, ...` line, or
-  `d1-backup: restore-check FAILED: ...` and rethrows, so the invocation shows as failed in the Worker's
-  Cron Events and Workers Logs. Logs carry keys and counts, never row data. The full round trip into a
+  `d1-backup: restore-check FAILED: ...`, emails an alert (below) and rethrows, so the invocation shows as
+  failed in the Worker's Cron Events and Workers Logs. Logs carry keys and counts, never row data. The full round trip into a
   fresh migrated database is proved by `lib/db/backup.test.ts`.
 - **Restoring for real:** download the dump with wrangler on an owner's machine, gunzip it, apply
   `db/d1/migrations` to an empty D1, then `wrangler d1 execute <database> --remote --file <dump.sql>`. D1
@@ -234,6 +235,17 @@ other machine ever holds a backup (owner ruling 20 November 2026; the pattern is
 - **No GitHub path:** the manual GitHub restore job is removed, and `scripts/workflows-no-backups.test.mjs`
   fails if any workflow names the bucket, calls R2 (REST API or wrangler), dumps D1 or fetches a backup
   key.
+- **Failure alerts** (owner ruling 20 November 2026, about 09:45 UTC, ops #610): a failed export (the
+  route's 503 when the binding or prefix is missing, or its 502) and a failed restore check each send one
+  email through the Resend REST API (`lib/alertEmail.ts`, `sendBackupAlert` in `lib/db/backup.ts`) to
+  `hello@frazzledproductions.com`, the company contact (`ops/email-and-domains.md` lists no separate
+  alerts address), holding the FAILED line only. The sender is the production var `RESEND_FROM`,
+  `Poké Memory <hello@frazzledproductions.com>`: `pokememory.com` is not verified in Resend and
+  `frazzledproductions.com` is. The key is the Worker secret `RESEND_API_KEY`, set at the cutover on the
+  production Worker only (#2393). The alert never throws: with no key it logs `d1-backup: alert not
+  sent: no RESEND_API_KEY`, and a refusal or network error logs `alert not sent: <reason>`; the export
+  still answers its error status and the restore check still rethrows. Tests use a fake fetch; none
+  calls Resend.
 
 ### D11. Previews and deploys
 
@@ -260,6 +272,43 @@ they are (the push subscription triggers must not rewrite `last_seen_at` or trim
 push rows on an unknown host are skipped and counted, since the D1 CHECK applies to copied rows. It then prints row
 counts per table for the check. Rehearsed in CI against the local Postgres container loaded with the
 migrations and fixtures, then imported into a local D1 and compared.
+
+### D13. No runner reads production data: the badge and the divergence check move into the Worker
+
+Owner ruling, 20 November 2026 (about 09:45 UTC, ops #610): no GitHub runner may read user data. Two
+workflows did, with the D1-writing `CLOUDFLARE_API_TOKEN`: `refresh-user-count.yml` (a daily
+`COUNT(*)` on `user`, committed to `.github/stats/users.json` on `main` and backmerged into `qa`) and
+`monitor-grade-log-divergence.yml` (three cross-user queries on `grade_log` and `card_reviews`, filing
+a GitHub issue). Both are removed, with `scripts/refresh-user-count.mjs`,
+`.github/scripts/check-grade-log-divergence.mjs`, `scripts/cloudflare/d1-query.mjs` (only they used
+it) and `.github/stats/users.json`.
+
+- **User-count badge:** `GET /api/stats/users` answers Shields.io endpoint JSON (`schemaVersion`,
+  `label`, `message`, `color`, `cacheSeconds: 3600`) from one `COUNT(*)` (`countUsers` in
+  `lib/db/system/stats.ts`), with `Cache-Control: public, max-age=3600`; the README badge reads
+  `https://pokememory.com/api/stats/users`. No Cron Trigger: a scheduled count would need somewhere to
+  store the number (a KV namespace or an object, a new binding and a write path) only to serve it from
+  the same Worker, while the live read is one aggregate over a small table, cached for an hour by
+  Shields.io and the response header (the old badge was a day stale). The number was already public,
+  and the route returns nothing else, so making it a public route discloses nothing new; it is on
+  ESLint's `lib/db/system` allowlist as the one public importer. Until the cutover points pokememory.com
+  at the Worker, the badge shows Shields.io's "inaccessible" (the main branch keeps the old README until
+  the build PR reaches `main`, which is the cutover).
+- **grade_log divergence check:** `POST /api/cron/grade-log-divergence`, the 08:00 UTC firing of the
+  hourly trigger (D2; production only, the preview Worker has no triggers), runs the same three queries,
+  moved verbatim into `lib/db/system/gradeLogDivergence.ts` with their rationale, through the D1
+  binding. On divergence it logs `grade-log-divergence: DIVERGED, ...` and emails the report (8-character
+  user id prefixes and counts, never a full id) through `lib/alertEmail.ts`, subject
+  `Poké Memory: grade_log divergence (N users)`; when a query fails it logs `grade-log-divergence:
+  FAILED: ...`, emails that and answers 502. The SQL tests move to
+  `lib/db/system/gradeLogDivergence.test.ts`. Trade-off: the workflow kept one GitHub issue per
+  divergence and updated it (#2003); the email is sent each day the divergence persists, since the
+  Worker keeps no alert state. The workflow's manual `threshold` override goes; the threshold stays 0.
+- **cron-health-monitor** stops watching both workflows; a failure now emails from the Worker.
+- **Guard:** `scripts/workflows-no-backups.test.mjs` also fails if a workflow runs `wrangler d1 execute
+  --remote` against production (`--env preview` is the preview seed and stays allowed), calls the D1
+  REST query API, uses the query helper or the removed scripts, or if any workflow other than
+  `deploy.yml` names `CLOUDFLARE_API_TOKEN`.
 
 ## Risks / Trade-offs
 

@@ -1,11 +1,12 @@
 /**
  * The grade_log divergence monitor's SQL (#2096), run against SQLite.
  *
- * `.github/scripts/check-grade-log-divergence.mjs` runs three queries against the production D1
- * database with `wrangler d1 execute --remote`. This file runs the SAME query strings (imported,
- * not copied) against node:sqlite, with the real db/d1/migrations when they exist and otherwise a
- * stand-in holding just the columns the queries read. Ported from the Postgres integration test
- * (lib/sync/integration/grade-log-divergence.test.ts) when the app moved to D1 (move-to-cloudflare).
+ * `lib/db/system/gradeLogDivergence.ts` runs three queries in the production Worker (the daily
+ * `POST /api/cron/grade-log-divergence`, design D13). This file runs the SAME query strings
+ * (imported, not copied) against node:sqlite, with the real db/d1/migrations when they exist and
+ * otherwise a stand-in holding just the columns the queries read. Ported from the Postgres
+ * integration test (lib/sync/integration/grade-log-divergence.test.ts) when the app moved to D1
+ * (move-to-cloudflare), and moved here from scripts/ with the queries when the check left GitHub.
  *
  * The bug this pins (#2096): Options A and C treated `MAX(grade) >= 4` as "graduated". A Good on a
  * brand-new card only enters learning step 0 (scheduler case A1), so cards still inside their
@@ -27,9 +28,9 @@ import {
   OPTION_A_QUERY,
   OPTION_B_QUERY,
   OPTION_C_QUERY,
-} from "../.github/scripts/check-grade-log-divergence.mjs";
+} from "./gradeLogDivergence";
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const migrationsDir = join(repoRoot, "db", "d1", "migrations");
 
 const STAND_IN_SCHEMA = `

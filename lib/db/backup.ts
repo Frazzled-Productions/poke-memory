@@ -16,8 +16,9 @@
  * manifest's number of INSERT lines (an empty table has none, so absent counts
  * as 0) and the export is at most MAX_BACKUP_AGE_DAYS old. It logs one
  * "d1-backup: restore-check ok|FAILED: ..." line (keys and counts, never row
- * data) and rethrows on failure, so the invocation shows as failed in the
- * Worker's Cron Events and Workers Logs.
+ * data), emails the FAILED line through Resend (lib/alertEmail.ts) and
+ * rethrows on failure, so the invocation shows as failed in the Worker's Cron
+ * Events and Workers Logs. A failed export (app/api/cron/backup) emails too.
  *
  * Dump format (gunzipped):
  *
@@ -42,6 +43,7 @@
  * push_subscriptions.last_seen_at keeps its value. No PRAGMA or transaction
  * statements.
  */
+import { type AlertEnv, sendAlertEmail } from "../alertEmail";
 import type { D1DatabaseLike, R2BucketLike } from "./d1";
 import { backupTables, databaseTriggers, readTablePages } from "./system/backup";
 
@@ -255,14 +257,37 @@ export async function checkLatestBackup({
 type Sink = { log: (message: string) => void; error: (message: string) => void };
 
 /**
+ * Emails a failed backup task's FAILED line (design D10). Never throws; without
+ * RESEND_API_KEY it logs "d1-backup: alert not sent: no RESEND_API_KEY".
+ */
+export function sendBackupAlert(
+  env: AlertEnv,
+  task: "export" | "restore-check",
+  line: string,
+  now: Date,
+  options: { fetch?: typeof fetch; out?: Pick<Console, "error"> } = {},
+): Promise<boolean> {
+  return sendAlertEmail(
+    env,
+    {
+      tag: "d1-backup",
+      subject: `Poké Memory: D1 ${task} FAILED`,
+      text: `${line}\n\nFrom the poke-memory Worker at ${now.toISOString()}. Details: Workers Logs, search "d1-backup".\n`,
+    },
+    options,
+  );
+}
+
+/**
  * The monthly Cron Trigger's body (worker/index.ts): runs checkLatestBackup
- * and logs one line; on failure logs "d1-backup: restore-check FAILED: ..."
- * and rethrows.
+ * and logs one line; on failure logs "d1-backup: restore-check FAILED: ...",
+ * emails that line and rethrows.
  */
 export async function runRestoreCheck(
-  env: { BACKUPS?: R2BucketLike; D1_BACKUP_PREFIX?: string },
+  env: AlertEnv & { BACKUPS?: R2BucketLike; D1_BACKUP_PREFIX?: string },
   now: Date = new Date(),
   out: Sink = console,
+  send: typeof fetch = fetch,
 ): Promise<void> {
   try {
     if (!env.BACKUPS || !env.D1_BACKUP_PREFIX) {
@@ -271,7 +296,9 @@ export async function runRestoreCheck(
     const result = await checkLatestBackup({ bucket: env.BACKUPS, prefix: env.D1_BACKUP_PREFIX, now });
     out.log(`d1-backup: restore-check ok, ${result.key} (exported ${result.exportedAt}), counts ${JSON.stringify(result.counts)}`);
   } catch (error) {
-    out.error(`d1-backup: restore-check FAILED: ${error instanceof Error ? error.message : String(error)}`);
+    const line = `d1-backup: restore-check FAILED: ${error instanceof Error ? error.message : String(error)}`;
+    out.error(line);
+    await sendBackupAlert(env, "restore-check", line, now, { fetch: send, out });
     throw error;
   }
 }

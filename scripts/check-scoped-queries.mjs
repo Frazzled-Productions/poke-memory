@@ -52,17 +52,12 @@ export const ALLOWED_PATHS = [
   // This rule and its test hold the patterns as data.
   "scripts/check-scoped-queries.mjs",
   "scripts/check-scoped-queries.test.mjs",
-  // The Postgres-era scripts. They talk to Postgres, not D1, and are removed
+  // The Postgres-era script. It talks to Postgres, not D1, and is removed
   // with db/migrations/ after the 14-day fallback (design D3).
-  "scripts/refresh-user-count.mjs",
   "scripts/check-migrations.mjs",
-  ".github/scripts/check-grade-log-divergence.mjs",
   // Better Auth's configuration test asserts what lands in its own tables
   // (user, session, account) and in rate_limit_buckets, which no app code reads.
   "lib/auth/server.test.ts",
-  // The grade_log divergence monitor reads across users by design (an operator
-  // check run by a workflow with wrangler, never by the app); its test seeds D1.
-  "scripts/check-grade-log-divergence.test.ts",
 ];
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"]);

@@ -13,6 +13,7 @@
  * | grade_log orphan reconcile (032)     | Sunday 04:00     | POST /api/cron/reconcile-grade-log |
  * | rate-limit bucket clean-up (041)     | every 30 minutes | POST /api/cron/rate-limit-cleanup  |
  * | (new) nightly backup                 | 02:00            | POST /api/cron/backup              |
+ * | (was a GitHub workflow) divergence   | 08:00            | POST /api/cron/grade-log-divergence |
  *
  * The `0 * * * *` trigger runs everything on the hour; `*\/30 * * * *` runs
  * only the clean-up (it also fires on the hour, so hourly work must not hang
@@ -36,6 +37,7 @@ export const CRON_ROUTES = {
   reconcileGradeLog: "/api/cron/reconcile-grade-log",
   rateLimitCleanup: "/api/cron/rate-limit-cleanup",
   backup: "/api/cron/backup",
+  gradeLogDivergence: "/api/cron/grade-log-divergence",
 } as const;
 
 const SUNDAY = 0;
@@ -56,6 +58,7 @@ export function cronRoutesFor(cron: string, now: Date): string[] {
   if (hour === 2) routes.push(CRON_ROUTES.backup);
   if (hour === 3) routes.push(CRON_ROUTES.feedbackRetention);
   if (hour === 4 && day === SUNDAY) routes.push(CRON_ROUTES.reconcileGradeLog);
+  if (hour === 8) routes.push(CRON_ROUTES.gradeLogDivergence);
   if (hour === 9 && day === MONDAY) routes.push(CRON_ROUTES.discordDigest);
   return routes;
 }
