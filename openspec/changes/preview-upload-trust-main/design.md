@@ -101,10 +101,12 @@ there for production migrations) gains three steps after "Deploy the Worker", un
 After the production deploy, not before: a preview-database failure (for example a seed that no longer
 matches the schema) can never hold back production; it turns the run red once production is live,
 which is visible and fixed by the next push. Koinori's tutor proxy runs its preview migrations before
-its deploy; poke-memory's seed is an extra step that can fail, hence the order. The account token's D1
-permission is account-wide (Cloudflare API tokens grant D1 per account, not per database), so it already
-covers `poke-memory-preview`; inferred from Cloudflare's permission model, proved on the first deploy of
-`main` after promotion (task 2.1).
+its deploy; poke-memory's seed is an extra step that can fail, hence the order. The account's only
+account-owned API token, `github-actions-deploy` (issued 19 November 2026, 20:10 UTC), grants "D1
+Write", "Workers R2 Storage Write" and "Workers Scripts Write" on the whole account (read through the
+Cloudflare API on 20 November 2026, names and policies only), so it already covers
+`poke-memory-preview`. That this is the token in `Production` is inferred from the dates; the first
+deploy of `main` after promotion proves it (task 2.1).
 
 The seed now runs once per deploy of `main` instead of once per preview upload, so the two test users
 are reset less often. The guard test's token holders do not change: the production token stays in

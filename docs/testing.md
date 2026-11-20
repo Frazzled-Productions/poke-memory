@@ -58,7 +58,7 @@ every PR.
 ## E2E (Playwright)
 
 Smoke tests in `e2e/` run in CI on a local build (`ci.yml` `e2e-browser`); `e2e/auth.spec.ts` also
-runs against each PR's preview version (`preview-upload.yml`, `preview-e2e`, the base branch's copy) and `e2e/auth-real.spec.ts`
+runs against each PR's preview version (`preview-upload.yml`, `preview-e2e`, `main`'s copy) and `e2e/auth-real.spec.ts`
 against a local Worker with a fresh local D1 (`ci.yml` `e2e-real-auth`). Config in
 `playwright.config.ts`.
 

@@ -74,9 +74,12 @@ Fixes: poke-memory #2415
   as today, minus the migration and seed steps.
 - **CI and GitHub Actions:** `.github/workflows/preview-upload.yml`, `.github/workflows/deploy.yml`
   (production job gains three preview-database steps after the production deploy; the `preview` job
-  stops copying migrations; comments), the guard test, `WORKFLOW.md` (Deploy and Preview upload
-  sections), `.claude/agents/workflow-expert.md` and `.claude/agents/playwright.md`. None of these
-  jobs is a required check. The Playwright image in `preview-upload.yml` now always matches the
+  stops copying migrations; comments), the guard test, and the docs that said the preview upload
+  applies migrations or uses the base branch's files: `WORKFLOW.md` (Migration check, Deploy and
+  Preview upload sections), `AGENTS.md` (migrations bullet), `docs/persistence.md`, `docs/testing.md`,
+  `.claude/agents/workflow-expert.md`, `.claude/agents/playwright.md`, `.claude/agents/d1-expert.md`,
+  `.claude/agents/data-coder.md` and `.claude/commands/batch-issues.md`. None of these jobs is a
+  required check. The Playwright image in `preview-upload.yml` now always matches the
   lockfile it runs against (both `main`'s).
 
 ## Removes
