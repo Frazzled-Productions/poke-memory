@@ -235,7 +235,10 @@ describe("preview guard", () => {
       expect(line, line).toMatch(/--config wrangler\.jsonc/);
     }
     expect(upload).toMatch(/--no-bundle/);
-    expect(upload).toMatch(/find "\$BUNDLE" -type l/);
+    // `find | grep -q` would pass under pipefail when grep exits early (SIGPIPE); -print -quit cannot.
+    expect(upload).toMatch(/\[ -n "\$\(find "\$BUNDLE" -type l -print -quit\)" \]/);
+    expect(upload).not.toMatch(/\| grep -q \./);
+    expect(upload).toMatch(/^permissions: \{\}$/m);
   });
 });
 

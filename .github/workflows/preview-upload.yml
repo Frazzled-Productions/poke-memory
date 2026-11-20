@@ -29,8 +29,9 @@ on:
     types: [completed]
 
 concurrency:
-  # One upload per PR branch at a time; a newer push replaces an older upload still running.
-  group: preview-upload-${{ github.event.workflow_run.head_branch }}
+  # One upload per PR branch at a time; a newer push replaces an older upload still running. Keyed
+  # on the head repository too, so a fork's branch of the same name cannot cancel an upload.
+  group: preview-upload-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 permissions: {}
@@ -110,13 +111,13 @@ jobs:
         run: |
           set -euo pipefail
           BUNDLE="$RUNNER_TEMP/preview-bundle"
-          if find "$BUNDLE" -type l | grep -q .; then
+          if [ -n "$(find "$BUNDLE" -type l -print -quit)" ]; then
             echo "::error::The preview bundle holds a symlink; refusing it."; exit 1
           fi
-          if find "$BUNDLE" ! -type f ! -type d | grep -q .; then
+          if [ -n "$(find "$BUNDLE" ! -type f ! -type d -print -quit)" ]; then
             echo "::error::The preview bundle holds something other than files and directories; refusing it."; exit 1
           fi
-          if find "$BUNDLE/migrations" -type f ! -name '*.sql' | grep -q .; then
+          if [ -n "$(find "$BUNDLE/migrations" -type f ! -name '*.sql' -print -quit)" ]; then
             echo "::error::The preview bundle's migrations hold a file that is not .sql; refusing it."; exit 1
           fi
           test -f "$BUNDLE/worker/index.js"
