@@ -15,7 +15,8 @@ The app SHALL build with `@opennextjs/cloudflare` into one Worker, `poke-memory`
 `cacheComponents: false`. Pages that were partially prerendered SHALL render per request, and nothing
 SHALL revalidate at runtime, so the incremental cache is the static-assets cache.
 `/test-error` SHALL be `force-dynamic`. Since the cutover (#2393) the Worker SHALL be reachable only at
-`pokememory.com`, with its workers.dev address off.
+`pokememory.com`, with its workers.dev address off. The preview Worker SHALL answer at
+`qa.pokememory.com`.
 
 #### Scenario: A page that used to be prerendered
 
@@ -47,12 +48,17 @@ SHALL revalidate at runtime, so the incremental cache is the static-assets cache
 - **WHEN** a version of `poke-memory-preview` is uploaded
 - **THEN** it keeps its workers.dev address, because `env.preview` sets `workers_dev: true`
 
+#### Scenario: Sign-in on the qa address
+
+- **WHEN** a tester signs in with a username on `https://qa.pokememory.com`, a Worker Custom Domain on `poke-memory-preview` attached in Cloudflare (not a route in `wrangler.jsonc`)
+- **THEN** sign-in succeeds, because the preview Worker's `BETTER_AUTH_URL` is that origin, and its workers.dev address and `pr-<n>` aliases stay trusted origins
+
 #### Scenario: Config drifts back
 
 - **WHEN** a change sets the top-level `workers_dev` to true, or drops `workers_dev: true` from `env.preview`
 - **THEN** `scripts/workflows-no-backups.test.mjs` fails
 
-Source: design D1, `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc`; change `production-deploy-guard`.
+Source: design D1, `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc`; changes `production-deploy-guard`, `qa-on-preview-worker`.
 
 ### Requirement: One D1 database in the EU holds the cloud data
 
