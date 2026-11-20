@@ -15,7 +15,7 @@ function makeRpcClient(rpcError: null | object = null) {
   const client = {
     rpc: rpcSpy,
   };
-  return client as unknown as import("@supabase/supabase-js").SupabaseClient & {
+  return client as unknown as import("@/lib/db/client").DataClient & {
     rpc: ReturnType<typeof vi.fn>;
   };
 }
@@ -57,7 +57,7 @@ describe("deleteAccount", () => {
   it("returns false and logs when the RPC throws", async () => {
     const client = {
       rpc: vi.fn().mockRejectedValue(new Error("network error")),
-    } as unknown as import("@supabase/supabase-js").SupabaseClient & {
+    } as unknown as import("@/lib/db/client").DataClient & {
       rpc: ReturnType<typeof vi.fn>;
     };
     expect(await deleteAccount(client)).toBe(false);
@@ -89,7 +89,7 @@ describe("deleteAccountEverywhere", () => {
         calls.push("cloud");
         return { error: null, data: null };
       }),
-    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+    } as unknown as import("@/lib/db/client").DataClient;
 
     const result = await deleteAccountEverywhere(client);
 

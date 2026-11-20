@@ -11,6 +11,13 @@ vi.mock("@/lib/share/generateShareImage", () => ({
 
 import { generateDailyShareImage } from "@/lib/share/generateShareImage";
 
+const { mockSharePartner } = vi.hoisted(() => ({
+  mockSharePartner: { value: undefined as undefined | { spriteUrl: string; name: string; silhouette: boolean } },
+}));
+vi.mock("@/components/favourite/useSharePartner", () => ({
+  useSharePartner: () => mockSharePartner.value,
+}));
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -213,5 +220,17 @@ describe("ShareTodayButton - Web Share API file path", () => {
     expect(shareFn).toHaveBeenCalledOnce();
     // No status shown - treated as a user cancellation, not an error.
     expect(screen.queryByRole("status")).toBeNull();
+  });
+});
+
+describe("ShareTodayButton - partner (#2187)", () => {
+  it("Unmastered partner on a share image: passes the partner to the image", async () => {
+    mockSharePartner.value = { spriteUrl: "/sprites/pokemon/webp/94/192.webp", name: "Gengar", silhouette: true };
+    render(<ShareTodayButton parts={PARTS} text={TEXT} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /share today/i }));
+    });
+    expect(generateDailyShareImage).toHaveBeenLastCalledWith(PARTS, mockSharePartner.value);
+    mockSharePartner.value = undefined;
   });
 });

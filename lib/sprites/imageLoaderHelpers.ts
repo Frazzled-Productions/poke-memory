@@ -8,7 +8,7 @@
  * Source PNGs are ~475 px wide (official-artwork resolution). We do not
  * generate variants wider than the source - a request for a larger width
  * snaps to the largest available generated width (320 px). This is not a
- * regression: Vercel's `/_next/image` endpoint also cannot add detail beyond
+ * regression: an image optimisation endpoint (`/_next/image`) also cannot add detail beyond
  * the source resolution.
  */
 

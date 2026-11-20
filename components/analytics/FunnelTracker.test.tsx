@@ -25,13 +25,13 @@ import React from "react";
 // Mocks - vi.hoisted() ensures variables are available before vi.mock factories run.
 // -----------------------------------------------------------------
 
-const { mockTrack, mockUseAuth, mockReadMasteredCountCache } = vi.hoisted(() => ({
-  mockTrack: vi.fn(),
+const { mockSendEvent, mockUseAuth, mockReadMasteredCountCache } = vi.hoisted(() => ({
+  mockSendEvent: vi.fn(),
   mockUseAuth: vi.fn(),
   mockReadMasteredCountCache: vi.fn(),
 }));
 
-vi.mock("@vercel/analytics", () => ({ track: mockTrack }));
+vi.mock("@/lib/analytics/events", () => ({ sendEvent: mockSendEvent }));
 vi.mock("@/lib/auth/AuthContext", () => ({ useAuth: mockUseAuth }));
 vi.mock("@/lib/profile/masteredCountCache", () => ({
   readMasteredCountCache: mockReadMasteredCountCache,
@@ -281,7 +281,7 @@ describe("hasPriorLocalProgress", () => {
 
 describe("FunnelTracker component", () => {
   beforeEach(() => {
-    mockTrack.mockReset();
+    mockSendEvent.mockReset();
     mockReadMasteredCountCache.mockReset();
     clearAllLocalStorage();
   });
@@ -312,8 +312,8 @@ describe("FunnelTracker component", () => {
 
   it("fires app_open with userType='new' and progressBucket='0' for a fresh session", async () => {
     renderTracker({ user: null, loading: false });
-    await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
-    expect(mockTrack).toHaveBeenCalledWith("app_open", {
+    await waitFor(() => expect(mockSendEvent).toHaveBeenCalledTimes(1));
+    expect(mockSendEvent).toHaveBeenCalledWith("app_open", {
       userType: "new",
       progressBucket: "0",
     });
@@ -322,8 +322,8 @@ describe("FunnelTracker component", () => {
   it("fires app_open with userType='returning_guest' when prior localStorage progress exists", async () => {
     setLocalStorageKeys([KEY_REVIEW_SESSION]);
     renderTracker({ user: null, loading: false });
-    await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
-    expect(mockTrack).toHaveBeenCalledWith("app_open", {
+    await waitFor(() => expect(mockSendEvent).toHaveBeenCalledTimes(1));
+    expect(mockSendEvent).toHaveBeenCalledWith("app_open", {
       userType: "returning_guest",
       progressBucket: "0",
     });
@@ -331,8 +331,8 @@ describe("FunnelTracker component", () => {
 
   it("fires app_open with userType='signed_in' when auth resolves a user", async () => {
     renderTracker({ user: { id: "usr-1" }, loading: false });
-    await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
-    expect(mockTrack).toHaveBeenCalledWith("app_open", {
+    await waitFor(() => expect(mockSendEvent).toHaveBeenCalledTimes(1));
+    expect(mockSendEvent).toHaveBeenCalledWith("app_open", {
       userType: "signed_in",
       progressBucket: "0",
     });
@@ -343,8 +343,8 @@ describe("FunnelTracker component", () => {
       user: null,
       masteredCounts: { en: 7, ja: 0, "zh-Hans": 0, "zh-Hant": 0 },
     });
-    await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
-    expect(mockTrack).toHaveBeenCalledWith(
+    await waitFor(() => expect(mockSendEvent).toHaveBeenCalledTimes(1));
+    expect(mockSendEvent).toHaveBeenCalledWith(
       "app_open",
       expect.objectContaining({ progressBucket: "1-10" }),
     );
@@ -357,8 +357,8 @@ describe("FunnelTracker component", () => {
       user: null,
       masteredCounts: { en: 25, ja: 8, "zh-Hans": 5, "zh-Hant": 2 },
     });
-    await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
-    expect(mockTrack).toHaveBeenCalledWith(
+    await waitFor(() => expect(mockSendEvent).toHaveBeenCalledTimes(1));
+    expect(mockSendEvent).toHaveBeenCalledWith(
       "app_open",
       expect.objectContaining({ progressBucket: "11-50" }),
     );
@@ -369,8 +369,8 @@ describe("FunnelTracker component", () => {
       user: null,
       masteredCounts: { en: 60, ja: 0, "zh-Hans": 0, "zh-Hant": 0 },
     });
-    await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
-    expect(mockTrack).toHaveBeenCalledWith(
+    await waitFor(() => expect(mockSendEvent).toHaveBeenCalledTimes(1));
+    expect(mockSendEvent).toHaveBeenCalledWith(
       "app_open",
       expect.objectContaining({ progressBucket: "50+" }),
     );
@@ -382,7 +382,7 @@ describe("FunnelTracker component", () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 10));
     });
-    expect(mockTrack).not.toHaveBeenCalled();
+    expect(mockSendEvent).not.toHaveBeenCalled();
   });
 
   it("fires once auth loading resolves", async () => {
@@ -391,17 +391,17 @@ describe("FunnelTracker component", () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 10));
     });
-    expect(mockTrack).not.toHaveBeenCalled();
+    expect(mockSendEvent).not.toHaveBeenCalled();
 
     // Resolve loading.
     (mockUseAuth as Mock).mockReturnValue({ user: null, loading: false });
     rerender(<FunnelTracker />);
-    await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockSendEvent).toHaveBeenCalledTimes(1));
   });
 
   it("fires exactly once even if the component re-renders", async () => {
     const { rerender } = renderTracker({ user: null, loading: false });
-    await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockSendEvent).toHaveBeenCalledTimes(1));
 
     // Re-render with updated auth (simulates a state change after initial load).
     (mockUseAuth as Mock).mockReturnValue({ user: { id: "usr-2" }, loading: false });
@@ -412,7 +412,7 @@ describe("FunnelTracker component", () => {
       await new Promise((r) => setTimeout(r, 10));
     });
     // Must not have fired again.
-    expect(mockTrack).toHaveBeenCalledTimes(1);
+    expect(mockSendEvent).toHaveBeenCalledTimes(1);
   });
 
   it("renders null (nothing visible in the DOM)", () => {
@@ -432,8 +432,8 @@ describe("FunnelTracker component", () => {
       user: { id: "real-user-id-abc123" },
       masteredCounts: { en: 42, ja: 0, "zh-Hans": 0, "zh-Hant": 0 },
     });
-    await waitFor(() => expect(mockTrack).toHaveBeenCalledTimes(1));
-    const [eventName, props] = mockTrack.mock.calls[0] as [string, Record<string, unknown>];
+    await waitFor(() => expect(mockSendEvent).toHaveBeenCalledTimes(1));
+    const [eventName, props] = mockSendEvent.mock.calls[0] as [string, Record<string, unknown>];
     expect(eventName).toBe("app_open");
     // Must not include any raw count or the real user ID.
     expect(Object.values(props)).not.toContain(42);

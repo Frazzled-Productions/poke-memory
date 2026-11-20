@@ -7,7 +7,7 @@
 
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { useSyncOnUnload } from "@/lib/sync/useSyncOnUnload";
 import { buildBeaconPayload } from "@/lib/sync/cloud";
 import type { SyncStatus } from "@/lib/sync/persistence";
@@ -45,7 +45,7 @@ import { markStructuralSyncError } from "@/lib/sync/structuralError";
 import type { UnsyncedSnapshot } from "@/lib/sync/usePerGradeSync";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 
-const FAKE_CLIENT = {} as unknown as SupabaseClient;
+const FAKE_CLIENT = {} as unknown as DataClient;
 const FAKE_USER = "00000000-0000-0000-0000-000000000000";
 
 const ZERO_STATUS: SyncStatus = {

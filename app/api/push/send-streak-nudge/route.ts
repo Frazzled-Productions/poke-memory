@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { isAuthorized } from "@/lib/auth/bearerAuth";
-import { fetchAllPages } from "@/lib/sync/paginatedFetch";
+import { getEnv } from "@/lib/db/env";
+import {
+  deleteDeadPushSubscriptions,
+  getPushStreakDays,
+  getPushTargets,
+  type PushStreakDayRow,
+  type PushTargetRow,
+} from "@/lib/db/system";
+import { outboundAllowed } from "@/lib/outbound";
 import webpush from "web-push";
+import { deliverPushes } from "@/lib/push/deliver";
 import { createTranslator as _createTranslatorRaw } from "use-intl/core";
 import { todayInTimezone } from "@/lib/utils/format-date";
 import { localHourToUtcHour, currentUtcHour, PUSH_DEFAULT_HOUR_UTC } from "@/lib/push/notificationHour";
 import { isEligibleForStreakNudge } from "@/lib/push/streakNudgePredicate";
 import { validateStreakProtection, effectiveStreakDates, type StreakProtection } from "@/lib/streak/tokens";
 import { computeStreak } from "@/lib/streak/compute";
-import { supabaseSecretKey } from "@/lib/supabase/keys";
 
 // use-intl's createTranslator has deeply generic types that conflict with the
 // simple Record<string, unknown> messages shape used here; cast to a plain
@@ -21,9 +28,8 @@ const _createTranslator = _createTranslatorRaw as unknown as (
 /**
  * Late-day "streak at risk" push route (#1950).
  *
- * Triggered by the `web-push-streak-nudge` pg_cron job (migration 047) via
- * `net.http_post`, hourly, reusing the `cron_shared_secret` Vault value that
- * migration 028 already provisions.
+ * Triggered every hour by the Worker's Cron Trigger (lib/cron/schedule.ts),
+ * with the same CRON_SHARED_SECRET bearer as send-daily.
  *
  * This is a SECOND, independent daily notification from send-daily/route.ts
  * (#1056 / #1315): it only fires for users who have explicitly opted in
@@ -32,21 +38,22 @@ const _createTranslator = _createTranslatorRaw as unknown as (
  * already reviewed today.
  *
  * AUTH MODEL: identical to send-daily - `Authorization: Bearer
- * <CRON_SHARED_SECRET>` via `isAuthorized` (401 on mismatch), 503 when any
- * required env var (VAPID keys/subject, Supabase URL/service-role key,
- * CRON_SHARED_SECRET) is missing.
+ * <CRON_SHARED_SECRET>` via `isAuthorized` (401 on mismatch), 503 when
+ * CRON_SHARED_SECRET is missing, or in production when a VAPID key or the
+ * subject is missing. Outside production (lib/outbound.ts) nothing is sent:
+ * the route computes the same targets and returns `wouldSend`.
  *
  * GATES (in order, cheapest-first so we do the least DB work per user):
  *   A. Opt-in + push subscription: `streakNudgeEnabled === true` in the
  *      user's settings JSONB (default false) AND at least one
- *      `push_subscriptions` row (implicit via `get_push_targets`).
+ *      `push_subscriptions` row (implicit via `getPushTargets`).
  *   B. Late-hour fan-out: the user's LOCAL time is `STREAK_NUDGE_LOCAL_HOUR`
  *      this run, via `localHourToUtcHour` (same DST-safe Intl conversion
  *      `notificationHour.ts` uses for the primary reminder).
  *   C. Collision guard: skip if the primary reminder's effective UTC hour is
  *      within 3 hours of the nudge's effective UTC hour for this user, so
  *      the two pushes never land close together.
- *   D. Reviewed-today: `get_push_streak_days` (migration 047) supplies the
+ *   D. Reviewed-today: `getPushStreakDays` (port of migration 047) supplies the
  *      raw `streak_days` rows for every remaining candidate in one call. A
  *      user has reviewed today when their own-timezone `today`
  *      (`todayInTimezone`, UTC fallback for a null/invalid tz) is in their
@@ -60,13 +67,10 @@ const _createTranslator = _createTranslatorRaw as unknown as (
  *      auto-bridge tonight's gap suppresses the nudge - #1950 ux/privacy
  *      sign-off).
  *
- * Uses the same `get_push_targets` RPC (migration 046) as send-daily so the
- * cross-user read surface for subscriptions + settings stays a single
- * narrowed function, not a second bespoke one.
+ * Uses the same `getPushTargets` query (lib/db/system, port of migration
+ * 046) as send-daily so the cross-user read surface for subscriptions +
+ * settings stays a single narrowed function, not a second bespoke one.
  */
-
-// Same runtime note as send-daily: must run on Node (not Edge) for the
-// `web-push` package's ES256 JWT signing via Node's `crypto` module.
 
 /** Fixed local hour (0-23) for the nudge send, v1 (#1950 planning comment). */
 export const STREAK_NUDGE_LOCAL_HOUR = 20;
@@ -120,29 +124,7 @@ export async function buildStreakNudgeMessage(streakDays: number): Promise<PushP
   return { title, body, url };
 }
 
-/**
- * Row shape returned by `get_push_targets` (migration 046) - identical to
- * send-daily's `PushTargetRow`. Duplicated here (rather than importing from
- * the sibling route module) to keep the two routes independently deployable
- * and because importing across `app/api/**` route modules is discouraged
- * (each route is its own bundle entry point).
- */
-type PushTargetRow = {
-  subscription_id: string;
-  user_id: string;
-  endpoint: string;
-  p256dh: string;
-  auth_secret: string;
-  timezone: string | null;
-  settings: Record<string, unknown> | null;
-  push_notification_hour: number | null;
-};
-
-/** Row shape returned by `get_push_streak_days` (migration 047). */
-type StreakDayRow = {
-  user_id: string;
-  review_date: string;
-};
+type StreakDayRow = PushStreakDayRow;
 
 /**
  * Parse the `streakNudgeEnabled` opt-in flag from the raw settings JSONB.
@@ -166,20 +148,17 @@ function parseStreakProtectionField(rawSettings: Record<string, unknown> | null)
 }
 
 export async function POST(request: Request) {
-  const sharedSecret = process.env.CRON_SHARED_SECRET;
+  const startedAt = Date.now();
+  const env = await getEnv();
+  const sharedSecret = env.CRON_SHARED_SECRET;
+  const sending = outboundAllowed(env);
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-  const vapidSubject = process.env.VAPID_SUBJECT;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = supabaseSecretKey();
+  const vapidPrivateKey = env.VAPID_PRIVATE_KEY;
+  const vapidSubject = env.VAPID_SUBJECT;
 
   if (
     !sharedSecret ||
-    !vapidPublicKey ||
-    !vapidPrivateKey ||
-    !vapidSubject ||
-    !supabaseUrl ||
-    !serviceRoleKey
+    (sending && (!vapidPublicKey || !vapidPrivateKey || !vapidSubject))
   ) {
     return NextResponse.json(
       { ok: false, error: "misconfigured" },
@@ -192,22 +171,19 @@ export async function POST(request: Request) {
     return new NextResponse(null, { status: 401 });
   }
 
-  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  if (sending) webpush.setVapidDetails(vapidSubject!, vapidPublicKey!, vapidPrivateKey!);
 
-  const admin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
-  // Step 1: fetch every push subscription + settings, same RPC send-daily uses.
-  const { data: targetsData, error: targetsError } =
-    await admin.rpc("get_push_targets");
-  if (targetsError || !targetsData) {
+  // Step 1: fetch every push subscription + settings, same query send-daily uses.
+  let targets: PushTargetRow[];
+  try {
+    targets = await getPushTargets(env.DB);
+  } catch (err) {
+    console.error("[push/send-streak-nudge] targets query failed", err);
     return NextResponse.json(
       { ok: false, error: "targets_query_failed" },
       { status: 502 },
     );
   }
-  const targets = targetsData as PushTargetRow[];
   if (targets.length === 0) {
     return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
   }
@@ -279,30 +255,20 @@ export async function POST(request: Request) {
   // written in the user's own local day (`recordReview(localToday, ...)`), the
   // same calendar as `todayInTimezone(tz)` below, so membership is exact.
   // Fetch every streak_days row for the candidates and group by user. The
-  // read is paginated (#2115): PostgREST caps a single response at 1000 rows
-  // and that cap is shared across ALL candidate users, so an unpaginated read
-  // would silently drop the last users' (and their latest) dates and cause
-  // false "streak at risk" nudges. The full history is genuinely needed (the
-  // streak length and protection maths walk it), so a since-date window is not
-  // a correct fix. `ORDER BY user_id, review_date` is applied on the RPC result
-  // (the unique key, a total order) so offset pages never skip or repeat rows.
-  const streakDaysData = await fetchAllPages<StreakDayRow>((from, to) =>
-    admin
-      .rpc("get_push_streak_days", { user_ids: activeUserIds })
-      .order("user_id", { ascending: true })
-      .order("review_date", { ascending: true })
-      .range(from, to),
-  );
-  if (streakDaysData === null) {
+  // full history is genuinely needed (the streak length and protection maths
+  // walk it), so a since-date window is not a correct fix (#2115). D1 has no
+  // row cap, so one read returns every row.
+  let streakDaysData: StreakDayRow[];
+  try {
+    streakDaysData = await getPushStreakDays(env.DB, activeUserIds);
+  } catch (err) {
+    console.error("[push/send-streak-nudge] streak_days query failed", err);
     return NextResponse.json(
       { ok: false, error: "streak_days_query_failed" },
       { status: 502 },
     );
   }
 
-  // Each page is its own request/snapshot, so a concurrent streak_days write at
-  // a page boundary can duplicate or skip a row. Accepted non-atomic race: a
-  // duplicate is neutralised by the Set; a skip could at worst cause one false nudge.
   const streakDaySetsByUser = new Map<string, Set<string>>();
   for (const row of streakDaysData) {
     const bucket = streakDaySetsByUser.get(row.user_id);
@@ -343,39 +309,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
   }
 
-  // Step: send. Dead subscriptions (410/404) are deleted so the next cron
-  // run doesn't retry them, same cleanup loop as send-daily.
-  const toDelete: string[] = [];
-  let sent = 0;
-  for (const sub of finalSubscriptions) {
-    const streakDays = streakLengthByUser.get(sub.user_id) ?? 0;
-    const payload = await buildStreakNudgeMessage(streakDays);
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.p256dh, auth: sub.auth_secret },
-        },
-        JSON.stringify(payload),
-      );
-      sent++;
-    } catch (err: unknown) {
-      const status = (err as { statusCode?: number }).statusCode;
-      if (status === 404 || status === 410) {
-        toDelete.push(sub.id);
-        continue;
-      }
-      console.warn("[push] streak-nudge sendNotification failed", { id: sub.id, status });
-    }
+  if (!sending) {
+    console.info(`[push/send-streak-nudge] would send ${finalSubscriptions.length} push(es); outbound off`);
+    return NextResponse.json({ ok: true, sent: 0, deleted: 0, wouldSend: finalSubscriptions.length });
   }
 
+  // Step: send. Dead subscriptions (410/404) are deleted so the next cron
+  // run doesn't retry them, same cleanup as send-daily.
+  const { sent, deadIds } = await deliverPushes(
+    finalSubscriptions,
+    (sub) => buildStreakNudgeMessage(streakLengthByUser.get(sub.user_id) ?? 0),
+    startedAt,
+  );
+
   let deleted = 0;
-  if (toDelete.length > 0) {
-    const { error: deleteError, count } = await admin
-      .from("push_subscriptions")
-      .delete({ count: "exact" })
-      .in("id", toDelete);
-    if (!deleteError) deleted = count ?? toDelete.length;
+  if (deadIds.length > 0) {
+    try {
+      deleted = await deleteDeadPushSubscriptions(env.DB, deadIds);
+    } catch (err) {
+      console.warn("[push/send-streak-nudge] dead-endpoint delete failed", err);
+    }
   }
 
   return NextResponse.json({ ok: true, sent, deleted });

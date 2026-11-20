@@ -1,13 +1,24 @@
-name: Migration drift check
+name: Migration check
+
+# D1 migration checks (OpenSpec change move-to-cloudflare, design D11). Replaces the Supabase
+# parity check (#1806): there is no second database to drift from any more, because deploy.yml
+# applies db/d1/migrations itself (`wrangler d1 migrations apply`) before every production deploy
+# and every preview upload.
+#
+#   1. Every migration applies cleanly, in order, to a fresh local D1 (`--local`, Miniflare's
+#      SQLite; no Cloudflare account or secret).
+#   2. Append-only: a migration file that already exists on the PR's base branch may not be
+#      edited, renamed or deleted. wrangler records applied migrations by file name, so an edit
+#      to an applied file never reaches a database that has it; the fix goes in a new file.
+#
+# Needs no secrets, so it runs on fork and Dependabot PRs too. Not a required check.
 
 on:
   pull_request:
     paths:
-      - "db/migrations/**"
-      - "scripts/check-migrations.mjs"
+      - "db/d1/migrations/**"
+      - "wrangler.jsonc"
       - ".github/workflows/migration-check.yml"
-  push:
-    branches: [main]
 
 concurrency:
   group: migration-check-${{ github.ref }}
@@ -16,40 +27,36 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 10
     permissions:
       contents: read
-    # Fork PRs don't see secrets - skip rather than fail. Same guard as coverage.yml.
-    # Dependabot-triggered runs read the Dependabot secrets store, so
-    # SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF are empty and the script exits 2
-    # (#1918). A dependency bump cannot add a migration file, so skipping keeps parity
-    # enforcement intact for human-authored PRs. The guard is scoped to pull_request
-    # events so the prod check on push to main stays unconditional.
-    # `push` events have no `pull_request` context, so gate them in explicitly
-    # (a bare `pull_request.head.repo.fork == false` is falsy on push).
-    if: github.event_name == 'push' || (github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]')
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The append-only check diffs against the base branch.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Migrations are append-only
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          # --no-renames reports a rename as a delete plus an add, so it is caught as a delete.
+          changed=$(git diff --no-renames --name-only --diff-filter=DM "origin/${BASE_REF}...HEAD" -- db/d1/migrations/)
+          if [ -n "$changed" ]; then
+            while IFS= read -r file; do
+              echo "::error file=${file}::${file} already exists on ${BASE_REF} and must not be edited or removed. Put the change in a new migration file."
+            done <<< "$changed"
+            exit 1
+          fi
+          echo "No existing migration was edited or removed."
+
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      # Env-to-branch parity (#1806): a PR into `qa` rehearses the migration on
-      # the QA project; a push to `main` (promotion) checks prod. The same
-      # env-driven script runs against whichever project the trigger selects.
-      # NB secrets can't be read in `if:` expressions, so routing is purely on
-      # event/base-ref context; missing secrets surface as a loud exit 2.
-      - name: Check that db/migrations/* is applied to the QA project
-        if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'qa'
-        env:
-          # A Supabase Management-API token is account-scoped (not per-project),
-          # so the existing prod token also reads the QA project - only the QA
-          # project ref is a new secret. No separate QA token needed (#1806).
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.QA_SUPABASE_PROJECT_REF }}
-        run: node scripts/check-migrations.mjs
-      - name: Check that db/migrations/* is applied to the prod project
-        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-        run: node scripts/check-migrations.mjs
+          cache: "npm"
+      - run: npm ci
+
+      - name: Apply every migration to a fresh local D1
+        run: npx wrangler d1 migrations apply DB --local --persist-to "$RUNNER_TEMP/d1"

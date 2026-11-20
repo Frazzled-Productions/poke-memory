@@ -107,12 +107,15 @@
       "theme": {
         "heading": "[App Theme]",
         "description": "[Master a Pokémon to unlock it as an app colour theme.]",
-        "selected": "[Selected]",
         "setAsTheme": "[Set as theme]",
         "remove": "[Remove]",
         "lockedHeading": "[App Theme]",
         "lockedBody": "[Master your first Pokémon to unlock themes.]",
-        "practiceLink": "[Go to Practice]"
+        "practiceLink": "[Go to Practice]",
+        "searchLabel": "[Search your mastered Pokémon]",
+        "matchFavourite": "[Match my favourite]",
+        "current": "[Current theme: {name}]",
+        "setAsThemeAria": "[Use {name} as your app theme]"
       },
       "intensityPicker": {
         "heading": "[Theme intensity]",
@@ -122,6 +125,16 @@
         "tintedDescription": "[A light wash of your mascot colour tints the page background.]",
         "fullLabel": "[Full mascot theme]",
         "fullDescription": "[Your mascot colour drives all backgrounds: loud by design.]"
+      },
+      "favourite": {
+        "heading": "[Favourite Pokémon]",
+        "description": "[Your favourite is your partner on Journey, in Pasture and on the all-done screen. Any Pokémon can be your favourite.]",
+        "current": "[Your favourite: {name}]",
+        "none": "[No favourite chosen yet.]",
+        "searchLabel": "[Search all Pokémon]",
+        "searchPlaceholder": "[Type a name]",
+        "clear": "[Clear favourite]",
+        "noResults": "[No Pokémon match that name.]"
       }
     },
     "practice": {
@@ -276,7 +289,37 @@
       "lowStorageProceed": "[Download anyway]"
     },
     "optimizerCooldown": "[{count, plural, one {Next optimisation in # day} other {Next optimisation in # days}}]",
-    "optimizerRetryAfter": "[{count, plural, one {Try again in # day.} other {Try again in # days.}}]",
+    "optimiser": {
+      "heading": "[Personalise my schedule]",
+      "signInPrompt": "[Sign in to enable personalised scheduling.]",
+      "intro": "[Tune scheduling to your memory using your full review history.]",
+      "notEnoughIntro": "[We need enough review history to tune the weights meaningfully.]",
+      "optimiseNow": "[Optimise now]",
+      "availableAfter": "[Available after about {min, number} reviews. You have {count, number}.]",
+      "pausedButton": "[Sync paused (superuser)]",
+      "pausedTitle": "[Optimisation is paused while a superuser flag is on.]",
+      "lastOptimised": "[Last optimised: {date}]",
+      "page": {
+        "description": "[This fits the scheduler's weights to your own review history. It runs in this browser and can take a minute.]",
+        "backToSettings": "[Back to settings]",
+        "loading": "[Loading your reviews…]",
+        "signedOut": "[Sign in to personalise your schedule. The optimiser uses the review history saved to your account.]",
+        "paused": "[Optimisation is paused while a superuser flag is on. Turn the flags off to run it.]",
+        "unsupported": "[This browser can't run the optimiser. Try a recent version of Chrome, Edge, Firefox or Safari.]",
+        "notEnough": "[You have {count, number} reviews the optimiser can use. It needs about {min, number}.]",
+        "ready": "[{count, plural, one {# review is ready to use.} other {# reviews are ready to use.}}]",
+        "fitting": "[Fitting your weights… this can take a minute.]",
+        "progress": "[{percent, number}% done]",
+        "saving": "[Saving your new weights…]",
+        "success": "[Done. Your schedule now uses weights fitted to your reviews.]",
+        "errorNotEnoughData": "[There isn't enough variety in your reviews yet. Keep studying and try again in a few weeks.]",
+        "errorLoad": "[Couldn't load your reviews. Check your connection and try again.]",
+        "errorSave": "[The weights were fitted but couldn't be saved. Check your connection and try again.]",
+        "errorFailed": "[Couldn't optimise. Try again later.]",
+        "errorDetail": "[Details: {detail}]",
+        "tryAgain": "[Try again]"
+      }
+    },
     "backup": {
       "heading": "[Backup]",
       "exportLabel": "[Export progress]",
@@ -287,6 +330,10 @@
       "downloadCsv": "[Download CSV]",
       "importLabel": "[Import progress]",
       "importDescription": "[Restore from a previously exported backup. Replaces current progress after confirmation.]",
+      "importDescriptionSignedIn": "[Restore card progress from a previously exported backup. Cards only move forward: anything your account has got further with stays as it is.]",
+      "importConfirmSignedIn": "[You're signed in, so this only moves cards forward. Anything your account has got further with stays as it is, your settings don't change, and progress from before your last reset can't be restored. Restore this backup?]",
+      "importFailedSignedIn": "[Couldn't reach your account, so nothing was restored. Check your connection and try again.]",
+      "importSaveFailedSignedIn": "[Couldn't save the backup on this device, so nothing was restored. Free up some storage space and try again.]",
       "importButton": "[Import]"
     },
     "howThisWorks": {
@@ -573,7 +620,8 @@
       "formCategoryPrimal": "[Primal Reversion]",
       "noAlternateForms": "[No alternate forms in the current seed.]",
       "matchCount": "[{match} of {total} Pokémon match]",
-      "hiddenCardsPaused": "[Hidden cards are paused: their review dates shift forward by the time they're hidden, so removing the scope won't flood your queue with overdue reviews.]"
+      "hiddenCardsPaused": "[Hidden cards are paused: their review dates shift forward by the time they're hidden, so removing the scope won't flood your queue with overdue reviews.]",
+      "presetFavourites": "[Favourites]"
     },
     "direction": {
       "name": "[Name this Pokémon]",
@@ -723,7 +771,8 @@
     "generationPokemonAriaLabel": "[{name} Pokémon]",
     "firstReviewed": "[First reviewed {date}]",
     "mastered": "[Mastered]",
-    "masteredAround": "[Mastered around {date}]"
+    "masteredAround": "[Mastered around {date}]",
+    "heartedBadge": "[Hearted]"
   },
   "pasture": {
     "title": "[Pasture]",
@@ -1266,5 +1315,31 @@
   "pushStreak": {
     "title": "[Keep your streak going]",
     "body": "[You're on a {days, plural, one {# day} other {# days}} streak. A few minutes today keeps it going.]"
+  },
+  "favourite": {
+    "makeFavourite": "[Make favourite]",
+    "isFavourite": "[Your favourite]",
+    "makeFavouriteAria": "[Make {name} your favourite]",
+    "heartAria": "[Heart {name}]",
+    "heartFavouriteAria": "[{name} is your favourite, so it stays hearted]",
+    "learnFirst": {
+      "question": "[Learn {name}'s evolution line next?]",
+      "body": "[Its Pokémon would be your next new cards, within your usual daily limit.]",
+      "yes": "[Yes]",
+      "no": "[No, thanks]"
+    },
+    "partner": {
+      "heading": "[Your partner]",
+      "playCry": "[Play {name}'s cry]",
+      "chooseFavourite": "[Choose your favourite]",
+      "chooseFavouriteBody": "[Pick any Pokémon in the Pokédex to be your partner.]"
+    },
+    "themeOffer": {
+      "question": "[Switch to {name}'s colours?]",
+      "body": "[You have mastered {name}, so its colours can be your app theme.]",
+      "yes": "[Switch colours]",
+      "no": "[Keep my colours]"
+    },
+    "pastureSpotAria": "[{name}, your favourite]"
   }
 }

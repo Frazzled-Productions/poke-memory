@@ -23,8 +23,8 @@
  * - `network-first` - try the network, fall back to cache when offline. No
  *                     longer used for navigations; retained as a strategy type
  *                     for any future asset class that needs it.
- * - `network-only` - never cache. Used for cross-origin requests (e.g. the
- *                     Supabase sync endpoint) so offline reads never return a
+ * - `network-only` - never cache. Used for cross-origin requests (e.g. GitHub
+ *                     avatars) so offline reads never return a
  *                     stale cloud response and sync semantics are unchanged.
  * - `idb-first` - serve from IndexedDB, fall back to network. Used for
  *                     sprites (`/sprites/`) and cries (`/cries/`). The offline
@@ -196,7 +196,7 @@ export function classifyRequest(
     return { strategy: "network-only" };
   }
 
-  // Cross-origin requests (Supabase sync, GitHub avatars, analytics) bypass the
+  // Cross-origin requests (GitHub avatars, analytics) bypass the
   // cache entirely. This keeps the best-effort sync model in docs/sync.md
   // intact - an offline read can never return a stale cloud response.
   if (parsed.origin !== origin) {

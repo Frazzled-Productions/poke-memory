@@ -12,9 +12,9 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const VISUAL_SPEC = "**/visual.spec.ts";
 
 // Real-auth spec runs ONLY under the dedicated `e2e-real-auth` CI job, which
-// bakes the QA Supabase env into its own build. The functional projects exclude
-// it so `e2e-browser` never picks it up without that env (beforeAll throws on
-// missing NEXT_PUBLIC_SUPABASE_URL, turning every retry into a hard failure).
+// serves a local build of the Worker with a fresh local D1. The functional
+// projects exclude it so `e2e-browser`, which serves a plain `next start` with no
+// database, never picks it up.
 const AUTH_REAL_SPEC = "**/auth-real.spec.ts";
 
 export default defineConfig({
@@ -25,7 +25,7 @@ export default defineConfig({
   workers: process.env.CI ? 4 : undefined,
   // In CI we pair the `github` reporter (writes annotations only) with the
   // `html` reporter so the `playwright-report/` directory exists on disk for
-  // the `actions/upload-artifact` step in visual-regression.yml / e2e.yml /
+  // the `actions/upload-artifact` step in visual-regression.yml / deploy.yml /
   // ci.yml. Without the html leg, the directory is never created and the
   // upload silently produces an empty artifact (#1127). `open: "never"`
   // prevents the reporter from spawning a browser on the runner.
@@ -83,10 +83,9 @@ export default defineConfig({
       testIgnore: [VISUAL_SPEC, AUTH_REAL_SPEC],
     },
     // --- Real-auth project -------------------------------------------------
-    // Runs ONLY the real-auth spec against the QA Supabase project. The
-    // e2e-real-auth CI job builds with the QA env baked in and selects this
-    // project; all functional projects testIgnore the spec so it never runs
-    // without that env.
+    // Runs ONLY the real-auth spec, against the local Worker and fresh local D1
+    // that the e2e-real-auth CI job starts; all functional projects testIgnore
+    // the spec so it never runs without them.
     {
       name: "auth-real",
       use: { ...devices["Desktop Chrome"] },

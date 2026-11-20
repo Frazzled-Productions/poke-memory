@@ -17,6 +17,7 @@ import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { useLocalePokemonName } from "@/lib/i18n/useLocalePokemonName";
 import { NameTtsButton } from "@/components/pokedex/NameTtsButton";
 import { CryButton } from "@/components/pokedex/CryButton";
+import { FavouriteControls } from "@/components/favourite/FavouriteControls";
 import { SpritePreloader } from "@/components/sprites/SpritePreloader";
 import {
   POKEDEX_DETAIL_SPRITE_SIZE,
@@ -496,6 +497,13 @@ export function PokemonDetailDisclosure({
             })}
           </div>
         )}
+        {/* Favourite and heart toggles (#2187): on every detail page,
+            silhouettes included. A locked page labels them by number so the
+            name stays hidden. */}
+        <FavouriteControls
+          speciesId={pokemon.speciesId}
+          name={isLocked ? t("lockedAriaLabel", { number: zeroPad(id) }) : pokemonLocaleName}
+        />
       </div>
 
       {!isLocked &&

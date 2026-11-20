@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -13,7 +12,9 @@ import {
   DEFAULT_ONBOARDING,
 } from "@/lib/settings/persistence";
 import type { UserSettings } from "@/lib/settings/persistence";
+import { settingsAfterProgressReset } from "@/lib/favourite/favourite";
 import { exportProgress, validateBackup, applyBackup } from "@/lib/backup/io";
+import { restoreBackupSignedIn } from "@/lib/sync/restoreBackup";
 import { loadSession, saveSession } from "@/lib/review/persistence";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { clearLocalProgress } from "@/lib/storage/reset";
@@ -24,11 +25,8 @@ import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 import { ReenableCardTypeDialog, type ReenableChoice } from "@/components/settings/ReenableCardTypeDialog";
 import { deleteAccountEverywhere } from "@/lib/sync/deleteAccount";
 import { signOut } from "@/lib/auth/actions";
-import { CURATED_POKEMON } from "@/lib/theme/curated-pokemon";
-import type { CuratedPokemon } from "@/lib/theme/curated-pokemon";
-import { loadFavourite, saveFavourite, masteredSpeciesUnion } from "@/lib/theme/persistence";
+import { FavouritePokemonSection, ThemeSection } from "@/components/favourite/FavouriteSettings";
 import { useFavourite } from "@/components/theme/FavouriteThemeProvider";
-import type { ReviewableCard } from "@/lib/review/session";
 import { useSeed } from "@/lib/pokemon/SeedContext";
 import { useSuperuser } from "@/lib/superuser/SuperuserContext";
 import { loadGradeLog } from "@/lib/gradelog/persistence";
@@ -67,7 +65,6 @@ import { cardPanelPadded, colStack, colStackLg, mutedText, mutedTextXs, pageTitl
 import { CompanyDisclosure } from "@/components/CompanyDisclosure";
 import { SUPPORTED_LOCALES, LOCALE_COOKIE, DEFAULT_LOCALE, LOCALE_ENDONYMS, type AppLocale } from "@/i18n/locales";
 import { setLocaleCookie } from "@/lib/i18n/actions";
-import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
 import { readMasteredCountCache } from "@/lib/profile/masteredCountCache";
 
 /**
@@ -178,135 +175,6 @@ function LoadingSkeleton() {
     </div>
   );
 }
-
-function FavouritePicker({
-  settings,
-  favouriteId,
-  onSelect,
-}: {
-  settings: UserSettings;
-  favouriteId: number | null;
-  onSelect: (entry: CuratedPokemon | null, spriteUrl: string | null) => void;
-}) {
-  const t = useTranslations();
-  const { flags } = useSuperuser();
-  const { seed } = useSeed();
-  // Loaded once at mount. Nothing on this page writes to the session so a
-  // snapshot is safe and avoids re-reading on every render. Stored as the
-  // set of mastered species ids rather than a Map keyed by id: a multi-locale
-  // session holds several name cards per numeric id, and the Map's
-  // Load the full ReviewableCard[] so both name AND reverse legs are available
-  // for species-level mastery (#1865). masteredSpeciesUnion unions across all
-  // enrolled locales so a species mastered in any locale earns the theme.
-  const [sessionCards, setSessionCards] = useState<readonly ReviewableCard[]>([]);
-  useEffect(() => {
-    async function load() {
-      const session = await loadSession();
-      setSessionCards(session?.cards ?? []);
-    }
-    void load();
-  }, []);
-
-  // Compute the mastered set once (not per-iteration) then filter.
-  const masteredIds = flags.pretendAllMastered
-    ? null
-    : masteredSpeciesUnion(sessionCards, false, settings.learningLocales);
-  const unlockedEntries = CURATED_POKEMON.filter((entry) =>
-    masteredIds === null || masteredIds.has(entry.id),
-  );
-
-  if (unlockedEntries.length === 0) {
-    return (
-      <div className="rounded-lg border border-zinc-200 bg-background px-4 py-5 dark:border-zinc-800">
-        <h3
-          id="theme-heading"
-          className="text-sm font-semibold text-foreground"
-        >
-          {t("settings.appearance.theme.lockedHeading")}
-        </h3>
-        <p className={`mt-1 ${mutedText}`}>
-          {t("settings.appearance.theme.lockedBody")}
-        </p>
-        <Link
-          href="/"
-          className="mt-3 inline-block text-sm font-medium text-foreground underline underline-offset-2 hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-        >
-          {t("settings.appearance.theme.practiceLink")}
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <h3
-        id="theme-heading"
-        className="text-sm font-semibold text-foreground"
-      >
-        {t("settings.appearance.theme.heading")}
-      </h3>
-      <p className={mutedTextXs}>
-        {t("settings.appearance.theme.description")}
-      </p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {unlockedEntries.map((entry) => {
-          const pokemon = seed?.seedPokemon.find((p) => p.id === entry.id);
-          const selected = favouriteId === entry.id;
-
-          return (
-            <div
-              key={entry.id}
-              className="relative rounded-xl border border-zinc-200 bg-background px-4 py-3 flex flex-col items-center gap-2 transition-colors dark:border-zinc-800"
-            >
-              <div
-                className="h-2 w-full rounded-full mb-1"
-                style={{ backgroundColor: entry.colors.primary }}
-                aria-hidden="true"
-              />
-              {pokemon?.spriteUrl ? (
-                <Image
-                  src={pokemon.spriteUrl}
-                  alt={entry.name}
-                  width={POKEDEX_GRID_SPRITE_SIZE}
-                  height={POKEDEX_GRID_SPRITE_SIZE}
-                  className="h-16 w-16 object-contain"
-                />
-              ) : (
-                <div className="h-16 w-16" />
-              )}
-              <p className="text-sm font-medium text-foreground text-center">
-                {entry.name}
-              </p>
-              {selected ? (
-                <div className="flex flex-col items-center gap-1 w-full">
-                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    {t("settings.appearance.theme.selected")} ✓
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(null, null)}
-                    className="w-full min-h-[36px] rounded-lg border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 dark:border-zinc-700 dark:text-zinc-400"
-                  >
-                    {t("settings.appearance.theme.remove")}
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onSelect(entry, pokemon?.spriteUrl ?? null)}
-                  className="w-full min-h-[36px] rounded-lg bg-foreground px-3 py-1 text-xs font-semibold text-background transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2"
-                >
-                  {t("settings.appearance.theme.setAsTheme")}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
 
 type FieldConfig = {
   key: keyof UserSettings;
@@ -553,9 +421,11 @@ function SettingsSubsection({
 export default function SettingsPage() {
   const router = useRouter();
   const t = useTranslations();
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const { updateFavourite } = useFavourite();
   const { unlocked, flags, setFlag, anyFlagOn } = useSuperuser();
+  // A superuser session writes nothing to the cloud, so it restores locally.
+  const restoreAccount = user && db && !anyFlagOn ? { userId: user.id, client: db } : null;
   const { seed } = useSeed();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [activeLocale, setActiveLocale] = useState<AppLocale>(DEFAULT_LOCALE);
@@ -571,7 +441,6 @@ export default function SettingsPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [toggleErrorKey, setToggleErrorKey] = useState<keyof UserSettings | null>(null);
-  const [favouriteId, setFavouriteId] = useState<number | null>(null);
   // Pending unenrol confirmation: the locale the user wants to remove when it
   // is the currently-active language. An inline confirm block is shown instead
   // of applying immediately, to avoid accidentally switching practice to English.
@@ -599,7 +468,7 @@ export default function SettingsPage() {
 
   // Retry push hook for the account/sync block.
   const { retryState, retryNow } = useRetryPush(
-    anyFlagOn ? null : supabase,
+    anyFlagOn ? null : db,
     anyFlagOn ? null : (user?.id ?? null),
   );
 
@@ -685,7 +554,6 @@ export default function SettingsPage() {
     }
 
     setSettings(loaded);
-    setFavouriteId(loadFavourite()?.id ?? null);
     setEnrolmentMasteredCounts(readMasteredCountCache());
     void loadGradeLog().then((log) => setOptimizableReviewCount(countOptimizableReviews(log)));
 
@@ -706,17 +574,17 @@ export default function SettingsPage() {
 
   // Best-effort push of auto-detected regional prefs once auth is available.
   useEffect(() => {
-    if (!user || !supabase || !autoDetectedPrefsRef.current) return;
+    if (!user || !db || !autoDetectedPrefsRef.current) return;
     // Guard: skip if any superuser flag is on (write-guard parity, #1854 F-settings).
     if (anyFlagOn) return;
     const prefs = autoDetectedPrefsRef.current;
     autoDetectedPrefsRef.current = null;
-    void pushRegionalPrefs(supabase, user.id, {
+    void pushRegionalPrefs(db, user.id, {
       timezone: prefs.timezone,
       dateFormat: prefs.dateFormat,
       pushNotificationHour: loadSettings().pushNotificationHour,
     }).catch(() => {});
-  }, [user, supabase, anyFlagOn]);
+  }, [user, db, anyFlagOn]);
 
   function handleChange(key: keyof UserSettings, raw: string) {
     setDraftValues((prev) => ({ ...prev, [key]: raw }));
@@ -812,28 +680,26 @@ export default function SettingsPage() {
 
   async function handleReset() {
     if (anyFlagOn) return;
-    if (user && supabase) {
-      const result = await resetAllProgressEverywhere(supabase);
+    if (user && db) {
+      const result = await resetAllProgressEverywhere(db);
       if (!result.ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
     } else {
       await clearLocalProgress();
     }
-    saveFavourite(null);
-    setFavouriteId(null);
+    saveSettings(settingsAfterProgressReset(loadSettings()));
     updateFavourite(null);
     router.replace("/");
   }
 
   async function handleDeleteAccount() {
     if (anyFlagOn) return;
-    if (!user || !supabase) return;
-    const result = await deleteAccountEverywhere(supabase);
+    if (!user || !db) return;
+    const result = await deleteAccountEverywhere(db);
     if (!result.ok) {
       throw new Error(
         "Could not delete your account. Check your connection and try again.",
       );
     }
-    setFavouriteId(null);
     updateFavourite(null);
     await signOut();
   }
@@ -849,12 +715,31 @@ export default function SettingsPage() {
       return;
     }
     const confirmed = window.confirm(
-      "Replace your current progress with this backup?"
+      restoreAccount
+        ? t("settings.backup.importConfirmSignedIn")
+        : "Replace your current progress with this backup?"
     );
-    if (confirmed) {
+    if (!confirmed) return;
+    if (restoreAccount) {
+      const restored = await restoreBackupSignedIn(
+        restoreAccount.client,
+        restoreAccount.userId,
+        result.data
+      );
+      if (!restored.ok) {
+        setImportError(
+          t(
+            restored.reason === "save-failed"
+              ? "settings.backup.importSaveFailedSignedIn"
+              : "settings.backup.importFailedSignedIn"
+          )
+        );
+        return;
+      }
+    } else {
       await applyBackup(result.data);
-      window.location.reload();
     }
+    window.location.reload();
   }
 
   function handleSave() {
@@ -1105,13 +990,6 @@ export default function SettingsPage() {
                   optimizableReviewCount={optimizableReviewCount}
                   isSignedIn={user !== null}
                   superuserPaused={anyFlagOn}
-                  onOptimized={(optimizedAt, weights) => {
-                    setSettings((prev) =>
-                      prev !== null
-                        ? { ...prev, fsrsWeights: weights, fsrsWeightsOptimizedAt: optimizedAt }
-                        : prev,
-                    );
-                  }}
                 />
 
                 {/* "Mark Pokémon I already know" quickstart (#1084) */}
@@ -1141,7 +1019,7 @@ export default function SettingsPage() {
                     {knownQuizOpen && (
                       <div id="known-quiz-panel" className="mt-4">
                         <KnownPokemonQuiz
-                          client={supabase}
+                          client={db}
                           userId={user?.id ?? null}
                           superuserPaused={anyFlagOn}
                         />
@@ -1790,21 +1668,9 @@ export default function SettingsPage() {
                 forceOpen={targetCategoryId === "appearance-heading"}
                 transientOpen={isFiltering}
               >
-                <div>
-                  <FavouritePicker
-                    settings={settings}
-                    favouriteId={favouriteId}
-                    onSelect={(entry, spriteUrl) => {
-                      saveFavourite(entry, spriteUrl);
-                      setFavouriteId(entry?.id ?? null);
-                      updateFavourite(
-                        entry
-                          ? { id: entry.id, name: entry.name, colors: entry.colors, spriteUrl: spriteUrl ?? null }
-                          : null
-                      );
-                    }}
-                  />
-                </div>
+                <FavouritePokemonSection />
+
+                <ThemeSection />
 
                 <IntensityPicker
                   value={settings.themeIntensity}
@@ -1897,8 +1763,8 @@ export default function SettingsPage() {
                         const next = { ...settings, timezone: e.target.value };
                         setSettings(next);
                         saveSettings(next);
-                        if (user && supabase && !anyFlagOn) {
-                          void pushRegionalPrefs(supabase, user.id, {
+                        if (user && db && !anyFlagOn) {
+                          void pushRegionalPrefs(db, user.id, {
                             timezone: e.target.value,
                             dateFormat: next.dateFormat,
                             pushNotificationHour: next.pushNotificationHour,
@@ -1945,8 +1811,8 @@ export default function SettingsPage() {
                                 const next = { ...settings, dateFormat: value };
                                 setSettings(next);
                                 saveSettings(next);
-                                if (user && supabase && !anyFlagOn) {
-                                  void pushRegionalPrefs(supabase, user.id, {
+                                if (user && db && !anyFlagOn) {
+                                  void pushRegionalPrefs(db, user.id, {
                                     timezone: next.timezone,
                                     dateFormat: value,
                                     pushNotificationHour: next.pushNotificationHour,
@@ -1988,8 +1854,8 @@ export default function SettingsPage() {
                         const next = { ...settings, pushNotificationHour: hour };
                         setSettings(next);
                         saveSettings(next);
-                        if (user && supabase && !anyFlagOn) {
-                          void pushRegionalPrefs(supabase, user.id, {
+                        if (user && db && !anyFlagOn) {
+                          void pushRegionalPrefs(db, user.id, {
                             timezone: next.timezone,
                             dateFormat: next.dateFormat,
                             pushNotificationHour: hour,
@@ -2010,8 +1876,8 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Push opt-in (#1056) - gated on signed-in user */}
-                {user && supabase && (
-                  <PushOptIn user={user} supabase={supabase} />
+                {user && db && (
+                  <PushOptIn user={user} db={db} />
                 )}
               </CollapsibleSection>
               )}
@@ -2106,7 +1972,9 @@ export default function SettingsPage() {
 
                   <div>
                     <p className="text-sm font-medium text-foreground">{t("settings.backup.importLabel")}</p>
-                    <p className={`mt-1 ${mutedTextXs}`}>{t("settings.backup.importDescription")}</p>
+                    <p className={`mt-1 ${mutedTextXs}`}>
+                      {t(restoreAccount ? "settings.backup.importDescriptionSignedIn" : "settings.backup.importDescription")}
+                    </p>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -2132,11 +2000,11 @@ export default function SettingsPage() {
 
                 {/* Restore from cloud - authenticated users only (#1732 / #1729).
                     Moved here from Stats page; Stats shows a link to /settings instead.
-                    Gated on signed-in + supabase available + superuser off. */}
-                {user && supabase && !anyFlagOn && (
+                    Gated on signed-in + data client available + superuser off. */}
+                {user && db && !anyFlagOn && (
                   <div className={cn(cardPanelPadded, "flex flex-col gap-3")}>
                     <h3 className={sectionLabel}>{t("stats.forcePull.heading")}</h3>
-                    <ForcePullSection supabase={supabase} userId={user.id} />
+                    <ForcePullSection db={db} userId={user.id} />
                   </div>
                 )}
               </CollapsibleSection>
@@ -2234,8 +2102,8 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Manage sign-in methods - for signed-in users */}
-                {user && supabase && (
-                  <LinkIdentitiesSection user={user} supabase={supabase} />
+                {user && (
+                  <LinkIdentitiesSection user={user} />
                 )}
               </CollapsibleSection>
               )}

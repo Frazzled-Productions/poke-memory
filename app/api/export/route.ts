@@ -2,8 +2,8 @@
  * GET /api/export
  *
  * Exports the authenticated user's review history as a CSV file, satisfying
- * GDPR's right to data portability. Reads from the `grade_log` table via the
- * RLS-protected Supabase client - only the requesting user's own rows are
+ * GDPR's right to data portability. Reads the `grade_log` table through
+ * forUser (lib/db/scope.ts) - only the requesting user's own rows are
  * returned.
  *
  * CSV columns: date, pokemon, card_type, grade, grade_label
@@ -14,16 +14,15 @@
  * - grade        Numeric FSRS grade (1=Again, 2=Hard, 4=Good, 5=Easy)
  * - grade_label  Human-readable grade label (Again, Hard, Good, Easy)
  *
- * Guest users (no session) receive 401. Supabase errors produce 503.
+ * Guest users (no session) receive 401. Database errors produce 503.
  */
 
 import { NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth/requireAuth";
+import { getDb } from "@/lib/db/env";
+import { forUser } from "@/lib/db/scope";
 import { SEED_POKEMON } from "@/lib/pokemon/seed";
 import { Subject } from "@/lib/cards/subjectKey";
-import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 
 // Build a lookup map once at module load - derived from static seed data so
 // the cost is paid once per cold start, not per request.
@@ -94,49 +93,24 @@ const GRADE_LABELS: Record<number, string> = {
   5: "Easy",
 };
 
-export async function GET(): Promise<NextResponse> {
-  let supabase: SupabaseClient;
-  try {
-    supabase = (await createClient()) as unknown as SupabaseClient;
-  } catch (err) {
-    // Re-throw Next.js internal prerender-control errors (identified by their
-    // `.digest` property). Swallowing these during build causes the prerender
-    // to record a 503 instead of deferring the route to request-time rendering.
-    if (err !== null && typeof err === "object" && "digest" in err) throw err;
-    console.error("[/api/export] Supabase client construction failed", err);
-    return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
-  }
-
-  const auth = await requireAuth(supabase);
+export async function GET(request: Request): Promise<NextResponse> {
+  const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
   const { user } = auth;
 
   // Fetch all grade_log rows for this user, ordered chronologically so the
-  // CSV reads in review order. Paginated to avoid the PostgREST 1000-row
-  // default cap, which would silently truncate the export for any active
-  // user and violate GDPR right-to-portability completeness.
-  // entry_date + occurred_at together form a total order tiebreaker so rows
-  // do not shift across page boundaries as the user continues reviewing.
+  // CSV reads in review order. D1 has no PostgREST row cap, so one read
+  // returns every row (GDPR right-to-portability completeness).
+  // entry_date + occurred_at together form a total order.
   let rows: GradeLogCloudRow[];
   try {
-    const data = await fetchAllPages<GradeLogCloudRow>((from, to) =>
-      supabase
-        .from("grade_log")
-        .select("occurred_at,entry_date,card_type,grade,subject_key")
-        .eq("user_id", user.id)
-        .order("entry_date", { ascending: true })
-        .order("occurred_at", { ascending: true })
-        .range(from, to),
-    );
-
-    if (!data) {
-      console.error("[/api/export] grade_log fetch failed");
-      return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
-    }
-
-    rows = data;
+    const db = forUser(await getDb(), user.id);
+    rows = (await db.select("grade_log", {
+      columns: ["occurred_at", "entry_date", "card_type", "grade", "subject_key"],
+      order: [{ column: "entry_date" }, { column: "occurred_at" }],
+    })) as GradeLogCloudRow[];
   } catch (err) {
-    console.error("[/api/export] unexpected error", err);
+    console.error("[/api/export] grade_log fetch failed", err);
     return NextResponse.json({ error: "service_unavailable" }, { status: 503 });
   }
 

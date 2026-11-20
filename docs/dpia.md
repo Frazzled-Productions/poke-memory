@@ -3,7 +3,8 @@
 **Date:** May 2026  
 **Controller:** Frazzled Productions Ltd (company no. 17258540), privacy@pokememory.com  
 **Reference:** Issue #721  
-**Status:** Approved - sole-operator sign-off (see Step 7)
+**Status:** Approved - sole-operator sign-off (see Step 7)  
+**Revised:** November 2026 for the move from Vercel and Supabase to Cloudflare (OpenSpec change `move-to-cloudflare`, #2393). The text describes the service after that cutover; the revision ships with the build that performs it.
 
 ---
 
@@ -35,17 +36,17 @@ A DPIA is **not legally mandatory** under UK GDPR Article 35. It is produced her
 
 Poké Memory operates two distinct paths:
 
-- **Guest path.** All card-review state is held in browser `localStorage`. No card or review data is transmitted to any server the controller operates. The only guest data that leaves the browser is technical error and performance diagnostics sent to Sentry (see below). Pokémon sprites are served as static files from the same Vercel infrastructure as the app - no third-party image CDN. The guest path involves no server-side personal-data processing.
+- **Guest path.** All card-review state is held in browser `localStorage`. No card or review data is transmitted to any server the controller operates. The only guest data that leaves the browser is technical error and performance diagnostics sent to Sentry (see below). Pokémon sprites are served as static files from the same Cloudflare infrastructure as the app - no third-party image CDN. The guest path involves no server-side personal-data processing.
 
-- **Authenticated path.** When a user signs in via GitHub or Google OAuth, or creates a username and password account directly, per-card review state is synchronised to a Supabase Postgres database so the user can continue across devices. This is the path where UK GDPR applies in full.
+- **Authenticated path.** When a user signs in via GitHub or Google OAuth, or creates a username and password account directly, per-card review state is synchronised to our Cloudflare D1 database (EU jurisdiction) so the user can continue across devices. This is the path where UK GDPR applies in full.
 
 The processing activities on the authenticated path are:
 
 - Reading and writing FSRS spaced-repetition parameters for each reviewed card (stability, difficulty, scheduled interval, repetition count, lapse count, FSRS state, due date, last review date, first seen date).
 - Recording the dates on which the user completed at least one review, for streak calculation.
-- Appending grade events (card type, subject identifier, grade, timestamp) to a log used for per-user FSRS-weight optimisation.
+- Appending grade events (card type, subject identifier, grade, timestamp) to a log used for per-user FSRS-weight optimisation (the optimiser runs in the user's browser and reads the log through the same per-account data route).
 - Storing and synchronising user settings (daily review limits, practice scope, theme, timezone, etc.).
-- Aggregate, cookieless, anonymous analytics (Vercel Analytics and Speed Insights) collecting page path, referrer, country, device type, and Core Web Vitals across all users regardless of sign-in status.
+- Aggregate, cookieless, anonymous analytics (Cloudflare Web Analytics) collecting page path, referrer, country, device type, and page-load performance across all users regardless of sign-in status, plus a daily count of app opens per bucket pair (new / returning guest / signed in; mastered 0, 1-10, 11-50, 50+) kept in our own `events` table with no identifier, IP address or page address.
 - Error monitoring and performance tracing (Sentry) across all users regardless of sign-in status, so faults can be detected and fixed (purpose 6; risk R9).
 
 ### Scope
@@ -80,12 +81,13 @@ All of the following apply to **authenticated users only** unless stated otherwi
 | Grade events | Card type, subject identifier, grade chosen, entry date, precise timestamp | `grade_log` |
 | User settings | Daily review limits, practice scope, theme, timezone, notification preferences (daily-reminder and streak-reminder opt-ins, reminder hour) | `user_settings` |
 | Web Push subscription | Browser-issued push endpoint URL plus the `p256dh` and `auth` encryption keys, scoped to the account. Present only for users who have opted into push notifications. Used solely to deliver the reminders described in purpose 5. | `push_subscriptions` |
-| Auth account record (held by Supabase Auth, not our own tables) | For OAuth accounts: the email address and display name returned by the provider, used only for authentication. For username/password accounts: the chosen username (also stored in `public.usernames`) plus a synthetic internal email that is not a real address and is never shown to the user or used to send mail. A username may be personal data if the user chooses a name that identifies them. | Supabase Auth schema; `public.usernames` |
-| Aggregate analytics (all users) | Page path, referrer, country, device type, Core Web Vitals - no per-user identifier, no cookie | Vercel infrastructure |
+| Auth account record (held by Better Auth, the sign-in library running in our Worker, in its own tables) | For OAuth accounts: the provider's account identifier, and the email address and display name returned by the provider, used only for authentication. For username/password accounts: the chosen username, a one-way password hash, and a synthetic internal email that is not a real address and is never shown to the user or used to send mail. A username may be personal data if the user chooses a name that identifies them. Sign-in sessions (the session token behind the HTTP-only `__Secure-better-auth.session_token` cookie). | Better Auth's `user`, `account` and `session` tables in D1 |
+| Aggregate analytics (all users) | Page path, referrer, country, device type, page-load performance - no per-user identifier, no cookie | Cloudflare Web Analytics |
+| App-open counts (all users) | Per UTC day: the event name (`app_open`), user type bucket, mastered-count bucket and a count. No identifier, IP address, user agent, page address or time finer than the day. | `events` (D1) |
 | Error and performance diagnostics (all users) | Error reports (exception type, message, stack trace, browser/OS/device type, page URL, breadcrumbs) and a ~10% sample of performance traces. We do not attach names, email addresses, account identifiers or IP addresses, we do not send cookies or request bodies, and Session Replay is off (sample rates 0). With the SDK version currently in production, standard headers (User-Agent, Referer) and full page URLs including query strings can still be sent; stricter minimisation is enforced by the SDK upgrade in #2106. No card or review data. | Sentry, EU region (`ingest.de.sentry.io`, Germany), via a first-party tunnel at `/monitoring` |
 | Feedback submissions | Category label, free-text message (up to 2,000 chars), page pathname, app version. user_id nullable (null for guest submissions). May contain personal data typed by the user. | `feedback` |
 
-No special-category data (Article 9) is collected. For OAuth accounts, no name or email from the provider is written into our own tables. For username/password accounts, the chosen username is written to `public.usernames` (keyed by the user UUID) and may be personal data if the user selects a name that identifies them; the synthetic internal email used by Supabase Auth for those accounts is not a real address and is never shown to the user. Our review tables remain keyed only by the opaque UUID issued by Supabase Auth (the `feedback` table's user_id is nullable for guests).
+No special-category data (Article 9) is collected. For OAuth accounts, no name or email from the provider is written into our own tables. For username/password accounts, the chosen username is stored on the account record (keyed by the user UUID) and may be personal data if the user selects a name that identifies them; the synthetic internal email used for those accounts is not a real address and is never shown to the user. Our review tables remain keyed only by the opaque user UUID (the `feedback` table's user_id is nullable for guests).
 
 As of #1369, the app UI renders in the user's chosen locale (`en` / `ja` / `zh-Hans` / `zh-Hant`), selected via the `poke-memory:locale` cookie. **This applies to all users - guest and authenticated** - since the locale cookie is set on explicit locale selection regardless of sign-in state. The chosen locale is a display preference only - it is **not personal data**: it carries no tracking payload, does not identify the individual, and is set only on an explicit user selection. It is recorded in the PECR storage inventory (`docs/cookies-pecr.md`) as a strictly-necessary functional-preference cookie, on the same footing as theme and timezone.
 
@@ -93,20 +95,22 @@ As of #1369, the app UI renders in the user's chosen locale (`en` / `ja` / `zh-H
 
 | Processor | Role | Transfer mechanism |
 |---|---|---|
-| Supabase | Postgres database (authenticated-path review data, auth sessions) | DPA in place; SCCs / IDTA addendum |
-| Vercel | Hosting, static asset delivery, aggregate analytics | DPA in place; SCCs / IDTA addendum |
-| Discord | Bug-report triage notifications (processor / sub-processor) | DPA in place; SCCs / IDTA addendum |
+| Cloudflare, Inc. | Hosting (Workers), the D1 database (EU jurisdiction: authenticated-path data, account records and sessions, feedback, app-open counts), nightly backups (R2, EU jurisdiction, 90 days), aggregate page-view analytics (Web Analytics) | Cloudflare DPA (part of its self-serve terms); data at rest in the EU; requests are handled at the nearest Cloudflare data centre and Cloudflare, Inc. is US-based, covered by the EU-US Data Privacy Framework (incl. UK Extension) and the EU SCCs with the UK Addendum |
+| Resend (Plus Five Five, Inc.) | Delivers the bug-report and weekly-digest emails to the company mailbox (processor / sub-processor) | Resend DPA (pre-signed at sign-up); data stored in the US, covered by the EU SCCs with the UK Addendum and the EU-US Data Privacy Framework (incl. UK Extension) |
+| Google Workspace (Google) | The company mailbox that receives those emails (processor) | Google's Cloud Data Processing Addendum |
 | Sentry (Functional Software, Inc.) | Error monitoring and performance tracing (all users, including guests) | DPA (v5.1.0) accepted by the owner; EU-region storage (Germany, UK adequacy regulations for the EEA); Functional Software, Inc. is US-based, so remote access is covered by the DPA's Schedule 3 (EU-US Data Privacy Framework incl. UK Extension, falling back to EU SCCs Module 2 plus the ICO UK Addendum) |
 
-GitHub and Google act as **independent controllers** for the OAuth authentication interaction only. They are not processors for our review data. The app itself never sees the OAuth token - the exchange is handled server-side by Supabase Auth.
+GitHub and Google act as **independent controllers** for the OAuth authentication interaction only. They are not processors for our review data. The token exchange is handled server-side by our own Worker (Better Auth), which keeps the provider account identifier, email address and display name on the account record.
 
-The browser's Web Push service (Google FCM, Mozilla, or Apple, depending on the user's browser) acts as a **protocol-level conduit** for delivering push messages, not a sub-processor with access to message content: the notification payload is end-to-end encrypted under the Web Push standard using the subscription's `p256dh`/`auth` keys, so the push service relays ciphertext it cannot read. No new sub-processor is therefore added by the push feature.
+The browser's Web Push service (Google FCM, Mozilla, Apple or Microsoft, depending on the user's browser) acts as a **protocol-level conduit** for delivering push messages, not a sub-processor with access to message content: the notification payload is end-to-end encrypted under the Web Push standard using the subscription's `p256dh`/`auth` keys, so the push service relays ciphertext it cannot read. No new sub-processor is therefore added by the push feature.
 
 ### Retention
 
-Authenticated-path data is retained for the lifetime of the account. Account deletion triggers a cascading delete on all rows associated with the user's UUID across `card_reviews`, `streak_days`, `grade_log`, `user_settings`, and `feedback`. The self-service "Reset all progress" action deletes review history immediately. There is currently no point-in-time backup (issue #298), so deletion is permanent and immediate.
+Authenticated-path data is retained for the lifetime of the account. Account deletion deletes all rows associated with the user's UUID across `card_reviews`, `streak_days`, `grade_log`, `user_settings`, `push_subscriptions`, `feedback` and the Better Auth account, sessions and user, in one atomic batch. The self-service "Reset all progress" action deletes review history immediately. Deleted data can persist for up to 90 days in the nightly backups (R2, EU, deleted after 90 days) and up to 30 days in D1's point-in-time restore history; backups are used only to restore the service after a failure.
 
-Feedback rows are retained for 12 months from `created_at` and are then automatically deleted by a scheduled database function. For authenticated users, feedback rows are also deleted by cascade on account deletion.
+Feedback rows are retained for 12 months from `created_at` and are then automatically deleted by a scheduled job (a Worker Cron Trigger). For authenticated users, feedback rows are also deleted by cascade on account deletion. A bug report also emails a notification, message preview included, to the company mailbox; the email holds no user identifier, so it cannot be matched to an account, and it is deleted from the mailbox 12 months after it arrives (the Discord notification and its automatic deletion, ops #405, went on 20 November 2026).
+
+A Web Push subscription is deleted when the user turns the reminder toggle off, on account deletion, when the push service reports the endpoint as gone, or when the account already has 10 subscriptions and another device subscribes, which replaces the least recently subscribed one (a database trigger, first added in Postgres migration 049).
 
 Sentry error reports and performance traces are retained for Sentry's default of 90 days and then deleted automatically. They carry no user identifier, so they are not linked to any account and are not affected by account deletion.
 
@@ -118,9 +122,9 @@ As a sole-operator service with no staff and no DPO (see Step 7), the consultati
 
 1. **Review of existing documentation.** The privacy notice (`app/privacy/page.tsx`), the Children's Code assessment (`docs/childrens-code-assessment.md`), and the PECR cookie position (`docs/cookies-pecr.md`) were reviewed in full. This DPIA draws on all three.
 
-2. **Processor agreements reviewed.** The Supabase standard Data Processing Addendum, the Vercel Data Processing Agreement, and (added on the Sentry review, see R9) the Sentry Data Processing Addendum were reviewed. No material gap between the processing described in those agreements and the processing carried out by the app was identified.
+2. **Processor agreements reviewed.** The Supabase standard Data Processing Addendum, the Vercel Data Processing Agreement, and (added on the Sentry review, see R9) the Sentry Data Processing Addendum were reviewed. No material gap between the processing described in those agreements and the processing carried out by the app was identified. For the November 2026 revision the Cloudflare Data Processing Addendum replaces the first two; the owner reviews it before the cutover (#2393).
 
-3. **Codebase review.** The sync layer (`lib/sync/`), the Supabase schema and Row-Level Security policies (`db/migrations/`), the regression trigger (`card_reviews_reject_regression_trigger`), the feedback table schema and RLS policies, and the integration test suite (`lib/sync/integration/`) were reviewed to verify that the described technical controls are in place and functioning.
+3. **Codebase review.** The sync layer (`lib/sync/`), the D1 schema (`db/migrations/` then, `db/d1/migrations/` since the move), the per-account scope helper (`lib/db/scope.ts`) and its CI rule, the regression trigger (`card_reviews_reject_regression_trigger`), the feedback table schema, and the cross-user tests were reviewed to verify that the described technical controls are in place and functioning.
 
 No external consultation (users, children's rights organisations, or supervisory authority pre-consultation) was sought, because no high-risk processing requiring pre-consultation under UK GDPR Article 36 was identified.
 
@@ -136,8 +140,8 @@ Each data category is assessed against the purposes stated in Step 2:
 - **Streak dates** (`streak_days`): The streak feature requires a record of which dates had at least one review. No alternative representation can produce this without storing the dates. Necessary.
 - **Grade-event log** (`grade_log`): Per-user FSRS-weight optimisation requires a time-ordered log of grade events; the optimiser reads raw grade sequences, not just aggregates. Necessary.
 - **Settings** (`user_settings`): The cross-device service requires that the user's preferences (daily limits, practice scope, timezone, theme) are available on all devices. Necessary.
-- **Auth account record** (Supabase Auth): Supabase Auth requires a profile record to identify the user on subsequent sign-ins. For OAuth accounts this is handled entirely by the provider exchange. For username/password accounts, the chosen username is the user-visible identifier (stored in `public.usernames`) and the synthetic internal email is a technical artefact required by Supabase Auth's data model, carrying no personal data. Necessary for authentication.
-- **Aggregate analytics** (Vercel): Anonymous, cookieless usage data enables the controller to understand whether the service is reaching users and identify performance regressions. No individual is identified. Proportionate.
+- **Auth account record** (Better Auth): the sign-in system needs a profile record to identify the user on subsequent sign-ins. For OAuth accounts this comes from the provider exchange. For username/password accounts, the chosen username is the user-visible identifier and the synthetic internal email is a technical artefact of the account data model, carrying no personal data. Necessary for authentication.
+- **Aggregate analytics** (Cloudflare Web Analytics and the daily app-open counts): Anonymous, cookieless usage data enables the controller to understand whether the service is reaching users and identify performance regressions. No individual is identified. Proportionate.
 - **Error and performance diagnostics** (Sentry): Error reports and a ~10% trace sample are the minimum needed to detect and fix faults in production. We attach no name, email address, account identifier or IP address, send no cookies or request bodies, and Session Replay is off, so nothing beyond technical diagnostics (page address, standard browser details, breadcrumbs) is collected; stricter minimisation (no headers, no query parameters) follows with the SDK upgrade in #2106. Necessary and proportionate.
 - **Feedback submissions** (`feedback`): Category, message, and pathname are consumed for issue investigation and service improvement. App version is included to contextualise reports against a specific release. user_id is included where present (authenticated users) to enable follow-up with the submitter if needed; it is nullable so guests can submit without being identified. The 2,000-character message limit prevents excessive data collection. Necessary.
 - **Web Push subscription** (`push_subscriptions`): The endpoint and encryption keys are the minimum needed to deliver a push message to the user's browser; they exist only for users who opted in and are used for no other purpose. **Streak/review-recency read for targeting:** the late-day at-risk reminder cannot be scoped without knowing which users have an active streak and have not yet reviewed today, so the send job reads `streak_days` and today's `card_reviews.last_review` state for candidate users. No broader read is performed - no grade content, card difficulty, or review history beyond the dates needed to determine "active streak, not reviewed today, genuinely at risk". Necessary and minimal.
@@ -146,7 +150,7 @@ Each data category is assessed against the purposes stated in Step 2:
 
 ### Proportionality
 
-- **Minimum data:** Our own tables hold no name, no email, no precise location, no advertising identifier, no payment data, and no special-category data. The only identifier in our tables is the opaque UUID issued by Supabase Auth - not the user's email or display name.
+- **Minimum data:** Our own tables hold no name, no email, no precise location, no advertising identifier, no payment data, and no special-category data. The only identifier in our app tables is the opaque user UUID - not the user's email or display name, which stay on the sign-in account record.
 - **Guest default:** Guest mode is the app's default state and stores nothing server-side. Data-minimisation is thus the default user experience, not an opt-in.
 - **No third-party sharing for external purposes:** Review data is never shared with advertisers, data brokers, or third parties for those parties' own purposes.
 
@@ -187,10 +191,10 @@ Risks are rated on a two-axis grid: **Likelihood** (Very Low / Low / Medium / Hi
 
 | # | Risk | Likelihood | Severity | Combined rating |
 |---|---|---|---|---|
-| R1 | Unauthorised access to a user's review data via Supabase (e.g. RLS misconfiguration or compromised credentials) | Low | Medium | Low–Medium |
+| R1 | Unauthorised access to a user's review data (e.g. a query not pinned to the session user, or compromised credentials) | Low | Medium | Low–Medium |
 | R2 | Cross-border transfer of personal data outside the UK/EEA without adequate safeguards | Low | Medium | Low–Medium |
 | R3 | Excessive data collection beyond what the SRS service requires | Low | Low | Low |
-| R4 | A child under 13 creates an account and has personal data stored in Supabase | Low | Medium | Low–Medium |
+| R4 | A child under 13 creates an account and has personal data stored in our database | Low | Medium | Low–Medium |
 | R5 | Data retained beyond its useful life after account deletion | Low | Low | Low |
 | R6 | Anonymous analytics data re-identified and linked to an individual | Very Low | Low | Very Low |
 | R7 | User types personal or sensitive data into the free-text feedback field | Low | Low | Low |
@@ -203,16 +207,17 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 
 ## Step 6 - Identify measures to reduce risk
 
-### R1 - Unauthorised access via RLS misconfiguration or compromised credentials
+### R1 - Unauthorised access via an unscoped query or compromised credentials
 
 **Existing controls:**
 
-- Row-Level Security (RLS) is enforced at the Supabase Postgres layer for all four tables (`card_reviews`, `streak_days`, `grade_log`, `user_settings`). Policies restrict each row to the authenticated user whose UUID matches the row's `user_id` column.
+- Every per-user query runs through one scope helper (`lib/db/scope.ts`, `forUser`) on the server: reads are bound to the session user's UUID, and a written row naming any other user is refused before SQL runs. This replaces Supabase's row-level security (November 2026 revision).
+- A CI rule (`scripts/check-scoped-queries.mjs`, in `npm run lint`) fails any raw query on a per-user table outside `lib/db/`. Cross-user work (cron jobs, the bug-report email, backups) uses named functions in `lib/db/system.ts` that only the cron, push-send and feedback routes may import.
 - The regression trigger (`card_reviews_reject_regression_trigger`, introduced in migration 002 and extended in migrations 015, 016, and 017) blocks illegal writes at the database layer, independently of application-level validation.
-- Integration tests (`lib/sync/integration/rls.test.ts`) verify that user A cannot read or write user B's rows. These tests run in CI on every PR that touches the sync surface.
-- Supabase project credentials (service-role key, anon key) are stored as environment secrets, not in the codebase.
+- Cross-user tests (`lib/db/crossUser.test.ts` and each route's tests) verify that user A cannot read or change user B's rows through any table or operation.
+- Cloudflare credentials and the Better Auth secret are Worker secrets, not in the codebase.
 
-**Residual risk:** Low. The RLS controls are enforced at the database layer and are tested end-to-end in CI. No additional technical measure is currently required.
+**Residual risk:** Low. The per-account check is enforced in one server-side helper, guarded by a CI rule and tested with two users in CI. The database itself no longer enforces it (the trade-off accepted in company decision 0018).
 
 **Acceptable:** Yes.
 
@@ -222,8 +227,7 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 
 **Existing controls:**
 
-- Supabase operates under its standard Data Processing Addendum, which includes the EU Standard Contractual Clauses (SCCs) and a UK International Data Transfer Agreement (IDTA) addendum. Supabase primarily operates UK/EU infrastructure for customers in this region.
-- Vercel operates under its Data Processing Agreement, which also includes SCCs / IDTA addendum.
+- Cloudflare stores the D1 database and the R2 backups in its EU jurisdiction. Requests are handled in the Cloudflare data centre nearest to the user, which may be outside the UK / EEA, and Cloudflare, Inc. is US-based. Its Data Processing Addendum relies on the EU-US Data Privacy Framework (including the UK Extension) and the EU SCCs with the UK Addendum. Not verified here: Cloudflare's live DPF certification and the current DPA version; check at the cutover and at each review.
 - Sentry stores our data in its EU region (ingest host `ingest.de.sentry.io`, Germany) under a Data Processing Addendum accepted by the owner. Storage in Germany relies on the UK adequacy regulations for the EEA. However, Sentry (Functional Software, Inc., San Francisco) is a US company, so remote or support access from the US can be a restricted transfer. Verified against Sentry's published DPA v5.1.0 (29 May 2024), https://sentry.io/legal/dpa/ : Schedule 3 (Cross-Border Transfer Mechanisms) states that Sentry complies with the Data Privacy Framework (defined to include the UK Extension) for transfers from Europe to the US and, if that does not apply, the parties are bound by the EU SCCs (Decision 2021/914, Module 2, controller to processor, deemed signed on acceptance) with the ICO International Data Transfer Addendum (version B1.0) incorporated for UK transfers. Not verified here: Sentry's live DPF certification status on the Department of Commerce list; re-check at each review.
 - The agreements were reviewed as part of Step 3. No gap between the processing described and the transfer mechanisms in place was identified.
 
@@ -258,8 +262,8 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 - The privacy notice (§11) explicitly directs under-13s to guest mode and asks them not to create an account or sign in.
 - Guest mode, which stores nothing server-side, is the default experience and requires no account. Children of any age can use the app's full feature set without creating an account.
 - The Children's Code uniform-standards approach is applied to all users regardless of age: minimal data, no profiling, no advertising, high-privacy defaults. The standard of care applied to any under-13 who does create an account is therefore the same as for all users, which satisfies the Code's requirement to treat the worst-case user as a child. The Children's Code assessment (`docs/childrens-code-assessment.md`) records this as the deliberate mitigation.
-- `public.usernames` stores only the user-chosen username alongside the UUID. No age, name, location, or contact details are solicited at account creation.
-- The absence of PITR (#298) means a parental erasure request results in immediate, permanent deletion.
+- The account record stores only the user-chosen username (and the password hash and synthetic email) alongside the UUID. No age, name, location, or contact details are solicited at account creation.
+- A parental erasure request deletes the account and its data immediately; copies in the nightly backups expire within 90 days.
 
 **Residual risk:** Low–Medium. The inherited OAuth age gate is gone for the username/password door. Likelihood stays Low (guest mode is the default path, the privacy notice advises against signing in, and no age-relevant feature drives sign-up). Severity is Medium because authenticated accounts do store personal data (username, FSRS parameters) under the controller's responsibility, though that data is highly minimal and the uniform Children's Code standard applies.
 
@@ -271,11 +275,11 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 
 **Existing controls:**
 
-- Account deletion triggers a cascading delete on all rows linked to the user's UUID across all four tables, via Postgres `ON DELETE CASCADE` foreign-key constraints.
+- Account deletion deletes all rows linked to the user's UUID, and the Better Auth user, accounts and sessions, in one atomic D1 batch (`lib/db/rpc/`).
 - The "Reset all progress" action issues a direct delete of `card_reviews`, `streak_days`, `grade_log`, and `user_settings` rows without requiring account deletion.
-- There is currently no point-in-time backup (issue #298), so deletion is permanent and immediate - there is no backup retention that could extend the data's life after erasure.
+- Nightly backups to R2 (EU) are deleted after 90 days by the backup job itself, and D1's point-in-time restore history covers 30 days, so erased data leaves every copy within 90 days. Backups are used only to restore the service after a failure; the privacy notice (§8) discloses the 90 days.
 
-**Residual risk:** Low. The absence of a PITR backup means deleted data is not recoverable - which is both a retention-risk mitigation and a recovery-risk consideration. That trade-off is recorded in issue #298.
+**Residual risk:** Low. Backups extend the life of erased data by at most 90 days, a bounded and disclosed period, in exchange for being able to recover from a failure (previously tracked in #298).
 
 **Acceptable:** Yes.
 
@@ -285,9 +289,10 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 
 **Existing controls:**
 
-- Vercel Analytics and Speed Insights set no cookie and write nothing to `localStorage` or any other terminal-equipment storage (confirmed by code review - see `docs/cookies-pecr.md`).
-- The analytics payload contains only page path, referrer, country (not city or more precise location), device type, and Core Web Vitals.
-- No per-user identifier is transmitted. There is no joining key that would allow the analytics data to be linked to the `card_reviews` or other user tables in Supabase.
+- Cloudflare Web Analytics sets no cookie and writes nothing to `localStorage` or any other terminal-equipment storage (see `docs/cookies-pecr.md`). The beacon is only added when its site token is set at build time (production).
+- The analytics payload contains only page path, referrer, country (not city or more precise location), device type, and page-load performance.
+- The daily app-open count (`POST /api/event`) accepts only the event name and two fixed buckets, rate-limited per event name (never per IP), and stores a count per UTC day with no identifier, IP address, user agent or page address (`db/d1/migrations/0003_events.sql`).
+- No per-user identifier is transmitted. There is no joining key that would allow the analytics data to be linked to the `card_reviews` or other user tables.
 - Country-level aggregate data is not personal data under UK GDPR.
 
 **Residual risk:** Very Low. Re-identification from cookieless, per-visit aggregate country-level data is not feasible in practice.
@@ -305,9 +310,9 @@ See Step 6 for the mitigation and residual-risk assessment for each row.
 - Feedback rows are automatically deleted after 12 months by a scheduled database function.
 - For authenticated users, feedback rows are deleted by cascade on account deletion.
 - Feedback data is not used for profiling or marketing.
-- Bug-report notifications to Discord: the message preview forwarded is capped at 500 characters, fetched by the Vercel route via the service-role client (keeping it out of pg_net request logs), sent to a private maintainer-only Discord channel, and processed under a DPA. No user identifier is included. The full message remains in Supabase within the existing RLS perimeter.
+- Bug-report notification emails: the message preview is capped at 500 characters and sent by the Worker itself (the feedback route, reading the message through `lib/db/system.ts`) through Resend to the company mailbox (Google Workspace), both under a DPA. No user identifier is included, so an email cannot be linked to an account. The full message remains in our database, behind the per-account check. Unlike the Discord notification it replaces (20 November 2026), an email cannot be deleted by the app: it is deleted from the mailbox 12 months after it arrives, so the preview can outlive an account deletion by up to 12 months but never the feedback retention period. The weekly digest email holds counts only.
 
-**Residual risk:** Low. Users may still include personal data despite the inline notice; the server-side truncation and automatic deletion schedule bound both the quantity and retention of any such data. The Discord preview is additionally capped at 500 characters and sent to a maintainer-only channel.
+**Residual risk:** Low. Users may still include personal data despite the inline notice; the server-side truncation and automatic deletion schedule bound both the quantity and retention of any such data. The emailed preview is additionally capped at 500 characters, goes only to the company mailbox, and is deleted from it after 12 months.
 
 **Acceptable:** Yes.
 
@@ -401,7 +406,7 @@ This DPIA should be reviewed and updated if any of the following occur:
 - Sentry configuration changes so that it collects user identifiers, IP addresses, request data, or Session Replay, or its region or retention changes.
 - A new push-notification use case reads an existing data category for a new targeting purpose. (Fired by #1950: the late-day streak-at-risk reminder reads `streak_days` / `card_reviews.last_review` for targeting. Purposes, data categories, lawful basis, and R8 were updated accordingly.)
 - Own-account creation was added in #1671 (username/password, June 2026): this trigger fired and R4 was updated accordingly. A further review is required if magic-link (#1670) or email + password (#1673) sign-in is added, since those introduce real email collection.
-- A new sub-processor is engaged. (Fired retroactively for Sentry, #2103: processor entry, purpose 6, lawful basis, R2 and R9 updated.)
+- A new sub-processor is engaged. (Fired retroactively for Sentry, #2103: processor entry, purpose 6, lawful basis, R2 and R9 updated. Fired again by the move to Cloudflare, November 2026, #2393: Cloudflare replaces Supabase and Vercel; nature, data categories, processors, retention, R1, R2, R4, R5 and R6 updated.)
 - A significant security incident occurs affecting the confidentiality, integrity, or availability of user data.
 - The Children's Code assessment (`docs/childrens-code-assessment.md`) is updated to reflect a changed risk profile.
 - The locale offering is expanded beyond the four supported locales, or a new processing purpose is introduced in connection with locale data.

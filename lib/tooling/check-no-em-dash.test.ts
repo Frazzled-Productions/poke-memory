@@ -133,7 +133,7 @@ describe("no-em-dash gate: file routing (#2045)", () => {
     [".claude/agents/ui-coder.md"],
     ["changelog.d/unreleased/foo.md"],
     ["CHANGELOG.md"],
-    ["scripts/vercel-ignored-build.sh"],
+    ["scripts/example.sh"],
     ["db/migrations/001_initial_sync_schema.sql"],
     ["app/globals.css"],
     ["messages/en.json"],

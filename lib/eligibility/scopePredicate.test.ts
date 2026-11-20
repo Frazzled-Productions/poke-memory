@@ -234,6 +234,21 @@ describe("scopeMatchesEntry - incomplete-chains preset (skipped server-side)", (
 // games axis
 // ---------------------------------------------------------------------------
 
+describe("scopeMatchesEntry - favourites preset (#2187)", () => {
+  const FAVOURITES_SCOPE: PracticeScope = { ...EMPTY_SCOPE, presets: ["favourites"] };
+
+  it("passes a hearted species and rejects the rest", () => {
+    const hearted = new Set([25, 150]);
+    expect(scopeMatchesEntry(PIKACHU, FAVOURITES_SCOPE, hearted)).toBe(true);
+    expect(scopeMatchesEntry(MEWTWO, FAVOURITES_SCOPE, hearted)).toBe(true);
+    expect(scopeMatchesEntry(BULBASAUR, FAVOURITES_SCOPE, hearted)).toBe(false);
+  });
+
+  it("matches nothing without hearts", () => {
+    expect(scopeMatchesEntry(PIKACHU, FAVOURITES_SCOPE)).toBe(false);
+  });
+});
+
 describe("scopeMatchesEntry - games axis", () => {
   const RED_BLUE_SCOPE: PracticeScope = {
     gens: [],

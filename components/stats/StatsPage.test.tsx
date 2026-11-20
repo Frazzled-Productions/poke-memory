@@ -386,7 +386,7 @@ vi.mock("@/lib/stats/accuracy", () => ({
 const { mockAuthValue } = vi.hoisted(() => ({
   mockAuthValue: {
     user: null as null | typeof mockSuiteUser,
-    supabase: null as null | { auth: unknown },
+    db: null as null | { auth: unknown },
     loading: false,
   },
 }));
@@ -469,7 +469,7 @@ beforeEach(() => {
   mockPullSession.mockResolvedValue([]);
   // Default: guest
   mockAuthValue.user = null;
-  mockAuthValue.supabase = null;
+  mockAuthValue.db = null;
   // Reset the mock snapshot to the default state so hint tests don't leak.
   mockSnapshotValue.snapshot = {
     today: "2026-05-21",
@@ -502,7 +502,7 @@ describe("StatsPage - signed-in user hydrates from cloud", () => {
     const cloudRows = [makeCloudRow(1), makeCloudRow(2), makeCloudRow(3)];
     mockPullSession.mockResolvedValue(cloudRows);
     mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
 
     render(<StatsPage />);
 
@@ -513,14 +513,14 @@ describe("StatsPage - signed-in user hydrates from cloud", () => {
     });
 
     expect(mockPullSession).toHaveBeenCalledTimes(1);
-    expect(mockPullSession).toHaveBeenCalledWith(mockAuthValue.supabase, mockSuiteUser.id);
+    expect(mockPullSession).toHaveBeenCalledWith(mockAuthValue.db, mockSuiteUser.id);
   });
 
   it("falls back gracefully when pullSession returns null (network failure)", async () => {
     mockLoadSession.mockResolvedValue(null);
     mockPullSession.mockResolvedValue(null);
     mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
 
     // Should not throw; page should still render from local fallback.
     render(<StatsPage />);
@@ -535,7 +535,7 @@ describe("StatsPage - signed-in user hydrates from cloud", () => {
     mockLoadSession.mockResolvedValue(null);
     mockPullSession.mockRejectedValue(new Error("timeout"));
     mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
 
     render(<StatsPage />);
 
@@ -560,7 +560,7 @@ describe("StatsPage - guest user reads only from local", () => {
       },
     });
     mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
+    mockAuthValue.db = null;
 
     render(<StatsPage />);
 
@@ -582,7 +582,7 @@ describe("StatsPage - Restore from cloud link (#1732 / #1729)", () => {
   it("does not show the force-pull button in Stats (it moved to Settings)", async () => {
     mockLoadSession.mockResolvedValue(null);
     mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
+    mockAuthValue.db = null;
 
     render(<StatsPage />);
 
@@ -598,7 +598,7 @@ describe("StatsPage - Restore from cloud link (#1732 / #1729)", () => {
     mockLoadSession.mockResolvedValue(null);
     mockPullSession.mockResolvedValue([]);
     mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
 
     render(<StatsPage />);
 
@@ -613,7 +613,7 @@ describe("StatsPage - Restore from cloud link (#1732 / #1729)", () => {
   it("does not show 'Restore from cloud' link for guests", async () => {
     mockLoadSession.mockResolvedValue(null);
     mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
+    mockAuthValue.db = null;
 
     render(<StatsPage />);
 
@@ -629,7 +629,7 @@ describe("StatsPage - CompletionProjection widget", () => {
   it("renders the completion-projection stub in the page", async () => {
     mockLoadSession.mockResolvedValue(null);
     mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
+    mockAuthValue.db = null;
 
     render(<StatsPage />);
 
@@ -648,7 +648,7 @@ describe("StatsPage - FirstMasteryHint (#1083)", () => {
       firstMasteryDays: 20,
     };
     mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
+    mockAuthValue.db = null;
 
     render(<StatsPage />);
 
@@ -677,7 +677,7 @@ describe("StatsPage - FirstMasteryHint (#1083)", () => {
       },
     };
     mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
+    mockAuthValue.db = null;
 
     render(<StatsPage />);
 
@@ -704,7 +704,7 @@ describe("StatsPage - FirstMasteryHint (#1083)", () => {
       },
     };
     mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
+    mockAuthValue.db = null;
 
     render(<StatsPage />);
 
@@ -732,7 +732,7 @@ describe("StatsPage - FirstMasteryHint (#1083)", () => {
       },
     };
     mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
+    mockAuthValue.db = null;
 
     render(<StatsPage />);
 

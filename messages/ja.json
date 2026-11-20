@@ -107,12 +107,15 @@
       "theme": {
         "heading": "アプリテーマ",
         "description": "Pokémon を習得済みにするとアプリのカラーテーマとして使用できるようになります。",
-        "selected": "選択中",
         "setAsTheme": "テーマに設定",
         "remove": "削除",
         "lockedHeading": "アプリテーマ",
         "lockedBody": "最初の Pokémon を習得するとテーマが解放されます。",
-        "practiceLink": "練習へ"
+        "practiceLink": "練習へ",
+        "searchLabel": "習得したポケモンを検索",
+        "matchFavourite": "お気に入りに合わせる",
+        "current": "現在のテーマ：{name}",
+        "setAsThemeAria": "{name}をアプリのテーマにする"
       },
       "intensityPicker": {
         "heading": "テーマの強度",
@@ -122,6 +125,16 @@
         "tintedDescription": "マスコットカラーが薄く背景に重なります。",
         "fullLabel": "フルマスコットテーマ",
         "fullDescription": "マスコットカラーがすべての背景を彩ります。鮮やかなデザインです。"
+      },
+      "favourite": {
+        "heading": "お気に入りのポケモン",
+        "description": "お気に入りは、旅、牧場、完了画面であなたのパートナーとして登場します。どのポケモンでもお気に入りにできます。",
+        "current": "お気に入り：{name}",
+        "none": "まだお気に入りが選ばれていません。",
+        "searchLabel": "すべてのポケモンを検索",
+        "searchPlaceholder": "名前を入力",
+        "clear": "お気に入りを解除",
+        "noResults": "その名前に一致するポケモンはいません。"
       }
     },
     "practice": {
@@ -276,7 +289,37 @@
       "lowStorageProceed": "このままダウンロード"
     },
     "optimizerCooldown": "{count, plural, other {次の最適化まであと # 日}}",
-    "optimizerRetryAfter": "{count, plural, other {# 日後に再試行してください。}}",
+    "optimiser": {
+      "heading": "スケジュールを自分向けに調整",
+      "signInPrompt": "サインインすると、自分に合わせたスケジュール調整を使えます。",
+      "intro": "これまでの復習履歴をもとに、スケジュールをあなたの記憶に合わせて調整します。",
+      "notEnoughIntro": "重みを意味のある形で調整するには、十分な復習履歴が必要です。",
+      "optimiseNow": "今すぐ最適化",
+      "availableAfter": "約 {min, number} 回の復習後に利用できます。現在 {count, number} 回です。",
+      "pausedButton": "同期停止中(スーパーユーザー)",
+      "pausedTitle": "スーパーユーザーのフラグがオンの間は最適化できません。",
+      "lastOptimised": "前回の最適化: {date}",
+      "page": {
+        "description": "あなた自身の復習履歴にスケジューラーの重みを合わせます。このブラウザ内で実行され、1 分ほどかかることがあります。",
+        "backToSettings": "設定に戻る",
+        "loading": "復習履歴を読み込んでいます…",
+        "signedOut": "スケジュールを調整するにはサインインしてください。最適化にはアカウントに保存された復習履歴を使います。",
+        "paused": "スーパーユーザーのフラグがオンの間は最適化できません。実行するにはフラグをオフにしてください。",
+        "unsupported": "このブラウザでは最適化を実行できません。最新の Chrome、Edge、Firefox、Safari をお試しください。",
+        "notEnough": "最適化に使える復習は {count, number} 回です。約 {min, number} 回必要です。",
+        "ready": "{count, plural, other {# 回分の復習を使えます。}}",
+        "fitting": "重みを計算しています…1 分ほどかかることがあります。",
+        "progress": "{percent, number}% 完了",
+        "saving": "新しい重みを保存しています…",
+        "success": "完了しました。スケジュールはあなたの復習に合わせた重みを使います。",
+        "errorNotEnoughData": "復習のばらつきがまだ足りません。学習を続けて、数週間後にもう一度お試しください。",
+        "errorLoad": "復習履歴を読み込めませんでした。接続を確認して、もう一度お試しください。",
+        "errorSave": "重みは計算できましたが保存できませんでした。接続を確認して、もう一度お試しください。",
+        "errorFailed": "最適化できませんでした。しばらくしてからもう一度お試しください。",
+        "errorDetail": "詳細: {detail}",
+        "tryAgain": "もう一度試す"
+      }
+    },
     "backup": {
       "heading": "バックアップ",
       "exportLabel": "進捗をエクスポート",
@@ -287,6 +330,10 @@
       "downloadCsv": "CSV をダウンロード",
       "importLabel": "進捗をインポート",
       "importDescription": "以前にエクスポートしたバックアップから復元します。確認後、現在の進捗を置き換えます。",
+      "importDescriptionSignedIn": "以前にエクスポートしたバックアップからカードの進捗を復元します。カードは先に進むだけで、アカウントの方が進んでいるカードはそのまま残ります。",
+      "importConfirmSignedIn": "サインイン中のため、カードは先に進むだけです。アカウントの方が進んでいるカードはそのまま残り、設定は変更されず、最後のリセットより前の進捗は復元できません。このバックアップを復元しますか？",
+      "importFailedSignedIn": "アカウントに接続できなかったため、何も復元されませんでした。接続を確認してもう一度お試しください。",
+      "importSaveFailedSignedIn": "このデバイスにバックアップを保存できなかったため、何も復元されませんでした。ストレージの空き容量を増やしてもう一度お試しください。",
       "importButton": "インポート"
     },
     "howThisWorks": {
@@ -573,7 +620,8 @@
       "formCategoryPrimal": "ゲンシカイキ",
       "noAlternateForms": "現在のシードに異なるフォルムはありません。",
       "matchCount": "{total} 匹中 {match} 匹が一致",
-      "hiddenCardsPaused": "非表示のカードは一時停止されています。スコープを削除してもレビュー期限切れのカードが溢れることはありません。"
+      "hiddenCardsPaused": "非表示のカードは一時停止されています。スコープを削除してもレビュー期限切れのカードが溢れることはありません。",
+      "presetFavourites": "お気に入り"
     },
     "direction": {
       "name": "この Pokémon の名前は？",
@@ -723,7 +771,8 @@
     "generationPokemonAriaLabel": "{name} のポケモン",
     "firstReviewed": "初回学習: {date}",
     "mastered": "習得済み",
-    "masteredAround": "{date}頃に習得"
+    "masteredAround": "{date}頃に習得",
+    "heartedBadge": "ハートつき"
   },
   "pasture": {
     "title": "牧場",
@@ -1266,5 +1315,31 @@
   "pushStreak": {
     "title": "ストリークを続けよう",
     "body": "{days, plural, other {#日連続で練習中です。今日も少し練習すれば、続けられます。}}"
+  },
+  "favourite": {
+    "makeFavourite": "お気に入りにする",
+    "isFavourite": "お気に入り",
+    "makeFavouriteAria": "{name}をお気に入りにする",
+    "heartAria": "{name}にハートをつける",
+    "heartFavouriteAria": "{name}はお気に入りなので、ハートはついたままです",
+    "learnFirst": {
+      "question": "{name}の進化系統を次に覚えますか？",
+      "body": "毎日の新しいカードの上限の範囲で、これらのポケモンが次の新しいカードになります。",
+      "yes": "はい",
+      "no": "いいえ"
+    },
+    "partner": {
+      "heading": "あなたのパートナー",
+      "playCry": "{name}の鳴き声を再生",
+      "chooseFavourite": "お気に入りを選ぶ",
+      "chooseFavouriteBody": "図鑑から好きなポケモンを選んで、パートナーにしましょう。"
+    },
+    "themeOffer": {
+      "question": "{name}のカラーに切り替えますか？",
+      "body": "{name}を習得したので、そのカラーをアプリのテーマに使えます。",
+      "yes": "カラーを切り替える",
+      "no": "今のカラーのままにする"
+    },
+    "pastureSpotAria": "お気に入りの{name}"
   }
 }

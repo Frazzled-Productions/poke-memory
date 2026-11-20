@@ -2,7 +2,7 @@
  * Standalone service-worker build (issue #1752).
  *
  * Produces `public/sw/sw.js` (+ `.map`) as a TRUE static asset, so the worker
- * is served by Vercel's CDN rather than by a request-time serverless Route
+ * is served from the Worker's static assets rather than by a request-time serverless Route
  * Handler. The previous architecture (`app/sw/[path]/route.ts` via
  * `@serwist/turbopack`'s `createSerwistRoute`) ran the worker through a Next.js
  * function under `cacheComponents: true`, which the file-tracer left missing

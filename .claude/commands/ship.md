@@ -1,6 +1,6 @@
 ---
 description: Take ONE linear change from issue to a correctly-formed qa PR - issue-first, branch off qa, implement, run the pre-PR gate, open a Closes-#N PR into qa, dispatch code-reviewer, enable auto-merge.
-allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, Agent, EnterWorktree, mcp__supabase__apply_migration]
+allowed-tools: [Bash, Read, Edit, Write, Grep, Glob, Agent, EnterWorktree]
 ---
 
 # Ship
@@ -15,7 +15,7 @@ User says `/ship`, "ship this one issue", "do #N and open a PR", or any single-c
 
 One change, start to finish:
 
-1. **Issue-first.** Identify the issue. If the change has no issue yet, create one (`gh issue create`) so the linkage and the auto workflows have an anchor - never the `auto` label (memory: `feedback_no_auto_label_on_create`). Run the issue-body cross-check: read the body verbatim, enumerate its acceptance criteria, and brief the implementer against them, exactly as batch-issues "Implementation" step 2 requires. If the work falls in an i18n / SRS / Supabase / PokéAPI / privacy domain, do the **specialist pre-consult on the brief** first (batch-issues step 2, "Specialist pre-consult").
+1. **Issue-first.** Identify the issue. If the change has no issue yet, create one (`gh issue create`) so the linkage and the auto workflows have an anchor - never the `auto` label (memory: `feedback_no_auto_label_on_create`). Run the issue-body cross-check: read the body verbatim, enumerate its acceptance criteria, and brief the implementer against them, exactly as batch-issues "Implementation" step 2 requires. If the work falls in an i18n / SRS / database (D1, Better Auth, scope helper) / PokéAPI / privacy domain, do the **specialist pre-consult on the brief** first (batch-issues step 2, "Specialist pre-consult").
 
 2. **Branch off the latest `origin/qa`.** Single changes target `qa`, never `main` directly, same as batch work (see "The qa staging-branch flow" in batch-issues). `git fetch origin && git worktree add /private/tmp/<name> -b <branch> origin/qa`.
 

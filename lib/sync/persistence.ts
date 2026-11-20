@@ -51,7 +51,7 @@ export type SyncStatus = {
    */
   structuralSyncError: string | null;
   /**
-   * The Supabase user.id of the user whose data currently occupies local
+   * The account user id of the user whose data currently occupies local
    * storage on this device. null = guest/never-signed-in. Written once on
    * first sign-in (guest claim path) and updated on each account switch.
    *

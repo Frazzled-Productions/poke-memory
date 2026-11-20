@@ -20,8 +20,6 @@ import { FavouriteThemeProvider } from "@/components/theme/FavouriteThemeProvide
 import { ThemeWatermark } from "@/components/theme/ThemeWatermark";
 import { SuperuserProvider } from "@/lib/superuser/SuperuserContext";
 import { DashboardSnapshotProvider } from "@/components/stats/DashboardSnapshotContext";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import { FunnelTracker } from "@/components/analytics/FunnelTracker";
 import { IdbMigration } from "@/components/IdbMigration";
 import { PwaInstallNudge } from "@/components/onboarding/PwaInstallNudge";
@@ -83,6 +81,10 @@ export const viewport: Viewport = {
   // no corresponding top inset to push content clear of the Dynamic Island.
   viewportFit: "cover",
 };
+
+// Cloudflare Web Analytics site token: a public site tag, not a secret, set for
+// production builds only. Read as a literal so Next inlines it at build time.
+const cfBeaconToken = process.env.NEXT_PUBLIC_CF_BEACON_TOKEN;
 
 export default function RootLayout({
   children,
@@ -260,8 +262,19 @@ export default function RootLayout({
             <PwaBadge />
             {/* Prefixes the browser tab title with a due-card count for desktop users (#1062). */}
             <DocumentTitleBadge />
-            <Analytics />
-            <SpeedInsights />
+            {/*
+              Cloudflare Web Analytics: aggregate page views with no cookie and
+              no local storage (privacy notice, docs/cookies-pecr.md). Only when
+              the site token is set at build time, which is production only, so
+              local and preview builds send no page views (design D9).
+            */}
+            {cfBeaconToken && (
+              <script
+                defer
+                src="https://static.cloudflareinsights.com/beacon.min.js"
+                data-cf-beacon={JSON.stringify({ token: cfBeaconToken })}
+              />
+            )}
             </SeedProvider>
             </PokemonLocaleProvider>
           </LocaleProvider>

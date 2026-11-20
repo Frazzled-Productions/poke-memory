@@ -155,6 +155,29 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
+    it("says a bug report is emailed to our company mailbox through Resend, not posted to Discord (20 November 2026)", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/automated notification email to our company\s+mailbox/i),
+      ).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(/discord/i);
+      // Section 6 lists Resend as the sub-processor that delivers it.
+      expect(screen.getByRole("cell", { name: "Resend" })).toBeInTheDocument();
+    });
+
+    it("says how long the bug-report email is kept, in sections 3, 6 and 8", async () => {
+      await renderPage();
+      expect(
+        screen.getByText(/we delete these emails 12 months after they arrive/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/each email is deleted from the mailbox 12 months/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/deleting your account does not remove it/i),
+      ).toBeInTheDocument();
+    });
+
     it("renders the feedback retention statement in section 8 (#1623)", async () => {
       await renderPage();
       expect(
@@ -179,9 +202,53 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 17 October 2026", async () => {
+    it("shows the last updated date as 20 November 2026", async () => {
       await renderPage();
-      expect(screen.getByText(/17 october 2026/i)).toBeTruthy();
+      expect(screen.getByText(/20 november 2026/i)).toBeTruthy();
+    });
+
+    it("names Cloudflare, not Supabase or Vercel, for hosting, data, backups and analytics (move-to-cloudflare)", async () => {
+      await renderPage();
+      const text = document.body.textContent ?? "";
+      expect(text).not.toMatch(/supabase|vercel|row-level security/i);
+      expect(screen.getByText("Cloudflare, Inc.")).toBeTruthy();
+      expect(text).toMatch(/Cloudflare D1,\s+EU jurisdiction/);
+      expect(text).toMatch(/Cloudflare R2, EU\s+jurisdiction/);
+      expect(text).toMatch(/Backups are stored in the EU and kept for\s+90 days/);
+      expect(text).toMatch(/Cloudflare Web Analytics counts page views in aggregate/);
+      expect(text).toMatch(/We keep only a count per day for each combination/);
+    });
+
+    it("describes the server-side per-account check and our own OAuth handling", async () => {
+      await renderPage();
+      const text = document.body.textContent ?? "";
+      expect(text).toMatch(/Every request is checked on our server, so each account can only\s+read and change its own rows\./);
+      expect(text).toMatch(/The OAuth token exchange is handled by our own server\s+\(Better Auth\)/);
+      expect(text).not.toMatch(/never sees the OAuth token/);
+    });
+
+    it("names the Better Auth session cookie as HTTP-only and strictly necessary", async () => {
+      await renderPage();
+      // On https (the live site) Better Auth adds the __Secure- prefix.
+      expect(screen.getAllByText("__Secure-better-auth.session_token").length).toBe(2);
+      expect(screen.queryByText("better-auth.session_token")).toBeNull();
+      const cookies = document.getElementById("section-cookies")?.closest("section");
+      expect(cookies?.textContent).toMatch(/HTTP-only session cookie/);
+    });
+
+    it("discloses that deleted data can remain in backups for up to 90 days", async () => {
+      await renderPage();
+      const retention = document.getElementById("section-retention")?.closest("section");
+      expect(retention?.textContent).toMatch(/can remain in a backup for up\s+to 90 days after deletion/);
+      expect(retention?.textContent).not.toMatch(/no\s+separate point-in-time backup/);
+    });
+
+    it("covers transfers: EU storage, nearest data centre, US company", async () => {
+      await renderPage();
+      const transfers = document.getElementById("section-transfers")?.closest("section");
+      const text = transfers?.textContent ?? "";
+      expect(text).toMatch(/Cloudflare stores our database and its backups in its EU\s+jurisdiction/);
+      expect(text).toMatch(/Cloudflare, Inc\. is based in the United States/);
     });
 
     it("offers a complaints route to us before the ICO, with a 30-day acknowledgement", async () => {

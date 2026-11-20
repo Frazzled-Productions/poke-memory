@@ -4,7 +4,7 @@
  * Verifies that all user-facing strings flow through useTranslations() and
  * render the correct values in English and Japanese.
  *
- * The page has heavy dependencies on localStorage, Supabase, and animated
+ * The page has heavy dependencies on localStorage, the auth context, and animated
  * child components. All of these are mocked so the tests are fast and focused
  * purely on the i18n wiring.
  */
@@ -28,7 +28,7 @@ vi.mock("next/link", () => ({
 
 const { mockLoadSession, mockUseAuth, STABLE_SEED } = vi.hoisted(() => ({
   mockLoadSession: vi.fn(),
-  mockUseAuth: vi.fn(() => ({ user: null as unknown, supabase: null, loading: false })),
+  mockUseAuth: vi.fn(() => ({ user: null as unknown, db: null, loading: false })),
   STABLE_SEED: { seedPokemon: [] as unknown[], seedEvolutionCards: [] as unknown[], seedReverseEvolutionCards: [] as unknown[] },
 }));
 
@@ -41,6 +41,9 @@ vi.mock("@/lib/review/persistence", () => ({
 vi.mock("@/lib/hooks/useLocalStorageKey", () => ({
   useLocalStorageKey: vi.fn(() => 0),
 }));
+
+// The partner has its own tests (TrainerCard, usePartner); here it is absent (#2187).
+vi.mock("@/components/favourite/usePartner", () => ({ usePartner: () => null }));
 
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: vi.fn(() => ({
@@ -247,7 +250,7 @@ beforeEach(async () => {
   mockLoadSession.mockResolvedValue(null);
   // Reset mockUseAuth to the guest default so tests don't bleed auth state.
   mockUseAuth.mockReset();
-  mockUseAuth.mockReturnValue({ user: null, supabase: null, loading: false });
+  mockUseAuth.mockReturnValue({ user: null, db: null, loading: false });
   // Reset computeStreak to its default (0 = no active streak) so tests don't
   // bleed streak state into each other.
   const { computeStreak } = vi.mocked(await import("@/lib/streak"));
@@ -435,7 +438,7 @@ describe("JourneyPage - GuestSignUpNudge (#1731)", () => {
     // Override mockUseAuth to simulate a signed-in user for ALL calls in this test.
     mockUseAuth.mockReturnValue({
       user: { id: "u1" },
-      supabase: null,
+      db: null,
       loading: false,
     });
 

@@ -1,5 +1,9 @@
 import { idbDelete, MIGRATION_FLAG_KEY } from "@/lib/idb/db";
-import { KEY_REVIEW_SESSION, KEY_GRADE_LOG } from "@/lib/storage/keys";
+import {
+  KEY_REVIEW_SESSION,
+  KEY_GRADE_LOG,
+  KEY_PENDING_GRADE_QUEUE,
+} from "@/lib/storage/keys";
 
 // Local aliases so the idbDelete calls below read like named store handles
 // rather than raw key strings. Both constants are sourced from the shared
@@ -44,12 +48,13 @@ export async function clearLocalProgress(): Promise<void> {
   // When IDB is unavailable, idbDelete is a no-op - that's fine because the
   // persistence layers fall back to localStorage, so the sweep above already
   // cleared those keys (they start with "poke-memory:" but not "poke-memory:settings:").
-  // Run all three deletes in parallel - each opens its own short transaction
+  // Run all four deletes in parallel - each opens its own short transaction
   // and there is no ordering dependency between them.
   await Promise.all([
     idbDelete(SESSION_IDB_KEY),
     idbDelete(GRADE_LOG_IDB_KEY),
     idbDelete(MIGRATION_FLAG_KEY),
+    idbDelete(KEY_PENDING_GRADE_QUEUE),
   ]);
 
   // Same-tab subscribers (Stats / Pasture / Pokédex) re-read on storage events;

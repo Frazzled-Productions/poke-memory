@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 /**
  * Constant-time bearer-header comparison, shared by every route guarded by
- * `CRON_SHARED_SECRET` (discord/digest, discord/notify, push/send-daily).
+ * `CRON_SHARED_SECRET` (the cron routes and the push sends).
  *
  * Plain `===` on the assembled `Bearer <secret>` string leaks the shared
  * secret's length and prefix via the early-exit timing characteristic of
@@ -27,4 +27,19 @@ export function isAuthorized(
   } catch {
     return false;
   }
+}
+
+/**
+ * The guard every cron route starts with (design D2): 503 when
+ * CRON_SHARED_SECRET is not configured, an empty 401 when the bearer does not
+ * match, otherwise null and the route carries on.
+ */
+export function cronGuard(request: Request, secret: string | undefined): Response | null {
+  if (!secret) {
+    return Response.json({ ok: false, error: "misconfigured" }, { status: 503 });
+  }
+  if (!isAuthorized(request.headers.get("authorization"), secret)) {
+    return new Response(null, { status: 401 });
+  }
+  return null;
 }

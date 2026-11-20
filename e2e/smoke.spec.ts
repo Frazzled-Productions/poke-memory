@@ -990,7 +990,7 @@ test.describe("Settings page", () => {
 
     // Guest state: sign-in prompt is visible
     await expect(
-      page.getByText("Sign in to enable personalized scheduling."),
+      page.getByText("Sign in to enable personalised scheduling."),
     ).toBeVisible();
 
     // Guest state: the optimize button is NOT rendered
@@ -1084,9 +1084,11 @@ test.describe("Settings page", () => {
     // Expand the Appearance section - App Theme lives inside it.
     await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
-    // App Theme heading and Charizard card should be visible.
+    // App Theme heading and the theme search's Charizard row should be visible
+    // (#2187: Charizard also appears in the favourite search above it).
     await expect(page.getByRole("heading", { name: "App Theme" })).toBeVisible();
-    await expect(page.getByText("Charizard")).toBeVisible();
+    const setCharizard = page.getByRole("button", { name: "Use Charizard as your app theme" });
+    await expect(setCharizard).toBeVisible();
 
     // Record nav header background before selecting theme
     const navHeader = page.locator("header").first();
@@ -1095,7 +1097,7 @@ test.describe("Settings page", () => {
     );
 
     // Select Charizard as the app theme
-    await page.getByRole("button", { name: "Set as theme" }).click();
+    await setCharizard.click();
 
     // Nav header background should have changed to Charizard's primary colour.
     // Poll until React re-renders and applyTheme writes the new CSS variable.
@@ -1106,8 +1108,8 @@ test.describe("Settings page", () => {
       expect(bgAfter).not.toBe(bgBefore);
     }).toPass({ timeout: 5000 });
 
-    // "Selected ✓" indicator and Remove button should appear
-    await expect(page.getByText("Selected ✓")).toBeVisible();
+    // The current theme and its Remove button should appear
+    await expect(page.getByText("Current theme: Charizard")).toBeVisible();
     await expect(page.getByRole("button", { name: "Remove" })).toBeVisible();
   });
 });
@@ -1121,7 +1123,7 @@ test.describe("Sign-in sheet (#1669)", () => {
 
     const signIn = page.getByRole("button", { name: "Sign in" });
     if (!(await signIn.isVisible().catch(() => false))) {
-      // AuthButton renders nothing when Supabase env vars are absent - skip
+      // AuthButton renders nothing when auth is not configured - skip
       // rather than fail in environments without auth configured.
       test.skip();
       return;
@@ -1581,8 +1583,8 @@ test.describe("PWA / offline support", () => {
     page,
     baseURL,
   }) => {
-    // Registration is gated to production builds, so it only happens on the
-    // Vercel preview deployment, not a local `next dev` server. Skip the
+    // Registration is gated to production builds, so it only happens on a
+    // production build (CI or the preview Worker), not a local `next dev` server. Skip the
     // assertion when running against localhost.
     test.skip(
       !baseURL || baseURL.includes("localhost") || baseURL.includes("127.0.0.1"),

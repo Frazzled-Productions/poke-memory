@@ -89,7 +89,7 @@ export function FeedbackModal({ open, onClose }: Props) {
     if (category === "" || message.trim().length === 0 || submitting) return;
     setSubmitting(true);
     setError(null);
-    // Use the user-stated page if provided; omit otherwise (null in DB, absent in Discord embed).
+    // Use the user-stated page if provided; omit otherwise (null in DB, "(not provided)" in the bug-report email).
     const pageValue = selectedPage !== "" ? selectedPage : null;
     try {
       const res = await fetch("/api/feedback", {

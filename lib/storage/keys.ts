@@ -241,7 +241,7 @@ export const KEY_POKEDEX_SORT = "poke-memory:pokedex-sort:v1";
  * persisted here so the shuffle order is consistent across page loads on the
  * same device but differs from other users/devices.
  *
- * Authenticated users use their Supabase `user.id` instead; this key is only
+ * Authenticated users use their account `user.id` instead; this key is only
  * read/written for the guest path.
  */
 export const KEY_CLIENT_SALT = "poke-memory:client-salt:v1";

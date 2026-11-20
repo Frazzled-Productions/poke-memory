@@ -743,3 +743,37 @@ describe("scenario streak + protection-token seeding", () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Favourite scenarios (#2187)
+// ---------------------------------------------------------------------------
+
+describe("favourite scenarios (#2187)", () => {
+  async function masteredIn(payload: SeedPayload): Promise<Set<number>> {
+    const { masteredSpeciesUnion } = await import("@/lib/theme/persistence");
+    return masteredSpeciesUnion(payload.session!.cards as unknown as ReviewableCard[], false, ["en"]);
+  }
+
+  it("favourite set, not mastered: Gengar is the favourite and hearted, and is not mastered", async () => {
+    const payload = SCENARIO_BY_SLUG.get("favourite-unmastered")!.build();
+    expect(payload.favourite?.favouritePokemonId).toBe(94);
+    expect(payload.favourite?.heartedSpeciesIds[0]).toBe(94);
+    expect((await masteredIn(payload)).has(94)).toBe(false);
+  });
+
+  it("favourite mastered: Pikachu is the favourite, hearted and mastered, with the colours offer still to come", async () => {
+    const payload = SCENARIO_BY_SLUG.get("favourite-mastered")!.build();
+    expect(payload.favourite?.favouritePokemonId).toBe(25);
+    expect(payload.favourite?.heartedSpeciesIds[0]).toBe(25);
+    expect(payload.favourite?.favouriteThemeOfferedForId).toBeNull();
+    expect((await masteredIn(payload)).has(25)).toBe(true);
+  });
+
+  it("every hearted species in the scenarios is a seed species", () => {
+    for (const slug of ["favourite-unmastered", "favourite-mastered"]) {
+      for (const id of SCENARIO_BY_SLUG.get(slug)!.build().favourite!.heartedSpeciesIds) {
+        expect(SEED_POKEMON.some((p) => p.id === id)).toBe(true);
+      }
+    }
+  });
+});

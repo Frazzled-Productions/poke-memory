@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 import { guardAccountSwitch } from "@/lib/sync/guardAccountSwitch";
 
@@ -23,7 +23,7 @@ import { guardAccountSwitch } from "@/lib/sync/guardAccountSwitch";
  * Best-effort: `pullAndMerge` swallows all errors and returns a string status.
  */
 export function useSignInPull(
-  client: SupabaseClient | null,
+  client: DataClient | null,
   userId: string | null,
   /**
    * When true, the locale push-back inside `pullAndMerge` is suppressed.

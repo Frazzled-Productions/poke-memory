@@ -5,7 +5,7 @@ name: Perf budget
 # Runs the gated `e2e/perf-budget.spec.ts` Playwright spec against a local
 # production build, on chromium and mobile-safari, with the PERF_BUDGET=1
 # env var that unlocks the spec body. The spec is skipped in every other
-# Playwright run (ci.yml `e2e-browser`, e2e.yml against previews) because
+# Playwright run (ci.yml `e2e-browser`, deploy.yml against previews) because
 # the gate prevents the body from executing without the env var.
 #
 # Status: NON-REQUIRED initially. After one week of stable baseline the

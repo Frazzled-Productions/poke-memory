@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import type { UserSettings } from "@/lib/settings/persistence";
 import {
   validateLearningLocales,
@@ -7,7 +7,6 @@ import {
 import type { AppLocale } from "@/i18n/locales";
 import { DEFAULT_LOCALE } from "@/i18n/locales";
 import type { DateFormat } from "@/lib/utils/format-date";
-import type { MergeUserSettingsRpc } from "@/lib/supabase/rpc-types";
 
 // Settings sync is best-effort. pushSettings routes through the
 // merge_user_settings RPC (migration 011/014), which atomically merges a JSONB
@@ -28,18 +27,31 @@ import type { MergeUserSettingsRpc } from "@/lib/supabase/rpc-types";
  * Other callers (sign-in, force-pull) intentionally push the full object.
  */
 export async function pushSettings(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   patch: Partial<UserSettings>,
 ): Promise<boolean> {
+  return (await pushSettingsWithCode(client, userId, patch)).ok;
+}
+
+/**
+ * `pushSettings` with the error code of a refused merge (null when the request
+ * threw or gave none), for a caller that must tell the optimiser's weekly
+ * limit (23514) from any other failure.
+ */
+export async function pushSettingsWithCode(
+  client: DataClient,
+  userId: string,
+  patch: Partial<UserSettings>,
+): Promise<{ ok: boolean; code: string | null }> {
   try {
-    const { error } = await (client.rpc as unknown as MergeUserSettingsRpc)(
-      "merge_user_settings",
-      { p_user_id: userId, p_patch: patch },
-    );
-    return !error;
+    const { error } = await client.rpc("merge_user_settings", {
+      p_user_id: userId,
+      p_patch: patch,
+    });
+    return error ? { ok: false, code: error.code } : { ok: true, code: null };
   } catch {
-    return false;
+    return { ok: false, code: null };
   }
 }
 
@@ -75,7 +87,7 @@ export type RegionalPrefs = {
  * safe to execute concurrently.
  */
 export async function pushRegionalPrefs(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   prefs: RegionalPrefs,
 ): Promise<boolean> {
@@ -104,7 +116,7 @@ export async function pushRegionalPrefs(
  * are null.
  */
 export async function pullRegionalPrefs(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<RegionalPrefs | null> {
   try {
@@ -149,7 +161,7 @@ function validatePushNotificationHour(value: number | null | undefined): number 
 // pushRegionalPrefs (which does not write to the settings column) or a
 // default-only scaffolding row does not overwrite real local choices.
 export async function pullSettings(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<UserSettings | null> {
   const result = await pullSettingsWithTimestamp(client, userId);
@@ -175,7 +187,7 @@ export type PulledSettings = {
  * `last_reset_at` populated - see migration 022).
  */
 export async function pullSettingsWithTimestamp(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<PulledSettings | null> {
   const row = await pullUserSettingsRow(client, userId);
@@ -193,6 +205,30 @@ export type UserSettingsRow = {
 };
 
 /**
+ * Reads the account's last reset. Returns `null` only when the fetch failed; an
+ * account with no row, or no reset, gives `{ lastResetAt: null }`. Use this when
+ * "no reset" and "could not tell" must not be confused, which
+ * `pullUserSettingsRow` cannot show.
+ */
+export async function pullLastResetAt(
+  client: DataClient,
+  userId: string,
+): Promise<{ lastResetAt: string | null } | null> {
+  try {
+    const { data, error } = await client
+      .from("user_settings")
+      .select("last_reset_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return null;
+    const row = data as { last_reset_at: string | null } | null;
+    return { lastResetAt: row?.last_reset_at ?? null };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Single-query helper that returns every column of the `user_settings` row the
  * sync layer cares about. Callers that only want the JSONB blob should use
  * `pullSettings` / `pullSettingsWithTimestamp`; the background pull uses this
@@ -202,16 +238,39 @@ export type UserSettingsRow = {
  * Returns `null` only when the row doesn't exist or the fetch failed.
  */
 export async function pullUserSettingsRow(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<UserSettingsRow | null> {
+  const result = await readUserSettingsRow(client, userId);
+  return result === "failed" ? null : result;
+}
+
+/**
+ * The JSONB settings blob, or `null` only when the fetch failed: an account
+ * with no row, or an empty blob, gives `{ settings: null }`. Use this when "no
+ * settings" and "could not tell" must not be confused, which `pullSettings`
+ * cannot show.
+ */
+export async function pullSettingsOrFailure(
+  client: DataClient,
+  userId: string,
+): Promise<{ settings: UserSettings | null } | null> {
+  const result = await readUserSettingsRow(client, userId);
+  return result === "failed" ? null : { settings: result?.settings ?? null };
+}
+
+async function readUserSettingsRow(
+  client: DataClient,
+  userId: string,
+): Promise<UserSettingsRow | null | "failed"> {
   try {
     const { data, error } = await client
       .from("user_settings")
       .select("settings, updated_at, last_reset_at")
       .eq("user_id", userId)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error) return "failed";
+    if (!data) return null;
     // updated_at + last_reset_at are typed string | undefined because the
     // actual failure mode this layer guards against is schema drift / missing
     // keys in the response, not a NULL column value. The `?? null` coercion
@@ -231,7 +290,7 @@ export async function pullUserSettingsRow(
       lastResetAt: row.last_reset_at ?? null,
     };
   } catch {
-    return null;
+    return "failed";
   }
 }
 

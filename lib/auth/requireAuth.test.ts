@@ -1,40 +1,59 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { requireAuth } from "./requireAuth";
+import { createSqliteD1, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
+import { syntheticEmail } from "./username";
 
-function fakeSupabase(result: {
-  user: { id: string } | null;
-  error: { message: string } | null;
-}): SupabaseClient {
-  return {
-    auth: {
-      getUser: async () => ({
-        data: { user: result.user },
-        error: result.error,
-      }),
-    },
-  } as unknown as SupabaseClient;
+const { getCloudflareContext } = vi.hoisted(() => ({ getCloudflareContext: vi.fn() }));
+vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext }));
+
+import { requireAuth } from "./requireAuth";
+import { createAuth } from "./server";
+
+const BASE = "http://localhost:3000";
+let d1: SqliteD1;
+let env: Record<string, unknown>;
+
+beforeEach(() => {
+  d1 = createSqliteD1();
+  env = { DB: d1, BETTER_AUTH_URL: BASE, BETTER_AUTH_SECRET: "test-secret-test-secret-test-secret-0123" };
+  getCloudflareContext.mockResolvedValue({ env });
+});
+afterEach(() => {
+  d1.close();
+  getCloudflareContext.mockReset();
+});
+
+/** Signs up a username account in-process and returns its session cookie and id. */
+async function signedIn(): Promise<{ cookie: string; userId: string }> {
+  const auth = createAuth(env as never);
+  const res = await auth.handler(
+    new Request(`${BASE}/api/auth/sign-up/email`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: BASE },
+      body: JSON.stringify({ email: syntheticEmail("dawn"), password: "correct horse", name: "dawn", username: "dawn" }),
+    }),
+  );
+  const body = (await res.json()) as { user: { id: string } };
+  const cookie = res.headers.getSetCookie().find((c) => c.startsWith("better-auth.session_token="))!.split(";")[0];
+  return { cookie, userId: body.user.id };
 }
 
-describe("requireAuth", () => {
-  it("returns { user } when a valid session exists", async () => {
-    const supabase = fakeSupabase({ user: { id: "user-1" }, error: null });
+const request = (cookie?: string) =>
+  new Request(`${BASE}/api/export`, { headers: cookie ? { cookie } : {} });
 
-    const result = await requireAuth(supabase);
+describe("requireAuth", () => {
+  it("returns { user } when the request carries a valid session cookie", async () => {
+    const { cookie, userId } = await signedIn();
+
+    const result = await requireAuth(request(cookie));
 
     expect(result).not.toBeInstanceOf(NextResponse);
     if (result instanceof NextResponse) throw new Error("unreachable");
-    expect(result.user.id).toBe("user-1");
+    expect(result.user).toEqual({ id: userId });
   });
 
-  it("returns 401 { error } when getUser reports an error", async () => {
-    const supabase = fakeSupabase({
-      user: { id: "user-1" },
-      error: { message: "expired" },
-    });
-
-    const result = await requireAuth(supabase);
+  it("returns 401 { error } when there is no session", async () => {
+    const result = await requireAuth(request());
 
     expect(result).toBeInstanceOf(NextResponse);
     if (!(result instanceof NextResponse)) throw new Error("unreachable");
@@ -42,20 +61,25 @@ describe("requireAuth", () => {
     expect(await result.json()).toEqual({ error: "unauthorized" });
   });
 
-  it("returns 401 when no user is present", async () => {
-    const supabase = fakeSupabase({ user: null, error: null });
+  it("returns 401 for a forged cookie", async () => {
+    const result = await requireAuth(request("better-auth.session_token=forged.value"));
 
-    const result = await requireAuth(supabase);
+    if (!(result instanceof NextResponse)) throw new Error("unreachable");
+    expect(result.status).toBe(401);
+  });
 
-    expect(result).toBeInstanceOf(NextResponse);
+  it("returns 401 when the session lookup fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    getCloudflareContext.mockResolvedValue({ env: {} });
+
+    const result = await requireAuth(request());
+
     if (!(result instanceof NextResponse)) throw new Error("unreachable");
     expect(result.status).toBe(401);
   });
 
   it("includes ok: false in the error body when withOkField is set", async () => {
-    const supabase = fakeSupabase({ user: null, error: null });
-
-    const result = await requireAuth(supabase, { withOkField: true });
+    const result = await requireAuth(request(), { withOkField: true });
 
     if (!(result instanceof NextResponse)) throw new Error("unreachable");
     expect(result.status).toBe(401);

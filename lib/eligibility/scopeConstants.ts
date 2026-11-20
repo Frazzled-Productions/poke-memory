@@ -15,6 +15,27 @@
 import type { PracticeScope, FormCategoryFilter } from "@/lib/review/scope";
 import type { FormCategory } from "@/lib/pokemon/forms";
 
+/**
+ * Every preset id, in the order the Scope control lists them (#2187). The one
+ * list the settings validator, the client matcher, the Scope control, the
+ * scope label and the server push predicate all read, so a preset known to
+ * one of them is known to all (`lib/review/presetIds.test.ts` guards it).
+ */
+export const PRESET_IDS = [
+  "starters",
+  "legendaries",
+  "incomplete-chains",
+  "mastery-blockers",
+  "favourites",
+] as const;
+
+export type PracticeScopePreset = (typeof PRESET_IDS)[number];
+
+/** True when `value` is a known preset id. */
+export function isPresetId(value: unknown): value is PracticeScopePreset {
+  return typeof value === "string" && (PRESET_IDS as readonly string[]).includes(value);
+}
+
 export const EMPTY_SCOPE: PracticeScope = {
   gens: [],
   types: [],

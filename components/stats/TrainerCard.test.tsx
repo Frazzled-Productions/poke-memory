@@ -283,3 +283,62 @@ describe("TrainerCard - locale coverage (i18n #1393)", () => {
     expect(descEl).toHaveAttribute("id", "trainer-level-desc");
   });
 });
+
+describe("TrainerCard partner (#2187)", () => {
+  const LINK = {
+    en: "Choose your favourite",
+    ja: "お気に入りを選ぶ",
+    "zh-Hans": "选择你的最爱",
+    "zh-Hant": "選擇你的最愛",
+  } as const;
+  const HEADING = {
+    en: "Your partner",
+    ja: "あなたのパートナー",
+    "zh-Hans": "你的伙伴",
+    "zh-Hant": "你的夥伴",
+  } as const;
+
+  for (const locale of ["en", "ja", "zh-Hans", "zh-Hant"] as const) {
+    it(`No favourite: a "Choose your favourite" link to the Pokédex (${locale})`, () => {
+      renderWithIntl(
+        <TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} partner={null} />,
+        { locale },
+      );
+      expect(screen.getByRole("link", { name: LINK[locale] })).toHaveAttribute("href", "/pokedex");
+    });
+
+    it(`Unmastered partner: silhouette and name under the partner heading (${locale})`, () => {
+      const { container } = renderWithIntl(
+        <TrainerCard
+          handle={null}
+          totalMastered={0}
+          perGeneration={ALL_INCOMPLETE}
+          partner={{ speciesId: 94, mastered: false }}
+        />,
+        { locale },
+      );
+      expect(screen.getByText(HEADING[locale])).toBeInTheDocument();
+      expect(screen.getByText("Gengar")).toBeInTheDocument();
+      expect(container.querySelector("img")!.className).toContain("brightness-0");
+      expect(screen.queryByRole("link", { name: LINK[locale] })).not.toBeInTheDocument();
+    });
+  }
+
+  it("Mastered partner: the full sprite", () => {
+    const { container } = renderWithIntl(
+      <TrainerCard
+        handle={null}
+        totalMastered={1}
+        perGeneration={ALL_INCOMPLETE}
+        partner={{ speciesId: 94, mastered: true }}
+      />,
+    );
+    expect(container.querySelector("img")!.className).not.toContain("brightness-0");
+  });
+
+  it("shows nothing new while the partner is still loading", () => {
+    renderWithIntl(<TrainerCard handle={null} totalMastered={0} perGeneration={ALL_INCOMPLETE} />);
+    expect(screen.queryByRole("link", { name: LINK.en })).not.toBeInTheDocument();
+    expect(screen.queryByText(HEADING.en)).not.toBeInTheDocument();
+  });
+});

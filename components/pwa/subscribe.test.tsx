@@ -8,7 +8,7 @@
  * project picks it up.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import {
   isPushSupported,
   isStandalone,
@@ -155,7 +155,7 @@ function makeRegistration(initial: FakeSubscription | null) {
 }
 
 function makeClient(): {
-  client: SupabaseClient;
+  client: DataClient;
   insertCalls: unknown[];
   deleteCalls: { filters: Array<{ col: string; val: unknown }> }[];
   failInsert?: boolean;
@@ -168,7 +168,7 @@ function makeClient(): {
     failDelete: false,
   };
   function makeDeleteChain() {
-    // Supabase delete().eq().eq() returns a thenable on each chain step. We
+    // The data client's delete().eq().eq() returns a thenable on each chain step. We
     // model it as a builder whose `.eq` returns the same shape and which
     // resolves when awaited, regardless of how many .eq calls were chained.
     const filters: Array<{ col: string; val: unknown }> = [];
@@ -200,7 +200,7 @@ function makeClient(): {
       },
       delete: () => makeDeleteChain(),
     }),
-  } as unknown as SupabaseClient;
+  } as unknown as DataClient;
   return Object.assign(state, { client });
 }
 
@@ -311,7 +311,7 @@ describe("subscribeToPush", () => {
     expect(call.rows.endpoint).toBe("https://push.example/existing");
   });
 
-  it("returns persist-failed when the Supabase delete errors", async () => {
+  it("returns persist-failed when the database delete errors", async () => {
     const registration = makeRegistration(null);
     Object.defineProperty(navigator, "serviceWorker", {
       value: { ready: Promise.resolve(registration) },
@@ -325,7 +325,7 @@ describe("subscribeToPush", () => {
     expect(harness.insertCalls).toHaveLength(0);
   });
 
-  it("returns persist-failed when the Supabase insert errors", async () => {
+  it("returns persist-failed when the database insert errors", async () => {
     const registration = makeRegistration(null);
     Object.defineProperty(navigator, "serviceWorker", {
       value: { ready: Promise.resolve(registration) },

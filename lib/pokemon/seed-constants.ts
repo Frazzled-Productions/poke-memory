@@ -35,3 +35,21 @@ export function reverseEdgeIdFor(forwardEdgeId: number): number {
 export function isReverseEdgeId(id: number): boolean {
   return id > REVERSE_EDGE_ID_BASE && id < CRY_ID_OFFSET;
 }
+
+/**
+ * Highest species id in the seed (#2187). Default forms are exactly
+ * 1..MAX_SPECIES_ID (asserted in `seed.test.ts`), so a species id can be
+ * checked without loading the seed JSON. Alternate forms (10000+) are not
+ * species ids.
+ */
+export const MAX_SPECIES_ID = 1025;
+
+/** True when `value` is a species id in the seed (an integer 1..MAX_SPECIES_ID). */
+export function isSpeciesId(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= MAX_SPECIES_ID
+  );
+}

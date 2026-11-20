@@ -12,6 +12,7 @@ import {
   countMatchingSpecies,
   isScopeEmpty,
   scopeLabel,
+  PRESET_IDS,
   type FormCategoryFilter,
   type PracticeScope,
   type PracticeScopePreset,
@@ -43,6 +44,11 @@ type Props = {
    * the preset counts as matching nothing.
    */
   masteryBlockingSpeciesIds?: ReadonlySet<number>;
+  /**
+   * The player's hearted species (#2187). The "Favourites" preset is offered
+   * only while this holds at least one species, and the live count matches it.
+   */
+  heartedSpeciesIds?: ReadonlySet<number>;
 };
 
 const GENS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -50,8 +56,6 @@ const ROMAN: Record<number, string> = {
   1: "I", 2: "II", 3: "III", 4: "IV", 5: "V",
   6: "VI", 7: "VII", 8: "VIII", 9: "IX",
 };
-// Keys only - labels are resolved via t() at render time to support locale switching.
-const PRESET_KEYS: PracticeScopePreset[] = ["starters", "legendaries", "incomplete-chains", "mastery-blockers"];
 
 function toggleNum(arr: number[], v: number): number[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
@@ -144,6 +148,7 @@ export function ScopeControl({
   alternateFormsEnabled = false,
   incompleteChainSpeciesIds,
   masteryBlockingSpeciesIds,
+  heartedSpeciesIds,
 }: Props) {
   const [open, setOpen] = useState(false);
   const { seed } = useSeed();
@@ -157,8 +162,13 @@ export function ScopeControl({
   // Context for progress-dependent presets (#995, #1767): the live count must
   // consult the same species sets the session uses, so both counts agree.
   const scopeContext: ScopeMatchContext = useMemo(
-    () => ({ incompleteChainSpeciesIds, masteryBlockingSpeciesIds }),
-    [incompleteChainSpeciesIds, masteryBlockingSpeciesIds],
+    () => ({ incompleteChainSpeciesIds, masteryBlockingSpeciesIds, heartedSpeciesIds }),
+    [incompleteChainSpeciesIds, masteryBlockingSpeciesIds, heartedSpeciesIds],
+  );
+  // Keys only - labels are resolved via t() at render time to support locale
+  // switching. Favourites shows only while there are hearts (#2187).
+  const presetKeys: PracticeScopePreset[] = PRESET_IDS.filter(
+    (id) => id !== "favourites" || (heartedSpeciesIds?.size ?? 0) > 0,
   );
   // When the forms gate is off, alternate-form entries are excluded from the
   // count so the "X of N" display is consistent with what the session builds.
@@ -298,12 +308,13 @@ export function ScopeControl({
             defaultOpen={presetsActive}
           >
             <div className="flex flex-wrap gap-1.5">
-              {PRESET_KEYS.map((key) => {
+              {presetKeys.map((key) => {
                 const selected = scope.presets.includes(key);
                 const presetLabel =
                   key === "starters" ? tScope("presetStarters")
                   : key === "legendaries" ? tScope("presetLegendaries")
                   : key === "incomplete-chains" ? tScope("presetIncompleteChains")
+                  : key === "favourites" ? tScope("presetFavourites")
                   : tScope("presetMasteryBlockers");
                 const ariaLabel =
                   key === "mastery-blockers"

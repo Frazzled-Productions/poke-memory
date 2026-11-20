@@ -43,7 +43,6 @@ const INCLUDE_PREFIXES = ["app/", "components/", "lib/"];
 function isMeasurableFile(repoPath) {
   if (!INCLUDE_PREFIXES.some((p) => repoPath.startsWith(p))) return false;
   if (/\.test\.tsx?$/.test(repoPath)) return false;
-  if (repoPath.startsWith("lib/sync/integration/")) return false;
   if (repoPath === "lib/pokemon/generated.json") return false;
   if (/\.d\.ts$/.test(repoPath)) return false;
   return true;

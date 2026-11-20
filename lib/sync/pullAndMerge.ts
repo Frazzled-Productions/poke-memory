@@ -1,5 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib/sync/cloud";
+import { isLaterInstant } from "@/lib/sync/instant";
 import {
   pullUserSettingsRow,
   pullRegionalPrefs,
@@ -24,6 +25,7 @@ import {
 import { loadGradeLog, saveGradeLog } from "@/lib/gradelog/persistence";
 import {
   preserveDeviceLocalKeys,
+  keepDeviceFavouriteKeys,
   loadLastPushedSettings,
   saveLastPushedSettings,
 } from "@/lib/settings/lastPushedSnapshot";
@@ -134,7 +136,7 @@ function mergeAffectsProgress(
  * breaks the local-first review flow.
  */
 export async function pullAndMerge(
-  client: SupabaseClient | null,
+  client: DataClient | null,
   userId: string | null,
   /**
    * When true, the push-back leg of the locale union-merge is suppressed.
@@ -173,7 +175,7 @@ export async function pullAndMerge(
     if (
       pulledRow?.lastResetAt &&
       (syncStatus.lastSeenResetAt === null ||
-        pulledRow.lastResetAt > syncStatus.lastSeenResetAt)
+        isLaterInstant(pulledRow.lastResetAt, syncStatus.lastSeenResetAt))
     ) {
       await clearLocalProgress();
       // clearLocalProgress wiped sync-status:v1 under the poke-memory:*
@@ -205,9 +207,9 @@ export async function pullAndMerge(
       const cloudIsNewer =
         pulledRow.updatedAt !== null &&
         (syncStatus.lastSettingsPullAt === null ||
-          pulledRow.updatedAt > syncStatus.lastSettingsPullAt);
+          isLaterInstant(pulledRow.updatedAt, syncStatus.lastSettingsPullAt));
       // `user_settings.updated_at` is `NOT NULL DEFAULT now()` so this
-      // branch is unreachable against real Supabase data. It exists for the
+      // branch is unreachable against real cloud data. It exists for the
       // schema-drift case `pullUserSettingsRow` coerces with `?? null`
       // (response missing the column entirely) - when that happens we still
       // want to apply the blob once and then stamp the cursor so we don't
@@ -232,7 +234,9 @@ export async function pullAndMerge(
         // above) so the locale merge step below still sees the correct original state.
         const { learningLocales: _learningLocales, removedLocales: _removedLocales, ...cloudSettingsWithoutLocales } =
           (pulledRow.settings ?? {}) as Partial<typeof DEFAULT_SETTINGS>;
-        const lwwBlob = preserveDeviceLocalKeys(
+        // keepDeviceFavouriteKeys (#2187): a cloud row older than the favourite
+        // keys must not wipe them, and must let the theme carry-over fire.
+        const { settings: lwwBlob, lastPushed } = keepDeviceFavouriteKeys(preserveDeviceLocalKeys(
           {
             ...DEFAULT_SETTINGS,
             ...cloudSettingsWithoutLocales,
@@ -243,14 +247,14 @@ export async function pullAndMerge(
             removedLocales: preLocalSettings.removedLocales,
           },
           preLocalSettings,
-        );
+        ), pulledRow.settings, preLocalSettings);
         // Snapshot the blob BEFORE saveSettings fires SETTINGS_SAVED_EVENT so the
         // AutoSyncOnChange listener sees a zero-key diff and does not re-push
         // cloud-pulled sub-objects back (CC-1, #1682). saveSettings mirrors
         // pokemonNameLocale from activePokemonNameLocale in the written object, so
         // we must do the same here to keep the snapshot and the event detail in sync.
         saveLastPushedSettings({
-          ...lwwBlob,
+          ...lastPushed,
           pokemonNameLocale: lwwBlob.activePokemonNameLocale,
         });
         saveSettings(lwwBlob);

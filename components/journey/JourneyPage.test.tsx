@@ -184,6 +184,9 @@ vi.mock("@/lib/pokemon/SeedContext", () => ({
   }),
 }));
 
+// The partner has its own tests (TrainerCard, usePartner); here it is absent (#2187).
+vi.mock("@/components/favourite/usePartner", () => ({ usePartner: () => null }));
+
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: vi.fn(() => ({
     masteryRepetitions: 3,
@@ -386,7 +389,7 @@ vi.mock("@/components/stats/RecordsCard", () => ({
 const { mockAuthValue } = vi.hoisted(() => ({
   mockAuthValue: {
     user: null as null | typeof mockSuiteUser,
-    supabase: null as null | { auth: unknown },
+    db: null as null | { auth: unknown },
     loading: false,
   },
 }));
@@ -410,7 +413,7 @@ beforeEach(() => {
   mockLoadSession.mockResolvedValue(null);
   mockPullSession.mockResolvedValue([]);
   mockAuthValue.user = null;
-  mockAuthValue.supabase = null;
+  mockAuthValue.db = null;
   mockSuperuserValue.flags = { pretendAllMastered: false };
   mockSuperuserValue.anyFlagOn = false;
 });
@@ -533,7 +536,7 @@ describe("JourneyPage - pretendAllMastered superuser path", () => {
     mockSuperuserValue.flags = { pretendAllMastered: true };
     mockSuperuserValue.anyFlagOn = true;
     mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
 
     render(<JourneyPage />);
 
@@ -550,7 +553,7 @@ describe("JourneyPage - cloud hydration (signed in)", () => {
     const cloudRows = [makeCloudRow(1), makeCloudRow(2), makeCloudRow(3)];
     mockPullSession.mockResolvedValue(cloudRows);
     mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
 
     render(<JourneyPage />);
 
@@ -560,7 +563,7 @@ describe("JourneyPage - cloud hydration (signed in)", () => {
 
     expect(mockPullSession).toHaveBeenCalledTimes(1);
     expect(mockPullSession).toHaveBeenCalledWith(
-      mockAuthValue.supabase,
+      mockAuthValue.db,
       mockSuiteUser.id,
     );
   });
@@ -568,7 +571,7 @@ describe("JourneyPage - cloud hydration (signed in)", () => {
   it("falls back to local data when pullSession returns null (network failure)", async () => {
     mockPullSession.mockResolvedValue(null);
     mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
 
     render(<JourneyPage />);
 
@@ -580,7 +583,7 @@ describe("JourneyPage - cloud hydration (signed in)", () => {
   it("falls back to local data when pullSession throws", async () => {
     mockPullSession.mockRejectedValue(new Error("timeout"));
     mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
 
     render(<JourneyPage />);
 
@@ -593,7 +596,7 @@ describe("JourneyPage - cloud hydration (signed in)", () => {
 describe("JourneyPage - guest user", () => {
   it("does not call pullSession when user is null", async () => {
     mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
+    mockAuthValue.db = null;
 
     render(<JourneyPage />);
 
@@ -703,7 +706,7 @@ describe("JourneyPage - timeline and evolution wall layout placeholders (#961)",
       }),
     );
     mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
 
     render(<JourneyPage />);
 
@@ -732,7 +735,7 @@ describe("JourneyPage - timeline and evolution wall layout placeholders (#961)",
     // Resolve pull immediately - no cards from cloud, so local path is used.
     mockPullSession.mockResolvedValue(null);
     mockAuthValue.user = mockSuiteUser;
-    mockAuthValue.supabase = { auth: {} };
+    mockAuthValue.db = { auth: {} };
 
     render(<JourneyPage />);
 
@@ -758,7 +761,7 @@ describe("JourneyPage - timeline and evolution wall layout placeholders (#961)",
 
   it("shows timeline and evolution wall headings even for a guest (no cloud pull)", async () => {
     mockAuthValue.user = null;
-    mockAuthValue.supabase = null;
+    mockAuthValue.db = null;
 
     render(<JourneyPage />);
 

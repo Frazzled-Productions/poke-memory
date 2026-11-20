@@ -228,6 +228,13 @@ vi.mock("@/lib/gradelog/persistence", async (importOriginal) => {
   };
 });
 
+// The partner (#2187) has its own tests; here there is no favourite unless a
+// test sets one.
+const { mockPartner } = vi.hoisted(() => ({
+  mockPartner: { value: null as { speciesId: number; mastered: boolean } | null },
+}));
+vi.mock("@/components/favourite/usePartner", () => ({ usePartner: () => mockPartner.value }));
+
 vi.mock("@/lib/settings/persistence", () => ({
   loadSettings: () => mockLoadSettings(),
   saveSettings: vi.fn(),
@@ -253,9 +260,9 @@ vi.mock("@/lib/streak", () => ({
 
 // Mutable so the #2052 undo-hold tests can sign in with a recording fake client.
 const mockAuthValue = vi.hoisted(() => ({
-  current: { user: null, supabase: null, loading: false } as {
+  current: { user: null, db: null, loading: false } as {
     user: { id: string } | null;
-    supabase: unknown;
+    db: unknown;
     loading: boolean;
   },
 }));
@@ -435,6 +442,46 @@ describe("ReviewSession reveal flow", () => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument(),
     );
     expect(screen.queryByRole("button", { name: /easy/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("Learn-first list (#2187)", () => {
+  it("Fully introduced: grading Bulbasaur's last new card removes it from priorityNewSpeciesIds", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...mockLoadSettings(),
+      priorityNewSpeciesIds: [1],
+    });
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+    const user = userEvent.setup();
+    renderWithIntl(<ReviewSession />);
+
+    await user.click(await screen.findByRole("button", { name: /reveal/i }));
+    await user.click(screen.getByRole("button", { name: /easy/i }));
+
+    await waitFor(() =>
+      expect(vi.mocked(saveSettings)).toHaveBeenCalledWith(
+        expect.objectContaining({ priorityNewSpeciesIds: [] }),
+      ),
+    );
+  });
+
+  it("does not touch the list before any card is introduced", async () => {
+    mockLoadSettings.mockReturnValue({
+      ...mockLoadSettings(),
+      priorityNewSpeciesIds: [1],
+    });
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      cards: [FIXTURE_CARD, GRADUATED_REVERSE_CARD],
+      limits: DEFAULT_LIMITS,
+    });
+    renderWithIntl(<ReviewSession />);
+    await screen.findByRole("button", { name: /reveal/i });
+    expect(vi.mocked(saveSettings)).not.toHaveBeenCalledWith(
+      expect.objectContaining({ priorityNewSpeciesIds: expect.anything() }),
+    );
   });
 });
 
@@ -1341,6 +1388,50 @@ describe("Practice scope (#333)", () => {
     });
 
     // The empty-state must offer a way out - a "Clear scope" button.
+    expect(screen.getByRole("button", { name: /clear scope/i })).toBeInTheDocument();
+  });
+
+  it("Practise your hearts: a Favourites scope keeps a hearted species (#2187)", async () => {
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 100,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: ["favourites"] },
+      heartedSpeciesIds: [1],
+      earnedBadges: [],
+    });
+    renderWithIntl(<ReviewSession />);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /reveal/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/no Pok[ée]mon match your scope/i)).not.toBeInTheDocument();
+  });
+
+  it("Un-heart everything: a Favourites scope with no hearts shows the no-match state (#2187)", async () => {
+    mockLoadSettings.mockReturnValue({
+      masteryRepetitions: 3,
+      maxNewPerDay: 10,
+      maxReviewsPerDay: 100,
+      maxNewEvolutionPerDay: 5,
+      maxReviewsEvolutionPerDay: 50,
+      maxNewReversePerDay: 0,
+      maxReviewsReversePerDay: 100,
+      evolutionCardsEnabled: true,
+      playCryOnReveal: false,
+      practiceScope: { gens: [], types: [], presets: ["favourites"] },
+      heartedSpeciesIds: [],
+      earnedBadges: [],
+    });
+    renderWithIntl(<ReviewSession />);
+    await waitFor(() => {
+      expect(screen.getByText(/no Pok[ée]mon match your scope/i)).toBeInTheDocument();
+    });
     expect(screen.getByRole("button", { name: /clear scope/i })).toBeInTheDocument();
   });
 
@@ -5458,6 +5549,44 @@ describe("ReviewSession Phase 2 - multi-locale crown-jewel invariant (#1562)", (
     // Must NOT include a language endonym for single-locale users.
     expect(screen.queryByText(/all caught up in/i)).not.toBeInTheDocument();
   });
+
+  it("all-caught-up screen shows the partner and the once-only colours offer (#2187)", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const masteredState = {
+      fsrsState: "review" as const,
+      stability: 10, difficulty: 5, elapsedDays: 25, scheduledDays: 25, reps: 3,
+      dueDate: "2099-01-01", lastReview: today, firstSeen: "2025-01-01",
+      lapses: 0, learningStep: null, stepStartedAt: null, hiddenSince: null, seenInPasture: false,
+    };
+    const enName: NameReviewCard = { ...enCard, state: masteredState };
+    const enReverse = { ...enCard, id: 2_000_001, locale: "en" as const, cardType: "reverse" as const, pokemonId: 1, subjectKey: "1", state: masteredState };
+    vi.mocked(loadSession).mockResolvedValueOnce({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      cards: [enName, enReverse as any],
+      limits: DEFAULT_LIMITS,
+    });
+    mockLoadSettings.mockReturnValue({
+      ...nameOnlySettings,
+      activePokemonNameLocale: "en",
+      learningLocales: ["en"],
+      favouritePokemonId: 1,
+      favouriteTheme: null,
+      favouriteThemeOfferedForId: null,
+    });
+    mockPartner.value = { speciesId: 1, mastered: true };
+
+    try {
+      renderWithIntl(<ReviewSession />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/all caught up!/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
+      expect(screen.getByText("Your partner")).toBeInTheDocument();
+      expect(await screen.findByRole("group", { name: "Switch to Bulbasaur's colours?" })).toBeInTheDocument();
+    } finally {
+      mockPartner.value = null;
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -6016,10 +6145,10 @@ describe("undo hold wiring for signed-in users (#2052)", () => {
       writable: true,
     });
     upserts = [];
-    // Recording fake Supabase: every cloud write lands in `upserts`.
+    // Recording fake data client: every cloud write lands in `upserts`.
     mockAuthValue.current = {
       user: { id: "user-1" },
-      supabase: {
+      db: {
         from: (table: string) => ({
           upsert: async (rows: Record<string, unknown> | Record<string, unknown>[]) => {
             upserts.push({ table, rows: Array.isArray(rows) ? rows : [rows] });
@@ -6036,7 +6165,7 @@ describe("undo hold wiring for signed-in users (#2052)", () => {
   });
 
   afterEach(() => {
-    mockAuthValue.current = { user: null, supabase: null, loading: false };
+    mockAuthValue.current = { user: null, db: null, loading: false };
     vi.mocked(appendGradeEntry).mockResolvedValue({ occurredAt: Date.now() } as never);
   });
 
@@ -6167,7 +6296,7 @@ describe("undo hold wiring for signed-in users (#2052)", () => {
   });
 
   it("guest (signed out): Undo still works and nothing is sent", async () => {
-    mockAuthValue.current = { user: null, supabase: null, loading: false };
+    mockAuthValue.current = { user: null, db: null, loading: false };
     vi.mocked(appendGradeEntry).mockResolvedValue({ occurredAt: 555 } as never);
     const user = userEvent.setup();
     renderWithIntl(<ReviewSession />);

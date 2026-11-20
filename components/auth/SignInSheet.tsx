@@ -150,7 +150,7 @@ export function SignInSheet({ open, onClose }: Props) {
 
   function handleSignIn(provider: AuthProvider) {
     startTransition(() => signIn(provider));
-    // Do not close the sheet here - the server action triggers a redirect.
+    // Do not close the sheet here - signIn redirects to the provider.
     // Closing prematurely removes the inert guard before the navigation completes.
   }
 
@@ -200,14 +200,9 @@ export function SignInSheet({ open, onClose }: Props) {
         );
         setIsSubmitting(false);
       } else {
-        // Success. signUpWithUsername / signInWithUsername are SERVER ACTIONS:
-        // they set the Supabase session in cookies server-side. The browser
-        // client's `onAuthStateChange` does NOT fire for an out-of-band cookie
-        // write, and AuthContext only reads the session via getUser() on mount,
-        // so closing the sheet alone leaves the UI in the signed-out state until
-        // a manual reload. A full navigation re-reads the new session cookie and
-        // runs the sign-in side effects (SignInPull etc.), mirroring what the
-        // OAuth callback redirect already does (#1671 real-auth regression).
+        // Success: Better Auth has set the session cookie. A full navigation
+        // re-reads the session and runs the sign-in side effects (SignInPull
+        // etc.), mirroring what the OAuth callback redirect does (#1671).
         window.location.assign("/");
         return;
       }

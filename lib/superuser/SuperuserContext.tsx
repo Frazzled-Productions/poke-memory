@@ -30,6 +30,7 @@ import {
   isFavouriteEarned,
 } from "@/lib/theme/persistence";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "@/lib/settings/persistence";
+import { keepDeviceFavouriteKeys } from "@/lib/settings/lastPushedSnapshot";
 import { saveStreakData } from "@/lib/streak/persistence";
 import { saveGradeLog } from "@/lib/gradelog/persistence";
 import { loadSeed } from "@/lib/pokemon/seed-async";
@@ -70,7 +71,7 @@ export function useSuperuser(): SuperuserContextValue {
 }
 
 export function SuperuserProvider({ children }: { children: React.ReactNode }) {
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const [unlocked, setUnlockedState] = useState(false);
   const [flags, setFlags] = useState<SuperuserFlags>(DEFAULT_FLAGS);
   // F16: tracks whether the cleanup-pending marker is set so the React
@@ -80,9 +81,9 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
   // Refs let chord/tap handlers see latest values without rebinding listeners
   // on every auth change or flag flip.
   const userRef = useRef(user);
-  const supabaseRef = useRef(supabase);
+  const dbRef = useRef(db);
   userRef.current = user;
-  supabaseRef.current = supabase;
+  dbRef.current = db;
 
   const flagsRef = useRef(flags);
   flagsRef.current = flags;
@@ -103,7 +104,7 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
     // only in the cardsTrusted=true branches below so the indicator survives a
     // cancelled or degraded cleanup - QA can still see the seed is active.
     const u = userRef.current;
-    const sb = supabaseRef.current;
+    const sb = dbRef.current;
     let cardsTrusted = false;
     if (u && sb) {
       try {
@@ -141,7 +142,13 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
             // mobileNav) would store an incomplete object and trigger a two-load
             // inconsistency until the next loadSettings() call. Spreading over
             // DEFAULT_SETTINGS ensures the stored blob is always complete.
-            saveSettings({ ...DEFAULT_SETTINGS, ...pulledSettings.settings });
+            // keepDeviceFavouriteKeys (#2187): a cloud row older than the
+            // favourite keys must not wipe them.
+            saveSettings(keepDeviceFavouriteKeys(
+              { ...DEFAULT_SETTINGS, ...pulledSettings.settings },
+              pulledSettings.settings,
+              loadSettings(),
+            ).settings);
           }
           // Regional prefs overlay runs ONLY if the JSONB pull succeeded -
           // otherwise the loadSettings() base is the QA-dirty local snapshot,
@@ -201,7 +208,7 @@ export function SuperuserProvider({ children }: { children: React.ReactNode }) {
           try { window.localStorage.removeItem(KEY_SUPERUSER_CLEANUP_PENDING); } catch { /* non-fatal */ }
           cardsTrusted = true;
         } else {
-          // pullSession returned null: the pull failed (network error / Supabase
+          // pullSession returned null: the pull failed (network error / cloud
           // unreachable). Leave local state as-is - overwriting with no cloud
           // data would be worse - and warn so QA can see the cleanup degraded.
           // cardsTrusted stays false so the favourite-theme re-validation below

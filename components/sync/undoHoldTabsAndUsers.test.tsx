@@ -12,7 +12,7 @@
  */
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 vi.mock("@/lib/sync/cloud", () => ({
   pushSingleCard: vi.fn(async () => "ok"),
@@ -47,7 +47,7 @@ import {
 import { KEY_HELD_GRADE_PREFIX, KEY_TAB_ID } from "@/lib/storage/keys";
 import type { ReviewableCard } from "@/lib/review/session";
 
-const CLIENT = {} as unknown as SupabaseClient;
+const CLIENT = {} as unknown as DataClient;
 const USER = "00000000-0000-0000-0000-00000000000a";
 const OTHER_USER = "00000000-0000-0000-0000-00000000000b";
 
@@ -218,7 +218,7 @@ describe("undo hold: per-tab and per-user held copies (#2052)", () => {
     vi.setSystemTime(Date.now() + HELD_COPY_STALE_MS + 1);
     window.sessionStorage.setItem(KEY_TAB_ID, "tab-A");
     const { result, rerender } = renderHook(
-      ({ client }: { client: SupabaseClient }) => usePerGradeSync(client, USER),
+      ({ client }: { client: DataClient }) => usePerGradeSync(client, USER),
       { initialProps: { client: CLIENT } },
     );
     await advance(250);
@@ -228,7 +228,7 @@ describe("undo hold: per-tab and per-user held copies (#2052)", () => {
     act(() => {
       result.current.enqueueGrade(makeCard(1), { hold: true });
     });
-    rerender({ client: {} as unknown as SupabaseClient });
+    rerender({ client: {} as unknown as DataClient });
     await advance(250);
 
     expect(pushedIds()).toEqual([]);

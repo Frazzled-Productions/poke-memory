@@ -316,6 +316,30 @@ describe("cardMatchesScope - mastery-blockers preset (#1767)", () => {
   });
 });
 
+// ─── favourites preset (#2187) ───────────────────────────────────────────────
+
+describe("cardMatchesScope - favourites preset (#2187)", () => {
+  const scope = { gens: [], types: [], presets: ["favourites" as const] };
+
+  it("Practise your hearts: matches the hearted species and evolution cards anchored on them", () => {
+    const ctx = { heartedSpeciesIds: new Set([25, 94]) };
+    expect(cardMatchesScope(nameCard(25), scope, ctx)).toBe(true);
+    expect(cardMatchesScope(nameCard(94), scope, ctx)).toBe(true);
+    expect(cardMatchesScope(nameCard(1), scope, ctx)).toBe(false);
+    expect(cardMatchesScope(evoCard(1_500_100, 25, 26), scope, ctx)).toBe(true);
+    expect(cardMatchesScope(evoCard(1_500_101, 172, 25), scope, ctx)).toBe(false);
+  });
+
+  it("Un-heart everything: with no hearts the preset matches nothing", () => {
+    expect(cardMatchesScope(nameCard(25), scope, { heartedSpeciesIds: new Set() })).toBe(false);
+    expect(cardMatchesScope(nameCard(25), scope)).toBe(false);
+  });
+
+  it("labels the favourites preset", () => {
+    expect(scopeLabel(scope)).toBe("Favourites");
+  });
+});
+
 describe("isScopeEmpty", () => {
   it("returns true for the canonical empty scope", () => {
     expect(isScopeEmpty(EMPTY_SCOPE)).toBe(true);

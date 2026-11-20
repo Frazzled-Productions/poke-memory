@@ -110,7 +110,7 @@ const { mockSuperuserFlags, mockSuperuserState, mockSetFlag } = vi.hoisted(
       string,
       boolean
     >,
-    mockSuperuserState: { unlocked: false },
+    mockSuperuserState: { unlocked: false, anyFlagOn: false },
     mockSetFlag: vi.fn(),
   }),
 );
@@ -119,7 +119,7 @@ vi.mock("@/lib/superuser/SuperuserContext", () => ({
     unlocked: mockSuperuserState.unlocked,
     flags: mockSuperuserFlags,
     setFlag: mockSetFlag,
-    anyFlagOn: false,
+    anyFlagOn: mockSuperuserState.anyFlagOn,
   }),
 }));
 
@@ -173,6 +173,10 @@ vi.mock("@/lib/pokemon/SeedContext", () => ({
 
 vi.mock("@/lib/stats/derive", () => ({
   isMastered: vi.fn(() => false),
+}));
+
+vi.mock("@/lib/sync/restoreBackup", () => ({
+  restoreBackupSignedIn: vi.fn(),
 }));
 
 vi.mock("@/lib/backup/io", () => ({
@@ -331,7 +335,14 @@ const { mockT } = vi.hoisted(() => {
 });
 
 vi.mock("next-intl", () => ({
-  useTranslations: () => mockT,
+  // Namespaced calls (the favourite sections, #2187) prefix the key.
+  useTranslations: (ns?: string) =>
+    ns === undefined
+      ? mockT
+      : Object.assign(
+          (key: string, params?: Record<string, string | number>) => mockT(`${ns}.${key}`, params),
+          { rich: (key: string, tags: never) => (mockT as unknown as { rich: (k: string, t: never) => unknown }).rich(`${ns}.${key}`, tags) },
+        ),
 }));
 
 vi.mock("@/i18n/locales", () => ({
@@ -449,6 +460,8 @@ function defaultSettings() {
 // ---------------------------------------------------------------------------
 
 import SettingsPage from "@/app/settings/page";
+import { applyBackup, validateBackup } from "@/lib/backup/io";
+import { restoreBackupSignedIn } from "@/lib/sync/restoreBackup";
 
 // ---------------------------------------------------------------------------
 // Shared setup
@@ -460,7 +473,7 @@ beforeEach(() => {
   mockLoadSession.mockResolvedValue(null);
   mockSaveSession.mockResolvedValue({ ok: true });
   // Reset auth to guest by default (matches prior static mock).
-  mockUseAuth.mockReturnValue({ user: null, supabase: null, loading: false });
+  mockUseAuth.mockReturnValue({ user: null, db: null, loading: false });
   // Reset retry/sync state to healthy defaults.
   mockUseRetryPush.mockReturnValue({ retryState: "idle", retryNow: vi.fn() });
   // Reset SW version state to no-controller by default.
@@ -1235,7 +1248,7 @@ describe("SettingsPage - language section is always visible (GA, #1723)", () => 
 // ---------------------------------------------------------------------------
 // Theme picker locked state (#1440)
 //
-// FavouritePicker renders a locked-state message when no Pokémon are mastered.
+// ThemeSection renders a locked-state message when no Pokémon are mastered.
 // When pretendAllMastered is on (or mastered entries exist), the picker renders.
 // ---------------------------------------------------------------------------
 
@@ -1274,16 +1287,18 @@ describe("SettingsPage - theme picker locked state (#1440)", () => {
 
     await renderAndWait();
 
-    expect(screen.queryByRole("button", { name: /Set as theme/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /as your app theme/i })).not.toBeInTheDocument();
   });
 
   it("pretendAllMastered on: picker grid renders, locked message absent", async () => {
-    // The superuser flag forces unlockedEntries to include every CURATED_POKEMON
-    // entry (the real, non-empty curated list), so the locked branch is skipped.
-    // This exercises the actual `flags.pretendAllMastered` short-circuit in the
-    // component's masteredSpeciesUnion call, not just catalogue-key presence.
+    // The superuser flag counts every seed species as mastered (#2187), so
+    // with an empty session the locked branch is still skipped and the theme
+    // search offers the seed's species.
     mockLoadSession.mockResolvedValue(null);
     mockSuperuserFlags.pretendAllMastered = true;
+    STABLE_SEED.seedPokemon = [
+      { id: 25, speciesId: 25, name: "Pikachu", displayName: "Pikachu", isDefaultForm: true, spriteUrl: "/sprites/pokemon/25.png" },
+    ];
     try {
       await renderAndWait();
 
@@ -1294,11 +1309,12 @@ describe("SettingsPage - theme picker locked state (#1440)", () => {
       // The picker grid renders at least one selectable theme.
       await waitFor(() => {
         expect(
-          screen.getAllByRole("button", { name: /Set as theme/i }).length,
+          screen.getAllByRole("button", { name: /as your app theme/i }).length,
         ).toBeGreaterThan(0);
       });
     } finally {
       mockSuperuserFlags.pretendAllMastered = false;
+      STABLE_SEED.seedPokemon = [];
     }
   });
 });
@@ -1782,7 +1798,7 @@ describe("SettingsPage - statutory trading disclosure in About section (#1565 Pa
 // and the amber border when sync has failed.
 // ---------------------------------------------------------------------------
 
-/** A minimal Supabase-shaped user fixture for account-block tests. */
+/** A minimal AppUser-shaped fixture for account-block tests. */
 function makeUser(overrides?: Record<string, unknown>) {
   return {
     id: "user-123",
@@ -1797,7 +1813,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
   it("signed-in healthy: shows identity, provider label, sync status, and sign-out", async () => {
     mockUseAuth.mockReturnValue({
       user: makeUser(),
-      supabase: {} as unknown,
+      db: {} as unknown,
       loading: false,
     });
     // Healthy sync - no failure flag.
@@ -1834,7 +1850,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
   it("signed-in healthy: account card has zinc border (not amber)", async () => {
     mockUseAuth.mockReturnValue({
       user: makeUser(),
-      supabase: {} as unknown,
+      db: {} as unknown,
       loading: false,
     });
     mockLoadSyncStatus.mockReturnValue({
@@ -1866,7 +1882,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
   it("signed-in sync-failed: shows the sync status line in failed state", async () => {
     mockUseAuth.mockReturnValue({
       user: makeUser(),
-      supabase: {} as unknown,
+      db: {} as unknown,
       loading: false,
     });
     // Simulate a persisted push failure.
@@ -1897,7 +1913,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
   it("signed-in sync-failed: account card gets amber border", async () => {
     mockUseAuth.mockReturnValue({
       user: makeUser(),
-      supabase: {} as unknown,
+      db: {} as unknown,
       loading: false,
     });
     mockLoadSyncStatus.mockReturnValue({
@@ -1948,7 +1964,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
   it("#1823: SyncStatusLine receives tz from settings.timezone when signed in", async () => {
     mockUseAuth.mockReturnValue({
       user: { id: "u1", email: "a@b.com", app_metadata: {}, user_metadata: {} },
-      supabase: {},
+      db: {},
       loading: false,
     });
     mockLoadSettings.mockReturnValue({
@@ -1969,7 +1985,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
     // The mock for detectTimezone returns "Europe/London" (see vi.mock above).
     mockUseAuth.mockReturnValue({
       user: { id: "u1", email: "a@b.com", app_metadata: {}, user_metadata: {} },
-      supabase: {},
+      db: {},
       loading: false,
     });
     mockLoadSettings.mockReturnValue({
@@ -2108,5 +2124,136 @@ describe("SettingsPage - lifted feedback row (#1847 / #1849)", () => {
     await waitFor(() => {
       expect(document.getElementById("feedback-category")).toBeInTheDocument();
     });
+  });
+});
+
+describe("SettingsPage - reset progress keeps the favourite (#2187)", () => {
+  it("Guest resets: theme, learn-first list and offer marker are cleared; favourite and hearts kept", async () => {
+    const gengarTheme = {
+      id: 94,
+      name: "Gengar",
+      colors: { primary: "#5A3E78", secondary: "#8B6EAE", accent: "#E23B3B", fgOnPrimary: "#FFFFFF" },
+      spriteUrl: "/sprites/pokemon/94.png",
+    };
+    mockLoadSettings.mockReturnValue({
+      ...defaultSettings(),
+      favouriteTheme: gengarTheme,
+      favouritePokemonId: 94,
+      heartedSpeciesIds: [94, 25],
+      priorityNewSpeciesIds: [92, 93],
+      favouriteThemeOfferedForId: 94,
+    });
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Reset all progress" }));
+    await user.type(screen.getByPlaceholderText("Type RESET to confirm"), "RESET");
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+
+    await waitFor(() => {
+      expect(mockSaveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          favouriteTheme: null,
+          priorityNewSpeciesIds: [],
+          favouriteThemeOfferedForId: null,
+          favouritePokemonId: 94,
+          heartedSpeciesIds: [94, 25],
+        }),
+      );
+    });
+  });
+});
+
+describe("SettingsPage - backup restore (#2218)", () => {
+  const validated = { cards: [], limits: {}, settings: {} };
+  const GUEST_CONFIRM = "Replace your current progress with this backup?";
+
+  async function importFile() {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(validateBackup).mockResolvedValue({ ok: true, data: validated as never });
+    render(<SettingsPage />);
+    await screen.findByRole("button", { name: /^import$/i });
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await user.upload(input, new File(["{}"], "backup.json", { type: "application/json" }));
+    await waitFor(() => expect(confirm).toHaveBeenCalled());
+    return confirm;
+  }
+
+  beforeEach(() => {
+    vi.mocked(applyBackup).mockReset();
+    vi.mocked(restoreBackupSignedIn).mockReset();
+  });
+
+  afterEach(() => {
+    mockSuperuserState.anyFlagOn = false;
+    vi.restoreAllMocks();
+  });
+
+  function signIn() {
+    mockUseAuth.mockReturnValue({ user: makeUser(), db: {} as unknown, loading: false });
+  }
+
+  it("a signed-in restore moves cards forward and says so before it runs", async () => {
+    signIn();
+    vi.mocked(restoreBackupSignedIn).mockResolvedValue({ ok: true });
+    const confirm = await importFile();
+
+    expect(confirm.mock.calls[0][0]).toMatch(/only moves cards forward/);
+    await waitFor(() => expect(restoreBackupSignedIn).toHaveBeenCalledOnce());
+    expect(applyBackup).not.toHaveBeenCalled();
+    expect(screen.getByText(/anything your account has got further with stays/i)).toBeInTheDocument();
+  });
+
+  it("a signed-in restore that cannot reach the cloud reports it", async () => {
+    signIn();
+    vi.mocked(restoreBackupSignedIn).mockResolvedValue({ ok: false, reason: "pull-failed" });
+    await importFile();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/nothing was restored/i);
+  });
+
+  it("a signed-in restore that cannot save on this device says so, not the connection", async () => {
+    signIn();
+    vi.mocked(restoreBackupSignedIn).mockResolvedValue({ ok: false, reason: "save-failed" });
+    await importFile();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't save the backup on this device/i);
+    expect(alert).not.toHaveTextContent(/check your connection/i);
+  });
+
+  it("a guest restore replaces local progress as before", async () => {
+    const confirm = await importFile();
+
+    expect(confirm).toHaveBeenCalledWith(GUEST_CONFIRM);
+    await waitFor(() => expect(applyBackup).toHaveBeenCalledOnce());
+    expect(restoreBackupSignedIn).not.toHaveBeenCalled();
+  });
+
+  it("a signed-in restore under a superuser flag stays local", async () => {
+    signIn();
+    mockSuperuserState.anyFlagOn = true;
+    const confirm = await importFile();
+
+    expect(confirm).toHaveBeenCalledWith(GUEST_CONFIRM);
+    await waitFor(() => expect(applyBackup).toHaveBeenCalledOnce());
+    expect(restoreBackupSignedIn).not.toHaveBeenCalled();
+  });
+
+  it("a declined restore changes nothing", async () => {
+    signIn();
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    vi.mocked(validateBackup).mockResolvedValue({ ok: true, data: validated as never });
+    render(<SettingsPage />);
+    await screen.findByRole("button", { name: /^import$/i });
+    await user.upload(
+      document.querySelector<HTMLInputElement>('input[type="file"]')!,
+      new File(["{}"], "backup.json", { type: "application/json" }),
+    );
+    await waitFor(() => expect(window.confirm).toHaveBeenCalled());
+    expect(restoreBackupSignedIn).not.toHaveBeenCalled();
+    expect(applyBackup).not.toHaveBeenCalled();
   });
 });

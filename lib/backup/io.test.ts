@@ -119,6 +119,11 @@ const VALID_SETTINGS: UserSettings = {
   dismissedMtBannerLocales: [],
   removedLocales: [],
   streakNudgeEnabled: false,
+  favouritePokemonId: null,
+  heartedSpeciesIds: [],
+  priorityNewSpeciesIds: [],
+  favouriteThemeOfferedForId: null,
+  learnFirstAskedSpeciesIds: [],
 };
 
 function makeMinimalCard(id: number): Record<string, unknown> {

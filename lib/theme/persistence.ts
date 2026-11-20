@@ -1,5 +1,3 @@
-import { CURATED_POKEMON } from "./curated-pokemon";
-import type { CuratedPokemon } from "./curated-pokemon";
 import {
   loadSettings,
   saveSettings,
@@ -7,6 +5,7 @@ import {
 } from "@/lib/settings/persistence";
 import { KEY_LEGACY_FAVOURITE_THEME } from "@/lib/storage/keys";
 import { readLocalStorage } from "@/lib/storage/readLocalStorage";
+import { validateRawFavourite } from "./stored-theme";
 import { masteredSpeciesIds } from "@/lib/badges/derive";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { AppLocale } from "@/i18n/locales";
@@ -17,73 +16,8 @@ import type { AppLocale } from "@/i18n/locales";
 // one-time migration that copies any pre-existing legacy value into settings
 // and removes the legacy key.
 const LEGACY_STORAGE_KEY = KEY_LEGACY_FAVOURITE_THEME;
-const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 export type StoredFavourite = StoredFavouriteTheme;
-
-// True when `value` is an absolute https URL whose host is exactly
-// raw.githubusercontent.com. Used to detect legacy remote sprite URLs that
-// predate self-hosting; an exact host match avoids treating a look-alike host
-// (e.g. `raw.githubusercontent.com.evil.example`) as a GitHub URL.
-function isRawGithubUserContentUrl(value: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return false;
-  }
-  return parsed.protocol === "https:" && parsed.hostname === "raw.githubusercontent.com";
-}
-
-// Validate a raw shape against the StoredFavourite schema. Returns the
-// validated object (with the canonical name from CURATED_POKEMON) or null if
-// validation fails. Pure - takes a value, returns a value. Used for both
-// the cloud-pulled shape (loadSettings().favouriteTheme) and the legacy
-// localStorage shape during one-time migration.
-function validateRawFavourite(value: unknown): StoredFavourite | null {
-  if (typeof value !== "object" || value === null) return null;
-  const obj = value as Record<string, unknown>;
-  if (typeof obj.id !== "number") return null;
-  const curated = CURATED_POKEMON.find((p) => p.id === obj.id);
-  if (!curated) return null;
-  if (typeof obj.colors !== "object" || obj.colors === null) return null;
-  const c = obj.colors as Record<string, unknown>;
-  if (
-    typeof c.primary !== "string" ||
-    typeof c.secondary !== "string" ||
-    typeof c.accent !== "string" ||
-    typeof c.fgOnPrimary !== "string"
-  ) {
-    return null;
-  }
-  if (
-    !HEX_COLOR.test(c.primary) ||
-    !HEX_COLOR.test(c.secondary) ||
-    !HEX_COLOR.test(c.accent) ||
-    !HEX_COLOR.test(c.fgOnPrimary)
-  ) {
-    return null;
-  }
-  const rawSpriteUrl = typeof obj.spriteUrl === "string" ? obj.spriteUrl : null;
-  // Migrate legacy remote sprite URLs stored before sprites were self-hosted.
-  // raw.githubusercontent.com is no longer in next.config.ts remotePatterns.
-  // Parse and match the host exactly - a substring check would also match a
-  // look-alike host like `raw.githubusercontent.com.evil.example`.
-  const needsRemoteMigration =
-    rawSpriteUrl !== null && isRawGithubUserContentUrl(rawSpriteUrl);
-  const spriteUrl = needsRemoteMigration ? `/sprites/pokemon/${obj.id}.png` : rawSpriteUrl;
-  return {
-    id: obj.id,
-    name: curated.name,
-    colors: {
-      primary: c.primary,
-      secondary: c.secondary,
-      accent: c.accent,
-      fgOnPrimary: c.fgOnPrimary,
-    },
-    spriteUrl,
-  };
-}
 
 export function loadFavourite(): StoredFavourite | null {
   if (typeof window === "undefined") return null;
@@ -165,18 +99,13 @@ export function isFavouriteEarned(
   return mastered.has(favourite.id);
 }
 
-export function saveFavourite(
-  entry: CuratedPokemon | null,
-  spriteUrl: string | null = null,
-): void {
+// Saves the theme (the colours on screen). Build it with `themeForSpecies`
+// (English seed name, `paletteFor` colours), or pass null to remove it.
+export function saveFavourite(theme: StoredFavourite | null): void {
   if (typeof window === "undefined") return;
   try {
     const settings = loadSettings();
-    const next: StoredFavourite | null =
-      entry === null
-        ? null
-        : { id: entry.id, name: entry.name, colors: entry.colors, spriteUrl };
-    saveSettings({ ...settings, favouriteTheme: next });
+    saveSettings({ ...settings, favouriteTheme: theme });
   } catch {
     // private browsing or storage full - silently ignore
   }

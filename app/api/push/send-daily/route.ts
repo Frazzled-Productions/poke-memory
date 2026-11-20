@@ -1,22 +1,30 @@
 import { NextResponse } from "next/server";
-import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { isAuthorized } from "@/lib/auth/bearerAuth";
-import { fetchAllPages } from "@/lib/sync/paginatedFetch";
+import { getEnv } from "@/lib/db/env";
+import {
+  deleteDeadPushSubscriptions,
+  getPushDueCards,
+  getPushTargets,
+  type PushDueCardRow,
+  type PushTargetRow,
+} from "@/lib/db/system";
+import { outboundAllowed } from "@/lib/outbound";
 import webpush from "web-push";
+import { deliverPushes } from "@/lib/push/deliver";
 import { createTranslator as _createTranslatorRaw } from "use-intl/core";
 import { todayInTimezone } from "@/lib/utils/format-date";
 import { isCardEligible } from "@/lib/eligibility";
 import { scopeMatchesEntry, resolveAnchorId } from "@/lib/eligibility/scopePredicate";
 import { SCOPE_LOOKUP } from "@/lib/pokemon/scopeLookup";
 import type { PracticeScope } from "@/lib/review/scope";
-import { EMPTY_SCOPE, isScopeEmpty, parseFormCategoryFilter } from "@/lib/eligibility/scopeConstants";
-import { shouldSendToUser, PUSH_DEFAULT_HOUR_UTC } from "@/lib/push/notificationHour";
+import { EMPTY_SCOPE, isScopeEmpty, isPresetId, parseFormCategoryFilter } from "@/lib/eligibility/scopeConstants";
+import { parseSpeciesIdList } from "@/lib/favourite/favourite";
+import { shouldSendToUser } from "@/lib/push/notificationHour";
 import {
   SUPPORTED_LOCALES,
   LOCALE_ENDONYMS,
   type AppLocale,
 } from "@/i18n/locales";
-import { supabaseSecretKey } from "@/lib/supabase/keys";
 
 // use-intl's createTranslator has deeply generic types that conflict with the
 // simple Record<string, unknown> messages shape used here; cast to a plain
@@ -28,61 +36,35 @@ const _createTranslator = _createTranslatorRaw as unknown as (
 /**
  * Daily Web Push reminder route (#1056, per-user hour gate: #1315).
  *
- * Triggered by the `web-push-daily-reminders` pg_cron job (migration 028)
- * via `net.http_post` with a Bearer header carrying the
- * `cron_shared_secret` Vault value.
- *
- * CURRENT CRON SCHEDULE: once per day at 08:00 UTC (0 8 * * *).
- * This route now supports per-user notification hours (#1315) but the cron
- * has NOT yet been changed to hourly - that is a deliberate split to avoid
- * a deploy-ordering hazard (the phase-2 migration must only be applied
- * AFTER this PR is promoted to production). See the follow-up issue filed
- * alongside #1315 for the phase-2 cron change.
- *
- * INTERIM BEHAVIOUR:
- *   - Users with no preferred hour (NULL → effective UTC 8) continue to
- *     receive their notification at 08:00 UTC exactly as before.
- *   - Users who set a non-8-UTC-equivalent preferred hour are DORMANT
- *     until the phase-2 cron flip activates hourly delivery.
- *   - No user receives a duplicate notification in the interim.
- *
- * AFTER PHASE-2 (hourly cron):
- *   The cron fires at `0 * * * *`. At each UTC hour H, only users whose
- *   effective UTC send-hour equals H are notified. Each user receives at
- *   most one notification per day, at their chosen local hour.
+ * Triggered every hour (`0 * * * *`) by the Worker's Cron Trigger
+ * (lib/cron/schedule.ts, worker/index.ts), which POSTs here with a Bearer
+ * header carrying CRON_SHARED_SECRET. At each UTC hour H,
+ * only users whose effective UTC send-hour equals H are notified, so each user
+ * receives at most one notification per day, at their chosen local hour.
  *
  * This handler fans out per-user Web Push notifications for every
  * `push_subscriptions` row whose owning user:
  *   1. Matches the current UTC hour gate (see shouldSendToUser / #1315), AND
  *   2. Has at least one card due today in their own timezone.
  *
- * Why a route handler instead of a Supabase Edge Function: VAPID JWTs are
- * ECDSA P-256 (ES256) and pgcrypto / pgsodium can't produce that shape, so
- * the cron call has to land somewhere with a real crypto stack. Keeping
- * this in the Next.js codebase means one deploy pipeline, one set of env
- * vars, and one place to test the auth + payload encryption logic.
- *
  * AUTH MODEL
- *   1. Caller authenticates via `Authorization: Bearer <CRON_SHARED_SECRET>`.
- *      Any other value (or missing header) returns 401. The shared secret
- *      lives in both Vercel env (`CRON_SHARED_SECRET`) and Supabase Vault
- *      (`cron_shared_secret`); they must match exactly.
- *   2. Inside the route, the SUPABASE_SERVICE_ROLE_KEY client calls two
- *      SECURITY DEFINER RPCs (migration 046, #1100) instead of raw table
- *      SELECTs: `get_push_targets` (subscriptions joined to settings) and
- *      `get_push_due_cards` (due card_reviews rows per timezone bucket).
- *      EXECUTE on both is revoked from PUBLIC/anon/authenticated and
- *      granted only to service_role, so the cross-user read surface is the
- *      functions' explicit return contracts rather than the whole schema.
- *      The only remaining direct table access is the dead-endpoint DELETE
- *      on `push_subscriptions` (410/404 cleanup).
+ *   1. Caller authenticates via `Authorization: Bearer <CRON_SHARED_SECRET>`
+ *      (a Worker secret). Any other value (or missing header) returns 401.
+ *   2. The cross-user reads go through two named queries in lib/db/system
+ *      (ports of migration 046's functions, #1100): `getPushTargets`
+ *      (subscriptions joined to settings) and `getPushDueCards` (due
+ *      card_reviews rows per timezone bucket). The only write is the
+ *      dead-endpoint delete (410/404 cleanup).
+ *
+ * OUTBOUND GATE
+ *   Pushes are sent only where outboundAllowed() (lib/outbound.ts) holds,
+ *   that is in production. Elsewhere the route computes the same targets,
+ *   logs how many it would have sent and returns that as `wouldSend`; the
+ *   VAPID keys are then not needed.
+ *
+ * `web-push` signs the VAPID JWT (ES256) and encrypts the payload with the
+ * Node `crypto` module, which the Worker provides under nodejs_compat.
  */
-
-// Note: this route must run on Node.js (not Edge) because the `web-push`
-// package relies on the Node `crypto` module for ES256 JWT signing and
-// payload encryption. Next.js 16's Cache Components mode forbids the
-// per-route `runtime` segment config, so we rely on the project-wide
-// default Node runtime here.
 
 /** JSON shape of the push payload delivered to the SW push handler. */
 type PushPayload = {
@@ -201,28 +183,15 @@ export async function buildDailyMessage(
 }
 
 /**
- * Row shape returned by the `get_push_targets` RPC (migration 046, #1100):
- * one row per push subscription, LEFT JOINed to the owner's `user_settings`
- * row, so the settings-derived fields are null for users without a settings
- * record.
+ * Row shape returned by `getPushTargets` (lib/db/system, port of migration
+ * 046's `get_push_targets`, #1100): one row per push subscription, LEFT
+ * JOINed to the owner's `user_settings` row, so the settings-derived fields
+ * are null for users without a settings record.
  *
- * `settings` is the JSONB blob carrying per-user card-type enabled flags and
- * daily new-card caps. `timezone` is a scalar column (migration 019).
- * `push_notification_hour` is a scalar column (migration 030, #1315) storing
- * the user's preferred LOCAL hour (0-23) for the daily reminder. NULL means
- * "no preference" - falls back to PUSH_DEFAULT_HOUR_UTC (8).
+ * `push_notification_hour` (migration 030, #1315) is the user's preferred
+ * LOCAL hour (0-23) for the daily reminder. NULL means "no preference" -
+ * falls back to PUSH_DEFAULT_HOUR_UTC (8).
  */
-type PushTargetRow = {
-  subscription_id: string;
-  user_id: string;
-  endpoint: string;
-  p256dh: string;
-  auth_secret: string;
-  timezone: string | null;
-  settings: Record<string, unknown> | null;
-  push_notification_hour: number | null;
-};
-
 // ---------------------------------------------------------------------------
 // Scope lookup map - built once at module load from the compact lookup table.
 // Keyed by pokemon id (same as card subject_key for name/reverse/cry cards;
@@ -272,6 +241,8 @@ type UserEligibility = {
    * Any invalid element is silently dropped.
    */
   learningLocales: AppLocale[];
+  /** Hearted species, for the `favourites` scope preset (#2187). */
+  heartedSpeciesIds: ReadonlySet<number>;
 };
 
 /** DEFAULT_SETTINGS-aligned fallbacks, used when a JSONB field is missing or invalid. */
@@ -288,6 +259,7 @@ const DEFAULT_ELIGIBILITY: UserEligibility = {
   // Pre-#1484 users have no `learningLocales` JSONB key; default to ["en"]
   // which matches migration 029's backfill of locale = 'en' for all legacy rows.
   learningLocales: ["en"],
+  heartedSpeciesIds: new Set(),
 };
 
 /**
@@ -324,14 +296,13 @@ function parsePracticeScope(raw: unknown): PracticeScope {
     }
   }
 
-  const VALID_PRESETS = new Set(["starters", "legendaries", "incomplete-chains"]);
   const presets: PracticeScope["presets"] = [];
   if (Array.isArray(obj.presets)) {
     const seen = new Set<string>();
     for (const p of obj.presets) {
-      if (typeof p !== "string" || !VALID_PRESETS.has(p) || seen.has(p)) continue;
+      if (!isPresetId(p) || seen.has(p)) continue;
       seen.add(p);
-      presets.push(p as PracticeScope["presets"][number]);
+      presets.push(p);
     }
   }
 
@@ -409,6 +380,7 @@ function parseEligibility(rawSettings: Record<string, unknown> | null): UserElig
     maxNewCryPerDay:       numField("maxNewCryPerDay",       DEFAULT_ELIGIBILITY.maxNewCryPerDay),
     practiceScope: parsePracticeScope(s.practiceScope),
     learningLocales,
+    heartedSpeciesIds: new Set(parseSpeciesIdList(s.heartedSpeciesIds)),
   };
 }
 
@@ -471,7 +443,7 @@ function rowIsEligible(
     return true;
   }
 
-  return scopeMatchesEntry(entry, scope);
+  return scopeMatchesEntry(entry, scope, eligibility.heartedSpeciesIds);
 }
 
 /**
@@ -539,40 +511,25 @@ function computeNewEstimate(
   return estimate;
 }
 
-type DueRow = {
-  user_id: string;
-  card_type: string;
-  subject_key: string;
-  first_seen: string | null;
-  /** Migration 029 locale column - part of the PK (#1480). */
-  locale: string;
-  /**
-   * Returned by the get_push_due_cards RPC (migration 046, #1100) so the
-   * route can keep its stable (user_id, due_date) ORDER BY for offset
-   * pagination. Not read by the aggregation below.
-   */
-  due_date: string;
-};
+type DueRow = PushDueCardRow;
 
 export async function POST(request: Request) {
-  const sharedSecret = process.env.CRON_SHARED_SECRET;
+  const startedAt = Date.now();
+  const env = await getEnv();
+  const sharedSecret = env.CRON_SHARED_SECRET;
+  const sending = outboundAllowed(env);
+  // The public key is a build-time NEXT_PUBLIC_ value; the private key and
+  // subject are Worker secrets.
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-  const vapidSubject = process.env.VAPID_SUBJECT;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = supabaseSecretKey();
+  const vapidPrivateKey = env.VAPID_PRIVATE_KEY;
+  const vapidSubject = env.VAPID_SUBJECT;
 
   // Misconfiguration → 503 (Service Unavailable). 500 would imply a crash
   // worth investigating; 503 conveys "the route is configured wrong" which
-  // is the actual state. The cron job retries are bounded by pg_net's
-  // own retry policy so this won't loop indefinitely.
+  // is the actual state. The VAPID keys are only needed where pushes are sent.
   if (
     !sharedSecret ||
-    !vapidPublicKey ||
-    !vapidPrivateKey ||
-    !vapidSubject ||
-    !supabaseUrl ||
-    !serviceRoleKey
+    (sending && (!vapidPublicKey || !vapidPrivateKey || !vapidSubject))
   ) {
     return NextResponse.json(
       { ok: false, error: "misconfigured" },
@@ -583,27 +540,18 @@ export async function POST(request: Request) {
   // Constant-time bearer check via timingSafeEqual; see lib/auth/bearerAuth.ts.
   // The 401 response carries no body so we don't reflect anything about the
   // configured route's expectations (header name, endpoint shape) back to an
-  // unauthenticated caller. The pg_cron job that triggers the legitimate
-  // call doesn't read the response body anyway.
+  // unauthenticated caller. The Cron Trigger doesn't read the body anyway.
   const authHeader = request.headers.get("authorization");
   if (!isAuthorized(authHeader, sharedSecret)) {
     return new NextResponse(null, { status: 401 });
   }
 
-  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  if (sending) webpush.setVapidDetails(vapidSubject!, vapidPublicKey!, vapidPrivateKey!);
 
-  // Service-role client. Bypasses RLS so we can read across all users in
-  // a single round-trip. This client must NEVER reach the browser; the
-  // route handler is the only consumer.
-  const admin = createSupabaseAdminClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
-  // Steps 1+2 (merged via the `get_push_targets` RPC, migration 046 / #1100):
-  // one call returns every push subscription LEFT JOINed to the owner's
-  // settings row, covering what the two previous table reads fetched:
+  // Steps 1+2 (`getPushTargets`, port of migration 046 / #1100): one read
+  // returns every push subscription LEFT JOINed to the owner's settings row:
   //   - the subscription tuple (id, endpoint, p256dh, auth_secret);
-  //   - `settings` JSONB: card-type enabled flags, alt-forms toggle, and
+  //   - `settings` JSON: card-type enabled flags, alt-forms toggle, and
   //     `learningLocales` (#1504 - the user's full learning-locale set);
   //   - `timezone`: scalar column (migration 019) - used for "today" bucketing
   //     and for converting the local preferred hour to UTC (#1315);
@@ -612,15 +560,16 @@ export async function POST(request: Request) {
   // The result fits comfortably in memory at our scale (one row per device
   // per signed-in user). Users without a stored settings record have null
   // settings fields and fall back to DEFAULT_ELIGIBILITY, as before.
-  const { data: targetsData, error: targetsError } =
-    await admin.rpc("get_push_targets");
-  if (targetsError || !targetsData) {
+  let targets: PushTargetRow[];
+  try {
+    targets = await getPushTargets(env.DB);
+  } catch (err) {
+    console.error("[push/send-daily] targets query failed", err);
     return NextResponse.json(
       { ok: false, error: "targets_query_failed" },
       { status: 502 },
     );
   }
-  const targets = targetsData as PushTargetRow[];
   if (targets.length === 0) {
     return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
   }
@@ -647,11 +596,6 @@ export async function POST(request: Request) {
 
   // Per-user UTC-hour gate (#1315). Evaluated against the current moment so
   // DST transitions are handled correctly via Intl.DateTimeFormat.
-  //
-  // INTERIM BEHAVIOUR: the cron is still daily (0 8 * * *), so this runs
-  // once at 08:00 UTC. NULL users (no preference) use PUSH_DEFAULT_HOUR_UTC
-  // (8) and match; users with a non-8-UTC-equivalent hour are dormant until
-  // the phase-2 cron change flips delivery to hourly (migration 031).
   const now = new Date();
   const filteredSubscriptions = subscriptions.filter((sub) => {
     const tz = timezoneByUser.get(sub.user_id) ?? null;
@@ -660,9 +604,7 @@ export async function POST(request: Request) {
   });
 
   if (filteredSubscriptions.length === 0) {
-    // No subscriptions match the current UTC hour. This is expected while the
-    // cron is still daily (only NULL/default-8 users arrive here at 08:00 UTC
-    // and they all pass) - in phase-2 it means no user scheduled this hour.
+    // No subscriptions match the current UTC hour: no user scheduled this hour.
     return NextResponse.json({ ok: true, sent: 0, deleted: 0 });
   }
 
@@ -698,7 +640,7 @@ export async function POST(request: Request) {
   //
   // NOTE: lib/profile/dueCountCache.ts (the localStorage badge cache) is
   // intentionally NOT used here - it is client-side only and unreachable
-  // from this Node cron route. The route computes due counts from the same
+  // from this cron route. The route computes due counts from the same
   // card_reviews aggregation it has always used; #1480 already threads the
   // `locale` column through DueRow. The per-locale breakdown is produced by
   // changing the accumulator from scalar to Map in the same loop.
@@ -723,29 +665,21 @@ export async function POST(request: Request) {
   // startedTodayByUser: user_id → { card_type → count }
   const startedTodayByUser = new Map<string, Record<string, number>>();
   for (const [today, userIds] of usersByDueDate) {
-    // Paginate to avoid the PostgREST 1000-row default cap. A single lapsed
-    // user can exceed 1000 due rows, and the bucket covers multiple users.
-    // ORDER BY user_id, due_date gives a stable total order for offset
-    // pagination so rows don't shift/skip between pages.
-    // #1100: the read goes through the `get_push_due_cards` SECURITY DEFINER
-    // RPC (migration 046) - the due_date <= today, user_id IN bucket, and
-    // hidden_since IS NULL filters live inside the function. The ORDER BY
-    // (user_id, due_date) is applied on the RPC result so offset pagination
-    // stays stable across pages, exactly as the raw query did.
-    const dueData = await fetchAllPages<DueRow>((from, to) =>
-      admin
-        .rpc("get_push_due_cards", { user_ids: userIds, today_input: today })
-        .order("user_id", { ascending: true })
-        .order("due_date", { ascending: true })
-        .range(from, to),
-    );
-    if (!dueData) {
+    // `getPushDueCards` (port of migration 046's `get_push_due_cards`,
+    // #1100): the due_date <= today, user_id IN bucket and hidden_since IS
+    // NULL filters live in the query. D1 has no row cap, so one read
+    // returns the whole bucket.
+    let dueData: DueRow[];
+    try {
+      dueData = await getPushDueCards(env.DB, userIds, today);
+    } catch (err) {
+      console.error("[push/send-daily] due query failed", err);
       return NextResponse.json(
         { ok: false, error: "due_query_failed" },
         { status: 502 },
       );
     }
-    for (const row of dueData as DueRow[]) {
+    for (const row of dueData) {
       const eligibility = eligibilityByUser.get(row.user_id) ?? DEFAULT_ELIGIBILITY;
 
       // Locale membership filter (#1504, supersedes #1480's single-locale drop):
@@ -778,55 +712,38 @@ export async function POST(request: Request) {
     }
   }
 
-  // Step 5: send. Dead subscriptions (410 Gone) and not-found (404) are
-  // deleted so the next cron run doesn't try them again. All other errors
-  // are logged and skipped - a single bad endpoint must not abort the
-  // whole batch.
-  const toDelete: string[] = [];
-  let sent = 0;
-  for (const sub of filteredSubscriptions) {
-    const localeDueCounts: LocaleDueMap = dueByUser.get(sub.user_id) ?? new Map();
-    const eligibility = eligibilityByUser.get(sub.user_id) ?? DEFAULT_ELIGIBILITY;
-    const startedTodayCounts = startedTodayByUser.get(sub.user_id) ?? {};
-    const newEstimate = computeNewEstimate(startedTodayCounts, eligibility);
-
-    // Check global due total from the map.
+  // Step 5: send to the devices with something due. Dead subscriptions (410
+  // Gone) and not-found (404) are deleted so the next cron run doesn't try them
+  // again.
+  const newEstimateFor = (userId: string) =>
+    computeNewEstimate(
+      startedTodayByUser.get(userId) ?? {},
+      eligibilityByUser.get(userId) ?? DEFAULT_ELIGIBILITY,
+    );
+  const dueSubscriptions = filteredSubscriptions.filter((sub) => {
     let dueTotal = 0;
-    for (const count of localeDueCounts.values()) dueTotal += count;
-
-    if (dueTotal <= 0 && newEstimate <= 0) continue;
-
-    const payload = await buildDailyMessage(localeDueCounts, newEstimate);
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.p256dh, auth: sub.auth_secret },
-        },
-        JSON.stringify(payload),
-      );
-      sent++;
-    } catch (err: unknown) {
-      const status = (err as { statusCode?: number }).statusCode;
-      if (status === 404 || status === 410) {
-        toDelete.push(sub.id);
-        continue;
-      }
-      // Transient or non-fatal error - keep going so a single bad device
-      // does not block the rest of the batch.
-      console.warn("[push] sendNotification failed", { id: sub.id, status });
-    }
+    for (const count of (dueByUser.get(sub.user_id) ?? new Map()).values()) dueTotal += count;
+    return dueTotal > 0 || newEstimateFor(sub.user_id) > 0;
+  });
+  if (!sending) {
+    console.info(`[push/send-daily] would send ${dueSubscriptions.length} push(es); outbound off`);
+    return NextResponse.json({ ok: true, sent: 0, deleted: 0, wouldSend: dueSubscriptions.length });
   }
+  const { sent, deadIds } = await deliverPushes(
+    dueSubscriptions,
+    (sub) => buildDailyMessage(dueByUser.get(sub.user_id) ?? new Map(), newEstimateFor(sub.user_id)),
+    startedAt,
+  );
 
   // Step 6: cleanup. Best-effort - if the delete fails we'll retry on the
   // next cron cycle when the same endpoints fail again.
   let deleted = 0;
-  if (toDelete.length > 0) {
-    const { error: deleteError, count } = await admin
-      .from("push_subscriptions")
-      .delete({ count: "exact" })
-      .in("id", toDelete);
-    if (!deleteError) deleted = count ?? toDelete.length;
+  if (deadIds.length > 0) {
+    try {
+      deleted = await deleteDeadPushSubscriptions(env.DB, deadIds);
+    } catch (err) {
+      console.warn("[push/send-daily] dead-endpoint delete failed", err);
+    }
   }
 
   return NextResponse.json({ ok: true, sent, deleted });

@@ -13,7 +13,7 @@
  * reaches /rest/v1 or /api/sync while Undo is available). There is no auth
  * stub in e2e, and a service worker only registers in prod builds and bypasses
  * page.route stubs (docs/testing.md, #1650 / #1773), so the cloud contract is
- * covered by unit tests over an in-memory fake Supabase
+ * covered by unit tests over an in-memory fake cloud database
  * (components/sync/undoHoldAcceptance.test.tsx), the ReviewSession wiring
  * tests, and the real-Postgres integration test
  * (lib/sync/integration/beacon-grade-log.test.ts) instead.

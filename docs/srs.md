@@ -6,6 +6,14 @@ Canonical reference for the SRS scheduler - algorithm, per-card state, queue pol
 
 FSRS via [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs). Default parameters per FSRS, with a user-controlled `request_retention` knob (Settings → Recall target, 0.80–0.97, default 0.90). Per-user FSRS weight optimisation has shipped (#268) - the optimiser runs against the user's `grade_log` history and persists trained weights to `user_settings`.
 
+## Weight optimiser (in the browser)
+
+The optimiser runs in the signed-in user's browser on `/settings/optimiser` (D7 of `openspec/changes/move-to-cloudflare`); there is no server route. The Settings section links there with a plain `<a>`, because the page must be its own document load: it is served with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (`next.config.ts`, plus `public/_headers` for the `/fsrs/*` assets on Workers), which the threaded wasm binding needs for a shared memory. Without cross-origin isolation or `SharedArrayBuffer` the page says the browser is not supported.
+
+- **Flow** (`components/settings/FsrsOptimiserPanel.tsx`): `pullGradeLog` and `pullSettings`, then the shared rules in `lib/srs/optimizer.ts` (`countOptimizableReviews` against `MIN_REVIEWS_FOR_OPTIMIZATION`, `optimizerCooldownRemainingMs` over the local and cloud `fsrsWeightsOptimizedAt`), then `gradeLogToOptimizerItems` into a Web Worker, then `pushSettings` with `fsrsWeights` + `fsrsWeightsOptimizedAt` and a local `saveSettings`. Paused while any superuser flag is on; signed-in only.
+- **Items are review prefixes (#2392)**: FSRS trains on the last review of each item with the earlier ones as history, so a card with n reviews gives n - 1 items. One item per card returned `NotEnoughData` for ordinary logs.
+- **Worker and wasm**: `lib/srs/optimiser/` (message protocol, worker, thread worker, loader) is bundled by `scripts/build-fsrs-optimiser.mjs` into `public/fsrs/` (gitignored; `npm run build` and `npm run dev` run it). The wasm is vendored in `vendor/fsrs-binding-wasm32-wasi/` (npm will not install that package: `cpu: wasm32`); the script pins its hash and its header says how to update it. Tests load the same wasm in Node (`lib/srs/optimizer.fit.test.ts`); weights match the old native binding to float32 precision.
+
 ## Anki-style learning steps layer
 
 Kept on top of FSRS. FSRS schedules graduated cards only; new and lapsed cards go through wall-clock learning steps via `learningStepsFor(difficulty)` / `relearningStepsFor(difficulty)` (`lib/srs/constants.ts`). The bands are:
@@ -50,7 +58,7 @@ Dates as `"YYYY-MM-DD"` strings (string-comparable, no timezone math). The `next
 
 ## Queue policy
 
-Two queues - review (`lastReview !== null && dueDate <= today && lastReview !== today`) served first, then new (`lastReview === null`). Within each queue, deterministic per-day shuffle via FNV-1a hash of `id + today + userSalt` (stable for the day, rotates daily, differs across users). The salt is the Supabase `user.id` for authenticated users, or a stable per-device UUID persisted to `localStorage` under `poke-memory:client-salt:v1` for guests. See `lib/identity/clientSalt.ts` and `stableShuffleForDay` in `lib/review/session.ts`.
+Two queues - review (`lastReview !== null && dueDate <= today && lastReview !== today`) served first, then new (`lastReview === null`). Within each queue, deterministic per-day shuffle via FNV-1a hash of `id + today + userSalt` (stable for the day, rotates daily, differs across users). The salt is the account `user.id` for authenticated users (Better Auth; accounts copied at the move to Cloudflare kept their UUID, so their order did not change), or a stable per-device UUID persisted to `localStorage` under `poke-memory:client-salt:v1` for guests. See `lib/identity/clientSalt.ts` and `stableShuffleForDay` in `lib/review/session.ts`.
 
 ## Daily limits
 
@@ -68,6 +76,10 @@ When a species has new-card candidates across multiple enabled directions (e.g. 
 4. Evolution cards are edge-keyed (not species-keyed) and use their own independent budget pass, unchanged.
 
 **No-regression guarantee**: cards with `lastReview !== null` (already introduced on a prior day) are never in `newCandidatesByType`, so they never appear in any species group. A species whose reverse was introduced before its name was enabled will have the reverse as a solo entry - admitted freely with no name partner to block it. No persisted card state is touched; the change is confined to new-card introduction ordering.
+
+## Priority species: learn your favourite first (#2187)
+
+`buildSessionQueues` takes an optional `priorityNewSpeciesIds` (from `UserSettings`, set when the player accepts "Learn <name>'s evolution line next?"). Each direction's shuffled candidates are stably reordered so priority species come first, in list order, before the cut to budget (evolution cards by their pre-evolution); after the final reshuffle the admitted priority cards are moved ahead of the other new cards. Caps, eligibility and scope are unchanged, and reviews still come first. Every `ReviewSession` call passes the same list (`lib/review/priorityCallers.test.ts`). After a first sighting, `removeIntroducedPrioritySpecies` drops each species whose enabled-direction cards in the active locale all have a `firstSeen`, and the shorter list is saved like any setting.
 
 ## Persisted session shape
 
@@ -108,4 +120,4 @@ The legacy `easeFactor` / `repetitions` field names survive on `StrugglingCard` 
 - **Mastery**: `stability >= MASTERY_STABILITY_DAYS` (21). The old `reps >= 3` sub-gate was removed in #1765 - `MASTERY_REPETITIONS` still exists for test fixtures and QA-seed descriptions, but must NOT be used in any new mastery-checking code path. A lapse that drops stability below 21 reverts a species to learning; gym badges are latched separately and stay earned.
 - **Dates**: scheduling-internal dates are `"YYYY-MM-DD"` UTC strings; user-facing day boundaries (today / streak / daily cap) are timezone-aware via `todayInTimezone(tz)` + `user_settings.timezone` (migration 019). Pass the user's tz through display/daily-cap code; stay UTC inside the scheduler.
 - **Scheduler is pure**, in `lib/srs/`. `nextReview(state, grade, now, options?)` is the single chokepoint reading `retentionTarget`.
-- **Grade-log retention - the cloud log is NOT trimmed.** For authenticated users the Supabase `grade_log` is unbounded; only the LOCAL log is pruned, to 365 days (`pruneGradeLog`), plus a size valve that applies to the localStorage fallback path only (IndexedDB is not size-trimmed). So a historical FSRS replay is complete for signed-in users and lossy only for guests past a year. `lib/timeline/reconstruct.ts` already replays the log to derive first/last mastery-crossing dates - prefer deriving history over persisting a new column, but note its srs-expert verdict (#853) blesses it at week-level granularity only, since it replays through current default weights. Assuming the log is trimmed sent #1956 down a migration-plus-trigger design that was not needed.
+- **Grade-log retention - the cloud log is NOT trimmed.** For authenticated users the cloud `grade_log` (D1) is unbounded (the weekly reconcile job only counts orphans); only the LOCAL log is pruned, to 365 days (`pruneGradeLog`), plus a size valve that applies to the localStorage fallback path only (IndexedDB is not size-trimmed). So a historical FSRS replay is complete for signed-in users and lossy only for guests past a year. `lib/timeline/reconstruct.ts` already replays the log to derive first/last mastery-crossing dates - prefer deriving history over persisting a new column, but note its srs-expert verdict (#853) blesses it at week-level granularity only, since it replays through current default weights. Assuming the log is trimmed sent #1956 down a migration-plus-trigger design that was not needed.

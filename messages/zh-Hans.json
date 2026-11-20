@@ -107,12 +107,15 @@
       "theme": {
         "heading": "应用主题",
         "description": "掌握一只 Pokémon 后，可将其解锁为应用配色主题。",
-        "selected": "已选择",
         "setAsTheme": "设为主题",
         "remove": "移除",
         "lockedHeading": "应用主题",
         "lockedBody": "掌握第一只宝可梦后即可解锁主题。",
-        "practiceLink": "前往练习"
+        "practiceLink": "前往练习",
+        "searchLabel": "搜索已掌握的宝可梦",
+        "matchFavourite": "用我最爱的配色",
+        "current": "当前主题：{name}",
+        "setAsThemeAria": "把{name}设为应用主题"
       },
       "intensityPicker": {
         "heading": "主题强度",
@@ -122,6 +125,16 @@
         "tintedDescription": "主题色以淡淡的色调覆盖页面背景。",
         "fullLabel": "完整主题",
         "fullDescription": "主题色覆盖所有背景，个性鲜明。"
+      },
+      "favourite": {
+        "heading": "最爱的宝可梦",
+        "description": "你的最爱会作为伙伴出现在旅程、牧场和完成页面中。任何宝可梦都可以成为你的最爱。",
+        "current": "你的最爱：{name}",
+        "none": "还没有选择最爱。",
+        "searchLabel": "搜索全部宝可梦",
+        "searchPlaceholder": "输入名字",
+        "clear": "取消最爱",
+        "noResults": "没有与该名字匹配的宝可梦。"
       }
     },
     "practice": {
@@ -276,7 +289,37 @@
       "lowStorageProceed": "仍然下载"
     },
     "optimizerCooldown": "{count, plural, other {下次优化还需 # 天}}",
-    "optimizerRetryAfter": "{count, plural, other {请在 # 天后重试。}}",
+    "optimiser": {
+      "heading": "个性化我的复习计划",
+      "signInPrompt": "登录后即可使用个性化复习计划。",
+      "intro": "根据你的完整复习记录,让复习计划贴合你的记忆。",
+      "notEnoughIntro": "需要足够的复习记录才能有意义地调整权重。",
+      "optimiseNow": "立即优化",
+      "availableAfter": "约 {min, number} 次复习后可用。你目前有 {count, number} 次。",
+      "pausedButton": "同步已暂停(超级用户)",
+      "pausedTitle": "超级用户标志开启期间暂停优化。",
+      "lastOptimised": "上次优化:{date}",
+      "page": {
+        "description": "这会根据你自己的复习记录拟合调度器的权重。它在此浏览器中运行,可能需要一分钟左右。",
+        "backToSettings": "返回设置",
+        "loading": "正在加载你的复习记录…",
+        "signedOut": "登录后即可个性化你的复习计划。优化器使用保存在你账户中的复习记录。",
+        "paused": "超级用户标志开启期间暂停优化。关闭这些标志后即可运行。",
+        "unsupported": "此浏览器无法运行优化器。请尝试最新版的 Chrome、Edge、Firefox 或 Safari。",
+        "notEnough": "你有 {count, number} 次复习可供优化器使用,大约需要 {min, number} 次。",
+        "ready": "{count, plural, other {有 # 次复习可供使用。}}",
+        "fitting": "正在拟合你的权重…可能需要一分钟左右。",
+        "progress": "已完成 {percent, number}%",
+        "saving": "正在保存新的权重…",
+        "success": "完成。你的复习计划现在使用根据你的复习拟合的权重。",
+        "errorNotEnoughData": "你的复习记录还不够多样。继续学习,几周后再试。",
+        "errorLoad": "无法加载你的复习记录。请检查网络连接后重试。",
+        "errorSave": "权重已拟合,但无法保存。请检查网络连接后重试。",
+        "errorFailed": "无法优化。请稍后再试。",
+        "errorDetail": "详情:{detail}",
+        "tryAgain": "重试"
+      }
+    },
     "backup": {
       "heading": "备份",
       "exportLabel": "导出进度",
@@ -287,6 +330,10 @@
       "downloadCsv": "下载 CSV",
       "importLabel": "导入进度",
       "importDescription": "从之前导出的备份文件恢复。确认后将替换当前进度。",
+      "importDescriptionSignedIn": "从之前导出的备份文件恢复卡片进度。卡片只会向前推进：账户中进度更靠前的内容保持不变。",
+      "importConfirmSignedIn": "你已登录，因此卡片只会向前推进。账户中进度更靠前的内容保持不变，设置不会更改，上次重置之前的进度无法恢复。要恢复此备份吗？",
+      "importFailedSignedIn": "无法连接到你的账户，因此未恢复任何内容。请检查网络连接后重试。",
+      "importSaveFailedSignedIn": "无法在此设备上保存备份，因此未恢复任何内容。请释放一些存储空间后重试。",
       "importButton": "导入"
     },
     "howThisWorks": {
@@ -573,7 +620,8 @@
       "formCategoryPrimal": "原始回归",
       "noAlternateForms": "当前种子中没有异形态。",
       "matchCount": "{total} 只中有 {match} 只匹配",
-      "hiddenCardsPaused": "隐藏的卡片已暂停：它们的复习日期会向后推移，因此删除范围不会让过期卡片涌入队列。"
+      "hiddenCardsPaused": "隐藏的卡片已暂停：它们的复习日期会向后推移，因此删除范围不会让过期卡片涌入队列。",
+      "presetFavourites": "最爱"
     },
     "direction": {
       "name": "这是哪只 Pokémon？",
@@ -723,7 +771,8 @@
     "generationPokemonAriaLabel": "{name}的宝可梦",
     "firstReviewed": "首次学习: {date}",
     "mastered": "已掌握",
-    "masteredAround": "约 {date} 掌握"
+    "masteredAround": "约 {date} 掌握",
+    "heartedBadge": "已点亮爱心"
   },
   "pasture": {
     "title": "牧场",
@@ -1266,5 +1315,31 @@
   "pushStreak": {
     "title": "继续保持连胜",
     "body": "{days, plural, other {你已经连续练习了#天。今天再练一会儿，就能继续保持。}}"
+  },
+  "favourite": {
+    "makeFavourite": "设为最爱",
+    "isFavourite": "你的最爱",
+    "makeFavouriteAria": "把{name}设为你的最爱",
+    "heartAria": "给{name}点亮爱心",
+    "heartFavouriteAria": "{name}是你的最爱，爱心会一直保留",
+    "learnFirst": {
+      "question": "接下来学习{name}的进化链吗？",
+      "body": "在每日新卡片上限内，这些宝可梦会成为你接下来的新卡片。",
+      "yes": "好的",
+      "no": "不用了"
+    },
+    "partner": {
+      "heading": "你的伙伴",
+      "playCry": "播放{name}的叫声",
+      "chooseFavourite": "选择你的最爱",
+      "chooseFavouriteBody": "在图鉴中挑选任意一只宝可梦作为你的伙伴。"
+    },
+    "themeOffer": {
+      "question": "切换为{name}的配色吗？",
+      "body": "你已掌握{name}，可以把它的配色用作应用主题。",
+      "yes": "切换配色",
+      "no": "保留当前配色"
+    },
+    "pastureSpotAria": "{name}，你的最爱"
   }
 }

@@ -1,4 +1,5 @@
-import type { SupabaseClient, PostgrestError } from "@supabase/supabase-js";
+import { isLaterInstant } from "@/lib/sync/instant";
+import type { DataClient, DataClientError } from "@/lib/db/client";
 import type {
   ReviewableCard,
   BuildSessionOpts,
@@ -34,7 +35,7 @@ export type SeedOpts = BuildSessionOpts;
  * Must exactly match the table's PRIMARY KEY: (user_id, card_type, subject_key, locale).
  * Migration 029 widened the PK from 3 columns to 4 (adding locale). Exporting
  * this constant - and importing it at every upsert call site (cloud.ts + route.ts)
- * - means the integration test in lib/sync/integration/onconflict-pk-parity.test.ts
+ * - means the parity test in lib/db/clientGateway.test.ts
  * mechanically catches any future PK change that is not matched by a client update.
  * That is the safeguard that would have caught the #1344 silent-outage shape at CI time.
  */
@@ -42,7 +43,7 @@ export const CARD_REVIEWS_CONFLICT_COLS =
   "user_id,card_type,subject_key,locale" as const;
 
 /**
- * Returns true when a PostgrestError code indicates a structural (non-transient)
+ * Returns true when an error code indicates a structural (non-transient)
  * failure on the card_reviews write path (#1358).
  *
  * Structural codes:
@@ -66,7 +67,7 @@ export const CARD_REVIEWS_CONFLICT_COLS =
  * (pushSettings, pushStreak, pushGradeLog, pushRegionalPrefs) must warn-and-
  * continue regardless of error code.
  */
-export function isStructuralError(error: PostgrestError | null): boolean {
+export function isStructuralError(error: DataClientError | null): boolean {
   if (!error) return false;
   const code = error.code;
   if (typeof code !== "string") return false;
@@ -148,7 +149,7 @@ export type CloudRow = {
  * cloud. Used by the conflict-picker to decide whether to show a merge prompt.
  */
 export async function hasCloudData(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<boolean> {
   try {
@@ -208,7 +209,7 @@ export function toCloudRows(cards: ReviewableCard[]): CloudRow[] {
  * no failures). The caller should not interpret true as "something was written".
  */
 export async function pushSession(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   cards: ReviewableCard[],
 ): Promise<boolean> {
@@ -285,7 +286,7 @@ export type PushSingleCardResult = "ok" | "failed" | "rejected";
  * Never throws.
  */
 export async function pushSingleCard(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   card: ReviewableCard,
 ): Promise<PushSingleCardResult> {
@@ -360,11 +361,11 @@ export async function pushSingleCard(
  * learningStep and stepStartedAt are not stored in the cloud; the caller
  * is responsible for reconstructing in-memory state from the seed.
  *
- * Paginates in PAGE-sized chunks to avoid the Supabase default max_rows cap
- * of 1000, which would silently truncate a full ~1482-card corpus.
+ * Paginates in PAGE-sized chunks under the gateway's 1000-row cap, which
+ * would otherwise truncate a full ~1482-card corpus.
  */
 export async function pullSession(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<CloudRow[] | null> {
   try {
@@ -403,7 +404,7 @@ export function maxCloudUpdatedAt(rows: CloudRow[]): string {
   if (rows.length === 0) return new Date().toISOString();
   return rows.reduce<string>((max, r) => {
     if (!r.updated_at) return max;
-    return r.updated_at > max ? r.updated_at : max;
+    return isLaterInstant(r.updated_at, max) ? r.updated_at : max;
   }, rows[0].updated_at ?? new Date().toISOString());
 }
 
@@ -649,7 +650,7 @@ export function mergeCloudIntoLocalSilent(
 
     // Cloud row updated after the last pull - take cloud.
     // When updated_at is absent (legacy row), conservatively treat as newer.
-    if (!row.updated_at || row.updated_at > lastPullAt) {
+    if (!row.updated_at || isLaterInstant(row.updated_at, lastPullAt)) {
       return applyCloudRow(card, row);
     }
 
@@ -688,6 +689,82 @@ export function mergeCloudIntoLocalSilent(
   }
 
   return updated;
+}
+
+/**
+ * True when `next` is further on than `base`: the two differ in a field the
+ * regression trigger guards, and writing `next` over `base` would pass that
+ * trigger. Mirrors `card_reviews_reject_regression` (migration 029); the
+ * integration test backup-restore.test.ts checks its cases against the real
+ * trigger, so a change there fails the test rather than drifting from this.
+ * One difference: when both last-review dates are null, a lower
+ * `scheduled_days` is refused here but accepted by the trigger. That is the safe
+ * side, and a card with no last review is never pushed anyway.
+ */
+export function isFurtherOn(next: CloudRow, base: CloudRow): boolean {
+  const newLastReview = next.last_review;
+  const oldLastReview = base.last_review;
+  if (oldLastReview !== null && newLastReview === null) return false;
+  if (base.first_seen !== null && next.first_seen === null) return false;
+  if (oldLastReview !== null && newLastReview !== null && newLastReview < oldLastReview) return false;
+  if (next.reps < base.reps || next.lapses < base.lapses) return false;
+  if (newLastReview === oldLastReview && next.scheduled_days < base.scheduled_days) return false;
+  if (base.seen_in_pasture && !next.seen_in_pasture) return false;
+  return (
+    newLastReview !== oldLastReview ||
+    next.first_seen !== base.first_seen ||
+    next.reps !== base.reps ||
+    next.lapses !== base.lapses ||
+    next.scheduled_days !== base.scheduled_days ||
+    next.seen_in_pasture !== base.seen_in_pasture
+  );
+}
+
+/**
+ * Works out a signed-in restore: which copy of each backup card this device
+ * should hold, and which cards the cloud should be given.
+ *
+ * A backup card is used only when it is further on than both the cloud and this
+ * device. Otherwise this device keeps what it has, so a grade still waiting to
+ * sync is never lost; a card this device lacks takes the cloud row. A card dated
+ * before the account's last reset is left out: the pre-reset trigger (migration
+ * 022) refuses it on every push, including after it is graded again, so keeping
+ * it would leave it stranded on this device. `resetDate` matches the trigger's
+ * `reset_at::date`.
+ */
+export function planSignedInRestore(
+  backup: readonly ReviewableCard[],
+  local: readonly ReviewableCard[],
+  cloud: readonly CloudRow[],
+  lastResetAt: string | null,
+): { cards: ReviewableCard[]; toPush: ReviewableCard[] } {
+  const resetDate = lastResetAt?.slice(0, 10) ?? null;
+  const cloudByKey = new Map(cloud.map((r) => [cloudRowKey(r), r]));
+  const byKey = new Map(local.map((c) => [cardKey(c), c]));
+  const toPush: ReviewableCard[] = [];
+
+  for (const card of backup) {
+    const key = cardKey(card);
+    const { firstSeen, lastReview } = card.state;
+    const beforeReset =
+      resetDate !== null &&
+      ((firstSeen !== null && firstSeen < resetDate) ||
+        (lastReview !== null && lastReview < resetDate));
+    if (beforeReset) continue;
+
+    const row = cloudByKey.get(key);
+    const held = byKey.get(key);
+    const candidate = toCloudRow(card);
+    if (row && !isFurtherOn(candidate, row)) {
+      if (!held) byKey.set(key, applyCloudRow(card, row));
+      continue;
+    }
+    if (held && !isFurtherOn(candidate, toCloudRow(held))) continue;
+    byKey.set(key, card);
+    if (lastReview !== null) toPush.push(card);
+  }
+
+  return { cards: [...byKey.values()], toPush };
 }
 
 /**

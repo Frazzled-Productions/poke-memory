@@ -1,7 +1,7 @@
 # poke-memory
 
 [![Release](https://img.shields.io/github/v/release/Frazzled-Productions/poke-memory)](https://github.com/Frazzled-Productions/poke-memory/releases)
-[![Users](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FFrazzled-Productions%2Fpoke-memory%2Fmain%2F.github%2Fstats%2Fusers.json)](https://github.com/Frazzled-Productions/poke-memory/blob/main/.github/stats/users.json)
+[![Users](https://img.shields.io/endpoint?url=https%3A%2F%2Fpokememory.com%2Fapi%2Fstats%2Fusers)](https://pokememory.com)
 
 <p align="center">
   <img src="public/sprites/pokemon/25.png" width="110" alt="Pikachu" />
@@ -67,22 +67,22 @@ Open the live demo in Safari, tap **Share → Add to Home Screen**. Tapping the 
 ## Features
 
 ### Practice
-The daily review loop. Live **Again / Hard / Good / Easy** tally for the current session, with a streak badge that ticks up each day you review. Misclick on a grade? Hit **Undo** (or ⌘/Ctrl+Z) to roll the most recent grade back. Optional **Scope** control narrows the session to specific generations, types, or preset groups (Starters, Legendaries). **Audio mode** keeps the screen awake and plays the cry on every reveal. When the day is done, a **Share today** button generates a Wordle-style summary you can paste anywhere.
+The daily review loop. Live **Again / Hard / Good / Easy** tally for the current session, with a streak badge that ticks up each day you review. Misclick on a grade? Hit **Undo** (or ⌘/Ctrl+Z) to roll the most recent grade back. Optional **Scope** control narrows the session to specific generations, types, or preset groups (Starters, Legendaries, and your hearted Favourites). **Audio mode** keeps the screen awake and plays the cry on every reveal. When the day is done, a **Share today** button generates a Wordle-style summary you can paste anywhere, and your favourite Pokémon waits beside the Pokémon of the day (tap it to hear its cry).
 
 ### Stats
 The analytical dashboard: a 30-day **accuracy sparkline** with a 7-day rolling headline, all-time grade breakdown, grade distribution and weekly trend, retention-vs-target indicator, per-direction accuracy breakdown, difficulty histogram, a GitHub-style **365-day review heatmap**, daily activity chart, mastery-over-time chart, a 14-day **due-forecast bar chart**, and a struggling-card list.
 
 ### Journey
-The celebratory home: trainer-card hero strip (level + generation badges), gym badge gallery, current streak, a four-cell **Records** card (longest streak, best review day, avg days to mastery, most-mastered week), mastery distribution rings, species-introduced ring, and mastered-by-type and per-generation breakdowns (each gen row deep-links into the Pokédex).
+The celebratory home: trainer-card hero strip (your partner Pokémon, level + generation badges), gym badge gallery, current streak, a four-cell **Records** card (longest streak, best review day, avg days to mastery, most-mastered week), mastery distribution rings, species-introduced ring, and mastered-by-type and per-generation breakdowns (each gen row deep-links into the Pokédex).
 
 ### Pokédex
-1025-cell grid with progressive disclosure - unlearned Pokémon appear as silhouettes, reviewed Pokémon greyscale, mastered ones in full colour. Tap any cell to open a detail page that reveals more as you progress: types and flavour text unlock when you start learning; base stats, facts, and the evolution chain unlock once mastered.
+1025-cell grid with progressive disclosure - unlearned Pokémon appear as silhouettes, reviewed Pokémon greyscale, mastered ones in full colour. Tap any cell to open a detail page that reveals more as you progress: types and flavour text unlock when you start learning; base stats, facts, and the evolution chain unlock once mastered. Any Pokémon, even a silhouette, can be made your **favourite** (your partner across the app) or given a **heart** to build a shortlist.
 
 ### Pasture
-A nav link that unlocks the moment you master your first Pokémon. Mastered Pokémon are placed into habitat-themed zones (grasslands, forest, mountain, open sea, cave, urban, and more), with newly arrived ones drawing a sparkle until you've seen them once. A miniature collection wall that grows as your mastery does.
+A nav link that unlocks the moment you master your first Pokémon. Mastered Pokémon are placed into habitat-themed zones (grasslands, forest, mountain, open sea, cave, urban, and more), with newly arrived ones drawing a sparkle until you've seen them once. A miniature collection wall that grows as your mastery does. Once mastered, your favourite gets its own highlighted spot.
 
 ### Settings
-Mastery threshold, new/review caps per direction, reverse-card and cry-card toggles, and an **FSRS recall-target slider** (80% – 97%) that trades off review frequency against retention.
+Your favourite Pokémon (search all 1025), an app colour theme from any Pokémon you have mastered, mastery threshold, new/review caps per direction, reverse-card and cry-card toggles, and an **FSRS recall-target slider** (80% – 97%) that trades off review frequency against retention.
 
 ### Under the hood
 
@@ -98,17 +98,17 @@ Mastery threshold, new/review caps per direction, reverse-card and cry-card togg
 Sign in with GitHub or Google (the **Sign in** button in the nav) to sync your review history across devices. Once signed in, every grade is pushed to the cloud immediately (with a short debounce to coalesce rapid re-grades), and a safety-net beacon flushes any unsent grades on tab close.
 
 - **Guest mode** - no account needed; everything stays in your browser.
-- **Sign in** - ties your session to a GitHub or Google account via Supabase Auth; data stored in Postgres.
+- **Sign in** - ties your session to a GitHub or Google account, or a username and password, via Better Auth; data stored in Cloudflare D1 in the EU.
 - **Conflict picker** - if you have local progress *and* cloud progress when you sign in, you'll be asked which to keep.
 - **Auto-pull on focus** - returning to a tab that's been in the background for ≥ 30 seconds silently pulls the latest cloud state and updates Stats and Pokédex without a page reload.
 - Signing out leaves your local `localStorage` intact; you can continue as a guest without losing anything.
 
-> **Note:** Supabase project URL and anon key must be configured (see `.env.local.example`). GitHub and Google OAuth redirect URIs must be added in the Supabase dashboard.
+> **Note:** Better Auth needs its secret and the GitHub and Google client credentials (see `.env.local.example`), and each provider needs the callback URL `<origin>/api/auth/callback/github` or `<origin>/api/auth/callback/google` registered. Locally, create the D1 tables with `npm run db:migrate:local`.
 
 ## Privacy
 
-- **Guest mode**: your card and session data stays in your browser - nothing is transmitted to any server we control. Sprites are self-hosted on the same Vercel deployment. Anonymous, aggregate telemetry (URL path, referrer, country, device type, Core Web Vitals) is collected by Vercel Analytics and Speed Insights; it does not include card progress, review history, or any personally identifying information.
-- **Signed in**: your per-card FSRS state (stability, difficulty, scheduledDays, reps, lapses, fsrsState, due date, last review, first seen) is stored in Supabase Postgres, accessible only to you via Row-Level Security. Signing out leaves local progress intact.
+- **Guest mode**: your card and session data stays in your browser - nothing is transmitted to any server we control. Sprites are self-hosted on the same Cloudflare Worker. Anonymous, aggregate page views (URL path, referrer, country, device type, page-load performance) are counted by Cloudflare Web Analytics without cookies, and one `app_open` event with two coarse buckets is counted per day in our own database; neither includes card progress, review history, or any personally identifying information.
+- **Signed in**: your per-card FSRS state (stability, difficulty, scheduledDays, reps, lapses, fsrsState, due date, last review, first seen) is stored in Cloudflare D1 in the EU; every request is checked on the server so each account can only read and change its own rows. Nightly backups are kept in the EU for 90 days. Signing out leaves local progress intact.
 
 ## Run locally
 
@@ -158,15 +158,15 @@ npx playwright install          # one-time browser install
 npm run test:e2e                # runs against http://localhost:3000
 ```
 
-E2E smoke tests run automatically against Vercel preview deployments in CI.
+E2E smoke tests run automatically in CI; the sign-in specs run against each pull request's preview Worker version.
 
 ## Stack
 
-- **Framework** - Next.js 16 (App Router, Cache Components)
+- **Framework** - Next.js 16 (App Router; Cache Components off on Workers, see `docs/nextjs.md`)
 - **UI** - React 19, Tailwind CSS 4
 - **Language** - TypeScript 6
-- **Sync** - Supabase (Auth + Postgres with RLS)
-- **Hosting** - Vercel (auto-deploys on every push to `main`)
+- **Sync** - Cloudflare D1 (EU jurisdiction) through a per-account scope helper, Better Auth for sign-in
+- **Hosting** - Cloudflare Workers via OpenNext (deploys on every push to `main`; a preview version per pull request)
 - **Testing** - vitest for unit/component, Playwright for E2E
 
 ### Dependency overrides
@@ -178,7 +178,7 @@ E2E smoke tests run automatically against Vercel preview deployments in CI.
 
 ## Development
 
-This repo doubles as a sandbox for practicing Claude Code sub-agent workflows. The custom agent roster, orchestration playbook, and project conventions live in [AGENTS.md](./AGENTS.md). Agent definitions are in [`.claude/agents/`](./.claude/agents/).
+The custom agent roster, orchestration playbook, and project conventions live in [AGENTS.md](./AGENTS.md). Agent definitions are in [`.claude/agents/`](./.claude/agents/).
 
 ## Status
 

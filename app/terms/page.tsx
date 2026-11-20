@@ -33,7 +33,7 @@ export default async function TermsPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Terms of Use</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 6 June 2026
+          Last updated: 19 November 2026
         </p>
       </header>
 
@@ -116,13 +116,13 @@ export default async function TermsPage() {
             storage-quota evictions.
           </p>
           <p className="mb-3">
-            For signed-in users, your review history is stored in Supabase
-            Postgres. We make reasonable efforts to maintain that data, but we
-            do not provide any guarantee of availability or durability. In
-            particular, <strong>there is currently no point-in-time backup
-            (PITR) in place for this project</strong>: a destructive operation
-            or database failure could result in permanent data loss. We will not
-            be liable for any such loss.
+            For signed-in users, your review history is stored in our database,
+            hosted by Cloudflare in the EU. We make reasonable efforts to
+            maintain that data, including nightly backups, but we do not
+            provide any guarantee of availability or durability. In particular,
+            a destructive operation or database failure could lose changes
+            made since the last backup, or in the worst case result in
+            permanent data loss. We will not be liable for any such loss.
           </p>
           <p className="mb-3">
             If you have a username and password account, there is{" "}

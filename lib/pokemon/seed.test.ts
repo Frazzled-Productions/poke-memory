@@ -14,6 +14,7 @@ import {
   type EvolutionNode,
   type SeedPokemon,
 } from "./seed";
+import { MAX_SPECIES_ID, isSpeciesId } from "./seed-constants";
 
 // ---------------------------------------------------------------------------
 // reverseEdgeIdFor
@@ -551,6 +552,19 @@ describe("SEED_REVERSE_EVOLUTION_CARDS", () => {
     const forwardIds = new Set(SEED_EVOLUTION_CARDS.map((c) => c.id));
     for (const card of SEED_REVERSE_EVOLUTION_CARDS) {
       expect(forwardIds.has(card.id)).toBe(false);
+    }
+  });
+});
+
+describe("MAX_SPECIES_ID (#2187)", () => {
+  it("default forms are exactly the ids 1..MAX_SPECIES_ID", () => {
+    const ids = SEED_POKEMON.filter((p) => p.isDefaultForm).map((p) => p.id).sort((a, b) => a - b);
+    expect(ids).toEqual(Array.from({ length: MAX_SPECIES_ID }, (_, i) => i + 1));
+  });
+
+  it("isSpeciesId accepts every default form and rejects alternate forms", () => {
+    for (const p of SEED_POKEMON) {
+      expect(isSpeciesId(p.id)).toBe(p.isDefaultForm);
     }
   });
 });

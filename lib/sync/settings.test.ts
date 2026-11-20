@@ -1,28 +1,33 @@
 import { describe, it, expect, vi } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import {
   pullSettings,
   pullSettingsWithTimestamp,
   pushSettings,
   pushRegionalPrefs,
   pullRegionalPrefs,
+  pullLastResetAt,
+  pullSettingsOrFailure,
+  pullUserSettingsRow,
+  pushSettingsWithCode,
   mergeRemovedLocales,
   mergeLearnedLocales,
 } from "./settings";
 import type { UserSettings } from "@/lib/settings/persistence";
-import type { MergeUserSettingsArgs } from "@/lib/supabase/rpc-types";
 import { DEFAULT_LABS_FLAGS } from "@/lib/labs/flags";
+
+type MergeUserSettingsArgs = { p_user_id: string; p_patch: Record<string, unknown> };
 
 function makeClientWithRpc(error: null | object = null) {
   const rpc = vi.fn().mockResolvedValue({ error });
-  return { client: { rpc } as unknown as SupabaseClient, rpc };
+  return { client: { rpc } as unknown as DataClient, rpc };
 }
 
 function makeClientWithUpdate(error: null | object = null) {
   const eq = vi.fn().mockResolvedValue({ error });
   const update = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ update });
-  return { client: { from } as unknown as SupabaseClient, update, eq };
+  return { client: { from } as unknown as DataClient, update, eq };
 }
 
 function makeClientWithMaybeSingle(data: unknown, error: null | object = null) {
@@ -30,7 +35,7 @@ function makeClientWithMaybeSingle(data: unknown, error: null | object = null) {
   const eq = vi.fn().mockReturnValue({ maybeSingle });
   const select = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ select });
-  return { client: { from } as unknown as SupabaseClient, maybeSingle };
+  return { client: { from } as unknown as DataClient, maybeSingle };
 }
 
 const SAMPLE: UserSettings = {
@@ -108,6 +113,11 @@ const SAMPLE: UserSettings = {
   dismissedMtBannerLocales: [],
   removedLocales: [],
   streakNudgeEnabled: false,
+  favouritePokemonId: null,
+  heartedSpeciesIds: [],
+  priorityNewSpeciesIds: [],
+  favouriteThemeOfferedForId: null,
+  learnFirstAskedSpeciesIds: [],
 };
 
 describe("pushSettings", () => {
@@ -121,7 +131,7 @@ describe("pushSettings", () => {
     expect(args.p_patch).toEqual(SAMPLE);
   });
 
-  it("returns false on supabase error", async () => {
+  it("returns false on a database error", async () => {
     const { client } = makeClientWithRpc({ message: "boom" });
     expect(await pushSettings(client, "user-1", SAMPLE)).toBe(false);
   });
@@ -221,7 +231,7 @@ describe("pullSettings", () => {
     expect(await pullSettings(client, "user-1")).toBeNull();
   });
 
-  it("returns null on supabase error", async () => {
+  it("returns null on a database error", async () => {
     const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
     expect(await pullSettings(client, "user-1")).toBeNull();
   });
@@ -250,7 +260,7 @@ describe("pullSettingsWithTimestamp", () => {
   });
 
   it("coerces a missing updated_at key to null rather than propagating undefined", async () => {
-    // If Supabase ever omits the key (e.g. schema drift), undefined must not
+    // If the database ever omits the key (e.g. schema drift), undefined must not
     // leak into pullAndMerge where `undefined !== null` would be mistaken for
     // a real newer timestamp, causing the cursor to stall and re-apply forever.
     const { client } = makeClientWithMaybeSingle({ settings: SAMPLE });
@@ -287,7 +297,7 @@ describe("pushRegionalPrefs", () => {
     expect(eq).toHaveBeenCalledWith("user_id", "user-1");
   });
 
-  it("returns false on supabase error", async () => {
+  it("returns false on a database error", async () => {
     const { client } = makeClientWithUpdate({ message: "boom" });
     expect(await pushRegionalPrefs(client, "user-1", { timezone: null, dateFormat: null, pushNotificationHour: null })).toBe(false);
   });
@@ -356,7 +366,7 @@ describe("pullRegionalPrefs", () => {
     expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
   });
 
-  it("returns null on supabase error", async () => {
+  it("returns null on a database error", async () => {
     const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
     expect(await pullRegionalPrefs(client, "user-1")).toBeNull();
   });
@@ -389,6 +399,82 @@ describe("pullRegionalPrefs", () => {
 });
 
 // ─── mergeRemovedLocales (#1568) ─────────────────────────────────────────────
+
+describe("pullLastResetAt (#2218)", () => {
+  it("returns the last reset when the row has one", async () => {
+    const { client } = makeClientWithMaybeSingle({ last_reset_at: "2026-10-01T09:00:00.000Z" });
+    expect(await pullLastResetAt(client, "user-1")).toEqual({
+      lastResetAt: "2026-10-01T09:00:00.000Z",
+    });
+  });
+
+  it("returns lastResetAt: null for an account that never reset", async () => {
+    const { client } = makeClientWithMaybeSingle({ last_reset_at: null });
+    expect(await pullLastResetAt(client, "user-1")).toEqual({ lastResetAt: null });
+  });
+
+  it("returns lastResetAt: null for an account with no settings row", async () => {
+    const { client } = makeClientWithMaybeSingle(null);
+    expect(await pullLastResetAt(client, "user-1")).toEqual({ lastResetAt: null });
+  });
+
+  it("returns null, not 'no reset', when the read reports an error", async () => {
+    const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
+    expect(await pullLastResetAt(client, "user-1")).toBeNull();
+  });
+
+  it("returns null when the client throws", async () => {
+    const from = vi.fn(() => {
+      throw new Error("network");
+    });
+    const client = { from } as unknown as DataClient;
+    expect(await pullLastResetAt(client, "user-1")).toBeNull();
+  });
+});
+
+describe("pullSettingsOrFailure (optimiser weekly limit)", () => {
+  it("returns the settings blob", async () => {
+    const { client } = makeClientWithMaybeSingle({ settings: { fsrsWeightsOptimizedAt: "2026-11-10T09:00:00.000Z" } });
+    expect(await pullSettingsOrFailure(client, "user-1")).toEqual({
+      settings: { fsrsWeightsOptimizedAt: "2026-11-10T09:00:00.000Z" },
+    });
+  });
+
+  it("returns settings: null for an account with no row", async () => {
+    const { client } = makeClientWithMaybeSingle(null);
+    expect(await pullSettingsOrFailure(client, "user-1")).toEqual({ settings: null });
+  });
+
+  it("returns null, not 'no settings', when the read fails or throws", async () => {
+    const { client } = makeClientWithMaybeSingle(null, { message: "boom" });
+    expect(await pullSettingsOrFailure(client, "user-1")).toBeNull();
+    const from = vi.fn(() => {
+      throw new Error("network");
+    });
+    expect(await pullSettingsOrFailure({ from } as unknown as DataClient, "user-1")).toBeNull();
+  });
+
+  it("leaves pullUserSettingsRow unchanged: null for both no row and a failed read", async () => {
+    expect(await pullUserSettingsRow(makeClientWithMaybeSingle(null).client, "user-1")).toBeNull();
+    expect(await pullUserSettingsRow(makeClientWithMaybeSingle(null, { message: "boom" }).client, "user-1")).toBeNull();
+  });
+});
+
+describe("pushSettingsWithCode", () => {
+  it("passes the refused merge's code through", async () => {
+    const { client } = makeClientWithRpc({ code: "23514", message: "weekly limit" });
+    expect(await pushSettingsWithCode(client, "user-1", {})).toEqual({ ok: false, code: "23514" });
+  });
+
+  it("ok on success, and code null when the client throws", async () => {
+    expect(await pushSettingsWithCode(makeClientWithRpc().client, "user-1", {})).toEqual({ ok: true, code: null });
+    const rpc = vi.fn().mockRejectedValue(new Error("network"));
+    expect(await pushSettingsWithCode({ rpc } as unknown as DataClient, "user-1", {})).toEqual({
+      ok: false,
+      code: null,
+    });
+  });
+});
 
 describe("mergeRemovedLocales (#1568)", () => {
   it("union of two disjoint non-empty sets", () => {

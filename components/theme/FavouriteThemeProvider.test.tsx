@@ -111,3 +111,31 @@ describe("FavouriteThemeProvider - grandfather rule (#1865)", () => {
     });
   });
 });
+
+describe("FavouriteThemeProvider - colours come from the current palette (#2187)", () => {
+  beforeEach(() => {
+    mockApplyTheme.mockClear();
+  });
+
+  it("Palette fix reaches an old pick: Gardevoir stored before its fgOnPrimary fix gets the corrected colours", async () => {
+    const gardevoir = CURATED_POKEMON.find((p) => p.id === 282)!;
+    mockLoadFavourite.mockReturnValue({
+      id: 282,
+      name: "Gardevoir",
+      colors: { ...gardevoir.colors, fgOnPrimary: "#FFFFFF" },
+      spriteUrl: "/sprites/pokemon/282.png",
+    });
+
+    render(
+      <FavouriteThemeProvider>
+        <FavouriteReadout />
+      </FavouriteThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mockApplyTheme).toHaveBeenCalledWith(gardevoir.colors);
+    });
+    expect(mockApplyTheme).not.toHaveBeenCalledWith(expect.objectContaining({ fgOnPrimary: "#FFFFFF" }));
+  });
+});
+

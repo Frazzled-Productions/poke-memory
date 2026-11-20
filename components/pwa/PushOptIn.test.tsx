@@ -24,7 +24,8 @@ import {
 import type { ReactElement } from "react";
 import { waitFor, fireEvent, act, cleanup } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/types";
+import type { DataClient } from "@/lib/db/client";
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -46,24 +47,24 @@ const mockIsPushSupported = vi.fn<() => boolean>(() => true);
 const mockIsStandalone = vi.fn<() => boolean>(() => true);
 const mockHasLocalSubscription = vi.fn<() => Promise<boolean>>(async () => false);
 const mockReconcileSubscription = vi.fn<
-  (client: SupabaseClient, userId: string) => Promise<ReconcileResult>
+  (client: DataClient, userId: string) => Promise<ReconcileResult>
 >(async () => "in-sync");
 const mockSubscribeToPush = vi.fn<
-  (client: SupabaseClient, userId: string) => Promise<SubscribeResult>
+  (client: DataClient, userId: string) => Promise<SubscribeResult>
 >(async () => ({ ok: true }));
 const mockUnsubscribeFromPush = vi.fn<
-  (client: SupabaseClient, userId: string) => Promise<UnsubscribeResult>
+  (client: DataClient, userId: string) => Promise<UnsubscribeResult>
 >(async () => ({ ok: true }));
 
 vi.mock("@/lib/push/subscribe", () => ({
   isPushSupported: () => mockIsPushSupported(),
   isStandalone: () => mockIsStandalone(),
   hasLocalSubscription: () => mockHasLocalSubscription(),
-  reconcileSubscription: (client: SupabaseClient, userId: string) =>
+  reconcileSubscription: (client: DataClient, userId: string) =>
     mockReconcileSubscription(client, userId),
-  subscribeToPush: (client: SupabaseClient, userId: string) =>
+  subscribeToPush: (client: DataClient, userId: string) =>
     mockSubscribeToPush(client, userId),
-  unsubscribeFromPush: (client: SupabaseClient, userId: string) =>
+  unsubscribeFromPush: (client: DataClient, userId: string) =>
     mockUnsubscribeFromPush(client, userId),
 }));
 
@@ -78,8 +79,8 @@ import { PushOptIn } from "@/components/pwa/PushOptIn";
 // Shared fixtures
 // ---------------------------------------------------------------------------
 
-const FAKE_USER = { id: "00000000-0000-0000-0000-000000000001" } as User;
-const FAKE_CLIENT = {} as SupabaseClient;
+const FAKE_USER = { id: "00000000-0000-0000-0000-000000000001" } as AppUser;
+const FAKE_CLIENT = {} as DataClient;
 
 function setNotificationPermission(value: NotificationPermission) {
   // jsdom does not implement Notification; stub the bits the component reads.
@@ -111,7 +112,7 @@ describe("PushOptIn - gating", () => {
   it("renders nothing when isStandalone() is false", async () => {
     mockIsStandalone.mockReturnValue(false);
     const { container } = render(
-      <PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />,
+      <PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />,
     );
     // Effect runs on mount; once it resolves the component re-renders with
     // visible=false and returns null. Wait one microtask to be sure.
@@ -123,7 +124,7 @@ describe("PushOptIn - gating", () => {
   it("renders nothing when isPushSupported() is false", async () => {
     mockIsPushSupported.mockReturnValue(false);
     const { container } = render(
-      <PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />,
+      <PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />,
     );
     await waitFor(() => {
       expect(container.firstChild).toBeNull();
@@ -131,7 +132,7 @@ describe("PushOptIn - gating", () => {
   });
 
   it("renders the opt-in toggle when both gating conditions pass", async () => {
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
     expect(toggle).toBeTruthy();
     // aria-checked reflects the subscribed state - false on a fresh device.
@@ -140,7 +141,7 @@ describe("PushOptIn - gating", () => {
 
   it("reflects an existing local subscription as the on state", async () => {
     mockHasLocalSubscription.mockResolvedValue(true);
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
     await waitFor(() => {
       expect(toggle.getAttribute("aria-checked")).toBe("true");
@@ -154,7 +155,7 @@ describe("PushOptIn - gating", () => {
 
 describe("PushOptIn - interaction", () => {
   it("calls subscribeToPush when toggled on from the unsubscribed state", async () => {
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
 
     await act(async () => {
@@ -172,7 +173,7 @@ describe("PushOptIn - interaction", () => {
 
   it("calls unsubscribeFromPush when toggled off from the subscribed state", async () => {
     mockHasLocalSubscription.mockResolvedValue(true);
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
     await waitFor(() => {
       expect(toggle.getAttribute("aria-checked")).toBe("true");
@@ -197,7 +198,7 @@ describe("PushOptIn - interaction", () => {
       ok: false,
       reason: "subscribe-failed",
     });
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
 
     await act(async () => {
@@ -216,7 +217,7 @@ describe("PushOptIn - interaction", () => {
       ok: false,
       reason: "delete-failed",
     });
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
     await waitFor(() => {
       expect(toggle.getAttribute("aria-checked")).toBe("true");
@@ -241,7 +242,7 @@ describe("PushOptIn - subscription reconciliation", () => {
   it("shows the toggle ON when hasLocalSubscription=true and reconcile returns 'in-sync'", async () => {
     mockHasLocalSubscription.mockResolvedValue(true);
     mockReconcileSubscription.mockResolvedValue("in-sync");
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
     await waitFor(() => {
       expect(toggle.getAttribute("aria-checked")).toBe("true");
@@ -251,11 +252,47 @@ describe("PushOptIn - subscription reconciliation", () => {
   it("shows the toggle ON when reconcile returns 're-inserted' (row was missing but re-persisted)", async () => {
     mockHasLocalSubscription.mockResolvedValue(true);
     mockReconcileSubscription.mockResolvedValue("re-inserted");
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
     await waitFor(() => {
       expect(toggle.getAttribute("aria-checked")).toBe("true");
     });
+  });
+
+  it("Unknown host in Settings: the toggle shows off, not on", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    mockReconcileSubscription.mockResolvedValue("disabled");
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
+    const toggle = await screen.findByTestId("push-optin-button");
+    await waitFor(() => {
+      expect(mockReconcileSubscription).toHaveBeenCalled();
+      expect(toggle.getAttribute("aria-checked")).toBe("false");
+    });
+  });
+
+  it("Replaced device opens Settings: the row is inserted again and the toggle stays on", async () => {
+    mockHasLocalSubscription.mockResolvedValue(true);
+    mockReconcileSubscription.mockResolvedValue("re-inserted");
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
+    const toggle = await screen.findByTestId("push-optin-button");
+    await waitFor(() => {
+      expect(mockReconcileSubscription).toHaveBeenCalled();
+      expect(toggle.getAttribute("aria-checked")).toBe("true");
+    });
+  });
+
+  it("New subscription refused: shows the persist-failed state and the toggle stays off", async () => {
+    mockSubscribeToPush.mockResolvedValue({ ok: false, reason: "persist-failed" });
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
+    const toggle = await screen.findByTestId("push-optin-button");
+
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/could not save/i);
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
   });
 
   it("shows the toggle OFF when reconcile returns 'disabled' (orphaned subscription, re-insert failed)", async () => {
@@ -264,7 +301,7 @@ describe("PushOptIn - subscription reconciliation", () => {
     // off so the user sees that reminders have stopped (#1858 F35).
     mockHasLocalSubscription.mockResolvedValue(true);
     mockReconcileSubscription.mockResolvedValue("disabled");
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
     await waitFor(() => {
       expect(toggle.getAttribute("aria-checked")).toBe("false");
@@ -279,7 +316,7 @@ describe("PushOptIn - subscription reconciliation", () => {
 describe("PushOptIn - superuser guard", () => {
   it("renders the disabled 'Sync paused' label when any flag is on", async () => {
     mockUseSuperuser.mockReturnValue({ anyFlagOn: true });
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const button = await screen.findByTestId("push-optin-button");
     expect(button.textContent).toMatch(/sync paused/i);
     expect(button.hasAttribute("disabled")).toBe(true);
@@ -287,7 +324,7 @@ describe("PushOptIn - superuser guard", () => {
 
   it("does not invoke subscribeToPush even if the disabled button is clicked", async () => {
     mockUseSuperuser.mockReturnValue({ anyFlagOn: true });
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const button = await screen.findByTestId("push-optin-button");
 
     await act(async () => {
@@ -305,7 +342,7 @@ describe("PushOptIn - superuser guard", () => {
 
 describe("PushOptIn - localised aria-label", () => {
   it("toggle aria-label is localised in Japanese", async () => {
-    renderJa(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    renderJa(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
     expect(toggle.getAttribute("aria-label")).toBe("毎日のレビューリマインダー");
   });
@@ -325,7 +362,7 @@ describe("PushOptIn - streak reminder toggle", () => {
   }
 
   it("defaults OFF and is DISABLED (aria-disabled) while the primary toggle is off", async () => {
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const primary = await screen.findByTestId("push-optin-button");
     await waitFor(() => {
       expect(primary.getAttribute("aria-checked")).toBe("false");
@@ -343,7 +380,7 @@ describe("PushOptIn - streak reminder toggle", () => {
 
   it("becomes enabled once the primary toggle is subscribed", async () => {
     mockHasLocalSubscription.mockResolvedValue(true);
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const primary = await screen.findByTestId("push-optin-button");
     await waitFor(() => {
       expect(primary.getAttribute("aria-checked")).toBe("true");
@@ -362,7 +399,7 @@ describe("PushOptIn - streak reminder toggle", () => {
   it("reflects a previously-persisted streakNudgeEnabled=true on load", async () => {
     saveSettings(settingsWith({ streakNudgeEnabled: true }));
     mockHasLocalSubscription.mockResolvedValue(true);
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const streakToggle = await screen.findByTestId("push-streak-optin-button");
     await waitFor(() => {
       expect(streakToggle.getAttribute("aria-checked")).toBe("true");
@@ -371,7 +408,7 @@ describe("PushOptIn - streak reminder toggle", () => {
 
   it("toggling persists streakNudgeEnabled via saveSettings", async () => {
     mockHasLocalSubscription.mockResolvedValue(true);
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const streakToggle = await screen.findByTestId("push-streak-optin-button");
     await waitFor(() => {
       expect(streakToggle.hasAttribute("disabled")).toBe(false);
@@ -396,7 +433,7 @@ describe("PushOptIn - streak reminder toggle", () => {
   });
 
   it("clicking while disabled does not toggle or persist", async () => {
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const streakToggle = await screen.findByTestId("push-streak-optin-button");
     await waitFor(() => {
       expect(streakToggle.hasAttribute("disabled")).toBe(true);
@@ -413,7 +450,7 @@ describe("PushOptIn - streak reminder toggle", () => {
   it("is disabled when a superuser flag is on, even with a subscribed primary toggle", async () => {
     mockHasLocalSubscription.mockResolvedValue(true);
     mockUseSuperuser.mockReturnValue({ anyFlagOn: true });
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const streakToggle = await screen.findByTestId("push-streak-optin-button");
     expect(streakToggle.hasAttribute("disabled")).toBe(true);
   });
@@ -421,7 +458,7 @@ describe("PushOptIn - streak reminder toggle", () => {
   it("shows the superuser-paused reason (not the primary-off hint) when a flag is on, even if subscribed", async () => {
     mockHasLocalSubscription.mockResolvedValue(true);
     mockUseSuperuser.mockReturnValue({ anyFlagOn: true });
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     await screen.findByTestId("push-streak-optin-button");
     expect(
       screen.getByText(/notifications are paused while a superuser flag is on/i),
@@ -434,7 +471,7 @@ describe("PushOptIn - streak reminder toggle", () => {
   it("resets streakNudgeEnabled to false when the primary toggle is turned off", async () => {
     mockHasLocalSubscription.mockResolvedValue(true);
     saveSettings(settingsWith({ streakNudgeEnabled: true }));
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const primary = await screen.findByTestId("push-optin-button");
     await waitFor(() => {
       expect(primary.getAttribute("aria-checked")).toBe("true");
@@ -490,7 +527,7 @@ describe("PushOptIn - streak reminder toggle", () => {
     ];
 
     for (const { renderFn, label, description } of cases) {
-      renderFn(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+      renderFn(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
       const toggle = await screen.findByTestId("push-streak-optin-button");
       expect(toggle.getAttribute("aria-label")).toBe(label);
       expect(screen.getByText(label)).toBeTruthy();
@@ -503,7 +540,7 @@ describe("PushOptIn - streak reminder toggle", () => {
 describe("PushOptIn - permission denied", () => {
   it("shows the iOS Settings explainer when Notification.permission is 'denied'", async () => {
     setNotificationPermission("denied");
-    render(<PushOptIn user={FAKE_USER} supabase={FAKE_CLIENT} />);
+    render(<PushOptIn user={FAKE_USER} db={FAKE_CLIENT} />);
     const toggle = await screen.findByTestId("push-optin-button");
     // Explainer text should be present.
     await waitFor(() => {

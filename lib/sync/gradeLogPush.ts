@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import { pushGradeLog } from "@/lib/sync/gradeLog";
 import { markPushSucceeded } from "@/lib/sync/persistence";
@@ -15,7 +15,7 @@ import { markPushSucceeded } from "@/lib/sync/persistence";
  * status into error.
  */
 export async function pushGradeLogEntry(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   entry: GradeLogEntry,
 ): Promise<void> {

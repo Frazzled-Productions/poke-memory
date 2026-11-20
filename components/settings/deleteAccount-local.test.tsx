@@ -15,7 +15,7 @@ vi.mock("@/lib/storage/reset", () => ({
 function makeRpcClient(rpcError: null | object = null) {
   return {
     rpc: vi.fn().mockResolvedValue({ error: rpcError, data: null }),
-  } as unknown as import("@supabase/supabase-js").SupabaseClient;
+  } as unknown as import("@/lib/db/client").DataClient;
 }
 
 // jsdom on this Node version does not ship localStorage out of the box, so

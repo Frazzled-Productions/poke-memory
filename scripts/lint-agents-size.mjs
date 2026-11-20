@@ -26,14 +26,17 @@ const FILE = "AGENTS.md";
 // section or two of genuine new runtime convention. Raised to 240 on
 // 2026-10-23 for the company-required "OpenSpec" and "Delegated work and the
 // stall watcher" sections (OpenSpec adoption, #2167; ~229 lines with them).
-const MAX_LINES = 240;
+// Back to 190 on 2026-11-14: those sections now point to their one source in
+// ops instead of pasting it (ops #527; ~167 lines).
+const MAX_LINES = 190;
 
 // Byte ceiling (#1912): some agent tools silently truncate instruction files
 // at 32 KiB, and the line budget alone missed a ~40 KB file made of long
 // lines. 26 KiB kept a hard margin below the truncation point; ratcheted to
 // 22 KiB on 2026-10-14 with the slimmer file; back to 26 KiB on 2026-10-23
-// for the two OpenSpec adoption sections (#2167; ~24 KiB with them).
-const MAX_BYTES = 26 * 1024;
+// for the two OpenSpec adoption sections (#2167; ~24 KiB with them); back to
+// 22 KiB on 2026-11-14 when they became pointers (ops #527; ~18 KiB).
+const MAX_BYTES = 22 * 1024;
 
 const text = readFileSync(resolve(ROOT, FILE), "utf8");
 const lines = text.trimEnd().split("\n").length;

@@ -14,8 +14,10 @@ test.beforeEach(async ({ page }) => {
  * nav, the conflict picker, and the visible superuser cloud-write-guard
  * surfaces.
  *
- * The seam (`lib/auth/mockAuth.ts`) is activated by `NEXT_PUBLIC_E2E_AUTH_MOCK=1`,
- * set ONLY against preview deployments by `e2e.yml`. It is provably unreachable
+ * The seam (`lib/auth/mockAuth.ts`) is activated by `NEXT_PUBLIC_E2E_AUTH_MOCK=1`
+ * in a non-production build (`deploy.yml`'s `preview-e2e` job runs this spec
+ * against each PR's preview version, where the signed-in specs skip themselves
+ * because that is a production build). It is provably unreachable
  * in production builds - `isMockAuthEnabled()` short-circuits on
  * `NODE_ENV === "production"`, and `next.config.ts` fails the build loudly if
  * the flag is ever set in a production build. See `lib/auth/mockAuth.test.ts`.
@@ -68,8 +70,8 @@ test.describe("Signed-in UI (mock-auth seam)", () => {
 
     const signOut = page.getByRole("button", { name: "Sign out" }).first();
     await expect(signOut).toBeEnabled();
-    // Clicking invokes the signOut server action. Under the mock seam there is
-    // no real session, so this is a smoke check that the control is wired and
+    // Clicking invokes signOut (Better Auth). Under the mock seam there is no
+    // real session, so this is a smoke check that the control is wired and
     // the click handler runs without a client-side error.
     await signOut.click();
     await expect(page).toHaveURL(/\/$|\/\?/);
@@ -137,6 +139,14 @@ test.describe("Signed-in UI (mock-auth seam)", () => {
       ([key, value]) => window.localStorage.setItem(key, value),
       [MOCK_CLOUD_FIXTURE_STORAGE_KEY, JSON.stringify(cloudFixture)] as const,
     );
+    // The local session is guest progress: the picker is for a device whose
+    // data belongs to nobody yet. The sign-in pull on "/" stamps the mock user
+    // as the owner, and callback-complete skips the picker for a returning
+    // player on their own device, so clear the owner on every page load.
+    await page.addInitScript((key) => {
+      const raw = window.localStorage.getItem(key);
+      if (raw) window.localStorage.setItem(key, JSON.stringify({ ...JSON.parse(raw), ownerUserId: null }));
+    }, "poke-memory:sync-status:v1");
 
     await page.goto("/");
     await awaitSeedIdb(page);

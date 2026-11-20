@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { clearLocalProgress } from "@/lib/storage/reset";
 
 /**
@@ -15,7 +15,7 @@ import { clearLocalProgress } from "@/lib/storage/reset";
  * Most callers should use `deleteAccountEverywhere` instead - calling this
  * directly wipes the cloud identity while leaving local data intact.
  */
-export async function deleteAccount(client: SupabaseClient): Promise<boolean> {
+export async function deleteAccount(client: DataClient): Promise<boolean> {
   try {
     const { error } = await client.rpc("delete_account");
     if (error) {
@@ -75,7 +75,7 @@ export type DeleteAccountResult =
  * same-tab storage-event dispatch; the extra settings-key sweep runs after it.
  */
 export async function deleteAccountEverywhere(
-  client: SupabaseClient,
+  client: DataClient,
 ): Promise<DeleteAccountResult> {
   const cloudOk = await deleteAccount(client);
   if (!cloudOk) return { ok: false, reason: "cloud-delete-failed" };

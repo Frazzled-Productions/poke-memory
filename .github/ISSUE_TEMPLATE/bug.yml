@@ -56,7 +56,7 @@ body:
       description: Where did you see this?
       options:
         - Production (pokememory.com)
-        - Preview deployment (vercel.app)
+        - Preview deployment (workers.dev)
         - Local dev (next dev)
         - Not sure
     validations:
@@ -95,7 +95,7 @@ body:
         - sync / persistence
         - SRS scheduler
         - PokéAPI / sprites
-        - Supabase schema or RLS
+        - database schema or access rules
         - workflow / CI / repo automation
         - docs
         - other / not sure

@@ -1,10 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { GenerationStats } from "@/lib/stats/derive";
 import type { BadgeDefinition } from "@/lib/badges/catalog";
 import { getSeedIfLoaded } from "@/lib/pokemon/seed-async";
-import { mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { inlineLink, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
+import { PartnerSprite } from "@/components/favourite/PartnerSprite";
+import type { Partner } from "@/components/favourite/usePartner";
+import { POKEDEX_GRID_SPRITE_SIZE } from "@/lib/sprites/sizes";
 
 type Props = {
   handle: string | null;
@@ -29,6 +33,12 @@ type Props = {
    * not including base species). Passed alongside `formsMastered`.
    */
   totalFormCards?: number;
+  /**
+   * The favourite as a partner (#2187): shown in the hero, a silhouette until
+   * mastered. Null (no favourite) shows a "Choose your favourite" link to the
+   * Pokédex; undefined (still loading, or omitted) shows nothing.
+   */
+  partner?: Partner | null;
 };
 
 /**
@@ -81,8 +91,10 @@ export function TrainerCard({
   earnedBadges,
   formsMastered,
   totalFormCards,
+  partner,
 }: Props) {
   const t = useTranslations("stats.trainerCard");
+  const tFavourite = useTranslations("favourite.partner");
   const level = trainerLevel(totalMastered);
   const next = nextLevelMastered(level);
   const needed = next - totalMastered;
@@ -101,6 +113,16 @@ export function TrainerCard({
             {handle ?? t("trainerFallback")}
           </span>
         </div>
+        {partner && (
+          <div className="flex flex-col items-center">
+            <span className={sectionLabel}>{tFavourite("heading")}</span>
+            <PartnerSprite
+              speciesId={partner.speciesId}
+              mastered={partner.mastered}
+              size={POKEDEX_GRID_SPRITE_SIZE}
+            />
+          </div>
+        )}
         <div className="flex items-baseline gap-2">
           <span className={sectionLabel}>
             {t("levelLabel")}
@@ -121,6 +143,14 @@ export function TrainerCard({
           ? t("allMastered")
           : t("masteryProgress", { mastered: totalMastered, next, needed, levelNext: level + 1 })}
       </p>
+      {partner === null && (
+        <p className={`mt-1 ${mutedTextXs}`}>
+          <Link href="/pokedex" className={inlineLink}>
+            {tFavourite("chooseFavourite")}
+          </Link>{" "}
+          {tFavourite("chooseFavouriteBody")}
+        </p>
+      )}
       {totalFormCards !== undefined && totalFormCards > 0 ? (
         <p className="mt-0.5 text-[11px] text-zinc-400 dark:text-zinc-500">
           {t("formsMastered", { mastered: formsMastered ?? 0, total: totalFormCards })}

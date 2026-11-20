@@ -28,7 +28,7 @@ import {
 
 /**
  * Renders nothing. Mounted in the root layout to push local-only changes
- * (settings, streak, grade log) to Supabase without waiting for user action.
+ * (settings, streak, grade log) to the cloud without waiting for user action.
  * See #319.
  *
  * Cards already have an equivalent path via `usePerGradeSync`; this covers
@@ -41,12 +41,12 @@ import {
  * for the cards-failed case (`lib/sync/useRetryPush.ts`).
  */
 export function AutoSyncOnChange() {
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const { anyFlagOn } = useSuperuser();
   // Treat the user as signed-out when any superuser flag is on, so settings/
   // streak/grade-log writes all skip the cloud during a QA session.
   const userId = anyFlagOn ? null : user?.id ?? null;
-  const client = anyFlagOn ? null : supabase;
+  const client = anyFlagOn ? null : db;
 
   useEffect(() => {
     if (!client || !userId) return;
@@ -108,7 +108,7 @@ export function AutoSyncOnChange() {
       window.removeEventListener(STREAK_UPDATED_EVENT, handleStreak);
       window.removeEventListener(GRADE_LOG_APPENDED_EVENT, handleGradeLog);
     };
-  }, [supabase, userId]);
+  }, [db, userId]);
 
   return null;
 }
