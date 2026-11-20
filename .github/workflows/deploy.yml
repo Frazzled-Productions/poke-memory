@@ -1,12 +1,14 @@
 # Deploys the app to Cloudflare Workers with OpenNext and wrangler (OpenSpec change
 # move-to-cloudflare, design D11), modelled on the company site's stage 1 workflow.
 #
-# - Push to `main`, or a published GitHub Release: test, build, apply D1 migrations to the
-#   production database, deploy the Worker `poke-memory`. The release trigger exists because
+# - Push to `main`, or a dispatch of this workflow on `main`: test, build, apply D1 migrations to
+#   the production database, deploy the Worker `poke-memory`. The job runs in the GitHub
+#   environment `Production`, which admits only `main` and is the only place the Cloudflare token
+#   and SENTRY_AUTH_TOKEN live (deploy guard, Fraser's ruling of 19 November 2026, ops #610).
 #   auto-release.yml commits the version bump and CHANGELOG.md to `main` with `[skip ci]`, which
-#   suppresses the push event; the Release it then creates with the bot App token is not
-#   suppressed, so the released version (and its What's new section) is what ends up deployed.
-#   A release deploys the tip of `main`, never the tag itself.
+#   suppresses the push event, so after its release it dispatches this workflow on `main`; the
+#   released version (and its What's new section) is what ends up deployed. A published Release no
+#   longer triggers a deploy: its ref is the tag, which the environment's branch rule refuses.
 # - Pull request into `qa`, or the qa-to-main promotion PR (so `qa` itself gets a preview to QA
 #   before promoting, which qa-preview-deploy.yml used to fire on Vercel): build, apply D1
 #   migrations to the preview database, seed it with the two test users
@@ -14,22 +16,24 @@
 #   `poke-memory-preview` aliased pr-<number>, comment its URL on the PR (one comment, edited on
 #   later pushes), then run the Playwright auth specs against that URL (`preview-e2e`, which
 #   replaces the old e2e.yml that waited for a Vercel deployment).
-# - With no CLOUDFLARE_API_TOKEN secret (a fork, Dependabot, or before the account is set up), or
-#   with no wrangler.jsonc or one still holding placeholder ids, both jobs skip the Cloudflare
-#   steps with a notice and pass.
+# - The preview job runs in the environment `Preview`, which holds no Cloudflare token: a token that
+#   can write D1 can write every database in the account (D1 write is account-wide), so pull
+#   request code never gets one. Until a token limited to the preview Worker exists, the preview job
+#   skips with a notice and passes. The same notice covers a fork, Dependabot, or a wrangler.jsonc
+#   that is missing or still holds placeholder ids.
 #
 # Secrets and the public repo: this is `pull_request`, never `pull_request_target`, so a fork PR
 # runs without secrets (and the preview job also skips forks outright). The Cloudflare token is
 # set only on the steps that call wrangler, never on `npm ci` or the Next.js build, so dependency
-# install scripts and the build never see it. Same-repo PR branches can only be pushed by
-# collaborators with write access, who are trusted with it. None of these jobs is a required check.
+# install scripts and the build never see it. There is no repository-level Cloudflare token, so
+# no job outside `Production` can read one. None of these jobs is a required check.
 name: Deploy
 
 on:
   push:
     branches: [main]
-  release:
-    types: [published]
+  # auto-release.yml dispatches this on `main` after it pushes a release commit (see above).
+  workflow_dispatch:
   pull_request:
     branches: [qa, main]
     # Docs and OpenSpec files never reach the Worker, so they need no preview.
@@ -39,7 +43,7 @@ on:
       - "openspec/**"
 
 concurrency:
-  # One group for every production deploy (push and release), so two never run at once and an
+  # One group for every production deploy (push and dispatch), so two never run at once and an
   # older build cannot finish after a newer one; one group per PR for previews.
   group: ${{ github.event_name == 'pull_request' && format('deploy-{0}', github.ref) || 'deploy-production' }}
   # Never cancel a production deploy half way; a newer push to a PR replaces its preview.
@@ -50,15 +54,15 @@ permissions:
 
 jobs:
   production:
-    if: github.event_name == 'push' || github.event_name == 'release'
+    # A dispatch on any other branch is skipped here rather than refused by the environment.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # Deployment branches: `main` only. Holds CLOUDFLARE_API_TOKEN and SENTRY_AUTH_TOKEN.
+    environment: Production
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
-          # A release deploys the tip of `main`, not the tag: the tip always contains the newest
-          # release, so a re-published or older Release can never roll production back.
-          ref: ${{ github.event_name == 'release' && 'main' || '' }}
           persist-credentials: false
 
       - name: Check Cloudflare is set up
@@ -120,6 +124,8 @@ jobs:
     # Cloudflare steps if that changes. Dependabot PRs read the Dependabot secret store, which has
     # no Cloudflare token, so the ready check skips them with a notice.
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
+    # Holds no Cloudflare token (see the header), so the ready check below skips with a notice.
+    environment: Preview
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -138,7 +144,7 @@ jobs:
           HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
         run: |
           if [ "$HAS_TOKEN" != "true" ]; then
-            echo "::notice::No CLOUDFLARE_API_TOKEN secret for this pull request (Dependabot, or not set up yet), so no preview version is uploaded. CI still builds and tests it."
+            echo "::notice::No Cloudflare token for pull requests (the deploy guard keeps it in the Production environment, for main only), so no preview version is uploaded. CI still builds and tests it."
             echo "ok=false" >> "$GITHUB_OUTPUT"
           elif [ ! -f wrangler.jsonc ]; then
             echo "::notice::No wrangler.jsonc on this branch, so no preview version is uploaded."

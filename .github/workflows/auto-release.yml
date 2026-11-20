@@ -73,6 +73,7 @@ jobs:
        github.event.pull_request.head.ref == 'qa')
     permissions:
       contents: write
+      actions: write # dispatch deploy.yml on main after the release (last step)
 
     steps:
       - name: Mint App installation token
@@ -132,6 +133,7 @@ jobs:
         run: node .github/scripts/cut-release.mjs
 
       - name: Commit, tag, push
+        id: push
         if: steps.cut.outputs.skip != 'true'
         env:
           NEW_VERSION: ${{ steps.cut.outputs.version }}
@@ -199,6 +201,18 @@ jobs:
           set -euo pipefail
           git push origin "+HEAD:refs/heads/qa"
           echo "Reset qa to main ($(git rev-parse --short HEAD))."
+
+      - name: Deploy the release
+        # The release commit carries `[skip ci]`, so its push does not start deploy.yml. Dispatch it
+        # on `main` instead: its production job runs in the `Production` environment, which admits
+        # only `main` (deploy guard, ops #610), so a Release's tag ref cannot deploy. A dispatch
+        # with GITHUB_TOKEN does start a run (the one exception to its no-new-runs rule). Runs
+        # whenever the release commit reached `main`, even if a qa step or the Release failed, so
+        # production never lags a pushed release.
+        if: ${{ !cancelled() && steps.push.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --repo "${GITHUB_REPOSITORY}" --ref main
 
   backmerge-hotfix:
     name: Backmerge main into qa after hotfix
