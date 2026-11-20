@@ -6,6 +6,30 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 
 <!-- Add changelog entries to changelog.d/unreleased/ - see changelog.d/README.md -->
 
+## [0.12.0] - 2026-11-20
+
+### Added
+
+- Choose any Pokémon as your favourite with the new Make favourite button on its Pokédex page, even before you have learned it, and heart others to build a shortlist. Your favourite now appears as your partner on Journey, in Share today and milestone images, beside the Pokémon of the day and, once mastered, in its own spot in Pasture.
+- App colour themes now come from any Pokémon you have mastered, chosen with a search in Settings, with Match my favourite once your favourite is mastered.
+- A Favourites group in the practice Scope control practises your hearted Pokémon.
+
+### Changed
+
+- "Optimise now" opens its own page, which fits your weights in the browser instead of on our server and shows its progress there.
+- Poké Memory now runs on Cloudflare, and signed-in progress is stored in the EU. Optimising your review schedule now happens on your own device.
+- Bug reports now reach the maintainer as an email instead of a Discord message, still with no account details. The privacy notice says these emails are deleted after 12 months.
+- When a bug report is deleted, after 12 months or with your account, its notification in the maintainer's Discord channel is now deleted too, message preview included. The privacy notice is updated to match.
+
+### Fixed
+
+- The Almost mastered group in the practice Scope control no longer disappears when the page reloads or your settings sync.
+- Daily reminders for an Almost mastered-only scope no longer count every due card.
+- Daily reminders and streak nudges now reach people on time even when one push service is slow to answer.
+- Reset all progress and Delete account now also clear grades waiting to sync from the browser's offline storage.
+- Restoring a backup while signed in now only moves cards forward. Anything your account has got further with stays as it is, so this device and your account no longer disagree and later grades keep syncing.
+- "Personalise my schedule" no longer fails with "not enough variety" for most review histories: the optimiser now learns from every review, not just the last one per card.
+
 ## [0.11.15] - 2026-10-23
 
 ### Changed
@@ -1917,7 +1941,8 @@ All notable user-facing changes to poke-memory. Format loosely based on [Keep a 
 - **Planner scope warning + `/split`** - when a plan touches too many files or surfaces, the planner appends a scope warning and a suggested split. Commenting `/split` creates the proposed child issues as native GitHub sub-issues of the parent, inheriting its priority label.
 - **Standalone `auto-review.yml`** - code-review now runs as its own workflow on `pull_request` open instead of as a final step inside `auto-issue.yml`'s implement job. Bot-opened PRs still get exactly one review on creation; manually-opened PRs (e.g. when an App-permissions block forces a manual push) can opt in by adding an `auto-review` label, restoring the `/fix` loop. Closes [#33](https://github.com/fraserbrookhouse/poke-memory/issues/33).
 
-[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.11.15...HEAD
+[Unreleased]: https://github.com/fraserbrookhouse/poke-memory/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.12.0
 [0.11.15]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.15
 [0.11.14]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.14
 [0.11.13]: https://github.com/fraserbrookhouse/poke-memory/releases/tag/v0.11.13
