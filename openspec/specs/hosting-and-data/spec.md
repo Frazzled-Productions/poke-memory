@@ -13,9 +13,9 @@ from Supabase. Company decision 0018 (19 November 2026) and the `move-to-cloudfl
 
 The app SHALL build with `@opennextjs/cloudflare` into one Worker, `poke-memory`, with
 `cacheComponents: false`. Pages that were partially prerendered SHALL render per request, and nothing
-SHALL revalidate at runtime, so the incremental cache is the static-assets cache with no R2 or KV cache.
-`/test-error` SHALL be `force-dynamic`. Until the cutover (#2393) the Worker SHALL be reachable only at
-`poke-memory.frasers-account.workers.dev`.
+SHALL revalidate at runtime, so the incremental cache is the static-assets cache.
+`/test-error` SHALL be `force-dynamic`. Since the cutover (#2393) the Worker SHALL be reachable only at
+`pokememory.com`, with its workers.dev address off.
 
 #### Scenario: A page that used to be prerendered
 
@@ -32,7 +32,27 @@ SHALL revalidate at runtime, so the incremental cache is the static-assets cache
 - **WHEN** a player who has visited before opens the app with no connection
 - **THEN** the service worker serves the cached shell as it does today, since per-request rendering changes nothing on the device
 
-Source (planned): design D1, `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc`.
+#### Scenario: The old production address
+
+- **WHEN** someone opens `poke-memory.frasers-account.workers.dev` after a production deploy
+- **THEN** Cloudflare does not serve the app there, while `https://pokememory.com` still answers 200
+
+#### Scenario: A deploy and the custom domain
+
+- **WHEN** `deploy.yml` deploys `poke-memory`
+- **THEN** the `pokememory.com` Worker Custom Domain, attached in Cloudflare and not listed as a route in `wrangler.jsonc`, is left as it is, so a deploy never re-takes DNS
+
+#### Scenario: The preview address
+
+- **WHEN** a version of `poke-memory-preview` is uploaded
+- **THEN** it keeps its workers.dev address, because `env.preview` sets `workers_dev: true`
+
+#### Scenario: Config drifts back
+
+- **WHEN** a change sets the top-level `workers_dev` to true, or drops `workers_dev: true` from `env.preview`
+- **THEN** `scripts/workflows-no-backups.test.mjs` fails
+
+Source: design D1, `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc`; change `production-deploy-guard`.
 
 ### Requirement: One D1 database in the EU holds the cloud data
 
@@ -504,27 +524,48 @@ Source (planned): design D13, owner ruling 20 November 2026, `scripts/workflows-
 
 ### Requirement: Main deploys production and each pull request gets a preview
 
-`.github/workflows/deploy.yml` SHALL, on a push to `main`, build, apply D1 migrations and deploy
-`poke-memory`. On a pull request it SHALL upload a version of the separate Worker
-`poke-memory-preview`, which has its own D1 database and bucket, alias it `pr-<number>` and comment its
-URL. Without a `CLOUDFLARE_API_TOKEN` secret the jobs SHALL skip with a notice.
+`.github/workflows/deploy.yml` SHALL build, apply D1 migrations and deploy `poke-memory` on a push or
+dispatch on `main`, from the GitHub environment `Production`, which admits only `main` and alone holds
+the Cloudflare and Sentry tokens. A published Release SHALL NOT deploy; `auto-release.yml` SHALL
+dispatch the deploy after its release commit. Pull request previews SHALL run in the environment
+`Preview`, and without a token the jobs SHALL skip with a notice.
 
 #### Scenario: Pull request opened
 
-- **WHEN** a pull request is opened with the token set
-- **THEN** a preview version is uploaded and its `pr-<number>` URL is commented on the PR
+- **WHEN** a pull request is opened and the `Preview` environment holds a token
+- **THEN** a version of the separate Worker `poke-memory-preview`, with its own D1 database and bucket, is uploaded, aliased `pr-<number>`, and its URL is commented on the PR
+
+#### Scenario: A job outside Production
+
+- **WHEN** any job not in the `Production` environment reads `secrets.CLOUDFLARE_API_TOKEN`
+- **THEN** it gets nothing, because there is no repository-level copy
 
 #### Scenario: No token
 
-- **WHEN** the repo has no `CLOUDFLARE_API_TOKEN`
+- **WHEN** the job's environment holds no Cloudflare token (every pull request today, Dependabot and forks)
 - **THEN** the deploy jobs skip with a notice and the run is green
+
+#### Scenario: Release
+
+- **WHEN** a `qa` to `main` promotion merges and `auto-release.yml` pushes the `[skip ci]` release commit
+- **THEN** it dispatches `deploy.yml` on `main`, and the production job deploys the released version from the `Production` environment
+
+#### Scenario: Dispatch on another branch
+
+- **WHEN** someone dispatches `deploy.yml` on a branch other than `main`
+- **THEN** the production job is skipped, and the environment would refuse it anyway
+
+#### Scenario: Guard drifts
+
+- **WHEN** a change drops `environment: Production` or the `main` check from the production job, adds the release trigger back, or removes the dispatch from `auto-release.yml`
+- **THEN** `scripts/workflows-no-backups.test.mjs` fails
 
 #### Scenario: End-to-end tests
 
-- **WHEN** `e2e.yml` runs for a pull request
+- **WHEN** a preview version was uploaded for a pull request
 - **THEN** the auth specs run against the preview version URL
 
-Source (planned): design D11, `.github/workflows/deploy.yml`, `.github/workflows/e2e.yml`.
+Source: design D11, `.github/workflows/deploy.yml`, `.github/workflows/auto-release.yml`; Fraser's ruling of 19 November 2026 (ops #610); change `production-deploy-guard`.
 
 ### Requirement: Preview databases hold seeded test data
 
