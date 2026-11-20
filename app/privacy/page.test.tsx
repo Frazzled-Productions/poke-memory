@@ -155,29 +155,26 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("says the Discord bug notification is deleted with the feedback (ops #405)", async () => {
+    it("says a bug report is emailed to our company mailbox through Resend, not posted to Discord (20 November 2026)", async () => {
       await renderPage();
       expect(
-        screen.getByText(/we delete this notification from discord too/i),
+        screen.getByText(/automated notification email to our company\s+mailbox/i),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText(/and deleted when the\s+feedback is deleted/i),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/we also delete its notification in our discord channel/i),
-      ).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(/discord/i);
+      // Section 6 lists Resend as the sub-processor that delivers it.
+      expect(screen.getByRole("cell", { name: "Resend" })).toBeInTheDocument();
     });
 
-    it("says a failed Discord deletion is retried, in sections 3, 6 and 8 (ruling 3 November 2026)", async () => {
+    it("says how long the bug-report email is kept, in sections 3, 6 and 8", async () => {
       await renderPage();
       expect(
-        screen.getByText(/delete this notification from discord too, and retry\s+any deletion that fails/i),
+        screen.getByText(/we delete these emails 12 months after they arrive/i),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/feedback is deleted \(we retry any deletion that fails\)/i),
+        screen.getByText(/each email is deleted from the mailbox 12 months/i),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/message preview included, and retry any deletion that fails/i),
+        screen.getByText(/deleting your account does not remove it/i),
       ).toBeInTheDocument();
     });
 
@@ -205,9 +202,9 @@ describe("Privacy Notice page", () => {
       ).toBeTruthy();
     });
 
-    it("shows the last updated date as 19 November 2026", async () => {
+    it("shows the last updated date as 20 November 2026", async () => {
       await renderPage();
-      expect(screen.getByText(/19 november 2026/i)).toBeTruthy();
+      expect(screen.getByText(/20 november 2026/i)).toBeTruthy();
     });
 
     it("names Cloudflare, not Supabase or Vercel, for hosting, data, backups and analytics (move-to-cloudflare)", async () => {

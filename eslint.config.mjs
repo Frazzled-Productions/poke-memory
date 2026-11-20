@@ -31,7 +31,7 @@ const eslintConfig = defineConfig([
     "vendor/**",
   ]),
   // Cross-user database access (decision 0018, design D4): lib/db/system runs
-  // queries across every user's rows, so only the cron, push-send, Discord and
+  // queries across every user's rows, so only the cron, push-send and
   // feedback routes, the public user count (design D13) and lib/db itself may
   // import it. Everything else reads
   // and writes per-user rows through forUser (lib/db/scope.ts).
@@ -41,7 +41,6 @@ const eslintConfig = defineConfig([
     ignores: [
       "app/api/cron/**",
       "app/api/push/send-*/**",
-      "app/api/discord/**",
       "app/api/feedback/**",
       "app/api/stats/users/**",
       "lib/db/**",
@@ -54,7 +53,7 @@ const eslintConfig = defineConfig([
             {
               regex: "(^|/)db/system(\\.ts)?(/.*)?$",
               message:
-                "lib/db/system reads across users: only app/api/cron, app/api/push/send-*, app/api/discord, app/api/feedback, app/api/stats/users and lib/db may import it. Use forUser (lib/db/scope.ts) for per-user rows (design D4).",
+                "lib/db/system reads across users: only app/api/cron, app/api/push/send-*, app/api/feedback, app/api/stats/users and lib/db may import it. Use forUser (lib/db/scope.ts) for per-user rows (design D4).",
             },
           ],
         },

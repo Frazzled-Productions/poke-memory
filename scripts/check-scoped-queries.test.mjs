@@ -48,7 +48,6 @@ describe("sql-table", () => {
     "'delete from feedback where id = ?'",
     "`update rate_limit_buckets set x = 1`",
     'const q = `select id from "account"`;',
-    "`INSERT INTO feedback_discord_posts (feedback_id) VALUES (?)`",
   ])("flags %s", (line) => {
     expect(rules(line)).toEqual(["sql-table"]);
   });

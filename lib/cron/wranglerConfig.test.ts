@@ -89,3 +89,11 @@ describe("wrangler.jsonc alert sender (design D13)", () => {
     expect(config.env.preview.vars?.RESEND_FROM).toBeUndefined();
   });
 });
+
+describe("wrangler.jsonc secrets (Discord dropped for email, 20 November 2026)", () => {
+  it("lists no Discord webhook secret: the feedback alert and digest email through Resend", () => {
+    const text = readFileSync(join(process.cwd(), "wrangler.jsonc"), "utf8");
+    expect(text).not.toMatch(/DISCORD/);
+    expect(text).toMatch(/RESEND_API_KEY/);
+  });
+});

@@ -4,8 +4,8 @@ import { hashIp } from "@/lib/auth/rateLimitIp";
 import { parseJsonBody } from "@/lib/api/parseJsonBody";
 import { requireAuth } from "@/lib/auth/requireAuth";
 import { getEnv } from "@/lib/db/env";
-import { checkRateLimit, discordPostStore, insertFeedback, type FeedbackCategory } from "@/lib/db/system";
-import { postBugNotification } from "@/lib/discord/notify";
+import { checkRateLimit, feedbackMessage, insertFeedback, type FeedbackCategory } from "@/lib/db/system";
+import { sendBugReportAlert } from "@/lib/feedback/alerts";
 
 /**
  * POST /api/feedback (#1621)
@@ -17,9 +17,11 @@ import { postBugNotification } from "@/lib/discord/notify";
  * `user_id` is derived from the server-validated session - NEVER from the
  * request body - to prevent callers from spoofing another user's id.
  *
- * A bug report also goes to the maintainers' Discord (#1653): the route sends
- * it itself after responding, through ctx.waitUntil, in place of the Postgres
- * trigger of migration 042 (design D3). Outside production nothing is sent.
+ * A bug report is also emailed to the company mailbox (#1653; Discord until
+ * Fraser's ruling of 20 November 2026): the route sends it after responding,
+ * through ctx.waitUntil, in place of the Postgres trigger of migration 042
+ * (design D3), with lib/feedback/alerts.ts. Outside production nothing is
+ * sent; without RESEND_API_KEY it is logged and skipped.
  *
  * Input shape:
  *   { category: 'bug' | 'feature' | 'other', message: string, page?: string, appVersion?: string }
@@ -120,16 +122,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 
-  // --- Discord bug notification, after the response (was the 042 trigger) ---
+  // --- Bug-report email, after the response (was the 042 trigger) ---
   if (category === "bug") {
-    const notification = postBugNotification(env, discordPostStore(env.DB), {
+    const notification = sendBugReportAlert(env, (id) => feedbackMessage(env.DB, id), {
       id: inserted.id,
-      category,
       page,
       app_version: appVersion,
       created_at: inserted.created_at,
       authenticated: userId !== null,
-    }).catch((err) => console.error("[feedback] Discord notification threw", err));
+    }).catch((err) => console.error("[feedback] bug-report email threw", err));
     try {
       const { ctx } = await getCloudflareContext({ async: true });
       ctx.waitUntil(notification);

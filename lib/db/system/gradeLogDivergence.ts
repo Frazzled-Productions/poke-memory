@@ -6,7 +6,7 @@
 // GitHub issue; no runner reads player data any more. The report carries counts and 8-character user
 // id prefixes only. The SQL is tested on node:sqlite by gradeLogDivergence.test.ts.
 //
-// Only importable from the cron, push-send, Discord and feedback routes (ESLint
+// Only importable from the cron, push-send and feedback routes (ESLint
 // no-restricted-imports in eslint.config.mjs).
 //
 // Monitor: grade_log vs card_reviews divergence (closes #607, #1047, #1221, #1357)

@@ -8,7 +8,7 @@
  * |--------------------------------------|------------------|------------------------------------|
  * | hourly daily reminders (031)         | every hour       | POST /api/push/send-daily          |
  * | hourly streak nudge (047)            | every hour       | POST /api/push/send-streak-nudge   |
- * | weekly digest, Monday 09:00 (042)    | Monday 09:00     | POST /api/discord/digest           |
+ * | weekly digest, Monday 09:00 (042)    | Monday 09:00     | POST /api/cron/feedback-digest     |
  * | feedback retention, 03:00 (034)      | 03:00            | POST /api/cron/feedback-retention  |
  * | grade_log orphan reconcile (032)     | Sunday 04:00     | POST /api/cron/reconcile-grade-log |
  * | rate-limit bucket clean-up (041)     | every 30 minutes | POST /api/cron/rate-limit-cleanup  |
@@ -32,7 +32,7 @@ export const RESTORE_CHECK_CRON = "0 4 1 * *";
 export const CRON_ROUTES = {
   sendDaily: "/api/push/send-daily",
   sendStreakNudge: "/api/push/send-streak-nudge",
-  discordDigest: "/api/discord/digest",
+  feedbackDigest: "/api/cron/feedback-digest",
   feedbackRetention: "/api/cron/feedback-retention",
   reconcileGradeLog: "/api/cron/reconcile-grade-log",
   rateLimitCleanup: "/api/cron/rate-limit-cleanup",
@@ -59,6 +59,6 @@ export function cronRoutesFor(cron: string, now: Date): string[] {
   if (hour === 3) routes.push(CRON_ROUTES.feedbackRetention);
   if (hour === 4 && day === SUNDAY) routes.push(CRON_ROUTES.reconcileGradeLog);
   if (hour === 8) routes.push(CRON_ROUTES.gradeLogDivergence);
-  if (hour === 9 && day === MONDAY) routes.push(CRON_ROUTES.discordDigest);
+  if (hour === 9 && day === MONDAY) routes.push(CRON_ROUTES.feedbackDigest);
   return routes;
 }

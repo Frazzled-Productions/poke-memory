@@ -7,7 +7,7 @@
  * routes decide who is due this hour (lib/push/notificationHour.ts) and each
  * user's "today" (todayInTimezone) in TypeScript and pass the date in.
  *
- * Only importable from the cron, push-send, Discord and feedback routes
+ * Only importable from the cron, push-send and feedback routes
  * (ESLint no-restricted-imports in eslint.config.mjs).
  */
 import type { D1DatabaseLike } from "../d1";

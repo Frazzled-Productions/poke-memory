@@ -142,15 +142,9 @@ describe("writes", () => {
     }
   });
 
-  it("delete_account reports the Discord posts to delete after the response", async () => {
+  it("delete_account answers 200 with nothing left to do after the response", async () => {
     d1.sqlite.prepare(`INSERT INTO feedback (id, user_id, category, message) VALUES ('f1', ?, 'bug', 'x')`).run(alice);
-    d1.sqlite.prepare(`INSERT INTO feedback_discord_posts (feedback_id, discord_message_id) VALUES ('f1', 'm1')`).run();
-    const result = await run({ kind: "rpc", name: "delete_account" });
-    expect(result).toEqual({
-      status: 200,
-      body: { data: null, error: null },
-      discordPostsToDelete: [{ feedbackId: "f1", discordMessageId: "m1" }],
-    });
+    expect(await run({ kind: "rpc", name: "delete_account" })).toEqual({ status: 200, body: { data: null, error: null } });
   });
 
   it("the reset cooldown is 200 with error P0001", async () => {

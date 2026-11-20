@@ -482,10 +482,8 @@ describe("other tables", () => {
     expect(query("SELECT settings FROM user_settings")).toEqual([{ settings: "{}" }]);
   });
 
-  it("feedback_discord_posts outlives its feedback row (no foreign key, 051)", async () => {
-    expect(
-      await outcome("INSERT INTO feedback_discord_posts (feedback_id, discord_message_id) VALUES ('gone', '1')"),
-    ).toBe("ok");
+  it("has no feedback_discord_posts table (dropped by 0004 with Discord, 20 November 2026)", () => {
+    expect(query("SELECT name FROM sqlite_master WHERE name = 'feedback_discord_posts'")).toEqual([]);
   });
 
   it("refuses a row for a user that does not exist (foreign key)", async () => {

@@ -7,8 +7,8 @@
  * listed is refused (42P01 / 42703) before any SQL runs. A test
  * (lib/db/tables.test.ts) keeps this file in step with db/d1/migrations.
  *
- * Tables reached only by system jobs (rate_limit_buckets,
- * feedback_discord_posts) and Better Auth's tables are deliberately absent: they
+ * Tables reached only by system jobs (rate_limit_buckets) and Better Auth's
+ * tables are deliberately absent: they
  * have no per-user scope and go through lib/db/system.ts or Better Auth.
  */
 import { DbError } from "./errors";
@@ -161,7 +161,6 @@ export const PROTECTED_TABLES = [
   "grade_log",
   "push_subscriptions",
   "feedback",
-  "feedback_discord_posts",
   "rate_limit_buckets",
   "user",
   "session",

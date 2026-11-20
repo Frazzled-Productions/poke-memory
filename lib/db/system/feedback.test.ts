@@ -1,6 +1,7 @@
 /**
  * Feedback and rate-limit system queries against the D1 test database:
- * retention (034), the digest read (042), Discord post ids (051) and
+ * retention (034), the digest read (042), the bug-report email's message
+ * read and
  * check_rate_limit / the bucket purge (041, 045).
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -8,9 +9,8 @@ import { forUser } from "../scope";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "../testing/sqliteD1";
 import {
   deleteFeedbackCreatedBefore,
-  discordPostStore,
-  discordPostsForUser,
   feedbackForDigest,
+  feedbackMessage,
   feedbackRetentionCutoff,
   insertFeedback,
 } from "./feedback";
@@ -67,17 +67,11 @@ describe("feedback retention (034)", () => {
     expect(feedbackRetentionCutoff(new Date("2026-11-19T03:00:00.000Z")).toISOString()).toBe("2025-11-19T03:00:00.000Z");
   });
 
-  it("deletes only rows created before the cutoff and returns their ids and categories", async () => {
-    const old = await feedbackAt(alice, "2025-11-19T02:59:59.999Z");
-    const oldGuest = await feedbackAt(null, "2025-01-01T00:00:00.000Z", "feature");
+  it("deletes only rows created before the cutoff and returns how many went", async () => {
+    await feedbackAt(alice, "2025-11-19T02:59:59.999Z");
+    await feedbackAt(null, "2025-01-01T00:00:00.000Z", "feature");
     const kept = await feedbackAt(bob, "2025-11-19T03:00:00.000Z");
-    const deleted = await deleteFeedbackCreatedBefore(d1, new Date("2025-11-19T03:00:00.000Z"));
-    expect(deleted.sort((a, b) => a.id.localeCompare(b.id))).toEqual(
-      [
-        { id: old, category: "bug" },
-        { id: oldGuest, category: "feature" },
-      ].sort((a, b) => a.id.localeCompare(b.id)),
-    );
+    expect(await deleteFeedbackCreatedBefore(d1, new Date("2025-11-19T03:00:00.000Z"))).toBe(2);
     expect((await forUser(d1, bob).select("feedback")).map((r) => r.id)).toEqual([kept]);
   });
 });
@@ -96,37 +90,11 @@ describe("feedbackForDigest (042)", () => {
   });
 });
 
-describe("discordPostStore and discordPostsForUser (051)", () => {
-  it("stores, reads and forgets a message id, and reads the feedback message", async () => {
-    const store = discordPostStore(d1);
+describe("feedbackMessage", () => {
+  it("reads one row's message by id, or null when the row is gone", async () => {
     const { id } = await insertFeedback(d1, { ...base, user_id: alice });
-    expect(await store.feedbackMessage(id)).toBe("it broke");
-    expect(await store.feedbackExists(id)).toBe(true);
-    expect(await store.messageIdFor(id)).toBeNull();
-    await store.storeMessageId(id, "123456789");
-    expect(await store.messageIdFor(id)).toBe("123456789");
-    await store.forgetMessageId(id);
-    expect(await store.messageIdFor(id)).toBeNull();
-    expect(await store.feedbackMessage("missing")).toBeNull();
-    expect(await store.feedbackExists("missing")).toBe(false);
-  });
-
-  it("keeps the stored id after the feedback row goes (no foreign key)", async () => {
-    const store = discordPostStore(d1);
-    const id = await feedbackAt(alice, "2020-01-01T00:00:00.000Z");
-    await store.storeMessageId(id, "m-1");
-    await deleteFeedbackCreatedBefore(d1, new Date("2021-01-01T00:00:00.000Z"));
-    expect(await store.feedbackExists(id)).toBe(false);
-    expect(await store.messageIdFor(id)).toBe("m-1");
-  });
-
-  it("lists one user's posts only", async () => {
-    const store = discordPostStore(d1);
-    const a = await insertFeedback(d1, { ...base, user_id: alice });
-    const b = await insertFeedback(d1, { ...base, user_id: bob });
-    await store.storeMessageId(a.id, "m-a");
-    await store.storeMessageId(b.id, "m-b");
-    expect(await discordPostsForUser(d1, alice)).toEqual([{ feedback_id: a.id, discord_message_id: "m-a" }]);
+    expect(await feedbackMessage(d1, id)).toBe("it broke");
+    expect(await feedbackMessage(d1, "missing")).toBeNull();
   });
 });
 

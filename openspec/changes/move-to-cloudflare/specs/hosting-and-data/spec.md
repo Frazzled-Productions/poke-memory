@@ -37,7 +37,8 @@ Source (planned): design D1, `next.config.ts`, `open-next.config.ts`, `wrangler.
 
 All cloud data SHALL live in one D1 database created with the EU jurisdiction and bound to the Worker.
 Its schema SHALL be Postgres migrations 001 to 051 translated to SQLite (`0001_schema.sql`), Better
-Auth's tables (`0002_auth.sql`) and the events table (`0003_events.sql`), in `db/d1/migrations/`.
+Auth's tables (`0002_auth.sql`), the events table (`0003_events.sql`) and the drop of the Discord-only
+`feedback_discord_posts` table (`0004_drop_feedback_discord_posts.sql`), in `db/d1/migrations/`.
 
 #### Scenario: Fresh database
 
@@ -114,9 +115,9 @@ Source (planned): design D4, `lib/db/tables.ts`.
 
 ### Requirement: Cross-user work uses one system module
 
-Work that reads or writes across users (cron routes, push sends, Discord, feedback, backups) SHALL use
+Work that reads or writes across users (cron routes, push sends, feedback, backups) SHALL use
 `lib/db/system.ts`, whose functions are each named for their one job. ESLint SHALL refuse an import of
-it outside `app/api/cron/**`, `app/api/push/send-*`, `app/api/discord/**` and `app/api/feedback/**`.
+it outside `app/api/cron/**`, `app/api/push/send-*`, `app/api/feedback/**` and `app/api/stats/users`.
 
 #### Scenario: System module imported from a page
 
@@ -135,7 +136,7 @@ Source (planned): design D4, `lib/db/system.ts`, `eslint.config.mjs`.
 `scripts/check-scoped-queries.mjs`, run by `npm run lint`, SHALL fail when a file outside `lib/db/`
 calls `.prepare(`, `.exec(` or `.batch(` on a D1 binding, or holds SQL naming a per-user table
 (`card_reviews`, `user_settings`, `streak_days`, `grade_log`, `push_subscriptions`, `feedback`,
-`feedback_discord_posts`, `rate_limit_buckets`, `user`, `session`, `account`). Better Auth's own queries
+`rate_limit_buckets`, `user`, `session`, `account`). Better Auth's own queries
 run inside the library and are outside the rule.
 
 #### Scenario: Planted raw query
@@ -262,7 +263,7 @@ NOT stop the others.
 #### Scenario: Monday 09:00
 
 - **WHEN** the hourly trigger fires at 09:00 UTC on a Monday
-- **THEN** the two push routes and `POST /api/discord/digest` run
+- **THEN** the two push routes and `POST /api/cron/feedback-digest` run
 
 #### Scenario: Daily jobs
 
@@ -298,9 +299,9 @@ Source (planned): design D2, `worker/index.ts`, `lib/cron/schedule.ts`, `wrangle
 
 ### Requirement: Outbound sends happen only in production
 
-Web Push and Discord sends SHALL happen only when `DEPLOY_ENV` is `cloudflare-production`
+Web Push sends and the feedback emails SHALL happen only when `DEPLOY_ENV` is `cloudflare-production`
 (`lib/outbound.ts`). Anywhere else the routes SHALL do their reads and log what they would have sent.
-The preview Worker SHALL have no Cron Triggers, no VAPID private key and no Discord webhook.
+The preview Worker SHALL have no Cron Triggers, no VAPID private key and no Resend key.
 
 #### Scenario: Preview loaded with rehearsal data
 
@@ -310,7 +311,7 @@ The preview Worker SHALL have no Cron Triggers, no VAPID private key and no Disc
 #### Scenario: Bug report on a preview
 
 - **WHEN** a bug report is sent on a preview version
-- **THEN** the row is stored and no Discord post is made
+- **THEN** the row is stored and no email is sent
 
 #### Scenario: Production
 
@@ -538,7 +539,7 @@ owner-approved copy rehearsal, and stays until the owner decides to wipe and res
 #### Scenario: After a rehearsal
 
 - **WHEN** the copy rehearsal has loaded real data into the preview database
-- **THEN** the preview still sends no push or Discord message
+- **THEN** the preview still sends no push or email
 
 Source (planned): design D11, proposal Open call 4, `scripts/cloudflare/seed-preview.mjs`.
 

@@ -30,7 +30,6 @@ export const PROTECTED_TABLES = [
   "grade_log",
   "push_subscriptions",
   "feedback",
-  "feedback_discord_posts",
   "rate_limit_buckets",
   "user",
   "session",

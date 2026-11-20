@@ -428,8 +428,8 @@ Source (planned): `components/auth/LinkIdentitiesSection.tsx`, `lib/auth/client.
 `deleteAccount` SHALL call the `delete_account` RPC through the data gateway and return true or false,
 logging failures and never throwing. The Worker SHALL take the user id from the session only, answer
 401 with no session, and in one atomic D1 batch delete the user's rows in every per-user table, their
-username, and the Better Auth user with its sessions and accounts. Each deleted bug report's Discord
-post SHALL be deleted as `feedback-and-operator-tools` describes.
+username, and the Better Auth user with its sessions and accounts. Nothing SHALL be sent afterwards:
+the bug-report emails hold no user id (`feedback-and-operator-tools`).
 
 #### Scenario: RPC error
 

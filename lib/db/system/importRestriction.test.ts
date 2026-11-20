@@ -1,7 +1,7 @@
 /**
  * Lint fixtures for the lib/db/system import restriction (design D4, task
  * 2.4): ESLint's no-restricted-imports in eslint.config.mjs lets only the
- * cron, push-send, Discord and feedback routes and lib/db import it.
+ * cron, push-send and feedback routes and lib/db import it.
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,7 +24,8 @@ describe("lib/db/system import restriction", () => {
     ["app/api/sync/fixture.ts", "@/lib/db/system"],
     ["app/api/push/resubscribe/fixture.ts", "@/lib/db/system"],
     ["lib/sync/fixture.ts", "../db/system"],
-    ["lib/discord/fixture.ts", "../db/system/feedback"],
+    ["lib/feedback/fixture.ts", "../db/system/feedback"],
+    ["app/api/discord/notify/fixture.ts", "@/lib/db/system"],
     ["app/api/export/fixture.ts", "../../../lib/db/system"],
   ])("refuses %s importing %s", async (file, specifier) => {
     const errors = await restrictedImportErrors(file, specifier);
@@ -36,7 +37,6 @@ describe("lib/db/system import restriction", () => {
     ["app/api/cron/backup/fixture.ts", "@/lib/db/system"],
     ["app/api/push/send-daily/fixture.ts", "@/lib/db/system"],
     ["app/api/push/send-streak-nudge/fixture.test.tsx", "@/lib/db/system"],
-    ["app/api/discord/notify/fixture.ts", "@/lib/db/system"],
     ["app/api/feedback/fixture.ts", "@/lib/db/system"],
     ["lib/db/rpc/fixture.ts", "../system"],
     ["lib/db/backup.ts", "./system/backup"],

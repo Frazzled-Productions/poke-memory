@@ -2,7 +2,7 @@
  * The backup job's reads (design D10): which tables exist, in an order a
  * restore can insert them in, and their rows.
  *
- * Only importable from the cron, push-send, Discord and feedback routes and
+ * Only importable from the cron, push-send and feedback routes and
  * lib/db (ESLint no-restricted-imports in eslint.config.mjs).
  */
 import type { D1DatabaseLike } from "../d1";
@@ -27,7 +27,6 @@ export const BACKUP_TABLE_ORDER = [
   "user_settings",
   "push_subscriptions",
   "feedback",
-  "feedback_discord_posts",
   "rate_limit_buckets",
   "events",
 ] as const;

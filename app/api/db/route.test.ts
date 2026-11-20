@@ -7,8 +7,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
-import { seedBugReportWithDiscordPost } from "@/lib/db/testing/gatewayClient";
-import { countDiscordPosts } from "@/lib/db/testing/rows";
+import { seedBugReport } from "@/lib/db/testing/gatewayClient";
+import { countFeedback } from "@/lib/db/testing/rows";
 
 const { requireAuth, getDb, waitUntil, workerEnv } = vi.hoisted(() => ({
   requireAuth: vi.fn(),
@@ -38,7 +38,6 @@ function post(body: unknown, headers: Record<string, string> = { origin: ORIGIN 
   });
 }
 
-const WEBHOOK = "https://discord.com/api/webhooks/123/abc";
 const fetchMock = vi.fn<typeof fetch>();
 
 beforeEach(() => {
@@ -46,7 +45,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
   for (const key of Object.keys(workerEnv)) delete workerEnv[key];
-  Object.assign(workerEnv, { DEPLOY_ENV: "cloudflare-production", DISCORD_NOTIFY_WEBHOOK_URL: WEBHOOK });
+  Object.assign(workerEnv, { DEPLOY_ENV: "cloudflare-production", RESEND_API_KEY: "re_test" });
   d1 = createSqliteD1();
   alice = createTestUser(d1);
   getDb.mockResolvedValue(d1);
@@ -132,35 +131,12 @@ describe("each operation through the route", () => {
     expect((await res.json()).error.code).toBe("42501");
   });
 
-  it("delete_account deletes the account's Discord posts through waitUntil, then their stored ids", async () => {
-    seedBugReportWithDiscordPost(d1, alice, "f1", "m1");
+  it("delete_account deletes the account's bug reports and sends nothing after the response", async () => {
+    seedBugReport(d1, alice, "f1");
     const res = await POST(post({ kind: "rpc", name: "delete_account" }));
     expect(res.status).toBe(200);
-    expect(waitUntil).toHaveBeenCalledTimes(1);
-    await waitUntil.mock.calls[0][0];
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0][0])).toBe(`${WEBHOOK}/messages/m1`);
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "DELETE" });
-    expect(countDiscordPosts(d1)).toBe(0);
-  });
-
-  it("delete_account sends nothing to Discord when outbound is off, and keeps the stored ids", async () => {
-    workerEnv.DEPLOY_ENV = "cloudflare-preview";
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    seedBugReportWithDiscordPost(d1, alice, "f1", "m1");
-    expect((await POST(post({ kind: "rpc", name: "delete_account" }))).status).toBe(200);
-    await waitUntil.mock.calls[0][0];
+    expect(countFeedback(d1)).toBe(0);
+    expect(waitUntil).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(countDiscordPosts(d1)).toBe(1);
   });
-
-  it("delete_account keeps the stored id when Discord refuses the delete", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    fetchMock.mockResolvedValue(new Response("{}", { status: 500 }));
-    seedBugReportWithDiscordPost(d1, alice, "f1", "m1");
-    expect((await POST(post({ kind: "rpc", name: "delete_account" }))).status).toBe(200);
-    await waitUntil.mock.calls[0][0];
-    expect(countDiscordPosts(d1)).toBe(1);
-  });
-
 });

@@ -1,6 +1,5 @@
 /**
- * reset_all_progress (018, 022, 026) and delete_account (027, with the 051
- * Discord post handling) on D1.
+ * reset_all_progress (018, 022, 026) and delete_account (027) on D1.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "../testing/sqliteD1";
@@ -28,7 +27,6 @@ function seed(userId: string, tag: string): void {
   ).run(userId, `https://fcm.googleapis.com/fcm/send/${tag}`);
   s.prepare(`INSERT INTO feedback (id, user_id, category, message) VALUES (?, ?, 'bug', 'x')`).run(`bug-${tag}`, userId);
   s.prepare(`INSERT INTO feedback (id, user_id, category, message) VALUES (?, ?, 'feature', 'y')`).run(`feat-${tag}`, userId);
-  s.prepare(`INSERT INTO feedback_discord_posts (feedback_id, discord_message_id) VALUES (?, ?)`).run(`bug-${tag}`, `msg-${tag}`);
   s.prepare(`INSERT INTO "session" (id, "expiresAt", token, "createdAt", "updatedAt", "userId") VALUES (?, ?, ?, ?, ?, ?)`).run(
     `sess-${tag}`, "2099-01-01", `tok-${tag}`, TODAY, TODAY, userId,
   );
@@ -95,25 +93,17 @@ describe("resetAllProgress", () => {
 });
 
 describe("deleteAccount", () => {
-  it("deletes every per-user row, the sessions, accounts and the user; returns the bug reports' Discord posts", async () => {
-    const result = await deleteAccount(d1, alice);
-    expect(result).toEqual({ discordPosts: [{ feedbackId: "bug-a", discordMessageId: "msg-a" }] });
+  it("deletes every per-user row, the sessions, accounts and the user", async () => {
+    expect(await deleteAccount(d1, alice)).toBeUndefined();
     for (const table of ["card_reviews", "grade_log", "streak_days", "user_settings", "push_subscriptions", "feedback"]) {
       expect(count(table, alice)).toBe(0);
     }
     expect(count("session", alice, "userId")).toBe(0);
     expect(count("account", alice, "userId")).toBe(0);
     expect(count("user", alice, "id")).toBe(0);
-    // The post row stays for the Discord side, which removes it after deleting the message (051).
-    expect(d1.sqlite.prepare("SELECT count(*) AS n FROM feedback_discord_posts").get()).toEqual({ n: 2 });
     // Bob untouched.
     expect(count("card_reviews", bob)).toBe(1);
     expect(count("user", bob, "id")).toBe(1);
-  });
-
-  it("returns no posts for an account without bug reports", async () => {
-    d1.sqlite.prepare("DELETE FROM feedback WHERE user_id = ?").run(alice);
-    expect(await deleteAccount(d1, alice)).toEqual({ discordPosts: [] });
   });
 
   it("deleteAuthUser on its own removes sessions, accounts and the user (and cascades)", async () => {

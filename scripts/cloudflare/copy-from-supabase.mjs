@@ -127,13 +127,13 @@ export const APP_TABLES = {
     app_version: "text",
     created_at: "timestamp",
   },
-  feedback_discord_posts: { feedback_id: "text", discord_message_id: "text", created_at: "timestamp" },
 };
 
 /** Public tables read but not copied row for row, with the reason. */
 export const NOT_COPIED_PUBLIC_TABLES = {
   usernames: "folded into \"user\".username",
   rate_limit_buckets: "transient one-hour rate-limit windows",
+  feedback_discord_posts: "Discord post ids; Discord went for email on 20 November 2026 and D1 migration 0004 drops the table",
 };
 
 /** Every table the guard checks is empty before the import. */

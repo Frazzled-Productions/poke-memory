@@ -118,7 +118,7 @@ Each route SHALL answer 503 `{ ok: false, error: "misconfigured" }` when the sha
 Cites: planned `app/api/push/send-daily/route.ts`, `app/api/push/send-streak-nudge/route.ts`, `lib/outbound.ts`.
 
 ### Requirement: Cross-user reads go through the system module
-The routes SHALL read across users only through named functions in `lib/db/system.ts` (ports of `get_push_targets`, `get_push_due_cards`, `get_push_streak_days` and `get_push_streak_nudge_targets`), which only the cron, push-send, Discord and feedback routes may import. The targets read SHALL return one row per subscription, LEFT JOINed to the owner's settings. The only other access SHALL be the dead-endpoint DELETE.
+The routes SHALL read across users only through named functions in `lib/db/system.ts` (ports of `get_push_targets`, `get_push_due_cards`, `get_push_streak_days` and `get_push_streak_nudge_targets`), which only the cron, push-send and feedback routes may import. The targets read SHALL return one row per subscription, LEFT JOINed to the owner's settings. The only other access SHALL be the dead-endpoint DELETE.
 
 #### Scenario: Route reads
 - **WHEN** `send-daily` runs

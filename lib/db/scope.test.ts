@@ -191,7 +191,7 @@ describe("forUser: filters, order, paging", () => {
 
 describe("forUser: identifiers are allowlisted", () => {
   it("refuses unknown and system tables with 42P01", async () => {
-    for (const table of ["nope", "rate_limit_buckets", "feedback_discord_posts", "user", "session", "account"]) {
+    for (const table of ["nope", "rate_limit_buckets", "user", "session", "account"]) {
       expect([table, await codeOf(asAlice.select(table))]).toEqual([table, "42P01"]);
     }
   });

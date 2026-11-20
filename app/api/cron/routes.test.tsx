@@ -1,6 +1,6 @@
 /**
  * The cron routes of design D2 on the D1 test database: feedback retention
- * (034, with the Discord post deletion of 051), the grade_log reconcile dry
+ * (034), the grade_log reconcile dry
  * run (032), the rate-limit clean-up (041) and the backup (D10); then every
  * route in CRON_ROUTES called the way worker/index.ts calls them, through
  * runCronRoutes with the bearer secret. `fetch` and `web-push` are mocked.
@@ -16,18 +16,17 @@ import { POST as reconcileGradeLog } from "./reconcile-grade-log/route";
 import { POST as rateLimitCleanup } from "./rate-limit-cleanup/route";
 import { POST as backup } from "./backup/route";
 import { POST as gradeLogDivergence } from "./grade-log-divergence/route";
+import { POST as feedbackDigest } from "./feedback-digest/route";
 import { POST as sendDaily } from "../push/send-daily/route";
 import { POST as sendStreakNudge } from "../push/send-streak-nudge/route";
-import { POST as discordDigest } from "../discord/digest/route";
 import { CRON_ROUTES, HALF_HOURLY_CRON, HOURLY_CRON, cronRoutesFor } from "@/lib/cron/schedule";
 import { runCronRoutes } from "@/lib/cron/run";
 import type { R2BucketLike } from "@/lib/db/d1";
 import { forUser } from "@/lib/db/scope";
-import { checkRateLimit, discordPostStore, insertFeedback } from "@/lib/db/system";
+import { checkRateLimit, insertFeedback } from "@/lib/db/system";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
 
 const SECRET = "cron-secret";
-const WEBHOOK = "https://discord.com/api/webhooks/123/abc";
 
 function fakeBucket() {
   const objects = new Map<string, Uint8Array>();
@@ -76,8 +75,6 @@ beforeEach(() => {
     D1_BACKUP_PREFIX: "d1/poke-memory",
     DEPLOY_ENV: "cloudflare-production",
     CRON_SHARED_SECRET: SECRET,
-    DISCORD_NOTIFY_WEBHOOK_URL: WEBHOOK,
-    DISCORD_DIGEST_WEBHOOK_URL: "https://discord.com/api/webhooks/456/digest",
     VAPID_PRIVATE_KEY: "vapid-priv",
     VAPID_SUBJECT: "mailto:test@example.com",
   };
@@ -100,7 +97,7 @@ const post = (path: string, secret: string | null = SECRET) =>
 const CRON_HANDLERS: Record<string, (request: Request) => Promise<Response>> = {
   [CRON_ROUTES.sendDaily]: sendDaily,
   [CRON_ROUTES.sendStreakNudge]: sendStreakNudge,
-  [CRON_ROUTES.discordDigest]: discordDigest,
+  [CRON_ROUTES.feedbackDigest]: feedbackDigest,
   [CRON_ROUTES.feedbackRetention]: feedbackRetention,
   [CRON_ROUTES.reconcileGradeLog]: reconcileGradeLog,
   [CRON_ROUTES.rateLimitCleanup]: rateLimitCleanup,
@@ -138,42 +135,16 @@ describe("POST /api/cron/feedback-retention", () => {
     return row.id as string;
   }
 
-  it("deletes feedback older than 12 months and the Discord posts of deleted bug reports", async () => {
+  it("deletes feedback older than 12 months and sends nothing", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-19T03:00:00.000Z"));
-    const oldBug = await feedbackAt("bug", "2025-11-18T00:00:00.000Z");
-    const oldFeature = await feedbackAt("feature", "2025-01-01T00:00:00.000Z");
+    await feedbackAt("bug", "2025-11-18T00:00:00.000Z");
+    await feedbackAt("feature", "2025-01-01T00:00:00.000Z");
     const recentBug = await feedbackAt("bug", "2025-11-20T00:00:00.000Z");
-    const store = discordPostStore(d1);
-    await store.storeMessageId(oldBug, "msg-old");
-    await store.storeMessageId(recentBug, "msg-recent");
 
     const res = await feedbackRetention(post(CRON_ROUTES.feedbackRetention));
-    expect(await res.json()).toEqual({ ok: true, deleted: 2, postsDeleted: 1, postsFailed: 0 });
+    expect(await res.json()).toEqual({ ok: true, deleted: 2 });
     expect((await forUser(d1, alice).select("feedback")).map((r) => r.id)).toEqual([recentBug]);
-    expect(fetchMock.mock.calls.map(([url, init]) => [String(url), init?.method])).toEqual([
-      [`${WEBHOOK}/messages/msg-old`, "DELETE"],
-    ]);
-    expect(await store.messageIdFor(oldBug)).toBeNull();
-    expect(await store.messageIdFor(recentBug)).toBe("msg-recent");
-    expect(oldFeature).toBeDefined();
-  });
-
-  it("keeps the stored id of a post Discord would not delete, and reports it", async () => {
-    const id = await feedbackAt("bug", "2020-01-01T00:00:00.000Z");
-    await discordPostStore(d1).storeMessageId(id, "msg-1");
-    fetchMock.mockResolvedValue(new Response("boom", { status: 500 }));
-    const res = await feedbackRetention(post(CRON_ROUTES.feedbackRetention));
-    expect(await res.json()).toEqual({ ok: true, deleted: 1, postsDeleted: 0, postsFailed: 1 });
-    expect(await discordPostStore(d1).messageIdFor(id)).toBe("msg-1");
-  });
-
-  it("outside production deletes the feedback but makes no Discord call", async () => {
-    env.DEPLOY_ENV = "cloudflare-preview";
-    const id = await feedbackAt("bug", "2020-01-01T00:00:00.000Z");
-    await discordPostStore(d1).storeMessageId(id, "msg-1");
-    const res = await feedbackRetention(post(CRON_ROUTES.feedbackRetention));
-    expect(await res.json()).toEqual({ ok: true, deleted: 1, postsDeleted: 0, postsFailed: 0 });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

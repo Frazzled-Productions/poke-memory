@@ -22,7 +22,7 @@ import {
 import { forUser } from "./scope";
 import { BACKUP_TABLE_ORDER, backupTables, readTablePages } from "./system/backup";
 import { parseMigrationTriggers } from "./migrationTriggers.mjs";
-import { discordPostStore, insertFeedback } from "./system/feedback";
+import { insertFeedback } from "./system/feedback";
 import { checkRateLimit } from "./rateLimit";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "./testing/sqliteD1";
 
@@ -122,9 +122,8 @@ async function seed(db: SqliteD1) {
     push_notification_hour: 9,
   });
   await a.insert("push_subscriptions", { endpoint: "https://fcm.googleapis.com/fcm/send/x", p256dh: "p", auth_secret: "s" });
-  const fb = await insertFeedback(db, { user_id: null, category: "bug", message: "O'Brien says 'hi' ;", page: null, app_version: "1.0" });
+  await insertFeedback(db, { user_id: null, category: "bug", message: "O'Brien says 'hi' ;", page: null, app_version: "1.0" });
   await insertFeedback(db, { user_id: bob, category: "feature", message: "émoji ✨ Flabébé", page: "/", app_version: null });
-  await discordPostStore(db).storeMessageId(fb.id, "123");
   await checkRateLimit(db, "c".repeat(64), "feedback", NOW);
 }
 

@@ -8,11 +8,10 @@
 //   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET   Google OAuth client (D6)
 //   CRON_SHARED_SECRET                       bearer for the cron routes (D2)
 //   VAPID_PRIVATE_KEY, VAPID_SUBJECT         Web Push signing (D8)
-//   DISCORD_NOTIFY_WEBHOOK_URL               feedback notify (042, 051)
-//   DISCORD_DIGEST_WEBHOOK_URL               weekly digest (042)
 //   RATE_LIMIT_SALT                          per-IP bucket hashing (041)
-//   RESEND_API_KEY                           alert emails (lib/alertEmail.ts; D10, D13),
-//                                            production only; without it they log "alert not sent"
+//   RESEND_API_KEY                           alert and feedback emails (lib/alertEmail.ts;
+//                                            D8, D10, D13), production only; without it
+//                                            they log "alert not sent"
 //   SENTRY_TRACES_SAMPLE_RATE (optional)     server trace sampling
 // Build-time values (CI environment, inlined by `next build`, not Worker
 // secrets): NEXT_PUBLIC_SENTRY_DSN, NEXT_PUBLIC_VAPID_PUBLIC_KEY,
@@ -77,7 +76,7 @@
       // neither a bucket binding nor the Cron Triggers (deploy guard, ops #610; design D10).
       "ratelimits": [{ "name": "EVENT_LIMITER", "namespace_id": "1004", "simple": { "limit": 60, "period": 60 } }],
       // No Cron Triggers at all: the preview database holds rehearsal copies of
-      // real data, so it must never send pushes or Discord messages (D2). Outbound
+      // real data, so it must never send pushes or emails (D2). Outbound
       // sends are also gated on DEPLOY_ENV by lib/outbound.ts.
       "triggers": { "crons": [] },
       "vars": {

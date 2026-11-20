@@ -41,7 +41,7 @@ import { forUser, type Filter, type FilterOp, type OrderBy, type Row } from "./s
 import { TABLES, type ScopedTableName } from "./tables";
 import { mergeUserSettings, type Json } from "./rpc/mergeUserSettings";
 import { resetAllProgress } from "./rpc/resetAllProgress";
-import { deleteAccount, type DiscordPostToDelete } from "./rpc/deleteAccount";
+import { deleteAccount } from "./rpc/deleteAccount";
 
 /** Largest request body the route accepts. */
 export const MAX_BODY_BYTES = 1_000_000;
@@ -128,8 +128,6 @@ export interface GatewayResponseBody {
 export interface GatewayResult {
   status: number;
   body: GatewayResponseBody;
-  /** Set after delete_account: Discord posts to delete once the response is sent. */
-  discordPostsToDelete?: DiscordPostToDelete[];
 }
 
 /** A malformed request: answered 400 before anything runs. */
@@ -394,8 +392,8 @@ async function runRpc(db: D1DatabaseLike, userId: string, q: Record<string, unkn
       return { status: 200, body: { data: null, error: null } };
     case "delete_account": {
       onlyKeys(args, [], "delete_account");
-      const { discordPosts } = await deleteAccount(db, userId);
-      return { status: 200, body: { data: null, error: null }, discordPostsToDelete: discordPosts };
+      await deleteAccount(db, userId);
+      return { status: 200, body: { data: null, error: null } };
     }
     default:
       throw new BadRequest("42883", `function ${String(q.name)} is not available`);

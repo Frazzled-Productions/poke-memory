@@ -1,12 +1,12 @@
 /**
  * Cross-user database work for the scheduled jobs, the push sends, the
- * Discord notifications, the feedback route and the public user count
+ * feedback route and the public user count
  * (decision 0018, design D4 and D13).
  * Each function does one named job; nothing here takes a session.
  *
  * Per-user requests use forUser (lib/db/scope.ts) instead. ESLint
  * (no-restricted-imports in eslint.config.mjs) only lets app/api/cron/**,
- * app/api/push/send-*, app/api/discord/**, app/api/feedback/**,
+ * app/api/push/send-*, app/api/feedback/**,
  * app/api/stats/users and lib/db import this module.
  */
 export {
@@ -23,8 +23,7 @@ export {
   deleteFeedbackCreatedBefore,
   feedbackRetentionCutoff,
   feedbackForDigest,
-  discordPostsForUser,
-  discordPostStore,
+  feedbackMessage,
   type FeedbackCategory,
   type NewFeedback,
 } from "./system/feedback";

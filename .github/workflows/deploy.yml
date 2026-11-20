@@ -212,7 +212,7 @@ jobs:
           body="${MARKER}
           ${line}
 
-          It runs on the separate poke-memory-preview Worker with its own seeded database (two test users, no real data unless a copy rehearsal loaded some), without the analytics beacon, push or Discord sends."
+          It runs on the separate poke-memory-preview Worker with its own seeded database (two test users, no real data unless a copy rehearsal loaded some), without the analytics beacon, push or email sends."
           # Find this job's own comment: posted with GITHUB_TOKEN (REST `user.login` is
           # `github-actions[bot]`, a login no human account can hold) with the marker as its whole
           # first line. A comment anyone else posts with the marker is ignored, not edited (#2124).

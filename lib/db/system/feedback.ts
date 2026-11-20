@@ -2,13 +2,12 @@
  * Cross-user feedback queries (design D4): the insert from POST /api/feedback
  * (guests have no user, so it cannot go through forUser), the 12-month
  * retention purge (Postgres migration 034's pg_cron job), the weekly digest's
- * read (042) and the Discord post ids (051).
+ * read (042) and the message read for the bug-report email's preview.
  *
- * Only importable from the cron, push-send, Discord and feedback routes
+ * Only importable from the cron, push-send and feedback routes
  * (ESLint no-restricted-imports in eslint.config.mjs).
  */
 import type { D1DatabaseLike } from "../d1";
-import type { DiscordPostStore } from "@/lib/discord/notify";
 import { all, run } from "./query";
 
 export type FeedbackCategory = "bug" | "feature" | "other";
@@ -48,20 +47,9 @@ export function feedbackRetentionCutoff(now: Date): Date {
   return cutoff;
 }
 
-/**
- * The retention purge (034): deletes every feedback row created before
- * `cutoff` and returns the deleted rows' ids and
- * categories, so the caller can remove their Discord posts (051).
- */
-export async function deleteFeedbackCreatedBefore(
-  db: D1DatabaseLike,
-  cutoff: Date,
-): Promise<{ id: string; category: string }[]> {
-  return all<{ id: string; category: string }>(
-    db,
-    `DELETE FROM feedback WHERE created_at < ? RETURNING id, category`,
-    cutoff.toISOString(),
-  );
+/** The retention purge (034): deletes every feedback row created before `cutoff`; returns how many went. */
+export async function deleteFeedbackCreatedBefore(db: D1DatabaseLike, cutoff: Date): Promise<number> {
+  return run(db, `DELETE FROM feedback WHERE created_at < ?`, cutoff.toISOString());
 }
 
 /**
@@ -82,64 +70,8 @@ export async function feedbackForDigest(
   return rows.map((r) => ({ id: r.id, category: r.category, authenticated: r.authenticated === 1 }));
 }
 
-/**
- * The stored Discord posts (051) for one user's feedback, for account
- * deletion: read them before the feedback rows go, delete the posts with
- * deleteDiscordPosts (lib/discord/webhook.ts), then the rows.
- */
-export async function discordPostsForUser(
-  db: D1DatabaseLike,
-  userId: string,
-): Promise<{ feedback_id: string; discord_message_id: string }[]> {
-  return all<{ feedback_id: string; discord_message_id: string }>(
-    db,
-    `SELECT p.feedback_id, p.discord_message_id
-       FROM feedback_discord_posts p
-       JOIN feedback f ON f.id = p.feedback_id
-      WHERE f.user_id = ?
-      ORDER BY p.feedback_id`,
-    userId,
-  );
-}
-
-/**
- * The database side of the Discord bug notification (lib/discord/notify.ts):
- * the feedback message for the preview, and the posted message ids in
- * feedback_discord_posts (no foreign key, so a row outlives its feedback and
- * the post can still be found and deleted).
- */
-export function discordPostStore(db: D1DatabaseLike): DiscordPostStore {
-  return {
-    async feedbackMessage(feedbackId) {
-      const [row] = await all<{ message: string }>(
-        db,
-        `SELECT message FROM feedback WHERE id = ?`,
-        feedbackId,
-      );
-      return row ? row.message : null;
-    },
-    async feedbackExists(feedbackId) {
-      const [row] = await all(db, `SELECT 1 AS found FROM feedback WHERE id = ?`, feedbackId);
-      return row !== undefined;
-    },
-    async storeMessageId(feedbackId, messageId) {
-      await run(
-        db,
-        `INSERT INTO feedback_discord_posts (feedback_id, discord_message_id) VALUES (?, ?)`,
-        feedbackId,
-        messageId,
-      );
-    },
-    async messageIdFor(feedbackId) {
-      const [row] = await all<{ discord_message_id: string }>(
-        db,
-        `SELECT discord_message_id FROM feedback_discord_posts WHERE feedback_id = ?`,
-        feedbackId,
-      );
-      return row ? row.discord_message_id : null;
-    },
-    async forgetMessageId(feedbackId) {
-      await run(db, `DELETE FROM feedback_discord_posts WHERE feedback_id = ?`, feedbackId);
-    },
-  };
+/** One row's message, for the bug-report email's preview, or null when the row is gone. */
+export async function feedbackMessage(db: D1DatabaseLike, feedbackId: string): Promise<string | null> {
+  const [row] = await all<{ message: string }>(db, `SELECT message FROM feedback WHERE id = ?`, feedbackId);
+  return row ? row.message : null;
 }

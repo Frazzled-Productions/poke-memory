@@ -34,11 +34,9 @@ export interface AppEnv {
   CRON_SHARED_SECRET?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
-  DISCORD_NOTIFY_WEBHOOK_URL?: string;
-  DISCORD_DIGEST_WEBHOOK_URL?: string;
   RATE_LIMIT_SALT?: string;
   SENTRY_TRACES_SAMPLE_RATE?: string;
-  /** Resend, for the operator alert emails (lib/alertEmail.ts); production only. */
+  /** Resend, for the operator alert and feedback emails (lib/alertEmail.ts); production only. */
   RESEND_API_KEY?: string;
   /** Plain var: the alert sender, a frazzledproductions.com address (verified in Resend). */
   RESEND_FROM?: string;

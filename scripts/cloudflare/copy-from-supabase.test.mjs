@@ -215,7 +215,6 @@ describe("convert and import", () => {
       grade_log: 2,
       push_subscriptions: 11,
       feedback: 2,
-      feedback_discord_posts: 1,
       rate_limit_buckets: 0,
     });
     const result = compareCounts(manifest, target);
@@ -225,6 +224,9 @@ describe("convert and import", () => {
     expect(byTable.card_reviews.skipped).toEqual({ "non-finite number in a REAL column": 1 });
     expect(byTable.account.skipped).toEqual({ "email identity (the credential account covers it)": 1 });
     expect(byTable.rate_limit_buckets).toMatchObject({ source: 2, expected: 0 });
+    // Read from the source but not copied: Discord went for email (20 November 2026), and 0004 drops the table.
+    expect(byTable.feedback_discord_posts).toBeUndefined();
+    expect(count(d1, "feedback")).toBe(2);
     expect(count(d1, "session")).toBe(0);
     expect(count(d1, "verification")).toBe(0);
   });
@@ -315,11 +317,7 @@ describe("convert and import", () => {
 
     const [guest] = all(d1, `SELECT * FROM feedback WHERE user_id IS NULL`);
     expect(guest.message).toBe("Guest says:\nline two; with 'quotes'");
-    expect(all(d1, `SELECT * FROM feedback_discord_posts`)[0]).toEqual({
-      feedback_id: "bbbbbbbb-0000-4000-8000-000000000001",
-      discord_message_id: "1234567890123456789",
-      created_at: "2026-10-01T12:00:01.000Z",
-    });
+    expect(all(d1, `SELECT name FROM sqlite_master WHERE name = 'feedback_discord_posts'`)).toEqual([]);
   });
 
   it("keeps all 11 push rows and their last_seen_at (the cap and stamp triggers are bypassed)", () => {

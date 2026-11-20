@@ -4,9 +4,9 @@
  */
 import type { SqliteD1 } from "./sqliteD1";
 
-/** How many stored Discord post ids (feedback_discord_posts) there are. */
-export function countDiscordPosts(d1: SqliteD1): number {
-  const row = d1.sqlite.prepare("SELECT COUNT(*) AS n FROM feedback_discord_posts").get() as { n: number };
+/** How many feedback rows there are, guests' included. */
+export function countFeedback(d1: SqliteD1): number {
+  const row = d1.sqlite.prepare("SELECT COUNT(*) AS n FROM feedback").get() as { n: number };
   return Number(row.n);
 }
 

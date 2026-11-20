@@ -5,9 +5,9 @@
  * empty message, 2000-character truncation, guest and signed-in user_id from
  * the session only, optional fields, 500 on an insert failure), the per-IP
  * rate limit on rate_limit_buckets keyed on CF-Connecting-IP, and the
- * Discord bug notification the route now sends itself through
- * ctx.waitUntil (design D3), with its message id stored. `fetch` is mocked:
- * nothing reaches Discord.
+ * bug-report email the route sends through ctx.waitUntil (design D3; email
+ * since Fraser's ruling of 20 November 2026). `fetch` is mocked: nothing
+ * reaches Resend.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -23,12 +23,12 @@ vi.mock("@/lib/auth/requireAuth", () => ({ requireAuth }));
 import { POST } from "./route";
 import { hashIp } from "@/lib/auth/rateLimitIp";
 import { forUser } from "@/lib/db/scope";
-import { discordPostStore, feedbackForDigest } from "@/lib/db/system";
+import { feedbackForDigest } from "@/lib/db/system";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
 import { spyD1, type SpyHooks } from "@/lib/db/testing/spyD1";
 import { rateLimitIpHashes } from "@/lib/db/testing/rows";
 
-const WEBHOOK = "https://discord.com/api/webhooks/123/abc";
+const RESEND = "https://api.resend.com/emails";
 
 let d1: SqliteD1;
 let env: Record<string, unknown>;
@@ -41,14 +41,14 @@ const fetchMock = vi.fn<typeof fetch>();
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockReset();
-  fetchMock.mockResolvedValue(Response.json({ id: "discord-msg-1" }));
+  fetchMock.mockResolvedValue(Response.json({ id: "email-1" }));
   for (const level of ["error", "warn", "info"] as const) vi.spyOn(console, level).mockImplementation(() => {});
   d1 = createSqliteD1();
   alice = createTestUser(d1);
   bob = createTestUser(d1);
   sessionUser = null;
   waitUntil = vi.fn();
-  env = { DB: d1, DEPLOY_ENV: "cloudflare-production", DISCORD_NOTIFY_WEBHOOK_URL: WEBHOOK };
+  env = { DB: d1, DEPLOY_ENV: "cloudflare-production", RESEND_API_KEY: "re_test" };
   getCloudflareContext.mockImplementation(async () => ({ env, ctx: { waitUntil } }));
   requireAuth.mockReset();
   requireAuth.mockImplementation(async () =>
@@ -219,40 +219,53 @@ describe("POST /api/feedback - rate limit (#1883)", () => {
   });
 });
 
-describe("POST /api/feedback - Discord bug notification (design D3)", () => {
-  it("sends a bug report to Discord through ctx.waitUntil and stores the message id", async () => {
+describe("POST /api/feedback - bug-report email (design D3)", () => {
+  it("emails a bug report through Resend in ctx.waitUntil, with the preview and no user id", async () => {
     sessionUser = alice;
     const res = await POST(makeRequest({ category: "bug", message: "it crashed", page: "/practice", appVersion: "1.2.3" }));
     expect(res.status).toBe(200);
     expect(waitUntil).toHaveBeenCalledTimes(1);
     await waitUntil.mock.calls[0][0];
 
-    expect(String(fetchMock.mock.calls[0][0])).toBe(`${WEBHOOK}?wait=true`);
-    const payload = String(fetchMock.mock.calls[0][1]!.body);
-    expect(payload).toContain("it crashed");
-    expect(payload).toContain('"Yes"');
-    expect(payload).not.toContain(alice);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toBe(RESEND);
+    const raw = String(fetchMock.mock.calls[0][1]!.body);
+    const { text } = JSON.parse(raw) as { text: string };
     const [row] = await forUser(d1, alice).select("feedback");
-    expect(await discordPostStore(d1).messageIdFor(row.id as string)).toBe("discord-msg-1");
+    expect(text).toContain("Message preview:\nit crashed");
+    expect(text).toContain("Page: /practice");
+    expect(text).toContain("App version: 1.2.3");
+    expect(text).toContain("Authenticated: Yes");
+    expect(text).toContain(`Feedback id: ${row.id as string}`);
+    expect(raw).not.toContain(alice);
   });
 
-  it("does not notify for a feature request or other feedback", async () => {
+  it("does not email a feature request or other feedback", async () => {
     await POST(makeRequest({ category: "feature", message: "x" }));
     await POST(makeRequest({ category: "other", message: "x" }));
     expect(waitUntil).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("still answers 200 when Discord fails", async () => {
+  it("still answers 200 when Resend fails", async () => {
     fetchMock.mockResolvedValue(new Response("nope", { status: 500 }));
     const res = await POST(makeRequest({ category: "bug", message: "x" }));
     expect(res.status).toBe(200);
     await waitUntil.mock.calls[0][0];
+    expect(await allFeedback()).toHaveLength(1);
+  });
+
+  it("keeps the row and makes no HTTP call without RESEND_API_KEY", async () => {
+    delete env.RESEND_API_KEY;
+    const res = await POST(makeRequest({ category: "bug", message: "x" }));
+    expect(res.status).toBe(200);
+    await waitUntil.mock.calls[0][0];
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await allFeedback()).toHaveLength(1);
   });
 
   it("outside production stores the row but sends nothing", async () => {
     env.DEPLOY_ENV = "cloudflare-preview";
-    delete env.DISCORD_NOTIFY_WEBHOOK_URL;
     const res = await POST(makeRequest({ category: "bug", message: "x" }));
     expect(res.status).toBe(200);
     await waitUntil.mock.calls[0][0];

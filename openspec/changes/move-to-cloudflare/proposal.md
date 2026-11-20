@@ -27,9 +27,10 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
   are upgraded on the next sign-in. Sessions are not copied: **every signed-in player signs in once more,
   with no notice**, and keeps their data.
 - **Scheduled work:** two Worker Cron Triggers replace the six `pg_cron` jobs and the `pg_net` calls
-  (daily reminders, streak nudges, the weekly Discord digest, feedback retention, the grade-log orphan
-  check, rate-limit clean-up). The Discord bug notification is sent by the feedback route instead of a
-  database trigger. A seventh job writes a nightly backup to R2, kept 90 days.
+  (daily reminders, streak nudges, the weekly feedback digest, feedback retention, the grade-log orphan
+  check, rate-limit clean-up). The bug notification is sent by the feedback route instead of a database
+  trigger, and it and the digest become emails instead of Discord posts (20 November 2026). A seventh job
+  writes a nightly backup to R2, kept 90 days.
 - **Optimiser:** runs in the browser on its own cross-origin-isolated page (`/settings/optimiser`)
   instead of a Node function; the same weekly limit and minimum review count.
 - **Analytics:** Vercel Analytics and Speed Insights are removed; the one custom event (`app_open`) is
@@ -52,7 +53,7 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
   same codes; the settings merge and its guard in the Worker.
 - `push-notifications`: the cron jobs are Worker Cron Triggers; target queries in the Worker.
 - `feedback-and-operator-tools`: the bug notification is sent from the Worker; the digest and retention
-  run from the Worker's schedule.
+  run from the Worker's schedule; both notifications are emails, not Discord posts.
 - `srs-scheduling`: the optimiser runs in the browser on its own page.
 - `pwa-and-whats-new`: the changelog is read from a generated module.
 - `local-data-and-backup`: a privacy-notice requirement: Cloudflare instead of Supabase and Vercel,
@@ -95,8 +96,11 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
   analytics) replaces Supabase and Vercel; Sentry is unchanged; the session cookie's name changes; the
   RLS paragraph becomes the scope-helper one. `docs/dpia.md` and `docs/cookies-pecr.md` follow. Terms
   (`app/terms/page.tsx:119`) name Cloudflare.
-- **Discord digest and bug notifications:** same messages, same channel, same weekly time; sent from the
-  Worker. Deleting feedback (retention or account deletion) still deletes the stored Discord post.
+- **Digest and bug notifications:** same content and the same weekly time, sent from the Worker, but as
+  emails to the company mailbox through Resend instead of Discord posts (Fraser's ruling, 20 November
+  2026). An email cannot be deleted by the Worker, so the privacy notice now says each one is deleted
+  from the mailbox 12 months after it arrives; the post deletion on retention and account deletion goes.
+  Not copied: `feedback_discord_posts` (D1 migration `0004` drops it).
 - **Sentry:** same privacy scrubbing; environment names become `cloudflare-production` and
   `cloudflare-preview`; it runs under `nodejs_compat` (trial).
 - **Accessibility (keyboard, screen reader, reduced motion):** the optimiser page uses a live region for
@@ -140,6 +144,10 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
 - `refresh-user-count.yml`, `monitor-grade-log-divergence.yml`, `scripts/refresh-user-count.mjs`,
   `.github/scripts/check-grade-log-divergence.mjs` (its queries move to `lib/db/system/`),
   `scripts/cloudflare/d1-query.mjs` and its test, and `.github/stats/users.json` (design D13).
+- Discord (Fraser's ruling, 20 November 2026): `app/api/discord/**` (notify and digest routes),
+  `lib/discord/**`, the `DISCORD_NOTIFY_WEBHOOK_URL` and `DISCORD_DIGEST_WEBHOOK_URL` secrets, the post
+  deletion on feedback retention and account deletion, and the `feedback_discord_posts` table in D1. The
+  digest moves to `POST /api/cron/feedback-digest`.
 - After the 14-day fallback, in the cutover issue: `db/migrations/`, `docs/supabase-capacity.md`,
   `vercel.json` (kept until then with every Git deployment off, so a still-connected Vercel project
   cannot rebuild production from the promotion).
@@ -222,3 +230,11 @@ assume.
   key it logs "alert not sent: no RESEND_API_KEY", and the FAILED line and rethrow stay. The sender is a
   frazzledproductions.com address because pokememory.com is not verified in Resend (coordinator note,
   20 November 2026).
+- 2026-11-20 Fraser (about 10:55 UTC): drop Discord for Poké Memory. The new-feedback alert and the
+  weekly digest become emails through Resend with the alert helper (`lib/alertEmail.ts`, same sender and
+  recipient), keeping the Discord posts' content, feedback text included, and no user identifier beyond
+  what those posts held. Built: design D8 "Feedback emails, not Discord"; the Discord routes, secrets and
+  `feedback_discord_posts` go (D1 migration `0004`); the two Discord webhook steps leave #2393. Consequence
+  for privacy: an email cannot be deleted with its feedback, so the notice says the mailbox copy is
+  deleted 12 months after it arrives (a mailbox step on #2393), replacing the ops #405 promise and the
+  retry sweep (#2369).

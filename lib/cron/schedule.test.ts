@@ -12,10 +12,12 @@ describe("cronRoutesFor (design D2 table)", () => {
     }
   });
 
-  it("Monday 09:00: weekly digest", () => {
+  it("Monday 09:00: weekly digest, by email (no Discord route)", () => {
+    expect(CRON_ROUTES.feedbackDigest).toBe("/api/cron/feedback-digest");
+    expect(Object.values(CRON_ROUTES).filter((route) => route.includes("discord"))).toEqual([]);
     expect(cronRoutesFor(HOURLY_CRON, new Date("2026-11-16T09:00:00Z"))).toEqual([
       ...HOURLY,
-      CRON_ROUTES.discordDigest,
+      CRON_ROUTES.feedbackDigest,
     ]);
   });
 
@@ -93,7 +95,7 @@ describe("cronRoutesFor: non-matching hours and days", () => {
   it("uses UTC, not the host's local time", () => {
     // 09:00 UTC on Monday is 10:00 in Paris; still the digest.
     expect(cronRoutesFor(HOURLY_CRON, new Date("2026-11-16T10:00:00+01:00"))).toContain(
-      CRON_ROUTES.discordDigest,
+      CRON_ROUTES.feedbackDigest,
     );
   });
 

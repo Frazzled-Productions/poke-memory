@@ -1,11 +1,13 @@
 /**
- * Tests for POST /api/discord/digest (#1653) on the D1 test database.
+ * Tests for POST /api/cron/feedback-digest (#1653; moved from Discord to email
+ * by Fraser's ruling of 20 November 2026) on the D1 test database.
  *
- * Covers: 503 on missing configuration, 401 on a missing / bad bearer,
+ * Covers: 503 without CRON_SHARED_SECRET, 401 on a missing / bad bearer,
  * window_days parsing and clamping (and no body at all, as the Cron Trigger
  * sends), the empty week, category grouping (total, auth, guest), the
- * CRITICAL guarantees that neither the message nor user_id reach Discord,
- * 502 on a database or webhook error, and the outbound gate (design D2).
+ * CRITICAL guarantees that neither the message nor user_id reach the email,
+ * 502 on a database or Resend error, no key (logged and skipped) and the
+ * outbound gate (design D2). `fetch` is mocked: nothing reaches Resend.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -19,7 +21,7 @@ import { insertFeedback } from "@/lib/db/system";
 import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
 import { spyD1 } from "@/lib/db/testing/spyD1";
 
-const WEBHOOK = "https://discord.com/api/webhooks/test/digest";
+const RESEND = "https://api.resend.com/emails";
 const VALID_BEARER = "Bearer test-secret-abc123";
 const NOW = new Date("2026-11-16T09:00:00.000Z");
 
@@ -33,7 +35,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockReset();
-  fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+  fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
   for (const level of ["error", "info"] as const) vi.spyOn(console, level).mockImplementation(() => {});
   d1 = createSqliteD1();
   alice = createTestUser(d1);
@@ -41,7 +43,7 @@ beforeEach(() => {
     DB: d1,
     DEPLOY_ENV: "cloudflare-production",
     CRON_SHARED_SECRET: "test-secret-abc123",
-    DISCORD_DIGEST_WEBHOOK_URL: WEBHOOK,
+    RESEND_API_KEY: "re_test",
   };
   getCloudflareContext.mockImplementation(async () => ({ env }));
 });
@@ -55,7 +57,7 @@ afterEach(() => {
 function makeRequest(body: unknown = { window_days: 7 }, authHeader: string | null = VALID_BEARER): Request {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (authHeader !== null) headers["authorization"] = authHeader;
-  return new Request("http://localhost/api/discord/digest", {
+  return new Request("http://localhost/api/cron/feedback-digest", {
     method: "POST",
     headers,
     body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
@@ -78,17 +80,14 @@ async function feedback(category: "bug" | "feature" | "other", signedIn: boolean
   }
 }
 
-function payload() {
+function email() {
   const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-  return { url, raw: init.body as string, embed: JSON.parse(init.body as string).embeds[0] as {
-    title: string;
-    color: number;
-    fields: Array<{ name: string; value: string }>;
-  } };
+  const raw = init.body as string;
+  return { url, raw, ...(JSON.parse(raw) as { to: string[]; subject: string; text: string }) };
 }
-const field = (name: string) => payload().embed.fields.find((f) => f.name === name)?.value;
+const line = (name: string) => email().text.split("\n").find((l) => l.startsWith(`${name}: `))?.slice(name.length + 2);
 
-describe("POST /api/discord/digest - gates", () => {
+describe("POST /api/cron/feedback-digest - gates", () => {
   it("returns 503 when CRON_SHARED_SECRET is missing", async () => {
     delete env.CRON_SHARED_SECRET;
     const res = await POST(makeRequest());
@@ -96,9 +95,13 @@ describe("POST /api/discord/digest - gates", () => {
     expect(await res.json()).toEqual({ ok: false, error: "misconfigured" });
   });
 
-  it("returns 503 in production when DISCORD_DIGEST_WEBHOOK_URL is missing", async () => {
-    delete env.DISCORD_DIGEST_WEBHOOK_URL;
-    expect((await POST(makeRequest())).status).toBe(503);
+  it("logs and skips the email in production when RESEND_API_KEY is missing", async () => {
+    delete env.RESEND_API_KEY;
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, total: 0, windowDays: 7, sent: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith("feedback-digest: alert not sent: no RESEND_API_KEY");
   });
 
   it("returns 401 when the Authorization header is missing or wrong", async () => {
@@ -108,15 +111,15 @@ describe("POST /api/discord/digest - gates", () => {
   });
 });
 
-describe("POST /api/discord/digest - digest", () => {
-  it("posts a zero-count digest embed when there are no submissions", async () => {
+describe("POST /api/cron/feedback-digest - digest", () => {
+  it("emails a zero-count digest when there are no submissions", async () => {
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, total: 0, windowDays: 7 });
-    expect(payload().url).toBe(WEBHOOK);
-    expect(payload().embed.title).toBe("Weekly feedback digest");
-    expect(payload().embed.color).toBe(0x3498db);
-    expect(field("Total")).toBe("0");
+    expect(await res.json()).toEqual({ ok: true, total: 0, windowDays: 7, sent: true });
+    expect(email().url).toBe(RESEND);
+    expect(email().to).toEqual(["hello@frazzledproductions.com"]);
+    expect(email().subject).toBe("Poké Memory: weekly feedback digest");
+    expect(line("Total")).toBe("0");
   });
 
   it("groups counts by category, authenticated against guest, inside the window only", async () => {
@@ -128,20 +131,20 @@ describe("POST /api/discord/digest - digest", () => {
     await feedback("bug", true, 8); // outside the 7-day window
 
     const res = await POST(makeRequest());
-    expect(await res.json()).toEqual({ ok: true, total: 5, windowDays: 7 });
-    expect(field("Total")).toBe("5");
-    expect(field("Bug")).toBe("3 (2 auth, 1 guest)");
-    expect(field("Feature")).toBe("1 (1 auth, 0 guest)");
-    expect(field("Other")).toBe("1 (0 auth, 1 guest)");
+    expect(await res.json()).toEqual({ ok: true, total: 5, windowDays: 7, sent: true });
+    expect(line("Total")).toBe("5");
+    expect(line("Bug")).toBe("3 (2 auth, 1 guest)");
+    expect(line("Feature")).toBe("1 (1 auth, 0 guest)");
+    expect(line("Other")).toBe("1 (0 auth, 1 guest)");
   });
 
-  it("CRITICAL: the Discord payload holds neither the message nor any user id", async () => {
+  it("CRITICAL: the email holds neither the message nor any user id", async () => {
     await feedback("bug", true, 1);
     await POST(makeRequest());
-    const { raw } = payload();
+    const { raw } = email();
     expect(raw).not.toContain("secret message text");
     expect(raw).not.toContain('"message"');
-    expect(raw).not.toContain('"user_id"');
+    expect(raw).not.toContain("user_id");
     expect(raw).not.toContain(alice);
   });
 
@@ -168,19 +171,22 @@ describe("POST /api/discord/digest - digest", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("returns 502 when the Discord webhook returns non-2xx or the fetch throws", async () => {
+  it("returns 502 when Resend answers non-2xx or the fetch throws", async () => {
     fetchMock.mockResolvedValueOnce(new Response("nope", { status: 500 }));
-    expect(await (await POST(makeRequest())).json()).toEqual({ ok: false, error: "webhook_error", status: 500 });
+    let res = await POST(makeRequest());
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ ok: false, error: "email_failed" });
     fetchMock.mockRejectedValueOnce(new Error("network"));
-    expect(await (await POST(makeRequest())).json()).toEqual({ ok: false, error: "webhook_fetch_failed" });
+    res = await POST(makeRequest());
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ ok: false, error: "email_failed" });
   });
 
-  it("outside production reads and returns the counts but posts nothing, with no webhook needed", async () => {
+  it("outside production reads and returns the counts but sends nothing, even with a key", async () => {
     await feedback("bug", false, 0);
     env.DEPLOY_ENV = "cloudflare-preview";
-    delete env.DISCORD_DIGEST_WEBHOOK_URL;
     const res = await POST(makeRequest());
-    expect(await res.json()).toEqual({ ok: true, total: 1, windowDays: 7, posted: false });
+    expect(await res.json()).toEqual({ ok: true, total: 1, windowDays: 7, sent: false });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

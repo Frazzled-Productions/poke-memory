@@ -3,7 +3,7 @@
  * The per-IP check itself is checkRateLimit in lib/db/rateLimit.ts, which
  * lib/db/system re-exports for the feedback route.
  *
- * Only importable from the cron, push-send, Discord and feedback routes
+ * Only importable from the cron, push-send and feedback routes
  * (ESLint no-restricted-imports in eslint.config.mjs).
  */
 import type { D1DatabaseLike } from "../d1";

@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 /**
  * Constant-time bearer-header comparison, shared by every route guarded by
- * `CRON_SHARED_SECRET` (discord/digest, discord/notify, push/send-daily).
+ * `CRON_SHARED_SECRET` (the cron routes and the push sends).
  *
  * Plain `===` on the assembled `Bearer <secret>` string leaks the shared
  * secret's length and prefix via the early-exit timing characteristic of

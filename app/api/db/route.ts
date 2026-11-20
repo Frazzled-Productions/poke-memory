@@ -8,21 +8,11 @@
  *   - a session (401 otherwise); the user id comes only from the session;
  *   - a body of at most MAX_BODY_BYTES that is JSON;
  *   - no caching of any answer.
- *
- * After delete_account the Discord posts of the account's bug reports are
- * deleted once the response is sent (ctx.waitUntil), the job the Postgres
- * trigger of migration 051 did; deleteDiscordPosts only sends where
- * outboundAllowed() (production), and the stored id of each post that is gone
- * is then removed. Failures are logged, never thrown: the account is gone.
  */
 import { NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDb } from "@/lib/db/env";
-import type { D1DatabaseLike } from "@/lib/db/d1";
 import { handleGatewayRequest, MAX_BODY_BYTES, type GatewayResponseBody } from "@/lib/db/gateway";
-import { forgetDiscordPosts, type DiscordPostToDelete } from "@/lib/db/rpc/deleteAccount";
 import { requireAuth } from "@/lib/auth/requireAuth";
-import { deleteDiscordPosts, type DiscordEnv } from "@/lib/discord/webhook";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
@@ -53,20 +43,6 @@ async function readBody(request: Request): Promise<string | null> {
   return new TextDecoder().decode(bytes);
 }
 
-async function deleteAccountDiscordPosts(
-  env: DiscordEnv,
-  db: D1DatabaseLike,
-  posts: readonly DiscordPostToDelete[],
-): Promise<void> {
-  try {
-    const { deleted } = await deleteDiscordPosts(env, posts.map((p) => p.discordMessageId));
-    const gone = new Set(deleted);
-    await forgetDiscordPosts(db, posts.filter((p) => gone.has(p.discordMessageId)).map((p) => p.feedbackId));
-  } catch (err) {
-    console.error("[api/db] deleting the account's Discord posts failed", err);
-  }
-}
-
 export async function POST(request: Request): Promise<NextResponse> {
   if (!sameOrigin(request)) return refused(403, "42501", "cross-origin request refused");
 
@@ -82,12 +58,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     return refused(400, "42601", "request body is not JSON");
   }
 
-  const db = await getDb();
-  const result = await handleGatewayRequest(db, auth.user.id, query);
-
-  if (result.discordPostsToDelete && result.discordPostsToDelete.length > 0) {
-    const { env, ctx } = await getCloudflareContext({ async: true });
-    ctx.waitUntil(deleteAccountDiscordPosts(env as DiscordEnv, db, result.discordPostsToDelete));
-  }
+  const result = await handleGatewayRequest(await getDb(), auth.user.id, query);
   return answer(result.body, result.status);
 }

@@ -12,7 +12,7 @@
  * today; ON CONFLICT DO NOTHING, so an existing row is never touched.
  * CURRENT_DATE was the database's UTC date; `today` is the UTC date here.
  *
- * Only importable from the cron, push-send, Discord and feedback routes
+ * Only importable from the cron, push-send and feedback routes
  * (ESLint no-restricted-imports in eslint.config.mjs).
  */
 import type { D1DatabaseLike } from "../d1";

@@ -35,7 +35,7 @@ export default async function PrivacyPage() {
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight">Privacy Notice</h1>
         <p className={`mt-2 ${mutedText}`}>
-          Last updated: 19 November 2026
+          Last updated: 20 November 2026
         </p>
       </header>
 
@@ -305,14 +305,14 @@ export default async function PrivacyPage() {
           <p className="mt-2">
             Feedback is used only to improve the service and to investigate
             reported issues. It is not used for profiling or marketing. Bug
-            reports trigger an automated notification to a private,
-            maintainer-only Discord channel used for triage: this notification
-            includes a capped preview (up to 500 characters) of the message,
-            plus the non-identifying metadata above (page, app version,
-            timestamp). No user identifier is included. When the feedback is
-            deleted, we delete this notification from Discord too, and retry
-            any deletion that fails (see §8). Discord is a sub-processor under
-            a data processing agreement (see §6).
+            reports trigger an automated notification email to our company
+            mailbox, used for triage: this email includes a capped preview (up
+            to 500 characters) of the message, plus the non-identifying
+            metadata above (page, app version, timestamp) and a random
+            reference for the report. No user identifier or email address is
+            included. It is sent through Resend, a sub-processor under a data
+            processing agreement (see §6), and we delete these emails 12 months
+            after they arrive (see §8).
           </p>
         </section>
 
@@ -528,16 +528,18 @@ export default async function PrivacyPage() {
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-2 pr-4 font-medium">Discord</td>
+                  <td className="py-2 pr-4 font-medium">Resend</td>
                   <td className="py-2 pr-4">
-                    Maintainer notification channel for bug-report triage
+                    Delivers our bug-report notification and weekly feedback
+                    summary emails to our company mailbox (Google Workspace)
                   </td>
                   <td className="py-2">
-                    A capped preview (up to 500 characters) of the free-text
-                    message, plus non-identifying metadata (page, app version,
-                    timestamp). No user identifier is included. Sent to a
-                    private, maintainer-only channel, and deleted when the
-                    feedback is deleted (we retry any deletion that fails).
+                    A capped preview (up to 500 characters) of a bug
+                    report&rsquo;s free-text message, plus non-identifying
+                    metadata (page, app version, timestamp); the weekly summary
+                    holds counts only. No user identifier or email address is
+                    included. Each email is deleted from the mailbox 12 months
+                    after it arrives.
                   </td>
                 </tr>
               </tbody>
@@ -641,8 +643,8 @@ export default async function PrivacyPage() {
             7. International transfers
           </h2>
           <p>
-            The third-party services listed in §6 (Cloudflare; Sentry; Discord
-            for bug-report triage notifications; and, if you sign in via GitHub
+            The third-party services listed in §6 (Cloudflare; Sentry; Resend
+            for bug-report notification emails; and, if you sign in via GitHub
             or Google, those providers) may process data outside the UK / EEA.
             Cloudflare stores our database and its backups in its EU
             jurisdiction, but each request is handled in the Cloudflare data
@@ -651,9 +653,11 @@ export default async function PrivacyPage() {
             agreement with Cloudflare relies on the EU-US Data Privacy
             Framework (including its UK Extension) and the EU Standard
             Contractual Clauses (SCCs) with the UK International Data Transfer
-            Addendum. Discord (our sub-processor) operates under the EU SCCs,
-            providing equivalent safeguards via the UK International Data
-            Transfer Agreement (IDTA) addendum. Sentry stores our data in its EU region (Germany), which
+            Addendum. Resend (our sub-processor) stores the emails it sends in
+            the United States; our data processing agreement with it relies on
+            the EU Standard Contractual Clauses with the UK International Data
+            Transfer Addendum, and on the EU-US Data Privacy Framework
+            (including its UK Extension). Sentry stores our data in its EU region (Germany), which
             the UK treats as adequate under the UK adequacy regulations for the
             EEA. Sentry&rsquo;s contracting company, Functional Software, Inc.,
             is based in the United States, so its staff may access reports
@@ -696,9 +700,11 @@ export default async function PrivacyPage() {
           <p className="mt-3">
             Feedback submissions are retained for 12 months from the date of
             submission and then automatically deleted, regardless of account
-            status. When a bug report is deleted, after 12 months or with your
-            account, we also delete its notification in our Discord channel,
-            message preview included, and retry any deletion that fails.
+            status. A bug report&rsquo;s notification email, message preview
+            included, is deleted from the mailbox 12 months after it arrives.
+            It holds no user identifier, so it cannot be matched to your
+            account: deleting your account does not remove it, but it never
+            outlasts those 12 months.
           </p>
           <p className="mt-3">
             Error reports and performance traces held by Sentry are kept for

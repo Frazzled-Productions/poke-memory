@@ -42,19 +42,11 @@ export function createGatewayTestClient(
 }
 
 /**
- * Seeds a bug report with its Discord post for `userId`, for tests outside
- * lib/db that cannot hold SQL (scripts/check-scoped-queries.mjs).
+ * Seeds a bug report for `userId`, for tests outside lib/db that cannot hold
+ * SQL (scripts/check-scoped-queries.mjs).
  */
-export function seedBugReportWithDiscordPost(
-  d1: SqliteD1,
-  userId: string,
-  feedbackId: string,
-  discordMessageId: string,
-): void {
+export function seedBugReport(d1: SqliteD1, userId: string, feedbackId: string): void {
   d1.sqlite
     .prepare(`INSERT INTO feedback (id, user_id, category, message) VALUES (?, ?, 'bug', 'test')`)
     .run(feedbackId, userId);
-  d1.sqlite
-    .prepare(`INSERT INTO feedback_discord_posts (feedback_id, discord_message_id) VALUES (?, ?)`)
-    .run(feedbackId, discordMessageId);
 }

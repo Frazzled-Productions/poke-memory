@@ -42,7 +42,6 @@ function seedAlice(): void {
     `INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth_secret) VALUES ('push-a', ?, ?, 'k', 's')`,
   ).run(alice, ENDPOINT);
   s.prepare(`INSERT INTO feedback (id, user_id, category, message) VALUES ('fb-a', ?, 'bug', 'private')`).run(alice);
-  s.prepare(`INSERT INTO feedback_discord_posts (feedback_id, discord_message_id) VALUES ('fb-a', 'msg-a')`).run();
 }
 
 /** Alice's rows, every table, as stored. */
@@ -52,7 +51,6 @@ function aliceSnapshot(): Record<string, unknown[]> {
     out[table] = d1.sqlite.prepare(`SELECT * FROM ${table} WHERE user_id = ? ORDER BY 1`).all(alice);
   }
   out.user = d1.sqlite.prepare(`SELECT * FROM "user" WHERE id = ?`).all(alice);
-  out.feedback_discord_posts = d1.sqlite.prepare(`SELECT * FROM feedback_discord_posts`).all();
   return out;
 }
 
@@ -271,20 +269,17 @@ describe("RPCs only ever act on the session user", () => {
     }
   });
 
-  it("delete_account removes Bob only, and returns only Bob's Discord posts", async () => {
+  it("delete_account removes Bob only, his bug report included", async () => {
     d1.sqlite.prepare(`INSERT INTO feedback (id, user_id, category, message) VALUES ('fb-b', ?, 'bug', 'mine')`).run(bob);
-    d1.sqlite.prepare(`INSERT INTO feedback_discord_posts (feedback_id, discord_message_id) VALUES ('fb-b', 'msg-b')`).run();
     const result = await bobRequest({ kind: "rpc", name: "delete_account" });
     expect(result.status).toBe(200);
-    expect(result.discordPostsToDelete).toEqual([{ feedbackId: "fb-b", discordMessageId: "msg-b" }]);
     expect(d1.sqlite.prepare(`SELECT count(*) AS n FROM "user" WHERE id = ?`).get(bob)).toEqual({ n: 0 });
-    // Keep Alice's snapshot equal: Bob's post row stays for the Discord side to remove.
-    d1.sqlite.prepare(`DELETE FROM feedback_discord_posts WHERE feedback_id = 'fb-b'`).run();
+    expect(d1.sqlite.prepare(`SELECT count(*) AS n FROM feedback WHERE user_id = ?`).get(bob)).toEqual({ n: 0 });
   });
 });
 
 describe("tables and functions outside the gateway", () => {
-  it.each(["feedback", "feedback_discord_posts", "rate_limit_buckets", "user", "session", "account", "verification", "sqlite_master"])(
+  it.each(["feedback", "rate_limit_buckets", "user", "session", "account", "verification", "sqlite_master"])(
     "%s is not available (400, 42P01)",
     async (table) => {
       for (const q of [
