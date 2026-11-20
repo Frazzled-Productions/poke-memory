@@ -20,7 +20,7 @@ admits only `main`, using `main`'s config, dependencies and specs and never writ
 
 #### Scenario: A change on qa edits a trusted file
 
-- **WHEN** a change merged into `qa` but not yet promoted edits `wrangler.jsonc`, `package.json`, `package-lock.json`, `.nvmrc`, the seed script, `playwright.config.ts` or the auth specs
+- **WHEN** a change merged into `qa` but not yet promoted edits `wrangler.jsonc`, `package.json`, `package-lock.json`, `.npmrc`, `.nvmrc`, `playwright.config.ts` or the end-to-end specs
 - **THEN** the next `qa` pull request's preview is still uploaded and tested with `main`'s copies, so nothing from that change runs next to the token before Fraser promotes it, and the run notice and one line of the PR comment name those files
 
 #### Scenario: A pull request adds a migration
@@ -30,7 +30,7 @@ admits only `main`, using `main`'s config, dependencies and specs and never writ
 
 #### Scenario: Listing the differences fails
 
-- **WHEN** the read-only GitHub compare call between `main` and the PR head fails
+- **WHEN** a read-only GitHub compare call between `main` and the PR head or its base branch fails
 - **THEN** the run prints a warning and the preview is still uploaded
 
 #### Scenario: An untrusted bundle

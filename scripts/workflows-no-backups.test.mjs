@@ -185,8 +185,10 @@ describe("production Worker address", () => {
 // Preview guard (koinori #2925 F3 and F4; change preview-deploy-guard). A pull request can edit its own
 // workflow and wrangler.jsonc, so no pull_request job may name the Preview environment or a
 // Cloudflare secret. The preview is uploaded by preview-upload.yml, a workflow_run workflow that GitHub
-// always runs from the default branch, with wrangler.jsonc from the PR's base branch, so the preview
-// bindings are never the PR's.
+// always runs from the default branch, with everything that runs or configures a run checked out from
+// `main` (never the PR's base: `qa` takes any CI-green change, #2415), so the preview bindings are never
+// the PR's. It never writes D1, so its token can be Workers-only; deploy.yml's production job applies
+// `main`'s migrations and seed to the preview database instead (change preview-upload-trust-main).
 describe("preview guard", () => {
   const files = readdirSync(WORKFLOWS).filter((f) => /\.ya?ml$/.test(f));
   const text = (f) => readFileSync(join(WORKFLOWS, f), "utf8");
@@ -225,12 +227,13 @@ describe("preview guard", () => {
     expect(job).toMatch(/contains\(fromJSON\('\["qa","main"\]'\), github\.event\.workflow_run\.pull_requests\[0\]\.base\.ref\)/);
   });
 
-  it("checks out only the pull request's base branch, never its head, and names the trusted config", () => {
+  it("checks out only main, never the pull request's base or head, and names the trusted config", () => {
     const upload = text("preview-upload.yml");
     const refs = [...upload.matchAll(/^ {10}ref: (.*)$/gm)].map((m) => m[1]);
-    expect(refs.length).toBeGreaterThan(0);
-    for (const ref of refs) expect(ref).toBe("${{ github.event.workflow_run.pull_requests[0].base.ref }}");
-    expect(upload).not.toMatch(/^ {10}ref: .*head/m);
+    const checkouts = (upload.match(/uses: actions\/checkout@/g) ?? []).length;
+    expect(checkouts).toBeGreaterThan(0);
+    expect(refs.length, "every checkout names its ref").toBe(checkouts);
+    for (const ref of refs) expect(ref).toBe("main");
     for (const line of upload.split("\n").filter((l) => /npx wrangler /.test(l))) {
       expect(line, line).toMatch(/--config wrangler\.jsonc/);
     }
@@ -240,7 +243,81 @@ describe("preview guard", () => {
     expect(upload).not.toMatch(/\| grep -q \./);
     expect(upload).toMatch(/^permissions: \{\}$/m);
   });
+
+  it("never writes D1 or runs the seed, so its token can be Workers-only", () => {
+    const upload = code(text("preview-upload.yml"));
+    expect(upload).not.toMatch(/\bwrangler\s+d1\b/);
+    expect(upload).not.toMatch(/seed-preview/);
+    // The artefact's migrations are neither read nor moved into place.
+    expect(upload).not.toMatch(/\$BUNDLE\/migrations|rm -r db\/d1\/migrations/);
+    expect(upload).not.toMatch(/PREVIEW_TEST_PASSWORD/);
+  });
+
+  it("takes nothing from the artefact but the Worker and the assets, and fetches no other tree", () => {
+    const upload = code(text("preview-upload.yml"));
+    // Every path into the bundle: the bundle itself (the refusal checks), its Worker or its assets.
+    const paths = [...upload.matchAll(/(?:\$\{?BUNDLE\}?|preview-bundle)(\/[^\s"']*)?/g)].map((m) => m[1] ?? "");
+    expect(paths.length).toBeGreaterThan(0);
+    for (const path of paths) expect(["", "/worker/index.js", "/assets"], path).toContain(path);
+    expect(upload).not.toMatch(/\bgit\s+(fetch|checkout|clone|switch|restore|pull)\b/);
+    expect(upload).not.toMatch(/\/contents\/|raw\.githubusercontent/);
+  });
+
+  it("lists what differs from main with a read-only compare call, checking out nothing", () => {
+    const compare = steps(jobBlock(text("preview-upload.yml"), "upload")).filter((s) => /compare\/main\.\.\./.test(s));
+    expect(compare).toHaveLength(1);
+    expect(compare[0]).toMatch(/GH_TOKEN: \$\{\{ github\.token \}\}/);
+    expect(compare[0]).not.toMatch(/secrets\./);
+    expect(compare[0]).not.toMatch(/actions\/checkout@|git (fetch|checkout|clone)/);
+    // Only ever a notice: a failed call warns and carries on, and continue-on-error keeps any other
+    // failure in the step from skipping the upload.
+    expect(compare[0]).toMatch(/^ {8}continue-on-error: true$/m);
+    expect(compare[0]).not.toMatch(/\bexit [1-9]/);
+    expect(compare[0]).toMatch(/compare\/main\.\.\.\$\{target\}/);
+    expect(compare[0]).toMatch(/for target in "\$HEAD_SHA" "\$BASE_REF"/);
+    expect(compare[0]).toMatch(/wrangler\\\.jsonc/);
+    expect(compare[0]).toMatch(/\^db\/d1\/migrations\//);
+    const comment = steps(jobBlock(text("preview-upload.yml"), "upload")).find((s) => /Comment the preview URL/.test(s));
+    expect(comment).toMatch(/\$TRUSTED/);
+    expect(comment).toMatch(/\$MIGRATIONS/);
+  });
+
+  it("leaves the migrations out of the pull request's bundle", () => {
+    expect(code(jobBlock(text("deploy.yml"), "preview"))).not.toMatch(/db\/d1\/migrations/);
+  });
+
+  it("migrates and seeds the preview database from the production job, after production deploys", () => {
+    const production = steps(jobBlock(text("deploy.yml"), "production"));
+    const at = (re) => production.findIndex((s) => re.test(code(s)));
+    const deployed = at(/name: Deploy the Worker/);
+    const migrate = at(/npx wrangler d1 migrations apply DB --remote --env preview\b/);
+    const seed = at(/node scripts\/cloudflare\/seed-preview\.mjs\b/);
+    const load = at(/npx wrangler d1 execute DB --remote --env preview --yes --file\b/);
+    expect(deployed).toBeGreaterThan(-1);
+    expect(migrate, "preview migrations after the production deploy").toBeGreaterThan(deployed);
+    expect(seed, "seed after the preview migrations").toBeGreaterThan(migrate);
+    expect(load, "seed loaded after it is written").toBeGreaterThan(seed);
+    // The seed step runs repository code, so it gets no Cloudflare token.
+    expect(production[seed]).not.toMatch(/CLOUDFLARE_API_TOKEN/);
+    // A failure must show: never hidden, and never run when the production deploy failed.
+    for (const step of [migrate, seed, load]) {
+      expect(production[step]).not.toMatch(/continue-on-error|always\(\)|failure\(\)|!cancelled\(\)/);
+    }
+  });
 });
+
+/** `text` without its comment lines, so prose about a command does not count as running it. */
+function code(text) {
+  return text
+    .split("\n")
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+}
+
+/** The steps of a job block, each from its `- ` line to the next. */
+function steps(job) {
+  return job.split(/^ {6}- /m).slice(1);
+}
 
 /** The jobs in a pull_request workflow that name the Preview environment or a Cloudflare secret. */
 function pullRequestOffenders(file, yml) {

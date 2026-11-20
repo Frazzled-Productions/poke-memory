@@ -21,8 +21,8 @@ Fixes: poke-memory #2415
 
 - **Trusted files come from `main`, whatever the base.** Both checkouts in `preview-upload.yml`
   (`upload` and `preview-e2e`) use `ref: main` instead of the PR's base branch. `wrangler.jsonc`,
-  `package.json`, `package-lock.json`, `.nvmrc`, `playwright.config.ts` and the auth specs are
-  therefore `main`'s for every PR, into `qa` or `main`.
+  `package.json`, `package-lock.json`, `.npmrc`, `.nvmrc`, `playwright.config.ts` and the auth
+  specs are therefore `main`'s for every PR, into `qa` or `main`.
 - **From the artefact, only the bundle and the assets.** The Worker bundle and static assets are
   uploaded as they are (`--no-bundle`), with the existing refusals (symlinks, non-files). Nothing from
   the artefact is executed. `deploy.yml`'s `preview` job stops copying `db/d1/migrations` into the
@@ -33,8 +33,8 @@ Fixes: poke-memory #2415
   `main` only, which already holds the production token) applies `main`'s migrations to the preview
   database and loads `main`'s seed after it deploys production, on every push or dispatch on `main`.
 - **A PR that differs from `main` in a trusted file or adds a migration** still gets a preview,
-  uploaded with `main`'s bindings against the preview database at `main`'s schema. A read-only GitHub
-  compare call (`main...` the PR head) lists the differences: the run prints a notice, and the PR
+  uploaded with `main`'s bindings against the preview database at `main`'s schema. Read-only GitHub
+  compare calls (`main...` the PR head and `main...` its base branch) list the differences: the run prints a notice, and the PR
   comment has one line naming the trusted files that differ (they reach previews at the next
   promotion) and, for a new migration, one line saying the preview runs against `main`'s schema until
   the migration reaches `main`.
@@ -74,9 +74,12 @@ Fixes: poke-memory #2415
   as today, minus the migration and seed steps.
 - **CI and GitHub Actions:** `.github/workflows/preview-upload.yml`, `.github/workflows/deploy.yml`
   (production job gains three preview-database steps after the production deploy; the `preview` job
-  stops copying migrations; comments), the guard test, `WORKFLOW.md` (Deploy and Preview upload
-  sections), `.claude/agents/workflow-expert.md` and `.claude/agents/playwright.md`. None of these
-  jobs is a required check. The Playwright image in `preview-upload.yml` now always matches the
+  stops copying migrations; comments), the guard test, and the docs that said the preview upload
+  applies migrations or uses the base branch's files: `WORKFLOW.md` (Migration check, Deploy and
+  Preview upload sections), `AGENTS.md` (migrations bullet), `docs/persistence.md`, `docs/testing.md`,
+  `.claude/agents/workflow-expert.md`, `.claude/agents/playwright.md`, `.claude/agents/d1-expert.md`,
+  `.claude/agents/data-coder.md` and `.claude/commands/batch-issues.md`. None of these jobs is a
+  required check. The Playwright image in `preview-upload.yml` now always matches the
   lockfile it runs against (both `main`'s).
 
 ## Removes
@@ -96,8 +99,8 @@ Fixes: poke-memory #2415
 - Creating the preview token (Fraser, ops #612): Workers-only, one per repo, limited to
   `poke-memory-preview`.
 - A pull-request or approval rule on `main` or `qa` (a GitHub settings change, Fraser's). `main` has
-  none either; its trust comes from `Restrict main PR source` (head `qa`, or the owner-applied `hotfix`
-  label) and Fraser owning promotions.
+  none either; its trust comes from `Restrict main PR source` (head `qa`, or the `hotfix` label, applied
+  by Fraser or by the bot on Dependabot security PRs) and Fraser owning promotions.
 - How `qa.pokememory.com`'s live deployment is made (by hand from `qa` today); automating it is a
   separate question.
 - koinori #2936 (the same fix in koinori's tutor proxy upload). website, koinori-web and plan-bee only
