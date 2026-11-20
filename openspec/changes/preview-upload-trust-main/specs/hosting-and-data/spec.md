@@ -6,7 +6,7 @@
 environment `Production`, which admits only `main` and alone holds the Cloudflare and Sentry tokens;
 a published Release SHALL NOT deploy. For a pull request it SHALL only build the `preview-bundle`
 artefact, with no environment or secret. `preview-upload.yml` SHALL upload it from `Preview`, which
-admits only `main`, using `main`'s config, dependencies, seed and specs, or skip with a notice.
+admits only `main`, using `main`'s config, dependencies and specs and never writing D1, or skip.
 
 #### Scenario: Pull request opened
 
@@ -21,16 +21,21 @@ admits only `main`, using `main`'s config, dependencies, seed and specs, or skip
 #### Scenario: A change on qa edits a trusted file
 
 - **WHEN** a change merged into `qa` but not yet promoted edits `wrangler.jsonc`, `package.json`, `package-lock.json`, `.nvmrc`, the seed script, `playwright.config.ts` or the auth specs
-- **THEN** the next `qa` pull request's preview is still uploaded, seeded and tested with `main`'s copies, so nothing from that change runs next to the token before Fraser promotes it
+- **THEN** the next `qa` pull request's preview is still uploaded and tested with `main`'s copies, so nothing from that change runs next to the token before Fraser promotes it, and the run notice and one line of the PR comment name those files
 
-#### Scenario: A qa pull request needs config not yet on main
+#### Scenario: A pull request adds a migration
 
-- **WHEN** a pull request into `qa` adds a `.sql` migration and changes `env.preview` in `wrangler.jsonc`
-- **THEN** its migration is applied to the preview database, its bundle is uploaded with `main`'s bindings, and the run notice and the PR comment name the trusted files that differ from `main`
+- **WHEN** a pull request into `qa` adds a `.sql` file under `db/d1/migrations`
+- **THEN** its preview is still uploaded, its migration is not applied, and the PR comment says the preview runs against `main`'s schema until the migration reaches `main`
+
+#### Scenario: Listing the differences fails
+
+- **WHEN** the read-only GitHub compare call between `main` and the PR head fails
+- **THEN** the run prints a warning and the preview is still uploaded
 
 #### Scenario: An untrusted bundle
 
-- **WHEN** the `preview-bundle` artefact holds a symlink, something other than files and directories, or a migration that is not a `.sql` file
+- **WHEN** the `preview-bundle` artefact holds a symlink or something other than files and directories
 - **THEN** `preview-upload.yml` refuses it and uploads nothing
 
 #### Scenario: A job outside Production
@@ -60,7 +65,7 @@ admits only `main`, using `main`'s config, dependencies, seed and specs, or skip
 
 #### Scenario: Guard drifts
 
-- **WHEN** a change drops `environment: Production` or the `main` check from the production job, adds the release trigger back, removes the dispatch from `auto-release.yml`, names `Preview` or a Cloudflare secret in a `pull_request` job, uploads a preview from any other workflow, or checks out anything but `main` in `preview-upload.yml`
+- **WHEN** a change drops `environment: Production` or the `main` check from the production job, adds the release trigger back, removes the dispatch from `auto-release.yml`, names `Preview` or a Cloudflare secret in a `pull_request` job, uploads a preview from any other workflow, checks out anything but `main` in `preview-upload.yml`, or adds a `wrangler d1` call or the seed to it
 - **THEN** `scripts/workflows-no-backups.test.mjs` fails
 
 #### Scenario: End-to-end tests
@@ -68,4 +73,39 @@ admits only `main`, using `main`'s config, dependencies, seed and specs, or skip
 - **WHEN** a preview version was uploaded for a pull request
 - **THEN** `main`'s auth specs run against the preview version URL
 
-Source: design D11, `.github/workflows/deploy.yml`, `.github/workflows/preview-upload.yml`, `.github/workflows/auto-release.yml`; Fraser's ruling of 19 November 2026 (ops #610); changes `production-deploy-guard`, `preview-deploy-guard` (koinori #2925 F3 and F4) and `preview-upload-trust-main` (#2415).
+Source: design D11, `.github/workflows/deploy.yml`, `.github/workflows/preview-upload.yml`, `.github/workflows/auto-release.yml`; Fraser's rulings of 19 November 2026 (ops #610) and 20 November 2026; changes `production-deploy-guard`, `preview-deploy-guard` (koinori #2925 F3 and F4) and `preview-upload-trust-main` (#2415).
+
+### Requirement: Preview databases hold seeded test data
+
+`scripts/cloudflare/seed-preview.mjs` SHALL seed the preview database with two test users, cards and a
+grade log, and no personal data. `deploy.yml`'s production job SHALL apply `main`'s migrations to the
+preview database and load the seed after each production deploy; no other workflow SHALL write it.
+Real data SHALL reach it only through the owner-approved copy rehearsal, and stays until the owner
+decides to wipe and reseed it.
+
+#### Scenario: Preview data
+
+- **WHEN** someone signs in on a seeded preview with a test user
+- **THEN** they see seeded data only
+
+#### Scenario: After a rehearsal
+
+- **WHEN** the copy rehearsal has loaded real data into the preview database
+- **THEN** the preview still sends no push or email
+
+#### Scenario: Main is deployed
+
+- **WHEN** a push or dispatch on `main` deploys production
+- **THEN** the production job then applies `main`'s migrations to `poke-memory-preview` with `--env preview` and reloads the two test users, so `qa.pokememory.com` and every `pr-<n>` version run against `main`'s schema
+
+#### Scenario: The preview database step fails
+
+- **WHEN** applying the preview migrations or loading the seed fails
+- **THEN** production is already deployed and stays live, and the Deploy run is red
+
+#### Scenario: Guard drifts
+
+- **WHEN** a change removes the preview migrations or seed from the production job, or moves them before "Deploy the Worker"
+- **THEN** `scripts/workflows-no-backups.test.mjs` fails
+
+Source: design D11, proposal Open call 4, `scripts/cloudflare/seed-preview.mjs`, `.github/workflows/deploy.yml`; change `preview-upload-trust-main` D3 (Fraser's ruling of 20 November 2026).
