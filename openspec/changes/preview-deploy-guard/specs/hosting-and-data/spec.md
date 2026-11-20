@@ -20,15 +20,11 @@ Source (planned): design D13, owner ruling 20 November 2026, `scripts/workflows-
 
 ### Requirement: Main deploys production and each pull request gets a preview
 
-`.github/workflows/deploy.yml` SHALL build, apply D1 migrations and deploy `poke-memory` on a push or
-dispatch on `main`, from the GitHub environment `Production`, which admits only `main` and alone holds
-the Cloudflare and Sentry tokens. A published Release SHALL NOT deploy; `auto-release.yml` SHALL
-dispatch the deploy after its release commit. For a pull request, `deploy.yml` SHALL only build and
-bundle the preview Worker, with no environment and no secret, and upload it as the artefact
-`preview-bundle`. `.github/workflows/preview-upload.yml`, on `workflow_run` of Deploy, SHALL upload it
-from the environment `Preview`, which admits only `main`, with the secret
-`CLOUDFLARE_PREVIEW_API_TOKEN` and the PR's base branch's `wrangler.jsonc`; without that secret it
-SHALL skip with a notice.
+`deploy.yml` SHALL build, migrate and deploy `poke-memory` on a push or dispatch on `main`, from the
+environment `Production`, which admits only `main` and alone holds the Cloudflare and Sentry tokens;
+a published Release SHALL NOT deploy. For a pull request it SHALL only build the `preview-bundle`
+artefact, with no environment or secret. `preview-upload.yml` SHALL upload it from `Preview`, which
+admits only `main`, with the base branch's `wrangler.jsonc`, or skip with a notice.
 
 #### Scenario: Pull request opened
 
