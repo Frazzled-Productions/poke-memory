@@ -513,8 +513,9 @@ Source (planned): design D13, `app/api/stats/users/route.ts`, `lib/db/system/sta
 
 ### Requirement: No GitHub workflow reads production data
 
-No GitHub workflow SHALL query the production D1 database, and only `deploy.yml` SHALL hold
-`CLOUDFLARE_API_TOKEN`, which can write D1.
+No GitHub workflow SHALL query the production D1 database. Only `deploy.yml` SHALL read
+`secrets.CLOUDFLARE_API_TOKEN`, which can write D1, and only `preview-upload.yml` SHALL read
+`secrets.CLOUDFLARE_PREVIEW_API_TOKEN`.
 
 #### Scenario: A workflow queries production
 
@@ -523,23 +524,33 @@ No GitHub workflow SHALL query the production D1 database, and only `deploy.yml`
 
 #### Scenario: Another workflow takes the token
 
-- **WHEN** a workflow other than `deploy.yml` names `CLOUDFLARE_API_TOKEN`
+- **WHEN** a workflow other than `deploy.yml` reads `secrets.CLOUDFLARE_API_TOKEN`, or one other than `preview-upload.yml` reads `secrets.CLOUDFLARE_PREVIEW_API_TOKEN`
 - **THEN** `scripts/workflows-no-backups.test.mjs` fails
 
-Source (planned): design D13, owner ruling 20 November 2026, `scripts/workflows-no-backups.test.mjs`.
+Source (planned): design D13, owner ruling 20 November 2026, `scripts/workflows-no-backups.test.mjs`; change `preview-deploy-guard`.
 
 ### Requirement: Main deploys production and each pull request gets a preview
 
-`.github/workflows/deploy.yml` SHALL build, apply D1 migrations and deploy `poke-memory` on a push or
-dispatch on `main`, from the GitHub environment `Production`, which admits only `main` and alone holds
-the Cloudflare and Sentry tokens. A published Release SHALL NOT deploy; `auto-release.yml` SHALL
-dispatch the deploy after its release commit. Pull request previews SHALL run in the environment
-`Preview`, and without a token the jobs SHALL skip with a notice.
+`deploy.yml` SHALL build, migrate and deploy `poke-memory` on a push or dispatch on `main`, from the
+environment `Production`, which admits only `main` and alone holds the Cloudflare and Sentry tokens;
+a published Release SHALL NOT deploy. For a pull request it SHALL only build the `preview-bundle`
+artefact, with no environment or secret. `preview-upload.yml` SHALL upload it from `Preview`, which
+admits only `main`, with the base branch's `wrangler.jsonc`, or skip with a notice.
 
 #### Scenario: Pull request opened
 
-- **WHEN** a pull request is opened and the `Preview` environment holds a token
-- **THEN** a version of the separate Worker `poke-memory-preview`, with its own D1 database and bucket, is uploaded, aliased `pr-<number>`, and its URL is commented on the PR
+- **WHEN** a same-repository pull request into `qa` or `main` builds successfully and `Preview` holds `CLOUDFLARE_PREVIEW_API_TOKEN`
+- **THEN** a version of the separate Worker `poke-memory-preview`, with its own D1 database, is uploaded with the base branch's bindings, aliased `pr-<number>`, and its URL is commented on the PR
+
+#### Scenario: A pull request edits its preview bindings or workflow
+
+- **WHEN** a pull request points `env.preview` in `wrangler.jsonc` at the production database, or edits `deploy.yml` to read the preview secret
+- **THEN** its preview is still uploaded with the base branch's `wrangler.jsonc`, and a job on its ref is refused the `Preview` environment, so it gets no token
+
+#### Scenario: An untrusted bundle
+
+- **WHEN** the `preview-bundle` artefact holds a symlink, something other than files and directories, or a migration that is not a `.sql` file
+- **THEN** `preview-upload.yml` refuses it and uploads nothing
 
 #### Scenario: A job outside Production
 
@@ -548,8 +559,13 @@ dispatch the deploy after its release commit. Pull request previews SHALL run in
 
 #### Scenario: No token
 
-- **WHEN** the job's environment holds no Cloudflare token (every pull request today, Dependabot and forks)
-- **THEN** the deploy jobs skip with a notice and the run is green
+- **WHEN** `Preview` holds no `CLOUDFLARE_PREVIEW_API_TOKEN` (every pull request today, Dependabot and forks)
+- **THEN** the upload skips with a notice and the run is green, and the pull request's own build still runs
+
+#### Scenario: Before the next promotion
+
+- **WHEN** this workflow is on `qa` but not yet on `main`
+- **THEN** no preview is uploaded, because GitHub runs `workflow_run` workflows only from the default branch
 
 #### Scenario: Release
 
@@ -563,15 +579,15 @@ dispatch the deploy after its release commit. Pull request previews SHALL run in
 
 #### Scenario: Guard drifts
 
-- **WHEN** a change drops `environment: Production` or the `main` check from the production job, adds the release trigger back, or removes the dispatch from `auto-release.yml`
+- **WHEN** a change drops `environment: Production` or the `main` check from the production job, adds the release trigger back, removes the dispatch from `auto-release.yml`, names `Preview` or a Cloudflare secret in a `pull_request` job, uploads a preview from any other workflow, or checks out anything but the base branch in `preview-upload.yml`
 - **THEN** `scripts/workflows-no-backups.test.mjs` fails
 
 #### Scenario: End-to-end tests
 
 - **WHEN** a preview version was uploaded for a pull request
-- **THEN** the auth specs run against the preview version URL
+- **THEN** the base branch's auth specs run against the preview version URL
 
-Source: design D11, `.github/workflows/deploy.yml`, `.github/workflows/auto-release.yml`; Fraser's ruling of 19 November 2026 (ops #610); change `production-deploy-guard`.
+Source: design D11, `.github/workflows/deploy.yml`, `.github/workflows/preview-upload.yml`, `.github/workflows/auto-release.yml`; Fraser's ruling of 19 November 2026 (ops #610); changes `production-deploy-guard` and `preview-deploy-guard` (koinori #2925 F3 and F4).
 
 ### Requirement: Preview databases hold seeded test data
 
