@@ -352,8 +352,10 @@ Source: `lib/srs/timeToMastery.ts:37`, `lib/srs/timeToMastery.ts:61`, `lib/srs/t
 ### Requirement: Optimiser input groups a player's reviews by card (baseline)
 
 `gradeLogToOptimizerItems` SHALL skip entries without a subject key, group the rest by card type,
-subject key and locale (a missing locale counts as "en"), sort each group by `occurredAt`, and map
-grades 1, 2, 4, 5 to ratings 1, 2, 3, 4.
+subject key and locale (a missing locale counts as "en"), sort each group by `occurredAt`, map grades
+1, 2, 4, 5 to ratings 1, 2, 3, 4, and build one item per review prefix of each group: its first two
+reviews, its first three, and so on to the whole history. (Assumed from #2392's finding that one item
+per card gives `NotEnoughData`; to be confirmed by task 6.1.)
 
 #### Scenario: Legacy entry
 
@@ -363,9 +365,19 @@ grades 1, 2, 4, 5 to ratings 1, 2, 3, 4.
 #### Scenario: Same card in two locales
 
 - **WHEN** entries for one subject carry `en` and `ja`
-- **THEN** they form separate items
+- **THEN** they form separate groups
 
-Source: `lib/srs/optimizer.ts:28`, `lib/srs/optimizer.ts:57`, `lib/srs/optimizer.ts:64`, `lib/srs/optimizer.ts:77`, `lib/srs/optimizer.test.ts:56`, `lib/srs/optimizer.test.ts:92`, `lib/srs/optimizer.test.ts:124`, `lib/srs/optimizer.test.ts:154`.
+#### Scenario: Four reviews of one card
+
+- **WHEN** a card has four reviews
+- **THEN** it gives three items, of two, three and four reviews
+
+#### Scenario: A large log
+
+- **WHEN** a log of about 19,000 reviews is fitted
+- **THEN** `computeParameters` returns parameters rather than `NotEnoughData`
+
+Source (planned): `lib/srs/optimizer.ts`; tests `lib/srs/optimizer.test.ts`; #2392.
 
 ### Requirement: Gaps between reviews are at least a day (baseline)
 
@@ -392,52 +404,22 @@ learning touch counts as a one-day gap (#2254).
 
 Source: `lib/srs/optimizer.ts:79`, `lib/srs/optimizer.ts:90`, `lib/srs/optimizer.ts:98`, `lib/srs/optimizer.ts:115`, `lib/srs/optimizer.ts:138`, `components/review/ReviewSession.tsx:2976`, `lib/srs/optimizer.test.ts:140`, `lib/srs/optimizer.test.ts:173`, `lib/srs/optimizer.test.ts:221`.
 
-### Requirement: Who can run the optimiser (baseline)
-
-`POST /api/srs/optimize` SHALL require a signed-in user, answering 401 otherwise. It SHALL fit only
-when the fittable review count is at least 200, otherwise answer 422 `not_enough_reviews` with the
-count. That count comes from the cloud grade log, so it can be lower than the local count on Settings;
-the screen then asks the player to sync first. Guests see a sign-in prompt, and the button is disabled
-during a superuser flag, a run, or a local fittable count under 200.
-
-#### Scenario: Guest calls the route
-
-- **WHEN** there is no session
-- **THEN** the answer is 401
-
-#### Scenario: Signed in, reviews not yet synced
-
-- **WHEN** the cloud log has fewer than 200 fittable reviews
-- **THEN** the answer is 422 with `reviewCount` and no fit runs
-
-#### Scenario: Superuser flag on
-
-- **WHEN** Settings renders with any superuser flag on
-- **THEN** the button is disabled
-
-#### Scenario: Too few local reviews
-
-- **WHEN** the signed-in player's local fittable count is under 200
-- **THEN** the button is disabled, the count shows and no request is sent
-
-Source: `lib/srs/optimizer.ts:12`, `app/api/srs/optimize/route.ts:174`, `app/api/srs/optimize/route.ts:256`, `app/api/srs/optimize/route.ts:263`, `components/settings/FsrsOptimizerSection.tsx:84`, `components/settings/FsrsOptimizerSection.tsx:175`, `components/settings/FsrsOptimizerSection.tsx:183`, `components/settings/FsrsOptimizerSection.tsx:240`, `app/api/srs/optimize/route.test.tsx:227`, `app/api/srs/optimize/route.test.tsx:255`.
-
 ### Requirement: One optimiser run a week (baseline)
 
-The route SHALL answer 429 `cooldown` with `retryAfterMs` and a `Retry-After` header in whole seconds
-while the last successful run is under 7 days old. If its stored state cannot be read it SHALL answer
-503 `service_unavailable`. Settings rounds the wait up to whole days, and blocks the button only while it
-holds the last-run date, which `loadSettings` drops (#2248).
+Before a fit the page SHALL read the last-run date (`fsrsWeightsOptimizedAt`) from the player's cloud
+settings row, and while it is under 7 days old SHALL show the weekly limit state with the days left,
+rounded up, and run nothing. If that read fails it SHALL show the error state and run nothing. The
+settings merge refuses a second save within the week as well.
 
 #### Scenario: Second run on day three
 
 - **WHEN** the last run was 3 days ago
-- **THEN** the answer is 429 and no grade log is read
+- **THEN** the weekly limit state shows 4 days left and no grade log is read
 
 #### Scenario: Stored state unreadable
 
-- **WHEN** the read fails
-- **THEN** the answer is 503 `service_unavailable`
+- **WHEN** the settings read fails
+- **THEN** the error state shows and no fit runs
 
 #### Scenario: Settings just after a successful run
 
@@ -446,36 +428,16 @@ holds the last-run date, which `loadSettings` drops (#2248).
 
 #### Scenario: Settings after a reload
 
-- **WHEN** the player reloads Settings two days after a successful run
-- **THEN** no last-run date shows, the button is enabled and pressing it gives the retry-after error
+- **WHEN** the player reloads the optimiser page two days after a successful run
+- **THEN** the page reads the date from the cloud row and shows 5 days left
 
-Source: `lib/srs/optimizer.ts:13`, `app/api/srs/optimize/route.ts:194`, `app/api/srs/optimize/route.ts:203`, `components/settings/FsrsOptimizerSection.tsx:23`, `components/settings/FsrsOptimizerSection.tsx:103`, `components/settings/FsrsOptimizerSection.tsx:204`, `app/settings/page.tsx:967`, `app/api/srs/optimize/route.test.tsx:238`.
+Source (planned): `app/settings/optimiser/page.tsx`, `lib/srs/optimizer.ts` (`OPTIMIZER_COOLDOWN_MS`).
 
-### Requirement: A running or failed fit blocks new runs for five minutes (baseline)
+### Requirement: The optimiser page reads the whole cloud grade log
 
-The route SHALL write an in-progress stamp before reading the grade log, and answer 429 `cooldown` with
-`retryAfterMs` and a `Retry-After` header while a stamp is under 5 minutes old. The stamp is not cleared on any path, and the result of its write
-is not checked. So a run ending in `not_enough_reviews`, `degenerate_data`, `reviews_unavailable`,
-`save_failed` or `unknown` blocks a retry for 5 minutes, and Settings reports that wait as a day (#2250). The
-route's own limit is 60 seconds.
-
-#### Scenario: Retry after syncing
-
-- **WHEN** a run answers 422 `not_enough_reviews` and the player retries at once
-- **THEN** the answer is 429 `cooldown` with about 300,000 ms to wait
-
-#### Scenario: Retry after six minutes
-
-- **WHEN** a run failed and the stamp is over 5 minutes old
-- **THEN** the run proceeds
-
-Source: `app/api/srs/optimize/route.ts:27`, `app/api/srs/optimize/route.ts:133`, `app/api/srs/optimize/route.ts:219`, `app/api/srs/optimize/route.ts:235`, `components/settings/FsrsOptimizerSection.tsx:103`.
-
-### Requirement: The route reads the whole grade log, without locale (baseline)
-
-The route SHALL page through the grade log oldest first and answer 503 `reviews_unavailable` when that
-fails. It selects no `locale`, so every entry is grouped as "en" and a card's reviews in two languages
-are merged into one item, unlike the count on Settings (#2252).
+The page SHALL read the player's grade log through the data client, oldest first, page by page, with
+`locale`, so items are grouped as the Settings count groups them (#2252). A failed page SHALL show the
+error state and run no fit.
 
 #### Scenario: Over 1,000 rows
 
@@ -485,29 +447,39 @@ are merged into one item, unlike the count on Settings (#2252).
 #### Scenario: Two learning languages
 
 - **WHEN** one card has cloud rows in `en` and `ja`
-- **THEN** the fit sees a single item
+- **THEN** the fit sees them as two groups, matching the count on Settings
 
-Source: `app/api/srs/optimize/route.ts:74`, `app/api/srs/optimize/route.ts:84`, `app/api/srs/optimize/route.ts:87`, `app/api/srs/optimize/route.ts:93`, `app/api/srs/optimize/route.ts:243`, `app/settings/page.tsx:555`, `app/api/srs/optimize/route.test.tsx:217`.
+#### Scenario: A page fails
+
+- **WHEN** the second page of the read fails
+- **THEN** the error state shows and no fit runs
+
+Source (planned): `app/settings/optimiser/page.tsx`, `lib/sync/paginatedFetch.ts`, `lib/db/client.ts`.
 
 ### Requirement: Fit results and failures (baseline)
 
-The route SHALL call the native binding with short-term mode on, only on the server. A throw from the
-fit SHALL answer 422 `degenerate_data` with `reviewCount` and a detail of at most 200 characters.
-Success SHALL save the weights through the `merge_user_settings` RPC and answer `{ weights, optimizedAt, reviewCount }`. A failed save SHALL answer
-500 `save_failed`. Any other throw SHALL answer 500 `unknown` with such a detail.
+The page SHALL run `computeParameters` in its Web Worker with short-term mode on. A throw from the fit
+SHALL show the error state with a detail of at most 200 characters. Success SHALL save `fsrsWeights` and
+`fsrsWeightsOptimizedAt` through the existing settings push (`merge_user_settings`) and show the done
+state. A failed save SHALL show the error state and keep the stored weights.
 
 #### Scenario: Binding rejects the data
 
 - **WHEN** `computeParameters` throws
-- **THEN** the answer is 422 `degenerate_data`, with the message as detail for an Error or a string, and
-  "internal_error" for anything else or an empty message
+- **THEN** the error state shows, with the message as detail for an Error or a string, and "internal_error" for anything else or an empty message
 
 #### Scenario: Save fails
 
-- **WHEN** the RPC returns an error
-- **THEN** the answer is 500 `save_failed`
+- **WHEN** the settings push returns an error
+- **THEN** the error state shows and the cloud weights are unchanged
 
-Source: `lib/srs/optimizer.ts:5`, `app/api/srs/optimize/route.ts:117`, `app/api/srs/optimize/route.ts:150`, `app/api/srs/optimize/route.ts:151`, `app/api/srs/optimize/route.ts:156`, `app/api/srs/optimize/route.ts:269`, `app/api/srs/optimize/route.ts:292`, `app/api/srs/optimize/route.test.tsx:124`, `app/api/srs/optimize/route.test.tsx:152`, `app/api/srs/optimize/route.test.tsx:162`, `app/api/srs/optimize/route.test.tsx:189`.
+#### Scenario: Superuser flag turned on during a run
+
+- **WHEN** a superuser flag is switched on while a fit runs
+- **THEN** the write guard suppresses the save
+
+Source (planned): `app/settings/optimiser/page.tsx`, `app/settings/optimiser/worker.ts`,
+`lib/srs/optimizer.ts`, `lib/sync/settings.ts`.
 
 ### Requirement: Flip cards are graded by the player (baseline)
 
@@ -744,3 +716,99 @@ and the other three SHALL pass through. An unknown database type SHALL map to nu
 - **THEN** the original value returns
 
 Source: `lib/cards/subjectKey.ts:113`, `lib/cards/subjectKey.ts:126`, `lib/cards/subjectKey.test.ts:184`, `lib/cards/subjectKey.test.ts:221`, `lib/cards/subjectKey.test.ts:227`.
+
+### Requirement: The optimiser runs on its own cross-origin-isolated page
+
+The optimiser SHALL run in the browser on `/settings/optimiser`, served with
+`Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` on that path
+only. The binding's wasm build SHALL run in a Web Worker on that page. The Settings optimiser section
+SHALL link to the page. `/api/srs/optimize` and the native binding SHALL be gone. Progress SHALL be
+announced in a live region, and every state SHALL be translated.
+
+#### Scenario: Isolation only on that page
+
+- **WHEN** a production build serves `/settings/optimiser` and `/settings`
+- **THEN** `crossOriginIsolated` is true on the optimiser page and false on Settings, so images elsewhere keep loading
+
+#### Scenario: Japanese locale
+
+- **WHEN** the app language is `ja`
+- **THEN** the running, done, not enough reviews, weekly limit, unsupported browser and error states read in Japanese
+
+#### Scenario: Screen reader
+
+- **WHEN** a fit is running
+- **THEN** its progress is announced through the live region
+
+#### Scenario: Offline
+
+- **WHEN** the page is opened with no connection
+- **THEN** the grade log read fails and the page shows the error state, with nothing saved
+
+Source (planned): design D7, `app/settings/optimiser/page.tsx`, `next.config.ts` headers.
+
+### Requirement: Browsers that cannot run the optimiser see a plain message
+
+When the page is not cross-origin isolated, or the browser lacks wasm threads, the page SHALL show a
+plain translated "not supported in this browser" message and SHALL NOT start a fit.
+
+#### Scenario: No wasm threads
+
+- **WHEN** the browser has no `SharedArrayBuffer`
+- **THEN** the unsupported message shows and no Web Worker starts
+
+#### Scenario: Other pages unaffected
+
+- **WHEN** the same browser opens Practice or Settings
+- **THEN** they work as before
+
+Source (planned): design D7, `app/settings/optimiser/page.tsx`.
+
+### Requirement: Who can run the optimiser on its page
+
+The page SHALL ask a guest to sign in and run no fit. For a signed-in player it SHALL fit only when the
+fittable review count from the cloud grade log is at least 200, and otherwise show the not enough
+reviews state with that count; this count can be lower than the local count on Settings, and the state
+then asks the player to sync first. The run button SHALL be disabled during any superuser flag, during a
+run, and when the local fittable count is under 200.
+
+#### Scenario: Guest opens the page
+
+- **WHEN** a guest opens `/settings/optimiser`
+- **THEN** a sign-in prompt shows and no grade log is read
+
+#### Scenario: Signed in, reviews not yet synced
+
+- **WHEN** the cloud log has fewer than 200 fittable reviews
+- **THEN** the not enough reviews state shows the count and no fit runs
+
+#### Scenario: Superuser flag on
+
+- **WHEN** the page renders with any superuser flag on
+- **THEN** the button is disabled and nothing is saved
+
+#### Scenario: Too few local reviews
+
+- **WHEN** the signed-in player's local fittable count is under 200
+- **THEN** the button is disabled, the count shows and no grade log is read
+
+Source (planned): design D7, `lib/srs/optimizer.ts` (`MIN_REVIEWS_FOR_OPTIMIZATION`),
+`app/settings/optimiser/page.tsx`.
+
+### Requirement: The settings merge enforces the optimiser's weekly limit
+
+The Worker's settings merge SHALL refuse, with 23514, a patch whose `fsrsWeightsOptimizedAt` is later
+than the stored value by less than `OPTIMIZER_COOLDOWN_MS` (7 days), so a second device or a stale page
+cannot save a second run within a week.
+
+#### Scenario: Two devices in one week
+
+- **WHEN** a phone and a laptop start a fit at the same time and the phone saves first
+- **THEN** the laptop's save fails with 23514 and its page shows the weekly limit state
+
+#### Scenario: A week later
+
+- **WHEN** a run is saved 7 days or more after the stored one
+- **THEN** the merge accepts it
+
+Source (planned): design D7, `lib/db/rpc/mergeUserSettings.ts`, `lib/srs/optimizer.ts`.

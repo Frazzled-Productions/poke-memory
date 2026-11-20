@@ -291,9 +291,9 @@ orphaned by a future `SW_CACHE_VERSION` bump.
 #### Scenario: Sign-out
 
 - **WHEN** a player signs out
-- **THEN** only the Supabase session ends; Cache Storage and the `offline-pack` store are unchanged
+- **THEN** only the session ends; Cache Storage and the `offline-pack` store are unchanged
 
-Source: `app/sw.ts:849`, `app/sw.ts:854`, `lib/pwa/cacheStrategy.ts:102`, `lib/auth/actions.ts:24`.
+Source: `app/sw.ts:849`, `app/sw.ts:854`, `lib/pwa/cacheStrategy.ts:102`, planned `lib/auth/actions.ts`.
 
 ### Requirement: Sprites and cries served from IndexedDB (baseline)
 
@@ -697,10 +697,10 @@ Source: `app/whats-new/page.tsx:9`, `app/whats-new/page.tsx:15`, `app/whats-new/
 
 ### Requirement: Reading CHANGELOG.md (baseline)
 
-`parseChangelog` SHALL accept `## [X.Y.Z] - YYYY-MM-DD`, with a hyphen or a legacy em dash, and SHALL end a
-release at any other `## ` heading. It SHALL keep only the six known `###` kinds, in canonical order, merge
-repeated kinds, drop `Internal:` bullets, and drop releases with no bullets left. `getChangelog` SHALL read
-`CHANGELOG.md`, cache the result outside development, and return an empty list when the file is missing.
+`parseChangelog` SHALL accept `## [X.Y.Z] - YYYY-MM-DD` (hyphen or legacy em dash) and end a release
+at any other `## ` heading, keeping the six known `###` kinds in canonical order, merging repeats,
+dropping `Internal:` bullets and empty releases. `getChangelog` SHALL read a module generated from
+`CHANGELOG.md` at build time (the Worker has no file system), returning an empty list if it was missing.
 
 #### Scenario: Wrapped bullet
 
@@ -721,10 +721,15 @@ repeated kinds, drop `Internal:` bullets, and drop releases with no bullets left
 
 #### Scenario: File missing
 
-- **WHEN** `CHANGELOG.md` cannot be read
+- **WHEN** `CHANGELOG.md` is missing when the module is generated
 - **THEN** the page shows its empty message, not a 500
 
-Source: `lib/changelog/parse.ts:33`, `lib/changelog/parse.ts:36`, `lib/changelog/parse.ts:52`, `lib/changelog/parse.ts:74`, `lib/changelog/parse.ts:92`, `lib/changelog/parse.ts:105`, `lib/changelog/parse.ts:110`, `lib/changelog/parse.ts:114`, `lib/changelog/parse.ts:139`, `lib/changelog/parse.ts:145`, `lib/changelog/parse.ts:150`, `next.config.ts:47`, `lib/changelog/parse.test.ts:99`, `lib/changelog/parse.test.ts:255`.
+#### Scenario: Release after a deploy
+
+- **WHEN** a release adds a section to `CHANGELOG.md` and the Worker is rebuilt and deployed
+- **THEN** What's new shows the new section, with the same content the file read gave
+
+Source: `lib/changelog/parse.ts:33`, `lib/changelog/parse.ts:36`, `lib/changelog/parse.ts:52`, `lib/changelog/parse.ts:74`, `lib/changelog/parse.ts:92`, `lib/changelog/parse.ts:105`, `lib/changelog/parse.ts:110`, `lib/changelog/parse.ts:114`, `lib/changelog/parse.ts:139`, `lib/changelog/parse.ts:145`, `lib/changelog/parse.ts:150`, `lib/changelog/parse.test.ts:99`, `lib/changelog/parse.test.ts:255`; planned `scripts/generate-changelog-module.mjs`.
 
 ### Requirement: Bullet formatting (baseline)
 

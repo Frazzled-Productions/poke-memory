@@ -118,7 +118,7 @@ Source: `lib/streak/compute.ts:10-32`, `lib/streak/tokens.ts:413-420`, `lib/stre
 
 #### Scenario: Push and pull failures
 
-- **WHEN** Supabase returns an error
+- **WHEN** the data gateway returns an error, or the device is offline
 - **THEN** push gives `false` and pull gives `null` (`lib/sync/streak.test.ts:64`, `:90`), and a pull orders by date before ranging (`:83`)
 
 #### Scenario: Nothing to push
@@ -129,7 +129,7 @@ Source: `lib/streak/compute.ts:10-32`, `lib/streak/tokens.ts:413-420`, `lib/stre
 #### Scenario: A date too far ahead
 
 - **WHEN** a pushed date is later than `current_date + 1`
-- **THEN** the database check rejects it (`db/migrations/021_streak_days_no_future_date.sql:25-27`)
+- **THEN** the D1 trigger rejects it (`db/migrations/021_streak_days_no_future_date.sql:25-27`)
 
 Source: `lib/sync/streak.ts:15`, `lib/sync/streak.ts:18-36`, `lib/sync/streak.ts:38-60`, `lib/sync/streak.ts:65-68`, `components/sync/AutoSyncOnChange.tsx:81-90`, `db/migrations/021_streak_days_no_future_date.sql:25-27`, `app/stats/page.tsx:217-219`.
 
@@ -223,7 +223,7 @@ Source: `lib/streak/tokens.ts:229-234`, `lib/streak/tokens.ts:329-334`, `lib/str
 
 ### Requirement: Protection state lives in settings and is parsed defensively (baseline)
 
-`StreakProtection` SHALL live in the settings blob, so it follows settings sync. `validateStreakProtection` SHALL never throw: bad fields SHALL take defaults, the balance SHALL clamp to `MAX_BALANCE`, `spendDates` SHALL keep only valid dates, sorted and unique, and bad events SHALL drop. Each append SHALL cap events at `MAX_PROTECTION_EVENTS` (10), but `spendDates` SHALL have no cap. Cloud pushes SHALL be deep-merged, and the database SHALL protect spend dates and balance.
+`StreakProtection` SHALL live in the settings blob, so it follows settings sync. `validateStreakProtection` SHALL never throw: bad fields SHALL take defaults, the balance SHALL clamp to `MAX_BALANCE`, `spendDates` SHALL keep only valid dates, sorted and unique, and bad events SHALL drop. Each append SHALL cap events at `MAX_PROTECTION_EVENTS` (10), but `spendDates` SHALL have no cap. Cloud pushes SHALL be deep-merged by the Worker's settings merge, which SHALL protect spend dates and balance.
 
 #### Scenario: Corrupt state
 
@@ -238,9 +238,9 @@ Source: `lib/streak/tokens.ts:229-234`, `lib/streak/tokens.ts:329-334`, `lib/str
 #### Scenario: A stale device pushes protection
 
 - **WHEN** a settings push would remove a spend date from the cloud row, or lower the balance without adding one
-- **THEN** the trigger raises `23514`, the push reports failure and it is retried on the next settings save (`components/sync/AutoSyncOnChange.tsx:63-75`)
+- **THEN** the settings merge refuses it with `23514`, the push reports failure and it is retried on the next settings save (`components/sync/AutoSyncOnChange.tsx:63-75`)
 
-Source: `lib/streak/tokens.ts:37`, `lib/streak/tokens.ts:59-96`, `lib/streak/tokens.ts:113-187`, `lib/streak/tokens.ts:398-401`, `lib/settings/persistence.ts:426`, `lib/settings/persistence.ts:905`, `db/migrations/037_merge_user_settings_deep.sql:9-19`, `db/migrations/038_user_settings_reject_regression_trigger.sql:78-100`.
+Source: `lib/streak/tokens.ts:37`, `lib/streak/tokens.ts:59-96`, `lib/streak/tokens.ts:113-187`, `lib/streak/tokens.ts:398-401`, `lib/settings/persistence.ts:426`, `lib/settings/persistence.ts:905`, planned `lib/db/rpc/mergeUserSettings.ts` (rules from `db/migrations/038_user_settings_reject_regression_trigger.sql:78-100`).
 
 ### Requirement: The protection step runs only on the client, with stored settings (baseline)
 

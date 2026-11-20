@@ -256,19 +256,31 @@ failed push waits for the next save.
 
 Source: `components/sync/AutoSyncOnChange.tsx:63`, `components/sync/AutoSyncOnChange.tsx:66`, `components/sync/AutoSyncOnChange.tsx:73`, `lib/sync/pullAndMerge.ts:255`, `lib/sync/pullAndMerge.ts:441`, `lib/settings/lastPushedSnapshot.ts:114`, `lib/settings/lastPushedSnapshot.ts:119`, `lib/sync/settings.ts:30`, `db/migrations/037_merge_user_settings_deep.sql:9`, `db/migrations/037_merge_user_settings_deep.sql:14`.
 
-### Requirement: The database refuses settings that lose data (baseline)
+### Requirement: The settings merge refuses settings that lose data
 
-A BEFORE UPDATE trigger on `user_settings` SHALL raise 23514 when an update removes a streak spend date,
-drops the balance with no new spend, removes a badge, turns off a one-way onboarding flag or lowers an
-onboarding counter (both unless `onboardingResetAt` advanced), turns off `typedEntryOnboardingShown` or
-`mcCardOnboardingShown` (never bypassed), or removes a learning locale not in `removedLocales`.
+The Worker's settings merge SHALL refuse, with code 23514 and no write, a patch whose result removes a
+streak spend date, drops the balance with no new spend, removes a badge, turns off a one-way onboarding
+flag or lowers an onboarding counter (both unless `onboardingResetAt` advanced), turns off
+`typedEntryOnboardingShown` or `mcCardOnboardingShown` (never bypassed), or removes a learning locale not
+in `removedLocales`. These are the rules of Postgres migration 038.
 
 #### Scenario: Stale device drops a badge
 
 - **WHEN** an update's `earnedBadges` lacks a badge id the row holds
 - **THEN** the update fails with 23514 and `pushSettings` returns false
 
-Source: `db/migrations/038_user_settings_reject_regression_trigger.sql:38`, `db/migrations/038_user_settings_reject_regression_trigger.sql:95`, `db/migrations/038_user_settings_reject_regression_trigger.sql:142`, `db/migrations/038_user_settings_reject_regression_trigger.sql:183`, `db/migrations/038_user_settings_reject_regression_trigger.sql:235`, `db/migrations/038_user_settings_reject_regression_trigger.sql:252`.
+#### Scenario: Locale removed with a tombstone
+
+- **WHEN** a patch removes `ja` from `learningLocales` and adds it to `removedLocales`
+- **THEN** the merge accepts it
+
+#### Scenario: Onboarding reset on another device
+
+- **WHEN** a patch turns off `statsHintDismissed` with a newer `onboardingResetAt`
+- **THEN** the merge accepts it
+
+Source (planned): `lib/db/rpc/mergeUserSettings.ts`; rules from
+`db/migrations/038_user_settings_reject_regression_trigger.sql`.
 
 ### Requirement: Locale sets union across devices (baseline)
 
@@ -508,11 +520,10 @@ Source: `lib/sync/useSyncOnUnload.ts:59`, `lib/sync/useSyncOnUnload.ts:69`, `lib
 ### Requirement: Sync route (baseline)
 
 `POST /api/sync` SHALL check the body before auth: invalid JSON or non-array `cards` answers 400. No
-session answers 401. An empty `cards` array answers 200 with no card write. The server SHALL set `user_id`
-from the session, default `locale` to `"en"`, omit `updated_at`, and omit `seen_in_pasture` when absent or
-null. Cards SHALL go in batches of 200, each tried up to 3
-times 100 ms apart, answering 200 when all land. Per-row reporting after the fallback is wrong today
-(#2206).
+session answers 401. An empty `cards` array answers 200 with no card write. Rows SHALL go through the
+scope helper with `user_id` from the session, `locale` defaulting to `"en"`, no `updated_at`, and no
+`seen_in_pasture` when absent or null. Cards SHALL go in batches of 200, each one D1 batch tried up to 3
+times 100 ms apart. Per-row reporting after the fallback is wrong today (#2206).
 
 #### Scenario: Not signed in
 
@@ -521,17 +532,17 @@ times 100 ms apart, answering 200 when all land. Per-row reporting after the fal
 
 #### Scenario: One transient failure
 
-- **WHEN** the first upsert fails with a generic error and the second succeeds
+- **WHEN** the first batch fails with a generic error and the second try succeeds
 - **THEN** the route answers 200
 
 #### Scenario: Schema mismatch
 
-- **WHEN** an upsert returns 42P10
+- **WHEN** a batch fails with a class 42 code, such as `42703`
 - **THEN** no retry runs and the route answers 409 `structural_error` with that code
 
 #### Scenario: Regression trigger rejects a batch
 
-- **WHEN** a batch upsert returns 23514
+- **WHEN** a batch fails with 23514
 - **THEN** its rows are upserted one by one and 23514 rows are skipped
 
 #### Scenario: A batch lands nothing
@@ -549,7 +560,12 @@ times 100 ms apart, answering 200 when all land. Per-row reporting after the fal
 - **WHEN** the body is the JSON value `null`
 - **THEN** the route throws reading `cards`, before any 400 check, and answers an unhandled 500
 
-Source: `app/api/sync/route.ts:44`, `app/api/sync/route.ts:52`, `app/api/sync/route.ts:99`, `app/api/sync/route.ts:105`, `app/api/sync/route.ts:117`, `app/api/sync/route.ts:123`, `app/api/sync/route.ts:146`, `app/api/sync/route.ts:157`, `app/api/sync/route.ts:168`, `app/api/sync/route.ts:182`, `app/api/sync/route.ts:204`, `app/api/sync/route.ts:224`, `app/api/sync/route.ts:234`, `app/api/sync/route.test.tsx:111`, `app/api/sync/route.test.tsx:253`, `app/api/sync/route.test.tsx:278`.
+#### Scenario: All batches land
+
+- **WHEN** every batch is written
+- **THEN** the route answers 200
+
+Source (planned): `app/api/sync/route.ts`, `lib/db/scope.ts`; tests `app/api/sync/route.test.tsx`.
 
 ### Requirement: Beacon grade-log leg (baseline)
 
@@ -699,10 +715,10 @@ Source: `lib/sync/useSyncOnUnload.ts:168`, `lib/sync/useOnlineReconnectSync.ts:7
 ### Requirement: Database guards on card rows (baseline)
 
 `card_reviews` SHALL be keyed by `(user_id, card_type, subject_key, locale)`, the column list every
-upsert uses. A BEFORE UPDATE trigger SHALL raise 23514 when `last_review` or `first_seen` becomes null,
-`last_review` moves back, `reps` or `lapses` fall, `scheduled_days` falls on the same `last_review`, or
-`seen_in_pasture` goes from true to false. A second trigger SHALL set `updated_at` to server time on every update.
-Row-level security SHALL limit each table to its own user.
+upsert uses. A D1 trigger SHALL abort an update with 23514 when `last_review` or `first_seen` becomes
+null, `last_review` moves back, `reps` or `lapses` fall, `scheduled_days` falls on the same
+`last_review`, or `seen_in_pasture` goes from true to false. A second trigger SHALL set `updated_at` to
+server time on every update. The scope helper SHALL limit each query to its own user.
 
 #### Scenario: A stale device writes lower reps
 
@@ -714,29 +730,34 @@ Row-level security SHALL limit each table to its own user.
 - **WHEN** a push updates a row
 - **THEN** `updated_at` is the server's time
 
-Source: `lib/sync/cloud.ts:41`, `db/migrations/029_card_reviews_locale.sql:27`, `db/migrations/029_card_reviews_locale.sql:36`, `db/migrations/029_card_reviews_locale.sql:67`, `db/migrations/029_card_reviews_locale.sql:81`, `db/migrations/017_card_reviews_pasture_one_way.sql:74`, `db/migrations/043_card_reviews_updated_at_trigger.sql:36`, `db/migrations/001_initial_sync_schema.sql:23`, `lib/sync/integration/regression-trigger.test.ts`, `lib/sync/integration/onconflict-pk-parity.test.ts`.
+#### Scenario: Two users with the same card
+
+- **WHEN** users A and B both push the same card key
+- **THEN** each has their own row and neither push touches the other's
+
+Source (planned): `db/d1/migrations/0001_schema.sql`, `lib/db/scope.ts`, `lib/sync/cloud.ts:41`; the
+D1 port of `lib/sync/integration/regression-trigger.test.ts` and `onconflict-pk-parity.test.ts`.
 
 ### Requirement: CHECK constraints share the regression code (baseline)
 
-CHECK constraints SHALL bound `locale`, `fsrs_state`, `stability` and `difficulty` on `card_reviews`. They
-raise 23514, as the triggers do, so clients and the route treat such a row as if the cloud row were newer.
+D1 CHECK constraints SHALL bound `locale`, `fsrs_state`, `stability` and `difficulty` on `card_reviews`.
+A CHECK failure SHALL reach callers as 23514, as the triggers do, so clients and the route treat such a
+row as if the cloud row were newer.
 
 #### Scenario: A row breaks a CHECK constraint
 
 - **WHEN** `pushSingleCard` sends a `difficulty` above 10
 - **THEN** it returns `"rejected"` and the card leaves the queue
 
-Source: `lib/sync/cloud.ts:336`, `db/migrations/004_card_reviews_fsrs_schema.sql:72`, `db/migrations/020_card_reviews_stability_difficulty_bounds.sql:15`, `db/migrations/029_card_reviews_locale.sql:21`.
+Source (planned): `db/d1/migrations/0001_schema.sql`, `lib/db/errors.ts`, `lib/sync/cloud.ts:336`.
 
 ### Requirement: Resetting progress (baseline)
 
-`reset_all_progress` SHALL require a session, refuse a repeat within 5 seconds, delete the user's
-`card_reviews`, `grade_log` and `streak_days` rows, and stamp `last_reset_at` and `updated_at`, keeping
-the settings blob. `resetAllProgressEverywhere` SHALL do this first and clear local only on success. A
-pull seeing `last_reset_at` later than `lastSeenResetAt`, or with that cursor null, SHALL clear local
-before merging.
-
-Two scenarios below look like bugs (#2231, #2334).
+`reset_all_progress` SHALL run in the Worker as one atomic D1 batch for the session user: refuse a
+repeat within 5 seconds, delete the user's `card_reviews`, `grade_log` and `streak_days` rows, and
+stamp `last_reset_at` and `updated_at`, keeping the settings. `resetAllProgressEverywhere` SHALL clear
+local only after it succeeds. A pull seeing a newer `last_reset_at` (or a null cursor) SHALL clear
+local before merging. Two scenarios look like bugs (#2231, #2334).
 
 #### Scenario: Cloud reset fails
 
@@ -756,7 +777,7 @@ Two scenarios below look like bugs (#2231, #2334).
 #### Scenario: Stale row after a reset
 
 - **WHEN** a row is inserted dated before the UTC date of `last_reset_at`
-- **THEN** the INSERT trigger raises 23514
+- **THEN** the D1 INSERT trigger aborts it with 23514
 
 #### Scenario: Queued rows at a reset
 
@@ -778,19 +799,33 @@ Two scenarios below look like bugs (#2231, #2334).
 - **WHEN** a pull's settings read fails after a reset elsewhere
 - **THEN** local is not cleared on this pull, the merge continues, and the next pull clears it
 
-Source: `db/migrations/026_reset_all_progress_cooldown.sql:28`, `db/migrations/026_reset_all_progress_cooldown.sql:45`, `db/migrations/026_reset_all_progress_cooldown.sql:54`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:25`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:68`, `db/migrations/022_user_settings_last_reset_at_tombstone_triggers.sql:133`, `lib/sync/reset.ts:50`, `lib/sync/pullAndMerge.ts:174`, `lib/sync/pullAndMerge.ts:624`, `lib/storage/reset.ts:22`, `lib/storage/reset.ts:53-58`, `lib/sync/pullAndMerge.test.ts:741`.
+#### Scenario: Batch fails halfway
+
+- **WHEN** one statement of the reset batch fails
+- **THEN** no row is deleted and `last_reset_at` is unchanged
+
+Source (planned): `lib/db/rpc/resetAllProgress.ts`, `db/d1/migrations/0001_schema.sql`,
+`lib/sync/reset.ts:50`, `lib/sync/pullAndMerge.ts:174`, `lib/sync/pullAndMerge.ts:624`,
+`lib/storage/reset.ts:22`, `lib/storage/reset.ts:53-58`, `lib/sync/pullAndMerge.test.ts:741`.
 
 ### Requirement: Deleting an account (baseline)
 
 `deleteAccountEverywhere` SHALL call `delete_account` first; on success it SHALL clear local progress
-and sweep every `poke-memory:*` key, settings included. The foreign keys cascade to the user's rows.
+and sweep every `poke-memory:*` key, settings included. The Worker SHALL delete the user's rows in every
+table, and the account itself, in one atomic D1 batch.
 
 #### Scenario: Delete fails
 
 - **WHEN** the RPC errors
 - **THEN** local data stays and the result is `cloud-delete-failed`
 
-Source: `lib/sync/deleteAccount.ts:41`, `lib/sync/deleteAccount.ts:77`, `db/migrations/027_delete_account_rpc.sql:40`, `db/migrations/027_delete_account_rpc.sql:57`, `lib/sync/deleteAccount.test.ts`.
+#### Scenario: Delete succeeds
+
+- **WHEN** the RPC succeeds
+- **THEN** no cloud row of that user remains and local progress is cleared
+
+Source (planned): `lib/sync/deleteAccount.ts:41`, `lib/sync/deleteAccount.ts:77`,
+`lib/db/rpc/deleteAccount.ts`; tests `lib/sync/deleteAccount.test.ts`.
 
 ### Requirement: Switching account on a device (baseline)
 
@@ -815,3 +850,83 @@ fresh cursors unless the archive restored that owner. Open item held in ops #417
 - **THEN** a warning is logged and the switch continues (#2208)
 
 Source: `lib/sync/guardAccountSwitch.ts:66`, `lib/sync/guardAccountSwitch.ts:109`, `lib/sync/guardAccountSwitch.ts:114`, `lib/sync/guardAccountSwitch.ts:120`, `lib/sync/guardAccountSwitch.ts:130`, `lib/sync/guardAccountSwitch.ts:139`, `lib/sync/guardAccountSwitch.ts:171`, `lib/storage/userArchive.ts:90`, `lib/storage/userArchive.ts:145`, `lib/sync/guardAccountSwitch.test.ts:135`, `lib/sync/guardAccountSwitch.test.ts:214`, `lib/sync/integration/account-switch.test.ts`.
+
+### Requirement: Cloud reads and writes go through the data gateway
+
+Every sync leg in the browser (cards, settings, streak, grade log, regional prefs, push count, reset,
+delete) SHALL use the data client from `lib/db/client.ts`, which sends each query to `POST /api/db`
+with the same query shapes the sync code sent to Supabase. The unload beacon and the Background Sync
+replay SHALL keep `POST /api/sync`. The sync rules in this capability SHALL stay as they are: results,
+error codes and structural-error handling reach the sync code unchanged.
+
+#### Scenario: Parity with the old client
+
+- **WHEN** `pullSession`, `pushSession`, `pushSingleCard`, the settings, streak and grade-log legs run against the D1 test database
+- **THEN** they return what they returned against Postgres, including `"rejected"` for a `23514`
+
+#### Scenario: Offline
+
+- **WHEN** a pull runs with no connection
+- **THEN** the client returns an error, `pullAndMerge` returns `"error"` and local state is unchanged
+
+#### Scenario: Guest
+
+- **WHEN** no user is signed in
+- **THEN** no request reaches the gateway
+
+#### Scenario: Superuser flag on
+
+- **WHEN** any superuser flag is on during a sign-in pull
+- **THEN** reads go through the gateway and no write is sent
+
+#### Scenario: Two devices syncing
+
+- **WHEN** a phone pushes a grade and a laptop pulls afterwards
+- **THEN** the laptop merges the phone's row by the per-card merge rule, as before
+
+Source (planned): design D5, `lib/db/client.ts`, `lib/sync/**`.
+
+### Requirement: The settings merge runs in the Worker and keeps nulls
+
+`merge_user_settings` SHALL run in the Worker: read the row, deep-merge the patch into the blob, set
+`updated_at`, and write with a compare-and-swap on `updated_at`, retrying up to 5 times. A key whose
+patch value is null SHALL be kept as null, as Postgres `jsonb_deep_merge` did, not dropped as SQLite's
+`json_patch` would. The user id SHALL come from the session only.
+
+#### Scenario: Null in a patch
+
+- **WHEN** a patch sets a nested key to null
+- **THEN** the stored blob holds that key with a null value
+
+#### Scenario: Two devices push at once
+
+- **WHEN** two devices patch different keys at the same moment
+- **THEN** both patches land, the second after a retry
+
+#### Scenario: Retries used up
+
+- **WHEN** the compare-and-swap loses 5 times
+- **THEN** the RPC returns an error, `pushSettings` returns false and the next save resends the keys
+
+#### Scenario: No row yet
+
+- **WHEN** a signed-in player with no `user_settings` row pushes a patch
+- **THEN** a row is created holding the patch
+
+Source (planned): design D3, `lib/db/rpc/mergeUserSettings.ts`; tests ported from the Postgres RPC
+integration tests (task 3.3).
+
+### Requirement: Sync cursors compare as instants
+
+Every "newer" check on a sync cursor SHALL compare instants, never strings: `last_reset_at` against
+`lastSeenResetAt`, and the `lastPullAt` and `lastSettingsPullAt` comparisons. Cursors stored before
+the move hold PostgREST text, and D1 returns ISO 8601 with milliseconds and `Z`.
+
+#### Scenario: First pull after the move to D1
+
+- **WHEN** a device stored `lastSeenResetAt` as `2026-05-13T15:00:00.78+00:00` before the move and the
+  pull reads `2026-05-13T15:00:00.780Z` from D1
+- **THEN** local progress is kept, and cards and settings are not treated as newer for that reason
+
+Source (planned): `lib/sync/pullAndMerge.ts:174`, `lib/sync/pullAndMerge.ts:624`,
+`lib/sync/pullAndMerge.test.ts:741`.

@@ -13,10 +13,9 @@ should do. Which Supabase key each client uses is in `supabase-keys`. What sync 
 ### Requirement: The app header has one auth control (baseline, current behaviour)
 
 `AuthButton` SHALL render nothing while auth is loading, a "Sign in" button that opens `SignInSheet`
-for a guest, and for a signed-in user the avatar (when `user_metadata.avatar_url` exists) and a
-"Sign out" button. `NavLinks`, `MobileNavSlot` and `NavDrawer` each render it. The header is not the
-only way in: Settings' guest account section and `GuestSignUpNudge` on Stats and Journey open the
-same `SignInSheet`.
+for a guest, and for a signed-in user the avatar (when the user has a profile image from GitHub or
+Google) and a "Sign out" button. `NavLinks`, `MobileNavSlot` and `NavDrawer` each render it. Settings'
+guest account section and `GuestSignUpNudge` on Stats and Journey open the same `SignInSheet`.
 
 #### Scenario: Guest opens the sheet
 
@@ -30,7 +29,7 @@ same `SignInSheet`.
 
 #### Scenario: Username account has no avatar
 
-- **WHEN** the signed-in user has no `avatar_url` in their metadata (every username account)
+- **WHEN** the signed-in user has no profile image (every username account)
 - **THEN** only the "Sign out" button shows
 
 Source: `components/auth/AuthButton.tsx:18-34`, `components/auth/AuthButton.tsx:36-67`,
@@ -61,50 +60,60 @@ Source: `components/auth/SignInSheet.tsx:78-96`, `components/auth/SignInSheet.ts
 
 ### Requirement: OAuth sign-in accepts GitHub and Google only (baseline, current behaviour)
 
-The `signIn` server action SHALL start Supabase OAuth for `github` or `google`, with
-`redirectTo` set to `NEXT_PUBLIC_SITE_URL` (or `http://localhost:3000`) plus `/api/auth/callback`,
-and redirect to the provider URL. Any other provider, a Supabase error or a missing URL SHALL
-redirect to `/` with no error shown. The sheet SHALL stay open during the redirect.
+The `signIn` server action SHALL start Better Auth social sign-in for `github` or `google`, with the
+callback URL `/auth/callback-complete` on the site's base URL (`BETTER_AUTH_URL`), and redirect to the
+provider URL. Any other provider, a Better Auth error or a missing URL SHALL redirect to `/` with no
+error shown. The sheet SHALL stay open during the redirect.
 
 #### Scenario: Unknown provider
 
 - **WHEN** `signIn` is called with a provider other than `github` or `google`
-- **THEN** it redirects to `/` and never calls Supabase
+- **THEN** it redirects to `/` and never calls Better Auth
 
 #### Scenario: Provider start fails
 
-- **WHEN** `signInWithOAuth` returns an error
+- **WHEN** Better Auth returns an error or no URL
 - **THEN** the player lands on `/` with no error banner
 
-Source: `lib/auth/actions.ts:10-22`, `lib/auth/types.ts:1`, `components/auth/SignInSheet.tsx:151-155`;
-tests `components/auth/SignInSheet.test.tsx:206-218`.
+Source (planned): `lib/auth/actions.ts`, `lib/auth/server.ts`, `lib/auth/types.ts:1`,
+`components/auth/SignInSheet.tsx:151-155`; tests `components/auth/SignInSheet.test.tsx`.
 
 ### Requirement: The OAuth callback exchanges the code (baseline, current behaviour)
 
-`GET /api/auth/callback` SHALL exchange the `code` query parameter for a session and redirect to
-`/auth/callback-complete`. A missing or empty code, or a failed exchange, SHALL redirect to
-`/?error=auth`, and the home page SHALL show the translated `signInFailed` alert for that value.
-Both redirects SHALL use `NEXT_PUBLIC_SITE_URL`, falling back to `http://localhost:3000`.
+Better Auth's `GET /api/auth/callback/<provider>` SHALL check the state, exchange the `code` for a
+session, set the session cookie and redirect to `/auth/callback-complete`. A missing code, a bad state
+or a failed exchange SHALL redirect to `/` with an `error` query parameter, and the home page SHALL
+show the translated `signInFailed` alert for any `error` value. The old `/api/auth/callback` route and
+`exchangeCodeForSession` SHALL no longer exist.
 
 #### Scenario: Good code
 
 - **WHEN** the exchange succeeds
-- **THEN** the browser is sent to `/auth/callback-complete`
+- **THEN** the browser is sent to `/auth/callback-complete` with the session cookie set
 
 #### Scenario: No code
 
 - **WHEN** the callback has no `code`
-- **THEN** no exchange is attempted and the browser is sent to `/?error=auth`
+- **THEN** no session is created and the browser lands on `/` with an `error` parameter and the sign-in failure alert
 
-Source: `app/api/auth/callback/route.ts:4-16`, `app/page.tsx:16-32`; tests
-`app/api/auth/callback/route.test.tsx:85-154`.
+#### Scenario: Japanese locale
+
+- **WHEN** the locale is `ja` and the callback fails
+- **THEN** the sign-in failure alert is in Japanese
+
+#### Scenario: Old callback URL
+
+- **WHEN** a request reaches `/api/auth/callback` with no provider segment
+- **THEN** it answers 404 and no session is created
+
+Source (planned): `app/api/auth/[...all]/route.ts`, `app/page.tsx`; design D6.
 
 ### Requirement: Usernames are normalised and validated (baseline, current behaviour)
 
-A username SHALL be trimmed and lowercased, then accepted only if it is 3 to 30 characters of
-`a-z`, `0-9`, `_` and `-`. Passwords SHALL be at least 8 characters. The database SHALL enforce the
-same username rules with CHECK constraints, one username per account, and an owner-only INSERT with
-no client SELECT, UPDATE or DELETE policy.
+A username SHALL be trimmed and lowercased, then accepted only if it is 3 to 30 characters of `a-z`,
+`0-9`, `_` and `-`; Better Auth's username plugin SHALL use this rule, not its own default. Passwords
+SHALL be at least 8 characters. D1 SHALL enforce the same username rules with CHECK constraints and one
+unique username per account, and no browser query SHALL read or write usernames.
 
 #### Scenario: Mixed case with spaces
 
@@ -116,9 +125,18 @@ no client SELECT, UPDATE or DELETE policy.
 - **WHEN** the normalised username has 2 characters
 - **THEN** validation returns `username_too_short`
 
+#### Scenario: A dot in the name
+
+- **WHEN** the player enters `ash.ketchum`, which Better Auth's default rule would allow
+- **THEN** validation refuses it, as today
+
+#### Scenario: Browser asks for usernames
+
+- **WHEN** a signed-in browser queries usernames through the data gateway
+- **THEN** the gateway refuses it with 400
+
 Source: `lib/auth/username.ts:27`, `lib/auth/username.ts:30`, `lib/auth/username.ts:44-46`,
-`lib/auth/username.ts:64-69`, `db/migrations/035_usernames.sql:22-37`,
-`db/migrations/035_usernames.sql:48-51`, `db/migrations/044_drop_usernames_select_public.sql:9`;
+`lib/auth/username.ts:64-69`; planned `lib/auth/server.ts`, `db/d1/migrations/0002_auth.sql`;
 tests `lib/auth/username.test.ts:24-114`.
 
 ### Requirement: A username maps to a synthetic email (baseline, current behaviour)
@@ -135,88 +153,58 @@ that address or the password.
 Source: `lib/auth/username.ts:21`, `lib/auth/username.ts:84-86`, `lib/auth/actions.ts:85`,
 `lib/auth/actions.ts:208`; tests `lib/auth/actions.test.ts:121-140`, `lib/auth/username.test.ts:147-167`.
 
-### Requirement: Username sign-up creates the account in the browser's session (baseline, current behaviour)
-
-`signUpWithUsername` SHALL, in order: validate the username and password, check the sign-up rate
-limit, call Supabase `signUp` with the synthetic email and `user_metadata.username`, require both a
-user and a session, then insert the `usernames` row. It SHALL return `{ ok: true }` only when all of
-those succeed. There SHALL be no rollback of the Auth user when a later step fails.
-
-#### Scenario: No session back from Supabase
-
-- **WHEN** `signUp` returns a user and no session
-- **THEN** the result is `signup_failed` and no `usernames` row is attempted
-
-#### Scenario: Username row conflict
-
-- **WHEN** the `usernames` insert fails with Postgres code `23505`
-- **THEN** the result is `username_taken`
-
-#### Scenario: Username row fails for another reason
-
-- **WHEN** the `usernames` insert fails with any other error after `signUp` returned a session
-- **THEN** the result is `signup_failed`, and the Auth user and the session already written stay in place
-
-Source: `lib/auth/actions.ts:53-160`; tests `lib/auth/actions.test.ts:111-117`,
-`lib/auth/actions.test.ts:227`.
-
-### Requirement: Taken usernames are recognised from two signals only (baseline, current behaviour)
-
-When `signUp` returns an error, the action SHALL report `username_taken` only when the error `code`
-is `email_exists` or the returned user has an empty `identities` list. Every other sign-up error,
-whatever its status, SHALL report `signup_failed`.
-
-#### Scenario: email_exists
-
-- **WHEN** `signUp` fails with code `email_exists`
-- **THEN** the result is `username_taken`
-
-#### Scenario: Any other code
-
-- **WHEN** `signUp` fails with a code other than `email_exists` and no empty `identities` list, including `user_already_exists`
-- **THEN** the result is `signup_failed`
-
-Source: `lib/auth/actions.ts:101-120`; tests `lib/auth/actions.test.ts:167-192`.
-
 ### Requirement: Username sign-in gives one answer for bad credentials (baseline, current behaviour)
 
 `signInWithUsername` SHALL return `invalid_credentials` for a username that fails validation and for
-any error from `signInWithPassword`, and SHALL NOT read the `usernames` table. A valid username SHALL
-pass the rate limit before Supabase is called.
+any error from Better Auth's username sign-in, and SHALL NOT reveal whether the username exists. A
+valid username SHALL pass the rate limit before the password is checked.
 
 #### Scenario: Malformed username
 
 - **WHEN** the username fails validation
-- **THEN** the result is `invalid_credentials` and neither the rate limit nor Supabase is called
+- **THEN** the result is `invalid_credentials` and neither the rate limit nor Better Auth is called
 
 #### Scenario: Wrong password
 
-- **WHEN** `signInWithPassword` returns an error
+- **WHEN** Better Auth's sign-in returns an error
 - **THEN** the result is `invalid_credentials`
 
-Source: `lib/auth/actions.ts:179-217`; tests `lib/auth/actions.test.ts:13-23`.
+#### Scenario: Unknown username
+
+- **WHEN** no account has the username
+- **THEN** the result is `invalid_credentials`, the same as a wrong password
+
+Source (planned): `lib/auth/actions.ts`; tests `lib/auth/actions.test.ts`.
 
 ### Requirement: Username sign-up and sign-in are throttled per IP (baseline, current behaviour)
 
-Both username actions SHALL hash the first `x-forwarded-for` value (or the literal `unknown`) as
-SHA-256 of `RATE_LIMIT_SALT` plus the IP, falling back to the salt `dev-salt`, and call
-`check_rate_limit` before Auth. A `false` result or an RPC error SHALL return `rate_limited`. The
-caps SHALL be 5 per 10 minutes and 20 per hour for `signup`, and 10 per 10 minutes and 40 per hour
-for `signin`; an attempt over a cap is not counted. Raw IPs SHALL NOT be stored.
+Both username actions SHALL check per-IP buckets in D1 in a Better Auth `before` hook, keyed by
+SHA-256 of `RATE_LIMIT_SALT` plus the `cf-connecting-ip` header (or `unknown`); raw IPs SHALL NOT be
+stored. A refusal or database error SHALL return `rate_limited`. Caps: `signup` 5 per 10 minutes and
+20 per hour, `signin` 10 per 10 minutes and 40 per hour; an attempt over a cap is not counted.
 
 #### Scenario: Database unavailable
 
-- **WHEN** `check_rate_limit` returns an error
-- **THEN** the action returns `rate_limited` and Auth is not called
+- **WHEN** the bucket check fails
+- **THEN** the action returns `rate_limited` and no account is read
 
 #### Scenario: No forwarded header
 
-- **WHEN** the request has no `x-forwarded-for` header
+- **WHEN** the request has no `cf-connecting-ip` header
 - **THEN** the attempt counts against the shared `unknown` value
 
-Source: `lib/auth/actions.ts:70-83`, `lib/auth/actions.ts:193-206`, `lib/auth/rateLimitIp.ts:25`,
-`lib/auth/rateLimitIp.ts:36-38`, `db/migrations/045_check_rate_limit_feedback_action.sql:18-50`;
-tests `lib/auth/rateLimitIp.test.ts:19-67`, `lib/auth/actions.test.ts:20-23`.
+#### Scenario: Sixth sign-up in ten minutes
+
+- **WHEN** the same IP makes a sixth sign-up attempt within 10 minutes
+- **THEN** the result is `rate_limited`
+
+#### Scenario: Spoofed forwarding header
+
+- **WHEN** a client sends its own `x-forwarded-for` value
+- **THEN** the bucket still uses the IP Cloudflare saw
+
+Source (planned): `lib/auth/rateLimitIp.ts`, `lib/auth/server.ts`, `lib/db/system.ts`; design D6
+"Per-IP throttle".
 
 ### Requirement: The username form validates and then navigates (baseline, current behaviour)
 
@@ -253,83 +241,48 @@ Source: `components/auth/SignInSheet.tsx:53`, `components/auth/SignInSheet.tsx:6
 
 ### Requirement: Auth state in the browser (baseline, current behaviour)
 
-`AuthProvider`, mounted in the root layout, SHALL read the user once with `getUser()` on mount and
-then follow `onAuthStateChange`. If the Supabase env vars are absent it SHALL render children with
-`supabase: null`, `user: null` and `loading: false`. `useAuth` SHALL throw outside the provider. The
-browser client is the only route to `user`; a server action SHALL NOT update it directly.
+`AuthProvider`, mounted in the root layout, SHALL follow the session with Better Auth's React client
+(`useSession`) and expose `{ user, loading }`, with `user` null when there is no session. It SHALL NOT
+carry a database client; callers create the data client. `useAuth` SHALL throw outside the provider. A
+server action that changes the session SHALL be followed by a full navigation, because the browser's
+session state does not see it directly.
 
 #### Scenario: No credentials in the build
 
-- **WHEN** `createClient` throws
-- **THEN** the app renders as a guest and `getUser` is never called
+- **WHEN** the app is built without auth secrets, as in CI, and the session request fails
+- **THEN** the app renders as a guest with `loading` false
 
 #### Scenario: Auth event
 
-- **WHEN** `onAuthStateChange` fires `SIGNED_OUT`
+- **WHEN** the session ends and the client refetches it
 - **THEN** `user` becomes null
 
-Source: `lib/auth/AuthContext.tsx:18-24`, `lib/auth/AuthContext.tsx:26-64`,
-`lib/auth/AuthContext.tsx:66-70`, `app/layout.tsx:178`, `lib/supabase/client.ts:5-10`; tests
-`components/auth/AuthProvider.test.tsx:105-254`.
+#### Scenario: Offline on load
+
+- **WHEN** the session request fails because the device is offline
+- **THEN** `user` is null and `loading` becomes false, and local data is not touched
+
+Source (planned): `lib/auth/AuthContext.tsx`, `lib/auth/client.ts`, `app/layout.tsx`; tests
+`components/auth/AuthProvider.test.tsx`.
 
 ### Requirement: The server client uses the request's cookies (baseline, current behaviour)
 
-The server Supabase client SHALL read and write the session through the Next.js cookie store, and
-SHALL ignore a cookie write that fails because it runs in a Server Component. The repo has no
-`middleware.ts` or `proxy.ts`, so a session is refreshed only by the code that uses it.
+Server code SHALL read the session by passing the request's headers, with its cookies, to Better
+Auth, built per request from the D1 binding. A cookie write that cannot happen because it runs in a
+Server Component SHALL be skipped without failing the render. The repo has no `middleware.ts` or
+`proxy.ts`, so a session is refreshed only by the code that uses it.
 
 #### Scenario: Write during a Server Component render
 
-- **WHEN** Supabase tries to set cookies during a Server Component render
-- **THEN** the error is swallowed and the render continues
+- **WHEN** Better Auth would refresh the session cookie during a Server Component render
+- **THEN** the write is skipped and the render continues
 
-Source: `lib/supabase/server.ts:8-32`; tests `lib/supabase/clients.test.ts`.
+#### Scenario: Only an old Supabase cookie
 
-### Requirement: Sign-out ends the session and keeps local data (baseline, current behaviour)
+- **WHEN** a request carries only the old Supabase session cookie
+- **THEN** no session is found
 
-The `signOut` server action SHALL call `auth.signOut()` with no options on the server client and
-redirect to `/` whatever that call returns. It SHALL NOT clear local progress, settings or `ownerUserId`, and SHALL NOT call the browser Supabase
-client. It is reachable from `AuthButton` and from Settings. When `userId` next becomes null,
-`useSignInPull` SHALL reset so that a later sign-in, even as the same user, pulls again.
-
-#### Scenario: Sign out
-
-- **WHEN** a signed-in player presses "Sign out"
-- **THEN** the session cookies are cleared, the app navigates to `/`, and local cards stay on the device
-
-#### Scenario: Signed in on two devices
-
-- **WHEN** a player signed in on two devices signs out on one
-- **THEN** the session on the other device is revoked too, because the upstream default scope is `global`
-
-#### Scenario: Supabase refuses the sign-out
-
-- **WHEN** `auth.signOut()` fails with anything other than a 401, 403 or 404
-- **THEN** the session stays in place and the app still navigates to `/`, with no error shown
-
-Source: `lib/auth/actions.ts:24-28`, `components/auth/AuthButton.tsx:61`, `app/settings/page.tsx:841`,
-`lib/sync/useSignInPull.ts:38-41`, `lib/sync/deleteAccount.ts:36-39`; tests `e2e/auth.spec.ts:66-76`.
-
-### Requirement: Signed-in API routes share a session guard (baseline, current behaviour)
-
-`/api/sync`, `/api/export`, `/api/srs/optimize` and `/api/push/resubscribe` SHALL call `requireAuth`,
-which SHALL return `{ user }` for a valid session and otherwise a 401 response with
-`{ error: "unauthorized" }`, or `{ ok: false, error: "unauthorized" }` when `withOkField` is set. `/api/feedback` SHALL NOT use it: it
-reads the user itself and treats a missing user or an error as a guest.
-
-#### Scenario: getUser reports an error
-
-- **WHEN** `getUser` returns an error
-- **THEN** the caller receives a 401
-
-#### Scenario: Guest sends feedback
-
-- **WHEN** `/api/feedback` is called with no session
-- **THEN** the route carries on with a null `user_id`
-
-Source: `lib/auth/requireAuth.ts:22-39`, `app/api/sync/route.ts:52`, `app/api/export/route.ts:110`,
-`app/api/srs/optimize/route.ts:174`, `app/api/push/resubscribe/route.ts:37`,
-`app/api/feedback/route.ts:87-94`; tests `lib/auth/requireAuth.test.ts:21-55`.
+Source (planned): `lib/auth/server.ts`, `lib/auth/requireAuth.ts`.
 
 ### Requirement: Cron routes compare the bearer header in constant time (baseline, current behaviour)
 
@@ -365,11 +318,11 @@ Source: `lib/auth/mockAuth.ts:52-58`, `lib/auth/mockAuth.ts:69-83`, `lib/auth/mo
 
 ### Requirement: A signed-in player can connect the other provider (baseline, current behaviour)
 
-The Settings section SHALL list connected GitHub and Google identities, ignoring other providers,
-and offer a Connect button for each one not connected. Connect SHALL call the browser client's
-`linkIdentity` with `redirectTo` set to `/api/auth/callback`, so a successful link returns through
-the same callback and `/auth/callback-complete` as a sign-in. An error SHALL show a mapped message
-and re-enable the button.
+Settings SHALL list the connected GitHub and Google accounts from Better Auth (other providers
+ignored) and offer Connect for each one not connected. Connect SHALL call Better Auth's social link
+with the callback URL `/auth/callback-complete`. Linking SHALL work across GitHub, Google and username
+accounts, also when the emails differ. An error starting the link SHALL show a mapped message and
+re-enable the button.
 
 #### Scenario: Both connected
 
@@ -383,12 +336,17 @@ and re-enable the button.
 
 #### Scenario: Link comes back with no code
 
-- **WHEN** the provider step returns to `/api/auth/callback` without a `code`
-- **THEN** the player lands on `/?error=auth` with the sign-in failure alert, not one of the mapped link messages
+- **WHEN** the provider step fails or returns without a `code`
+- **THEN** the player lands on `/` with an `error` parameter and the sign-in failure alert, not one of the mapped link messages
 
-Source: `app/api/auth/callback/route.ts:8-15`, `components/auth/LinkIdentitiesSection.tsx:42-52`, `components/auth/LinkIdentitiesSection.tsx:57-78`,
-`components/auth/LinkIdentitiesSection.tsx:121-156`, `app/settings/page.tsx:2088-2090`; tests
-`components/auth/LinkIdentitiesSection.test.tsx:54-354`.
+#### Scenario: Username account adds GitHub
+
+- **WHEN** a username player connects a GitHub account with a real email
+- **THEN** both sign-in methods reach the same user id
+
+Source (planned): `components/auth/LinkIdentitiesSection.tsx`, `lib/auth/client.ts`,
+`lib/auth/server.ts`, `app/settings/page.tsx:2088-2090`; tests
+`components/auth/LinkIdentitiesSection.test.tsx`.
 
 ### Requirement: Callback-complete sorts the first arrival by what data exists (baseline, current behaviour)
 
@@ -558,22 +516,29 @@ Source: `lib/sync/guardAccountSwitch.ts:66-102`, `lib/sync/guardAccountSwitch.ts
 
 ### Requirement: Cloud deletion removes the identity (baseline, current behaviour)
 
-`deleteAccount` SHALL call the `delete_account` RPC and return true or false, logging failures and
-never throwing. The RPC SHALL delete `auth.users` for `auth.uid()` only, raise when there is no
-session, and be executable by `authenticated` alone. `card_reviews`, `streak_days`, `user_settings`,
-`grade_log`, `push_subscriptions`, `feedback` and `usernames` rows SHALL go through
-`ON DELETE CASCADE`. There is no database test of this RPC (#2210).
+`deleteAccount` SHALL call the `delete_account` RPC through the data gateway and return true or false,
+logging failures and never throwing. The Worker SHALL take the user id from the session only, answer
+401 with no session, and in one atomic D1 batch delete the user's rows in every per-user table, their
+username, and the Better Auth user with its sessions and accounts. Nothing SHALL be sent afterwards:
+the bug-report emails hold no user id (`feedback-and-operator-tools`).
 
 #### Scenario: RPC error
 
 - **WHEN** the RPC returns an error
 - **THEN** `deleteAccount` logs it and returns false
 
-Source: `lib/sync/deleteAccount.ts:18-30`, `db/migrations/027_delete_account_rpc.sql:40-62`,
-`db/migrations/001_initial_sync_schema.sql:7`, `db/migrations/001_initial_sync_schema.sql:39`,
-`db/migrations/001_initial_sync_schema.sql:61`, `db/migrations/006_grade_log.sql:13`,
-`db/migrations/028_web_push_subscriptions.sql:80`, `db/migrations/034_feedback.sql:17`,
-`db/migrations/035_usernames.sql:24`; tests `lib/sync/deleteAccount.test.ts:32-57`.
+#### Scenario: Every table emptied
+
+- **WHEN** a player deletes their account
+- **THEN** `card_reviews`, `streak_days`, `user_settings`, `grade_log`, `push_subscriptions`, `feedback` and the auth tables hold no row for that user id, and another user's rows are unchanged
+
+#### Scenario: Signed in on another device
+
+- **WHEN** the player deletes their account on one device while signed in on another
+- **THEN** the other device's next request answers 401, because its session was deleted
+
+Source (planned): `lib/sync/deleteAccount.ts`, `lib/db/rpc/deleteAccount.ts`; tests
+`lib/sync/deleteAccount.test.ts`, the delete-account test against the D1 test database (task 4.5).
 
 ### Requirement: Account deletion clears the cloud first, then the device (baseline, current behaviour)
 
@@ -643,3 +608,185 @@ outside a browser. If the write fails the value SHALL last for the session only.
 
 Source: `lib/identity/clientSalt.ts:17-32`, `components/review/ReviewSession.tsx:1148`; tests
 `components/identity/clientSalt.test.tsx`.
+
+### Requirement: Copied bcrypt passwords verify and are upgraded
+
+Better Auth's password check SHALL accept a stored hash starting `$2a$` or `$2b$` (copied from
+Supabase) by checking it with `bcryptjs`, and otherwise use Better Auth's own scrypt. After a successful
+username sign-in against a bcrypt hash, an after-hook SHALL replace the stored hash with a scrypt hash
+of the same password. A failed check SHALL give the same `invalid_credentials` answer whichever kind of
+hash is stored.
+
+#### Scenario: First sign-in after the move
+
+- **WHEN** a username player signs in with the right password and a copied bcrypt hash
+- **THEN** the sign-in succeeds and the stored hash no longer starts with `$2`
+
+#### Scenario: Wrong password on a bcrypt hash
+
+- **WHEN** the password is wrong and the stored hash is bcrypt
+- **THEN** the result is `invalid_credentials` and the hash is unchanged
+
+#### Scenario: Second sign-in
+
+- **WHEN** the same player signs in again
+- **THEN** the scrypt hash is checked and the sign-in succeeds
+
+Source (planned): design D6 "Passwords", `lib/auth/server.ts`.
+
+### Requirement: Every signed-in player signs in once more after the move, with no notice
+
+Sessions SHALL NOT be copied, and the app SHALL show no notice about the move. A player signed in
+before the move SHALL find themselves signed out on their next visit, with their local data and
+`ownerUserId` still on the device. User ids are copied unchanged, so signing in again SHALL reach the
+same account and data, and `guardAccountSwitch` SHALL archive and wipe nothing.
+
+#### Scenario: Returning player, username account
+
+- **WHEN** a player signed in before the move opens the app and signs in again with their username and password
+- **THEN** they reach the same account, the guard does nothing, and the sign-in pull merges as for any returning sign-in
+
+#### Scenario: Returning player, OAuth, progress on both sides
+
+- **WHEN** a player with reviewed cards on the device and in the cloud signs in again with GitHub or Google
+- **THEN** the keep-local or keep-cloud picker shows once, as it does today when the same player signs in again by OAuth
+
+#### Scenario: Grades made before signing in again
+
+- **WHEN** the player reviews while signed out after the move
+- **THEN** the grades stay on the device and reach the cloud after the next sign-in by the existing sync paths
+
+#### Scenario: Two devices
+
+- **WHEN** a player used two devices before the move
+- **THEN** each device asks for one sign-in, and each keeps its local data until then
+
+#### Scenario: Offline at first open after the move
+
+- **WHEN** the first open after the move happens with no connection
+- **THEN** the app runs as a guest on the local data, and nothing is cleared
+
+#### Scenario: Reminders before signing in again
+
+- **WHEN** a subscribed player has not signed in again
+- **THEN** reminders stop: the copied subscriptions were made with the old VAPID key, so pushes signed
+  with the new key do not reach them, until the player's next signed-in visit moves the subscription
+  onto the new key (push-notifications) and reminders resume
+
+#### Scenario: Background Sync replay with only the old session
+
+- **WHEN** the service worker replays queued grades and the browser holds only the old Supabase cookie
+- **THEN** the route answers 401 and the mirror is cleared, as for any expired session today
+
+#### Scenario: A week without a visit
+
+- **WHEN** a player signed in after the move does not open the app for 8 days
+- **THEN** they are still signed in: a session lasts 365 days and is renewed at most once a day of use
+  (`session.expiresIn` and `updateAge` in `lib/auth/server.ts`), where Better Auth's default would end
+  it after 7 days without a visit and Supabase sessions did not lapse
+
+Source (planned): design D6 "Sessions", decision 0018.
+
+### Requirement: Username sign-up creates the account and its session in one step
+
+`signUpWithUsername` SHALL, in order: validate the username and password, check the sign-up rate
+limit, and call Better Auth's email sign-up with the synthetic email and the username, which creates
+the user, the `credential` account and the username together and signs the player in. It SHALL return
+`{ ok: true }` only when Better Auth returns both a user and a session, with the session cookie set.
+
+#### Scenario: No session back from Better Auth
+
+- **WHEN** sign-up returns a user and no session
+- **THEN** the result is `signup_failed`
+
+#### Scenario: Username taken
+
+- **WHEN** another account already has the normalised username
+- **THEN** the result is `username_taken` and no second account exists
+
+#### Scenario: Two devices pick the same name at once
+
+- **WHEN** two sign-ups for the same username race
+- **THEN** one succeeds and the other gets `username_taken`, because the username is unique in D1
+
+#### Scenario: Guest with progress signs up
+
+- **WHEN** a guest with reviewed cards signs up with a username
+- **THEN** the browser navigates to `/` and the sign-in pull merges the local cards into the new account
+
+Source (planned): `lib/auth/actions.ts`, `lib/auth/server.ts`; tests `lib/auth/actions.test.ts`.
+
+### Requirement: Taken usernames are recognised from Better Auth's two errors
+
+When sign-up fails, the action SHALL report `username_taken` only when Better Auth returns the
+username plugin's taken-username error or its user-already-exists error for the synthetic email. Every
+other sign-up error, whatever its status, SHALL report `signup_failed`.
+
+#### Scenario: Username plugin says taken
+
+- **WHEN** sign-up fails with the username plugin's taken-username code
+- **THEN** the result is `username_taken`
+
+#### Scenario: Synthetic email exists
+
+- **WHEN** sign-up fails because a user with the synthetic email exists
+- **THEN** the result is `username_taken`
+
+#### Scenario: Any other code
+
+- **WHEN** sign-up fails with any other code
+- **THEN** the result is `signup_failed`
+
+Source (planned): `lib/auth/actions.ts`; tests `lib/auth/actions.test.ts`.
+
+### Requirement: Sign-out ends every session and keeps local data
+
+The `signOut` server action SHALL revoke every Better Auth session of the user, clear the session
+cookie and redirect to `/` whatever that call returns. It SHALL NOT clear local progress, settings or
+`ownerUserId`. It is reachable from `AuthButton` and from Settings. When `userId` next becomes null,
+`useSignInPull` SHALL reset so that a later sign-in, even as the same user, pulls again.
+
+#### Scenario: Sign out
+
+- **WHEN** a signed-in player presses "Sign out"
+- **THEN** the session cookie is cleared, the app navigates to `/`, and local cards stay on the device
+
+#### Scenario: Signed in on two devices
+
+- **WHEN** a player signed in on two devices signs out on one
+- **THEN** the session on the other device is revoked too, as it was under Supabase's global sign-out
+
+#### Scenario: Sign-out call fails
+
+- **WHEN** Better Auth's sign-out fails
+- **THEN** the app still navigates to `/`, with no error shown
+
+Source (planned): `lib/auth/actions.ts`, `components/auth/AuthButton.tsx:61`, `app/settings/page.tsx:841`,
+`lib/sync/useSignInPull.ts:38-41`; tests `e2e/auth.spec.ts`.
+
+### Requirement: Signed-in API routes share a Better Auth session guard
+
+`/api/db`, `/api/sync`, `/api/export` and `/api/push/resubscribe` SHALL call `requireAuth`, which SHALL
+read the session from the request headers through Better Auth and return `{ user }` for a valid
+session, and otherwise a 401 with `{ error: "unauthorized" }`, or `{ ok: false, error: "unauthorized" }`
+when `withOkField` is set. `/api/feedback` SHALL NOT use it: it treats a missing session or an error as
+a guest.
+
+#### Scenario: Session read fails
+
+- **WHEN** reading the session throws or returns an error
+- **THEN** the caller receives a 401
+
+#### Scenario: Guest sends feedback
+
+- **WHEN** `/api/feedback` is called with no session
+- **THEN** the route carries on with a null `user_id`
+
+#### Scenario: Expired session
+
+- **WHEN** the session cookie names a session that has expired or was revoked
+- **THEN** the caller receives a 401
+
+Source (planned): `lib/auth/requireAuth.ts`, `app/api/db/route.ts`, `app/api/sync/route.ts`,
+`app/api/export/route.ts`, `app/api/push/resubscribe/route.ts`, `app/api/feedback/route.ts`; tests
+`lib/auth/requireAuth.test.ts`.
