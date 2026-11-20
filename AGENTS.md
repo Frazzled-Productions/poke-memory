@@ -83,7 +83,7 @@ Canonical reference: **[docs/sync.md](docs/sync.md)** - read before touching any
 
 Decision tree (JSONB on `user_settings` vs. column on `card_reviews` vs. new table) + new-table checklist: **[docs/persistence.md](docs/persistence.md)**. Card-shaped persistence keyed by `(user_id, card_type, subject_key)`: **[docs/card-identity.md](docs/card-identity.md)**. Tables today: `card_reviews`, `streak_days`, `user_settings`, `grade_log`, `push_subscriptions`, `feedback`, `usernames`, `rate_limit_buckets`, `feedback_discord_posts` (shapes, precedents and FK exceptions in the doc; a test keeps both lists in step with `db/migrations/`). Two runtime reminders:
 
-- **Migrations are append-only files in `db/d1/migrations/`**, applied by `deploy.yml` (preview database per PR, production on each deploy); never edit one already on `qa`. `migration-check.yml` applies them to a fresh local D1 and fails on an edited file - new tables also go in `lib/db/tables.ts`, `delete_account` and a two-user test; mechanics in [docs/persistence.md](docs/persistence.md#apply-the-migration).
+- **Migrations are append-only files in `db/d1/migrations/`**, applied by `preview-upload.yml` (preview database per PR) and `deploy.yml` (production on each deploy); never edit one already on `qa`. `migration-check.yml` applies them to a fresh local D1 and fails on an edited file - new tables also go in `lib/db/tables.ts`, `delete_account` and a two-user test; mechanics in [docs/persistence.md](docs/persistence.md#apply-the-migration).
 - **Wire cross-device sync** via `lib/sync/<feature>.ts` exporting `push` / `pull` (+ `merge`); pull as a best-effort leg in `pullAndMerge`, push wherever the data is written.
 
 

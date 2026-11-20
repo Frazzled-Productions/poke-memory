@@ -87,9 +87,11 @@
       "triggers": { "crons": [] },
       "vars": {
         "DEPLOY_ENV": "cloudflare-preview",
-        // Version aliases (pr-<n>-poke-memory-preview...) differ from this base
-        // URL; the auth set-up decides how OAuth callbacks reach an alias.
-        "BETTER_AUTH_URL": "https://poke-memory-preview.frasers-account.workers.dev"
+        // qa.pokememory.com is this Worker's Custom Domain (attached in Cloudflare, not a route
+        // here; it replaced the Vercel qa deploy on 20 November 2026, #2393). The workers.dev
+        // address and the version aliases (pr-<n>-poke-memory-preview...) stay trusted origins
+        // (lib/auth/server.ts trustedOriginsFor), so username sign-in works on them too.
+        "BETTER_AUTH_URL": "https://qa.pokememory.com"
       }
     }
   }

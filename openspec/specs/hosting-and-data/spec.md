@@ -15,7 +15,8 @@ The app SHALL build with `@opennextjs/cloudflare` into one Worker, `poke-memory`
 `cacheComponents: false`. Pages that were partially prerendered SHALL render per request, and nothing
 SHALL revalidate at runtime, so the incremental cache is the static-assets cache.
 `/test-error` SHALL be `force-dynamic`. Since the cutover (#2393) the Worker SHALL be reachable only at
-`pokememory.com`, with its workers.dev address off.
+`pokememory.com`, with its workers.dev address off. The preview Worker SHALL answer at
+`qa.pokememory.com`.
 
 #### Scenario: A page that used to be prerendered
 
@@ -47,12 +48,17 @@ SHALL revalidate at runtime, so the incremental cache is the static-assets cache
 - **WHEN** a version of `poke-memory-preview` is uploaded
 - **THEN** it keeps its workers.dev address, because `env.preview` sets `workers_dev: true`
 
+#### Scenario: Sign-in on the qa address
+
+- **WHEN** a tester signs in with a username on `https://qa.pokememory.com`, a Worker Custom Domain on `poke-memory-preview` attached in Cloudflare (not a route in `wrangler.jsonc`)
+- **THEN** sign-in succeeds, because the preview Worker's `BETTER_AUTH_URL` is that origin, and its workers.dev address and `pr-<n>` aliases stay trusted origins
+
 #### Scenario: Config drifts back
 
 - **WHEN** a change sets the top-level `workers_dev` to true, or drops `workers_dev: true` from `env.preview`
 - **THEN** `scripts/workflows-no-backups.test.mjs` fails
 
-Source: design D1, `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc`; change `production-deploy-guard`.
+Source: design D1, `next.config.ts`, `open-next.config.ts`, `wrangler.jsonc`; changes `production-deploy-guard`, `qa-on-preview-worker`.
 
 ### Requirement: One D1 database in the EU holds the cloud data
 
@@ -507,8 +513,9 @@ Source (planned): design D13, `app/api/stats/users/route.ts`, `lib/db/system/sta
 
 ### Requirement: No GitHub workflow reads production data
 
-No GitHub workflow SHALL query the production D1 database, and only `deploy.yml` SHALL hold
-`CLOUDFLARE_API_TOKEN`, which can write D1.
+No GitHub workflow SHALL query the production D1 database. Only `deploy.yml` SHALL read
+`secrets.CLOUDFLARE_API_TOKEN`, which can write D1, and only `preview-upload.yml` SHALL read
+`secrets.CLOUDFLARE_PREVIEW_API_TOKEN`.
 
 #### Scenario: A workflow queries production
 
@@ -517,23 +524,33 @@ No GitHub workflow SHALL query the production D1 database, and only `deploy.yml`
 
 #### Scenario: Another workflow takes the token
 
-- **WHEN** a workflow other than `deploy.yml` names `CLOUDFLARE_API_TOKEN`
+- **WHEN** a workflow other than `deploy.yml` reads `secrets.CLOUDFLARE_API_TOKEN`, or one other than `preview-upload.yml` reads `secrets.CLOUDFLARE_PREVIEW_API_TOKEN`
 - **THEN** `scripts/workflows-no-backups.test.mjs` fails
 
-Source (planned): design D13, owner ruling 20 November 2026, `scripts/workflows-no-backups.test.mjs`.
+Source (planned): design D13, owner ruling 20 November 2026, `scripts/workflows-no-backups.test.mjs`; change `preview-deploy-guard`.
 
 ### Requirement: Main deploys production and each pull request gets a preview
 
-`.github/workflows/deploy.yml` SHALL build, apply D1 migrations and deploy `poke-memory` on a push or
-dispatch on `main`, from the GitHub environment `Production`, which admits only `main` and alone holds
-the Cloudflare and Sentry tokens. A published Release SHALL NOT deploy; `auto-release.yml` SHALL
-dispatch the deploy after its release commit. Pull request previews SHALL run in the environment
-`Preview`, and without a token the jobs SHALL skip with a notice.
+`deploy.yml` SHALL build, migrate and deploy `poke-memory` on a push or dispatch on `main`, from the
+environment `Production`, which admits only `main` and alone holds the Cloudflare and Sentry tokens;
+a published Release SHALL NOT deploy. For a pull request it SHALL only build the `preview-bundle`
+artefact, with no environment or secret. `preview-upload.yml` SHALL upload it from `Preview`, which
+admits only `main`, with the base branch's `wrangler.jsonc`, or skip with a notice.
 
 #### Scenario: Pull request opened
 
-- **WHEN** a pull request is opened and the `Preview` environment holds a token
-- **THEN** a version of the separate Worker `poke-memory-preview`, with its own D1 database and bucket, is uploaded, aliased `pr-<number>`, and its URL is commented on the PR
+- **WHEN** a same-repository pull request into `qa` or `main` builds successfully and `Preview` holds `CLOUDFLARE_PREVIEW_API_TOKEN`
+- **THEN** a version of the separate Worker `poke-memory-preview`, with its own D1 database, is uploaded with the base branch's bindings, aliased `pr-<number>`, and its URL is commented on the PR
+
+#### Scenario: A pull request edits its preview bindings or workflow
+
+- **WHEN** a pull request points `env.preview` in `wrangler.jsonc` at the production database, or edits `deploy.yml` to read the preview secret
+- **THEN** its preview is still uploaded with the base branch's `wrangler.jsonc`, and a job on its ref is refused the `Preview` environment, so it gets no token
+
+#### Scenario: An untrusted bundle
+
+- **WHEN** the `preview-bundle` artefact holds a symlink, something other than files and directories, or a migration that is not a `.sql` file
+- **THEN** `preview-upload.yml` refuses it and uploads nothing
 
 #### Scenario: A job outside Production
 
@@ -542,8 +559,13 @@ dispatch the deploy after its release commit. Pull request previews SHALL run in
 
 #### Scenario: No token
 
-- **WHEN** the job's environment holds no Cloudflare token (every pull request today, Dependabot and forks)
-- **THEN** the deploy jobs skip with a notice and the run is green
+- **WHEN** `Preview` holds no `CLOUDFLARE_PREVIEW_API_TOKEN` (every pull request today, Dependabot and forks)
+- **THEN** the upload skips with a notice and the run is green, and the pull request's own build still runs
+
+#### Scenario: Before the next promotion
+
+- **WHEN** this workflow is on `qa` but not yet on `main`
+- **THEN** no preview is uploaded, because GitHub runs `workflow_run` workflows only from the default branch
 
 #### Scenario: Release
 
@@ -557,15 +579,15 @@ dispatch the deploy after its release commit. Pull request previews SHALL run in
 
 #### Scenario: Guard drifts
 
-- **WHEN** a change drops `environment: Production` or the `main` check from the production job, adds the release trigger back, or removes the dispatch from `auto-release.yml`
+- **WHEN** a change drops `environment: Production` or the `main` check from the production job, adds the release trigger back, removes the dispatch from `auto-release.yml`, names `Preview` or a Cloudflare secret in a `pull_request` job, uploads a preview from any other workflow, or checks out anything but the base branch in `preview-upload.yml`
 - **THEN** `scripts/workflows-no-backups.test.mjs` fails
 
 #### Scenario: End-to-end tests
 
 - **WHEN** a preview version was uploaded for a pull request
-- **THEN** the auth specs run against the preview version URL
+- **THEN** the base branch's auth specs run against the preview version URL
 
-Source: design D11, `.github/workflows/deploy.yml`, `.github/workflows/auto-release.yml`; Fraser's ruling of 19 November 2026 (ops #610); change `production-deploy-guard`.
+Source: design D11, `.github/workflows/deploy.yml`, `.github/workflows/preview-upload.yml`, `.github/workflows/auto-release.yml`; Fraser's ruling of 19 November 2026 (ops #610); changes `production-deploy-guard` and `preview-deploy-guard` (koinori #2925 F3 and F4).
 
 ### Requirement: Preview databases hold seeded test data
 
@@ -632,50 +654,3 @@ at build time.
 - **THEN** the beacon script is on every page
 
 Source (planned): design D9, `app/layout.tsx`.
-
-### Requirement: A rehearsable copy moves Supabase data into D1 and checks row counts
-
-`scripts/cloudflare/copy-from-supabase.mjs` SHALL read a Postgres connection read-only and write one
-SQL file for `wrangler d1 execute --file`, then print row counts per table for both sides. It SHALL be
-rehearsed in CI from the local Postgres container, loaded with the migrations and fixtures, into a
-local D1. The live copy and the DNS switch are owner steps (#2393).
-
-#### Scenario: Counts match
-
-- **WHEN** the rehearsal imports the file into a fresh D1
-- **THEN** every table, `push_subscriptions` included, has the same count on both sides, and each copied row keeps its stored timestamps
-
-#### Scenario: A count differs
-
-- **WHEN** a table's count differs after import
-- **THEN** the script names the table and both counts and exits non-zero
-
-#### Scenario: Rehearsal against production
-
-- **WHEN** the owner-approved rehearsal reads production into the preview database
-- **THEN** nothing is written to Supabase, only counts are recorded on #2393, and the dump files are deleted afterwards
-
-Source (planned): design D12, proposal Clarifications (19 November 2026, about 20:30).
-
-### Requirement: The copy maps accounts and passwords and copies no sessions
-
-The copy SHALL write app tables row for row; `auth.users` to `user` with the same id and email and the
-username from `usernames`; GitHub and Google identities to `account`, keyed by the provider's user id;
-bcrypt password hashes to `credential` accounts; and no sessions.
-
-#### Scenario: Username account
-
-- **WHEN** a username account is copied
-- **THEN** it keeps its user id and username, and its bcrypt hash is stored for the `credential` provider
-
-#### Scenario: Account with GitHub and Google
-
-- **WHEN** a user has both identities
-- **THEN** both `account` rows point at the same user id
-
-#### Scenario: Sessions
-
-- **WHEN** the copy runs
-- **THEN** no session row is written, so every player signs in once more
-
-Source (planned): design D12.

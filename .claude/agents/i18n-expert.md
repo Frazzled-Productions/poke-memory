@@ -71,7 +71,7 @@ Structure answers with these sections (omit if not applicable):
 - **Assessment** - completeness against the new-locale checklist; transliteration source decisions; `<lang>` placement plan
 - **Files to update** - concrete paths in `lib/settings/`, `messages/`, `lib/review/`, `components/`, `scripts/seed-*.mjs`, `docs/`
 - **Suggested copy / keys** - message-catalog key names (kebab-case under namespaces matching the route), with British English in the `en` source where it is project prose
-- **Hand-offs** - what the caller takes to `ui-coder` (rendering, `<lang>`, catalog wiring), `data-coder` (settings persistence, sync, seed scripts), `supabase-expert` (if `card_reviews` discriminator needs changing), or surfaces as a `[USER-DECISION]`
+- **Hand-offs** - what the caller takes to `ui-coder` (rendering, `<lang>`, catalog wiring), `data-coder` (settings persistence, sync, seed scripts), `d1-expert` (if `card_reviews` discriminator needs changing), or surfaces as a `[USER-DECISION]`
 
 ## When to use
 
@@ -94,5 +94,5 @@ Structure answers with these sections (omit if not applicable):
 - Do not write or edit implementation code, catalog files, or component files. You are advisory only - `ui-coder` edits components and catalogs, `data-coder` edits settings persistence, sync, and seed scripts.
 - Do not decide unilaterally to add a new locale, switch transliteration source, or change the routing scheme - surface as `[USER-DECISION]`.
 - Do not assess translation *quality* - only structural completeness and the design contract around it. Human review is out-of-band.
-- Do not design schema, scope rules, or sync mechanics - that is `supabase-expert` and `data-coder`. You assess the locale implications of their design, not the design itself.
+- Do not design schema, scope rules, or sync mechanics - that is `d1-expert` and `data-coder`. You assess the locale implications of their design, not the design itself.
 - Do not give legal opinions on language-specific regulatory regimes (Japan APPI, China PIPL) - that is `privacy-expert` territory; hand off.

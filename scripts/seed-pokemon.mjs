@@ -580,7 +580,7 @@ function slugToDisplayName(slug) {
 //
 // Sub-range carve-out inside the evolution namespace [1_000_001, 1_999_999]:
 //   [1_000_001, 1_500_000]  reserved for legacy per-pre-evo cloud rows (#262
-//                            orphans; never re-issued - see supabase-expert
+//                            orphans; never re-issued - see d1-expert
 //                            recommendation in the #262 plan).
 //   [1_500_001, 1_999_999]  edge cards.
 //
