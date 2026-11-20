@@ -14,7 +14,6 @@
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare deploy",
-    "cf:upload-preview": "opennextjs-cloudflare upload --env preview --preview-alias pr-$PR_NUMBER",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "check:bundle": "node scripts/check-bundle-size.mjs",
     "lint": "eslint && npm run lint:em-dash && npm run lint:i18n && npm run lint:pseudo-locale && npm run lint:changelog && npm run lint:agents-size && npm run lint:playwright-pin && npm run lint:skills-layout && npm run lint:workflow-markers && npm run lint:scoped-queries",

@@ -30,7 +30,7 @@ Automations that post a comment or tracking issue dedupe on an HTML-comment mark
 |---|---|---|
 | `<!-- coverage-report -->` | `coverage.yml` | One PR comment, updated in place |
 | `<!-- pr-check-monitor:<sha> -->` | `pr-check-monitor.yml` | One alert per PR per SHA |
-| `<!-- poke-memory-preview -->` | `deploy.yml` (`preview` job) | One preview-URL comment per PR, edited in place on each push |
+| `<!-- poke-memory-preview -->` | `preview-upload.yml` (`upload` job) | One preview-URL comment per PR, edited in place on each push |
 | `<!-- qa-drift-check -->` | `auto-release.yml` | Tracking issue opened on qa/main drift, closed when healthy |
 | `<!-- cron-health-monitor:<file> -->` | `cron-health-monitor.yml` | One tracking issue per failing scheduled workflow |
 | `<!-- pokeapi-species-monitor -->` | `pokeapi-species-monitor.yml` | One tracking issue, updated in place |
@@ -41,7 +41,7 @@ Rulesets make these job names required: `main` - `test`, `e2e`, `Test coverage r
 
 ## Fork-PR and author guards
 
-- Workflows that use secrets or write to the repo skip fork PRs (`github.event.pull_request.head.repo.fork == false`; for `workflow_run`, `github.event.workflow_run.head_repository.fork == false`). Never remove or weaken these; a bare `== false` is falsy on non-PR events, so combine with an `event_name` check where needed (`deploy.yml`, `coverage.yml`). `deploy.yml` also sets `CLOUDFLARE_API_TOKEN` only on the steps that call wrangler, never workflow-wide, so `npm ci` install scripts and the Next.js build never see it; keep it that way. The token lives only in the GitHub environment `Production` (deployment branches: `main`), which the production job names; there is no repository-level copy, so pull request jobs cannot read it. Never add one back.
+- Workflows that use secrets or write to the repo skip fork PRs (`github.event.pull_request.head.repo.fork == false`; for `workflow_run`, `github.event.workflow_run.head_repository.fork == false`). Never remove or weaken these; a bare `== false` is falsy on non-PR events, so combine with an `event_name` check where needed (`deploy.yml`, `coverage.yml`). `deploy.yml` also sets `CLOUDFLARE_API_TOKEN` only on the steps that call wrangler, never workflow-wide, so `npm ci` install scripts and the Next.js build never see it; keep it that way. The token lives only in the GitHub environment `Production` (deployment branches: `main`), which the production job names; there is no repository-level copy, so pull request jobs cannot read it. Never add one back. Previews (change `preview-deploy-guard`): no `pull_request` job may name the `Preview` environment or a Cloudflare secret; `deploy.yml`'s `preview` job only builds and uploads the `preview-bundle` artefact, and `preview-upload.yml` (`workflow_run`, run from the default branch, `Preview` admits only `main`) checks out the PR's base branch and uploads it with `CLOUDFLARE_PREVIEW_API_TOKEN`. Never check out the PR head or execute anything from the artefact there.
 - Comment-triggered commands (none today; `/preview` went with `vercel-preview-on-ready.yml`) must be gated on `OWNER` / `MEMBER` / `COLLABORATOR` `author_association` at both job and step level. Any authenticated user can comment on a public repo.
 
 ## GitHub Actions gotchas
