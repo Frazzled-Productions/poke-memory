@@ -16,13 +16,17 @@
  *
  * The `0 * * * *` trigger runs everything on the hour; `*\/30 * * * *` runs
  * only the clean-up (it also fires on the hour, so hourly work must not hang
- * off it or it would run twice).
+ * off it or it would run twice). A third trigger, RESTORE_CHECK_CRON, runs the
+ * monthly restore check inside the Worker (worker/index.ts, design D10); it
+ * maps to no route.
  */
 
 /** Fires at minute 0 of every hour. */
 export const HOURLY_CRON = "0 * * * *";
 /** Fires at minutes 0 and 30 of every hour. */
 export const HALF_HOURLY_CRON = "*/30 * * * *";
+/** Fires at 04:00 UTC on the 1st of each month: the backup restore check (lib/db/backup.ts). */
+export const RESTORE_CHECK_CRON = "0 4 1 * *";
 
 export const CRON_ROUTES = {
   sendDaily: "/api/push/send-daily",

@@ -108,7 +108,8 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
 - **CI and GitHub Actions:** new `deploy.yml`; `e2e.yml` targets the preview Worker; `migration-check.yml`
   and `integration-tests.yml` use D1; the Vercel workflows go and `vercel.json` keeps only every Git deployment turned off until the
   14-day fallback ends; the scoped-query rule
-  joins `npm run lint`. Every workflow change gets a `workflow-expert` review.
+  joins `npm run lint`. No workflow touches the backups: the restore check runs in the Worker, and
+  `scripts/workflows-no-backups.test.mjs` fails on any workflow that names the bucket or calls R2. Every workflow change gets a `workflow-expert` review.
 
 ## Removes
 
@@ -121,6 +122,10 @@ Fixes: none (programme step; refs ops #610, #2392 checked along the way)
   entry).
 - The Postgres integration suite (`lib/sync/integration/**` on `postgres:15`), replaced by the D1 suite.
 - `maxDuration` exports (ignored by Workers).
+- The manual GitHub restore job (`restore-test.yml`), its `scripts/cloudflare/check-restore.mjs` and test,
+  and the local-database option of `scripts/cloudflare/d1-query.mjs`: the restore check runs inside the
+  Worker instead (owner ruling 20 November 2026). The preview Worker's backups bucket binding
+  (`poke-memory-backups-preview`) goes too.
 - After the 14-day fallback, in the cutover issue: `db/migrations/`, `docs/supabase-capacity.md`,
   `vercel.json` (kept until then with every Git deployment off, so a still-connected Vercel project
   cannot rebuild production from the promotion).
@@ -190,3 +195,9 @@ assume.
   subscriptions stop at cutover; the build re-subscribes a signed-in player with permission automatically
   on their next visit. Discord webhooks, the Sentry auth token and the GitHub and Google client secrets
   are his steps (#2393).
+- 2026-11-20 Fraser (about 09:10 UTC): the monthly restore test, and any other path that moves backup
+  data through GitHub, moves into Cloudflare, as koinori-web's waitlist did. Built: the export writes a
+  gzipped dump with a SHA-256 manifest, the production Worker runs the restore check as a monthly Cron
+  Trigger, the GitHub restore job is removed and a test fails if a workflow touches the backups. The
+  preview Worker loses its bucket binding (deploy guard). Settles the question of a GitHub restore
+  schedule (#2393): there is none.

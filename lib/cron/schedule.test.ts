@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CRON_ROUTES, HALF_HOURLY_CRON, HOURLY_CRON, cronRoutesFor } from "./schedule";
+import { CRON_ROUTES, HALF_HOURLY_CRON, HOURLY_CRON, RESTORE_CHECK_CRON, cronRoutesFor } from "./schedule";
 
 const HOURLY = [CRON_ROUTES.sendDaily, CRON_ROUTES.sendStreakNudge];
 
@@ -90,5 +90,11 @@ describe("cronRoutesFor: non-matching hours and days", () => {
   it("an unknown cron string runs nothing", () => {
     expect(cronRoutesFor("15 * * * *", new Date("2026-11-16T09:00:00Z"))).toEqual([]);
     expect(cronRoutesFor("", new Date("2026-11-16T09:00:00Z"))).toEqual([]);
+  });
+});
+
+describe("the monthly restore check cron (design D10)", () => {
+  it("is not an app route: worker/index.ts runs it inside the Worker", () => {
+    expect(cronRoutesFor(RESTORE_CHECK_CRON, new Date("2026-12-01T04:00:00Z"))).toEqual([]);
   });
 });

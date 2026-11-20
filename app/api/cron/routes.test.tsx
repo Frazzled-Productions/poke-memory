@@ -29,16 +29,18 @@ const SECRET = "cron-secret";
 const WEBHOOK = "https://discord.com/api/webhooks/123/abc";
 
 function fakeBucket() {
-  const objects = new Map<string, string>();
-  const bucket: R2BucketLike & { objects: Map<string, string> } = {
+  const objects = new Map<string, Uint8Array>();
+  const bucket: R2BucketLike & { objects: Map<string, Uint8Array> } = {
     objects,
     async put(key, value) {
-      objects.set(key, String(value));
+      objects.set(key, typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value as ArrayBuffer));
       return {};
     },
     async get(key) {
       const body = objects.get(key);
-      return body === undefined ? null : { text: async () => body };
+      return body === undefined
+        ? null
+        : { text: async () => new TextDecoder().decode(body), arrayBuffer: async () => body.slice().buffer };
     },
     async delete(keys) {
       for (const k of Array.isArray(keys) ? keys : [keys]) objects.delete(k);
@@ -70,6 +72,7 @@ beforeEach(() => {
   env = {
     DB: d1,
     BACKUPS: bucket,
+    D1_BACKUP_PREFIX: "d1/poke-memory",
     DEPLOY_ENV: "cloudflare-production",
     CRON_SHARED_SECRET: SECRET,
     DISCORD_NOTIFY_WEBHOOK_URL: WEBHOOK,
@@ -201,15 +204,29 @@ describe("POST /api/cron/backup", () => {
     const res = await backup(post(CRON_ROUTES.backup));
     const body = (await res.json()) as { ok: boolean; key: string; counts: Record<string, number> };
     expect(body.ok).toBe(true);
-    expect(body.key).toBe(`d1/${new Date().toISOString().slice(0, 10)}.sql`);
+    expect(body.key).toBe(`d1/poke-memory/${new Date().toISOString().slice(0, 10)}.sql.gz`);
     expect(body.counts).toMatchObject({ user: 1, feedback: 1 });
     expect(JSON.stringify(body)).not.toContain("private words");
-    expect(bucket.objects.get(body.key)).toContain("private words");
+    const stored = new Response(bucket.objects.get(body.key)!.slice()).body!.pipeThrough(new DecompressionStream("gzip"));
+    expect(await new Response(stored).text()).toContain("private words");
+    expect(bucket.objects.has("d1/poke-memory/latest.json")).toBe(true);
+    expect(console.info).toHaveBeenCalledWith(expect.stringMatching(/^d1-backup: export ok, d1\/poke-memory\//));
   });
 
-  it("answers 503 without the BACKUPS binding", async () => {
+  it("answers 503 without the BACKUPS binding or the prefix", async () => {
+    delete env.D1_BACKUP_PREFIX;
+    expect((await backup(post(CRON_ROUTES.backup))).status).toBe(503);
+    env.D1_BACKUP_PREFIX = "d1/poke-memory";
     delete env.BACKUPS;
     expect((await backup(post(CRON_ROUTES.backup))).status).toBe(503);
+  });
+
+  it('logs "d1-backup: export FAILED: ..." and answers 502 when the write fails', async () => {
+    bucket.put = async () => {
+      throw new Error("R2 unavailable");
+    };
+    expect((await backup(post(CRON_ROUTES.backup))).status).toBe(502);
+    expect(console.error).toHaveBeenCalledWith("d1-backup: export FAILED: R2 unavailable");
   });
 });
 

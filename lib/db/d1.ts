@@ -40,8 +40,8 @@ export interface D1DatabaseLike {
 
 /** The R2 calls the backup job needs (design D10). */
 export interface R2BucketLike {
-  put(key: string, value: string | ArrayBuffer | ReadableStream, options?: unknown): Promise<unknown>;
-  get(key: string): Promise<{ text(): Promise<string> } | null>;
+  put(key: string, value: string | ArrayBuffer | ArrayBufferView | ReadableStream, options?: unknown): Promise<unknown>;
+  get(key: string): Promise<{ text(): Promise<string>; arrayBuffer(): Promise<ArrayBuffer> } | null>;
   delete(keys: string | string[]): Promise<void>;
   list(options?: { prefix?: string; cursor?: string; limit?: number }): Promise<{
     objects: { key: string; uploaded: Date }[];

@@ -1,0 +1,51 @@
+// No GitHub workflow may read, write or list the D1 backups (owner ruling 20 November 2026,
+// OpenSpec change move-to-cloudflare, design D10). The backups hold every player's data, and copying
+// them to a GitHub-hosted runner is a transfer the privacy notice does not cover, so the export and
+// the monthly restore check run inside Cloudflare, in the production Worker's Cron Triggers. This
+// test fails if a workflow names the backups bucket, calls R2 (REST API or wrangler), dumps D1, or
+// fetches a backup object.
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const WORKFLOWS = join(process.cwd(), ".github", "workflows");
+
+/** What touching the backups from a runner looks like. */
+const BACKUP_PATTERNS = [
+  { name: "the backups bucket", re: /poke-memory-backups/ },
+  { name: "the R2 REST API", re: /\/r2\/buckets/i },
+  { name: "the R2 jurisdiction header", re: /cf-r2-jurisdiction/i },
+  { name: "wrangler r2", re: /\bwrangler\s+r2\b/i },
+  { name: "a full D1 dump", re: /\bd1\s+export\b/i },
+  { name: "a backup object key", re: /\bd1\/[\w-]*\/?(?:latest\.json|\d{4}-\d{2}-\d{2}\.(?:sql|json))/ },
+];
+
+/** The backup patterns `text` matches. */
+function backupTouches(text) {
+  return BACKUP_PATTERNS.filter(({ re }) => re.test(text)).map(({ name }) => name);
+}
+
+describe("no workflow touches the D1 backups", () => {
+  it("recognises the GitHub restore job this replaced", () => {
+    const removed = [
+      'api="https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/r2/buckets/${BUCKET}/objects"',
+      "BUCKET: poke-memory-backups",
+      'curl -fsS -H "cf-r2-jurisdiction: eu" -o "$RUNNER_TEMP/backup.sql" "${api}/${key}"',
+      "npx wrangler r2 object get poke-memory-backups/d1/poke-memory/latest.json",
+      "npx wrangler d1 export DB --remote --output dump.sql",
+    ];
+    for (const line of removed) expect(backupTouches(line), line).not.toEqual([]);
+    expect(backupTouches("npx wrangler d1 migrations apply DB --local")).toEqual([]);
+    expect(backupTouches("npx wrangler d1 execute DB --remote --env preview --file seed.sql")).toEqual([]);
+  });
+
+  it("every workflow file is free of backup access", () => {
+    const files = readdirSync(WORKFLOWS).filter((f) => /\.ya?ml$/.test(f));
+    expect(files.length).toBeGreaterThan(0);
+    const offenders = files.flatMap((f) => {
+      const hits = backupTouches(readFileSync(join(WORKFLOWS, f), "utf8"));
+      return hits.length ? [`${f}: ${hits.join(", ")}`] : [];
+    });
+    expect(offenders).toEqual([]);
+  });
+});

@@ -6,10 +6,10 @@ import { getEnv } from "@/lib/db/env";
 /**
  * POST /api/cron/backup (design D10), nightly at 02:00 UTC.
  *
- * Writes every D1 table as SQL INSERT statements to the R2 bucket bound as
- * BACKUPS (poke-memory-backups, or poke-memory-backups-preview on the
- * preview Worker) at `d1/YYYY-MM-DD.sql`, then deletes backups older than
- * 90 days. Format and restore: lib/db/backup.ts.
+ * Writes every D1 table as gzipped SQL INSERT statements, with a manifest, to
+ * the R2 bucket bound as BACKUPS (poke-memory-backups, production only) under
+ * D1_BACKUP_PREFIX, then deletes backups older than 90 days. Format, the
+ * monthly restore check and restoring: lib/db/backup.ts.
  *
  * Bearer CRON_SHARED_SECRET, constant time. Responds with the key, size and
  * row counts (counts only, never data).
@@ -18,18 +18,18 @@ export async function POST(request: Request) {
   const env = await getEnv();
   const refused = cronGuard(request, env.CRON_SHARED_SECRET);
   if (refused) return refused;
-  if (!env.BACKUPS) {
+  if (!env.BACKUPS || !env.D1_BACKUP_PREFIX) {
     return NextResponse.json({ ok: false, error: "misconfigured" }, { status: 503 });
   }
 
   try {
-    const result = await runBackup(env.DB, env.BACKUPS);
+    const result = await runBackup(env.DB, env.BACKUPS, env.D1_BACKUP_PREFIX);
     console.info(
-      `[cron/backup] wrote ${result.key} (${result.bytes} bytes); pruned ${result.pruned.length} old backup(s)`,
+      `d1-backup: export ok, ${result.key} (${result.bytes} bytes), counts ${JSON.stringify(result.counts)}; pruned ${result.pruned.length} old backup(s)`,
     );
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
-    console.error("[cron/backup] failed", err);
+    console.error(`d1-backup: export FAILED: ${err instanceof Error ? err.message : String(err)}`);
     return NextResponse.json({ ok: false, error: "backup_failed" }, { status: 502 });
   }
 }

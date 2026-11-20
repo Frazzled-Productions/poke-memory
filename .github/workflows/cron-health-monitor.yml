@@ -71,8 +71,8 @@ jobs:
             "monitor-grade-log-divergence.yml|Monitor Grade-Log Divergence|48"
             "pokeapi-species-monitor.yml|PokéAPI Species Monitor|840"
           )
-          # restore-test.yml is manual-only while its schedule is off (move-to-cloudflare), so it
-          # has no scheduled runs to watch; add it back here with its schedule.
+          # The backup restore check is not a workflow: it runs inside Cloudflare as the production
+          # Worker's monthly Cron Trigger (move-to-cloudflare, design D10).
 
           NOW=$(date -u +%s)
 

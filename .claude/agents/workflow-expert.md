@@ -47,7 +47,7 @@ Rulesets make these job names required: `main` - `test`, `e2e`, `Test coverage r
 
 ## GitHub Actions gotchas
 
-- **Public logs** - this repo's Actions logs are public. A step that handles personal data (`restore-test.yml` loading a backup) must not print it: drop the tool's output and log only counts.
+- **Public logs** - this repo's Actions logs are public. A step that handles personal data must not print it: drop the tool's output and log only counts. No workflow may touch the D1 backups at all: the export and restore check run inside Cloudflare (`scripts/workflows-no-backups.test.mjs`).
 - **`if: always()`** - use it only for steps that must run regardless of prior failure (report/comment steps, aggregate gate jobs such as `integration-gate`). Omitting `if:` is equivalent to `if: success()`.
 - **Concurrency** - check an existing `concurrency:` group before adding or changing one; `cancel-in-progress` on a release, deploy or tracking-issue workflow can lose work or race (`auto-release.yml` shares one group across triggers deliberately).
 - **Permissions blocks** - declare the minimum; a missing `issues: write` or `pull-requests: write` fails with a silent 403.

@@ -316,26 +316,27 @@ Source (planned): design D2, proposal Clarifications (19 November 2026, about 20
 
 ### Requirement: Nightly backups go to R2 and are kept 90 days
 
-`POST /api/cron/backup`, at 02:00 UTC, SHALL write every table as SQL `INSERT` statements to the R2
-bucket `poke-memory-backups` (EU jurisdiction) at `d1/YYYY-MM-DD.sql`, then delete objects older than
-90 days. The preview Worker SHALL use its own bucket. A GitHub Actions job, run by hand, SHALL restore
-the latest file into a local D1 and check row counts. It SHALL have no schedule until the owner decides
-on one.
+`POST /api/cron/backup`, at 02:00 UTC, SHALL write every table as gzipped SQL `INSERT` statements, one a
+line, to the R2 bucket `poke-memory-backups` (EU jurisdiction) at `d1/poke-memory/YYYY-MM-DD.sql.gz`,
+then a manifest with the export time, the dump's key, size, SHA-256 and per-table row counts at
+`d1/poke-memory/YYYY-MM-DD.json` and, last, `d1/poke-memory/latest.json`, then delete dumps and manifests
+dated more than 90 days ago. Only the production Worker SHALL have the bucket binding.
 
 #### Scenario: Nightly run
 
 - **WHEN** the 02:00 firing runs on 20 November 2026
-- **THEN** `d1/2026-11-20.sql` exists in the bucket
+- **THEN** `d1/poke-memory/2026-11-20.sql.gz`, `d1/poke-memory/2026-11-20.json` and an updated
+  `d1/poke-memory/latest.json` exist in the bucket
 
 #### Scenario: Old object
 
-- **WHEN** the run finds an object dated 91 days ago
-- **THEN** it is deleted, and one dated 89 days ago stays
+- **WHEN** the run finds a dump dated 91 days ago
+- **THEN** it and its manifest are deleted, and one dated 90 days ago stays, as does `latest.json`
 
-#### Scenario: Restore check
+#### Scenario: Round trip
 
-- **WHEN** a backup file is restored into a fresh test database
-- **THEN** every table has the same row count as the source
+- **WHEN** a dump is gunzipped and restored into a fresh migrated test database
+- **THEN** every table has the same rows as the source
 
 #### Scenario: Rows today's triggers would refuse
 
@@ -344,18 +345,61 @@ on one.
 - **THEN** the file drops the triggers before its rows and recreates them verbatim after, so the
   restore keeps every such row, with identical counts and values
 
-#### Scenario: No R2 read token yet
+#### Scenario: A value with a line break
 
-- **WHEN** the restore job runs before its token is set
-- **THEN** it skips with a notice instead of failing
+- **WHEN** a feedback message holds a line break
+- **THEN** its `INSERT` stays on one line and the restored message is unchanged
 
-#### Scenario: No schedule yet
+#### Scenario: Preview Worker
 
-- **WHEN** a month passes with no one running the restore job
-- **THEN** it has not run, so no production backup has been copied to a GitHub-hosted runner (a
-  transfer the privacy notice does not disclose), and the cron health monitor raises no issue about it
+- **WHEN** a pull request's preview version runs
+- **THEN** it has no backups bucket binding, no backup prefix and no Cron Triggers
 
-Source (planned): design D10, `app/api/cron/backup/route.ts`.
+Source (planned): design D10, `app/api/cron/backup/route.ts`, `lib/db/backup.ts`.
+
+### Requirement: The restore check runs monthly inside Cloudflare
+
+The production Worker SHALL run a restore check on the Cron Trigger `0 4 1 * *` (04:00 UTC on the 1st)
+through its own bucket binding. It SHALL fail unless the newest dump matches its SHA-256, decompresses,
+holds each table's row count (an empty table counts as 0) and is at most 3 days old. It SHALL log one
+`d1-backup: restore-check ok` or `d1-backup: restore-check FAILED` line, with keys and counts only, and
+rethrow on failure.
+
+#### Scenario: Healthy backup
+
+- **WHEN** the check runs on 1 December 2026 after the export at 02:00 that day
+- **THEN** it logs `d1-backup: restore-check ok` with the dump's key and the per-table counts
+
+#### Scenario: Empty table
+
+- **WHEN** a table has no rows, so the dump has no `INSERT` line for it
+- **THEN** the check counts it as 0 and passes
+
+#### Scenario: Export stopped
+
+- **WHEN** the newest export is more than 3 days old
+- **THEN** the check logs `d1-backup: restore-check FAILED:` naming the stale export and the invocation fails
+
+#### Scenario: Corrupt dump
+
+- **WHEN** the dump's SHA-256 differs from the manifest, it does not decompress, or a table's rows differ
+  from the manifest's count
+- **THEN** the check logs `d1-backup: restore-check FAILED:` with every problem found and the invocation
+  fails
+
+Source (planned): design D10, owner ruling 20 November 2026, `lib/db/backup.ts`, `worker/index.ts`.
+
+### Requirement: No GitHub workflow touches the backups
+
+No GitHub workflow SHALL read, write or list the backups or dump the database to a runner.
+
+#### Scenario: A workflow reaches for the backups
+
+- **WHEN** a pull request adds a workflow step that names `poke-memory-backups`, calls the R2 API or
+  `wrangler r2`, runs `wrangler d1 export`, or fetches a backup key
+- **THEN** `scripts/workflows-no-backups.test.mjs` fails
+
+Source (planned): design D10, owner ruling 20 November 2026, `scripts/workflows-no-backups.test.mjs`.
 
 ### Requirement: Main deploys production and each pull request gets a preview
 

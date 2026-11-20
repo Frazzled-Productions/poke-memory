@@ -41,7 +41,8 @@ render mismatch, not shippable).
 ### D2. Worker entry and scheduled work
 
 `worker/index.ts` wraps the OpenNext handler and adds `scheduled`. Two Cron Triggers replace the six
-`pg_cron` jobs: `0 * * * *` and `*/30 * * * *`. A pure function `cronRoutesFor(cron, now)`
+`pg_cron` jobs: `0 * * * *` and `*/30 * * * *`. A third, `0 4 1 * *`, runs the monthly backup restore
+check inside the Worker (D10) and maps to no route. A pure function `cronRoutesFor(cron, now)`
 (`lib/cron/schedule.ts`) maps each firing to the app's own routes, which keep their constant-time bearer
 check (`CRON_SHARED_SECRET`, now a Worker secret instead of a Vault secret):
 
@@ -206,19 +207,39 @@ event name. Page views come from Cloudflare Web Analytics when a beacon token is
 
 ### D10. Backups
 
-`POST /api/cron/backup` (02:00 UTC) writes every table as SQL `INSERT` statements to R2
-(`poke-memory-backups`, EU jurisdiction) at `d1/YYYY-MM-DD.sql`, then deletes objects older than 90 days.
-D1 Time Travel covers 30 days on top. A GitHub Actions job restores the latest file into a local D1 and
-checks row counts (it needs an R2 read token, an owner step). It runs by hand only: a monthly schedule
-waits on an owner decision, because a run copies the full production backup to a GitHub-hosted runner,
-which the privacy notice does not disclose. The preview Worker has its own
-bucket.
+Both halves run inside Cloudflare, through the production Worker's own bindings, so no GitHub runner or
+other machine ever holds a backup (owner ruling 20 November 2026; the pattern is koinori-web's
+`worker/d1-backup.ts`). Code: `lib/db/backup.ts`.
+
+- **Export:** `POST /api/cron/backup` (the 02:00 UTC firing of the hourly trigger) writes every table as
+  SQL `INSERT` statements, one a line, gzipped, to R2 (`poke-memory-backups`, EU jurisdiction) under the
+  prefix in `D1_BACKUP_PREFIX` (`d1/poke-memory`): `<prefix>/YYYY-MM-DD.sql.gz`, then its manifest
+  `<prefix>/YYYY-MM-DD.json` (time, key, size, SHA-256 and per-table row counts), then
+  `<prefix>/latest.json` (the same manifest, written last so it never names a missing dump). Dumps and
+  manifests dated more than 90 days ago are deleted. The dump drops the triggers before its rows and
+  recreates them verbatim after, so rows restore exactly as stored; text holding a line break or other
+  control character is written as UTF-8 hex (`CAST(X'..' AS TEXT)`) so every statement is one line.
+- **Restore check:** the Cron Trigger `0 4 1 * *` (04:00 UTC on the 1st) reads `latest.json` and the dump
+  it names, and fails unless the dump's SHA-256 matches, it decompresses, every table holds the
+  manifest's number of `INSERT` lines (an empty table has none, so absent counts as 0) and the export is
+  at most 3 days old. It logs one `d1-backup: restore-check ok, ...` line, or
+  `d1-backup: restore-check FAILED: ...` and rethrows, so the invocation shows as failed in the Worker's
+  Cron Events and Workers Logs. Logs carry keys and counts, never row data. The full round trip into a
+  fresh migrated database is proved by `lib/db/backup.test.ts`.
+- **Restoring for real:** download the dump with wrangler on an owner's machine, gunzip it, apply
+  `db/d1/migrations` to an empty D1, then `wrangler d1 execute <database> --remote --file <dump.sql>`. D1
+  Time Travel covers 30 days on top.
+- **Production only:** the preview Worker gets neither the bucket binding, the prefix nor the Cron
+  Triggers, because preview versions run pull request code (deploy guard, ops #610).
+- **No GitHub path:** the manual GitHub restore job is removed, and `scripts/workflows-no-backups.test.mjs`
+  fails if any workflow names the bucket, calls R2 (REST API or wrangler), dumps D1 or fetches a backup
+  key.
 
 ### D11. Previews and deploys
 
 `.github/workflows/deploy.yml`, modelled on the company site's (stage 1): a push to `main` builds, applies
 D1 migrations and deploys the Worker `poke-memory`; a pull request uploads a version of the separate
-Worker `poke-memory-preview` (own D1 database and bucket, seeded with test data by
+Worker `poke-memory-preview` (own D1 database and no backups bucket, seeded with test data by
 `scripts/cloudflare/seed-preview.mjs`), aliased `pr-<number>`, and comments its URL. With no
 `CLOUDFLARE_API_TOKEN` secret the jobs skip with a notice. Until cutover the Worker is only reachable
 at `poke-memory.frasers-account.workers.dev`. The Vercel-specific workflows (`qa-preview-deploy`,

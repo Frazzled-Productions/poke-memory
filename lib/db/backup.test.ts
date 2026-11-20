@@ -1,12 +1,24 @@
 /**
- * The nightly backup (design D10) with a fake R2 bucket, and a restore of the
- * file into a fresh migrated database with the row counts compared.
+ * The nightly backup (design D10) with a fake R2 bucket, a restore of the
+ * file into a fresh migrated database with the row counts compared, and the
+ * monthly restore check the production Worker runs inside Cloudflare.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { R2BucketLike } from "./d1";
-import { BACKUP_RETENTION_DAYS, backupKey, dumpDatabase, pruneBackups, runBackup, sqlLiteral } from "./backup";
+import {
+  BACKUP_RETENTION_DAYS,
+  MAX_BACKUP_AGE_DAYS,
+  backupKeys,
+  checkLatestBackup,
+  dumpDatabase,
+  pruneBackups,
+  runBackup,
+  runRestoreCheck,
+  sqlLiteral,
+  type BackupManifest,
+} from "./backup";
 import { forUser } from "./scope";
 import { BACKUP_TABLE_ORDER, backupTables, readTablePages } from "./system/backup";
 import { parseMigrationTriggers } from "./migrationTriggers.mjs";
@@ -16,16 +28,22 @@ import { createSqliteD1, createTestUser, type SqliteD1 } from "./testing/sqliteD
 
 /** An in-memory stand-in for an R2 bucket, listing in pages of `pageSize`. */
 function fakeBucket(pageSize = 1000) {
-  const objects = new Map<string, { body: string; uploaded: Date }>();
+  const objects = new Map<string, { body: Uint8Array; uploaded: Date }>();
   const bucket: R2BucketLike & { objects: typeof objects } = {
     objects,
     async put(key, value) {
-      objects.set(key, { body: String(value), uploaded: new Date() });
+      const body =
+        typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value as ArrayBuffer);
+      objects.set(key, { body: body.slice(), uploaded: new Date() });
       return {};
     },
     async get(key) {
       const o = objects.get(key);
-      return o ? { text: async () => o.body } : null;
+      if (!o) return null;
+      return {
+        text: async () => new TextDecoder().decode(o.body),
+        arrayBuffer: async () => o.body.slice().buffer,
+      };
     },
     async delete(keys) {
       for (const k of Array.isArray(keys) ? keys : [keys]) objects.delete(k);
@@ -46,6 +64,22 @@ function fakeBucket(pageSize = 1000) {
 }
 
 const NOW = new Date("2026-11-20T02:00:03.120Z");
+const PREFIX = "d1/poke-memory";
+
+async function gunzipText(bytes: Uint8Array): Promise<string> {
+  const stream = new Blob([bytes.slice()]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return new Response(stream).text();
+}
+
+async function gzipText(text: string): Promise<Uint8Array> {
+  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes.slice()));
+  return Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 function migrationTexts(): string[] {
   const dir = join(process.cwd(), "db", "d1", "migrations");
@@ -118,7 +152,7 @@ describe("backupTables", () => {
 });
 
 describe("dumpDatabase", () => {
-  it("starts with the header the restore check parses: a dated first line, then rows per table", async () => {
+  it("starts with a header: a dated first line, then rows per table", async () => {
     await seed(d1);
     const { sql, counts } = await dumpDatabase(d1, NOW);
     const lines = sql.split("\n");
@@ -127,10 +161,9 @@ describe("dumpDatabase", () => {
       BACKUP_TABLE_ORDER.map((t) => `-- rows ${t}: ${counts[t]}`),
     );
     expect(counts).toMatchObject({ user: 2, card_reviews: 2, streak_days: 2, feedback: 2, rate_limit_buckets: 1 });
-    // Same pattern as scripts/cloudflare/check-restore.mjs.
     const rowsLine = /^-- rows ([A-Za-z_][A-Za-z0-9_]*): (\d+)\s*$/;
     expect(lines.filter((l) => rowsLine.test(l))).toHaveLength(BACKUP_TABLE_ORDER.length);
-    // One INSERT per row after the header (a multi-line value spans lines).
+    // One INSERT per row after the header, each on its own line.
     const inserts = lines.filter((l) => l.startsWith("INSERT INTO "));
     expect(inserts).toHaveLength(Object.values(counts).reduce((a, b) => a + b, 0));
     // No schema beyond the triggers it drops and recreates, and no PRAGMA or transaction.
@@ -273,36 +306,235 @@ describe("sqlLiteral", () => {
     expect(sqlLiteral(new Uint8Array([0, 255]))).toBe("X'00ff'");
     expect(() => sqlLiteral(Number.NaN)).toThrow();
   });
+
+  it("writes text with a line break or other control character as UTF-8 hex, so every statement is one line", () => {
+    expect(sqlLiteral("a\nb")).toBe("CAST(X'610a62' AS TEXT)");
+    expect(sqlLiteral("tab\there")).toBe("CAST(X'7461620968657265' AS TEXT)");
+    expect(sqlLiteral("émoji ✨")).toBe("'émoji ✨'");
+  });
+});
+
+describe("dumpDatabase: one statement a line", () => {
+  it("a multi-line value stays on its INSERT line and restores unchanged", async () => {
+    await seed(d1);
+    await insertFeedback(d1, {
+      user_id: null,
+      category: "bug",
+      message: 'line one\nINSERT INTO "user" ("id") VALUES (\'x\');\r\nline three',
+      page: null,
+      app_version: null,
+    });
+    const { sql, counts } = await dumpDatabase(d1, NOW);
+    const inserts = sql.split("\n").filter((l) => l.startsWith("INSERT INTO "));
+    expect(inserts).toHaveLength(Object.values(counts).reduce((a, b) => a + b, 0));
+    expect(inserts.filter((l) => l.startsWith('INSERT INTO "user" '))).toHaveLength(counts.user);
+
+    const fresh = createSqliteD1();
+    try {
+      fresh.sqlite.exec(sql);
+      const read = (db: SqliteD1) => db.sqlite.prepare('SELECT * FROM "feedback" ORDER BY rowid').all();
+      expect(read(fresh)).toEqual(read(d1));
+    } finally {
+      fresh.close();
+    }
+  });
 });
 
 describe("runBackup and pruneBackups", () => {
-  it("writes d1/YYYY-MM-DD.sql and returns the counts", async () => {
+  it("writes <prefix>/YYYY-MM-DD.sql.gz, its counts file and latest.json, and returns the counts", async () => {
     await seed(d1);
     const bucket = fakeBucket();
-    const result = await runBackup(d1, bucket, NOW);
-    expect(result.key).toBe("d1/2026-11-20.sql");
-    expect(backupKey(NOW)).toBe("d1/2026-11-20.sql");
+    const result = await runBackup(d1, bucket, PREFIX, NOW);
+    expect(backupKeys(PREFIX, NOW)).toEqual({
+      dump: "d1/poke-memory/2026-11-20.sql.gz",
+      counts: "d1/poke-memory/2026-11-20.json",
+      latest: "d1/poke-memory/latest.json",
+    });
+    expect(result.key).toBe("d1/poke-memory/2026-11-20.sql.gz");
     expect(result.counts.user).toBe(2);
-    const stored = await bucket.get("d1/2026-11-20.sql");
-    expect((await stored!.text()).startsWith("-- poke-memory D1 backup ")).toBe(true);
-    expect(result.bytes).toBe(new TextEncoder().encode(await stored!.text()).byteLength);
+
+    const stored = bucket.objects.get("d1/poke-memory/2026-11-20.sql.gz")!.body;
+    const sql = await gunzipText(stored);
+    expect(sql.startsWith("-- poke-memory D1 backup 2026-11-20T02:00:03.120Z\n")).toBe(true);
+    expect(sql).toBe((await dumpDatabase(d1, NOW)).sql);
+    expect(result.bytes).toBe(stored.byteLength);
+    expect(result.sha256).toBe(await sha256Hex(stored));
+
+    const latest = JSON.parse(await (await bucket.get("d1/poke-memory/latest.json"))!.text()) as BackupManifest;
+    expect(latest).toEqual({
+      exportedAt: "2026-11-20T02:00:03.120Z",
+      key: "d1/poke-memory/2026-11-20.sql.gz",
+      bytes: stored.byteLength,
+      sha256: result.sha256,
+      counts: result.counts,
+    });
+    expect(JSON.parse(await (await bucket.get("d1/poke-memory/2026-11-20.json"))!.text())).toEqual(latest);
   });
 
-  it(`deletes backups dated more than ${BACKUP_RETENTION_DAYS} days ago, across list pages, and keeps other keys`, async () => {
+  it(`deletes dumps and counts files dated more than ${BACKUP_RETENTION_DAYS} days ago, across list pages, and keeps other keys`, async () => {
     const bucket = fakeBucket(2);
     const keys = [
-      "d1/2026-08-21.sql", // 91 days before 2026-11-20
-      "d1/2026-08-22.sql", // exactly 90 days: kept
-      "d1/2026-01-01.sql",
-      "d1/2026-11-19.sql",
-      "d1/notes.txt",
+      "d1/poke-memory/2026-08-21.sql.gz", // 91 days before 2026-11-20
+      "d1/poke-memory/2026-08-21.json",
+      "d1/poke-memory/2026-08-22.sql.gz", // exactly 90 days: kept
+      "d1/poke-memory/2026-08-22.json",
+      "d1/poke-memory/2026-01-01.sql.gz",
+      "d1/poke-memory/2026-11-19.sql.gz",
+      "d1/poke-memory/latest.json",
+      "d1/poke-memory/notes.txt",
+      "d1/poke-memory-preview/2026-01-01.sql.gz",
       "other/2020-01-01.sql",
     ];
     for (const k of keys) await bucket.put(k, "x");
-    const pruned = await pruneBackups(bucket, NOW);
-    expect(pruned.sort()).toEqual(["d1/2026-01-01.sql", "d1/2026-08-21.sql"]);
-    expect([...bucket.objects.keys()].sort()).toEqual(
-      ["d1/2026-08-22.sql", "d1/2026-11-19.sql", "d1/notes.txt", "other/2020-01-01.sql"],
+    const pruned = await pruneBackups(bucket, PREFIX, NOW);
+    expect(pruned.sort()).toEqual([
+      "d1/poke-memory/2026-01-01.sql.gz",
+      "d1/poke-memory/2026-08-21.json",
+      "d1/poke-memory/2026-08-21.sql.gz",
+    ]);
+    expect([...bucket.objects.keys()].sort()).toEqual([
+      "d1/poke-memory-preview/2026-01-01.sql.gz",
+      "d1/poke-memory/2026-08-22.json",
+      "d1/poke-memory/2026-08-22.sql.gz",
+      "d1/poke-memory/2026-11-19.sql.gz",
+      "d1/poke-memory/latest.json",
+      "d1/poke-memory/notes.txt",
+      "other/2020-01-01.sql",
+    ]);
+  });
+});
+
+describe("checkLatestBackup (the monthly restore check, inside Cloudflare)", () => {
+  const CHECK_AT = new Date("2026-12-01T04:00:00.000Z");
+
+  async function exported() {
+    await seed(d1);
+    const bucket = fakeBucket();
+    const result = await runBackup(d1, bucket, PREFIX, new Date("2026-11-30T02:00:00.000Z"));
+    return { bucket, result };
+  }
+
+  /** Replaces the dump with `bytes` and rewrites latest.json with `edit` applied. */
+  async function tamper(
+    bucket: ReturnType<typeof fakeBucket>,
+    bytes: Uint8Array | null,
+    edit: (m: BackupManifest) => BackupManifest = (m) => m,
+  ) {
+    const manifest = JSON.parse(await (await bucket.get(`${PREFIX}/latest.json`))!.text()) as BackupManifest;
+    if (bytes) await bucket.put(manifest.key, bytes);
+    await bucket.put(`${PREFIX}/latest.json`, JSON.stringify(edit(manifest)));
+  }
+
+  it("passes on a fresh export: checksum, decompression, per-table counts and freshness", async () => {
+    const { bucket, result } = await exported();
+    const checked = await checkLatestBackup({ bucket, prefix: PREFIX, now: CHECK_AT });
+    expect(checked).toEqual({ key: result.key, exportedAt: "2026-11-30T02:00:00.000Z", counts: result.counts });
+  });
+
+  it("counts an empty table, which has no INSERT lines, as 0", async () => {
+    // An empty database: every table is listed in the counts file with 0 and the dump has no INSERTs.
+    const bucket = fakeBucket();
+    const result = await runBackup(d1, bucket, PREFIX, new Date("2026-11-30T02:00:00.000Z"));
+    expect(Object.values(result.counts).every((n) => n === 0)).toBe(true);
+    await expect(checkLatestBackup({ bucket, prefix: PREFIX, now: CHECK_AT })).resolves.toMatchObject({
+      key: result.key,
+    });
+  });
+
+  it("fails when there is no latest.json", async () => {
+    await expect(checkLatestBackup({ bucket: fakeBucket(), prefix: PREFIX, now: CHECK_AT })).rejects.toThrow(
+      /no latest\.json/,
     );
+  });
+
+  it(`fails when the newest export is more than ${MAX_BACKUP_AGE_DAYS} days old`, async () => {
+    const { bucket } = await exported();
+    const late = new Date("2026-12-03T02:00:01.000Z");
+    await expect(checkLatestBackup({ bucket, prefix: PREFIX, now: late })).rejects.toThrow(/stale/);
+  });
+
+  it("fails when the dump's checksum does not match", async () => {
+    const { bucket } = await exported();
+    await tamper(bucket, null, (m) => ({ ...m, sha256: "0".repeat(64) }));
+    await expect(checkLatestBackup({ bucket, prefix: PREFIX, now: CHECK_AT })).rejects.toThrow(/sha256/);
+  });
+
+  it("fails when the dump does not decompress", async () => {
+    const { bucket } = await exported();
+    const garbage = new TextEncoder().encode("not gzip at all");
+    // The checksum is made to match, so only the decompression can fail.
+    const sha = await sha256Hex(garbage);
+    await tamper(bucket, garbage, (m) => ({ ...m, bytes: garbage.byteLength, sha256: sha }));
+    await expect(checkLatestBackup({ bucket, prefix: PREFIX, now: CHECK_AT })).rejects.toThrow(/decompress/);
+  });
+
+  it("fails when a table's rows in the dump differ from the counts file", async () => {
+    const { bucket } = await exported();
+    const manifest = JSON.parse(await (await bucket.get(`${PREFIX}/latest.json`))!.text()) as BackupManifest;
+    const lines = (await gunzipText(bucket.objects.get(manifest.key)!.body)).split("\n");
+    lines.splice(lines.findIndex((l) => l.startsWith('INSERT INTO "card_reviews" ')), 1);
+    const bytes = await gzipText(lines.join("\n"));
+    const sha = await sha256Hex(bytes);
+    await tamper(bucket, bytes, (m) => ({ ...m, bytes: bytes.byteLength, sha256: sha }));
+    await expect(checkLatestBackup({ bucket, prefix: PREFIX, now: CHECK_AT })).rejects.toThrow(
+      /card_reviews: counts file 2, dump 1/,
+    );
+  });
+
+  it("fails when the dump named by latest.json is missing", async () => {
+    const { bucket, result } = await exported();
+    await bucket.delete(result.key);
+    await expect(checkLatestBackup({ bucket, prefix: PREFIX, now: CHECK_AT })).rejects.toThrow(/is missing/);
+  });
+
+  it("fails when latest.json lists no tables", async () => {
+    const { bucket } = await exported();
+    await tamper(bucket, null, (m) => ({ ...m, counts: {} }));
+    await expect(checkLatestBackup({ bucket, prefix: PREFIX, now: CHECK_AT })).rejects.toThrow(/no tables/);
+  });
+});
+
+describe("runRestoreCheck (the Worker's monthly Cron Trigger)", () => {
+  const CHECK_AT = new Date("2026-12-01T04:00:00.000Z");
+  const sink = () => {
+    const lines: string[] = [];
+    return { lines, log: (m: string) => void lines.push(`log ${m}`), error: (m: string) => void lines.push(`error ${m}`) };
+  };
+
+  it("logs one ok line with the key and counts", async () => {
+    await seed(d1);
+    const bucket = fakeBucket();
+    await runBackup(d1, bucket, PREFIX, new Date("2026-11-30T02:00:00.000Z"));
+    const out = sink();
+    await runRestoreCheck({ BACKUPS: bucket, D1_BACKUP_PREFIX: PREFIX }, CHECK_AT, out);
+    expect(out.lines).toHaveLength(1);
+    expect(out.lines[0]).toMatch(
+      /^log d1-backup: restore-check ok, d1\/poke-memory\/2026-11-30\.sql\.gz \(exported 2026-11-30T02:00:00\.000Z\), counts \{"user":2,/,
+    );
+  });
+
+  it('logs "d1-backup: restore-check FAILED: ..." and rethrows, so the invocation shows as failed', async () => {
+    const out = sink();
+    await expect(runRestoreCheck({ BACKUPS: fakeBucket(), D1_BACKUP_PREFIX: PREFIX }, CHECK_AT, out)).rejects.toThrow(
+      /no latest\.json/,
+    );
+    expect(out.lines).toEqual([expect.stringMatching(/^error d1-backup: restore-check FAILED: no latest\.json at d1\/poke-memory\/latest\.json/)]);
+  });
+
+  it("fails without the BACKUPS binding or the prefix (the preview Worker has neither)", async () => {
+    for (const env of [{ D1_BACKUP_PREFIX: PREFIX }, { BACKUPS: fakeBucket() }]) {
+      const out = sink();
+      await expect(runRestoreCheck(env, CHECK_AT, out)).rejects.toThrow(/BACKUPS binding or the D1_BACKUP_PREFIX/);
+      expect(out.lines[0]).toMatch(/^error d1-backup: restore-check FAILED: /);
+    }
+  });
+
+  it("logs no row data, only keys and counts", async () => {
+    await seed(d1);
+    const bucket = fakeBucket();
+    await runBackup(d1, bucket, PREFIX, new Date("2026-11-30T02:00:00.000Z"));
+    const out = sink();
+    await runRestoreCheck({ BACKUPS: bucket, D1_BACKUP_PREFIX: PREFIX }, CHECK_AT, out);
+    expect(out.lines.join("\n")).not.toMatch(/O'Brien|alice_1|Europe\/London/);
   });
 });

@@ -36,20 +36,25 @@
       "migrations_dir": "db/d1/migrations"
     }
   ],
+  // Nightly export and monthly restore check, inside Cloudflare through this binding: no GitHub
+  // runner touches the backups (design D10; owner ruling 20 November 2026). Production only.
   "r2_buckets": [
     { "binding": "BACKUPS", "bucket_name": "poke-memory-backups", "jurisdiction": "eu" }
   ],
   // App-open counter limit (lib/analytics/events.ts), keyed by event name, never by IP.
   // Namespace ids are unique per account: the company site uses 1001 and 1002.
   "ratelimits": [{ "name": "EVENT_LIMITER", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } }],
-  // Both crons map to app routes through cronRoutesFor() in lib/cron/schedule.ts.
-  "triggers": { "crons": ["0 * * * *", "*/30 * * * *"] },
+  // The first two map to app routes through cronRoutesFor() in lib/cron/schedule.ts (the 02:00
+  // firing of the hourly one runs the backup export); "0 4 1 * *" is the monthly restore check,
+  // run by worker/index.ts.
+  "triggers": { "crons": ["0 * * * *", "*/30 * * * *", "0 4 1 * *"] },
   "vars": {
     "DEPLOY_ENV": "cloudflare-production",
+    "D1_BACKUP_PREFIX": "d1/poke-memory",
     "BETTER_AUTH_URL": "https://poke-memory.frasers-account.workers.dev"
   },
   "env": {
-    // Per-PR versions (design D11): its own Worker, D1 database and bucket.
+    // Per-PR versions (design D11): its own Worker and D1 database.
     // d1_databases, r2_buckets, services and vars do not inherit, so each is
     // repeated here; triggers DO inherit, so they are emptied explicitly.
     "preview": {
@@ -64,9 +69,8 @@
           "migrations_dir": "db/d1/migrations"
         }
       ],
-      "r2_buckets": [
-        { "binding": "BACKUPS", "bucket_name": "poke-memory-backups-preview", "jurisdiction": "eu" }
-      ],
+      // No backups bucket: preview versions run pull request code, so the preview Worker gets
+      // neither a bucket binding nor the Cron Triggers (deploy guard, ops #610; design D10).
       "ratelimits": [{ "name": "EVENT_LIMITER", "namespace_id": "1004", "simple": { "limit": 60, "period": 60 } }],
       // No Cron Triggers at all: the preview database holds rehearsal copies of
       // real data, so it must never send pushes or Discord messages (D2). Outbound

@@ -18,8 +18,10 @@ export type DeployEnv = "cloudflare-production" | "cloudflare-preview";
 export interface AppEnv {
   /** D1: poke-memory (production) or poke-memory-preview. */
   DB: D1DatabaseLike;
-  /** R2 (EU): poke-memory-backups or poke-memory-backups-preview (design D10). */
-  BACKUPS: R2BucketLike;
+  /** R2 (EU): poke-memory-backups, production only; the preview Worker has no bucket (design D10). */
+  BACKUPS?: R2BucketLike;
+  /** Key prefix of the backups in BACKUPS, without a trailing slash (production: d1/poke-memory). */
+  D1_BACKUP_PREFIX?: string;
   /** Gate outbound sends with outboundAllowed() in lib/outbound.ts. */
   DEPLOY_ENV: DeployEnv | (string & {});
   BETTER_AUTH_URL: string;
