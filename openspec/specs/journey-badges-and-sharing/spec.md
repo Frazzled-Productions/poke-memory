@@ -15,7 +15,7 @@ belong to stats-and-streaks; the pull and merge belong to cloud-sync.
 The Journey page SHALL wait for the seed, then read settings, load the saved session or build a fresh
 one, persist any healed cards, read streak and grade log, and show a loading skeleton until both the
 mastery snapshot and the current streak exist. The load SHALL re-run when the stored session, any-flag
-state, Supabase client, user or seed changes, and not on a settings save, which looks wrong (#2339).
+state, data client, user or seed changes, and not on a settings save, which looks wrong (#2339).
 Metadata SHALL title the route "Journey - Poké Memory".
 
 #### Scenario: Seed not ready
@@ -33,7 +33,7 @@ Metadata SHALL title the route "Journey - Poké Memory".
 - **WHEN** the player switches language in the status bar while on Journey
 - **THEN** the status bar, language breakdown and Pokémon names change, and the snapshot, timeline, close-to-mastery list, next-badge hint and records stay on the old language until the page remounts (#2339)
 
-Source: `app/journey/layout.tsx:3`, `app/journey/page.tsx:424`, `app/journey/page.tsx:427`, `app/journey/page.tsx:435`, `app/journey/page.tsx:443`, `app/journey/page.tsx:560`, `app/journey/page.tsx:627`.
+Source: `app/journey/layout.tsx:3`, `app/journey/page.tsx:424`, `app/journey/page.tsx:427`, `app/journey/page.tsx:435`, `app/journey/page.tsx:443`, `app/journey/page.tsx:560`, `app/journey/page.tsx:627`; planned `lib/db/client.ts`.
 
 ### Requirement: Journey reads the cloud for signed-in players (baseline)
 
@@ -279,21 +279,21 @@ Source: `app/journey/page.tsx:471`, `app/journey/page.tsx:480`, `app/journey/pag
 ### Requirement: Earned badges persist in settings and do not regress (baseline)
 
 Earned badges SHALL live in settings as id and `earnedAt` pairs, reach the cloud inside the settings
-JSONB, and be replaced as a whole on write. The cloud trigger SHALL reject an update that removes a
-badge id. A developer row in Settings, shown only in the superuser section, SHALL clear the local
-list. The Journey page SHALL ignore a stored id that is not in the catalogue.
+blob, and be replaced as a whole on write. The Worker's settings merge SHALL reject an update that
+removes a badge id. A developer row in Settings, shown only in the superuser section, SHALL clear the
+local list. The Journey page SHALL ignore a stored id that is not in the catalogue.
 
 #### Scenario: A push would drop a badge
 
 - **WHEN** an update's `earnedBadges` lacks an id the row holds
-- **THEN** the trigger refuses the regression
+- **THEN** the settings merge refuses the regression with 23514
 
 #### Scenario: Unknown stored id
 
 - **WHEN** settings hold an id with no catalogue entry
 - **THEN** Journey leaves it out
 
-Source: `lib/settings/persistence.ts:338`, `lib/settings/persistence.ts:858`, `lib/settings/lastPushedSnapshot.ts:99`, `db/migrations/038_user_settings_reject_regression_trigger.sql:11`, `db/migrations/038_user_settings_reject_regression_trigger.sql:102`, `app/settings/page.tsx:139`, `app/settings/page.tsx:2102`, `app/settings/page.tsx:2199`, `app/journey/page.tsx:589`.
+Source: `lib/settings/persistence.ts:338`, `lib/settings/persistence.ts:858`, `lib/settings/lastPushedSnapshot.ts:99`, `app/settings/page.tsx:139`, `app/settings/page.tsx:2102`, `app/settings/page.tsx:2199`, `app/journey/page.tsx:589`; planned `lib/db/rpc/mergeUserSettings.ts`.
 
 ### Requirement: Badge gallery (baseline)
 

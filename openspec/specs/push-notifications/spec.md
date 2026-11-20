@@ -11,7 +11,7 @@ does with a push. Baseline of current behaviour, from code and tests on `qa` at 
 ## Requirements
 
 ### Requirement: Cron routes check a constant-time bearer secret
-Both routes SHALL accept a caller only when the `Authorization` header equals `Bearer <CRON_SHARED_SECRET>`, compared in constant time, and SHALL otherwise answer 401 with an empty body. A missing header, an empty secret or a header of the wrong length SHALL be refused without throwing.
+Both routes SHALL accept a caller only when the `Authorization` header equals `Bearer <CRON_SHARED_SECRET>`, compared in constant time, and SHALL otherwise answer 401 with an empty body. `CRON_SHARED_SECRET` SHALL be a Worker secret, and the Worker's scheduled handler SHALL send it. A missing header, an empty secret or a header of the wrong length SHALL be refused without throwing.
 
 #### Scenario: Correct secret
 - **WHEN** a request carries exactly `Bearer <secret>`
@@ -25,42 +25,41 @@ Both routes SHALL accept a caller only when the `Authorization` header equals `B
 - **WHEN** the header holds multi-byte characters
 - **THEN** the check returns false without throwing (`lib/auth/bearerAuth.test.ts:41`)
 
-Cites: `lib/auth/bearerAuth.ts:18-30`, `send-daily:592-595`, `send-nudge:190-193`.
+#### Scenario: Scheduled call
+- **WHEN** the Worker's Cron Trigger calls a route
+- **THEN** the call carries the secret and is accepted
+
+Cites: `lib/auth/bearerAuth.ts:18-30`, planned `worker/index.ts`.
 
 ### Requirement: A route with missing configuration answers 503
-Each route SHALL answer 503 `{ ok: false, error: "misconfigured" }` when the shared secret, a VAPID value, the Supabase URL or the secret key is missing, and this check SHALL run before the bearer check. The secret key SHALL be `SUPABASE_SECRET_KEY`, falling back to `SUPABASE_SERVICE_ROLE_KEY`.
+Each route SHALL answer 503 `{ ok: false, error: "misconfigured" }` when the shared secret or the D1 binding is missing, or, where outbound sends are on (`DEPLOY_ENV` is `cloudflare-production`), a VAPID value is missing. This check SHALL run before the bearer check.
 
 #### Scenario: Secret unset
-- **WHEN** `CRON_SHARED_SECRET` or `VAPID_PRIVATE_KEY` is unset
-- **THEN** the route answers 503 (`app/api/push/send-daily/route.test.tsx:399-407`, `app/api/push/send-streak-nudge/route.test.tsx:218-224`)
+- **WHEN** `CRON_SHARED_SECRET` is unset, or `VAPID_PRIVATE_KEY` is unset in production
+- **THEN** the route answers 503
 
-Cites: `send-daily:562-585`, `send-nudge:169-188`, `lib/supabase/keys.ts:20-26`.
+#### Scenario: Preview without a VAPID private key
+- **WHEN** the preview Worker, which has no VAPID private key, is called with the right bearer
+- **THEN** the route reads its targets, logs what it would have sent and answers 200 with zero sent
 
-### Requirement: Two hourly cron jobs call the routes
-The database SHALL schedule `web-push-daily-reminders` and `web-push-streak-nudge`, each at `0 * * * *`, posting an empty JSON body to the URL in Vault (`push_send_url`, `push_streak_nudge_send_url`) with the `cron_shared_secret` Vault value as the bearer token. Where `pg_cron` is missing the migrations SHALL log a notice and carry on. `vercel.json` SHALL define no crons.
+Cites: planned `app/api/push/send-daily/route.ts`, `app/api/push/send-streak-nudge/route.ts`, `lib/outbound.ts`.
 
-#### Scenario: Top of each hour
-- **WHEN** the clock reaches minute 0 of any UTC hour
-- **THEN** both jobs fire and each route applies its own per-user hour gate (`db/migrations/031_web_push_hourly_cron.sql:57`, `db/migrations/047_get_push_streak_nudge_targets.sql:134`)
-
-#### Scenario: Stock Postgres in CI
-- **WHEN** migrations run with no `pg_cron` or `pg_net`
-- **THEN** the schedule step becomes a notice and the migration still applies (`db/migrations/031_web_push_hourly_cron.sql:69-72`)
-
-Cites: `db/migrations/031_web_push_hourly_cron.sql:44-73`, `db/migrations/047_get_push_streak_nudge_targets.sql:121-150`, `vercel.json:1-10`.
-
-### Requirement: Cross-user reads go through service-role functions
-The routes SHALL read across users only through `get_push_targets`, `get_push_due_cards` and `get_push_streak_days`, which are SECURITY DEFINER with an empty `search_path`, and whose EXECUTE is revoked from PUBLIC, anon and authenticated and granted to `service_role`. `get_push_targets` SHALL return one row per subscription, LEFT JOINed to the owner's settings. The only direct table access SHALL be the dead-endpoint DELETE. `get_push_reviewed_today` SHALL no longer exist.
+### Requirement: Cross-user reads go through the system module
+The routes SHALL read across users only through named functions in `lib/db/system.ts` (ports of `get_push_targets`, `get_push_due_cards`, `get_push_streak_days` and `get_push_streak_nudge_targets`), which only the cron, push-send and feedback routes may import. The targets read SHALL return one row per subscription, LEFT JOINed to the owner's settings. The only other access SHALL be the dead-endpoint DELETE.
 
 #### Scenario: Route reads
 - **WHEN** `send-daily` runs
-- **THEN** it calls the two RPCs and no raw table SELECT (`app/api/push/send-daily/route.test.tsx:463`)
+- **THEN** it calls the targets and due-cards functions and runs no other query
 
 #### Scenario: User with no settings row
 - **WHEN** a subscription's owner has no `user_settings` row
-- **THEN** the target row still comes back with null settings, and default eligibility applies (`app/api/push/send-daily/route.test.tsx:1870`)
+- **THEN** the target row still comes back with null settings, and default eligibility applies
 
-Cites: `db/migrations/046_get_push_targets.sql:45-73`, `:121-125`, `db/migrations/047_get_push_streak_nudge_targets.sql:68-84`, `:112-113`, `db/migrations/048_drop_get_push_reviewed_today.sql:14`, `send-daily:619-620`, `send-daily:829-832`.
+#### Scenario: Same answers as Postgres
+- **WHEN** the system functions run against the D1 test database loaded like the Postgres RPC tests
+- **THEN** they return the same rows
+
+Cites: planned `lib/db/system.ts`; behaviour from `db/migrations/046_get_push_targets.sql`, `db/migrations/047_get_push_streak_nudge_targets.sql`.
 
 ### Requirement: A failed read stops the run before any send
 Each route SHALL answer 502 with `targets_query_failed` when the targets read fails, `send-daily` SHALL answer 502 `due_query_failed` and `send-nudge` 502 `streak_days_query_failed` when any page of their second read fails, and nothing SHALL have been sent by then. No targets, or none left after a gate, SHALL answer 200 `{ ok: true, sent: 0, deleted: 0 }`.
@@ -304,7 +303,7 @@ The payload SHALL be `{ title, body, url: "/" }` from the English `pushStreak` c
 Cites: `send-nudge:112-121`, `send-nudge:391-397`, `messages/en.json:1281-1284`.
 
 ### Requirement: Subscribing stores this device's endpoint and keys
-`subscribeToPush` SHALL stop with a named reason when push is unsupported, the VAPID key is missing or permission is not granted, SHALL reuse an existing PushManager subscription or create one with `userVisibleOnly`, and SHALL save the row by delete-then-insert on `(user_id, endpoint)`, because the table has no UPDATE policy. Delete or insert failure SHALL return `persist-failed`, and the local subscription SHALL stay.
+`subscribeToPush` SHALL stop with a named reason when push is unsupported, the VAPID key is missing or permission is not granted, SHALL reuse an existing PushManager subscription or create one with `userVisibleOnly`, and SHALL save the row by delete-then-insert on `(user_id, endpoint)` through the data client, because the gateway allows no update on that table. Delete or insert failure SHALL return `persist-failed`, and the local subscription SHALL stay.
 
 #### Scenario: Turning reminders on
 - **WHEN** the user turns the toggle on and permission is granted
@@ -318,7 +317,11 @@ Cites: `send-nudge:112-121`, `send-nudge:391-397`, `messages/en.json:1281-1284`.
 - **WHEN** a base64url VAPID key is decoded
 - **THEN** the bytes are the right length and round-trip (`components/pwa/subscribeHelpers.test.tsx:23-34`)
 
-Cites: `lib/push/subscribe.ts:110-209`.
+#### Scenario: Existing subscription after the move
+- **WHEN** a device subscribed before the move loads the app signed in, with permission granted
+- **THEN** it keeps working, because its subscription moves to the new VAPID key on load ("A subscription on the old VAPID key moves to the new one on load")
+
+Cites: `lib/push/subscribe.ts:110-209`, planned `lib/db/client.ts`.
 
 ### Requirement: Turning reminders off removes every device
 `unsubscribeFromPush` SHALL delete all of the user's rows first, then unsubscribe the local PushManager, ignoring local errors. If the delete fails it SHALL return `delete-failed` and leave the local subscription. On success the Settings card SHALL also reset `streakNudgeEnabled` to false.
@@ -338,13 +341,17 @@ Cites: `lib/push/subscribe.ts:110-209`.
 Cites: `lib/push/subscribe.ts:223-257`, `components/pwa/PushOptIn.tsx:148-164`.
 
 ### Requirement: Signing out leaves subscriptions in place
-Signing out and switching accounts SHALL NOT change `push_subscriptions` or the local subscription: `PushOptIn` SHALL be the only caller of `unsubscribeFromPush`. A device used by two accounts SHALL hold one row for each. Account deletion SHALL remove the rows by `ON DELETE CASCADE`.
+Signing out and switching accounts SHALL NOT change `push_subscriptions` or the local subscription: `PushOptIn` SHALL be the only caller of `unsubscribeFromPush`. A device used by two accounts SHALL hold one row for each. Account deletion SHALL remove the user's rows in its D1 batch.
 
 #### Scenario: Second account on one device
 - **WHEN** a second account subscribes on the same device
 - **THEN** the endpoint has one row per user, and the first row stays (`lib/push/subscribe.ts:103-108`; see ops #425)
 
-Cites: `lib/push/subscribe.ts:103-108`, `components/pwa/PushOptIn.tsx:152`, `db/migrations/028_web_push_subscriptions.sql:80`, `:89`.
+#### Scenario: Account deleted
+- **WHEN** a subscribed player deletes their account
+- **THEN** their rows are gone and another account's row for the same endpoint stays
+
+Cites: `lib/push/subscribe.ts:103-108`, `components/pwa/PushOptIn.tsx:152`, planned `lib/db/rpc/deleteAccount.ts`.
 
 ### Requirement: Opening Settings reconciles the local subscription
 When Settings loads with a local subscription on a known push host, `reconcileSubscription` SHALL look for the signed-in user's row for that endpoint. A matching row, or a failed query, SHALL show the toggle on. With no row it SHALL re-insert one from the local keys, for whichever account is signed in, superuser flags on or off. If the re-insert fails or the keys are missing, the toggle SHALL show off. With no local subscription, the toggle SHALL show off without a server check.
@@ -544,17 +551,21 @@ On `notificationclick` the service worker SHALL close the notification, focus a 
 Cites: `app/sw.ts:787-833`.
 
 ### Requirement: Subscriptions are stored per user and endpoint
-`push_subscriptions` SHALL hold one row per `(user_id, endpoint)` with the endpoint, `p256dh`, `auth_secret`, `created_at` and `last_seen_at`, under row-level security with SELECT, INSERT and DELETE policies for the owner and no UPDATE policy. A new row SHALL have an endpoint on a known push host. The database SHALL set `last_seen_at` on insert and nothing SHALL update it afterwards. An insert SHALL keep the user to at most 10 rows by deleting their least recently subscribed rows.
+`push_subscriptions` SHALL hold one row per `(user_id, endpoint)` with `p256dh`, `auth_secret`,
+`created_at` and `last_seen_at`. Browsers SHALL reach it only through the data gateway (session user
+pinned; select, insert and delete, no update). A new row SHALL be on a known push host; D1 SHALL set
+`last_seen_at` on insert only, and keep each user to at most 10 rows by deleting the least recently
+subscribed.
 
 #### Scenario: Another user's row
 - **WHEN** a signed-in client reads, adds or deletes a row for a different user
-- **THEN** the policies refuse it (`db/migrations/028_web_push_subscriptions.sql:98-105`)
+- **THEN** the gateway refuses it or returns no rows
 
 #### Scenario: Re-subscribing
 - **WHEN** a device re-subscribes
 - **THEN** its row is deleted and inserted again, with a new `created_at` and `last_seen_at`, and no other row is replaced (`lib/push/subscribe.ts:186-207`)
 
-Cites: `db/migrations/028_web_push_subscriptions.sql:78-105`, `db/migrations/049_push_subscriptions_limits.sql`, `lib/push/subscribe.ts:186-207`, `app/api/push/resubscribe/route.ts:45-63`.
+Cites: planned `db/d1/migrations/0001_schema.sql`, `lib/db/tables.ts`; `lib/push/subscribe.ts:186-207`, `app/api/push/resubscribe/route.ts:45-63`.
 
 ### Requirement: Sync counts subscriptions and nothing reads the count
 Each pull SHALL read the caller's row count, returning null on any error without failing the sync, and SHALL dispatch `poke-memory:push-subscriptions-pulled` with the count only when it is not null. No code SHALL listen for that event.
@@ -615,10 +626,11 @@ the next device as soon as a send ends.
 
 ### Requirement: A run that starts sending always finishes
 
-Both routes SHALL declare `maxDuration = 300`. No new send SHALL start more than 240 seconds after
-the route started. Once sending has started, the run SHALL still delete dead subscriptions and
-respond, and SHALL log how many due devices it did not reach and how many rows it skipped. The reads
-before the first send have no limit of their own.
+Both routes SHALL export no `maxDuration`, since Workers ignore it and a Cron Trigger run may last 15
+minutes. No new send SHALL start more than 240 seconds after the route started. Once sending has
+started, the run SHALL still delete dead subscriptions and respond, and SHALL log how many due devices
+it did not reach and how many rows it skipped. The reads before the first send have no limit of their
+own.
 
 #### Scenario: Budget used up
 
@@ -727,6 +739,82 @@ toggle shows off with or without a row: the send path skips that row, so the dev
 
 - **WHEN** the delete throws
 - **THEN** the result is still `disabled` (`components/pwa/subscribeHelpers.test.tsx:166`)
+
+### Requirement: A Worker Cron Trigger calls the routes every hour
+
+The production Worker's `0 * * * *` Cron Trigger SHALL call `send-daily` and `send-nudge` at minute 0
+of every UTC hour, through the Worker's own fetch handler, with an empty JSON body and
+`CRON_SHARED_SECRET` as the bearer token. There SHALL be no `pg_cron` job, no Vault secret and no
+`vercel.json` cron. The preview Worker SHALL have no Cron Triggers.
+
+#### Scenario: Top of each hour
+
+- **WHEN** the clock reaches minute 0 of any UTC hour
+- **THEN** both routes are called and each applies its own per-user hour gate
+
+#### Scenario: One route fails
+
+- **WHEN** `send-daily` answers 502 in a firing
+- **THEN** `send-nudge` still runs in that firing and both statuses are logged
+
+#### Scenario: Preview Worker
+
+- **WHEN** the hour turns on the preview Worker
+- **THEN** neither route is called
+
+Source (planned): design D2, `worker/index.ts`, `lib/cron/schedule.ts`, `wrangler.jsonc`.
+
+### Requirement: A subscription on the old VAPID key moves to the new one on load
+
+Once per page load for a signed-in user, the app SHALL move this browser's push subscription onto the
+current VAPID key when it was made with another one (`options.applicationServerKey` differs from
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY`): unsubscribe, delete the old row, subscribe again with no permission
+prompt and store the new endpoint as `subscribeToPush` does. It SHALL act only when permission is
+already "granted", the browser is online and no superuser flag is on.
+
+#### Scenario: Subscription on the old key
+
+- **WHEN** a signed-in player whose permission is granted loads the app online with a subscription
+  made with the old public key
+- **THEN** the old subscription is unsubscribed and its row deleted, a new subscription on the current
+  key is made with no permission prompt, and its endpoint is stored as a new row
+
+#### Scenario: Subscription already on the current key
+
+- **WHEN** the subscription's key equals `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+- **THEN** nothing changes, in the browser or in `push_subscriptions`
+
+#### Scenario: Permission not granted
+
+- **WHEN** Notification permission is "default" or "denied"
+- **THEN** nothing changes and no permission prompt is shown
+
+#### Scenario: Superuser flag on
+
+- **WHEN** any superuser flag is on
+- **THEN** the check does not run, so no row is written or deleted
+
+#### Scenario: Offline
+
+- **WHEN** the browser is offline at load
+- **THEN** nothing changes, and the check runs again on a later load
+
+#### Scenario: Subscribing again fails
+
+- **WHEN** the new subscribe call fails after the old subscription was removed
+- **THEN** the old row is still deleted, since its key no longer signs, and Settings shows reminders
+  off so the player can turn them on again
+
+#### Scenario: Guest
+
+- **WHEN** nobody is signed in
+- **THEN** the check does not run
+
+Why: the key pair is new at cutover (owner ruling, 19 November 2026: the old private key could not be
+read back from Vercel), so subscriptions on the old public key would otherwise get no more pushes.
+
+Source: `lib/push/subscribe.ts` (`reconcileVapidKey`), `components/sync/SignInPull.tsx`;
+tests `components/pwa/reconcileVapidKey.test.tsx`, `components/sync/SignInPull.test.tsx`.
 
 ## Clarifications
 
