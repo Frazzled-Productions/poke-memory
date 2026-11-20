@@ -26,7 +26,12 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "poke-memory" }],
-  "workers_dev": true,
+  // Served only at pokememory.com (cutover 20 November 2026, #2393), so the workers.dev address is
+  // off. The Worker Custom Domain is attached in Cloudflare, deliberately not listed as a route
+  // here: wrangler overrides existing DNS records when it runs in CI, so a route in this file would
+  // let any push to main re-take DNS after a rollback (as on the company site). `workers_dev`
+  // inherits into env.preview, which turns it back on for the preview test address.
+  "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },
   "d1_databases": [
@@ -62,6 +67,7 @@
     // repeated here; triggers DO inherit, so they are emptied explicitly.
     "preview": {
       "name": "poke-memory-preview",
+      "workers_dev": true,
       "preview_urls": true,
       "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "poke-memory-preview" }],
       "d1_databases": [

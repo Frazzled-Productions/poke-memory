@@ -41,7 +41,7 @@ Rulesets make these job names required: `main` - `test`, `e2e`, `Test coverage r
 
 ## Fork-PR and author guards
 
-- Workflows that use secrets or write to the repo skip fork PRs (`github.event.pull_request.head.repo.fork == false`; for `workflow_run`, `github.event.workflow_run.head_repository.fork == false`). Never remove or weaken these; a bare `== false` is falsy on non-PR events, so combine with an `event_name` check where needed (`deploy.yml`, `coverage.yml`). `deploy.yml` also sets `CLOUDFLARE_API_TOKEN` only on the steps that call wrangler, never workflow-wide, so `npm ci` install scripts and the Next.js build never see it; keep it that way.
+- Workflows that use secrets or write to the repo skip fork PRs (`github.event.pull_request.head.repo.fork == false`; for `workflow_run`, `github.event.workflow_run.head_repository.fork == false`). Never remove or weaken these; a bare `== false` is falsy on non-PR events, so combine with an `event_name` check where needed (`deploy.yml`, `coverage.yml`). `deploy.yml` also sets `CLOUDFLARE_API_TOKEN` only on the steps that call wrangler, never workflow-wide, so `npm ci` install scripts and the Next.js build never see it; keep it that way. The token lives only in the GitHub environment `Production` (deployment branches: `main`), which the production job names; there is no repository-level copy, so pull request jobs cannot read it. Never add one back.
 - Comment-triggered commands (none today; `/preview` went with `vercel-preview-on-ready.yml`) must be gated on `OWNER` / `MEMBER` / `COLLABORATOR` `author_association` at both job and step level. Any authenticated user can comment on a public repo.
 
 ## GitHub Actions gotchas

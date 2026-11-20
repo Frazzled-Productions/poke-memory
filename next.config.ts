@@ -126,7 +126,10 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 // build hook. Wrapping order: Sentry(next-intl(nextConfig)).
 //
 // Key options:
-//   silent           - suppresses Sentry CLI output during `next build`.
+//   silent           - suppresses Sentry CLI output during a local `next build`,
+//                      but not in CI (`CI` is set on GitHub runners), so the
+//                      production deploy log shows whether source maps
+//                      uploaded or why they were skipped.
 //   sourcemaps.deleteSourcemapsAfterUpload
 //                    - strips source maps from the build output after they are
 //                      uploaded so they are not served publicly. Defaults to
@@ -166,7 +169,7 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 // is a no-op (no network, no throw). When SENTRY_AUTH_TOKEN is absent,
 // withSentryConfig warns and skips map upload - it does NOT fail the build.
 export default withSentryConfig(withNextIntl(nextConfig), {
-  silent: true,
+  silent: !process.env.CI,
   sourcemaps: {
     deleteSourcemapsAfterUpload: true,
   },
