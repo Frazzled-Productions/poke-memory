@@ -269,8 +269,10 @@ describe("preview guard", () => {
     expect(compare[0]).toMatch(/GH_TOKEN: \$\{\{ github\.token \}\}/);
     expect(compare[0]).not.toMatch(/secrets\./);
     expect(compare[0]).not.toMatch(/actions\/checkout@|git (fetch|checkout|clone)/);
-    // Only ever a notice: a failed call warns and carries on, so the upload is never skipped.
-    expect(compare[0]).not.toMatch(/\bexit [1-9]|\bset -e|continue-on-error/);
+    // Only ever a notice: a failed call warns and carries on, and continue-on-error keeps any other
+    // failure in the step from skipping the upload.
+    expect(compare[0]).toMatch(/^ {8}continue-on-error: true$/m);
+    expect(compare[0]).not.toMatch(/\bexit [1-9]/);
     expect(compare[0]).toMatch(/compare\/main\.\.\.\$\{target\}/);
     expect(compare[0]).toMatch(/for target in "\$HEAD_SHA" "\$BASE_REF"/);
     expect(compare[0]).toMatch(/wrangler\\\.jsonc/);

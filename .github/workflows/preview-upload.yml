@@ -12,7 +12,7 @@
 #   so no repository or organisation secret can stand in): a notice, and the run is green.
 # - Everything that runs or configures a run comes from a checkout of `main`, whatever the PR's base:
 #   wrangler.jsonc (so the preview bindings are main's, never the PR's or qa's), package.json and
-#   package-lock.json (trusted wrangler and Playwright), .nvmrc, playwright.config.ts and the auth
+#   package-lock.json (trusted wrangler and Playwright), .npmrc, .nvmrc, playwright.config.ts and the auth
 #   specs. `qa` takes any CI-green change, so it is not trusted here (#2415). Every wrangler call
 #   names that config.
 # - The artefact is untrusted bytes: symlinks and anything but plain files are refused, and nothing in
@@ -22,8 +22,8 @@
 #   permissions on poke-memory-preview (ops #612). deploy.yml's production job applies main's
 #   migrations and seed to it, so every preview runs against main's schema; a PR's own migration
 #   reaches it only once promoted.
-# - A read-only compare of main with the PR head names the trusted files and migrations the preview
-#   does not get yet, in a notice and the PR comment.
+# - Read-only compares of main with the PR head and with its base branch name the trusted files and
+#   migrations the preview does not get yet, in a notice and the PR comment.
 # - PR number, base branch and head SHA come from the event, never from the artefact.
 #
 # Active only once this file is on `main`: until a qa-to-main promotion carries it there, previews
@@ -140,8 +140,9 @@ jobs:
         # to the preview database. Each files list comes whole (up to 300) on the first page. Names are
         # kept only if made of safe characters (no `@`, `:` or `%`), so a crafted file name cannot
         # inject a workflow command, a mention or Markdown; names left out are counted. A failure only
-        # warns: this is a notice, never a reason to skip the upload.
+        # warns: this is a notice, never a reason to skip the upload (continue-on-error makes sure).
         id: differs
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}

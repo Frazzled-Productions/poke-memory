@@ -134,11 +134,13 @@ PR branch lacks are in it too. It keeps file names made only of `A-Za-z0-9._/+-`
 a crafted name cannot inject a workflow command, a mention or Markdown), warns with a count when it
 drops a name or GitHub's 300-file limit is reached, and splits the union into:
 - trusted: `wrangler.jsonc`, `package.json`, `package-lock.json`, `.npmrc`, `.nvmrc`,
-  `playwright.config.ts`, `e2e/*` (what `main`'s checkout installs and runs here; the seed script no
-  longer runs in this workflow);
+  `playwright.config.ts`, `e2e/*` (the files that decide what `main`'s checkout installs, binds and
+  tests here; the seed script no longer runs in this workflow, and `npm ci`'s Node version check is
+  left out as noise);
 - migrations: `db/d1/migrations/*`.
 
-Each non-empty list prints a `::notice::` and adds one line to the PR comment. The three-dot compare
+Each non-empty list prints a `::notice::` and adds one line to the PR comment. The step has
+`continue-on-error: true`, so no failure in it can skip the upload. The three-dot compare
 includes changes already on `qa` but not on `main`, which is exactly what the preview does not get. A
 failed call prints a `::warning::` and the upload goes ahead; 300 files prints a warning that the list
 may be incomplete.
