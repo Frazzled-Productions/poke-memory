@@ -66,6 +66,10 @@ describe("wrangler.jsonc Cron Triggers", () => {
     expect(config.env.preview.triggers).toEqual({ crons: [] });
     expect(config.env.preview.vars?.DEPLOY_ENV).toBe("cloudflare-preview");
   });
+
+  it("the preview Worker's sign-in base URL is qa.pokememory.com, its Worker Custom Domain", () => {
+    expect(config.env.preview.vars?.BETTER_AUTH_URL).toBe("https://qa.pokememory.com");
+  });
 });
 
 describe("wrangler.jsonc backups bucket (design D10)", () => {
