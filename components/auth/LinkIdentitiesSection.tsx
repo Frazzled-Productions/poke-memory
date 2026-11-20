@@ -3,9 +3,9 @@
 /**
  * Allows a signed-in user to link a second OAuth provider to their account.
  *
- * Uses supabase.auth.linkIdentity() which is currently in beta.
- * The no-beta-auth rule has been knowingly overridden by the repo owner for
- * this feature - see PR #362.
+ * Uses Better Auth's authClient.linkSocial() (design D6); the linked
+ * providers come from the user's accounts (listAccounts, mapped to
+ * `user.identities` by AuthContext).
  *
  * Placed in components/auth/ to sit alongside AuthButton, the other
  * auth-surface component.
@@ -13,8 +13,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
-import type { AuthProvider } from "@/lib/auth/types";
+import { authClient } from "@/lib/auth/client";
+import type { AppUser, AuthProvider } from "@/lib/auth/types";
 import { cn } from "@/lib/utils/cn";
 import { cardPanelPadded, colStack, mutedText, mutedTextXs, sectionLabel } from "@/lib/utils/class-names";
 
@@ -30,17 +30,14 @@ const ALL_PROVIDERS: AuthProvider[] = ["github", "google"];
 type LinkState = "idle" | "pending" | "success" | "error";
 
 type Props = {
-  user: User;
-  supabase: SupabaseClient;
+  user: AppUser;
 };
 
 /**
  * Returns the set of OAuth providers already linked to this user.
- * `user.identities` is undefined when the user has no linked identities - 
- * treat that as an empty list.
  */
-function linkedProviders(user: User): Set<AuthProvider> {
-  const identities = user.identities ?? [];
+function linkedProviders(user: AppUser): Set<AuthProvider> {
+  const identities = user.identities;
   const providers = new Set<AuthProvider>();
   for (const identity of identities) {
     const p = identity.provider as string;
@@ -52,28 +49,14 @@ function linkedProviders(user: User): Set<AuthProvider> {
 }
 
 /**
- * Maps a Supabase linkIdentity error message to a friendly user-facing string.
+ * Maps a Better Auth linkSocial error to a friendly user-facing string. (An
+ * account already linked to a different user is reported after the provider
+ * round trip, on the home page's sign-in failed banner.)
  */
-function friendlyError(rawMessage: string): string {
-  const msg = rawMessage.toLowerCase();
-
-  // Already linked to this user.
-  if (
-    msg.includes("identity is already linked") ||
-    msg.includes("already linked") ||
-    msg.includes("provider already linked")
-  ) {
+function friendlyError(error: { code?: string }): string {
+  if (error.code === "SOCIAL_ACCOUNT_ALREADY_LINKED") {
     return "That provider is already connected to your account.";
   }
-
-  // The email on the OAuth account is already in use by a different Supabase user.
-  // Supabase returns "a user with this email address has already been registered"
-  // for the identity-already-linked-to-another-user case. We match the full
-  // phrase to avoid misclassifying unrelated errors that happen to mention "registered".
-  if (msg.includes("a user with this email address has already been registered")) {
-    return "That email address is already linked to a different account. Sign in with that account directly.";
-  }
-
   return "Could not connect the provider. Please try again.";
 }
 
@@ -109,7 +92,7 @@ function LinkProviderRow({
  *
  * Only rendered when the user is signed in (the caller gates on this).
  */
-export function LinkIdentitiesSection({ user, supabase }: Props) {
+export function LinkIdentitiesSection({ user }: Props) {
   const t = useTranslations("auth");
   const [linkState, setLinkState] = useState<LinkState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -124,33 +107,30 @@ export function LinkIdentitiesSection({ user, supabase }: Props) {
     setErrorMsg(null);
 
     try {
-      const base =
-        process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-      const { error } = await supabase.auth.linkIdentity({
+      // Redirects to the provider, then back to settings once linked; a
+      // failure lands on the home page's sign-in failed banner, as before.
+      const { error } = await authClient.linkSocial({
         provider,
-        options: { redirectTo: `${base}/api/auth/callback` },
+        callbackURL: "/settings",
+        errorCallbackURL: "/",
       });
 
       if (error) {
         setLinkState("error");
-        setErrorMsg(friendlyError(error.message));
+        setErrorMsg(friendlyError(error));
         setPendingProvider(null);
         return;
       }
 
-      // linkIdentity redirects the browser to the OAuth provider. If we reach
+      // linkSocial redirects the browser to the OAuth provider. If we reach
       // here the redirect did not happen (unexpected), so surface a generic
       // success note. In normal usage the page will navigate away before
       // React re-renders.
       setLinkState("success");
       setPendingProvider(null);
-    } catch (err) {
+    } catch {
       setLinkState("error");
-      setErrorMsg(
-        err instanceof Error
-          ? friendlyError(err.message)
-          : "Could not connect the provider. Please try again.",
-      );
+      setErrorMsg(friendlyError({}));
       setPendingProvider(null);
     }
   }

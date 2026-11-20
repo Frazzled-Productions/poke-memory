@@ -10,7 +10,7 @@ Canonical reference for how Pokémon sprites are rendered across the app. AGENTS
 - **Sprite sizes live in one place** - `lib/sprites/sizes.ts`. Never hard-code a sprite pixel size at a call site; import the named constant for the surface.
 - **`preload` is for above-the-fold hero sprites only.** Off-screen and below-the-fold sprites use the `next/image` default (lazy) loading; never set `preload` on them. The old `priority` prop is deprecated in Next 16 and banned by lint (#2015).
 - **Network warming vs. decode warming are two different gaps.** `SpritePreloader` warms the *network* cache ahead of time; `decodeSpriteUrls` / `useSpritePrefetch().decodeAhead` bridges the *fetch → GPU-decode* gap just before a state swap. A surface with a visible transition often needs both.
-- **`/_next/image` is NOT used for sprites.** The global custom loader (`lib/sprites/imageLoader.ts`) redirects sprite paths directly to pre-generated static WebP files; no Vercel Image Optimisation transformations are billed.
+- **`/_next/image` is NOT used for sprites.** The global custom loader (`lib/sprites/imageLoader.ts`) redirects sprite paths directly to pre-generated static WebP files; no server-side image optimisation runs (it was billed per transformation on Vercel, and the Worker has none).
 
 ## The static WebP tree
 
@@ -40,7 +40,7 @@ Sprite infrastructure is neutral and lives outside `lib/review/` so non-review s
 
 ## `next/image` vs. plain `<img>`
 
-**Use `next/image` by default.** It resolves to the pre-generated static WebP variant via the global loader (no Vercel Image Optimisation transformation), sets explicit dimensions (so there is no layout shift), and integrates with `SpritePreloader` - the preloader's hidden `<Image>` and the visible `<Image>` share a `src` + `width`, so the visible one is served from cache.
+**Use `next/image` by default.** It resolves to the pre-generated static WebP variant via the global loader (no server-side image optimisation), sets explicit dimensions (so there is no layout shift), and integrates with `SpritePreloader` - the preloader's hidden `<Image>` and the visible `<Image>` share a `src` + `width`, so the visible one is served from cache.
 
 **Use a plain `<img>` only with a documented reason.** Today the single exemption is the Pokédex grid (below). Any future plain-`<img>` surface must carry an inline comment explaining why and the `// eslint-disable-next-line @next/next/no-img-element` directive, and should be recorded here.
 

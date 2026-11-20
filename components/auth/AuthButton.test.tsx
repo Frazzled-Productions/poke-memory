@@ -13,7 +13,7 @@
  *  - signIn pending transition renders "Signing in…" and disables the button
  *  - signOut pending transition renders "Signing out…"
  *  - Signed-in: avatar rendered when avatar_url is set
- *  - Signed-in: display-name fallback chain (user_name → full_name → name → email → "User avatar")
+ *  - Signed-in: display-name fallback chain (user_name → full_name → name → "User avatar"; Better Auth keeps no email in metadata)
  *  - Both GitHub and Google provider branches invoke signIn with the right provider
  *  - Japanese locale renders auth strings correctly (サインイン for Sign in)
  */
@@ -21,7 +21,7 @@
 import { screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { User } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/types";
 import { renderWithIntl, renderJa } from "@/components/test-utils/renderWithIntl";
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ import { AuthButton } from "@/components/auth/AuthButton";
 // Fake user factory
 // ---------------------------------------------------------------------------
 
-function makeUser(meta: Record<string, string | undefined> = {}): Partial<User> {
+function makeUser(meta: AppUser["user_metadata"] = {}): Partial<AppUser> {
   return {
     id: "00000000-0000-0000-0000-000000000001",
     user_metadata: meta,
@@ -290,15 +290,6 @@ describe("AuthButton - signed-in state", () => {
     });
     renderWithIntl(<AuthButton />);
     expect(screen.getByRole("img").getAttribute("alt")).toBe("Ash");
-  });
-
-  it("falls back to email when user_name / full_name / name are absent", () => {
-    mockUseAuth.mockReturnValue({
-      user: makeUser({ avatar_url: "https://example.com/avatar.png", email: "ash@pallet.town" }),
-      loading: false,
-    });
-    renderWithIntl(<AuthButton />);
-    expect(screen.getByRole("img").getAttribute("alt")).toBe("ash@pallet.town");
   });
 
   it("uses 'User avatar' as the alt when all metadata fields are absent", () => {

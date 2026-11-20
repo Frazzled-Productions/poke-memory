@@ -1,5 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { pullSession, mergeCloudIntoLocalSilent, maxCloudUpdatedAt } from "@/lib/sync/cloud";
+import { isLaterInstant } from "@/lib/sync/instant";
 import {
   pullUserSettingsRow,
   pullRegionalPrefs,
@@ -135,7 +136,7 @@ function mergeAffectsProgress(
  * breaks the local-first review flow.
  */
 export async function pullAndMerge(
-  client: SupabaseClient | null,
+  client: DataClient | null,
   userId: string | null,
   /**
    * When true, the push-back leg of the locale union-merge is suppressed.
@@ -174,7 +175,7 @@ export async function pullAndMerge(
     if (
       pulledRow?.lastResetAt &&
       (syncStatus.lastSeenResetAt === null ||
-        pulledRow.lastResetAt > syncStatus.lastSeenResetAt)
+        isLaterInstant(pulledRow.lastResetAt, syncStatus.lastSeenResetAt))
     ) {
       await clearLocalProgress();
       // clearLocalProgress wiped sync-status:v1 under the poke-memory:*
@@ -206,9 +207,9 @@ export async function pullAndMerge(
       const cloudIsNewer =
         pulledRow.updatedAt !== null &&
         (syncStatus.lastSettingsPullAt === null ||
-          pulledRow.updatedAt > syncStatus.lastSettingsPullAt);
+          isLaterInstant(pulledRow.updatedAt, syncStatus.lastSettingsPullAt));
       // `user_settings.updated_at` is `NOT NULL DEFAULT now()` so this
-      // branch is unreachable against real Supabase data. It exists for the
+      // branch is unreachable against real cloud data. It exists for the
       // schema-drift case `pullUserSettingsRow` coerces with `?? null`
       // (response missing the column entirely) - when that happens we still
       // want to apply the blob once and then stamp the cursor so we don't

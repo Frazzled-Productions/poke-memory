@@ -47,7 +47,7 @@ describe("urlBase64ToUint8Array", () => {
 // ---------------------------------------------------------------------------
 
 /**
- * A minimal Supabase client stub.
+ * A minimal data client stub.
  */
 function makeMockClient(opts: {
   selectData?: { endpoint: string } | null;
@@ -73,7 +73,7 @@ function makeMockClient(opts: {
     }),
     insert: vi.fn().mockResolvedValue({ error: opts.insertError ?? null }),
   }));
-  return { from } as unknown as import("@supabase/supabase-js").SupabaseClient;
+  return { from } as unknown as import("@/lib/db/client").DataClient;
 }
 
 function mockNavigatorServiceWorker(subscription: PushSubscription | null) {
@@ -170,7 +170,7 @@ describe("reconcileSubscription", () => {
       from: vi.fn(() => {
         throw new Error("offline");
       }),
-    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+    } as unknown as import("@/lib/db/client").DataClient;
     expect(await reconcileSubscription(client, "user-1")).toBe("disabled");
   });
 

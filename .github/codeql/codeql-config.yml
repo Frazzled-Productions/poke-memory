@@ -1,0 +1,7 @@
+# CodeQL configuration, read by .github/workflows/codeql.yml (`config-file`).
+#
+# vendor/ holds third-party code copied unmodified (vendor/fsrs-binding-wasm32-wasi is the FSRS
+# wasm binding's own browser glue, MIT). Alerts there are not ours to fix and would come back on
+# every re-vendor, so it is not analysed. Our own wrapper code (lib/srs/optimiser/) is.
+paths-ignore:
+  - vendor/**

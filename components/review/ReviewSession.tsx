@@ -1113,13 +1113,13 @@ export function ReviewSession() {
   // eslint-disable-next-line @typescript-eslint/no-use-before-define
   const handleGradeRef = useRef<(grade: Grade) => Promise<void>>(handleGrade);
   // Sync: per-grade debounced upserts (primary path) + unload safety-net.
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const { anyFlagOn: superuserGuarded, flags: superuserFlags } = useSuperuser();
   // When any superuser flag is on, suppress cloud writes by treating sync as
   // signed-out. Per-grade enqueue, debounced drain, and unload sendBeacon all
   // short-circuit on null client/userId. Background pulls (SyncOnVisible /
   // SignInPull) keep running so local stays consistent with cloud.
-  const syncClient = superuserGuarded ? null : supabase;
+  const syncClient = superuserGuarded ? null : db;
   const syncUserId = superuserGuarded ? null : user?.id ?? null;
   // An undoable grade is HELD on the device and only reaches the cloud once
   // committed (next grade, unmount, page hidden/closed, idle cap); commit
@@ -1137,7 +1137,7 @@ export function ReviewSession() {
   );
   useSyncOnUnload(syncClient, syncUserId, flushPending);
 
-  // Per-user shuffle salt: authenticated users use their stable Supabase UUID;
+  // Per-user shuffle salt: authenticated users use their stable account UUID;
   // guests use a per-device UUID persisted to localStorage.  This ensures the
   // daily card order is deterministic per (user, day) but differs across users.
   //

@@ -1,7 +1,7 @@
 /**
  * Older-client safety for the favourite keys (#2187), the client half of the
  * change's safety fact (the SQL half is
- * `lib/sync/integration/favourite-settings.test.ts`).
+ * `lib/db/rpc/mergeUserSettings.test.ts`).
  *
  * A device on the previous release rebuilds the settings blob field by field
  * (`parseStoredSettings`), so it holds none of the four new keys. Its
@@ -14,7 +14,7 @@
 
 import { render, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { AutoSyncOnChange } from "@/components/sync/AutoSyncOnChange";
 import {
   loadSettings,
@@ -32,7 +32,7 @@ vi.mock("@/lib/sync/persistence", () => ({ markPushSucceeded: vi.fn() }));
 vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => ({
     user: { id: "00000000-0000-0000-0000-000000000000" },
-    supabase: {} as unknown as SupabaseClient,
+    db: {} as unknown as DataClient,
   }),
 }));
 vi.mock("@/lib/sync/settings", () => ({ pushSettings: vi.fn() }));

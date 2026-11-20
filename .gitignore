@@ -23,6 +23,10 @@
 # regenerated on every build incl. CI/Vercel, so not committed, #1752)
 /public/sw/
 
+# generated FSRS optimiser worker bundles + wasm (scripts/build-fsrs-optimiser.mjs,
+# run by `npm run build` and `npm run dev`)
+/public/fsrs/
+
 # production
 /build
 
@@ -55,3 +59,11 @@ next-env.d.ts
 /tools/art/.venv/
 /tools/art/out/
 __pycache__/
+
+# generated from CHANGELOG.md by scripts/generate-changelog-module.mjs (Workers have no filesystem)
+/lib/changelog/changelog.generated.ts
+
+# Cloudflare: OpenNext build output and wrangler local state (D1, R2)
+/.open-next/
+/.wrangler/
+/.dev.vars*

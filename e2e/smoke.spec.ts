@@ -990,7 +990,7 @@ test.describe("Settings page", () => {
 
     // Guest state: sign-in prompt is visible
     await expect(
-      page.getByText("Sign in to enable personalized scheduling."),
+      page.getByText("Sign in to enable personalised scheduling."),
     ).toBeVisible();
 
     // Guest state: the optimize button is NOT rendered
@@ -1123,7 +1123,7 @@ test.describe("Sign-in sheet (#1669)", () => {
 
     const signIn = page.getByRole("button", { name: "Sign in" });
     if (!(await signIn.isVisible().catch(() => false))) {
-      // AuthButton renders nothing when Supabase env vars are absent - skip
+      // AuthButton renders nothing when auth is not configured - skip
       // rather than fail in environments without auth configured.
       test.skip();
       return;
@@ -1583,8 +1583,8 @@ test.describe("PWA / offline support", () => {
     page,
     baseURL,
   }) => {
-    // Registration is gated to production builds, so it only happens on the
-    // Vercel preview deployment, not a local `next dev` server. Skip the
+    // Registration is gated to production builds, so it only happens on a
+    // production build (CI or the preview Worker), not a local `next dev` server. Skip the
     // assertion when running against localhost.
     test.skip(
       !baseURL || baseURL.includes("localhost") || baseURL.includes("127.0.0.1"),

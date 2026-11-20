@@ -11,7 +11,6 @@
 #     into main)
 #   * auto-release.yml `release` job on the schedule / workflow_dispatch path
 #     (the `chore(release)` commit)
-#   * refresh-user-count.yml (the daily `chore(stats)` commit)
 # A new push-to-main producer must call this too. Without it, qa silently
 # drifts behind main and the daily qa-drift-check opens a tracking issue
 # (#1959, #1989, #2044).

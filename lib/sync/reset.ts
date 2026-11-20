@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { clearLocalProgress } from "@/lib/storage/reset";
 
 /**
@@ -18,7 +18,7 @@ import { clearLocalProgress } from "@/lib/storage/reset";
  * state will resurrect the cloud rows on the next push (the #293 + #576
  * delete-resurrection class).
  */
-export async function resetAllProgress(client: SupabaseClient): Promise<boolean> {
+export async function resetAllProgress(client: DataClient): Promise<boolean> {
   try {
     const { error } = await client.rpc("reset_all_progress");
     if (error) {
@@ -48,7 +48,7 @@ export type ResetEverywhereResult =
  * there is no cloud side to wipe.
  */
 export async function resetAllProgressEverywhere(
-  client: SupabaseClient,
+  client: DataClient,
 ): Promise<ResetEverywhereResult> {
   const cloudOk = await resetAllProgress(client);
   if (!cloudOk) return { ok: false, reason: "cloud-reset-failed" };

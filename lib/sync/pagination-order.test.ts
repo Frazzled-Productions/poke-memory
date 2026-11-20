@@ -87,7 +87,7 @@ describe("findUnorderedRanges (fixtures)", () => {
   });
 });
 
-describe("paginated Supabase queries are ordered", () => {
+describe("paginated cloud queries are ordered", () => {
   const root = join(__dirname, "..", "..");
   const files = [...walk(join(root, "lib")), ...walk(join(root, "app", "api"))];
 
@@ -100,9 +100,9 @@ describe("paginated Supabase queries are ordered", () => {
         "lib/sync/cloud.ts",
         "lib/sync/streak.ts",
         "lib/sync/gradeLog.ts",
-        "app/api/export/route.ts",
-        "app/api/push/send-daily/route.ts",
-        "app/api/srs/optimize/route.ts",
+        // app/api/export and app/api/push/send-daily read D1 now, which has
+        // no PostgREST row cap, so they no longer page; the server optimiser
+        // route is gone (optimisation runs in the browser).
       ]),
     );
   });

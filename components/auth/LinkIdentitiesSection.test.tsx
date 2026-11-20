@@ -2,42 +2,28 @@ import { renderWithIntl as render, screen } from "@/components/test-utils/render
 import { waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { User } from "@supabase/supabase-js";
+import type { AppUser } from "@/lib/auth/types";
+
+const mockLinkSocial = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/auth/client", () => ({
+  authClient: { linkSocial: (...args: unknown[]) => mockLinkSocial(...args) },
+}));
+
 import { LinkIdentitiesSection } from "@/components/auth/LinkIdentitiesSection";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build a minimal User fixture with the given linked providers. */
-function makeUser(providers: string[]): User {
+/** A minimal AppUser with the given linked providers (as listAccounts maps them). */
+function makeUser(providers: string[]): AppUser {
   return {
     id: "user-123",
-    app_metadata: {},
-    user_metadata: {},
-    aud: "authenticated",
+    email: null,
     created_at: "2024-01-01T00:00:00.000Z",
-    identities: providers.map((provider, i) => ({
-      id: `identity-${i}`,
-      user_id: "user-123",
-      identity_id: `identity-${i}`,
-      provider,
-      identity_data: {},
-      last_sign_in_at: "2024-01-01T00:00:00.000Z",
-      created_at: "2024-01-01T00:00:00.000Z",
-      updated_at: "2024-01-01T00:00:00.000Z",
-    })),
-  } as unknown as User;
-}
-
-/** Build a minimal Supabase client mock. */
-function makeMockSupabase(
-  linkResult: { error: { message: string } | null } = { error: null },
-) {
-  return {
-    auth: {
-      linkIdentity: vi.fn().mockResolvedValue(linkResult),
-    },
+    user_metadata: {},
+    app_metadata: { provider: providers[0], providers },
+    identities: providers.map((provider, i) => ({ provider, id: `account-${i}` })),
   };
 }
 
@@ -47,332 +33,111 @@ function makeMockSupabase(
 
 describe("LinkIdentitiesSection", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockLinkSocial.mockReset();
   });
 
   describe("linked providers display", () => {
     it("shows GitHub as connected when user has github identity", () => {
-      const user = makeUser(["github"]);
-      const supabase = makeMockSupabase();
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-      expect(
-        screen.getByRole("listitem", { name: /github connected/i }),
-      ).toBeInTheDocument();
+      render(<LinkIdentitiesSection user={makeUser(["github"])} />);
+      expect(screen.getByRole("listitem", { name: /github connected/i })).toBeInTheDocument();
     });
 
     it("shows Google as connected when user has google identity", () => {
-      const user = makeUser(["google"]);
-      const supabase = makeMockSupabase();
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-      expect(
-        screen.getByRole("listitem", { name: /google connected/i }),
-      ).toBeInTheDocument();
+      render(<LinkIdentitiesSection user={makeUser(["google"])} />);
+      expect(screen.getByRole("listitem", { name: /google connected/i })).toBeInTheDocument();
     });
 
     it("shows both providers connected when user has both identities", () => {
-      const user = makeUser(["github", "google"]);
-      const supabase = makeMockSupabase();
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-      expect(
-        screen.getByRole("listitem", { name: /github connected/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("listitem", { name: /google connected/i }),
-      ).toBeInTheDocument();
+      render(<LinkIdentitiesSection user={makeUser(["github", "google"])} />);
+      expect(screen.getByRole("listitem", { name: /github connected/i })).toBeInTheDocument();
+      expect(screen.getByRole("listitem", { name: /google connected/i })).toBeInTheDocument();
     });
 
-    it("shows no linked providers list when user has no identities", () => {
-      const user = makeUser([]);
-      const supabase = makeMockSupabase();
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-      expect(
-        screen.queryByRole("list", { name: /connected providers/i }),
-      ).not.toBeInTheDocument();
+    it("shows no linked providers list for a username-only account", () => {
+      render(<LinkIdentitiesSection user={makeUser(["email"])} />);
+      expect(screen.queryByRole("list")).toBeNull();
     });
   });
 
-  describe("linkable providers display", () => {
+  describe("linkable providers", () => {
     it("offers Connect Google when only github is linked", () => {
-      const user = makeUser(["github"]);
-      const supabase = makeMockSupabase();
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-      expect(
-        screen.getByRole("button", { name: /connect google/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /connect github/i }),
-      ).not.toBeInTheDocument();
-    });
-
-    it("offers Connect GitHub when only google is linked", () => {
-      const user = makeUser(["google"]);
-      const supabase = makeMockSupabase();
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-      expect(
-        screen.getByRole("button", { name: /connect github/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /connect google/i }),
-      ).not.toBeInTheDocument();
+      render(<LinkIdentitiesSection user={makeUser(["github"])} />);
+      expect(screen.getByRole("button", { name: /connect google/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /connect github/i })).toBeNull();
     });
 
     it("offers both Connect buttons when no providers are linked", () => {
-      const user = makeUser([]);
-      const supabase = makeMockSupabase();
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-      expect(
-        screen.getByRole("button", { name: /connect github/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /connect google/i }),
-      ).toBeInTheDocument();
+      render(<LinkIdentitiesSection user={makeUser([])} />);
+      expect(screen.getByRole("button", { name: /connect github/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /connect google/i })).toBeInTheDocument();
     });
 
     it("shows 'all methods connected' copy when all providers are linked", () => {
-      const user = makeUser(["github", "google"]);
-      const supabase = makeMockSupabase();
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-      expect(
-        screen.getByText(/all available sign-in methods are already connected/i),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /connect/i }),
-      ).not.toBeInTheDocument();
+      render(<LinkIdentitiesSection user={makeUser(["github", "google"])} />);
+      expect(screen.getByText(/all available sign-in methods are already connected/i)).toBeInTheDocument();
     });
   });
 
-  describe("linking flow", () => {
-    it("calls linkIdentity with the correct provider and redirectTo from NEXT_PUBLIC_SITE_URL", async () => {
+  describe("linking", () => {
+    it("calls linkSocial with the provider, back to settings, failures to the home banner", async () => {
       const ue = userEvent.setup();
-      const user = makeUser(["github"]);
-      const supabase = makeMockSupabase({ error: null });
-      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pokememory.com");
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
+      mockLinkSocial.mockResolvedValue({ data: { url: "https://accounts.google.com/" }, error: null });
+      render(<LinkIdentitiesSection user={makeUser(["github"])} />);
 
       await ue.click(screen.getByRole("button", { name: /connect google/i }));
 
-      await waitFor(() => {
-        expect(supabase.auth.linkIdentity).toHaveBeenCalledWith({
-          provider: "google",
-          options: { redirectTo: "https://pokememory.com/api/auth/callback" },
-        });
+      expect(mockLinkSocial).toHaveBeenCalledWith({
+        provider: "google",
+        callbackURL: "/settings",
+        errorCallbackURL: "/",
       });
-
-      vi.unstubAllEnvs();
-    });
-
-    it("falls back to localhost redirectTo when NEXT_PUBLIC_SITE_URL is unset", async () => {
-      const ue = userEvent.setup();
-      const user = makeUser(["github"]);
-      const supabase = makeMockSupabase({ error: null });
-      vi.stubEnv("NEXT_PUBLIC_SITE_URL", undefined);
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-
-      await ue.click(screen.getByRole("button", { name: /connect google/i }));
-
-      await waitFor(() => {
-        expect(supabase.auth.linkIdentity).toHaveBeenCalledWith({
-          provider: "google",
-          options: { redirectTo: "http://localhost:3000/api/auth/callback" },
-        });
-      });
-
-      vi.unstubAllEnvs();
     });
 
     it("disables the button while a link is pending", async () => {
       const ue = userEvent.setup();
-      const user = makeUser(["github"]);
-      // Never resolves during the test - simulates a pending state.
-      const supabase = {
-        auth: {
-          linkIdentity: vi.fn().mockImplementation(() => new Promise(() => {})),
-        },
-      };
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
+      mockLinkSocial.mockImplementation(() => new Promise(() => {}));
+      render(<LinkIdentitiesSection user={makeUser(["github"])} />);
 
       await ue.click(screen.getByRole("button", { name: /connect google/i }));
 
-      // The button should become disabled while the promise is pending.
-      expect(
-        screen.getByRole("button", { name: /connect google/i }),
-      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: /connect google/i })).toBeDisabled();
     });
   });
 
   describe("error handling", () => {
-    it("shows a generic error message on unexpected failure", async () => {
+    it("shows 'already connected' for SOCIAL_ACCOUNT_ALREADY_LINKED", async () => {
       const ue = userEvent.setup();
-      const user = makeUser(["github"]);
-      const supabase = makeMockSupabase({
-        error: { message: "unexpected server error" },
-      });
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
+      mockLinkSocial.mockResolvedValue({ data: null, error: { status: 400, code: "SOCIAL_ACCOUNT_ALREADY_LINKED" } });
+      render(<LinkIdentitiesSection user={makeUser(["github"])} />);
 
       await ue.click(screen.getByRole("button", { name: /connect google/i }));
 
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("link-identities-error"),
-        ).toHaveTextContent("Could not connect the provider. Please try again.");
-      });
+      await waitFor(() =>
+        expect(screen.getByTestId("link-identities-error")).toHaveTextContent(/already connected to your account/i),
+      );
     });
 
-    it("shows 'already connected' message for an already-linked error", async () => {
+    it("shows a generic error message on any other failure", async () => {
       const ue = userEvent.setup();
-      const user = makeUser(["github"]);
-      const supabase = makeMockSupabase({
-        error: { message: "Identity is already linked to another user" },
-      });
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
+      mockLinkSocial.mockResolvedValue({ data: null, error: { status: 500, code: "INTERNAL_SERVER_ERROR" } });
+      render(<LinkIdentitiesSection user={makeUser(["github"])} />);
 
       await ue.click(screen.getByRole("button", { name: /connect google/i }));
 
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("link-identities-error"),
-        ).toHaveTextContent("That provider is already connected to your account.");
-      });
+      await waitFor(() =>
+        expect(screen.getByTestId("link-identities-error")).toHaveTextContent(/could not connect the provider/i),
+      );
     });
 
-    it("shows 'email collision' message for an email-conflict error", async () => {
+    it("shows an error and re-enables the button when linkSocial throws", async () => {
       const ue = userEvent.setup();
-      const user = makeUser(["github"]);
-      const supabase = makeMockSupabase({
-        error: {
-          message:
-            "A user with this email address has already been registered",
-        },
-      });
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
+      mockLinkSocial.mockRejectedValue(new Error("network"));
+      render(<LinkIdentitiesSection user={makeUser(["github"])} />);
 
       await ue.click(screen.getByRole("button", { name: /connect google/i }));
 
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("link-identities-error"),
-        ).toHaveTextContent(
-          "That email address is already linked to a different account. Sign in with that account directly.",
-        );
-      });
-    });
-
-    it("shows error when linkIdentity throws (network failure)", async () => {
-      const ue = userEvent.setup();
-      const user = makeUser(["github"]);
-      const supabase = {
-        auth: {
-          linkIdentity: vi.fn().mockRejectedValue(new Error("network error")),
-        },
-      };
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-
-      await ue.click(screen.getByRole("button", { name: /connect google/i }));
-
-      await waitFor(() => {
-        expect(
-          screen.getByTestId("link-identities-error"),
-        ).toHaveTextContent("Could not connect the provider. Please try again.");
-      });
-    });
-
-    it("re-enables the connect button after an error so the user can retry", async () => {
-      const ue = userEvent.setup();
-      const user = makeUser(["github"]);
-      const supabase = makeMockSupabase({
-        error: { message: "unexpected server error" },
-      });
-      render(
-        <LinkIdentitiesSection
-          user={user}
-          supabase={supabase as never}
-        />,
-      );
-
-      await ue.click(screen.getByRole("button", { name: /connect google/i }));
-
-      await waitFor(() => {
-        expect(screen.getByTestId("link-identities-error")).toBeInTheDocument();
-      });
-
-      expect(
-        screen.getByRole("button", { name: /connect google/i }),
-      ).not.toBeDisabled();
+      await waitFor(() => expect(screen.getByTestId("link-identities-error")).toBeInTheDocument());
+      expect(screen.getByRole("button", { name: /connect google/i })).not.toBeDisabled();
     });
   });
 });

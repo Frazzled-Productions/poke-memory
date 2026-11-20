@@ -1,6 +1,6 @@
 import { render, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { AutoSyncOnChange } from "@/components/sync/AutoSyncOnChange";
 
 // Superuser context: default to no flags on. Tests that exercise the write-guard
@@ -20,11 +20,11 @@ vi.mock("@/lib/sync/persistence", () => ({
 }));
 
 // Auth: a signed-in fake. Tests can override by re-mocking inside an `it`.
-const FAKE_CLIENT = {} as unknown as SupabaseClient;
+const FAKE_CLIENT = {} as unknown as DataClient;
 const FAKE_USER = { id: "00000000-0000-0000-0000-000000000000" };
 
 vi.mock("@/lib/auth/AuthContext", () => ({
-  useAuth: vi.fn(() => ({ user: FAKE_USER, supabase: FAKE_CLIENT })),
+  useAuth: vi.fn(() => ({ user: FAKE_USER, db: FAKE_CLIENT })),
 }));
 
 vi.mock("@/lib/sync/settings", () => ({
@@ -82,7 +82,7 @@ describe("AutoSyncOnChange", () => {
     // Default to signed-in with no superuser flags active.
     vi.mocked(useAuth).mockReturnValue({
       user: FAKE_USER as unknown as ReturnType<typeof useAuth>["user"],
-      supabase: FAKE_CLIENT,
+      db: FAKE_CLIENT,
     } as ReturnType<typeof useAuth>);
     mockUseSuperuser.mockReturnValue({
       unlocked: false,
@@ -162,7 +162,7 @@ describe("AutoSyncOnChange", () => {
   it("does not push anything when signed out (user is null)", () => {
     vi.mocked(useAuth).mockReturnValue({
       user: null,
-      supabase: FAKE_CLIENT,
+      db: FAKE_CLIENT,
     } as ReturnType<typeof useAuth>);
     render(<AutoSyncOnChange />);
 
@@ -413,7 +413,7 @@ describe("AutoSyncOnChange - superuser write-guard", () => {
     // Signed-in user - credentials are valid. The guard must kick in despite this.
     vi.mocked(useAuth).mockReturnValue({
       user: FAKE_USER as unknown as ReturnType<typeof useAuth>["user"],
-      supabase: FAKE_CLIENT,
+      db: FAKE_CLIENT,
     } as ReturnType<typeof useAuth>);
     // Activate a superuser flag so anyFlagOn is true.
     mockUseSuperuser.mockReturnValue({
@@ -505,7 +505,7 @@ describe("AutoSyncOnChange - held grade-log entries (#2052)", () => {
     vi.clearAllMocks();
     vi.mocked(useAuth).mockReturnValue({
       user: FAKE_USER as unknown as ReturnType<typeof useAuth>["user"],
-      supabase: FAKE_CLIENT,
+      db: FAKE_CLIENT,
     } as ReturnType<typeof useAuth>);
     mockUseSuperuser.mockReturnValue({
       unlocked: false,

@@ -142,9 +142,13 @@ jobs:
           # (scripts/build-sw.mjs, #1752). It is gitignored, so the e2e job's
           # fresh checkout does not have it; without bundling it here `npm start`
           # would 404 on /sw/sw.js and the smoke SW assertion would fail.
+          # `public/fsrs/` is the same kind of output: the in-browser FSRS
+          # optimiser's worker bundles and wasm (scripts/build-fsrs-optimiser.mjs),
+          # which e2e/optimiser.spec.ts loads.
           path: |
             .next/
             public/sw/
+            public/fsrs/
           retention-days: 1
           include-hidden-files: true
 
@@ -237,32 +241,27 @@ jobs:
           if-no-files-found: error
 
   e2e-real-auth:
-    # Real-auth E2E (#1710): exercises the username/password door against the
-    # dedicated QA Supabase project on localhost (NOT the SSO-gated preview).
+    # Real-auth E2E (#1710): exercises the username/password door end to end.
     # This is the durable guard for the #1709 regression (sign-in succeeded
     # server-side but the UI never reflected it).
     #
-    # Builds its OWN server: NEXT_PUBLIC_* are inlined at BUILD time, and the
-    # shared `next-build` artifact from the `test` job is built with guest/no-
-    # Supabase env, so it cannot serve real auth. This job bakes the QA env into
-    # its own build + start.
+    # Runs against a local build of the Cloudflare Worker (`opennextjs-cloudflare
+    # preview`, which serves it with wrangler dev on localhost) and a fresh local
+    # D1 with every migration applied (move-to-cloudflare, design D11): Better
+    # Auth, the data gateway and the database triggers for real, with no
+    # Cloudflare account, no secrets and no QA project. The database lives in the
+    # runner's .wrangler/ folder and goes with it, so nothing needs tearing down,
+    # and the job runs on fork and Dependabot PRs too (it used to skip them for
+    # want of the QA project's secrets).
     #
-    # Fork / Dependabot guard: the QA_* secrets are exposed to neither fork PRs
-    # nor Dependabot PRs (Dependabot PRs run in a restricted secret context where
-    # secrets.QA_* resolve to empty), so the job would hard-fail (the spec's
-    # beforeAll throws without the env). Skip both, the `e2e` gate treats a
-    # skipped result as a pass. Use `pull_request.user.login`, NOT `github.actor`:
-    # actor changes to the maintainer on a manual re-run, which would un-skip the
-    # job and fail it again, whereas user.login is the stable PR author.
+    # Builds its OWN Worker: the shared `next-build` artifact from the `test` job
+    # is a plain `next build`, not the Worker bundle.
     needs: [changes, test]
-    if: >-
-      github.event.pull_request.head.repo.fork == false
-      && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     container:
       # Same pinned Playwright image as e2e-browser (browsers + Node 24 baked in).
       image: mcr.microsoft.com/playwright:v1.63.0-noble
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
     steps:
@@ -271,6 +270,8 @@ jobs:
         run: echo "No e2e-relevant changes detected - skipping real-auth Playwright suite."
       - uses: actions/checkout@v7
         if: needs.changes.outputs.e2e_relevant == 'true'
+        with:
+          persist-credentials: false
       - name: Cache npm
         if: needs.changes.outputs.e2e_relevant == 'true'
         uses: actions/cache@v6
@@ -281,37 +282,41 @@ jobs:
             npm-${{ runner.os }}-
       - run: npm ci
         if: needs.changes.outputs.e2e_relevant == 'true'
-      - name: Build with QA Supabase env baked in
+      - name: Build the Worker
+        if: needs.changes.outputs.e2e_relevant == 'true'
+        run: npm run cf:build
+      - name: Apply every migration to a fresh local D1
+        if: needs.changes.outputs.e2e_relevant == 'true'
+        run: npx wrangler d1 migrations apply DB --local
+      - name: Local Worker secrets (random per run, never stored)
+        if: needs.changes.outputs.e2e_relevant == 'true'
+        # wrangler dev reads .dev.vars (CI only, never committed). BETTER_AUTH_URL matches the
+        # origin the browser uses so Better Auth accepts its requests.
+        run: |
+          secret=$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')
+          printf 'BETTER_AUTH_SECRET=%s\nBETTER_AUTH_URL=http://localhost:8787\n' "$secret" > .dev.vars
+      - name: Start the Worker and run the real-auth spec
         if: needs.changes.outputs.e2e_relevant == 'true'
         env:
-          # NEXT_PUBLIC_* are inlined into the client bundle at build time, so the
-          # QA project must be provided HERE for real auth to work at runtime.
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.QA_NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.QA_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        run: npm run build
-      - name: Start Next.js and run the real-auth spec
-        if: needs.changes.outputs.e2e_relevant == 'true'
-        env:
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
-          # The spec (Node side) reads these to drive the RLS round-trip and the
-          # delete_account teardown via a fresh supabase-js client.
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.QA_NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.QA_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          # Unique per run+attempt so concurrent / repeated runs never collide on
-          # the ephemeral username, and no QA account accretes.
+          PLAYWRIGHT_BASE_URL: http://localhost:8787
+          # Unique per run+attempt so a repeated run never collides on the
+          # ephemeral username.
           E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
-          npm start &
-          echo $! > /tmp/next.pid
-          npx wait-on http://localhost:3000 --timeout 60000
+          npx opennextjs-cloudflare preview --port 8787 --ip 127.0.0.1 > /tmp/worker.log 2>&1 &
+          echo $! > /tmp/worker.pid
+          if ! npx wait-on http://localhost:8787 --timeout 120000; then
+            cat /tmp/worker.log
+            exit 1
+          fi
           # Dedicated auth-real project (Desktop Chrome); all functional
-          # projects testIgnore this spec so it only runs here with the QA env.
+          # projects testIgnore this spec so it only runs here.
           npx playwright test --project=auth-real
-      - name: Stop Next.js
+      - name: Stop the Worker
         if: always() && needs.changes.outputs.e2e_relevant == 'true'
         run: |
-          if [ -f /tmp/next.pid ]; then
-            kill "$(cat /tmp/next.pid)" 2>/dev/null || true
+          if [ -f /tmp/worker.pid ]; then
+            kill "$(cat /tmp/worker.pid)" 2>/dev/null || true
           fi
       - name: Upload Playwright report
         if: failure() && needs.changes.outputs.e2e_relevant == 'true'
@@ -346,9 +351,8 @@ jobs:
         run: |
           result="${{ needs.e2e-real-auth.result }}"
           echo "e2e-real-auth result: $result"
-          # Skipped is a pass: docs-only change (e2e_relevant false), or a fork PR
-          # or Dependabot PR (no QA secrets). Anything other than success or
-          # skipped fails the gate.
+          # Skipped is a pass (the job only skips if `test` did not run).
+          # Anything other than success or skipped fails the gate.
           if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
             echo "::error::The e2e-real-auth job did not pass (result: $result)."
             exit 1

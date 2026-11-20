@@ -9,7 +9,7 @@
  *
  * Cross-device sync: on dismiss, `saveSettings` is called with the updated
  * `dismissedMtBannerLocales` array; `AutoSyncOnChange` picks this up and
- * pushes the change to Supabase via the best-effort settings leg. On pull,
+ * pushes the change to the cloud via the best-effort settings leg. On pull,
  * `pullAndMerge` unions cloud locales into the standalone localStorage keys
  * so this component's read path requires no changes (AC2 of #1387).
  *

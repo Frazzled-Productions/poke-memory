@@ -54,7 +54,7 @@ const STORAGE_KEY = KEY_GRADE_LOG;
  * Fires on every successful `appendGradeEntry`. The detail is the stamped
  * `GradeLogEntry` that was just persisted. Consumed by
  * `components/sync/AutoSyncOnChange.tsx` (#319) to push the entry to
- * Supabase without waiting for the next manual Sync.
+ * the cloud without waiting for the next manual Sync.
  */
 export const GRADE_LOG_APPENDED_EVENT = "poke-memory:grade-log-appended";
 

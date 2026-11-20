@@ -114,16 +114,15 @@ export function scrubSentryEvent(event: ErrorEvent): ErrorEvent {
 }
 
 /**
- * Keeps the v10 environment names (`vercel-production`, `vercel-preview`) so
- * existing Sentry alerts and filters keep matching; v11 would otherwise report
- * the bare `production` / `preview`. Pass the runtime's Vercel env value
- * (`VERCEL_ENV`, or `NEXT_PUBLIC_VERCEL_ENV` in the browser bundle, which must
- * be read as a literal `process.env.X` for Next to inline it).
+ * The Sentry environment name. On Cloudflare it is the `DEPLOY_ENV` value
+ * itself (`cloudflare-production` or `cloudflare-preview`, set per Worker in
+ * `wrangler.jsonc`; `NEXT_PUBLIC_DEPLOY_ENV` in the browser bundle, inlined at
+ * build). Without it (local dev, tests) it falls back to `NODE_ENV`. Browser
+ * values must be read as a literal `process.env.X` for Next to inline them.
  */
 export function sentryEnvironment(
-  vercelEnv: string | undefined,
+  deployEnv: string | undefined,
   nodeEnv: string | undefined = process.env.NODE_ENV,
 ): string | undefined {
-  if (vercelEnv) return `vercel-${vercelEnv}`;
-  return nodeEnv;
+  return deployEnv || nodeEnv;
 }

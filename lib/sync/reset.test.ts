@@ -11,7 +11,7 @@ function makeRpcClient(rpcError: null | object = null) {
   const client = {
     rpc: rpcSpy,
   };
-  return client as unknown as import("@supabase/supabase-js").SupabaseClient & {
+  return client as unknown as import("@/lib/db/client").DataClient & {
     rpc: ReturnType<typeof vi.fn>;
   };
 }
@@ -55,7 +55,7 @@ describe("resetAllProgress", () => {
   it("returns false and logs when the RPC throws", async () => {
     const client = {
       rpc: vi.fn().mockRejectedValue(new Error("network error")),
-    } as unknown as import("@supabase/supabase-js").SupabaseClient & {
+    } as unknown as import("@/lib/db/client").DataClient & {
       rpc: ReturnType<typeof vi.fn>;
     };
     const result = await resetAllProgress(client);
@@ -78,7 +78,7 @@ describe("resetAllProgress - cooldown error path", () => {
 
   it("returns false when the RPC returns the cooldown SQLSTATE P0001", async () => {
     // PostgreSQL RAISE EXCEPTION ... USING ERRCODE = 'P0001' surfaces through
-    // Supabase/PostgREST as a PostgrestError with code 'P0001'. The function
+    // the gateway as a DbError with code 'P0001'. The function
     // must surface this as a failure without throwing.
     const cooldownError = {
       code: "P0001",
@@ -143,7 +143,7 @@ describe("resetAllProgressEverywhere", () => {
         calls.push("cloud");
         return { error: null, data: null };
       }),
-    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+    } as unknown as import("@/lib/db/client").DataClient;
 
     const result = await resetAllProgressEverywhere(client);
 

@@ -42,8 +42,6 @@ vi.mock("@/components/theme/FavouriteThemeProvider", () => ({
 }));
 vi.mock("@/components/theme/ThemeWatermark", () => ({ ThemeWatermark: () => null }));
 vi.mock("@/lib/superuser/SuperuserContext", () => ({ SuperuserProvider: () => null }));
-vi.mock("@vercel/analytics/next", () => ({ Analytics: () => null }));
-vi.mock("@vercel/speed-insights/next", () => ({ SpeedInsights: () => null }));
 vi.mock("@/components/analytics/FunnelTracker", () => ({
   FunnelTracker: () => null,
 }));
@@ -201,5 +199,36 @@ describe("Root layout - body structure (#1103)", () => {
         (el.props as { ["data-marker"]?: string })["data-marker"] === String(childrenMarker),
     );
     expect(found).not.toBeNull();
+  });
+});
+
+describe("Root layout - analytics (move-to-cloudflare D9)", () => {
+  const isBeacon = (el: ReactElement) =>
+    el.type === "script" &&
+    (el.props as { src?: string }).src === "https://static.cloudflareinsights.com/beacon.min.js";
+
+  async function loadLayout(token: string | undefined) {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_CF_BEACON_TOKEN", token);
+    try {
+      const layoutModule = await import("@/app/layout");
+      return await layoutModule.default({ children: null });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  }
+
+  it("adds no Cloudflare Web Analytics beacon when no token is set", async () => {
+    const tree = await loadLayout(undefined);
+    expect(findElement(tree, isBeacon)).toBeNull();
+  });
+
+  it("adds the deferred beacon with the token when one is set at build time", async () => {
+    const tree = await loadLayout("0123456789abcdef");
+    const beacon = findElement(tree, isBeacon);
+    expect(beacon).not.toBeNull();
+    const props = beacon!.props as { defer?: boolean; "data-cf-beacon"?: string };
+    expect(props.defer).toBe(true);
+    expect(JSON.parse(props["data-cf-beacon"]!)).toEqual({ token: "0123456789abcdef" });
   });
 });

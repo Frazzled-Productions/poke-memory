@@ -65,6 +65,21 @@ patch value is null SHALL be kept as null, as Postgres `jsonb_deep_merge` did, n
 Source (planned): design D3, `lib/db/rpc/mergeUserSettings.ts`; tests ported from the Postgres RPC
 integration tests (task 3.3).
 
+### Requirement: Sync cursors compare as instants
+
+Every "newer" check on a sync cursor SHALL compare instants, never strings: `last_reset_at` against
+`lastSeenResetAt`, and the `lastPullAt` and `lastSettingsPullAt` comparisons. Cursors stored before
+the move hold PostgREST text, and D1 returns ISO 8601 with milliseconds and `Z`.
+
+#### Scenario: First pull after the move to D1
+
+- **WHEN** a device stored `lastSeenResetAt` as `2026-05-13T15:00:00.78+00:00` before the move and the
+  pull reads `2026-05-13T15:00:00.780Z` from D1
+- **THEN** local progress is kept, and cards and settings are not treated as newer for that reason
+
+Source (planned): `lib/sync/pullAndMerge.ts:174`, `lib/sync/pullAndMerge.ts:624`,
+`lib/sync/pullAndMerge.test.ts:741`.
+
 ## RENAMED Requirements
 
 - FROM: `### Requirement: The database refuses settings that lose data (baseline)`

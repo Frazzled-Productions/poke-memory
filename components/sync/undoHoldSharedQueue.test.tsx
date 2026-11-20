@@ -6,11 +6,11 @@
  * Real: usePerGradeSync, useOnlineReconnectSync, pushWithFallback,
  * useSyncOnUnload, pushSingleCard, the pending-queue + held-grade persistence,
  * the session store and fake IndexedDB (the service worker's mirror).
- * Fake: the Supabase client (records upserts) and pullAndMerge (always ok).
+ * Fake: the data client (records upserts) and pullAndMerge (always ok).
  */
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 vi.mock("@/lib/sync/pullAndMerge", () => ({
   pullAndMerge: vi.fn(async () => "ok"),
@@ -88,7 +88,7 @@ function makeCard(id: number): ReviewableCard {
 
 describe("undo hold vs the shared pending queue (#2052)", () => {
   let cardUpserts: Record<string, unknown>[];
-  let client: SupabaseClient;
+  let client: DataClient;
 
   beforeEach(async () => {
     await __resetForTests();
@@ -110,7 +110,7 @@ describe("undo hold vs the shared pending queue (#2052)", () => {
           return { error: null };
         },
       }),
-    } as unknown as SupabaseClient;
+    } as unknown as DataClient;
   });
 
   afterEach(() => {

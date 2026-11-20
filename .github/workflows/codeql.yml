@@ -32,6 +32,8 @@ jobs:
         with:
           languages: javascript-typescript
           queries: security-extended
+          # paths-ignore for vendored, unmodified third-party code (vendor/**).
+          config-file: ./.github/codeql/codeql-config.yml
       # No `autobuild` step: CodeQL v3 traces JS/TS without a build, and we
       # deliberately skip `next build` here to keep the scan fast - generated
       # `.next/` output is not in scope. Add `autobuild` only if a future

@@ -1,0 +1,90 @@
+// Cloudflare Worker for Poké Memory (decision 0018; openspec/changes/move-to-cloudflare/design.md).
+//
+// Secrets are NOT in this file (the repo is public). Set each per environment
+// with `npx wrangler secret put <NAME> [--env preview]`; for `wrangler dev`,
+// put local test values in a gitignored `.dev.vars`:
+//   BETTER_AUTH_SECRET                       Better Auth session signing (D6)
+//   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET   GitHub OAuth app (D6)
+//   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET   Google OAuth client (D6)
+//   CRON_SHARED_SECRET                       bearer for the cron routes (D2)
+//   VAPID_PRIVATE_KEY, VAPID_SUBJECT         Web Push signing (D8)
+//   RATE_LIMIT_SALT                          per-IP bucket hashing (041)
+//   RESEND_API_KEY                           alert and feedback emails (lib/alertEmail.ts;
+//                                            D8, D10, D13), production only; without it
+//                                            they log "alert not sent"
+//   SENTRY_TRACES_SAMPLE_RATE (optional)     server trace sampling
+// Build-time values (CI environment, inlined by `next build`, not Worker
+// secrets): NEXT_PUBLIC_SENTRY_DSN, NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+// NEXT_PUBLIC_SITE_URL, NEXT_PUBLIC_CF_BEACON_TOKEN, SENTRY_AUTH_TOKEN,
+// SENTRY_ORG, SENTRY_PROJECT.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "poke-memory",
+  // Custom entry: wraps .open-next/worker.js and adds scheduled() (design D2).
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "poke-memory" }],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "poke-memory",
+      "database_id": "7c8bb1fd-212a-46b9-8027-611ec095213f",
+      "migrations_dir": "db/d1/migrations"
+    }
+  ],
+  // Nightly export and monthly restore check, inside Cloudflare through this binding: no GitHub
+  // runner touches the backups (design D10; owner ruling 20 November 2026). Production only.
+  "r2_buckets": [
+    { "binding": "BACKUPS", "bucket_name": "poke-memory-backups", "jurisdiction": "eu" }
+  ],
+  // App-open counter limit (lib/analytics/events.ts), keyed by event name, never by IP.
+  // Namespace ids are unique per account: the company site uses 1001 and 1002.
+  "ratelimits": [{ "name": "EVENT_LIMITER", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } }],
+  // The first two map to app routes through cronRoutesFor() in lib/cron/schedule.ts (the 02:00
+  // firing of the hourly one runs the backup export, the 08:00 one the grade_log divergence check); "0 4 1 * *" is the monthly restore check,
+  // run by worker/index.ts.
+  "triggers": { "crons": ["0 * * * *", "*/30 * * * *", "0 4 1 * *"] },
+  "vars": {
+    "DEPLOY_ENV": "cloudflare-production",
+    "D1_BACKUP_PREFIX": "d1/poke-memory",
+    // The alert sender: pokememory.com is not verified in Resend, frazzledproductions.com is (D13).
+    "RESEND_FROM": "Poké Memory <hello@frazzledproductions.com>",
+    "BETTER_AUTH_URL": "https://pokememory.com"
+  },
+  "env": {
+    // Per-PR versions (design D11): its own Worker and D1 database.
+    // d1_databases, r2_buckets, services and vars do not inherit, so each is
+    // repeated here; triggers DO inherit, so they are emptied explicitly.
+    "preview": {
+      "name": "poke-memory-preview",
+      "preview_urls": true,
+      "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "poke-memory-preview" }],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "poke-memory-preview",
+          "database_id": "77adf699-88e9-4f04-af67-f65e7cf09d36",
+          "migrations_dir": "db/d1/migrations"
+        }
+      ],
+      // No backups bucket: preview versions run pull request code, so the preview Worker gets
+      // neither a bucket binding nor the Cron Triggers (deploy guard, ops #610; design D10).
+      "ratelimits": [{ "name": "EVENT_LIMITER", "namespace_id": "1004", "simple": { "limit": 60, "period": 60 } }],
+      // No Cron Triggers at all: the preview database holds rehearsal copies of
+      // real data, so it must never send pushes or emails (D2). Outbound
+      // sends are also gated on DEPLOY_ENV by lib/outbound.ts.
+      "triggers": { "crons": [] },
+      "vars": {
+        "DEPLOY_ENV": "cloudflare-preview",
+        // Version aliases (pr-<n>-poke-memory-preview...) differ from this base
+        // URL; the auth set-up decides how OAuth callbacks reach an alias.
+        "BETTER_AUTH_URL": "https://poke-memory-preview.frasers-account.workers.dev"
+      }
+    }
+  }
+}

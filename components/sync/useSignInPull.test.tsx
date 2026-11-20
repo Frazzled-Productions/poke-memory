@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { useSignInPull } from "@/lib/sync/useSignInPull";
 
 vi.mock("@/lib/sync/pullAndMerge", () => ({
@@ -19,7 +19,7 @@ import { guardAccountSwitch } from "@/lib/sync/guardAccountSwitch";
 const mockPullAndMerge = vi.mocked(pullAndMerge);
 const mockGuardAccountSwitch = vi.mocked(guardAccountSwitch);
 
-const CLIENT = {} as unknown as SupabaseClient;
+const CLIENT = {} as unknown as DataClient;
 const USER_A = "00000000-0000-0000-0000-000000000001";
 const USER_B = "00000000-0000-0000-0000-000000000002";
 

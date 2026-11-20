@@ -464,8 +464,8 @@ test.describe("Settings - CSV review history export (#918)", () => {
   }) => {
     // Verify the endpoint is guarded - an unauthenticated request must never
     // receive a CSV. In a fully-configured environment the route returns 401
-    // (no session). In the CI e2e environment where Supabase env vars are
-    // absent the client construction fails and the route returns 503 instead.
+    // (no session). In the CI e2e environment without a Worker database the
+    // route returns 503 instead.
     // Both are acceptable: the endpoint is guarded and the caller does not get
     // the CSV.
     const response = await page.request.get("/api/export");
@@ -560,7 +560,7 @@ test.describe("Settings page - Web Push opt-in (#1056)", () => {
     // PushManager.subscribe path so the helper round-trip does not depend on
     // a real push backend (no VAPID key on the preview deployment) and so
     // the test never sends a real notification. The mock-auth seam's
-    // Supabase client resolves the delete + insert legs as no-op successes.
+    // data client resolves the delete + insert legs as no-op successes.
 
     // Seed the addInitScript before navigation - the same ordering pattern
     // as the auth-spec helpers. This runs in the page context before any
@@ -890,7 +890,7 @@ test.describe("Settings - Send feedback modal (#1622 / #1849)", () => {
     // NOTE: The submit->success and submit->error round-trips are NOT asserted
     // here. The PWA service worker bypasses page.route(), so a stubbed 200
     // cannot be reliably delivered by the local e2e server; the real
-    // /api/feedback route returns 500 in CI (no Supabase env vars). Both the
+    // /api/feedback route returns 500 in CI (no Worker database). Both the
     // success and error branches are fully covered by the 21 FeedbackModal
     // unit tests in components/feedback/FeedbackModal.test.tsx (mocked fetch).
     // The error branch IS covered by the "error state shows inline error"

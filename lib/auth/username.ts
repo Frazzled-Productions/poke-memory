@@ -1,8 +1,8 @@
 /**
  * Username/password auth helpers (#1671).
  *
- * Supabase Auth only supports email or phone as the login identifier, so
- * username-based accounts use a synthetic email address that is derived
+ * Accounts are keyed on an email address (as they were before Better Auth),
+ * so username-based accounts use a synthetic email address that is derived
  * deterministically from the normalised username. The synthetic email is
  * NEVER shown to the user.
  *
@@ -13,7 +13,7 @@
  *     `usernames` table SELECT policy is intentionally open so that "username
  *     already taken?" checks work before a session exists. This is documented
  *     in the PR body (#1671).
- *   - Passwords are passed directly to Supabase's signUp / signInWithPassword;
+ *   - Passwords are passed directly to Better Auth's sign-up and sign-in;
  *     they are never logged or stored by application code.
  */
 

@@ -211,10 +211,10 @@ function StrugglingCards({ struggling }: { struggling: readonly StrugglingCard[]
 export default function StatsPage() {
   const t = useTranslations("stats");
   const tCommon = useTranslations("common");
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const { flags, anyFlagOn } = useSuperuser();
   const { seed } = useSeed();
-  const client = anyFlagOn ? null : supabase;
+  const client = anyFlagOn ? null : db;
   const userId = anyFlagOn ? null : (user?.id ?? null);
   const { retryState, retryNow } = useRetryPush(client, userId);
   const storageVersion = useLocalStorageKey(SESSION_STORAGE_KEY);
@@ -333,9 +333,9 @@ export default function StatsPage() {
         }
       }
 
-      if (supabase !== null && user !== null && !anyFlagOn) {
+      if (db !== null && user !== null && !anyFlagOn) {
         try {
-          const cloudRows = await pullSession(supabase, user.id);
+          const cloudRows = await pullSession(db, user.id);
           if (cloudRows !== null) {
             const opts = seedOptsFromSettings(settings);
             const cloudCards = applyCloudAuthoritative(
@@ -353,7 +353,7 @@ export default function StatsPage() {
     }
     void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageVersion, anyFlagOn, supabase, user, seed]);
+  }, [storageVersion, anyFlagOn, db, user, seed]);
 
   // Per-game mastery breakdown (#1313). Recomputed whenever cards change or
   // the superuser flag toggles. Locale-scoped (#1851) so the panel reflects
@@ -448,10 +448,10 @@ export default function StatsPage() {
           "Restore from cloud" link - visible only when signed in (#1732 / #1729).
           Telegraphs that recovery options are in Settings and links there directly.
           Does NOT duplicate the ForcePullSection action (which has moved to Settings).
-          Gated on user !== null && supabase !== null && !anyFlagOn to match the
+          Gated on user !== null && db !== null && !anyFlagOn to match the
           former ForcePullSection gate.
         */}
-        {user !== null && supabase !== null && !anyFlagOn && (
+        {user !== null && db !== null && !anyFlagOn && (
           <p className={`mb-8 ${mutedText}`}>
             {t("restoreFromCloudDescription")}{" "}
             <Link

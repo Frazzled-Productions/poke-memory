@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import { isCloudPushHeld } from "@/lib/gradelog/persistence";
 import { isGradeLogEntry, pushGradeLogDetailed } from "@/lib/sync/gradeLog";
@@ -7,7 +7,7 @@ import { HELD_COPY_STALE_MS } from "@/lib/sync/heldGrade";
 /**
  * Grade-log reconcile leg (#2117).
  *
- * A `grade_log` entry that did not reach Supabase when it was appended (offline
+ * A `grade_log` entry that did not reach the cloud when it was appended (offline
  * or flaky network, tab killed between append and push, or a grade held for
  * undo across a reload - #2052) stays local-only, and `pullAndMerge` used to
  * only union the CLOUD log into local. This leg pushes the local entries the
@@ -43,7 +43,7 @@ export function resetRejectedGradeLogRepush(): void {
  *
  * This mirrors the DB trigger EXACTLY, on purpose: the trigger rejects when
  * `entry_date < reset_at::date`, i.e. the entry's own (user-local-day) date
- * against the UTC date of the reset (PostgREST sessions run in UTC). Do not
+ * against the UTC date of the reset (the D1 trigger uses date(), which is UTC). Do not
  * "fix" this into a timezone-aware comparison: it would then disagree with
  * the trigger and either drop rows the DB accepts or send rows it rejects.
  */
@@ -110,7 +110,7 @@ export function selectRepushEntries(
  * bisection matters.
  */
 export async function repushLocalGradeLog(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   local: readonly GradeLogEntry[],
   cloud: readonly GradeLogEntry[],

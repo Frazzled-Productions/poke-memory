@@ -4,7 +4,7 @@
  * Verifies that all user-facing strings flow through useTranslations() and
  * render the correct values in English and Japanese.
  *
- * The page has heavy dependencies on localStorage, Recharts, and Supabase.
+ * The page has heavy dependencies on localStorage, Recharts, and the auth context.
  * All of these are mocked so the tests are fast and focused purely on
  * the i18n wiring.
  */
@@ -100,7 +100,7 @@ vi.mock("@/lib/settings/persistence", () => ({
 }));
 
 vi.mock("@/lib/auth/AuthContext", () => ({
-  useAuth: () => ({ user: null, supabase: null, loading: false }),
+  useAuth: () => ({ user: null, db: null, loading: false }),
 }));
 
 vi.mock("@/lib/superuser/SuperuserContext", () => ({

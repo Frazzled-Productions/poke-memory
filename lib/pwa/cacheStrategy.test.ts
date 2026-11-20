@@ -100,8 +100,8 @@ describe("classifyRequest", () => {
     expect(result.strategy).toBe("stale-while-revalidate");
   });
 
-  it("never caches cross-origin requests (Supabase sync, avatars)", () => {
-    expect(classifyRequest("https://abc.supabase.co/rest/v1/card_reviews", ORIGIN).strategy).toBe(
+  it("never caches cross-origin requests (APIs, avatars)", () => {
+    expect(classifyRequest("https://api.example.com/rest/v1/card_reviews", ORIGIN).strategy).toBe(
       "network-only",
     );
     expect(
@@ -207,7 +207,7 @@ describe("shouldCache", () => {
   });
 
   it("returns false for cross-origin requests", () => {
-    expect(shouldCache("https://abc.supabase.co/rest/v1/x", ORIGIN)).toBe(false);
+    expect(shouldCache("https://api.example.com/rest/v1/x", ORIGIN)).toBe(false);
   });
 
   it("returns false for /api/** requests (authenticated responses must not be cached)", () => {

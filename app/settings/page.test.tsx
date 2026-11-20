@@ -473,7 +473,7 @@ beforeEach(() => {
   mockLoadSession.mockResolvedValue(null);
   mockSaveSession.mockResolvedValue({ ok: true });
   // Reset auth to guest by default (matches prior static mock).
-  mockUseAuth.mockReturnValue({ user: null, supabase: null, loading: false });
+  mockUseAuth.mockReturnValue({ user: null, db: null, loading: false });
   // Reset retry/sync state to healthy defaults.
   mockUseRetryPush.mockReturnValue({ retryState: "idle", retryNow: vi.fn() });
   // Reset SW version state to no-controller by default.
@@ -1798,7 +1798,7 @@ describe("SettingsPage - statutory trading disclosure in About section (#1565 Pa
 // and the amber border when sync has failed.
 // ---------------------------------------------------------------------------
 
-/** A minimal Supabase-shaped user fixture for account-block tests. */
+/** A minimal AppUser-shaped fixture for account-block tests. */
 function makeUser(overrides?: Record<string, unknown>) {
   return {
     id: "user-123",
@@ -1813,7 +1813,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
   it("signed-in healthy: shows identity, provider label, sync status, and sign-out", async () => {
     mockUseAuth.mockReturnValue({
       user: makeUser(),
-      supabase: {} as unknown,
+      db: {} as unknown,
       loading: false,
     });
     // Healthy sync - no failure flag.
@@ -1850,7 +1850,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
   it("signed-in healthy: account card has zinc border (not amber)", async () => {
     mockUseAuth.mockReturnValue({
       user: makeUser(),
-      supabase: {} as unknown,
+      db: {} as unknown,
       loading: false,
     });
     mockLoadSyncStatus.mockReturnValue({
@@ -1882,7 +1882,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
   it("signed-in sync-failed: shows the sync status line in failed state", async () => {
     mockUseAuth.mockReturnValue({
       user: makeUser(),
-      supabase: {} as unknown,
+      db: {} as unknown,
       loading: false,
     });
     // Simulate a persisted push failure.
@@ -1913,7 +1913,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
   it("signed-in sync-failed: account card gets amber border", async () => {
     mockUseAuth.mockReturnValue({
       user: makeUser(),
-      supabase: {} as unknown,
+      db: {} as unknown,
       loading: false,
     });
     mockLoadSyncStatus.mockReturnValue({
@@ -1964,7 +1964,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
   it("#1823: SyncStatusLine receives tz from settings.timezone when signed in", async () => {
     mockUseAuth.mockReturnValue({
       user: { id: "u1", email: "a@b.com", app_metadata: {}, user_metadata: {} },
-      supabase: {},
+      db: {},
       loading: false,
     });
     mockLoadSettings.mockReturnValue({
@@ -1985,7 +1985,7 @@ describe("SettingsPage - account block signed-in states (#1721)", () => {
     // The mock for detectTimezone returns "Europe/London" (see vi.mock above).
     mockUseAuth.mockReturnValue({
       user: { id: "u1", email: "a@b.com", app_metadata: {}, user_metadata: {} },
-      supabase: {},
+      db: {},
       loading: false,
     });
     mockLoadSettings.mockReturnValue({
@@ -2191,7 +2191,7 @@ describe("SettingsPage - backup restore (#2218)", () => {
   });
 
   function signIn() {
-    mockUseAuth.mockReturnValue({ user: makeUser(), supabase: {} as unknown, loading: false });
+    mockUseAuth.mockReturnValue({ user: makeUser(), db: {} as unknown, loading: false });
   }
 
   it("a signed-in restore moves cards forward and says so before it runs", async () => {

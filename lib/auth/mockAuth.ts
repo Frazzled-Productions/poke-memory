@@ -4,9 +4,9 @@
  * `e2e/` is otherwise guest-mode only. To exercise the signed-in render path
  * (avatar, sign-out button, signed-in nav, the conflict picker, the superuser
  * cloud-write-guard surfaces) in a real browser without a real OAuth handshake,
- * this module provides a hard-coded fake `User` plus a fake `SupabaseClient`
- * whose `.from()` calls resolve from an in-memory fixture instead of the
- * network.
+ * this module provides a hard-coded fake `User` plus a fake data client
+ * (`DataClient`, lib/db/client.ts) whose `.from()` calls resolve from an
+ * in-memory fixture instead of the network.
  *
  * SECURITY-CRITICAL - this seam is an auth bypass if it ever leaks into a
  * production build. It is gated two ways and CANNOT activate in production:
@@ -14,19 +14,20 @@
  *   1. `NEXT_PUBLIC_E2E_AUTH_MOCK` must be exactly `"1"`.
  *   2. `process.env.NODE_ENV` must NOT be `"production"`.
  *
- * Both conditions are checked by `isMockAuthEnabled()`. Production Vercel
+ * Both conditions are checked by `isMockAuthEnabled()`. Production
  * builds run with `NODE_ENV === "production"`, so even if the flag were ever
  * set there the seam would stay inert. As defence-in-depth,
  * `assertMockAuthNotInProduction()` is invoked from `next.config.ts` and fails
  * the build loudly if both the flag and a production `NODE_ENV` are present at
- * build time. The flag is never set in any production Vercel environment - it
- * is set only by `e2e.yml`, only against preview deployments.
+ * build time. The flag is never set in any deployed build - `deploy.yml`'s
+ * `preview-e2e` job sets it only on the Playwright runner.
  *
  * See `lib/auth/mockAuth.test.ts` for the assertion proving the seam is
  * unreachable in production builds.
  */
 
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { AppUser } from "./types";
+import type { DataClient, DataResponse } from "../db/client";
 import { readLocalStorage } from "../storage/readLocalStorage";
 
 /** Public env var that opts a build into the mock-auth seam. */
@@ -88,10 +89,8 @@ export function assertMockAuthNotInProduction(): void {
  * identifiable. The metadata mirrors what GitHub OAuth populates so the
  * `AuthButton` avatar and display-name code paths render normally.
  */
-export const MOCK_USER: User = {
+export const MOCK_USER: AppUser = {
   id: "e2e00000-0000-4000-8000-000000000751",
-  aud: "authenticated",
-  role: "authenticated",
   email: "e2e-trainer@poke-memory.test",
   app_metadata: { provider: "github", providers: ["github"] },
   user_metadata: {
@@ -102,7 +101,6 @@ export const MOCK_USER: User = {
   },
   identities: [],
   created_at: "2024-01-01T00:00:00.000Z",
-  updated_at: "2024-01-01T00:00:00.000Z",
 };
 
 /**
@@ -136,18 +134,19 @@ const EMPTY_FIXTURE: MockCloudFixture = {
 };
 
 /**
- * A minimal PostgREST-style query builder. Every chain method returns `this`
- * so the call chains in `lib/sync/*` (`.select().eq().range()` etc.) work, and
- * the object is thenable so `await client.from(...).select(...)` resolves.
+ * A minimal query builder with the DataClient's chain methods. Every chain
+ * method returns `this` so the call chains in `lib/sync/*`
+ * (`.select().eq().range()` etc.) work, and the object is thenable so
+ * `await client.from(...).select(...)` resolves.
  *
- * Reads resolve from the in-memory fixture. Writes (`upsert` / `update`)
- * resolve successfully without doing anything - the seam never persists.
+ * Reads resolve from the in-memory fixture, ignoring filters. Writes
+ * (`upsert` / `insert` / `update` / `delete`) resolve successfully without
+ * doing anything - the seam never persists.
  */
-class MockQueryBuilder<Row extends Record<string, unknown>>
-  implements PromiseLike<{ data: Row[] | Row | null; error: null; count: number }>
-{
+class MockQueryBuilder<Row extends Record<string, unknown>> implements PromiseLike<DataResponse> {
   private rows: Row[];
   private headOnly = false;
+  private singleRow = false;
 
   constructor(rows: Row[]) {
     this.rows = rows;
@@ -158,6 +157,30 @@ class MockQueryBuilder<Row extends Record<string, unknown>>
     return this;
   }
   eq(): this {
+    return this;
+  }
+  neq(): this {
+    return this;
+  }
+  gt(): this {
+    return this;
+  }
+  gte(): this {
+    return this;
+  }
+  lt(): this {
+    return this;
+  }
+  lte(): this {
+    return this;
+  }
+  in(): this {
+    return this;
+  }
+  is(): this {
+    return this;
+  }
+  not(): this {
     return this;
   }
   limit(): this {
@@ -190,23 +213,23 @@ class MockQueryBuilder<Row extends Record<string, unknown>>
     return this;
   }
 
-  /** Resolves to a single row (or null) - mirrors PostgREST `.maybeSingle()`. */
-  maybeSingle(): Promise<{ data: Row | null; error: null }> {
-    return Promise.resolve({ data: this.rows[0] ?? null, error: null });
+  /** Resolves to a single row (or null) - mirrors `.maybeSingle()`. */
+  maybeSingle(): this {
+    this.singleRow = true;
+    return this;
   }
-  single(): Promise<{ data: Row | null; error: null }> {
-    return Promise.resolve({ data: this.rows[0] ?? null, error: null });
+  single(): this {
+    this.singleRow = true;
+    return this;
   }
 
-  then<TResult1 = { data: Row[] | Row | null; error: null; count: number }, TResult2 = never>(
-    onfulfilled?:
-      | ((value: { data: Row[] | Row | null; error: null; count: number }) => TResult1 | PromiseLike<TResult1>)
-      | null,
+  then<TResult1 = DataResponse, TResult2 = never>(
+    onfulfilled?: ((value: DataResponse) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2> {
-    const value = {
-      data: this.headOnly ? null : this.rows,
-      error: null as null,
+    const value: DataResponse = {
+      data: this.headOnly ? null : this.singleRow ? (this.rows[0] ?? null) : this.rows,
+      error: null,
       count: this.rows.length,
     };
     return Promise.resolve(value).then(onfulfilled, onrejected);
@@ -237,11 +260,11 @@ function readFixtureOverride(): Partial<MockCloudFixture> {
 }
 
 /**
- * Builds the fake `SupabaseClient` the seam injects into `AuthProvider`.
+ * Builds the fake data client the seam injects into `AuthProvider` (the
+ * signed-in user itself is {@link MOCK_USER}, set by the provider).
  *
- * `.auth.getUser()` resolves to {@link MOCK_USER}. `.auth.onAuthStateChange()`
- * returns an inert subscription. `.from(table)` returns a {@link MockQueryBuilder}
- * backed by the fixture for that table - no network call is ever made.
+ * `.from(table)` returns a {@link MockQueryBuilder} backed by the fixture for
+ * that table - no network call is ever made.
  *
  * The cloud fixture is, in priority order: the explicit `fixture` argument,
  * then a localStorage override (see {@link MOCK_CLOUD_FIXTURE_STORAGE_KEY}),
@@ -251,7 +274,7 @@ function readFixtureOverride(): Partial<MockCloudFixture> {
  */
 export function createMockClient(
   fixture: Partial<MockCloudFixture> = {},
-): SupabaseClient {
+): DataClient {
   const data: MockCloudFixture = {
     ...EMPTY_FIXTURE,
     ...readFixtureOverride(),
@@ -259,16 +282,6 @@ export function createMockClient(
   };
 
   const client = {
-    auth: {
-      getUser: () => Promise.resolve({ data: { user: MOCK_USER }, error: null }),
-      getSession: () =>
-        Promise.resolve({ data: { session: { user: MOCK_USER } }, error: null }),
-      onAuthStateChange: () => ({
-        data: { subscription: { id: "mock", callback: () => {}, unsubscribe: () => {} } },
-      }),
-      signOut: () => Promise.resolve({ error: null }),
-      signInWithOAuth: () => Promise.resolve({ data: {}, error: null }),
-    },
     from: (table: string) => {
       switch (table) {
         case "card_reviews":
@@ -286,11 +299,11 @@ export function createMockClient(
       }
     },
     // `rpc` is used by reset_all_progress; resolve it as a harmless no-op.
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    rpc: () => Promise.resolve<DataResponse>({ data: null, error: null, count: null }),
   };
 
-  // Cast via `unknown` to sidestep the deep generic signature of
-  // SupabaseClient<Database, ...> - the same pattern the sync test suite uses
-  // (FAKE_CLIENT = {} as unknown as SupabaseClient).
-  return client as unknown as SupabaseClient;
+  // Cast via `unknown`: MockQueryBuilder has the DataQuery chain methods but
+  // not its private fields - the same pattern the sync test suite uses
+  // (FAKE_CLIENT = {} as unknown as DataClient).
+  return client as unknown as DataClient;
 }

@@ -37,7 +37,8 @@ Source (planned): design D1, `next.config.ts`, `open-next.config.ts`, `wrangler.
 
 All cloud data SHALL live in one D1 database created with the EU jurisdiction and bound to the Worker.
 Its schema SHALL be Postgres migrations 001 to 051 translated to SQLite (`0001_schema.sql`), Better
-Auth's tables (`0002_auth.sql`) and the events table (`0003_events.sql`), in `db/d1/migrations/`.
+Auth's tables (`0002_auth.sql`), the events table (`0003_events.sql`) and the drop of the Discord-only
+`feedback_discord_posts` table (`0004_drop_feedback_discord_posts.sql`), in `db/d1/migrations/`.
 
 #### Scenario: Fresh database
 
@@ -114,9 +115,9 @@ Source (planned): design D4, `lib/db/tables.ts`.
 
 ### Requirement: Cross-user work uses one system module
 
-Work that reads or writes across users (cron routes, push sends, Discord, feedback, backups) SHALL use
+Work that reads or writes across users (cron routes, push sends, feedback, backups) SHALL use
 `lib/db/system.ts`, whose functions are each named for their one job. ESLint SHALL refuse an import of
-it outside `app/api/cron/**`, `app/api/push/send-*`, `app/api/discord/**` and `app/api/feedback/**`.
+it outside `app/api/cron/**`, `app/api/push/send-*`, `app/api/feedback/**` and `app/api/stats/users`.
 
 #### Scenario: System module imported from a page
 
@@ -135,7 +136,7 @@ Source (planned): design D4, `lib/db/system.ts`, `eslint.config.mjs`.
 `scripts/check-scoped-queries.mjs`, run by `npm run lint`, SHALL fail when a file outside `lib/db/`
 calls `.prepare(`, `.exec(` or `.batch(` on a D1 binding, or holds SQL naming a per-user table
 (`card_reviews`, `user_settings`, `streak_days`, `grade_log`, `push_subscriptions`, `feedback`,
-`feedback_discord_posts`, `rate_limit_buckets`, `user`, `session`, `account`). Better Auth's own queries
+`rate_limit_buckets`, `user`, `session`, `account`). Better Auth's own queries
 run inside the library and are outside the rule.
 
 #### Scenario: Planted raw query
@@ -200,8 +201,9 @@ Source (planned): design D5, `lib/db/client.ts`, `app/api/db/route.ts`.
 
 The gateway SHALL accept only the tables `card_reviews`, `user_settings`, `streak_days`, `grade_log`
 and `push_subscriptions`; per table only the operations its row-level security policies allowed; the
-allowlisted columns and filter operators (`eq`, `in`, `gte`, `not`, `order`, `range`, `limit`); and the
-RPCs `reset_all_progress`, `delete_account` and `merge_user_settings`.
+allowlisted columns, the filter operators `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `is` and
+`not-is`, with `order`, `range` and `limit`; and the RPCs `reset_all_progress`, `delete_account` and
+`merge_user_settings`. Upserts on `grade_log` and `streak_days` SHALL never update a stored row.
 
 #### Scenario: Table not on the gateway
 
@@ -211,7 +213,14 @@ RPCs `reset_all_progress`, `delete_account` and `merge_user_settings`.
 #### Scenario: Update on push subscriptions
 
 - **WHEN** a signed-in browser sends an `update` on `push_subscriptions`
-- **THEN** the answer is 400, as no update policy existed under row-level security
+- **THEN** the answer is 403 with `42501`, as no update policy existed under row-level security
+
+#### Scenario: A repeated grade
+
+- **WHEN** a browser upserts a `grade_log` entry that is already stored, with a different grade and
+  without `ignoreDuplicates`
+- **THEN** the stored grade is unchanged: the upsert runs as `ON CONFLICT DO NOTHING` whatever the
+  request asks, as `grade_log` had no update policy
 
 #### Scenario: Unknown RPC
 
@@ -224,7 +233,7 @@ Source (planned): design D5, `lib/db/tables.ts`, `app/api/db/route.ts`.
 
 A request with no session SHALL answer 401 with an error code outside classes 22, 23 and 42. An
 unknown table, column, operator or RPC SHALL answer 400 with a class 42 code. A row naming another
-user SHALL answer 403 with `42501`. Guard and unique failures SHALL pass through as `23514` and `23505`.
+user, or an operation the table does not allow, SHALL answer 403 with `42501`. Guard and unique failures SHALL pass through as `23514` and `23505`.
 
 #### Scenario: Guest request
 
@@ -254,7 +263,7 @@ NOT stop the others.
 #### Scenario: Monday 09:00
 
 - **WHEN** the hourly trigger fires at 09:00 UTC on a Monday
-- **THEN** the two push routes and `POST /api/discord/digest` run
+- **THEN** the two push routes and `POST /api/cron/feedback-digest` run
 
 #### Scenario: Daily jobs
 
@@ -265,6 +274,11 @@ NOT stop the others.
 
 - **WHEN** the hourly trigger fires at 04:00 UTC on a Sunday
 - **THEN** `POST /api/cron/reconcile-grade-log` runs with the two push routes
+
+#### Scenario: 08:00 every day
+
+- **WHEN** the hourly trigger fires at 08:00 UTC on any day
+- **THEN** `POST /api/cron/grade-log-divergence` runs with the two push routes
 
 #### Scenario: Every 30 minutes
 
@@ -285,9 +299,9 @@ Source (planned): design D2, `worker/index.ts`, `lib/cron/schedule.ts`, `wrangle
 
 ### Requirement: Outbound sends happen only in production
 
-Web Push and Discord sends SHALL happen only when `DEPLOY_ENV` is `cloudflare-production`
+Web Push sends and the feedback emails SHALL happen only when `DEPLOY_ENV` is `cloudflare-production`
 (`lib/outbound.ts`). Anywhere else the routes SHALL do their reads and log what they would have sent.
-The preview Worker SHALL have no Cron Triggers, no VAPID private key and no Discord webhook.
+The preview Worker SHALL have no Cron Triggers, no VAPID private key and no Resend key.
 
 #### Scenario: Preview loaded with rehearsal data
 
@@ -297,7 +311,7 @@ The preview Worker SHALL have no Cron Triggers, no VAPID private key and no Disc
 #### Scenario: Bug report on a preview
 
 - **WHEN** a bug report is sent on a preview version
-- **THEN** the row is stored and no Discord post is made
+- **THEN** the row is stored and no email is sent
 
 #### Scenario: Production
 
@@ -308,32 +322,184 @@ Source (planned): design D2, proposal Clarifications (19 November 2026, about 20
 
 ### Requirement: Nightly backups go to R2 and are kept 90 days
 
-`POST /api/cron/backup`, at 02:00 UTC, SHALL write every table as SQL `INSERT` statements to the R2
-bucket `poke-memory-backups` (EU jurisdiction) at `d1/YYYY-MM-DD.sql`, then delete objects older than
-90 days. The preview Worker SHALL use its own bucket. A monthly GitHub Actions job SHALL restore the
-latest file into a local D1 and check row counts.
+`POST /api/cron/backup`, at 02:00 UTC, SHALL write every table as gzipped SQL `INSERT` statements, one a
+line, to the R2 bucket `poke-memory-backups` (EU jurisdiction) at `d1/poke-memory/YYYY-MM-DD.sql.gz`,
+then a manifest with the export time, the dump's key, size, SHA-256 and per-table row counts at
+`d1/poke-memory/YYYY-MM-DD.json` and, last, `d1/poke-memory/latest.json`, then delete dumps and manifests
+dated more than 90 days ago. Only the production Worker SHALL have the bucket binding.
 
 #### Scenario: Nightly run
 
 - **WHEN** the 02:00 firing runs on 20 November 2026
-- **THEN** `d1/2026-11-20.sql` exists in the bucket
+- **THEN** `d1/poke-memory/2026-11-20.sql.gz`, `d1/poke-memory/2026-11-20.json` and an updated
+  `d1/poke-memory/latest.json` exist in the bucket
 
 #### Scenario: Old object
 
-- **WHEN** the run finds an object dated 91 days ago
-- **THEN** it is deleted, and one dated 89 days ago stays
+- **WHEN** the run finds a dump dated 91 days ago
+- **THEN** it and its manifest are deleted, and one dated 90 days ago stays, as does `latest.json`
 
-#### Scenario: Restore check
+#### Scenario: The export fails
 
-- **WHEN** a backup file is restored into a fresh test database
-- **THEN** every table has the same row count as the source
+- **WHEN** the write to R2 fails, or the bucket binding or prefix is missing
+- **THEN** the route logs `d1-backup: export FAILED: <reason>`, emails that line (see "Backup and monitor failures email an alert") and answers 502, or 503 for the missing binding
 
-#### Scenario: No R2 read token yet
+#### Scenario: Round trip
 
-- **WHEN** the monthly restore job runs before its token is set
-- **THEN** it skips with a notice instead of failing
+- **WHEN** a dump is gunzipped and restored into a fresh migrated test database
+- **THEN** every table has the same rows as the source
 
-Source (planned): design D10, `app/api/cron/backup/route.ts`.
+#### Scenario: Rows today's triggers would refuse
+
+- **WHEN** the database holds rows the copy kept with triggers bypassed, such as 11 push subscriptions
+  for one user or a streak date in 2099
+- **THEN** the file drops the triggers before its rows and recreates them verbatim after, so the
+  restore keeps every such row, with identical counts and values
+
+#### Scenario: A value with a line break
+
+- **WHEN** a feedback message holds a line break
+- **THEN** its `INSERT` stays on one line and the restored message is unchanged
+
+#### Scenario: Preview Worker
+
+- **WHEN** a pull request's preview version runs
+- **THEN** it has no backups bucket binding, no backup prefix and no Cron Triggers
+
+Source (planned): design D10, `app/api/cron/backup/route.ts`, `lib/db/backup.ts`.
+
+### Requirement: The restore check runs monthly inside Cloudflare
+
+The production Worker SHALL run a restore check on the Cron Trigger `0 4 1 * *` (04:00 UTC on the 1st)
+through its own bucket binding. It SHALL fail unless the newest dump matches its SHA-256, decompresses,
+holds each table's row count (an empty table counts as 0) and is at most 3 days old. It SHALL log one
+`d1-backup: restore-check ok` or `d1-backup: restore-check FAILED` line, with keys and counts only, and
+rethrow on failure.
+
+#### Scenario: Healthy backup
+
+- **WHEN** the check runs on 1 December 2026 after the export at 02:00 that day
+- **THEN** it logs `d1-backup: restore-check ok` with the dump's key and the per-table counts
+
+#### Scenario: Empty table
+
+- **WHEN** a table has no rows, so the dump has no `INSERT` line for it
+- **THEN** the check counts it as 0 and passes
+
+#### Scenario: Export stopped
+
+- **WHEN** the newest export is more than 3 days old
+- **THEN** the check logs `d1-backup: restore-check FAILED:` naming the stale export and the invocation fails
+
+#### Scenario: Corrupt dump
+
+- **WHEN** the dump's SHA-256 differs from the manifest, it does not decompress, or a table's rows differ
+  from the manifest's count
+- **THEN** the check logs `d1-backup: restore-check FAILED:` with every problem found, emails that line,
+  and the invocation fails
+
+Source (planned): design D10, owner ruling 20 November 2026, `lib/db/backup.ts`, `worker/index.ts`.
+
+### Requirement: No GitHub workflow touches the backups
+
+No GitHub workflow SHALL read, write or list the backups or dump the database to a runner.
+
+#### Scenario: A workflow reaches for the backups
+
+- **WHEN** a pull request adds a workflow step that names `poke-memory-backups`, calls the R2 API or
+  `wrangler r2`, runs `wrangler d1 export`, or fetches a backup key
+- **THEN** `scripts/workflows-no-backups.test.mjs` fails
+
+Source (planned): design D10, owner ruling 20 November 2026, `scripts/workflows-no-backups.test.mjs`.
+
+### Requirement: Backup and monitor failures email an alert
+
+A failed backup export, restore check or divergence check, and a detected divergence, SHALL each send
+one email through the Resend REST API with the Worker secret `RESEND_API_KEY`, from `RESEND_FROM`
+(`Poké Memory <hello@frazzledproductions.com>`, production only) to `hello@frazzledproductions.com`,
+holding counts, keys and 8-character user id prefixes only. Sending SHALL never throw, and the task
+SHALL still log its FAILED line and rethrow or answer its error status.
+
+#### Scenario: The restore check fails with the key set
+
+- **WHEN** the monthly restore check finds no `latest.json` and `RESEND_API_KEY` is set
+- **THEN** one email goes to Resend with the subject `Poké Memory: D1 restore-check FAILED` and the FAILED line as its text, and the invocation still fails
+
+#### Scenario: No key yet
+
+- **WHEN** a task fails before the cutover has set `RESEND_API_KEY`
+- **THEN** the Worker logs `d1-backup: alert not sent: no RESEND_API_KEY` (or the monitor's tag), sends nothing, and the task still fails
+
+#### Scenario: Resend refuses or is unreachable
+
+- **WHEN** Resend answers an error status, or the request throws
+- **THEN** the Worker logs `alert not sent: <reason>` and the task's own failure is unchanged
+
+#### Scenario: A healthy night
+
+- **WHEN** the export and the restore check pass
+- **THEN** no email is sent
+
+Source (planned): design D10 and D13, owner ruling 20 November 2026, `lib/alertEmail.ts`, `lib/db/backup.ts`, `app/api/cron/backup/route.ts`.
+
+### Requirement: The grade_log divergence check runs in the Worker
+
+`POST /api/cron/grade-log-divergence`, at 08:00 UTC daily, SHALL run the three divergence queries
+(Options A, B and C, `lib/db/system/gradeLogDivergence.ts`) through the D1 binding and alert on any
+user above the threshold of 0, answering counts only and logging one line.
+
+#### Scenario: Nothing diverges
+
+- **WHEN** every graded subject has its `card_reviews` row, or is still in its learning steps
+- **THEN** the route answers `{ ok: true, diverged: false, users: 0 }`, logs `grade-log-divergence: ok` and sends nothing
+
+#### Scenario: A graduated orphan
+
+- **WHEN** a user graduated a card today and has no `card_reviews` row for it
+- **THEN** the route answers `{ ok: true, diverged: true, users: 1 }`, logs `grade-log-divergence: DIVERGED`, and emails a report naming Option C with the user's 8-character id prefix, never the full id
+
+#### Scenario: A query fails
+
+- **WHEN** a divergence query throws
+- **THEN** the route logs `grade-log-divergence: FAILED: <reason>`, emails that line and answers 502
+
+Source (planned): design D13, `app/api/cron/grade-log-divergence/route.ts`, `lib/db/system/gradeLogDivergence.ts`.
+
+### Requirement: The user-count badge is served by the Worker
+
+`GET /api/stats/users` SHALL answer the number of accounts as Shields.io endpoint JSON
+(`schemaVersion` 1, `label` "users", `message` the count, `color` "blue", `cacheSeconds` 3600) with
+`Cache-Control: public, max-age=3600`, and nothing else about any account. The README user-count badge
+SHALL read it. When the count fails it SHALL answer 503 with `Cache-Control: no-store`.
+
+#### Scenario: Two accounts
+
+- **WHEN** the database holds two accounts
+- **THEN** the route answers `message: "2"` and the badge shows "users 2"
+
+#### Scenario: The database is unavailable
+
+- **WHEN** the count throws
+- **THEN** the route answers 503, uncached, and logs `[stats/users] count failed`
+
+Source (planned): design D13, `app/api/stats/users/route.ts`, `lib/db/system/stats.ts`, `README.md`.
+
+### Requirement: No GitHub workflow reads production data
+
+No GitHub workflow SHALL query the production D1 database, and only `deploy.yml` SHALL hold
+`CLOUDFLARE_API_TOKEN`, which can write D1.
+
+#### Scenario: A workflow queries production
+
+- **WHEN** a pull request adds a workflow step that runs `wrangler d1 execute --remote` without `--env preview`, calls the D1 REST query API, or runs the removed monitor scripts or their query helper
+- **THEN** `scripts/workflows-no-backups.test.mjs` fails
+
+#### Scenario: Another workflow takes the token
+
+- **WHEN** a workflow other than `deploy.yml` names `CLOUDFLARE_API_TOKEN`
+- **THEN** `scripts/workflows-no-backups.test.mjs` fails
+
+Source (planned): design D13, owner ruling 20 November 2026, `scripts/workflows-no-backups.test.mjs`.
 
 ### Requirement: Main deploys production and each pull request gets a preview
 
@@ -373,7 +539,7 @@ owner-approved copy rehearsal, and stays until the owner decides to wipe and res
 #### Scenario: After a rehearsal
 
 - **WHEN** the copy rehearsal has loaded real data into the preview database
-- **THEN** the preview still sends no push or Discord message
+- **THEN** the preview still sends no push or email
 
 Source (planned): design D11, proposal Open call 4, `scripts/cloudflare/seed-preview.mjs`.
 

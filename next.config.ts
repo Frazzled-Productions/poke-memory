@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { withSentryConfig } from "@sentry/nextjs/config";
 import pkg from "./package.json";
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
 
 // SECURITY: fail the build loudly if the test-only mock-auth seam (issue #751)
@@ -10,43 +11,28 @@ import { assertMockAuthNotInProduction } from "./lib/auth/mockAuth";
 // - it turns a silent misconfiguration into a hard build failure.
 assertMockAuthNotInProduction();
 
+// `next dev` gets the Worker bindings (D1 `DB`, R2 `BACKUPS`, vars) from
+// wrangler.jsonc through a local Miniflare, so getCloudflareContext() works in
+// dev as it does on Workers (decision 0018). Only in dev: the production build
+// and vitest must not start Miniflare.
+if (process.env.NODE_ENV === "development") {
+  void initOpenNextCloudflareForDev();
+}
+
 const nextConfig: NextConfig = {
-  cacheComponents: true,
-  // The FSRS optimizer route loads @open-spaced-repetition/binding which
-  // ships a native Node.js binary (.node). Mark it (and its platform-specific
-  // sub-package) as server-external so Next.js/Turbopack does not attempt to
-  // bundle them - they are loaded at runtime by Node's native addon loader.
-  serverExternalPackages: [
-    "@open-spaced-repetition/binding",
-    "@open-spaced-repetition/binding-android-arm64",
-    "@open-spaced-repetition/binding-darwin-arm64",
-    "@open-spaced-repetition/binding-darwin-x64",
-    "@open-spaced-repetition/binding-linux-arm64-gnu",
-    "@open-spaced-repetition/binding-linux-arm64-musl",
-    "@open-spaced-repetition/binding-linux-x64-gnu",
-    "@open-spaced-repetition/binding-linux-x64-musl",
-    "@open-spaced-repetition/binding-wasm32-wasi",
-    "@open-spaced-repetition/binding-win32-arm64-msvc",
-    "@open-spaced-repetition/binding-win32-ia32-msvc",
-    "@open-spaced-repetition/binding-win32-x64-msvc",
-  ],
+  // Off for the Cloudflare move (decision 0018, design D1): on
+  // @opennextjs/cloudflare every Cache Components page hangs until OpenNext
+  // PR #1318 lands (unmerged, and with it a render mismatch is still logged).
+  // Turn it back on only once that fix is released and tested on Workers.
+  cacheComponents: false,
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version ?? "dev",
   },
-  // /whats-new reads CHANGELOG.md via fs at render time. The path is dynamic
-  // (process.cwd() + filename), which @vercel/nft may not statically trace, so
-  // include it explicitly so the file ships with the deployment in any
-  // output mode.
-  //
-  // The service worker is NO LONGER a route: it is built to a static
+  // The service worker is not a route: it is built to a static
   // `public/sw/sw.js` asset by `scripts/build-sw.mjs` (post-`next build`) and
-  // served by Vercel's CDN, so there is no serverless function and therefore
-  // no file-trace gap to patch (the previous `/sw/[path]` entry that forced
-  // `next/dist/server/config.js` into the function bundle is gone, #1752,
-  // superseding the #1751 hotfix for #1749).
-  outputFileTracingIncludes: {
-    "/whats-new": ["./CHANGELOG.md"],
-  },
+  // served from the Worker's static assets (#1752). /whats-new needs no file
+  // either: CHANGELOG.md is inlined into a module at build time
+  // (scripts/generate-changelog-module.mjs), since Workers have no filesystem.
   // Headers for the statically-generated service-worker script (built to
   // public/sw/ by scripts/build-sw.mjs).
   //
@@ -69,6 +55,29 @@ const nextConfig: NextConfig = {
       {
         source: "/sw/sw.js.map",
         headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+      // The FSRS optimiser page runs the threaded wasm binding, which needs a
+      // shared WebAssembly.Memory and so a cross-origin-isolated page (D7 of
+      // openspec/changes/move-to-cloudflare). Only this path is isolated, so
+      // cross-origin resources elsewhere keep loading. Link to it with a plain
+      // <a>, not next/link: isolation is set per document load.
+      {
+        source: "/settings/optimiser",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+        ],
+      },
+      // Its worker scripts and wasm (scripts/build-fsrs-optimiser.mjs). A
+      // dedicated worker started from an isolated page needs its own COEP.
+      // On Workers static assets these come from public/_headers instead,
+      // because assets are served before the Next server sees the request.
+      {
+        source: "/fsrs/:path*",
+        headers: [
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+        ],
       },
     ];
   },

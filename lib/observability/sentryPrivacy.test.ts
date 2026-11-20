@@ -47,6 +47,34 @@ describe("every Sentry.init passes the shared privacy config", () => {
   });
 });
 
+describe("every Sentry.init takes its environment from DEPLOY_ENV", () => {
+  beforeEach(() => {
+    mockInit.mockClear();
+    vi.resetModules();
+    vi.unstubAllEnvs();
+    vi.stubEnv("SENTRY_ENVIRONMENT", undefined);
+  });
+
+  it.each(INIT_MODULES)("%s on the preview Worker", async (_name, load) => {
+    vi.stubEnv("DEPLOY_ENV", "cloudflare-preview");
+    vi.stubEnv("NEXT_PUBLIC_DEPLOY_ENV", "cloudflare-preview");
+    await load();
+    const options = mockInit.mock.calls[0][0] as Record<string, unknown>;
+    expect(options.environment).toBe("cloudflare-preview");
+    vi.unstubAllEnvs();
+  });
+
+  it.each(INIT_MODULES)("%s falls back to NODE_ENV without it", async (_name, load) => {
+    vi.stubEnv("DEPLOY_ENV", undefined);
+    vi.stubEnv("NEXT_PUBLIC_DEPLOY_ENV", undefined);
+    vi.stubEnv("NODE_ENV", "development");
+    await load();
+    const options = mockInit.mock.calls[0][0] as Record<string, unknown>;
+    expect(options.environment).toBe("development");
+    vi.unstubAllEnvs();
+  });
+});
+
 describe("SENTRY_DATA_COLLECTION", () => {
   it("switches every personal-data category off", () => {
     expect(SENTRY_DATA_COLLECTION).toEqual({
@@ -136,12 +164,12 @@ describe("stripUrlQueryAndFragment", () => {
 });
 
 describe("sentryEnvironment", () => {
-  it("keeps the v10 vercel-* names", () => {
-    expect(sentryEnvironment("production", "production")).toBe("vercel-production");
-    expect(sentryEnvironment("preview", "production")).toBe("vercel-preview");
+  it("uses DEPLOY_ENV as is on Cloudflare", () => {
+    expect(sentryEnvironment("cloudflare-production", "production")).toBe("cloudflare-production");
+    expect(sentryEnvironment("cloudflare-preview", "production")).toBe("cloudflare-preview");
   });
 
-  it("falls back to NODE_ENV when there is no Vercel env", () => {
+  it("falls back to NODE_ENV without DEPLOY_ENV", () => {
     expect(sentryEnvironment(undefined, "development")).toBe("development");
     expect(sentryEnvironment("", "test")).toBe("test");
   });

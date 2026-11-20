@@ -12,18 +12,18 @@
 
 import { render } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
 
-const FAKE_CLIENT = {} as unknown as SupabaseClient;
+const FAKE_CLIENT = {} as unknown as DataClient;
 const FAKE_USER = { id: "00000000-0000-0000-0000-000000000000" };
 
-type FakeAuthReturn = { user: { id: string } | null; supabase: SupabaseClient | null };
+type FakeAuthReturn = { user: { id: string } | null; db: DataClient | null };
 
-const mockUseAuth = vi.fn<() => FakeAuthReturn>(() => ({ user: FAKE_USER, supabase: FAKE_CLIENT }));
+const mockUseAuth = vi.fn<() => FakeAuthReturn>(() => ({ user: FAKE_USER, db: FAKE_CLIENT }));
 
 vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
@@ -62,7 +62,7 @@ describe("OnlineReconnectSync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: signed-in, no superuser flags.
-    mockUseAuth.mockReturnValue({ user: FAKE_USER, supabase: FAKE_CLIENT });
+    mockUseAuth.mockReturnValue({ user: FAKE_USER, db: FAKE_CLIENT });
     mockUseSuperuser.mockReturnValue({
       anyFlagOn: false,
       flags: { pretendAllMastered: false },
@@ -95,7 +95,7 @@ describe("OnlineReconnectSync", () => {
   });
 
   it("passes null userId when user is null (guest mode)", () => {
-    mockUseAuth.mockReturnValue({ user: null, supabase: FAKE_CLIENT } as FakeAuthReturn);
+    mockUseAuth.mockReturnValue({ user: null, db: FAKE_CLIENT } as FakeAuthReturn);
 
     render(<OnlineReconnectSync />);
 
@@ -104,7 +104,7 @@ describe("OnlineReconnectSync", () => {
   });
 
   it("passes null for both when signed out AND superuser flag is on", () => {
-    mockUseAuth.mockReturnValue({ user: null, supabase: FAKE_CLIENT } as FakeAuthReturn);
+    mockUseAuth.mockReturnValue({ user: null, db: FAKE_CLIENT } as FakeAuthReturn);
     mockUseSuperuser.mockReturnValue({
       anyFlagOn: true,
       flags: { pretendAllMastered: true },

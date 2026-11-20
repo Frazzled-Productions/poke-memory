@@ -214,7 +214,7 @@ describe("FeedbackModal - submit payload", () => {
     };
     expect(body.category).toBe("feature");
     expect(body.message).toBe("Add dark mode");
-    // No page selected: must be null (not "/settings"), so the Discord embed
+    // No page selected: must be null (not "/settings"), so the bug-report email
     // does not show a constant meaningless pathname (#1847).
     expect(body.page).toBeNull();
   });

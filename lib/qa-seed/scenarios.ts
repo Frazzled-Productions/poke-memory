@@ -10,7 +10,7 @@
  * store that the app reads, so they are indistinguishable from real progress - 
  * but the sync write-guard on SuperuserContext suppresses all cloud writes
  * while any superuser flag is on (including qaSeedMode). Seeded data can
- * therefore never reach Supabase.
+ * therefore never reach the cloud.
  *
  * To add a new scenario: add an entry to SCENARIOS and implement a builder
  * function that returns a SeedPayload. Keep builders pure (no side effects);

@@ -8,7 +8,7 @@
  *
  * The generated files are committed to the repository so the build never
  * needs to run this script - they are static assets served directly without
- * any Vercel Image Optimisation transformation.
+ * any image optimisation transformation.
  *
  * `sharp` is used for conversion. It is a Next.js transitive dependency and
  * is NOT listed in package.json - do not add it. If `sharp` cannot be

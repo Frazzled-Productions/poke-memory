@@ -421,11 +421,11 @@ function SettingsSubsection({
 export default function SettingsPage() {
   const router = useRouter();
   const t = useTranslations();
-  const { user, supabase } = useAuth();
+  const { user, db } = useAuth();
   const { updateFavourite } = useFavourite();
   const { unlocked, flags, setFlag, anyFlagOn } = useSuperuser();
   // A superuser session writes nothing to the cloud, so it restores locally.
-  const restoreAccount = user && supabase && !anyFlagOn ? { userId: user.id, client: supabase } : null;
+  const restoreAccount = user && db && !anyFlagOn ? { userId: user.id, client: db } : null;
   const { seed } = useSeed();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [activeLocale, setActiveLocale] = useState<AppLocale>(DEFAULT_LOCALE);
@@ -468,7 +468,7 @@ export default function SettingsPage() {
 
   // Retry push hook for the account/sync block.
   const { retryState, retryNow } = useRetryPush(
-    anyFlagOn ? null : supabase,
+    anyFlagOn ? null : db,
     anyFlagOn ? null : (user?.id ?? null),
   );
 
@@ -574,17 +574,17 @@ export default function SettingsPage() {
 
   // Best-effort push of auto-detected regional prefs once auth is available.
   useEffect(() => {
-    if (!user || !supabase || !autoDetectedPrefsRef.current) return;
+    if (!user || !db || !autoDetectedPrefsRef.current) return;
     // Guard: skip if any superuser flag is on (write-guard parity, #1854 F-settings).
     if (anyFlagOn) return;
     const prefs = autoDetectedPrefsRef.current;
     autoDetectedPrefsRef.current = null;
-    void pushRegionalPrefs(supabase, user.id, {
+    void pushRegionalPrefs(db, user.id, {
       timezone: prefs.timezone,
       dateFormat: prefs.dateFormat,
       pushNotificationHour: loadSettings().pushNotificationHour,
     }).catch(() => {});
-  }, [user, supabase, anyFlagOn]);
+  }, [user, db, anyFlagOn]);
 
   function handleChange(key: keyof UserSettings, raw: string) {
     setDraftValues((prev) => ({ ...prev, [key]: raw }));
@@ -680,8 +680,8 @@ export default function SettingsPage() {
 
   async function handleReset() {
     if (anyFlagOn) return;
-    if (user && supabase) {
-      const result = await resetAllProgressEverywhere(supabase);
+    if (user && db) {
+      const result = await resetAllProgressEverywhere(db);
       if (!result.ok) throw new Error("Could not delete cloud data. Check your connection and try again.");
     } else {
       await clearLocalProgress();
@@ -693,8 +693,8 @@ export default function SettingsPage() {
 
   async function handleDeleteAccount() {
     if (anyFlagOn) return;
-    if (!user || !supabase) return;
-    const result = await deleteAccountEverywhere(supabase);
+    if (!user || !db) return;
+    const result = await deleteAccountEverywhere(db);
     if (!result.ok) {
       throw new Error(
         "Could not delete your account. Check your connection and try again.",
@@ -990,13 +990,6 @@ export default function SettingsPage() {
                   optimizableReviewCount={optimizableReviewCount}
                   isSignedIn={user !== null}
                   superuserPaused={anyFlagOn}
-                  onOptimized={(optimizedAt, weights) => {
-                    setSettings((prev) =>
-                      prev !== null
-                        ? { ...prev, fsrsWeights: weights, fsrsWeightsOptimizedAt: optimizedAt }
-                        : prev,
-                    );
-                  }}
                 />
 
                 {/* "Mark Pokémon I already know" quickstart (#1084) */}
@@ -1026,7 +1019,7 @@ export default function SettingsPage() {
                     {knownQuizOpen && (
                       <div id="known-quiz-panel" className="mt-4">
                         <KnownPokemonQuiz
-                          client={supabase}
+                          client={db}
                           userId={user?.id ?? null}
                           superuserPaused={anyFlagOn}
                         />
@@ -1770,8 +1763,8 @@ export default function SettingsPage() {
                         const next = { ...settings, timezone: e.target.value };
                         setSettings(next);
                         saveSettings(next);
-                        if (user && supabase && !anyFlagOn) {
-                          void pushRegionalPrefs(supabase, user.id, {
+                        if (user && db && !anyFlagOn) {
+                          void pushRegionalPrefs(db, user.id, {
                             timezone: e.target.value,
                             dateFormat: next.dateFormat,
                             pushNotificationHour: next.pushNotificationHour,
@@ -1818,8 +1811,8 @@ export default function SettingsPage() {
                                 const next = { ...settings, dateFormat: value };
                                 setSettings(next);
                                 saveSettings(next);
-                                if (user && supabase && !anyFlagOn) {
-                                  void pushRegionalPrefs(supabase, user.id, {
+                                if (user && db && !anyFlagOn) {
+                                  void pushRegionalPrefs(db, user.id, {
                                     timezone: next.timezone,
                                     dateFormat: value,
                                     pushNotificationHour: next.pushNotificationHour,
@@ -1861,8 +1854,8 @@ export default function SettingsPage() {
                         const next = { ...settings, pushNotificationHour: hour };
                         setSettings(next);
                         saveSettings(next);
-                        if (user && supabase && !anyFlagOn) {
-                          void pushRegionalPrefs(supabase, user.id, {
+                        if (user && db && !anyFlagOn) {
+                          void pushRegionalPrefs(db, user.id, {
                             timezone: next.timezone,
                             dateFormat: next.dateFormat,
                             pushNotificationHour: hour,
@@ -1883,8 +1876,8 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Push opt-in (#1056) - gated on signed-in user */}
-                {user && supabase && (
-                  <PushOptIn user={user} supabase={supabase} />
+                {user && db && (
+                  <PushOptIn user={user} db={db} />
                 )}
               </CollapsibleSection>
               )}
@@ -2007,11 +2000,11 @@ export default function SettingsPage() {
 
                 {/* Restore from cloud - authenticated users only (#1732 / #1729).
                     Moved here from Stats page; Stats shows a link to /settings instead.
-                    Gated on signed-in + supabase available + superuser off. */}
-                {user && supabase && !anyFlagOn && (
+                    Gated on signed-in + data client available + superuser off. */}
+                {user && db && !anyFlagOn && (
                   <div className={cn(cardPanelPadded, "flex flex-col gap-3")}>
                     <h3 className={sectionLabel}>{t("stats.forcePull.heading")}</h3>
-                    <ForcePullSection supabase={supabase} userId={user.id} />
+                    <ForcePullSection db={db} userId={user.id} />
                   </div>
                 )}
               </CollapsibleSection>
@@ -2109,8 +2102,8 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Manage sign-in methods - for signed-in users */}
-                {user && supabase && (
-                  <LinkIdentitiesSection user={user} supabase={supabase} />
+                {user && (
+                  <LinkIdentitiesSection user={user} />
                 )}
               </CollapsibleSection>
               )}

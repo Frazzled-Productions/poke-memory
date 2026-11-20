@@ -1,0 +1,284 @@
+# Deploys the app to Cloudflare Workers with OpenNext and wrangler (OpenSpec change
+# move-to-cloudflare, design D11), modelled on the company site's stage 1 workflow.
+#
+# - Push to `main`, or a published GitHub Release: test, build, apply D1 migrations to the
+#   production database, deploy the Worker `poke-memory`. The release trigger exists because
+#   auto-release.yml commits the version bump and CHANGELOG.md to `main` with `[skip ci]`, which
+#   suppresses the push event; the Release it then creates with the bot App token is not
+#   suppressed, so the released version (and its What's new section) is what ends up deployed.
+#   A release deploys the tip of `main`, never the tag itself.
+# - Pull request into `qa`, or the qa-to-main promotion PR (so `qa` itself gets a preview to QA
+#   before promoting, which qa-preview-deploy.yml used to fire on Vercel): build, apply D1
+#   migrations to the preview database, seed it with the two test users
+#   (scripts/cloudflare/seed-preview.mjs), upload a version of the separate Worker
+#   `poke-memory-preview` aliased pr-<number>, comment its URL on the PR (one comment, edited on
+#   later pushes), then run the Playwright auth specs against that URL (`preview-e2e`, which
+#   replaces the old e2e.yml that waited for a Vercel deployment).
+# - With no CLOUDFLARE_API_TOKEN secret (a fork, Dependabot, or before the account is set up), or
+#   with no wrangler.jsonc or one still holding placeholder ids, both jobs skip the Cloudflare
+#   steps with a notice and pass.
+#
+# Secrets and the public repo: this is `pull_request`, never `pull_request_target`, so a fork PR
+# runs without secrets (and the preview job also skips forks outright). The Cloudflare token is
+# set only on the steps that call wrangler, never on `npm ci` or the Next.js build, so dependency
+# install scripts and the build never see it. Same-repo PR branches can only be pushed by
+# collaborators with write access, who are trusted with it. None of these jobs is a required check.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  pull_request:
+    branches: [qa, main]
+    # Docs and OpenSpec files never reach the Worker, so they need no preview.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "openspec/**"
+
+concurrency:
+  # One group for every production deploy (push and release), so two never run at once and an
+  # older build cannot finish after a newer one; one group per PR for previews.
+  group: ${{ github.event_name == 'pull_request' && format('deploy-{0}', github.ref) || 'deploy-production' }}
+  # Never cancel a production deploy half way; a newer push to a PR replaces its preview.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  production:
+    if: github.event_name == 'push' || github.event_name == 'release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # A release deploys the tip of `main`, not the tag: the tip always contains the newest
+          # release, so a re-published or older Release can never roll production back.
+          ref: ${{ github.event_name == 'release' && 'main' || '' }}
+          persist-credentials: false
+
+      - name: Check Cloudflare is set up
+        id: ready
+        env:
+          HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "::notice::No CLOUDFLARE_API_TOKEN secret, so nothing is deployed to Cloudflare."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          elif [ ! -f wrangler.jsonc ]; then
+            echo "::notice::No wrangler.jsonc on this commit, so nothing is deployed to Cloudflare."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          elif grep -q 'REPLACE_WITH_' wrangler.jsonc; then
+            echo "::notice::wrangler.jsonc still holds placeholder ids, so nothing is deployed to Cloudflare."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.ready.outputs.ok == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: "npm"
+      - if: steps.ready.outputs.ok == 'true'
+        run: npm ci
+      - if: steps.ready.outputs.ok == 'true'
+        run: npm test
+      - if: steps.ready.outputs.ok == 'true'
+        name: Build the Worker
+        run: npm run cf:build
+        env:
+          # NEXT_PUBLIC_* are inlined into the browser bundle at build time.
+          NEXT_PUBLIC_DEPLOY_ENV: cloudflare-production
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          NEXT_PUBLIC_CF_BEACON_TOKEN: ${{ vars.NEXT_PUBLIC_CF_BEACON_TOKEN }}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+          # Source map upload (next.config.ts withSentryConfig); skipped when the token is absent.
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+      - if: steps.ready.outputs.ok == 'true'
+        name: Apply D1 migrations (production)
+        run: npx wrangler d1 migrations apply DB --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - if: steps.ready.outputs.ok == 'true'
+        name: Deploy the Worker
+        run: npm run cf:deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+
+  preview:
+    # Fork PRs get no secrets anyway; skipping them outright keeps a fork from ever reaching the
+    # Cloudflare steps if that changes. Dependabot PRs read the Dependabot secret store, which has
+    # no Cloudflare token, so the ready check skips them with a notice.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      url: ${{ steps.upload.outputs.url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check Cloudflare is set up
+        id: ready
+        env:
+          HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "::notice::No CLOUDFLARE_API_TOKEN secret for this pull request (Dependabot, or not set up yet), so no preview version is uploaded. CI still builds and tests it."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          elif [ ! -f wrangler.jsonc ]; then
+            echo "::notice::No wrangler.jsonc on this branch, so no preview version is uploaded."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          elif grep -q 'REPLACE_WITH_' wrangler.jsonc; then
+            echo "::notice::wrangler.jsonc still holds placeholder ids, so no preview version is uploaded."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.ready.outputs.ok == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: "npm"
+      - if: steps.ready.outputs.ok == 'true'
+        run: npm ci
+      - if: steps.ready.outputs.ok == 'true'
+        name: Build the Worker (preview, no analytics beacon)
+        run: npm run cf:build
+        env:
+          NEXT_PUBLIC_DEPLOY_ENV: cloudflare-preview
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+      - if: steps.ready.outputs.ok == 'true'
+        name: Apply D1 migrations (preview)
+        run: npx wrangler d1 migrations apply DB --remote --env preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - if: steps.ready.outputs.ok == 'true'
+        name: Seed the preview database (two test users)
+        env:
+          # Optional. Without it the test users get a random password nobody knows.
+          SEED_TEST_PASSWORD: ${{ secrets.PREVIEW_TEST_PASSWORD }}
+        run: node scripts/cloudflare/seed-preview.mjs --out "$RUNNER_TEMP/seed-preview.sql"
+      - if: steps.ready.outputs.ok == 'true'
+        name: Load the seed into the preview database
+        run: npx wrangler d1 execute DB --remote --env preview --yes --file "$RUNNER_TEMP/seed-preview.sql"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - if: steps.ready.outputs.ok == 'true'
+        name: Upload the preview version
+        id: upload
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -o pipefail
+          npm run cf:upload-preview 2>&1 | tee "$RUNNER_TEMP/upload.log"
+          url=$(grep -oE "https://pr-${PR_NUMBER}-[A-Za-z0-9.-]+\.workers\.dev" "$RUNNER_TEMP/upload.log" | head -n 1 || true)
+          echo "url=${url}" >> "$GITHUB_OUTPUT"
+      - if: steps.ready.outputs.ok == 'true'
+        name: Comment the preview URL on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PREVIEW_URL: ${{ steps.upload.outputs.url }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          MARKER="<!-- poke-memory-preview -->"
+          if [ -n "$PREVIEW_URL" ]; then
+            line="Preview version for ${SHA}: ${PREVIEW_URL}"
+          else
+            line="Preview version for ${SHA} uploaded; its URL was not found in the log, see this run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          fi
+          body="${MARKER}
+          ${line}
+
+          It runs on the separate poke-memory-preview Worker with its own seeded database (two test users, no real data unless a copy rehearsal loaded some), without the analytics beacon, push or email sends."
+          # Find this job's own comment: posted with GITHUB_TOKEN (REST `user.login` is
+          # `github-actions[bot]`, a login no human account can hold) with the marker as its whole
+          # first line. A comment anyone else posts with the marker is ignored, not edited (#2124).
+          COMMENT_ID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+            | jq -rn --arg marker "$MARKER" --arg author "github-actions[bot]" \
+                '[inputs[] | select(.user.login == $author and (((.body // "") | split("\n")[0] | rtrimstr("\r")) == $marker)) | .id] | first // empty')
+          if [ -n "$COMMENT_ID" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" -f body="$body" > /dev/null
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" > /dev/null
+          fi
+
+  preview-e2e:
+    # Playwright auth specs against the preview version (was e2e.yml on a Vercel
+    # deployment_status). Not a required check, and deliberately not named `e2e`: that name is
+    # ci.yml's required aggregator, and a second job reporting it would change the gate.
+    #
+    # Scope: ONLY `e2e/auth.spec.ts` runs here (#829). The full suite against a remote preview
+    # chronically timed out and never completed. Guest-mode smoke is covered by the required
+    # `e2e-browser` check, which runs a local build. Keep this run scoped to the auth specs.
+    name: Preview auth specs
+    needs: preview
+    if: needs.preview.outputs.url != ''
+    runs-on: ubuntu-latest
+    # Browsers and system deps are baked into the image (#644). The tag must track the
+    # @playwright/test version in package-lock.json (`npm run lint:playwright-pin` checks it).
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Cache npm
+        uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Test-only mock-auth seam (#751). `NEXT_PUBLIC_E2E_AUTH_MOCK` is inlined at BUILD time and
+      # `isMockAuthEnabled()` is false in any production build, which the preview Worker is, so
+      # the signed-in specs detect the seam is not live and skip themselves; the rest of the
+      # auth specs run against the preview. The env var below only documents intent on the
+      # runner side and is harmless there. See WORKFLOW.md "Mock-auth seam (E2E)".
+      - name: Run Playwright auth specs
+        run: npx playwright test e2e/auth.spec.ts --project=chromium --project=mobile-safari
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ needs.preview.outputs.url }}
+          NEXT_PUBLIC_E2E_AUTH_MOCK: "1"
+
+      # Upload the report only on failure: failures are the only case a maintainer needs the
+      # diff for (#1127). Fail loud if the html reporter produced nothing.
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+          if-no-files-found: error

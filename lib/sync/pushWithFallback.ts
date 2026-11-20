@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { pushSingleCard } from "@/lib/sync/cloud";
 import {
   loadPendingQueue,
@@ -78,7 +78,7 @@ export interface PushWithFallbackOptions {
  * trigger) is evicted - the cloud row is newer, no point retrying.
  */
 export async function pushWithFallback(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   options: PushWithFallbackOptions,
 ): Promise<PushWithFallbackOutcome> {

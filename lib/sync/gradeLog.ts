@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import type { GradeLogEntry } from "@/lib/gradelog/persistence";
 import { fetchAllPages } from "@/lib/sync/paginatedFetch";
 import { SUPPORTED_LOCALES } from "@/i18n/locales";
@@ -110,7 +110,7 @@ export type GradeLogPushResult = "ok" | "rejected" | "failed";
 const ROW_REJECTION_SQLSTATE = /^2[23][0-9A-Z]{3}$/;
 
 export async function pushGradeLogDetailed(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   entries: GradeLogEntry[],
 ): Promise<GradeLogPushResult> {
@@ -134,7 +134,7 @@ export async function pushGradeLogDetailed(
 }
 
 export async function pushGradeLog(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
   entries: GradeLogEntry[],
 ): Promise<boolean> {
@@ -156,11 +156,11 @@ type GradeLogCloudRow = {
 };
 
 export async function pullGradeLog(
-  client: SupabaseClient,
+  client: DataClient,
   userId: string,
 ): Promise<GradeLogEntry[] | null> {
   try {
-    // Paginate to avoid the PostgREST 1000-row default cap, which would
+    // Paginate under the gateway's 1000-row cap, which would otherwise
     // silently truncate the grade log for any user past ~10 active days.
     // Rows are ordered by occurred_at ascending so offset pagination is
     // safe: grade_log is append-only and new rows only appear at the tail.

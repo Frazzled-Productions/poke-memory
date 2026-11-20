@@ -289,7 +289,37 @@
       "lowStorageProceed": "このままダウンロード"
     },
     "optimizerCooldown": "{count, plural, other {次の最適化まであと # 日}}",
-    "optimizerRetryAfter": "{count, plural, other {# 日後に再試行してください。}}",
+    "optimiser": {
+      "heading": "スケジュールを自分向けに調整",
+      "signInPrompt": "サインインすると、自分に合わせたスケジュール調整を使えます。",
+      "intro": "これまでの復習履歴をもとに、スケジュールをあなたの記憶に合わせて調整します。",
+      "notEnoughIntro": "重みを意味のある形で調整するには、十分な復習履歴が必要です。",
+      "optimiseNow": "今すぐ最適化",
+      "availableAfter": "約 {min, number} 回の復習後に利用できます。現在 {count, number} 回です。",
+      "pausedButton": "同期停止中(スーパーユーザー)",
+      "pausedTitle": "スーパーユーザーのフラグがオンの間は最適化できません。",
+      "lastOptimised": "前回の最適化: {date}",
+      "page": {
+        "description": "あなた自身の復習履歴にスケジューラーの重みを合わせます。このブラウザ内で実行され、1 分ほどかかることがあります。",
+        "backToSettings": "設定に戻る",
+        "loading": "復習履歴を読み込んでいます…",
+        "signedOut": "スケジュールを調整するにはサインインしてください。最適化にはアカウントに保存された復習履歴を使います。",
+        "paused": "スーパーユーザーのフラグがオンの間は最適化できません。実行するにはフラグをオフにしてください。",
+        "unsupported": "このブラウザでは最適化を実行できません。最新の Chrome、Edge、Firefox、Safari をお試しください。",
+        "notEnough": "最適化に使える復習は {count, number} 回です。約 {min, number} 回必要です。",
+        "ready": "{count, plural, other {# 回分の復習を使えます。}}",
+        "fitting": "重みを計算しています…1 分ほどかかることがあります。",
+        "progress": "{percent, number}% 完了",
+        "saving": "新しい重みを保存しています…",
+        "success": "完了しました。スケジュールはあなたの復習に合わせた重みを使います。",
+        "errorNotEnoughData": "復習のばらつきがまだ足りません。学習を続けて、数週間後にもう一度お試しください。",
+        "errorLoad": "復習履歴を読み込めませんでした。接続を確認して、もう一度お試しください。",
+        "errorSave": "重みは計算できましたが保存できませんでした。接続を確認して、もう一度お試しください。",
+        "errorFailed": "最適化できませんでした。しばらくしてからもう一度お試しください。",
+        "errorDetail": "詳細: {detail}",
+        "tryAgain": "もう一度試す"
+      }
+    },
     "backup": {
       "heading": "バックアップ",
       "exportLabel": "進捗をエクスポート",

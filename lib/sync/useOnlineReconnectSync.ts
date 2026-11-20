@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataClient } from "@/lib/db/client";
 import { pullAndMerge } from "@/lib/sync/pullAndMerge";
 import { useLatestRef } from "@/lib/hooks/useLatestRef";
 import { isSyncSafe } from "@/lib/sync/cloud";
@@ -43,7 +43,7 @@ import { SW_REPLAY_MESSAGE } from "@/lib/sync/backgroundSync";
  * flip the overall sync status into the error state.
  */
 export function useOnlineReconnectSync(
-  client: SupabaseClient | null,
+  client: DataClient | null,
   userId: string | null,
 ): void {
   // Use refs so the event handler always sees the latest values without

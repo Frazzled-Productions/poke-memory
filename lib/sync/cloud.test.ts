@@ -11,11 +11,12 @@ import {
   isStructuralError,
   buildBeaconPayload,
   CARD_REVIEWS_CONFLICT_COLS,
+  maxCloudUpdatedAt,
 } from "./cloud";
 import type { ReviewableCard } from "@/lib/review/session";
 import type { CloudRow, SeedOpts } from "./cloud";
 import type { SeedPokemon, EvolutionCard } from "@/lib/pokemon/seed";
-import type { PostgrestError } from "@supabase/supabase-js";
+import type { DataClientError } from "@/lib/db/client";
 
 // Minimal ReviewableCard factory for sync tests.
 // Only the fields relevant to isSyncSafe and sync are set.
@@ -101,7 +102,7 @@ function makeCloudRow(
   };
 }
 
-function makeSupabaseClient(upsertError: null | object = null) {
+function makeDataClient(upsertError: null | object = null) {
   const upsertSpy = vi.fn().mockResolvedValue({ error: upsertError });
   const client = {
     from: vi.fn().mockReturnValue({
@@ -109,7 +110,7 @@ function makeSupabaseClient(upsertError: null | object = null) {
     }),
     _upsertSpy: upsertSpy,
   };
-  return client as unknown as import("@supabase/supabase-js").SupabaseClient & {
+  return client as unknown as import("@/lib/db/client").DataClient & {
     _upsertSpy: ReturnType<typeof vi.fn>;
   };
 }
@@ -143,7 +144,7 @@ describe("pushSession", () => {
   });
 
   it("skips a card with firstSeen set and lastReview null without calling upsert for it", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
     const unsafeCard = makeCard(2, "2026-05-10", null);
 
@@ -162,7 +163,7 @@ describe("pushSession", () => {
   });
 
   it("uses (user_id, card_type, subject_key, locale) as the conflict target (#1259)", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
     await pushSession(client, "user-1", [safeCard]);
     const [, conflictArg] = client._upsertSpy.mock.calls[0] as [unknown, { onConflict: string }];
@@ -170,7 +171,7 @@ describe("pushSession", () => {
   });
 
   it("warns when an unsafe card is skipped", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     await pushSession(client, "user-1", [makeCard(42, "2026-05-10", null)]);
     expect(console.warn).toHaveBeenCalledWith(
       expect.stringContaining("42")
@@ -178,7 +179,7 @@ describe("pushSession", () => {
   });
 
   it("returns true with no upsert calls when all cards are unsafe", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     const ok = await pushSession(client, "user-1", [makeCard(1, "2026-05-10", null)]);
     expect(ok).toBe(true);
     expect(client._upsertSpy).not.toHaveBeenCalled();
@@ -193,7 +194,7 @@ describe("pushSingleCard", () => {
   });
 
   it("returns 'failed' without calling upsert for an unsafe card", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     const unsafeCard = makeCard(7, "2026-05-10", null);
 
     const result = await pushSingleCard(client, "user-1", unsafeCard);
@@ -202,13 +203,13 @@ describe("pushSingleCard", () => {
   });
 
   it("warns when an unsafe card is skipped", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     await pushSingleCard(client, "user-1", makeCard(7, "2026-05-10", null));
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("7"));
   });
 
   it("calls upsert and returns 'ok' for a safe card", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
 
     const result = await pushSingleCard(client, "user-1", safeCard);
@@ -218,7 +219,7 @@ describe("pushSingleCard", () => {
   });
 
   it("returns 'rejected' and does not set structural error when upsert returns 23514", async () => {
-    const client = makeSupabaseClient({ code: "23514", message: "check constraint violation", details: "", hint: "" });
+    const client = makeDataClient({ code: "23514", message: "check constraint violation", details: "", hint: "" });
     const safeCard = makeCard(11, "2026-05-10", "2026-05-10");
 
     const result = await pushSingleCard(client, "user-1", safeCard);
@@ -227,7 +228,7 @@ describe("pushSingleCard", () => {
   });
 
   it("does not include updated_at in the upsert payload (server trigger handles it)", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
     await pushSingleCard(client, "user-1", safeCard);
     const [rowArg] = client._upsertSpy.mock.calls[0] as [Record<string, unknown>, unknown];
@@ -235,7 +236,7 @@ describe("pushSingleCard", () => {
   });
 
   it("upsert uses (user_id, card_type, subject_key, locale) as the conflict target (#1259)", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     const safeCard = makeCard(1, "2026-05-10", "2026-05-10");
     await pushSingleCard(client, "user-1", safeCard);
     const [rowArg, conflictArg] = client._upsertSpy.mock.calls[0] as [
@@ -386,8 +387,8 @@ describe("hidden_since (#333) round-trip", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
-  it("pushSession sends hidden_since to Supabase", async () => {
-    const client = makeSupabaseClient();
+  it("pushSession sends hidden_since to the cloud", async () => {
+    const client = makeDataClient();
     const card = makeCard(11, "2026-05-01", "2026-05-08", "2026-05-09");
     const ok = await pushSession(client, "user-1", [card]);
     expect(ok).toBe(true);
@@ -401,7 +402,7 @@ describe("hidden_since (#333) round-trip", () => {
   });
 
   it("pushSession sends null hidden_since for cards that are not hidden", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     const card = makeCard(12, "2026-05-01", "2026-05-08", null);
     await pushSession(client, "user-1", [card]);
     const [batchArg] = client._upsertSpy.mock.calls[0] as [
@@ -411,8 +412,8 @@ describe("hidden_since (#333) round-trip", () => {
     expect(batchArg[0].hidden_since).toBeNull();
   });
 
-  it("pushSingleCard sends hidden_since to Supabase", async () => {
-    const client = makeSupabaseClient();
+  it("pushSingleCard sends hidden_since to the cloud", async () => {
+    const client = makeDataClient();
     const card = makeCard(13, "2026-05-01", "2026-05-08", "2026-05-09");
     const ok = await pushSingleCard(client, "user-1", card);
     expect(ok).toBe("ok");
@@ -449,8 +450,8 @@ describe("seen_in_pasture (#350) round-trip", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
-  it("pushSession sends seen_in_pasture=true to Supabase", async () => {
-    const client = makeSupabaseClient();
+  it("pushSession sends seen_in_pasture=true to the cloud", async () => {
+    const client = makeDataClient();
     const card = makeCard(31, "2026-05-01", "2026-05-08", null, true);
     const ok = await pushSession(client, "user-1", [card]);
     expect(ok).toBe(true);
@@ -462,7 +463,7 @@ describe("seen_in_pasture (#350) round-trip", () => {
   });
 
   it("pushSession sends seen_in_pasture=false for unacknowledged arrivals", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     const card = makeCard(32, "2026-05-01", "2026-05-08", null, false);
     await pushSession(client, "user-1", [card]);
     const [batchArg] = client._upsertSpy.mock.calls[0] as [
@@ -472,8 +473,8 @@ describe("seen_in_pasture (#350) round-trip", () => {
     expect(batchArg[0].seen_in_pasture).toBe(false);
   });
 
-  it("pushSingleCard sends seen_in_pasture=true to Supabase", async () => {
-    const client = makeSupabaseClient();
+  it("pushSingleCard sends seen_in_pasture=true to the cloud", async () => {
+    const client = makeDataClient();
     const card = makeCard(33, "2026-05-01", "2026-05-08", null, true);
     const ok = await pushSingleCard(client, "user-1", card);
     expect(ok).toBe("ok");
@@ -503,6 +504,16 @@ describe("seen_in_pasture (#350) round-trip", () => {
 
 // ─── mergeCloudIntoLocalSilent (#359) ─────────────────────────────────────
 
+describe("maxCloudUpdatedAt compares instants, not strings", () => {
+  it("picks the later instant when the strings sort the other way", () => {
+    const rows = [
+      makeCloudRow(1, null, null, "2026-05-13T11:00:00+01:00"),
+      makeCloudRow(2, null, null, "2026-05-13T10:30:00.000Z"),
+    ];
+    expect(maxCloudUpdatedAt(rows)).toBe("2026-05-13T10:30:00.000Z");
+  });
+});
+
 describe("mergeCloudIntoLocalSilent", () => {
   beforeEach(() => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -528,6 +539,17 @@ describe("mergeCloudIntoLocalSilent", () => {
     const local = makeCard(1, "2026-05-13", null);
     const row = makeCloudRow(1, null, null);
     const [merged] = mergeCloudIntoLocalSilent([local], [row], null);
+    expect(merged).toBe(local);
+  });
+
+  it.each([
+    ["2026-05-13T08:00:00.789012+00:00", "2026-05-13T08:00:00.789Z"],
+    ["2026-05-13T08:00:00.78+00:00", "2026-05-13T08:00:00.780Z"],
+    ["2026-05-13T08:00:00+00:00", "2026-05-13T08:00:00.000Z"],
+  ])("a PostgREST lastPullAt %s is the same instant as D1's %s: keep local", (lastPullAt, updatedAt) => {
+    const local = makeCard(1, "2026-05-12", "2026-05-12");
+    const row = makeCloudRow(1, "2026-05-01", "2026-05-01", updatedAt);
+    const [merged] = mergeCloudIntoLocalSilent([local], [row], lastPullAt);
     expect(merged).toBe(local);
   });
 
@@ -635,7 +657,7 @@ describe("toCloudRow / pushSingleCard: evo cards sync their actual locale (no fo
       },
     };
 
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     await pushSingleCard(client, "user-1", jaEvoCard);
 
     const [rowArg] = client._upsertSpy.mock.calls[0] as [
@@ -972,7 +994,7 @@ describe("locale round-trip (#1259)", () => {
   });
 
   it("pushSession sends locale field in every row", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     // A card without an explicit locale defaults to "en"
     const card = makeCard(1, "2026-05-10", "2026-05-10");
     await pushSession(client, "user-1", [card]);
@@ -984,7 +1006,7 @@ describe("locale round-trip (#1259)", () => {
   });
 
   it("pushSingleCard sends locale field in the row", async () => {
-    const client = makeSupabaseClient();
+    const client = makeDataClient();
     const card = makeCard(1, "2026-05-10", "2026-05-10");
     await pushSingleCard(client, "user-1", card);
     const [rowArg] = client._upsertSpy.mock.calls[0] as [{ locale: string }, unknown];
@@ -1033,16 +1055,8 @@ describe("locale round-trip (#1259)", () => {
 
 // ─── isStructuralError (#1358) ────────────────────────────────────────────────
 
-function makePostgrestError(code: string): PostgrestError {
-  const name = "PostgrestError";
-  return {
-    code,
-    message: `Error with code ${code}`,
-    details: "",
-    hint: "",
-    name,
-    toJSON: () => ({ code, message: `Error with code ${code}`, details: "", hint: "", name }),
-  };
+function makeDbError(code: string): DataClientError {
+  return { code, message: `Error with code ${code}`, details: "", hint: "" };
 }
 
 describe("isStructuralError (#1358)", () => {
@@ -1051,47 +1065,47 @@ describe("isStructuralError (#1358)", () => {
   });
 
   it("returns true for 42P10 (ON CONFLICT mismatch - the #1344 incident code)", () => {
-    expect(isStructuralError(makePostgrestError("42P10"))).toBe(true);
+    expect(isStructuralError(makeDbError("42P10"))).toBe(true);
   });
 
   it("returns true for 42P01 (relation does not exist)", () => {
-    expect(isStructuralError(makePostgrestError("42P01"))).toBe(true);
+    expect(isStructuralError(makeDbError("42P01"))).toBe(true);
   });
 
   it("returns true for 42703 (column does not exist)", () => {
-    expect(isStructuralError(makePostgrestError("42703"))).toBe(true);
+    expect(isStructuralError(makeDbError("42703"))).toBe(true);
   });
 
   it("returns true for 42501 (insufficient privilege at PG layer)", () => {
-    expect(isStructuralError(makePostgrestError("42501"))).toBe(true);
+    expect(isStructuralError(makeDbError("42501"))).toBe(true);
   });
 
   it("returns true for 23505 (unique violation)", () => {
-    expect(isStructuralError(makePostgrestError("23505"))).toBe(true);
+    expect(isStructuralError(makeDbError("23505"))).toBe(true);
   });
 
   it("returns true for 23503 (foreign key violation)", () => {
-    expect(isStructuralError(makePostgrestError("23503"))).toBe(true);
+    expect(isStructuralError(makeDbError("23503"))).toBe(true);
   });
 
   it("returns false for 23514 (check_violation - deliberate regression trigger)", () => {
     // 23514 is the DELIBERATE regression trigger (migrations 002/015/016/017).
     // It must NOT fail loud - it is the expected rejection of bad state.
-    expect(isStructuralError(makePostgrestError("23514"))).toBe(false);
+    expect(isStructuralError(makeDbError("23514"))).toBe(false);
   });
 
   it("returns false for PGRST-prefixed codes (PostgREST transient schema-cache)", () => {
-    expect(isStructuralError(makePostgrestError("PGRST116"))).toBe(false);
-    expect(isStructuralError(makePostgrestError("PGRST301"))).toBe(false);
+    expect(isStructuralError(makeDbError("PGRST116"))).toBe(false);
+    expect(isStructuralError(makeDbError("PGRST301"))).toBe(false);
   });
 
   it("returns false for generic 5xx-style codes", () => {
     // These are transient - not structural.
-    expect(isStructuralError(makePostgrestError("500"))).toBe(false);
+    expect(isStructuralError(makeDbError("500"))).toBe(false);
   });
 
   it("returns false when code is not a string", () => {
-    const err = { code: undefined, message: "test", details: "", hint: "" } as unknown as PostgrestError;
+    const err = { code: undefined, message: "test", details: "", hint: "" } as unknown as DataClientError;
     expect(isStructuralError(err)).toBe(false);
   });
 });
@@ -1129,7 +1143,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
   });
 
   it("calls markStructuralSyncError('42P10') and console.error fires on a 42P10 error", async () => {
-    const client = makeSupabaseClient({ code: "42P10", message: "ON CONFLICT mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const client = makeDataClient({ code: "42P10", message: "ON CONFLICT mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const card = makeCard(1, "2026-05-10", "2026-05-10");
 
     const result = await pushSingleCard(client, "user-1", card);
@@ -1142,7 +1156,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
   });
 
   it("calls markStructuralSyncError('23505') for a unique violation", async () => {
-    const client = makeSupabaseClient({ code: "23505", message: "unique violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const client = makeDataClient({ code: "23505", message: "unique violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const card = makeCard(2, "2026-05-10", "2026-05-10");
 
     await pushSingleCard(client, "user-1", card);
@@ -1152,7 +1166,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
 
   it("does not call markStructuralSyncError on a 23514 (deliberate regression trigger)", async () => {
     // 23514 is deliberate - the regression trigger rejecting bad state.
-    const client = makeSupabaseClient({ code: "23514", message: "check violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const client = makeDataClient({ code: "23514", message: "check violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const card = makeCard(3, "2026-05-10", "2026-05-10");
 
     await pushSingleCard(client, "user-1", card);
@@ -1164,7 +1178,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
     const upsertSpy = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
     const client = {
       from: vi.fn().mockReturnValue({ upsert: upsertSpy }),
-    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+    } as unknown as import("@/lib/db/client").DataClient;
     const card = makeCard(4, "2026-05-10", "2026-05-10");
 
     const result = await pushSingleCard(client, "user-1", card);
@@ -1174,7 +1188,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
   });
 
   it("does not call markStructuralSyncError on a transient PGRST error", async () => {
-    const client = makeSupabaseClient({ code: "PGRST116", message: "transient", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const client = makeDataClient({ code: "PGRST116", message: "transient", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const card = makeCard(5, "2026-05-10", "2026-05-10");
 
     await pushSingleCard(client, "user-1", card);
@@ -1183,7 +1197,7 @@ describe("pushSingleCard structural error handling (#1358)", () => {
   });
 
   it("calls clearStructuralSyncError on a successful push (self-heal after deploy fix)", async () => {
-    const client = makeSupabaseClient(null); // no error - success
+    const client = makeDataClient(null); // no error - success
     const card = makeCard(6, "2026-05-10", "2026-05-10");
 
     const result = await pushSingleCard(client, "user-1", card);
@@ -1207,7 +1221,7 @@ describe("pushSession structural error handling (#1358)", () => {
   });
 
   it("calls markStructuralSyncError('42P10') and console.error fires when a batch returns 42P10", async () => {
-    const client = makeSupabaseClient({ code: "42P10", message: "ON CONFLICT mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const client = makeDataClient({ code: "42P10", message: "ON CONFLICT mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const cards = [makeCard(1, "2026-05-10", "2026-05-10"), makeCard(2, "2026-05-10", "2026-05-10")];
 
     const result = await pushSession(client, "user-1", cards);
@@ -1220,7 +1234,7 @@ describe("pushSession structural error handling (#1358)", () => {
   it("breaks early and calls upsert only once on structural error (does not retry remaining batches)", async () => {
     // With BATCH=200 and 1 card, there is only 1 batch. Verify the early-break
     // logic by checking upsert was called exactly once.
-    const client = makeSupabaseClient({ code: "42P10", message: "mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const client = makeDataClient({ code: "42P10", message: "mismatch", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const cards = [makeCard(10, "2026-05-10", "2026-05-10")];
 
     await pushSession(client, "user-1", cards);
@@ -1230,7 +1244,7 @@ describe("pushSession structural error handling (#1358)", () => {
   });
 
   it("does not call markStructuralSyncError on a 23514 (deliberate regression trigger)", async () => {
-    const client = makeSupabaseClient({ code: "23514", message: "check violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
+    const client = makeDataClient({ code: "23514", message: "check violation", details: "", hint: "", name: "PostgrestError", toJSON: () => ({}) });
     const cards = [makeCard(11, "2026-05-10", "2026-05-10")];
 
     await pushSession(client, "user-1", cards);
@@ -1239,7 +1253,7 @@ describe("pushSession structural error handling (#1358)", () => {
   });
 
   it("calls clearStructuralSyncError when all batches succeed (self-heal)", async () => {
-    const client = makeSupabaseClient(null); // no error - success
+    const client = makeDataClient(null); // no error - success
     const cards = [makeCard(12, "2026-05-10", "2026-05-10")];
 
     const result = await pushSession(client, "user-1", cards);
@@ -1264,7 +1278,7 @@ describe("pullSession pagination order (#2053)", () => {
     const select = vi.fn().mockReturnValue({ eq });
     const from = vi.fn().mockReturnValue({ select });
     return {
-      client: { from } as unknown as import("@supabase/supabase-js").SupabaseClient,
+      client: { from } as unknown as import("@/lib/db/client").DataClient,
       order,
       calls,
     };

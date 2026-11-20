@@ -11,7 +11,7 @@ import { writeLocalStorageRaw } from "@/lib/storage/writeLocalStorage";
  * Node test environment) a fallback empty string is returned - the shuffle
  * still works, just without per-device differentiation.
  *
- * Authenticated users should use their Supabase `user.id` instead of this
+ * Authenticated users should use their account `user.id` instead of this
  * value; this helper is intended for the guest path only.
  */
 export function getOrCreateClientSalt(): string {

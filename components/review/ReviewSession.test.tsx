@@ -260,9 +260,9 @@ vi.mock("@/lib/streak", () => ({
 
 // Mutable so the #2052 undo-hold tests can sign in with a recording fake client.
 const mockAuthValue = vi.hoisted(() => ({
-  current: { user: null, supabase: null, loading: false } as {
+  current: { user: null, db: null, loading: false } as {
     user: { id: string } | null;
-    supabase: unknown;
+    db: unknown;
     loading: boolean;
   },
 }));
@@ -6145,10 +6145,10 @@ describe("undo hold wiring for signed-in users (#2052)", () => {
       writable: true,
     });
     upserts = [];
-    // Recording fake Supabase: every cloud write lands in `upserts`.
+    // Recording fake data client: every cloud write lands in `upserts`.
     mockAuthValue.current = {
       user: { id: "user-1" },
-      supabase: {
+      db: {
         from: (table: string) => ({
           upsert: async (rows: Record<string, unknown> | Record<string, unknown>[]) => {
             upserts.push({ table, rows: Array.isArray(rows) ? rows : [rows] });
@@ -6165,7 +6165,7 @@ describe("undo hold wiring for signed-in users (#2052)", () => {
   });
 
   afterEach(() => {
-    mockAuthValue.current = { user: null, supabase: null, loading: false };
+    mockAuthValue.current = { user: null, db: null, loading: false };
     vi.mocked(appendGradeEntry).mockResolvedValue({ occurredAt: Date.now() } as never);
   });
 
@@ -6296,7 +6296,7 @@ describe("undo hold wiring for signed-in users (#2052)", () => {
   });
 
   it("guest (signed out): Undo still works and nothing is sent", async () => {
-    mockAuthValue.current = { user: null, supabase: null, loading: false };
+    mockAuthValue.current = { user: null, db: null, loading: false };
     vi.mocked(appendGradeEntry).mockResolvedValue({ occurredAt: 555 } as never);
     const user = userEvent.setup();
     renderWithIntl(<ReviewSession />);

@@ -9,14 +9,14 @@
  * The route is intentionally not linked from navigation. It exists solely as
  * a stable throw target for Playwright smoke tests.
  *
- * In production (NEXT_PUBLIC_VERCEL_ENV==="production") the route returns a
- * 404 so it is never reachable by real users.
+ * In production (NEXT_PUBLIC_DEPLOY_ENV==="cloudflare-production", inlined at
+ * build time) the route returns a 404 so it is never reachable by real users.
  */
 "use client";
 
 import { notFound } from "next/navigation";
 
 export default function TestErrorPage(): never {
-  if (process.env.NEXT_PUBLIC_VERCEL_ENV === "production") notFound();
+  if (process.env.NEXT_PUBLIC_DEPLOY_ENV === "cloudflare-production") notFound();
   throw new Error("Intentional test error - used by E2E smoke tests (#1533).");
 }

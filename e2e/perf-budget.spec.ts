@@ -40,7 +40,7 @@ test.describe("Fresh-visitor performance budget (#1268)", () => {
   test("practice page loads within budget on a fresh visit", async ({
     page,
   }, testInfo) => {
-    // Gated on PERF_BUDGET=1 so the spec is invisible to the normal e2e.yml /
+    // Gated on PERF_BUDGET=1 so the spec is invisible to the normal deploy.yml /
     // ci.yml runs. A dedicated perf-budget.yml workflow runs it explicitly
     // with the env var set. Keeping it out of the required `e2e` matrix means
     // a flaky budget breach cannot block merges while the baseline is still

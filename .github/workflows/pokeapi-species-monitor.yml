@@ -19,7 +19,7 @@ name: PokéAPI Species Monitor
 # NOT use the raw generated-core.json record count (1174) - it includes 149
 # alternate-form records at ids 10001+.
 #
-# Modelled on cron-health-monitor.yml / refresh-user-count.yml (schedule +
+# Modelled on cron-health-monitor.yml (schedule +
 # workflow_dispatch, open/update an issue in place via an HTML marker).
 
 on:

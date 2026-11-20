@@ -18,8 +18,9 @@ async function AuthErrorBanner({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  // Any sign-in failure: Better Auth redirects OAuth errors to /?error=<code>.
   const { error } = await searchParams;
-  if (error !== "auth") return null;
+  if (!error) return null;
   const t = await getTranslations("practice");
   return (
     <div

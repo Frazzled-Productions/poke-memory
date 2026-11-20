@@ -1,64 +1,56 @@
 ## ADDED Requirements
 
-### Requirement: Bug reports notify Discord from the feedback route
+### Requirement: Bug reports email the company mailbox from the feedback route
 
-After storing a `bug` row, the feedback route SHALL run the notify logic in the same Worker with
-`ctx.waitUntil`, passing `id`, `category`, `page`, `app_version`, `created_at` and `authenticated`, and
-never `message` or `user_id`. A failed or skipped notification SHALL be logged and SHALL NOT change the
-route's answer. The post SHALL go out only when outbound sends are on, as `hosting-and-data` describes.
+After storing a `bug` row, the feedback route SHALL send the bug-report email in the same Worker with
+`ctx.waitUntil`, through Resend to the company mailbox (`lib/alertEmail.ts`), from the row's `id`,
+`page`, `app_version`, `created_at` and `authenticated`, never `user_id`. A failed or skipped email
+SHALL be logged and SHALL NOT change the route's answer. It SHALL go out only when outbound sends are
+on, as `hosting-and-data` describes.
 
 #### Scenario: Feature request
 
 - **WHEN** a `feature` or `other` row is inserted
-- **THEN** no notification is sent
+- **THEN** no email is sent
 
-#### Scenario: Discord down
+#### Scenario: Resend down
 
-- **WHEN** the webhook fails after a bug row is stored
+- **WHEN** Resend refuses the email, or the request fails, after a bug row is stored
 - **THEN** the route still answers `{ ok: true }` and the row stays
 
-#### Scenario: Webhook not configured
+#### Scenario: No Resend key
 
-- **WHEN** `DISCORD_NOTIFY_WEBHOOK_URL` is not set
-- **THEN** the feedback row is kept and no HTTP call is made
+- **WHEN** `RESEND_API_KEY` is not set
+- **THEN** the feedback row is kept, `feedback-alert: alert not sent: no RESEND_API_KEY` is logged and
+  no HTTP call is made
 
 #### Scenario: Preview version
 
 - **WHEN** a bug report is sent on the preview Worker
-- **THEN** the row is stored, the would-be notification is logged and nothing reaches Discord
+- **THEN** the row is stored, the would-be email is logged and nothing reaches Resend
 
-Source (planned): design D3, `app/api/feedback/route.ts`, `lib/discord/notify.ts`.
+Source (planned): design D3 and D8, `app/api/feedback/route.ts`, `lib/feedback/alerts.ts`,
+`lib/alertEmail.ts`; tests `app/api/feedback/route.test.tsx`, `lib/feedback/alerts.test.ts`.
 
-### Requirement: Deleting feedback deletes its bug notification
+### Requirement: Bug-report email content
 
-`feedback_discord_posts` SHALL hold only a feedback id, a Discord message id and a timestamp, with no
-foreign key to `feedback`, and SHALL NOT be on the data gateway. When the retention job or an account
-deletion removes a `bug` row with a stored message id, the Worker SHALL run the notify route's delete
-logic for it with `ctx.waitUntil`, sending neither `message` nor `user_id`. A failed delete SHALL never
-block the feedback delete.
-
-#### Scenario: Purge removes an old bug report
-
-- **WHEN** the daily purge deletes a bug report whose notification id is stored
-- **THEN** the Discord message is deleted and its `feedback_discord_posts` row goes
-
-#### Scenario: Account deletion
-
-- **WHEN** a signed-in player deletes their account and their bug reports go with it
-- **THEN** each one's Discord message is deleted the same way
+The bug-report email SHALL have the subject "Poké Memory: new bug report" and a plain-text body with
+the page, app version, authenticated (Yes or "No (guest)"), timestamp and the feedback row id, never
+`user_id` or an email address. A null page or version SHALL show "(not provided)". It SHALL go to
+hello@frazzledproductions.com from `RESEND_FROM`, the same sender and recipient as the operator
+alerts.
 
 #### Scenario: Guest report
 
-- **WHEN** a guest's bug report reaches 12 months
-- **THEN** its Discord message is deleted by the purge path
+- **WHEN** the report has `authenticated` false
+- **THEN** the email shows "No (guest)" and holds no user id
 
-#### Scenario: Discord down at deletion
+#### Scenario: Missing page
 
-- **WHEN** the Discord delete fails
-- **THEN** the feedback row is still deleted and the stored id stays for the retry sweep (#2369)
+- **WHEN** the report has no page
+- **THEN** the email shows "Page: (not provided)"
 
-Source (planned): design D3, `app/api/cron/feedback-retention/route.ts`, `lib/db/rpc/deleteAccount.ts`,
-`lib/discord/notify.ts`.
+Source (planned): design D8, `lib/feedback/alerts.ts`, `lib/alertEmail.ts`; tests `lib/feedback/alerts.test.ts`.
 
 ## MODIFIED Requirements
 
@@ -132,7 +124,7 @@ The route SHALL insert through `lib/db/system.ts` and answer `{ ok: true }`, or 
 insert error or throw. The `feedback` table SHALL NOT be on the data gateway, so no browser reads or
 writes it. `user_id` is nullable. The Worker's schedule SHALL call `POST /api/cron/feedback-retention`
 at 03:00 UTC daily, which SHALL delete rows older than 12 months. Account deletion SHALL delete the
-player's rows. Either deletion SHALL also delete a bug report's Discord notification.
+player's rows. Neither deletion sends anything.
 
 #### Scenario: Account deleted
 
@@ -152,58 +144,12 @@ player's rows. Either deletion SHALL also delete a bug report's Discord notifica
 Source (planned): `app/api/feedback/route.ts`, `app/api/cron/feedback-retention/route.ts`,
 `lib/db/system.ts`, `lib/db/tables.ts`.
 
-### Requirement: Notify route guards (baseline)
-
-`POST /api/discord/notify` SHALL answer 503 `misconfigured` without `CRON_SHARED_SECRET`,
-`DISCORD_NOTIFY_WEBHOOK_URL` or its D1 binding; 401 with no body unless the bearer matches in constant
-time; 400 `invalid_json` for an unparseable body; and 400 `forbidden_fields` if the body contains
-`message` or `user_id`. It does not check the rest of the body's shape or its category.
-
-#### Scenario: Wrong bearer
-
-- **WHEN** the token is wrong or a different length
-- **THEN** the route answers 401
-
-#### Scenario: Malformed authorised body
-
-- **WHEN** an authorised body is `null` or has no valid `created_at`
-- **THEN** the handler throws (held in ops #442)
-
-#### Scenario: Forbidden field
-
-- **WHEN** the body contains `message`
-- **THEN** the route answers 400 and nothing reaches Discord
-
-Source (planned): `app/api/discord/notify/route.ts`, `lib/auth/bearerAuth.ts:18`; tests
-`app/api/discord/notify/route.test.tsx`.
-
-### Requirement: Bug notification content (baseline)
-
-The notify logic SHALL post one red embed titled "New bug report" with page, app version,
-authenticated (Yes or "No (guest)"), timestamp and the feedback row id, never `user_id`; the Supabase
-dashboard link goes. A null page or version SHALL show "(not provided)". A failed webhook SHALL answer
-502, `webhook_fetch_failed` for a network error and `webhook_error` with the status for a non-2xx.
-Success answers `{ ok: true }`.
-
-#### Scenario: Guest report
-
-- **WHEN** the payload has `authenticated` false
-- **THEN** the embed shows "No (guest)" and holds no user id
-
-#### Scenario: Discord down
-
-- **WHEN** the webhook answers non-2xx
-- **THEN** the route answers 502 with that status, and the feedback row stays
-
-Source (planned): `app/api/discord/notify/route.ts`, `lib/discord/notify.ts`; tests
-`app/api/discord/notify/route.test.tsx`.
-
 ### Requirement: Bug notification message preview (baseline)
 
-The notify logic SHALL read the row's message through `lib/db/system.ts` and add a "Message preview"
-field, cut to 500 characters plus "…" when longer. If the read fails or finds no row, the preview SHALL
-be left out and the embed still posted. The preview stays (the #1848 ruling, upheld by the owner on 2
-November 2026) and is deleted with its feedback.
+The feedback route SHALL read the row's message through `lib/db/system.ts` and add a "Message
+preview" to the email, cut to 500 characters plus "…" when longer. If the read fails or finds no row,
+the preview SHALL be left out and the email still sent. The preview stays (the #1848 ruling, upheld
+by the owner on 2 November 2026, and again for email on 20 November 2026).
 
 #### Scenario: Long message
 
@@ -213,23 +159,23 @@ November 2026) and is deleted with its feedback.
 #### Scenario: Message fetch fails
 
 - **WHEN** the read errors
-- **THEN** the embed posts without the preview field
+- **THEN** the email is sent without the preview
 
-Source (planned): `lib/discord/notify.ts`, `lib/db/system.ts`; tests
-`app/api/discord/notify/route.test.tsx` "message preview (#1848)".
+Source (planned): `lib/feedback/alerts.ts`, `lib/db/system/feedback.ts`; tests
+`lib/feedback/alerts.test.ts`.
 
 ### Requirement: Weekly feedback digest (baseline)
 
-The Worker's schedule SHALL call the digest route on Mondays at 09:00 UTC with `{"window_days":7}`. The
-route SHALL answer 503 without `CRON_SHARED_SECRET`, its own `DISCORD_DIGEST_WEBHOOK_URL` or its D1
-binding, and 401 on a wrong bearer. `window_days` SHALL default to 7 when absent or the body is
-unparseable, and a number SHALL be rounded and clamped to 1-90. The post SHALL go out only when
-outbound sends are on.
+The Worker's schedule SHALL call `POST /api/cron/feedback-digest` on Mondays at 09:00 UTC. The route
+SHALL answer 503 without `CRON_SHARED_SECRET` and 401 on a wrong bearer. `window_days` SHALL default
+to 7 when absent or the body is unparseable, and a number SHALL be rounded and clamped to 1-90. The
+email SHALL go out only when outbound sends are on; without `RESEND_API_KEY` it is logged and skipped
+and the route answers 200 with `sent` false.
 
 #### Scenario: Window too large
 
 - **WHEN** `window_days` is 365
-- **THEN** the window is 90 days, although the comment at the top of the route says it falls back to 7
+- **THEN** the window is 90 days
 
 #### Scenario: Unparseable body
 
@@ -241,8 +187,29 @@ outbound sends are on.
 - **WHEN** Monday 09:00 UTC passes on the preview Worker
 - **THEN** no digest runs, because the preview has no Cron Triggers
 
-Source (planned): `app/api/discord/digest/route.ts`, `lib/cron/schedule.ts`; tests
-`app/api/discord/digest/route.test.tsx`.
+Source (planned): `app/api/cron/feedback-digest/route.ts`, `lib/cron/schedule.ts`; tests
+`app/api/cron/feedback-digest/route.test.tsx`.
+
+### Requirement: Digest content (baseline)
+
+The route SHALL count rows by category in the window, splitting authenticated from guest without
+selecting `user_id`, and SHALL never select `message`. It SHALL email the window, the total and one
+line per category with rows, as "Bug: 3 (2 auth, 1 guest)", with the subject "Poké Memory: weekly
+feedback digest". A query error SHALL answer 502 `query_failed`; a Resend refusal or network error
+SHALL answer 502 `email_failed`. Success answers with the total, window and `sent`.
+
+#### Scenario: Empty week
+
+- **WHEN** there is no feedback in the window
+- **THEN** a digest showing a total of 0 is still emailed
+
+#### Scenario: Category with no rows
+
+- **WHEN** a category has no rows
+- **THEN** it has no line in the email
+
+Source (planned): `app/api/cron/feedback-digest/route.ts`, `lib/feedback/alerts.ts`; tests
+`app/api/cron/feedback-digest/route.test.tsx`, `lib/feedback/alerts.test.ts`.
 
 ### Requirement: Sentry start-up in every runtime (baseline)
 
@@ -288,85 +255,67 @@ Playwright smoke tests. It is not linked from navigation and renders per request
 
 Source (planned): `app/test-error/page.tsx`; tests `e2e/error-boundary.spec.ts`.
 
-### Requirement: The notify route stores the Discord message id
+### Requirement: The privacy notice states the deletion
 
-The notify logic, reached through the route or called by the feedback route, SHALL send the bug embed
-with `wait=true`, keeping any query parameters already on the webhook URL, and SHALL store the message
-id Discord returns in `feedback_discord_posts` against the feedback id. Failing to store it SHALL be
-logged and SHALL NOT change the answer. If the row is gone once the id is stored, it SHALL delete the
-post.
+Notice section 3 SHALL say a bug report sends a notification email to the company mailbox through
+Resend, with a preview of up to 500 characters and no user identifier, deleted 12 months after it
+arrives. Section 6 SHALL list Resend in place of Discord, section 7 its transfer safeguards, and
+section 8 SHALL say the email cannot be matched to an account, so deleting the account does not
+remove it, but it never outlasts 12 months. The DPIA and the Children's Code assessment SHALL say
+the same.
 
-#### Scenario: Message id stored
+#### Scenario: Reading the notice
 
-- **WHEN** Discord accepts the post and returns a message id
-- **THEN** one `feedback_discord_posts` row holds the feedback id and that message id
+- **WHEN** anyone opens the privacy notice, in any locale
+- **THEN** sections 3, 6 and 8 say the bug-report email is deleted 12 months after it arrives
+- **AND** the notice does not mention Discord
 
-#### Scenario: Row deleted while the post was in flight
-
-- **WHEN** the feedback row is gone by the time the message id is stored
-- **THEN** the logic deletes that Discord post and its stored id
-
-#### Scenario: Storing the id fails
-
-- **WHEN** the insert into `feedback_discord_posts` errors, or Discord returns no id
-- **THEN** the failure is logged and the answer is still 200
-
-Source (planned): `lib/discord/notify.ts`, `app/api/discord/notify/route.ts`; tests
-`app/api/discord/notify/route.test.tsx` "stores the Discord message id (ops #405)".
-
-### Requirement: The notify route deletes the stored post
-
-After the bearer and forbidden-field guards, a deletion event with an id SHALL delete the stored
-Discord message, then the stored id; the retention job and account deletion run the same logic
-in-process. Only 404 code 10008 SHALL count as deleted; a 429 SHALL be retried twice after
-`retry_after`. Other failures SHALL answer 502 and keep the id. No id: 400; no stored id: 200 without
-calling Discord; no D1 binding: 503.
-
-#### Scenario: Discord down at deletion
-
-- **WHEN** the webhook delete answers 500 or the request throws
-- **THEN** the route answers 502 and the stored id stays
-
-#### Scenario: Already gone
-
-- **WHEN** Discord answers 404 with code 10008 (Unknown Message)
-- **THEN** the stored id is removed and the route answers 200
-
-#### Scenario: Webhook gone
-
-- **WHEN** Discord answers 404 with code 10015 (Unknown Webhook)
-- **THEN** the route answers 502 and the stored id stays
-
-#### Scenario: Rate limited
-
-- **WHEN** Discord answers 429 and then accepts the delete
-- **THEN** the post and the stored id are deleted and the route answers 200
-
-#### Scenario: Nothing stored
-
-- **WHEN** a deletion event arrives for a row with no stored id
-- **THEN** the route answers 200 without calling Discord
-
-#### Scenario: Forbidden field on a deletion event
-
-- **WHEN** a deletion body contains `user_id` or `message`
-- **THEN** the route answers 400 and nothing reaches Discord
-
-Source (planned): `app/api/discord/notify/route.ts`, `lib/discord/notify.ts`; tests
-`app/api/discord/notify/route.test.tsx` "deletes the post with the feedback (ops #405)".
+Source (planned): `app/privacy/page.tsx`, `docs/dpia.md`, `docs/childrens-code-assessment.md`; tests
+`app/privacy/page.test.tsx` "says a bug report is emailed to our company mailbox through Resend" and
+"says how long the bug-report email is kept, in sections 3, 6 and 8".
 
 ## REMOVED Requirements
 
 ### Requirement: Bug reports notify Discord through the database (baseline)
 
-**Reason**: The `feedback` insert trigger, `pg_net` and the Vault secrets go with Supabase.
+**Reason**: The `feedback` insert trigger, `pg_net` and the Vault secrets go with Supabase, and
+Discord goes for email (Fraser's ruling, 20 November 2026).
 
-**Migration**: Replaced by "Bug reports notify Discord from the feedback route", which sends the same
-fields and never `message` or `user_id`.
+**Migration**: Replaced by "Bug reports email the company mailbox from the feedback route", which
+sends the same fields and never `user_id`.
 
 ### Requirement: Bug notifications are deleted with their feedback
 
-**Reason**: The `feedback` delete trigger and its Vault secrets go with Supabase.
+**Reason**: The `feedback` delete trigger and its Vault secrets go with Supabase, and an email cannot
+be deleted from the Worker. Fraser's ruling of 20 November 2026 moved the notification to email.
 
-**Migration**: Replaced by "Deleting feedback deletes its bug notification", which keeps the same
-behaviour for the purge, account deletion and guest reports.
+**Migration**: The email holds no user id and is deleted from the mailbox 12 months after it
+arrives, as "The privacy notice states the deletion" says. `feedback_discord_posts` is not copied to
+D1, and D1 migration `0004` drops it.
+
+### Requirement: Notify route guards (baseline)
+
+**Reason**: `POST /api/discord/notify` is removed with Discord (20 November 2026). The feedback route
+sends the email itself, so no bearer-guarded notify route is needed.
+
+**Migration**: None; a bug-report email is sent only from the feedback route.
+
+### Requirement: The notify route stores the Discord message id
+
+**Reason**: Discord goes for email (20 November 2026); there is no message id to store.
+
+**Migration**: None.
+
+### Requirement: The notify route deletes the stored post
+
+**Reason**: Discord goes for email (20 November 2026); the notify route and its delete event go.
+
+**Migration**: None. The retry sweep for failed Discord deletions (#2369) is no longer needed.
+
+### Requirement: Bug notification content (baseline)
+
+**Reason**: The Discord embed goes with Discord (Fraser's ruling, 20 November 2026), and with it the
+webhook failure answers of the notify route.
+
+**Migration**: Replaced by "Bug-report email content", which carries the same fields; a failed send is
+covered by "Bug reports email the company mailbox from the feedback route".

@@ -23,37 +23,29 @@ deterministically broke the `test` job in the full-suite / `--changed` run (`get
 retry, so it hard-failed against the component's async mount render) and had to be reverted
 (#1470).
 
-## Integration (vitest + local Postgres)
+## Integration (vitest + D1 on node:sqlite)
 
-`lib/sync/integration/` runs against a local `postgres:15` container - no Supabase Pro/branch quota
-(#464 / #545 replaced PR #531's branching approach). Opt-in locally:
-`VITEST_INTEGRATION=1 npm run test:integration`. CI's `integration-tests.yml` runs on PRs touching
-`lib/sync/**`, `app/api/sync/**`, `db/migrations/**`, `lib/gradelog/**`, or itself (#611); the
-`integration-tests` label is the escape hatch. In scope: `apply-migrations.test.ts`, `rls.test.ts`,
-`regression-trigger.test.ts`. `auth.uid()` is polyfilled via `SET LOCAL "request.jwt.claims"` in a
-transaction.
+The D1 suite (`lib/db/**`, plus the sync parity tests in `lib/sync/**`) runs in the normal `node`
+vitest project against node:sqlite with `db/d1/migrations` applied through the D1 test shim
+(`lib/db/testing/sqliteD1.ts`): no container and no Cloudflare account. It replaced the Postgres
+suite in `lib/sync/integration/` (move-to-cloudflare). Run all of it with
+`npx vitest run --project node lib/db lib/sync`. CI's `integration-tests.yml` runs that on PRs
+touching `lib/sync/**`, `lib/db/**`, `app/api/sync/**`, `app/api/db/**`, `db/d1/**`,
+`lib/gradelog/**`, the grade_log divergence monitor, or itself (#611); the `integration-tests`
+label is the escape hatch.
 
-**Any change that adds or edits a `db/migrations/*.sql` file must run this suite locally before
-push** - `npm test` does not execute SQL, so a migration that fails to parse (e.g. a nested
-`DO $$...$$` colliding with an outer `DO $$...$$` on the same empty dollar-tag) passes the normal
-gate and only goes red on CI's `integration` job. Give nested PL/pgSQL blocks a distinct tag
-(`$func$`, `$digest$`) or extract a top-level function and call it from the cron/trigger body
-(#1653, 2026-06-09).
+**Any change that adds a `db/d1/migrations/*.sql` file must run the whole D1 suite locally before
+push.** The PR's `test` job runs `--changed` tests, picked by the import graph, and a migration is
+SQL read from disk, so it selects none of the tests that apply it. Also check it applies under D1
+itself: `npx wrangler d1 migrations apply DB --local` (what `migration-check.yml` runs on a fresh
+database). Migrations are append-only: never edit one already on `qa` (see
+[docs/persistence.md](persistence.md#apply-the-migration)).
 
-**A migration must keep the rows it should keep.** `apply-migrations.test.ts` runs on empty tables;
-`migration-data-preservation.test.ts` seeds rows at a cut-off and applies the rest. Its sweep carries
-a row in every table from `SWEEP_BASELINE` through every later file, so a new migration is covered
-with no edit. If the sweep fails, your migration loses or rewrites rows: if you meant that, add a
-named test for the rewrite and move `SWEEP_BASELINE` to your file (#2217). The named tests also run
-to the head, so if one fails too, update its expected values. `check-migrations.mjs` reads the SQL;
-this checks the data.
-
-**Calling a Postgres RPC with a new action/enum value requires BOTH a migration** (teaching the
-function body and any CHECK constraint) **AND a real-RPC integration test** against the local
-container. A mocked-RPC unit test proves the caller's branching but not the DB contract; the
-mismatch ships silently (#1883: the feedback throttle was green despite the action being unknown to
-the DB). Model: `RATE_LIMIT_ACTIONS` in `lib/auth/rateLimitIp.ts` is the single source of truth;
-`rate-limit.test.ts` iterates it and calls the real RPC for each action.
+**A new RPC action or enum value needs a test against the D1 test database**, not only a mocked
+one. A mocked unit test proves the caller's branching but not the database contract; the mismatch
+ships silently (#1883: the feedback throttle was green despite the action being unknown to the DB).
+Model: `RATE_LIMIT_ACTIONS` in `lib/auth/rateLimitIp.ts` is the single source of truth and its test
+iterates it against the real implementation.
 
 ## Coverage gate (#824)
 
@@ -65,7 +57,10 @@ every PR.
 
 ## E2E (Playwright)
 
-Smoke tests in `e2e/` run against Vercel previews via `e2e.yml`; config in `playwright.config.ts`.
+Smoke tests in `e2e/` run in CI on a local build (`ci.yml` `e2e-browser`); `e2e/auth.spec.ts` also
+runs against each PR's preview version (`deploy.yml`, `preview-e2e`) and `e2e/auth-real.spec.ts`
+against a local Worker with a fresh local D1 (`ci.yml` `e2e-real-auth`). Config in
+`playwright.config.ts`.
 
 - **Scope**: guest-mode only. **Projects**: `chromium` + `mobile-safari` (Webkit, iPhone 14
   viewport). **Base URL**: `PLAYWRIGHT_BASE_URL`. **Run locally**: `npm run test:e2e` (after
@@ -118,7 +113,10 @@ behaviours that passed unit tests, CI, and review).
 ### State coverage
 
 When a fresh preview can't reach a data-dependent state, drive it via QA-seed scenarios (#1326) or
-superuser flags (see [superuser.md](superuser.md)). Verify locale switched, seed applied, empty
+superuser flags (see [superuser.md](superuser.md)). Signed-in test accounts on the preview Worker
+come from `scripts/cloudflare/seed-preview.mjs` (two fixed test users with some progress, written
+to the preview D1 database; never a copy of real data). The Supabase-era `qa:seed-cloud` seeder
+was removed with Supabase (move-to-cloudflare). Verify locale switched, seed applied, empty
 branch, eyeballing exempted surfaces too (memory: `feedback_verify_core_mechanics_by_running_app`).
 
 ### Locale coverage

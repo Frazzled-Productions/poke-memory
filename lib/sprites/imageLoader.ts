@@ -12,7 +12,7 @@
  * - `/sprites/pokemon/<id>.png` paths → redirect to the pre-generated static
  *   WebP variant at `/sprites/pokemon/webp/<id>/<snapped-width>.webp`. The
  *   browser fetches a static file directly; no `/_next/image` endpoint is
- *   involved, so Vercel bills zero Image Optimisation transformations.
+ *   involved, so no image optimisation runs (or is billed) at request time.
  *
  * - `https://avatars.githubusercontent.com/...` → returned unchanged. GitHub
  *   OAuth avatar URLs are user-controlled and potentially mutable; they are

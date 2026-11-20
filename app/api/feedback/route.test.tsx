@@ -1,446 +1,275 @@
 /**
- * Tests for POST /api/feedback (#1621).
+ * Tests for POST /api/feedback (#1621) on the D1 test database.
  *
- * Covers all acceptance-criteria cases:
- *   - Valid categories (bug / feature / other) → 200 { ok: true }
- *   - Invalid category → 400
- *   - Missing / empty message → 400
- *   - Message longer than 2000 chars → truncated to 2000 before insert
- *   - Guest (no session) → user_id: null inserted
- *   - Authenticated user → user_id from session, NOT from any body field
- *   - A body-supplied user_id is ignored (cannot spoof)
- *   - Insert throws → 500 { ok: false }
- *
- * Both Supabase clients are mocked so the test never touches the network.
+ * Covers the acceptance criteria (valid and invalid categories, missing or
+ * empty message, 2000-character truncation, guest and signed-in user_id from
+ * the session only, optional fields, 500 on an insert failure), the per-IP
+ * rate limit on rate_limit_buckets keyed on CF-Connecting-IP, and the
+ * bug-report email the route sends through ctx.waitUntil (design D3; email
+ * since Fraser's ruling of 20 November 2026). `fetch` is mocked: nothing
+ * reaches Resend.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { NextResponse } from "next/server";
 
-// Mock the admin (service-role) client.
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(),
+const { getCloudflareContext, requireAuth } = vi.hoisted(() => ({
+  getCloudflareContext: vi.fn(),
+  requireAuth: vi.fn(),
 }));
-
-// Mock the server Supabase client used to resolve the session.
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn(),
-}));
+vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext }));
+vi.mock("@/lib/auth/requireAuth", () => ({ requireAuth }));
 
 import { POST } from "./route";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { hashIp } from "@/lib/auth/rateLimitIp";
+import { forUser } from "@/lib/db/scope";
+import { feedbackForDigest } from "@/lib/db/system";
+import { createSqliteD1, createTestUser, type SqliteD1 } from "@/lib/db/testing/sqliteD1";
+import { spyD1, type SpyHooks } from "@/lib/db/testing/spyD1";
+import { rateLimitIpHashes } from "@/lib/db/testing/rows";
 
-const mockCreateAdminClient = vi.mocked(createAdminClient);
-const mockCreateServerClient = vi.mocked(createServerClient);
+const RESEND = "https://api.resend.com/emails";
 
-/** Build a request with the given JSON body. */
-function makeRequest(body: unknown): Request {
+let d1: SqliteD1;
+let env: Record<string, unknown>;
+let alice: string;
+let bob: string;
+let sessionUser: string | null;
+let waitUntil: ReturnType<typeof vi.fn>;
+const fetchMock = vi.fn<typeof fetch>();
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", fetchMock);
+  fetchMock.mockReset();
+  fetchMock.mockResolvedValue(Response.json({ id: "email-1" }));
+  for (const level of ["error", "warn", "info"] as const) vi.spyOn(console, level).mockImplementation(() => {});
+  d1 = createSqliteD1();
+  alice = createTestUser(d1);
+  bob = createTestUser(d1);
+  sessionUser = null;
+  waitUntil = vi.fn();
+  env = { DB: d1, DEPLOY_ENV: "cloudflare-production", RESEND_API_KEY: "re_test" };
+  getCloudflareContext.mockImplementation(async () => ({ env, ctx: { waitUntil } }));
+  requireAuth.mockReset();
+  requireAuth.mockImplementation(async () =>
+    sessionUser ? { user: { id: sessionUser } } : NextResponse.json({ error: "unauthorized" }, { status: 401 }),
+  );
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  d1.close();
+});
+
+function installDb(hooks: SpyHooks) {
+  env.DB = spyD1(d1, hooks);
+}
+
+let ipCounter = 0;
+/** A request with the given JSON body, from a fresh IP unless one is given. */
+function makeRequest(body: unknown, ip = `198.51.100.${++ipCounter}`, headers: Record<string, string> = {}): Request {
   return new Request("http://localhost/api/feedback", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json", "CF-Connecting-IP": ip, ...headers },
+    body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
 
-/** Build a mock admin client whose `.from("feedback").insert(...)` resolves to the given result. */
-function buildAdminMock(opts: { insertError?: unknown } = {}) {
-  const insertFn = vi.fn(() => Promise.resolve({ error: opts.insertError ?? null }));
-  const fromFn = vi.fn(() => ({ insert: insertFn }));
-  return { client: { from: fromFn }, insertFn, fromFn };
+/** Every feedback row, as the retention and digest jobs see them. */
+async function allFeedback() {
+  const rows = await feedbackForDigest(d1, new Date(0));
+  const owned = [...(await forUser(d1, alice).select("feedback")), ...(await forUser(d1, bob).select("feedback"))];
+  return rows.map((r) => ({
+    ...r,
+    row: owned.find((o) => o.id === r.id) ?? null,
+  }));
 }
-
-/** Build a mock server client that resolves getUser() to the given user (or null for guest). */
-function buildServerMock(user: { id: string } | null) {
-  const getUserFn = vi.fn(() => Promise.resolve({ data: { user }, error: null }));
-  return {
-    client: { auth: { getUser: getUserFn } } as unknown as Awaited<ReturnType<typeof createServerClient>>,
-    getUserFn,
-  };
-}
-
-/**
- * Build a mock server client with both getUser and rpc (for rate-limit tests).
- * rpcResult controls what the mocked check_rate_limit RPC returns.
- */
-function buildServerMockWithRpc(
-  user: { id: string } | null,
-  rpcResult: { data: boolean | null; error: unknown },
-) {
-  const getUserFn = vi.fn(() => Promise.resolve({ data: { user }, error: null }));
-  const rpcFn = vi.fn(() => Promise.resolve(rpcResult));
-  const client = {
-    auth: { getUser: getUserFn },
-    rpc: rpcFn,
-  } as unknown as Awaited<ReturnType<typeof createServerClient>>;
-  return { client, getUserFn, rpcFn };
-}
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
-});
-
-// ─── Valid categories ─────────────────────────────────────────────────────────
 
 describe("POST /api/feedback - valid categories", () => {
-  const CATEGORIES = ["bug", "feature", "other"] as const;
-
-  for (const cat of CATEGORIES) {
+  for (const cat of ["bug", "feature", "other"] as const) {
     it(`accepts category '${cat}' and returns 200 { ok: true }`, async () => {
-      const adminMock = buildAdminMock();
-      const serverMock = buildServerMock(null);
-      mockCreateAdminClient.mockReturnValue(
-        adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-      );
-      mockCreateServerClient.mockResolvedValue(
-        serverMock.client,
-      );
-
-      const res = await POST(makeRequest({ category: cat, message: "Test message" }));
+      const res = await POST(makeRequest({ category: cat, message: "Hello" }));
       expect(res.status).toBe(200);
-      const body = (await res.json()) as { ok: boolean };
-      expect(body.ok).toBe(true);
-
-      // Insert was called with the correct category.
-      expect(adminMock.fromFn).toHaveBeenCalledWith("feedback");
-      expect(adminMock.insertFn).toHaveBeenCalledWith(
-        expect.objectContaining({ category: cat }),
-      );
+      expect(await res.json()).toEqual({ ok: true });
+      expect((await allFeedback()).map((r) => r.category)).toEqual([cat]);
     });
   }
 });
 
-// ─── Input validation ─────────────────────────────────────────────────────────
-
 describe("POST /api/feedback - input validation", () => {
-  it("returns 400 for an invalid category string", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    const res = await POST(makeRequest({ category: "spam", message: "hello" }));
+  it.each([
+    ["an invalid category", { category: "spam", message: "x" }, "invalid_category"],
+    ["a missing category", { message: "x" }, "invalid_category"],
+    ["a missing message", { category: "bug" }, "missing_message"],
+    ["an empty message", { category: "bug", message: "   " }, "missing_message"],
+    ["a non-string message", { category: "bug", message: 42 }, "missing_message"],
+  ])("returns 400 for %s and inserts nothing", async (_label, body, error) => {
+    const res = await POST(makeRequest(body));
     expect(res.status).toBe(400);
-    const b = (await res.json()) as { ok: boolean; error: string };
-    expect(b.ok).toBe(false);
-    expect(b.error).toBe("invalid_category");
-    expect(adminMock.insertFn).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ ok: false, error });
+    expect(await allFeedback()).toEqual([]);
   });
 
-  it("returns 400 for a missing category", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    const res = await POST(makeRequest({ message: "hello" }));
-    expect(res.status).toBe(400);
-    expect(adminMock.insertFn).not.toHaveBeenCalled();
-  });
-
-  it("returns 400 for a missing message", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    const res = await POST(makeRequest({ category: "bug" }));
-    expect(res.status).toBe(400);
-    const b = (await res.json()) as { ok: boolean; error: string };
-    expect(b.ok).toBe(false);
-    expect(b.error).toBe("missing_message");
-    expect(adminMock.insertFn).not.toHaveBeenCalled();
-  });
-
-  it("returns 400 for an empty message string", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    const res = await POST(makeRequest({ category: "bug", message: "   " }));
-    expect(res.status).toBe(400);
-    const b = (await res.json()) as { ok: boolean; error: string };
-    expect(b.ok).toBe(false);
-    expect(b.error).toBe("missing_message");
-    expect(adminMock.insertFn).not.toHaveBeenCalled();
-  });
-
-  it("returns 400 for non-string message", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    const res = await POST(makeRequest({ category: "bug", message: 42 }));
-    expect(res.status).toBe(400);
-    expect(adminMock.insertFn).not.toHaveBeenCalled();
+  it("returns 400 for a non-JSON body", async () => {
+    expect((await POST(makeRequest("not json"))).status).toBe(400);
   });
 });
 
-// ─── Message truncation ───────────────────────────────────────────────────────
+describe("POST /api/feedback - stored row", () => {
+  it("truncates a message longer than 2000 chars, and keeps exactly 2000", async () => {
+    sessionUser = alice;
+    await POST(makeRequest({ category: "feature", message: "a".repeat(2500) }));
+    await POST(makeRequest({ category: "feature", message: "b".repeat(2000) }));
+    const messages = (await forUser(d1, alice).select("feedback")).map((r) => r.message as string);
+    expect(messages.map((m) => m.length).sort()).toEqual([2000, 2000]);
+  });
 
-describe("POST /api/feedback - message truncation", () => {
-  it("truncates a message longer than 2000 chars to exactly 2000 before inserting", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
+  it("stores user_id null for a guest", async () => {
+    await POST(makeRequest({ category: "other", message: "hi" }));
+    const [row] = await allFeedback();
+    expect(row).toMatchObject({ authenticated: false, row: null });
+  });
 
-    const longMessage = "x".repeat(3000);
-    const res = await POST(makeRequest({ category: "bug", message: longMessage }));
+  it("stores the session user's id for a signed-in user", async () => {
+    sessionUser = alice;
+    await POST(makeRequest({ category: "other", message: "hi" }));
+    expect((await forUser(d1, alice).select("feedback")).map((r) => r.user_id)).toEqual([alice]);
+  });
+
+  it("ignores a user_id in the body (cannot spoof another user)", async () => {
+    sessionUser = bob;
+    await POST(makeRequest({ category: "other", message: "hi", user_id: alice }));
+    expect(await forUser(d1, alice).select("feedback")).toEqual([]);
+    expect((await forUser(d1, bob).select("feedback")).map((r) => r.user_id)).toEqual([bob]);
+  });
+
+  it("falls back to a guest row when the session check throws", async () => {
+    requireAuth.mockRejectedValue(new Error("session store down"));
+    const res = await POST(makeRequest({ category: "other", message: "hi" }));
     expect(res.status).toBe(200);
-
-    const insertArg = ((adminMock.insertFn.mock.calls as unknown[][])[0][0]) as { message: string };
-    expect(insertArg.message.length).toBe(2000);
-    expect(insertArg.message).toBe("x".repeat(2000));
+    expect((await allFeedback())[0].authenticated).toBe(false);
   });
 
-  it("does not truncate a message of exactly 2000 chars", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    const exactMessage = "a".repeat(2000);
-    const res = await POST(makeRequest({ category: "feature", message: exactMessage }));
-    expect(res.status).toBe(200);
-
-    const insertArg = ((adminMock.insertFn.mock.calls as unknown[][])[0][0]) as { message: string };
-    expect(insertArg.message.length).toBe(2000);
+  it("stores page and appVersion, capped at 300 characters, or null when absent", async () => {
+    sessionUser = alice;
+    await POST(makeRequest({ category: "feature", message: "a", page: "/practice", appVersion: "v".repeat(400) }));
+    await POST(makeRequest({ category: "feature", message: "b" }));
+    const rows = await forUser(d1, alice).select("feedback", { order: [{ column: "message" }] });
+    expect(rows.map((r) => [r.page, (r.app_version as string | null)?.length ?? null])).toEqual([
+      ["/practice", 300],
+      [null, null],
+    ]);
   });
 });
-
-// ─── User id resolution ───────────────────────────────────────────────────────
-
-describe("POST /api/feedback - user_id resolution", () => {
-  it("inserts user_id: null for a guest (no session)", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    await POST(makeRequest({ category: "bug", message: "Something broke" }));
-
-    const insertArg = ((adminMock.insertFn.mock.calls as unknown[][])[0][0]) as { user_id: unknown };
-    expect(insertArg.user_id).toBeNull();
-  });
-
-  it("inserts user_id from the session for an authenticated user", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock({ id: "user-abc-123" });
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    await POST(makeRequest({ category: "feature", message: "Add dark mode" }));
-
-    const insertArg = ((adminMock.insertFn.mock.calls as unknown[][])[0][0]) as { user_id: string };
-    expect(insertArg.user_id).toBe("user-abc-123");
-  });
-
-  it("ignores a user_id field in the request body (cannot spoof)", async () => {
-    const adminMock = buildAdminMock();
-    // Session returns user-from-session; body also sends a spoofed user_id.
-    const serverMock = buildServerMock({ id: "user-from-session" });
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    await POST(
-      makeRequest({
-        category: "bug",
-        message: "Spoofing attempt",
-        user_id: "spoofed-user-id",
-      }),
-    );
-
-    const insertArg = ((adminMock.insertFn.mock.calls as unknown[][])[0][0]) as { user_id: string };
-    // Must use the session-derived id, never the body-supplied one.
-    expect(insertArg.user_id).toBe("user-from-session");
-    expect(insertArg.user_id).not.toBe("spoofed-user-id");
-  });
-
-  it("falls back to user_id: null when getUser throws", async () => {
-    const adminMock = buildAdminMock();
-    // Server client throws during getUser.
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue({
-      auth: { getUser: vi.fn().mockRejectedValue(new Error("session error")) },
-    } as unknown as Awaited<ReturnType<typeof createServerClient>>);
-
-    const res = await POST(makeRequest({ category: "other", message: "Feedback" }));
-    expect(res.status).toBe(200);
-
-    const insertArg = ((adminMock.insertFn.mock.calls as unknown[][])[0][0]) as { user_id: unknown };
-    expect(insertArg.user_id).toBeNull();
-  });
-});
-
-// ─── Optional fields ──────────────────────────────────────────────────────────
-
-describe("POST /api/feedback - optional fields", () => {
-  it("passes page and appVersion through to the insert when provided", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    await POST(
-      makeRequest({
-        category: "bug",
-        message: "Crash on load",
-        page: "/practice",
-        appVersion: "0.10.34",
-      }),
-    );
-
-    const insertArg = ((adminMock.insertFn.mock.calls as unknown[][])[0][0]) as {
-      page: string;
-      app_version: string;
-    };
-    expect(insertArg.page).toBe("/practice");
-    expect(insertArg.app_version).toBe("0.10.34");
-  });
-
-  it("inserts null for page and app_version when not provided", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    await POST(makeRequest({ category: "other", message: "General feedback" }));
-
-    const insertArg = ((adminMock.insertFn.mock.calls as unknown[][])[0][0]) as {
-      page: unknown;
-      app_version: unknown;
-    };
-    expect(insertArg.page).toBeNull();
-    expect(insertArg.app_version).toBeNull();
-  });
-});
-
-// ─── Error handling ───────────────────────────────────────────────────────────
 
 describe("POST /api/feedback - error handling", () => {
-  it("returns 500 { ok: false } when the insert returns an error", async () => {
-    const adminMock = buildAdminMock({ insertError: { message: "DB error" } });
-    const serverMock = buildServerMock(null);
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    const res = await POST(makeRequest({ category: "bug", message: "Error case" }));
+  it("returns 500 { ok: false } when the insert fails", async () => {
+    installDb({
+      before: (s) => {
+        if (s.table === "feedback") throw new Error("D1_ERROR: down");
+      },
+    });
+    const res = await POST(makeRequest({ category: "bug", message: "x" }));
     expect(res.status).toBe(500);
-    const b = (await res.json()) as { ok: boolean };
-    expect(b.ok).toBe(false);
-  });
-
-  it("returns 500 { ok: false } when insert throws unexpectedly", async () => {
-    const serverMock = buildServerMock(null);
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    // Make the admin client itself throw during insert.
-    const throwingInsert = vi.fn().mockRejectedValue(new Error("network error"));
-    mockCreateAdminClient.mockReturnValue({
-      from: vi.fn(() => ({ insert: throwingInsert })),
-    } as unknown as ReturnType<typeof createAdminClient>);
-
-    const res = await POST(makeRequest({ category: "feature", message: "Feature request" }));
-    expect(res.status).toBe(500);
-    const b = (await res.json()) as { ok: boolean };
-    expect(b.ok).toBe(false);
-  });
-
-  it("returns 500 { ok: false } when env vars are missing", async () => {
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    const res = await POST(makeRequest({ category: "bug", message: "test" }));
-    expect(res.status).toBe(500);
-    const b = (await res.json()) as { ok: boolean };
-    expect(b.ok).toBe(false);
+    expect(await res.json()).toEqual({ ok: false });
   });
 });
 
-// ─── Rate-limit behaviour ─────────────────────────────────────────────────────
-
-describe("POST /api/feedback - rate-limit behaviour (#1883)", () => {
-  it("returns 429 when the RPC explicitly returns false (over cap)", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMockWithRpc(null, { data: false, error: null });
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    const res = await POST(makeRequest({ category: "bug", message: "Too many requests" }));
+describe("POST /api/feedback - rate limit (#1883)", () => {
+  it("refuses the 6th submission from one IP within 10 minutes with 429", async () => {
+    for (let i = 0; i < 5; i++) {
+      expect((await POST(makeRequest({ category: "other", message: `m${i}` }, "203.0.113.7"))).status).toBe(200);
+    }
+    const res = await POST(makeRequest({ category: "other", message: "m6" }, "203.0.113.7"));
     expect(res.status).toBe(429);
-    const b = (await res.json()) as { ok: boolean; error: string };
-    expect(b.ok).toBe(false);
-    expect(b.error).toBe("rate_limited");
-    // Insert must NOT have been called when rate-limited.
-    expect(adminMock.insertFn).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ ok: false, error: "rate_limited" });
+    expect(await allFeedback()).toHaveLength(5);
+    // Another IP is unaffected.
+    expect((await POST(makeRequest({ category: "other", message: "x" }, "203.0.113.8"))).status).toBe(200);
   });
 
-  it("proceeds with the insert (200) when the RPC returns an error (fail-open)", async () => {
-    // This is the regression case from #1883: check_rate_limit raised EXCEPTION
-    // for the 'feedback' action, returning { data: null, error: <error> }.
-    // The old code treated rlError as a block; the fix makes it non-fatal.
-    const adminMock = buildAdminMock();
-    const rpcError = { message: "check_rate_limit: unknown action feedback", code: "P0001" };
-    const serverMock = buildServerMockWithRpc(null, { data: null, error: rpcError });
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
+  it("keys on CF-Connecting-IP, never on a client-set X-Forwarded-For", async () => {
+    for (let i = 0; i < 5; i++) {
+      await POST(makeRequest({ category: "other", message: `m${i}` }, "203.0.113.9", { "X-Forwarded-For": `10.0.0.${i}` }));
+    }
+    const res = await POST(
+      makeRequest({ category: "other", message: "m6" }, "203.0.113.9", { "X-Forwarded-For": "10.0.0.99" }),
     );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
-
-    const res = await POST(makeRequest({ category: "bug", message: "Feedback that was broken" }));
-    expect(res.status).toBe(200);
-    const b = (await res.json()) as { ok: boolean };
-    expect(b.ok).toBe(true);
-    // The insert MUST still have been called despite the RPC error.
-    expect(adminMock.insertFn).toHaveBeenCalledOnce();
+    expect(res.status).toBe(429);
   });
 
-  it("proceeds with the insert (200) when the RPC returns true (under cap)", async () => {
-    const adminMock = buildAdminMock();
-    const serverMock = buildServerMockWithRpc(null, { data: true, error: null });
-    mockCreateAdminClient.mockReturnValue(
-      adminMock.client as unknown as ReturnType<typeof createAdminClient>,
-    );
-    mockCreateServerClient.mockResolvedValue(serverMock.client);
+  it("hashes the IP with the Worker's RATE_LIMIT_SALT, never process.env", async () => {
+    vi.stubEnv("RATE_LIMIT_SALT", "process-env-salt");
+    env.RATE_LIMIT_SALT = "worker-salt";
+    try {
+      expect((await POST(makeRequest({ category: "other", message: "x" }, "203.0.113.10"))).status).toBe(200);
+      expect(rateLimitIpHashes(d1)).toEqual([hashIp("203.0.113.10", "worker-salt")]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 
-    const res = await POST(makeRequest({ category: "feature", message: "Under cap" }));
+  it("proceeds (fail-open) when the rate-limit check fails", async () => {
+    installDb({
+      before: (s) => {
+        if (s.table === "rate_limit_buckets") throw new Error("D1_ERROR: down");
+      },
+    });
+    expect((await POST(makeRequest({ category: "other", message: "x" }))).status).toBe(200);
+  });
+});
+
+describe("POST /api/feedback - bug-report email (design D3)", () => {
+  it("emails a bug report through Resend in ctx.waitUntil, with the preview and no user id", async () => {
+    sessionUser = alice;
+    const res = await POST(makeRequest({ category: "bug", message: "it crashed", page: "/practice", appVersion: "1.2.3" }));
     expect(res.status).toBe(200);
-    const b = (await res.json()) as { ok: boolean };
-    expect(b.ok).toBe(true);
-    expect(adminMock.insertFn).toHaveBeenCalledOnce();
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    await waitUntil.mock.calls[0][0];
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toBe(RESEND);
+    const raw = String(fetchMock.mock.calls[0][1]!.body);
+    const { text } = JSON.parse(raw) as { text: string };
+    const [row] = await forUser(d1, alice).select("feedback");
+    expect(text).toContain("Message preview:\nit crashed");
+    expect(text).toContain("Page: /practice");
+    expect(text).toContain("App version: 1.2.3");
+    expect(text).toContain("Authenticated: Yes");
+    expect(text).toContain(`Feedback id: ${row.id as string}`);
+    expect(raw).not.toContain(alice);
+  });
+
+  it("does not email a feature request or other feedback", async () => {
+    await POST(makeRequest({ category: "feature", message: "x" }));
+    await POST(makeRequest({ category: "other", message: "x" }));
+    expect(waitUntil).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still answers 200 when Resend fails", async () => {
+    fetchMock.mockResolvedValue(new Response("nope", { status: 500 }));
+    const res = await POST(makeRequest({ category: "bug", message: "x" }));
+    expect(res.status).toBe(200);
+    await waitUntil.mock.calls[0][0];
+    expect(await allFeedback()).toHaveLength(1);
+  });
+
+  it("keeps the row and makes no HTTP call without RESEND_API_KEY", async () => {
+    delete env.RESEND_API_KEY;
+    const res = await POST(makeRequest({ category: "bug", message: "x" }));
+    expect(res.status).toBe(200);
+    await waitUntil.mock.calls[0][0];
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await allFeedback()).toHaveLength(1);
+  });
+
+  it("outside production stores the row but sends nothing", async () => {
+    env.DEPLOY_ENV = "cloudflare-preview";
+    const res = await POST(makeRequest({ category: "bug", message: "x" }));
+    expect(res.status).toBe(200);
+    await waitUntil.mock.calls[0][0];
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await allFeedback()).toHaveLength(1);
   });
 });
