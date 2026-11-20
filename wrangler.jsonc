@@ -54,7 +54,7 @@
     "D1_BACKUP_PREFIX": "d1/poke-memory",
     // The alert sender: pokememory.com is not verified in Resend, frazzledproductions.com is (D13).
     "RESEND_FROM": "Poké Memory <hello@frazzledproductions.com>",
-    "BETTER_AUTH_URL": "https://poke-memory.frasers-account.workers.dev"
+    "BETTER_AUTH_URL": "https://pokememory.com"
   },
   "env": {
     // Per-PR versions (design D11): its own Worker and D1 database.
