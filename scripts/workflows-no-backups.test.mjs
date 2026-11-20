@@ -100,3 +100,51 @@ describe("no workflow reads production data", () => {
     expect(holders).toEqual(TOKEN_HOLDERS);
   });
 });
+
+// Deploy guard (Fraser's ruling of 19 November 2026, ops #610): only `main` may use the token that
+// writes the live D1 and the production Worker. It lives in the GitHub environment `Production`,
+// whose deployment branch rule admits only `main`; there is no repository-level copy.
+/** The block of `jobs:` in `text` for job `name`, up to the next job. */
+function jobBlock(text, name) {
+  const lines = text.split("\n");
+  const start = lines.findIndex((l) => l === `  ${name}:`);
+  if (start === -1) return "";
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((l) => /^ {2}[\w-]+:\s*$/.test(l));
+  return [lines[start], ...(end === -1 ? rest : rest.slice(0, end))].join("\n");
+}
+
+describe("deploy guard", () => {
+  const deploy = readFileSync(join(WORKFLOWS, "deploy.yml"), "utf8");
+
+  it("runs the production job in the Production environment, on main only", () => {
+    const production = jobBlock(deploy, "production");
+    expect(production).toMatch(/^ {4}environment: Production$/m);
+    expect(production).toMatch(/^ {4}if: .*github\.ref == 'refs\/heads\/main'/m);
+  });
+
+  it("runs the preview job in the Preview environment, which holds no Cloudflare token", () => {
+    expect(jobBlock(deploy, "preview")).toMatch(/^ {4}environment: Preview$/m);
+  });
+
+  it("is not started by a published Release, whose tag ref the environment refuses", () => {
+    expect(deploy).not.toMatch(/^ {2}release:/m);
+    expect(deploy).toMatch(/^ {2}workflow_dispatch:/m);
+  });
+
+  it("is dispatched on main by auto-release.yml after the [skip ci] release commit", () => {
+    const release = readFileSync(join(WORKFLOWS, "auto-release.yml"), "utf8");
+    expect(release).toMatch(/gh workflow run deploy\.yml [^\n]*--ref main/);
+    expect(jobBlock(release, "release")).toMatch(/^ {6}actions: write\b/m);
+  });
+});
+
+describe("production Worker address", () => {
+  it("serves production only on its custom domain, and keeps the preview's workers.dev address", () => {
+    const wrangler = readFileSync(join(process.cwd(), "wrangler.jsonc"), "utf8");
+    const [top, preview] = wrangler.split(/^ {4}"preview": \{$/m);
+    expect(preview, "wrangler.jsonc has no env.preview block").toBeDefined();
+    expect(top).toMatch(/^ {2}"workers_dev": false,$/m);
+    expect(preview).toMatch(/^ {6}"workers_dev": true,$/m);
+  });
+});
