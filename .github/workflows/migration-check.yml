@@ -2,8 +2,8 @@ name: Migration check
 
 # D1 migration checks (OpenSpec change move-to-cloudflare, design D11). Replaces the Supabase
 # parity check (#1806): there is no second database to drift from any more, because deploy.yml
-# applies db/d1/migrations itself (`wrangler d1 migrations apply`) before every production deploy
-# and every preview upload.
+# applies db/d1/migrations itself (`wrangler d1 migrations apply`) before every production deploy,
+# and to the preview database right after it (change preview-upload-trust-main).
 #
 #   1. Every migration applies cleanly, in order, to a fresh local D1 (`--local`, Miniflare's
 #      SQLite; no Cloudflare account or secret).

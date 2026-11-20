@@ -37,8 +37,10 @@ only by `main`'s deploy.
 - Cited: `gh api repos/Frazzled-Productions/poke-memory/rulesets/16499371` (20 November 2026):
   `qa-staging` has one rule, `required_status_checks` (strict off), and no pull-request rule.
 - Cited: `main-protection` is also only required status checks (strict, including `Restrict main PR
-  source`); `main`'s extra trust is that it takes only PRs from `qa` or with the `hotfix` label, and
-  promotions are Fraser's.
+  source`); `main`'s extra trust is that it takes only PRs from `qa` or with the `hotfix` label (applied
+  by Fraser, or by the bot on Dependabot security PRs), and promotions are Fraser's. It is a working
+  rule, not an approval GitHub enforces; the bot can bypass the ruleset (#2419, filed from this change's
+  final review).
 - Seen: run 44806717982 (20 November 2026) passed with the notice "No CLOUDFLARE_PREVIEW_API_TOKEN
   secret in the Preview environment" and skipped every later step, so nothing has run with a token.
 - Seen: a check that every `ref:` in the workflow is `main` fails on `origin/main`'s file ("76: ref:
@@ -124,12 +126,16 @@ Consequences until the next promotion:
   and the PR's own specs run in `ci.yml`.
 
 Handling (Fraser's ruling on decision 1): a step before the upload calls
-`gh api "repos/$GITHUB_REPOSITORY/compare/main...$HEAD_SHA?per_page=1"` with `github.token` (read only,
+`gh api "repos/$GITHUB_REPOSITORY/compare/main...<target>?per_page=1"` with `github.token` (read only,
 no checkout of PR code; the files list comes on the first page whatever `per_page` is, up to 300 files,
-seen 20 November 2026: 118 files on page 1, none on page 2). It keeps file names made only of
-`A-Za-z0-9._/@+-` (so a crafted name cannot inject a workflow command or Markdown), and splits them into:
-- trusted: `wrangler.jsonc`, `package.json`, `package-lock.json`, `.nvmrc`, `playwright.config.ts`,
-  `scripts/cloudflare/*`, `e2e/*`;
+seen 20 November 2026: 118 files on page 1, none on page 2) for two targets: the PR head, and the PR's
+base branch, because `deploy.yml` builds the bundle from the PR merged into its base, so `qa` changes the
+PR branch lacks are in it too. It keeps file names made only of `A-Za-z0-9._/+-` (no `@`, `:` or `%`, so
+a crafted name cannot inject a workflow command, a mention or Markdown), warns with a count when it
+drops a name or GitHub's 300-file limit is reached, and splits the union into:
+- trusted: `wrangler.jsonc`, `package.json`, `package-lock.json`, `.npmrc`, `.nvmrc`,
+  `playwright.config.ts`, `e2e/*` (what `main`'s checkout installs and runs here; the seed script no
+  longer runs in this workflow);
 - migrations: `db/d1/migrations/*`.
 
 Each non-empty list prints a `::notice::` and adds one line to the PR comment. The three-dot compare

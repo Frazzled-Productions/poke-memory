@@ -133,33 +133,48 @@ jobs:
 
       - if: steps.ready.outputs.ok == 'true'
         name: List what the preview does not get from the PR yet
-        # Read-only, with this run's own token, and nothing of the PR is checked out: the three-dot
-        # compare of main with the PR head (qa's unpromoted changes included) names the trusted files
-        # this preview takes from main instead, and migrations not yet applied to the preview database.
-        # The files list comes whole (up to 300) on the first page. Names are kept only if made of
-        # safe characters, so a crafted file name cannot inject a workflow command or Markdown. A
-        # failure only warns: this is a notice, never a reason to skip the upload.
+        # Read-only, with this run's own token, and nothing of the PR is checked out. Two three-dot
+        # compares against main: the PR head, and the base branch (deploy.yml built the bundle from the
+        # PR merged into its base, so qa changes the PR branch lacks are in it too). Together they name
+        # the trusted files this preview takes from main instead, and migrations main has not applied
+        # to the preview database. Each files list comes whole (up to 300) on the first page. Names are
+        # kept only if made of safe characters (no `@`, `:` or `%`), so a crafted file name cannot
+        # inject a workflow command, a mention or Markdown; names left out are counted. A failure only
+        # warns: this is a notice, never a reason to skip the upload.
         id: differs
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          BASE_REF: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
         run: |
           set -uo pipefail
-          if ! files=$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...${HEAD_SHA}?per_page=1" \
-              --jq '[.files[]?.filename | select(test("^[A-Za-z0-9._/@+-]+$"))] | .[]'); then
-            echo "::warning::Could not compare main with ${HEAD_SHA}, so this run does not say which trusted files or migrations differ from main."
-            exit 0
-          fi
-          if [ "$(printf '%s\n' "$files" | grep -c .)" -ge 300 ]; then
-            echo "::warning::The compare lists 300 files or more, so the lists below may be incomplete."
-          fi
-          trusted=$(printf '%s\n' "$files" | grep -E '^(wrangler\.jsonc|package\.json|package-lock\.json|\.nvmrc|playwright\.config\.ts|scripts/cloudflare/.+|e2e/.+)$' | paste -sd ' ' - || true)
+          files=""
+          for target in "$HEAD_SHA" "$BASE_REF"; do
+            # First line: how many files GitHub listed; then the safe names, one per line.
+            if ! listed=$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...${target}?per_page=1" \
+                --jq '(.files | length), (.files[]?.filename | select(test("\\A[A-Za-z0-9._/+-]+\\z")))'); then
+              echo "::warning::Could not compare main with ${target}, so this run may not name every trusted file or migration that differs from main."
+              continue
+            fi
+            total=$(printf '%s\n' "$listed" | head -n 1)
+            names=$(printf '%s\n' "$listed" | tail -n +2)
+            kept=$(printf '%s\n' "$names" | grep -c . || true)
+            if [ "$total" -ge 300 ]; then
+              echo "::warning::The compare of main with ${target} lists 300 files, GitHub's limit, so the lists below may be incomplete."
+            fi
+            if [ "$kept" -lt "$total" ]; then
+              echo "::warning::$((total - kept)) file name(s) in the compare of main with ${target} hold unusual characters and are not listed below."
+            fi
+            files=$(printf '%s\n%s\n' "$files" "$names")
+          done
+          files=$(printf '%s\n' "$files" | grep . | sort -u || true)
+          trusted=$(printf '%s\n' "$files" | grep -E '^(wrangler\.jsonc|package\.json|package-lock\.json|\.npmrc|\.nvmrc|playwright\.config\.ts|e2e/.+)$' | paste -sd ' ' - || true)
           migrations=$(printf '%s\n' "$files" | grep -E '^db/d1/migrations/.+' | paste -sd ' ' - || true)
           if [ -n "$trusted" ]; then
             echo "::notice::These trusted files differ from main, and this preview uses main's copies until they are promoted: ${trusted}"
           fi
           if [ -n "$migrations" ]; then
-            echo "::notice::These migrations are not on main, so the preview database does not have them until they are promoted: ${migrations}"
+            echo "::notice::These migration files differ from main, and main's deploy applies only main's migrations to the preview database: ${migrations}"
           fi
           echo "trusted=${trusted}" >> "$GITHUB_OUTPUT"
           echo "migrations=${migrations}" >> "$GITHUB_OUTPUT"
@@ -193,7 +208,7 @@ jobs:
           body="${MARKER}
           ${line}
 
-          It runs on the separate poke-memory-preview Worker with its own seeded database (two test users, no real data unless a copy rehearsal loaded some), without the analytics beacon, push or email sends. Its bindings, config and database schema are main's."
+          It runs on the separate poke-memory-preview Worker with its own seeded database (two test users, no real data unless a copy rehearsal loaded some), without the analytics beacon, push or email sends. Its bindings and config are main's, and main's deploy applies main's migrations to its database."
           if [ -n "$TRUSTED" ]; then
             body="${body}
 
@@ -202,7 +217,7 @@ jobs:
           if [ -n "$MIGRATIONS" ]; then
             body="${body}
 
-          This preview runs against main's database schema until these migrations reach main: ${MIGRATIONS}"
+          This preview runs against main's database schema until these migrations reach main (unless someone applied them to the preview database by hand): ${MIGRATIONS}"
           fi
           # Find this job's own comment: posted with GITHUB_TOKEN (REST `user.login` is
           # `github-actions[bot]`, a login no human account can hold) with the marker as its whole

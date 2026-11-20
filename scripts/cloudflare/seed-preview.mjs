@@ -11,7 +11,7 @@
 // inserted again; their `user` and `account` rows are upserted (never deleted, so nothing the preview
 // keeps for them elsewhere is cascaded away). Running it twice leaves the same rows.
 //
-// Password: read from SEED_TEST_PASSWORD (in CI the PREVIEW_TEST_PASSWORD repo secret) and hashed with
+// Password: read from SEED_TEST_PASSWORD (in CI the PREVIEW_TEST_PASSWORD secret, in the `Production` environment: deploy.yml's production job runs this seed after each deploy of main) and hashed with
 // Better Auth's own scrypt (`hashPassword` from `better-auth/crypto`). With no password set, a random
 // one is used and thrown away, so the users exist but nobody can sign in as them. No password or hash
 // is ever written to this repository.

@@ -253,12 +253,31 @@ describe("preview guard", () => {
     expect(upload).not.toMatch(/PREVIEW_TEST_PASSWORD/);
   });
 
+  it("takes nothing from the artefact but the Worker and the assets, and fetches no other tree", () => {
+    const upload = code(text("preview-upload.yml"));
+    // Every path into the bundle: the bundle itself (the refusal checks), its Worker or its assets.
+    const paths = [...upload.matchAll(/(?:\$\{?BUNDLE\}?|preview-bundle)(\/[^\s"']*)?/g)].map((m) => m[1] ?? "");
+    expect(paths.length).toBeGreaterThan(0);
+    for (const path of paths) expect(["", "/worker/index.js", "/assets"], path).toContain(path);
+    expect(upload).not.toMatch(/\bgit\s+(fetch|checkout|clone|switch|restore|pull)\b/);
+    expect(upload).not.toMatch(/\/contents\/|raw\.githubusercontent/);
+  });
+
   it("lists what differs from main with a read-only compare call, checking out nothing", () => {
     const compare = steps(jobBlock(text("preview-upload.yml"), "upload")).filter((s) => /compare\/main\.\.\./.test(s));
     expect(compare).toHaveLength(1);
     expect(compare[0]).toMatch(/GH_TOKEN: \$\{\{ github\.token \}\}/);
     expect(compare[0]).not.toMatch(/secrets\./);
     expect(compare[0]).not.toMatch(/actions\/checkout@|git (fetch|checkout|clone)/);
+    // Only ever a notice: a failed call warns and carries on, so the upload is never skipped.
+    expect(compare[0]).not.toMatch(/\bexit [1-9]|\bset -e|continue-on-error/);
+    expect(compare[0]).toMatch(/compare\/main\.\.\.\$\{target\}/);
+    expect(compare[0]).toMatch(/for target in "\$HEAD_SHA" "\$BASE_REF"/);
+    expect(compare[0]).toMatch(/wrangler\\\.jsonc/);
+    expect(compare[0]).toMatch(/\^db\/d1\/migrations\//);
+    const comment = steps(jobBlock(text("preview-upload.yml"), "upload")).find((s) => /Comment the preview URL/.test(s));
+    expect(comment).toMatch(/\$TRUSTED/);
+    expect(comment).toMatch(/\$MIGRATIONS/);
   });
 
   it("leaves the migrations out of the pull request's bundle", () => {
@@ -278,6 +297,10 @@ describe("preview guard", () => {
     expect(load, "seed loaded after it is written").toBeGreaterThan(seed);
     // The seed step runs repository code, so it gets no Cloudflare token.
     expect(production[seed]).not.toMatch(/CLOUDFLARE_API_TOKEN/);
+    // A failure must show: never hidden, and never run when the production deploy failed.
+    for (const step of [migrate, seed, load]) {
+      expect(production[step]).not.toMatch(/continue-on-error|always\(\)|failure\(\)|!cancelled\(\)/);
+    }
   });
 });
 
