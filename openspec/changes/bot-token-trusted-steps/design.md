@@ -156,18 +156,23 @@ mints the token there and runs nothing from the checkout. Minting late in one jo
 
 ### D3. `visual-baseline-update.yml`: the push job checks out the regenerated commit
 
-- `regenerate` (`contents: read`): checkout the branch with `persist-credentials: false`; record
-  `git rev-parse HEAD` as output `sha` and whether anything under `e2e/__screenshots__/` changed as
-  `changed`; upload `e2e/__screenshots__/` as artefact `visual-baselines`. The global identity step
+- `gate` records the branch tip with `git ls-remote` (public, no credentials) as output `sha`, before
+  any branch code runs (build fix pass: the tip comes from a trusted job, so the branch's code cannot
+  name another commit for the bot to push).
+- `regenerate` (`contents: read`): checkout that `sha` with `persist-credentials: false`; record
+  whether anything under `e2e/__screenshots__/` changed as `changed`; upload `e2e/__screenshots__/` as artefact `visual-baselines`. The global identity step
   goes; `safe.directory` stays if a git command still needs it in the container.
 - `push` (`needs: [gate, regenerate]`, `if: needs.regenerate.outputs.changed == 'true'`,
-  `ubuntu-latest`, no container): re-check the branch guard; mint the token; checkout `sha` (checked to
-  be 40 hex characters) with `persist-credentials: false`; download the artefact to `$RUNNER_TEMP`;
-  fail if it holds a symlink or anything but `.png` files; copy them into `e2e/__screenshots__/`
-  keeping their paths; commit with the bot identity given by `git -c`; and push
-  `HEAD:refs/heads/<branch>` with the token as a one-off `http.extraheader` on that command only. If
-  the branch moved since `regenerate`, the push is rejected as non-fast-forward and the run fails,
-  as a moved branch fails today.
+  `ubuntu-latest`, no container, no checkout): re-check the branch guard and that `sha` is 40 hex
+  characters; download the artefact to `$RUNNER_TEMP`; fail if it holds a symlink or anything but
+  `.png` files (by name and PNG signature) or odd names; fetch `sha` into an empty repository with no
+  credentials; refuse a branch whose `e2e` or `e2e/__screenshots__` path is or holds a symlink; build
+  the commit with `git hash-object`, `git update-index --cacheinfo`, `git write-tree` and
+  `git commit-tree` (bot identity given by `git -c`); then mint the token and push
+  `<commit>:refs/heads/<branch>` with it as a one-off `http.extraheader` on that command only. No
+  branch file is ever written to disk in this job (build fix pass: a working-tree copy let a branch
+  symlink redirect a "PNG" into `.git/config`, which `git add` then executed via `core.fsmonitor`).
+  If the branch moved since `gate`, the push is rejected as non-fast-forward and the run fails.
 - Nothing from the branch runs in `push`: no `npm`, no build, no script. A fresh clone has no hooks.
 
 ### D4. `qa-issue-label.yml`: `main`'s parser
@@ -218,13 +223,12 @@ environments are `Preview` and `Production`).
 | `auto-release.yml` | `backmerge-hotfix` | `pull_request` closed into `main` | `refs/pull/N/merge` | no, O1 |
 | `qa-issue-label.yml` | `label` | `pull_request` closed into `qa` or `main` | `refs/pull/N/merge` | no, O2 |
 
-- **`cut-release.yml`** is dispatched on `main` (the `gh workflow run` default) from the promotion that
-  carries this change. `prepare` checks out `qa` by name with `persist-credentials: false`, so the run's
-  ref only chooses which copy of the workflow runs. Until then, dispatching on `qa` runs the new
-  two-job copy; after the move a dispatch on `qa` stops at `open-pr` ("not allowed to deploy to bot")
-  with the PR untouched.
-- **`visual-baseline-update.yml`** is dispatched on `main` with the branch as its input, as
-  `gh workflow run visual-baseline-update.yml -f branch=<branch>` already does by default.
+- **`cut-release.yml`** checks out `qa` by name in `prepare` (`persist-credentials: false`), so the
+  run's ref only chooses which copy of the workflow runs, and it works dispatched on `main`. It stays
+  dispatched on `qa` until the key moves (O3); after the move a dispatch on `qa` stops at `open-pr`
+  ("not allowed to deploy to bot") with the PR untouched, so it must then be dispatched on `main`.
+- **`visual-baseline-update.yml`** takes the branch as input and records its tip in `gate`, so it
+  also works dispatched on `main`; the same O3 timing applies.
 - **Deployment records.** Each run of a job naming `bot` adds a deployment to the `bot` environment
   (about one per closed issue). GitHub's `deployment: false` (March 2026) skips that, but its docs do
   not say the branch rule still applies with it, so it is not used.
@@ -247,11 +251,16 @@ environments are `Preview` and `Production`).
   `auto-close-umbrella.yml`, so issues closed only by the label lose the board move and umbrella
   check; (c) keep it on the repository secret, as O1 (b).
 - **O3. The dispatched workflows' cache scope.** Dispatching on `main` runs `qa`'s or the branch's
-  `npm ci` and tests in a run whose Actions cache scope is `main`, which `deploy.yml` and
-  `preview-upload.yml` restore `~/.npm` from. npm checks package integrity against the lockfile, so the
-  residual risk is a planted `~/.npm/_npx` entry run by a later `npx`. Options: (a) accept it; (b,
-  recommended) in the O1/O2 follow-up, split each dispatched workflow into an unprivileged run on `qa`
-  or the branch and a `workflow_run` run on `main` that holds the token.
+  `npm ci` and tests in a run whose Actions cache scope is `main`. `deploy.yml`'s Production job
+  (Cloudflare and Sentry tokens) and `preview-upload.yml` restore `~/.npm` from that scope, and the
+  restore runs `tar -xf ... -P`, so a crafted entry (written with the runner's runtime token, which
+  code on a hosted runner can read) can drop files anywhere, such as `~/.npmrc`; the final review
+  showed the Production run restoring that key. No minting job restores a cache, so the bot token is
+  not reachable this way. Until O3 is settled the two workflows stay dispatched on `qa`, which keeps
+  that code in `qa`'s scope. Options: (a, recommended) in the O1/O2 follow-up, split each dispatched
+  workflow into an unprivileged run on `qa` or the branch and a `workflow_run` run on `main` that
+  holds the token; (b) drop the Actions cache from `deploy.yml`'s Production job and
+  `preview-upload.yml` and dispatch on `main`; (c) accept it.
 
 `dependabot-hotfix-label.yml` is admitted under `bot`, but GitHub blocks `pull_request_target` in
 public repositories from 2 December 2026 (#2383), which is separate.

@@ -32,10 +32,13 @@ const DEFAULT_BRANCH_TRIGGERS = new Set(["issues", "issue_comment", "schedule", 
 /** A `run:` block that executes repository or third-party code from the checkout. */
 const RUNS_CODE = /\b(?:npm|npx)\b|\bnode\s+[^\s-]|\bbash\s+\S+\.sh\b|(?:^|[\s"'])\.{0,2}\/?(?:\.github\/scripts|scripts)\/\S+/m;
 
+/** A run step that brings another ref's files into the job without actions/checkout. */
+const GIT_OTHER_REF = /\bgh\s+(?:pr\s+checkout|repo\s+clone)\b|\bgit\s+(?:clone|worktree\s+add|checkout|switch)\b/;
+
 /** The top-level trigger names in a workflow's `on:` block. */
 function triggers(text) {
   const lines = text.split("\n");
-  const start = lines.findIndex((l) => /^on:\s*$/.test(l));
+  const start = lines.findIndex((l) => /^["']?on["']?:\s*$/.test(l));
   if (start === -1) {
     const inline = text.match(/^on:\s*\[?([^\]\n]+)\]?\s*$/m);
     return inline ? inline[1].split(",").map((s) => s.trim()) : [];
@@ -57,8 +60,8 @@ function jobs(text) {
   const out = [];
   let current = null;
   for (const line of lines.slice(start + 1)) {
-    if (/^\S/.test(line) && line.trim() !== "") break;
-    const m = line.match(/^ {2}([A-Za-z0-9_-]+):\s*$/);
+    if (/^[^\s#]/.test(line)) break;
+    const m = line.match(/^ {2}([A-Za-z0-9_-]+):\s*(?:#.*)?$/);
     if (m) {
       current = { name: m[1], lines: [] };
       out.push(current);
@@ -108,13 +111,22 @@ function environmentOf(job) {
 /** What is wrong with one job of a workflow under the bot-token rule (code checks, a and b). */
 function codeViolations(text, job) {
   if (!job.steps.some(mints)) return [];
-  const onDefault = triggers(text).every((t) => DEFAULT_BRANCH_TRIGGERS.has(t));
+  const on = triggers(text);
+  const onDefault = on.length > 0 && on.every((t) => DEFAULT_BRANCH_TRIGGERS.has(t));
   const untrusted = job.steps.filter(isCheckout).filter((s) => {
     const ref = checkoutRef(s);
     return ref === undefined ? !onDefault : ref !== "main";
   });
-  if (untrusted.length === 0) return [];
   const out = [];
+  // Data from another job reaches a run script only through `env:` (checked there), never as an
+  // expression spliced into the script, and the job fetches no other ref by hand.
+  if (job.steps.some((s) => /\$\{\{\s*needs\./.test(runBlock(s)))) {
+    out.push("splices another job's output into a run script");
+  }
+  if (job.steps.some((s) => GIT_OTHER_REF.test(runBlock(s)))) {
+    out.push("checks out or clones another ref in a run step");
+  }
+  if (untrusted.length === 0) return out;
   if (job.steps.some((s) => RUNS_CODE.test(runBlock(s)) || /uses:\s*\.\//.test(s))) {
     out.push("runs repository code from a non-main checkout");
   }
@@ -211,6 +223,16 @@ describe("the parser", () => {
     ]);
   });
 
+  it("flags a spliced job output and a hand-made checkout in a minting job", () => {
+    const text = (run) => `on:\n  schedule:\njobs:\n  j:\n    environment: bot\n    steps:\n      - uses: actions/create-github-app-token@v3\n        with:\n          private-key: \${{ secrets.BOT_APP_PRIVATE_KEY }}\n      - run: ${run}\n`;
+    const spliced = text('test "${{ needs.prepare.outputs.status }}" = 0');
+    expect(codeViolations(spliced, jobs(spliced)[0])).toEqual(["splices another job's output into a run script"]);
+    const prCheckout = text("gh pr checkout 12");
+    expect(codeViolations(prCheckout, jobs(prCheckout)[0])).toEqual(["checks out or clones another ref in a run step"]);
+    const fine = text('test "$STATUS" = 0');
+    expect(codeViolations(fine, jobs(fine)[0])).toEqual([]);
+  });
+
   it("reads the block form of environment", () => {
     const text = "on:\n  push:\njobs:\n  j:\n    environment:\n      name: bot\n    steps:\n      - run: true\n";
     expect(environmentOf(jobs(text)[0])).toBe("bot");
@@ -223,6 +245,18 @@ describe("the bot token never meets code from outside main", () => {
       codeViolations(text, j).map((v) => `${file}/${j.name}: ${v}`),
     );
     expect(offenders).toEqual([]);
+  });
+
+  it("sees every use of the bot key as a mint step the parser found", () => {
+    // A job the parser cannot read (other indentation) or a key passed some other way would
+    // otherwise escape every check here.
+    const files = readdirSync(WORKFLOWS).filter((f) => /\.ya?ml$/.test(f));
+    const uses = files.reduce(
+      (n, f) => n + (readFileSync(join(WORKFLOWS, f), "utf8").match(/BOT_APP_PRIVATE_KEY/g) ?? []).length,
+      0,
+    );
+    const mintSteps = allJobs().reduce((n, { job: j }) => n + j.steps.filter(mints).length, 0);
+    expect(mintSteps).toBe(uses);
   });
 
   it("finds the minting jobs it is meant to guard", () => {
@@ -269,6 +303,12 @@ describe("the split jobs keep their shape", () => {
     expect(openPr.steps.some(mints)).toBe(true);
     expect(openPr.steps.some(isCheckout)).toBe(false);
     expect(openPr.body).toMatch(/needs:\s*prepare/);
+    // `needs: prepare` alone: an `if:` such as always() would mint after qa's tests failed.
+    expect(openPr.body).not.toMatch(/^ {4}if:/m);
+    expect(openPr.steps.some((s) => RUNS_CODE.test(runBlock(s)))).toBe(false);
+    const prepCheckout = prepare.steps.find(isCheckout);
+    expect(checkoutRef(prepCheckout)).toBe("qa");
+    expect(prepCheckout).toMatch(/persist-credentials:\s*false/);
     const ghStep = openPr.steps.find((s) => /gh pr create/.test(s));
     expect(ghStep).toMatch(/GH_TOKEN:\s*\$\{\{\s*steps\.app-token\.outputs\.token\s*\}\}/);
     expect(ghStep).toMatch(/--body-file/);
@@ -280,11 +320,28 @@ describe("the split jobs keep their shape", () => {
     expect(regenerate.body).not.toMatch(/app-token/);
     expect(regenerate.body).toMatch(/contents:\s*read/);
     expect(regenerate.body).not.toMatch(/contents:\s*write/);
+    // Both jobs use the tip the trusted gate job recorded, never a commit the branch's code names.
+    expect(regenerate.steps.find(isCheckout)).toMatch(/persist-credentials:\s*false/);
+    expect(checkoutRef(regenerate.steps.find(isCheckout))).toBe("${{ needs.gate.outputs.sha }}");
     const push = job("visual-baseline-update.yml", "push");
     expect(push.steps.some(mints)).toBe(true);
     expect(push.body).not.toMatch(/\b(?:npm|npx)\b/);
-    const pushStep = push.steps.find((s) => /\bpush origin\b/.test(runBlock(s)));
+    expect(push.steps.some((s) => RUNS_CODE.test(runBlock(s)))).toBe(false);
+    // No checkout: a symlink in the branch must never turn a copied file into a write elsewhere,
+    // so the commit is built with git plumbing from the recorded tip and the artefact's PNGs.
+    expect(push.steps.some(isCheckout)).toBe(false);
+    expect(push.body).not.toMatch(/\bcp\s|\bgit add\b/);
+    expect(push.body).toMatch(/git update-index --add --cacheinfo/);
+    expect(push.body).toMatch(/SHA: \$\{\{ needs\.gate\.outputs\.sha \}\}/);
+    const mintAt = push.steps.findIndex(mints);
+    expect(mintAt).toBeGreaterThan(push.steps.findIndex((s) => /git write-tree/.test(s)));
+    expect(push.body).not.toMatch(/needs\.regenerate\.outputs\.sha/);
+    // Nothing changed: the job does not run, so the token is never minted.
+    expect(push.body).toMatch(/^ {4}if: needs\.regenerate\.outputs\.changed == 'true'$/m);
+    const pushStep = push.steps.find((s) => /\bgit\b[\s\S]*\bpush\s+"https:/.test(runBlock(s)));
     expect(pushStep).toMatch(/steps\.app-token\.outputs\.token/);
+    // A moved branch must reject the push, not be overwritten.
+    expect(runBlock(pushStep)).not.toMatch(/--force|"\+|push\s+-f\b/);
   });
 
   it("qa-issue-label: the parser comes from main without credentials", () => {

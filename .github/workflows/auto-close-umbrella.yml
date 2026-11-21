@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Mints the bot token: admits only `main` once the key moves (ops #613).
-    # A manual dispatch therefore runs on `main` (the default ref).
+    # Once the key is only there, a manual dispatch must run on `main` (the default ref).
     environment: bot
     steps:
       - name: Mint repo-scoped App token

@@ -39,11 +39,12 @@ name: Cut Release
 #     re-drafts the PR from that artefact, read as data.
 # `scripts/workflows-bot-token.test.mjs` keeps it that way.
 #
-# Dispatch on `main` (the default ref of `gh workflow run cut-release.yml`):
-# `prepare` names `qa` itself, so the dispatch ref only chooses which copy of
-# this file runs. Once the bot key lives only in the `bot` environment, which
-# admits `main` (ops #613), a dispatch on any other ref stops at `open-pr`
-# before the token is minted, with the PR untouched.
+# Dispatch ref: `prepare` names `qa` itself, so the ref only chooses which copy
+# of this file runs. Today dispatch on `qa` (`--ref qa`): a dispatch on `main`
+# would run qa's code in `main`'s Actions cache scope (open item O3). Once the
+# bot key lives only in the `bot` environment, which admits `main` (ops #613),
+# dispatch on `main`; any other ref then stops at `open-pr` before the token is
+# minted, with the PR untouched. WORKFLOW.md "Bot token rule" has the detail.
 #
 # This does NOT merge anything. The maintainer's QA of the qa preview is the gate
 # between batch work and production (mirrors the /batch-issues "never merge the

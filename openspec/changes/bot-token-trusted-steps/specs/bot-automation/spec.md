@@ -34,7 +34,8 @@ Every job that mints the poke-memory-bot token SHALL name the GitHub environment
 only there, admitting `main`, is minted only by runs on `main`. The only exceptions SHALL be
 `auto-release.yml` `release` and `backmerge-hotfix` and `qa-issue-label.yml` `label` (they run on
 `pull_request` refs), named in `scripts/workflows-bot-token.test.mjs`. `cut-release.yml` and
-`visual-baseline-update.yml` SHALL be dispatched on `main`.
+`visual-baseline-update.yml` SHALL name `qa` or the branch explicitly, so they work dispatched on
+`main`.
 
 #### Scenario: A new minting job leaves out the environment
 - **WHEN** a change adds a job that mints the bot token without `environment: bot` and the job is not one of the three exceptions
@@ -80,11 +81,11 @@ coverage SHALL fail the run after the PR is updated, unless the input says not t
 - **THEN** the run fails, the bot token is never minted, and the PR is left as it was
 
 ### Requirement: Regenerating visual baselines
-`visual-baseline-update.yml` SHALL take a branch from a listed maintainer and refuse `main` and `qa`.
-A job without the bot token SHALL check out the branch with `persist-credentials: false`, build it and
-regenerate the screenshots in the pinned Playwright image. A second job SHALL mint the token, check
-out the same commit, copy in only PNG files under `e2e/__screenshots__/`, commit, and push to the
-branch with the token given to the push alone.
+`visual-baseline-update.yml` SHALL take a branch from a listed maintainer, refuse `main` and `qa`, and
+record its tip before branch code runs. A job without the bot token SHALL check out that tip with
+`persist-credentials: false` and regenerate the screenshots in the pinned Playwright image. A second
+job SHALL build a commit on that tip from only the PNG files, never checking out the branch, then
+mint the token and give it to the push alone.
 
 #### Scenario: Baselines change
 - **WHEN** a listed maintainer dispatches the workflow on a feature branch whose screenshots differ
@@ -101,6 +102,10 @@ branch with the token given to the push alone.
 #### Scenario: The artefact holds something else
 - **WHEN** the uploaded screenshots include a symlink or a file that is not a PNG
 - **THEN** the push job refuses them and pushes nothing
+
+#### Scenario: The branch plants a symlink among the screenshots
+- **WHEN** the branch holds a symlink under `e2e/__screenshots__/` and the artefact holds a file of the same name
+- **THEN** the push job writes no branch file to disk, refuses the symlinked path, and pushes nothing
 
 #### Scenario: A long-lived branch or an unlisted actor
 - **WHEN** the input is `main` or `qa`, or the dispatcher is not a listed maintainer
