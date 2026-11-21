@@ -197,6 +197,8 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 
 **Trust rule for comment/edit-triggered jobs (#1859).** Any job triggered by a user-authorable event (`issue_comment`, `issues: edited`, and similar) must gate on the event author before any secret-bearing or write-token step runs: bot-produced artefacts (idempotency markers, tracking issues) are only trusted when the comment/issue author is `poke-memory-bot[bot]`, and human commands (today only `/preview`) require `author_association` OWNER / MEMBER / COLLABORATOR. Body-content markers alone are attacker-postable and never sufficient.
 
+**Bot token rule (#2419, OpenSpec change `bot-token-trusted-steps`).** The `poke-memory-bot` App token is a bypass actor on the `main-protection` and `qa-staging` rulesets, so it never meets code that has not reached `main`. A job that mints it checks out only `main`, or checks out another ref with `persist-credentials: false` and runs nothing from it; `qa` or branch code (`npm ci`, builds, tests, repository scripts) runs in a separate job with the read-only `GITHUB_TOKEN` and hands its results on as an artefact read as data. Every minting job also names the GitHub environment `bot`, so once the bot's private key lives only there, admitting `main` (ops #613), only runs on `main` can mint it; dispatch `cut-release.yml` and `visual-baseline-update.yml` on `main` (the `gh workflow run` default). Three jobs run on `pull_request` refs (`refs/pull/N/merge`) and cannot name it yet: `auto-release.yml` `release` and `backmerge-hotfix`, and `qa-issue-label.yml` `label` (open items O1 and O2 in the change's design). `scripts/workflows-bot-token.test.mjs` enforces all of this in `npm test`.
+
 ### `ci.yml` - CI
 
 | | |
@@ -243,7 +245,7 @@ A non-zero exit means the aggregate patch coverage is below the 90% bar; fold th
 | **Trigger** | `pull_request_target: [opened, synchronize, reopened]` |
 | **Job** | `label` (`Apply hotfix label`) |
 | **What it does** | Dependabot SECURITY-advisory PRs ignore `target-branch` in `dependabot.yml` and always open against `main`, where they immediately fail the required `Restrict main PR source` check (`main-pr-source-gate.yml`). Auto-retargeting the base to `qa` doesn't stick - Dependabot resets it back to `main` on its next push (#1942) - so this workflow instead applies the `hotfix` label, the bypass `main-pr-source-gate.yml` already understands. Guarded to `github.actor == 'dependabot[bot]'` with `base.ref == 'main'`, so normal version-update PRs (which already target `qa`) never match. |
-| **Token** | Mints a `poke-memory-bot` App installation token (`actions/create-github-app-token@v3`, same pattern as `qa-issue-label.yml`) for the label mutation. The default `GITHUB_TOKEN` cannot be used here: GitHub suppresses new workflow runs for events triggered by `GITHUB_TOKEN`, so a `github.token`-applied label would never re-fire `main-pr-source-gate.yml`'s `labeled` trigger and the gate would stay red. |
+| **Token** | Mints a `poke-memory-bot` App installation token (`actions/create-github-app-token@v3`, same pattern as `qa-issue-label.yml`) for the label mutation, in the `bot` environment (a `pull_request_target` run's ref is the default branch, so a `main`-only `bot` admits it). The default `GITHUB_TOKEN` cannot be used here: GitHub suppresses new workflow runs for events triggered by `GITHUB_TOKEN`, so a `github.token`-applied label would never re-fire `main-pr-source-gate.yml`'s `labeled` trigger and the gate would stay red. |
 | **`pull_request_target` trust boundary** | No `actions/checkout`, no execution of PR-head code; only reads `github.event.pull_request` fields and calls `gh pr edit --add-label`. |
 | **Activation caveat** | Because `pull_request_target` resolves the workflow definition from the PR's BASE branch, this has no effect on `main`-targeted Dependabot PRs until the file itself is promoted `qa -> main`. Landing it on `qa` alone does not activate it. |
 | **Required check** | No - convenience labelling only. |
@@ -308,7 +310,7 @@ The functional Playwright projects are `chromium`, `mobile-safari`, `desktop-web
 | **Why a dedicated workflow** | Snapshot baselines are platform-sensitive. macOS Core Text and Linux font anti-aliasing differ visibly (the reason README screenshots are macOS-only - see AGENTS.md → "Screenshots"). The job runs inside the pinned `mcr.microsoft.com/playwright:v1.63.0-noble` Docker image so baselines are generated AND compared in the same deterministic Linux environment. The image tag MUST track the `@playwright/test` version in `package-lock.json`; `npm run lint:playwright-pin` (in the `lint` chain) fails on any `playwright:vX.Y.Z` tag in the repo that disagrees, so move every tag in the same PR as the package bump (#2074). |
 | **Required check** | No - non-blocking, and a non-matching PR does not run it at all. |
 | **Concurrency** | Per-ref, `cancel-in-progress: true`. |
-| **Updating baselines** | When a UI change intentionally alters a surface, regenerate baselines inside the Docker image - never from macOS. Two paths: (1) **In CI** - dispatch `visual-baseline-update.yml` against the feature branch (owner-gated, refuses `main`/`qa`); it runs the same pinned image, commits the regenerated PNGs as `chore(visual): regenerate baselines [skip ci]`, and pushes to the dispatching branch. (2) **Locally**, from the repo root: `docker run --rm -v "$(pwd)":/work -w /work mcr.microsoft.com/playwright:v1.63.0-noble bash -c 'npm ci && npm run build && (npm start &) && npx wait-on http://localhost:3000 && npm run test:visual -- --update-snapshots'` - then commit the changed PNGs under `e2e/__screenshots__/`. |
+| **Updating baselines** | When a UI change intentionally alters a surface, regenerate baselines inside the Docker image - never from macOS. Two paths: (1) **In CI** - dispatch `visual-baseline-update.yml` on `main` with the feature branch as its `branch` input (`gh workflow run visual-baseline-update.yml -f branch=<branch>`; maintainer-gated, refuses `main`/`qa`); it runs the same pinned image, and the bot commits the regenerated PNGs as `chore(visual): regenerate baselines` to that branch. (2) **Locally**, from the repo root: `docker run --rm -v "$(pwd)":/work -w /work mcr.microsoft.com/playwright:v1.63.0-noble bash -c 'npm ci && npm run build && (npm start &) && npx wait-on http://localhost:3000 && npm run test:visual -- --update-snapshots'` - then commit the changed PNGs under `e2e/__screenshots__/`. |
 
 ---
 
@@ -316,11 +318,11 @@ The functional Playwright projects are `chromium`, `mobile-safari`, `desktop-web
 
 | | |
 |---|---|
-| **Trigger** | `workflow_dispatch` only, with a required `branch` input. |
-| **Gate** | The `gate` job refuses to run unless `github.actor == github.repository_owner` (owner-only) and the `branch` input is neither `main` nor `qa`. Defence-in-depth: the push step re-checks the branch name. |
-| **Job** | `gate` (owner + branch guard), `regenerate` (snapshot regeneration + commit + push). |
-| **What it does** | Runs inside the pinned `mcr.microsoft.com/playwright:v1.63.0-noble` image - the same pin `visual-regression.yml` uses for comparison. Checks out the dispatching branch via a `poke-memory-bot` App installation token, builds the app, serves it, runs `npm run test:visual -- --update-snapshots` to rewrite `e2e/__screenshots__/{visual-chromium,visual-webkit}/*.png`, then commits `chore(visual): regenerate baselines [skip ci]` and pushes to the dispatching branch. If the regeneration produces no diff, the job exits cleanly without an empty commit. |
-| **Why an App token** | The push must be able to bypass branch protection on whatever feature-flow branch the dispatcher names (`GITHUB_TOKEN` cannot). The `[skip ci]` marker prevents the regenerated baselines from immediately re-firing `ci.yml` / `migration-check.yml`. |
+| **Trigger** | `workflow_dispatch` only, with a required `branch` input. Dispatch it on `main` (the `gh workflow run` default): once the bot key is `main`-only (ops #613), a dispatch on any other ref stops at `push`. |
+| **Gate** | The `gate` job refuses to run unless the actor is on its `MAINTAINERS` allowlist (or a verifiable org member) and the `branch` input is neither `main` nor `qa`. Defence-in-depth: the `push` job re-checks the branch name. |
+| **Job** | `gate` (maintainer + branch guard), `regenerate` (snapshot regeneration, no bot token), `push` (commit + push, in the `bot` environment). |
+| **What it does** | `regenerate` runs inside the pinned `mcr.microsoft.com/playwright:v1.63.0-noble` image - the same pin `visual-regression.yml` uses for comparison. It checks out the branch with `persist-credentials: false` and `contents: read`, builds the app, serves it, runs `npm run test:visual -- --update-snapshots` to rewrite `e2e/__screenshots__/{visual-chromium,visual-webkit}/*.png`, and uploads them with the commit it used. If nothing changed, `push` does not run and no token is minted. `push` mints the App token on a fresh runner, checks out that commit without credentials, copies in only PNG files (refusing symlinks, other files and odd names), commits `chore(visual): regenerate baselines` as the bot, and gives the token to the one `git push`; a branch that moved meanwhile rejects it as non-fast-forward. |
+| **Token** | A push made with `GITHUB_TOKEN` would not start the branch's PR checks, so the push uses the `poke-memory-bot` App token, only in `push`, which runs nothing from the branch (bot token rule above). No `[skip ci]` marker: it would skip the PR's own checks (#1145). |
 | **Required check** | No - manual dispatch only. |
 | **Concurrency** | Per-branch input, `cancel-in-progress: false` (a queued regeneration should finish, not be cancelled by a second dispatch). |
 
@@ -424,6 +426,7 @@ fake `User` plus a fake data client (`DataClient`, `lib/db/client.ts`) whose
 | **Trigger** | `issues: [closed]` |
 | **What it does** | Moves the issue to **Done** on the project board - regardless of how it was closed (PR merge, manual close, or `not_planned`) |
 | **Note** | The only automated board transition. The others were driven by the removed `auto-issue.yml` / `auto-pr.yml` and are now set by hand. |
+| **Token** | Repo- and org-scoped `poke-memory-bot` App tokens, in the `bot` environment; it checks out and runs only `main`'s `set-project-status.sh` (an `issues` run's ref is the default branch). |
 
 ---
 
@@ -440,7 +443,7 @@ fake `User` plus a fake data client (`DataClient`, `lib/db/client.ts`) whose
 | **Child-reopened** | No `reopened` trigger by design - reopening a child leaves the umbrella closed; a human reopens it if needed. Avoids open/close thrash. |
 | **Batch-close race** | A `qa -> main` promotion PR closing ~20 issues fires ~20 runs against the same umbrella; the "already closed" guard plus `cancel-in-progress: false` make this safe (first run closes, the rest find it closed). |
 | **Dry run** | `workflow_dispatch` with `dry_run: true` posts a `[DRY RUN] Would close ...` comment instead of closing. |
-| **Token** | Repo-scoped App token via `actions/create-github-app-token@v3` (mirrors `auto-status.yml`). No board move - this workflow only closes the issue. |
+| **Token** | Repo-scoped App token via `actions/create-github-app-token@v3` (mirrors `auto-status.yml`), in the `bot` environment, so a manual dispatch runs on `main`. No board move - this workflow only closes the issue. |
 | **Required check** | No - board / backlog hygiene, does not gate merge. |
 | **Concurrency** | `auto-close-umbrella-${{ github.event.issue.number || github.event.inputs.issue_number }}` (the manual-dispatch branch produces a distinct key), `cancel-in-progress: false`. |
 
@@ -457,6 +460,7 @@ fake `User` plus a fake data client (`DataClient`, `lib/db/client.ts`) whose
 | **Scope** | Label only. Project-board column transitions are deliberately left to `auto-status.yml`; this workflow never touches board columns. |
 | **Fork PRs** | Skipped (`head.repo.fork == false` guard - same pattern as `coverage.yml`; fork PRs run with a read-only token and cannot edit issue labels). |
 | **Idempotency** | `gh label create ... \|\| true` no-ops once the label exists; `--add-label` / `--remove-label` are idempotent by nature, so a re-run changes nothing. |
+| **Token** | `poke-memory-bot` App token, so its closes start `auto-status.yml` and `auto-close-umbrella.yml`. The parser that runs next to it is `main`'s `parse-closing-refs.sh` (sparse checkout `ref: main`, `persist-credentials: false`), never the merged branch's (#2419); a parser change on `qa` reaches labelling at the next promotion. Not in the `bot` environment yet: a `pull_request` run's ref is `refs/pull/N/merge` (open item O2). |
 | **Required check** | No - board hygiene only, does not gate merge. |
 | **Concurrency** | Serialized per PR (`cancel-in-progress: false`). |
 
@@ -492,12 +496,12 @@ fake `User` plus a fake data client (`DataClient`, `lib/db/client.ts`) whose
 
 | | |
 |---|---|
-| **Trigger** | `workflow_dispatch` only. Any maintainer dispatches it to open the correct `qa -> main` promotion PR for a **hand-rolled** release (the path `/batch-issues` automates at end of drain; #1715). |
+| **Trigger** | `workflow_dispatch` only. Any maintainer dispatches it **on `main`** (`gh workflow run cut-release.yml`, the default ref) to open the correct `qa -> main` promotion PR for a **hand-rolled** release (the path `/batch-issues` automates at end of drain; #1715). It checks out `qa` by name, so the dispatch ref only picks which copy of the workflow runs; once the bot key is `main`-only (ops #613), a dispatch on another ref stops at `open-pr` with the PR untouched. |
 | **What it does** | (1) Computes the `origin/main..origin/qa` range and parses `closes/fixes/resolves #N` from both the range's commit messages and each linked merged PR's body (the same keyword set GitHub honours, mirroring `qa-issue-label.yml`), aggregating a `## Closes` section so the promotion closes every referenced issue on merge. (2) Runs the aggregate diff-coverage gate over the whole `qa`-vs-`main` diff (`git diff origin/main...origin/qa \| node scripts/diff-coverage.mjs`, WORKFLOW.md "Batch-drain pre-flight") and surfaces the result in the PR body. (3) Opens, or edits in place if already open, the `qa -> main` PR as a **draft** with the body + summary. |
 | **Why** | A hand-rolled promotion opened by hand skips the aggregated `Closes #N` and the aggregate diff-coverage check. The v0.10.35 release missed every `Closes #N` (11 issues left open, reconciled manually + the #1714 label safety net) and skipped the aggregate check. This makes the correct promotion PR a single dispatch, whether or not the batch came through `/batch-issues` (it reads the live range, not session state). |
 | **Idempotency** | Looks up an existing open PR (`--base main --head qa`) and edits it; never opens a duplicate on re-dispatch. |
 | **Coverage breach** | Below-bar aggregate diff coverage fails the job *after* the PR is opened/updated (so the maintainer still gets the PR), unless the `coverage_fail_on_breach` dispatch input is set false (annotate-only). |
-| **Token** | Mints a `poke-memory-bot` App installation token (same as `auto-release.yml`) so the PR behaves like a bot-opened promotion. **Does not merge** - the maintainer's preview QA is the gate. |
+| **Token** | Two jobs (bot token rule above). `prepare` checks out `qa` with `persist-credentials: false` and the read-only `GITHUB_TOKEN`, runs `npm ci`, the `Closes` aggregation and the coverage gate, and uploads the PR body. `open-pr`, in the `bot` environment, mints the `poke-memory-bot` App token so the PR is bot-opened and its CI runs, checks out nothing, and only opens, edits or re-drafts the PR from that body. **Does not merge** - the maintainer's preview QA is the gate. |
 | **Concurrency** | Shares `group: auto-release` (`cancel-in-progress: false`) so a dispatch cannot race a release run touching the same qa/main state. |
 
 ---

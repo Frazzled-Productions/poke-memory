@@ -283,7 +283,7 @@ describe("the split jobs keep their shape", () => {
     const push = job("visual-baseline-update.yml", "push");
     expect(push.steps.some(mints)).toBe(true);
     expect(push.body).not.toMatch(/\b(?:npm|npx)\b/);
-    const pushStep = push.steps.find((s) => /git\b.*\bpush\b/.test(runBlock(s)));
+    const pushStep = push.steps.find((s) => /\bpush origin\b/.test(runBlock(s)));
     expect(pushStep).toMatch(/steps\.app-token\.outputs\.token/);
   });
 

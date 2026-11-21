@@ -57,6 +57,9 @@ jobs:
       && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    # Mints the bot token: admits only `main` once the key moves (ops #613).
+    # A `pull_request_target` run's ref is the default branch, so it passes.
+    environment: bot
     permissions:
       pull-requests: write
     steps:

@@ -36,6 +36,11 @@ name: QA Issue Label
 # regression for a non-problem, so we leave hotfix issues to GitHub's native
 # auto-close on the main merge.
 #
+# Token: the poke-memory-bot App token, so its closes start auto-status.yml and
+# auto-close-umbrella.yml. It can bypass the `main` ruleset, so the parser that
+# runs next to it is `main`'s, never the merged branch's (#2419, OpenSpec change
+# bot-token-trusted-steps; scripts/workflows-bot-token.test.mjs).
+#
 # Out of scope: project-board column transitions. `auto-status.yml` owns the
 # board; this workflow only touches the `status:in-qa` label.
 #
@@ -69,6 +74,10 @@ jobs:
               && github.event.pull_request.head.ref == 'qa'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # No `environment: bot`: a `pull_request` run's ref is `refs/pull/N/merge`,
+    # which the `main`-only `bot` environment would refuse. It keeps the
+    # repository secret until a follow-up moves it (bot-token-trusted-steps
+    # design D7, open item O2; listed in scripts/workflows-bot-token.test.mjs).
     permissions:
       contents: read
       issues: write
@@ -76,10 +85,15 @@ jobs:
     steps:
       # Checkout is needed for `.github/scripts/parse-closing-refs.sh`. Every
       # other input still comes from the event payload or the `gh` API (all
-      # `gh` calls pass `--repo`).
+      # `gh` calls pass `--repo`). It is `main`'s copy, without credentials:
+      # the parser runs in the step that holds the bot token, so it must not
+      # be the merged branch's (#2419). A parser change on `qa` reaches this
+      # labelling at the next promotion.
       - name: Checkout (for the parser script)
         uses: actions/checkout@v7
         with:
+          ref: main
+          persist-credentials: false
           sparse-checkout: .github/scripts
           sparse-checkout-cone-mode: false
 

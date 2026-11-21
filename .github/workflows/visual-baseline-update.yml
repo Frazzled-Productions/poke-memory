@@ -29,10 +29,22 @@ name: Visual Baseline Update
 #      baselines must land on a feature branch only; never on a long-lived
 #      branch directly. See AGENTS.md → "Branching model".
 #
-# The push uses a `poke-memory-bot` App installation token (the same pattern
-# `auto-release.yml` uses). `GITHUB_TOKEN` cannot bypass branch protection,
-# so the App token is also what gives us a sensible escape hatch if the
-# dispatcher ever targets a protected feature-flow branch in future.
+# The push uses a `poke-memory-bot` App installation token, because a push made
+# with `GITHUB_TOKEN` would not start the branch's PR checks. That token can
+# bypass the `main` ruleset, so it never meets the branch's code (#2419,
+# OpenSpec change bot-token-trusted-steps; `scripts/workflows-bot-token.test.mjs`):
+#   - `regenerate` checks out the branch with `persist-credentials: false` and
+#     only a read-only GITHUB_TOKEN, runs its `npm ci`, build and Playwright, and
+#     uploads `e2e/__screenshots__/` with the commit it used.
+#   - `push` runs in the `bot` environment on a fresh runner: it mints the token,
+#     checks out that commit without credentials, copies in only PNG files from
+#     the artefact (refusing symlinks and anything else), commits, and gives the
+#     token to the one `git push`. Nothing from the branch runs there.
+#
+# Dispatch on `main` with the branch as the input
+# (`gh workflow run visual-baseline-update.yml -f branch=<branch>`): once the bot
+# key lives only in the `bot` environment, which admits `main` (ops #613), a
+# dispatch on any other ref stops at `push` before the token is minted.
 #
 # The regenerated push uses a plain commit message (no `[skip ci]` marker).
 # Earlier iterations of this workflow added `[skip ci]` to suppress
@@ -138,10 +150,11 @@ jobs:
       run:
         shell: bash
     permissions:
-      # The regenerate job pushes regenerated baselines via the poke-memory-bot
-      # App token. Declare contents: write to match the actual capability for
-      # audit clarity, even though the token's scope is independent of this block.
-      contents: write
+      # Runs the branch's code: read only, no bot token. The `push` job pushes.
+      contents: read
+    outputs:
+      sha: ${{ steps.result.outputs.sha }}
+      changed: ${{ steps.result.outputs.changed }}
     # Browsers + system deps are baked into the image. The tag MUST track the
     # `@playwright/test` version resolved in `package-lock.json` (enforced by
     # `npm run lint:playwright-pin`, #2074), the same pin `visual-regression.yml`
@@ -150,34 +163,19 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
     steps:
-      - name: Mint App installation token
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ vars.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-
       - name: Check out the dispatching branch
         uses: actions/checkout@v7
         with:
-          token: ${{ steps.app-token.outputs.token }}
           ref: ${{ inputs.branch }}
-          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Configure git identity
-        # `--global` is required because this job runs inside the
-        # `mcr.microsoft.com/playwright:v1.63.0-noble` container, where the
-        # default working directory is not `$GITHUB_WORKSPACE`. A bare
-        # `git config` (which defaults to `--local`) fails with
-        # `fatal: not in a git directory` because there is no `.git` in cwd.
-        # `safe.directory` is also needed: the container runs as root by
-        # default and `actions/checkout` chowns the workspace to the `runner`
-        # user, so git's dubious-ownership check would otherwise reject the
-        # later `git add` / `commit` / `push` steps.
-        run: |
-          git config --global user.name "poke-memory-bot[bot]"
-          git config --global user.email "${{ vars.BOT_APP_ID }}+poke-memory-bot[bot]@users.noreply.github.com"
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Trust the workspace for git
+        # The container runs as root and `actions/checkout` chowns the
+        # workspace to the `runner` user, so git's dubious-ownership check
+        # would otherwise reject the `git rev-parse` / `git status` below.
+        # `--global` because the container's working directory is not
+        # `$GITHUB_WORKSPACE`.
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Cache npm
         uses: actions/cache@v6
@@ -213,27 +211,28 @@ jobs:
             kill "$(cat /tmp/next.pid)" 2>/dev/null || true
           fi
 
-      - name: Commit and push regenerated baselines
-        env:
-          BRANCH: ${{ inputs.branch }}
+      - name: Record the commit and whether the baselines changed
+        id: result
         run: |
           set -euo pipefail
-          # Defence in depth: re-check the branch guard here, in the same job
-          # that actually pushes. The `gate` job already enforces this, but a
-          # second check next to the push means a future refactor that drops
-          # the gate job cannot silently start writing to a protected branch.
-          if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "qa" ]; then
-            echo "Refusing to push: regenerated baselines must not land on '$BRANCH' directly."
-            exit 1
-          fi
-          git add e2e/__screenshots__/
-          if git diff --cached --quiet; then
+          cd "$GITHUB_WORKSPACE"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [ -n "$(git status --porcelain -- e2e/__screenshots__/)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Baselines changed; the push job commits them."
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No baseline changes to commit - the regenerated PNGs are identical to the committed ones."
-            exit 0
           fi
-          git commit -m "chore(visual): regenerate baselines"
-          git push origin "HEAD:${BRANCH}"
-          echo "Pushed regenerated baselines to '${BRANCH}'."
+
+      - name: Upload the regenerated baselines
+        if: steps.result.outputs.changed == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-baselines
+          path: e2e/__screenshots__/
+          retention-days: 1
+          if-no-files-found: error
 
       # If the snapshot run itself failed (rather than the comparison being
       # different), the report carries the failing-test detail.
@@ -244,3 +243,112 @@ jobs:
           name: visual-baseline-update-report
           path: playwright-report/
           retention-days: 14
+
+  push:
+    name: Commit and push the regenerated baselines
+    needs: [gate, regenerate]
+    if: needs.regenerate.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Admits only `main` once the bot key moves here (ops #613, design D7).
+    environment: bot
+    permissions:
+      contents: read # the credential-free checkout; the push uses the App token
+    steps:
+      - name: Re-check the branch and the commit
+        env:
+          BRANCH: ${{ inputs.branch }}
+          SHA: ${{ needs.regenerate.outputs.sha }}
+        run: |
+          set -euo pipefail
+          # Defence in depth: re-check the branch guard here, in the same job
+          # that actually pushes. The `gate` job already enforces this, but a
+          # second check next to the push means a future refactor that drops
+          # the gate job cannot silently start writing to a protected branch.
+          if [ -z "$BRANCH" ] || [ "$BRANCH" = "main" ] || [ "$BRANCH" = "qa" ]; then
+            echo "Refusing to push: regenerated baselines must not land on '$BRANCH' directly."
+            exit 1
+          fi
+          if ! printf '%s' "$SHA" | grep -qxE '[0-9a-f]{40}'; then
+            echo "::error::regenerate's sha '$SHA' is not a 40-character commit id."
+            exit 1
+          fi
+
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Check out the regenerated commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.regenerate.outputs.sha }}
+          persist-credentials: false
+
+      - name: Download the regenerated baselines
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-baselines
+          path: ${{ runner.temp }}/visual-baselines
+
+      - name: Copy in the PNG files only
+        env:
+          SRC: ${{ runner.temp }}/visual-baselines
+          DEST: e2e/__screenshots__
+        run: |
+          set -euo pipefail
+          # The artefact comes from a job that ran the branch's code: data only.
+          # Refuse symlinks, anything that is not a regular file or directory,
+          # any file that is not a .png, and any odd path, then copy keeping
+          # the paths under e2e/__screenshots__/.
+          if [ -n "$(find "$SRC" -type l)" ] || [ -n "$(find "$SRC" ! -type f ! -type d)" ]; then
+            echo "::error::The visual-baselines artefact holds a symlink or a special file. Nothing pushed."
+            exit 1
+          fi
+          BAD=$(cd "$SRC" && find . -type f ! -name '*.png' | head -n 5 | tr '\n' ' ')
+          if [ -n "$BAD" ]; then
+            echo "::error::The visual-baselines artefact holds files that are not PNG: $BAD. Nothing pushed."
+            exit 1
+          fi
+          ODD=$(cd "$SRC" && find . -type f -name '*.png' | sed 's|^\./||' | grep -vxE '[A-Za-z0-9._/-]+' | head -n 5 | tr '\n' ' ' || true)
+          if [ -n "$ODD" ]; then
+            echo "::error::Unexpected file names in the artefact: $ODD. Nothing pushed."
+            exit 1
+          fi
+          COUNT=0
+          while IFS= read -r -d '' f; do
+            rel=${f#./}
+            mkdir -p "$DEST/$(dirname -- "$rel")"
+            cp -- "$SRC/$rel" "$DEST/$rel"
+            COUNT=$((COUNT + 1))
+          done < <(cd "$SRC" && find . -type f -name '*.png' -print0)
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::The visual-baselines artefact holds no PNG files. Nothing pushed."
+            exit 1
+          fi
+          echo "Copied $COUNT PNG file(s) into $DEST."
+
+      - name: Commit and push regenerated baselines
+        env:
+          BRANCH: ${{ inputs.branch }}
+          TOKEN: ${{ steps.app-token.outputs.token }}
+          BOT_APP_ID: ${{ vars.BOT_APP_ID }}
+        run: |
+          set -euo pipefail
+          git add e2e/__screenshots__/
+          if git diff --cached --quiet; then
+            echo "No baseline changes to commit - the regenerated PNGs are identical to the committed ones."
+            exit 0
+          fi
+          git -c user.name="poke-memory-bot[bot]" \
+            -c user.email="${BOT_APP_ID}+poke-memory-bot[bot]@users.noreply.github.com" \
+            commit -m "chore(visual): regenerate baselines"
+          # The token reaches this one command only, never the checkout's
+          # config. A moved branch rejects the push as non-fast-forward.
+          AUTH=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" \
+            push origin "HEAD:refs/heads/${BRANCH}"
+          echo "Pushed regenerated baselines to '${BRANCH}'."
