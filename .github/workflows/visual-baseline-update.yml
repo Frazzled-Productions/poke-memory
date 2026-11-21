@@ -151,8 +151,10 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          SHA=$(git ls-remote "https://github.com/${REPO}.git" "refs/heads/${BRANCH}" | cut -f1)
-          if ! printf '%s' "$SHA" | grep -qxE '[0-9a-f]{40}'; then
+          # ls-remote matches ref names from the tail, so keep the exact ref only.
+          SHA=$(git ls-remote "https://github.com/${REPO}.git" "refs/heads/${BRANCH}" \
+            | awk -v r="refs/heads/${BRANCH}" '$2 == r { print $1 }')
+          if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Refusing to run: branch '$BRANCH' was not found."
             exit 1
           fi
@@ -291,7 +293,7 @@ jobs:
             echo "Refusing to push: regenerated baselines must not land on '$BRANCH' directly."
             exit 1
           fi
-          if ! printf '%s' "$SHA" | grep -qxE '[0-9a-f]{40}'; then
+          if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::gate's sha '$SHA' is not a 40-character commit id."
             exit 1
           fi
@@ -340,7 +342,7 @@ jobs:
           # Public repository: the fetch needs no credentials.
           git fetch -q --no-tags --depth 1 "https://github.com/${REPO}.git" "$SHA"
           # Refuse a branch whose screenshot path is or holds a symlink.
-          LINKS=$(git ls-tree -r "$SHA" -- e2e | awk '$1 == "120000" { print $4 }' | head -n 5 | tr '\n' ' ')
+          LINKS=$(git ls-tree -r "$SHA" -- e2e/__screenshots__ | awk '$1 == "120000" { print $4 }' | head -n 5 | tr '\n' ' ')
           for p in e2e e2e/__screenshots__; do
             MODE=$(git ls-tree "$SHA" -- "$p" | awk '{ print $1 }')
             if [ -n "$MODE" ] && [ "$MODE" != "040000" ]; then LINKS="$LINKS $p"; fi

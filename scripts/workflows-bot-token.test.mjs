@@ -333,6 +333,15 @@ describe("the split jobs keep their shape", () => {
     expect(push.body).not.toMatch(/\bcp\s|\bgit add\b/);
     expect(push.body).toMatch(/git update-index --add --cacheinfo/);
     expect(push.body).toMatch(/SHA: \$\{\{ needs\.gate\.outputs\.sha \}\}/);
+    // Only plumbing that never writes a branch file to disk or runs one.
+    const code = push.body.replace(/^\s*#.*$/gm, "");
+    const gitCalls = [...code.matchAll(/\bgit\b(?:\s+-c\s+"[^"]*"|\s+-c\s+\S+|\s*\\\n\s*)*\s+([a-z-]+)/g)].map((m) => m[1]);
+    const PLUMBING = ["init", "fetch", "ls-tree", "read-tree", "hash-object", "update-index", "write-tree", "rev-parse", "commit-tree", "push"];
+    expect(gitCalls.filter((c) => !PLUMBING.includes(c))).toEqual([]);
+    expect(gitCalls).toContain("commit-tree");
+    expect(push.body).not.toMatch(/read-tree\s+(?:-\S+\s+)*-u\b|\btar\b|\bmake\b|\bpython|\bsh\s/);
+    expect(push.steps.find(mints)).toMatch(/if: steps\.commit\.outputs\.commit != ''/);
+    expect(push.body).toMatch(/89504e470d0a1a0a/);
     const mintAt = push.steps.findIndex(mints);
     expect(mintAt).toBeGreaterThan(push.steps.findIndex((s) => /git write-tree/.test(s)));
     expect(push.body).not.toMatch(/needs\.regenerate\.outputs\.sha/);
