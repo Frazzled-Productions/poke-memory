@@ -81,6 +81,9 @@ jobs:
     name: Close completed umbrella
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Mints the bot token: admits only `main` once the key moves (ops #613).
+    # Once the key is only there, a manual dispatch must run on `main` (the default ref).
+    environment: bot
     steps:
       - name: Mint repo-scoped App token
         id: app-token

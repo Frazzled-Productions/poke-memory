@@ -19,6 +19,8 @@ jobs:
     name: Mark Done
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Mints the bot token: admits only `main` once the key moves (ops #613).
+    environment: bot
     permissions:
       contents: read
       id-token: write

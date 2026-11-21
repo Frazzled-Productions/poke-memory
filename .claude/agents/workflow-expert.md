@@ -51,7 +51,8 @@ Rulesets make these job names required: `main` - `test`, `e2e`, `Test coverage r
 - **Concurrency** - check an existing `concurrency:` group before adding or changing one; `cancel-in-progress` on a release, deploy or tracking-issue workflow can lose work or race (`auto-release.yml` shares one group across triggers deliberately).
 - **Permissions blocks** - declare the minimum; a missing `issues: write` or `pull-requests: write` fails with a silent 403.
 - **`gh` CLI in steps** - pass the token via `env: GH_TOKEN:` (`secrets.GITHUB_TOKEN` or a minted App token); never hardcode one.
-- **`workflow_dispatch`-only workflows** (`visual-baseline-update.yml`, `cut-release.yml`) - adding an automatic trigger needs careful thought about idempotency and blast radius.
+- **`workflow_dispatch`-only workflows** (`visual-baseline-update.yml`, `cut-release.yml`) - adding an automatic trigger needs careful thought about idempotency and blast radius. Which ref to dispatch them on is in WORKFLOW.md "Bot token rule" (today `qa`; `main` once the bot key is only in the `bot` environment).
+- **The bot token** (`actions/create-github-app-token` with `BOT_APP_PRIVATE_KEY`) can bypass the `main` and `qa` rulesets. A job that mints it checks out only `main`, or another ref with `persist-credentials: false` and runs nothing from it; `qa` or branch code runs in a separate job with the read-only `GITHUB_TOKEN` and hands results on as an artefact read as data. Every minting job names `environment: bot`, except the three `pull_request`-ref jobs listed in `scripts/workflows-bot-token.test.mjs`, which enforces both rules (WORKFLOW.md "Bot token rule").
 - **`workflow_run` consumers** run in the base-repo context with secrets, whatever the triggering PR's origin: always pair them with the fork guard.
 
 ## Project-board transitions
