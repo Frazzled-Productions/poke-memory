@@ -3,21 +3,28 @@ name: Auto Release
 # Cuts a SemVer release when changelog fragments exist under
 # changelog.d/unreleased/ - otherwise the run no-ops.
 #
-# Primary trigger: a merged `qa -> main` promotion PR (the qa staging-branch
-# workflow, #806). The daily 09:00 UTC cron is kept as a safety net - it cuts
-# any fragments a misfired promotion left unreleased. `workflow_dispatch`
-# covers manual cuts.
+# Primary trigger: the push to `main` that a merged `qa -> main` promotion PR
+# makes (the qa staging-branch workflow, #806). The `find-pr` job asks the API
+# which merged PR has the pushed commit as its merge commit: a promotion runs
+# `release`, any other merged PR runs `backmerge-hotfix`, and a push with no
+# merged PR (an admin push) does neither. The daily 09:00 UTC cron is kept as a
+# safety net - it cuts any fragments a misfired promotion left unreleased.
+# `workflow_dispatch` covers manual cuts; dispatch it on `main` only.
+#
+# Why `push`, not `pull_request` (OpenSpec change bot-key-main-only, #2383): a
+# `pull_request` run's ref is `refs/pull/N/merge`, which the `main`-only `bot`
+# environment refuses; a push to `main` runs on `refs/heads/main`. Both minting
+# jobs name `bot` (scripts/workflows-bot-token.test.mjs).
 #
 # Per AGENTS.md "Versioning":
 #   - kind: minor-bump fragment present  → minor bump (0.N.0 → 0.N+1.0)
 #   - any other non-empty set of fragments → patch bump (0.N.M → 0.N.M+1)
 #
 # Each run → at most one commit, one tag, one GitHub Release. The release
-# commit + tag are pushed to `main`; a `push` event does not match this
-# workflow's schedule/workflow_dispatch/pull_request triggers, so the release
-# commit cannot re-fire the workflow. The `[skip ci]` marker on the commit is
-# belt-and-braces for the `push`-triggered workflows (`ci.yml`,
-# `migration-check.yml`).
+# commit + tag are pushed to `main`. Loop break: the release commit carries
+# `[skip ci]`, which GitHub honours for `push`, so it starts no run of this
+# workflow (nor of `deploy.yml`, which the last step dispatches instead); a tag
+# push and the `qa` reset are not pushes to `main`.
 #
 # On a `qa -> main` trigger, a final step resets `qa` to `main` so the next
 # batch run starts from a clean integration branch. If that reset is skipped
@@ -44,10 +51,9 @@ name: Auto Release
 # fix.
 
 on:
-  # Primary: a merged `qa -> main` promotion PR. The job `if:` below filters
-  # to merged PRs whose head branch is `qa`.
-  pull_request:
-    types: [closed]
+  # Primary: the push a merged PR makes to `main`. `find-pr` decides what, if
+  # anything, runs for it.
+  push:
     branches: [main]
   schedule:
     # 09:00 UTC daily - safety net. Cuts any fragments a misfired `qa -> main`
@@ -60,17 +66,77 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  find-pr:
+    name: Find the merged PR for this push
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    # Read-only and no checkout: only the API says which PR made the push.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      kind: ${{ steps.find.outputs.kind }}
+      number: ${{ steps.find.outputs.number }}
+    steps:
+      - name: Find the merged PR whose merge commit is the pushed commit
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+          HEAD_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != "push" ]; then
+            echo "kind=none" >> "$GITHUB_OUTPUT"
+            echo "Not a push ($EVENT): the release job decides on its own."
+            exit 0
+          fi
+          # `commits/{sha}/pulls` names the PR GitHub merged as this commit
+          # (merge, squash or rebase); keep only a merged PR into `main` from
+          # this repository whose merge commit is exactly the pushed commit.
+          PULLS=$(gh api "repos/$REPO/commits/$SHA/pulls")
+          MATCHES=$(jq --arg sha "$SHA" --arg repo "$REPO" '[.[]
+            | select(.merged_at != null and .merge_commit_sha == $sha and .base.ref == "main"
+                and .head.repo.full_name == $repo)
+            | {number, head: .head.ref}]' <<<"$PULLS")
+          COUNT=$(jq 'length' <<<"$MATCHES")
+          if [ "$COUNT" -eq 0 ] && [[ "$HEAD_MSG" =~ ^Merge\ pull\ request\ \#[0-9]+\ from\  ]]; then
+            # A merge commit GitHub made for a PR, but the API names no merged
+            # PR for it: fail loudly rather than skip a release or backmerge.
+            echo "::error::$SHA is a PR merge commit, but the API names no merged PR from this repository for it. Re-run this job; if it still fails, run the release or backmerge by hand."
+            exit 1
+          fi
+          if [ "$COUNT" -eq 0 ]; then
+            echo "kind=none" >> "$GITHUB_OUTPUT"
+            echo "No merged PR has $SHA as its merge commit: nothing to do."
+            exit 0
+          fi
+          if [ "$COUNT" -gt 1 ]; then
+            echo "::error::$COUNT merged PRs claim $SHA as their merge commit; refusing to guess."
+            exit 1
+          fi
+          NUMBER=$(jq -r '.[0].number' <<<"$MATCHES")
+          HEAD=$(jq -r '.[0].head' <<<"$MATCHES")
+          case "$NUMBER" in ''|*[!0-9]*) echo "::error::PR number '$NUMBER' is not a whole number."; exit 1 ;; esac
+          if [ "$HEAD" = "qa" ]; then KIND=promotion; else KIND=hotfix; fi
+          echo "kind=$KIND" >> "$GITHUB_OUTPUT"
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Push $SHA is the merge of PR #$NUMBER (head $HEAD): $KIND."
+
   release:
     name: Cut release
+    needs: find-pr
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # On a pull_request trigger, run only for a merged `qa -> main` PR. A
-    # closed-without-merge PR, or a merge from any other branch, is ignored.
-    # schedule and workflow_dispatch always run.
+    # On a push, run only for a merged `qa -> main` promotion. schedule and
+    # workflow_dispatch always run (dispatch on `main` only).
     if: >-
-      github.event_name != 'pull_request' ||
-      (github.event.pull_request.merged == true &&
-       github.event.pull_request.head.ref == 'qa')
+      github.event_name != 'push' ||
+      needs.find-pr.outputs.kind == 'promotion'
+    # Mints the bot token: admits only `main` once the key moves (ops #613).
+    environment: bot
     permissions:
       contents: write
       actions: write # dispatch deploy.yml on main after the release (last step)
@@ -86,8 +152,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           token: ${{ steps.app-token.outputs.token }}
-          # Always operate on `main` itself - for a pull_request trigger the
-          # default ref is the merge ref, not the post-merge branch tip.
+          # Always operate on the tip of `main` itself, not the pushed commit,
+          # in case another push followed it.
           ref: main
           fetch-depth: 0
 
@@ -159,7 +225,7 @@ jobs:
         # holds the App token, the `qa-staging` bypass actor.
         if: >-
           success() &&
-          github.event_name != 'pull_request' &&
+          github.event_name != 'push' &&
           steps.cut.outputs.skip != 'true'
         env:
           NEW_VERSION: ${{ steps.cut.outputs.version }}
@@ -182,7 +248,7 @@ jobs:
 
       - name: Reset qa to main
         # Mutually exclusive with "Backmerge release into qa" above by their
-        # `if:`s (pull_request vs not): keep it that way. This step force-pushes
+        # `if:`s (push vs not): keep it that way. This step force-pushes
         # HEAD, which must be `main`; the backmerge script restores the caller's
         # HEAD on exit, but the two must still never both run in one job.
         # Only after a `qa -> main` promotion merge. schedule/workflow_dispatch
@@ -196,7 +262,7 @@ jobs:
         # `qa-drift-check` job below then detects the un-reset `qa` and opens a
         # tracking issue (with the `/batch-issues` pre-flight as a secondary
         # backstop), rather than the drift being discovered at the next promotion.
-        if: success() && github.event_name == 'pull_request'
+        if: success() && github.event_name == 'push'
         run: |
           set -euo pipefail
           git push origin "+HEAD:refs/heads/qa"
@@ -230,10 +296,10 @@ jobs:
     # every other push-to-main path (#2058). It checks out main so the script
     # runs from the same branch as this workflow definition; the script fetches
     # and merges into qa itself.
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.head.ref != 'qa'
+    needs: find-pr
+    if: needs.find-pr.outputs.kind == 'hotfix'
+    # Mints the bot token: admits only `main` once the key moves (ops #613).
+    environment: bot
     permissions:
       contents: write
 
@@ -258,7 +324,7 @@ jobs:
 
       - name: Merge main into qa
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ needs.find-pr.outputs.number }}
         run: |
           set -euo pipefail
           bash .github/scripts/backmerge-main-into-qa.sh \
@@ -278,8 +344,8 @@ jobs:
     # batch work that a blind force-reset would destroy, so reconciliation stays
     # human-in-the-loop (the same channel as the /batch-issues pre-flight).
     #
-    # Scoped to schedule/workflow_dispatch only: on a pull_request (qa -> main
-    # merge) the release job's own reset step handles the post-merge state, and
+    # Scoped to schedule/workflow_dispatch only: on a push (qa -> main merge)
+    # the release job's own reset step handles the post-merge state, and
     # running here would race it. The shared `auto-release` concurrency group also
     # queues this behind any in-flight release, so a mid-promotion false positive
     # cannot occur.

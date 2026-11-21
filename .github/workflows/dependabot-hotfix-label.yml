@@ -20,70 +20,102 @@ name: Dependabot hotfix label
 # rule: "events triggered by the GITHUB_TOKEN will not create a new workflow
 # run"). So the label step below mints a `poke-memory-bot` App installation
 # token and uses that for the `gh pr edit --add-label` call, matching the
-# pattern already used in qa-issue-label.yml, auto-close-umbrella.yml and
-# auto-retro-harvest.yml. The App-attributed `labeled` event DOES cascade,
+# pattern already used in qa-issue-label.yml and auto-close-umbrella.yml. The App-attributed `labeled` event DOES cascade,
 # so the gate re-evaluates and passes on its own without any further
 # cross-trigger.
 #
-# Guard: actor must be `dependabot[bot]` AND the PR base must be `main`.
-# Normal Dependabot version-update PRs already target `qa` (per
-# dependabot.yml) and never match this, so only the security-update path is
-# affected.
+# How it runs (OpenSpec change bot-key-main-only, #2383): the unprivileged
+# `dependabot-hotfix-label-trigger.yml` runs on `pull_request` into `main` and
+# succeeds when Dependabot opened or updated the PR. This file then runs as a
+# `workflow_run` on `main` (GitHub always runs `main`'s copy, on `main`), checks
+# that the trigger was that file, from this repository, started by Dependabot,
+# and succeeded, finds the open PR into `main` through the API by the trigger's
+# head branch and head commit, requires that Dependabot opened it, and adds
+# `hotfix` unless it is there. It never reads `workflow_run.pull_requests` and
+# checks out nothing. No `pull_request_target`: GitHub blocks it by default in
+# public repositories from 2 December 2026.
 #
-# `pull_request_target` runs with a token scoped to the BASE branch's
-# workflow file, which is required here because a Dependabot PR carries a
-# read-only token under plain `pull_request`. Per pull_request_target's trust
-# boundary: this workflow never checks out or executes PR-head code - it only
-# reads `github.event.pull_request` fields and calls `gh pr edit --add-label`.
+# Dependabot version-update PRs target `qa` (per dependabot.yml) and do not
+# start the trigger; one that Dependabot moves onto `main` (after a base change)
+# does, and is labelled like a security PR, as before. A `pull_request` run does
+# not start while the PR conflicts with `main`, so such a PR is labelled once
+# Dependabot rebases it.
 #
-# NOTE: because `pull_request_target` resolves the workflow definition from
-# the PR's base branch, this only takes effect once the file itself has been
-# promoted to `main` (qa -> main). Landing it on `qa` alone does not activate
-# it for `main`-targeted Dependabot PRs.
+# Active only once this file and its trigger are on `main`: `workflow_run`
+# workflows run from the default branch.
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: [Dependabot hotfix label trigger]
+    types: [completed]
 
 concurrency:
-  group: dependabot-hotfix-label-${{ github.event.pull_request.number }}
+  group: dependabot-hotfix-label-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 jobs:
   label:
     name: Apply hotfix label
     if: >-
-      github.actor == 'dependabot[bot]'
-      && github.event.pull_request.base.ref == 'main'
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.path == '.github/workflows/dependabot-hotfix-label-trigger.yml' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     # Mints the bot token: admits only `main` once the key moves (ops #613).
-    # A `pull_request_target` run's ref is the default branch, so it passes.
     environment: bot
     permissions:
-      pull-requests: write
+      pull-requests: read
     steps:
+      - name: Find the open Dependabot PR into main by head branch and head commit
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          PULLS=$(gh api -X GET "repos/$REPO/pulls" \
+            -f state=open -f base=main -f head="$OWNER:$HEAD_BRANCH" -F per_page=100)
+          MATCHES=$(jq --arg sha "$HEAD_SHA" '[.[]
+            | select(.state == "open" and .base.ref == "main" and .head.sha == $sha
+                and .user.login == "dependabot[bot]")
+            | {number, hotfix: ([.labels[].name] | index("hotfix") != null)}]' <<<"$PULLS")
+          COUNT=$(jq 'length' <<<"$MATCHES")
+          if [ "$COUNT" -ne 1 ]; then
+            echo "::notice::$COUNT open Dependabot PRs into main have head $HEAD_BRANCH at $HEAD_SHA (closed, moved on or not Dependabot's): nothing to do."
+            echo "label=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          NUMBER=$(jq -r '.[0].number' <<<"$MATCHES")
+          case "$NUMBER" in ''|*[!0-9]*) echo "::error::PR number '$NUMBER' is not a whole number."; exit 1 ;; esac
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
+          if [ "$(jq -r '.[0].hotfix' <<<"$MATCHES")" = "true" ]; then
+            echo "PR #$NUMBER already carries the 'hotfix' label; nothing to do."
+            echo "label=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "label=true" >> "$GITHUB_OUTPUT"
+
       - name: Mint App installation token
+        if: steps.pr.outputs.label == 'true'
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
-      - name: Apply hotfix label if missing
+      - name: Apply hotfix label
+        if: steps.pr.outputs.label == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+          PR: ${{ steps.pr.outputs.number }}
         run: |
           set -euo pipefail
-
-          # jq -e exits non-zero when no element matches; stdout suppressed.
-          if echo "$PR_LABELS" | jq -e '.[] | select(.name == "hotfix")' >/dev/null; then
-            echo "PR #$PR already carries the 'hotfix' label; nothing to do."
-            exit 0
-          fi
-
           echo "Labelling Dependabot PR #$PR 'hotfix' to clear the main-pr-source-gate."
           gh pr edit "$PR" --repo "$REPO" --add-label "hotfix"

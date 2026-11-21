@@ -17,10 +17,10 @@ name: Cut Release
 #      (`git diff origin/main...origin/qa | node scripts/diff-coverage.mjs`,
 #      WORKFLOW.md "Batch-drain pre-flight"). The result is surfaced in the PR
 #      body; below-bar fails the job so the maintainer sees it before merge.
-#   3. Opens - or, if one is already open, EDITS in place - the `qa -> main`
-#      PR as a DRAFT, with the body + a generated summary. The maintainer marks
-#      it ready after the preview QA, then merges (which triggers
-#      auto-release.yml).
+#   3. `cut-release-open-pr.yml` then opens - or, if one is already open,
+#      EDITS in place - the `qa -> main` PR as a DRAFT, with the body + a
+#      generated summary. The maintainer marks it ready after the preview QA,
+#      then merges (which triggers auto-release.yml).
 #
 # Idempotent: re-dispatching never opens a duplicate. It looks up an existing
 # open PR with base `main` + head `qa` first and edits that one.
@@ -28,23 +28,23 @@ name: Cut Release
 # Works whether or not the batch came through `/batch-issues`: it reads the live
 # `origin/main..origin/qa` range, not any `/batch-issues` session state.
 #
-# Token (#2419, OpenSpec change bot-token-trusted-steps): two jobs, because the
-# poke-memory-bot token can bypass the `main` ruleset and must never meet code
-# that has not reached `main`.
-#   - `prepare` checks out `qa` with `persist-credentials: false` and only the
-#     read-only GITHUB_TOKEN, runs qa's `npm ci`, the Closes aggregation and the
-#     coverage gate, and uploads the PR body as the `promotion-pr` artefact.
-#   - `open-pr` runs in the `bot` environment, mints the App token (so the PR is
-#     bot-opened and its CI runs), checks out nothing, and only opens, edits or
-#     re-drafts the PR from that artefact, read as data.
+# Token (#2419, #2383; OpenSpec changes bot-token-trusted-steps and
+# bot-key-main-only): the poke-memory-bot token can bypass the `main` ruleset and
+# must never meet code that has not reached `main`, so this file never mints it.
+#   - `prepare` (here) checks out `qa` with `persist-credentials: false` and only
+#     the read-only GITHUB_TOKEN, runs qa's `npm ci`, the Closes aggregation and
+#     the coverage gate, and uploads the PR body and `meta.txt` as the
+#     `promotion-pr` artefact.
+#   - `cut-release-open-pr.yml`, a `workflow_run` run on `main` in the `bot`
+#     environment, checks that artefact as data, then mints the App token (so the
+#     PR is bot-opened and its CI runs) and only opens, edits or re-drafts the PR.
 # `scripts/workflows-bot-token.test.mjs` keeps it that way.
 #
-# Dispatch ref: `prepare` names `qa` itself, so the ref only chooses which copy
-# of this file runs. Today dispatch on `qa` (`--ref qa`): a dispatch on `main`
-# would run qa's code in `main`'s Actions cache scope (open item O3). Once the
-# bot key lives only in the `bot` environment, which admits `main` (ops #613),
-# dispatch on `main`; any other ref then stops at `open-pr` before the token is
-# minted, with the PR untouched. WORKFLOW.md "Bot token rule" has the detail.
+# Dispatch ref: always `qa` (`gh workflow run cut-release.yml --ref qa`), never
+# `main`. `prepare` names `qa` itself; a dispatch on `main` skips it, so qa's
+# code never runs in `main`'s Actions cache scope (which every branch and the
+# Production deploy restore), and the follow-up acts only on a run from `qa`.
+# WORKFLOW.md "Bot token rule" has the detail.
 #
 # This does NOT merge anything. The maintainer's QA of the qa preview is the gate
 # between batch work and production (mirrors the /batch-issues "never merge the
@@ -67,14 +67,13 @@ concurrency:
 jobs:
   prepare:
     name: Prepare the promotion PR body (qa code, no bot token)
+    # qa's code never runs on a `main` ref (it would write main's cache scope).
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
-    outputs:
-      diffcov_status: ${{ steps.diffcov.outputs.status }}
-      closes_count: ${{ steps.closes.outputs.count }}
 
     steps:
       - uses: actions/checkout@v7
@@ -208,12 +207,21 @@ jobs:
           OUT_DIR: ${{ runner.temp }}/promotion-pr
           DIFFCOV_STATUS: ${{ steps.diffcov.outputs.status }}
           CLOSES_COUNT: ${{ steps.closes.outputs.count }}
+          FAIL_ON_BREACH: ${{ inputs.coverage_fail_on_breach }}
         run: |
           set -euo pipefail
 
+          # Job outputs and inputs do not cross into the follow-up run, so the
+          # values it needs travel in the artefact, one `key=value` per line.
+          {
+            echo "diffcov_status=${DIFFCOV_STATUS}"
+            echo "closes_count=${CLOSES_COUNT}"
+            echo "fail_on_breach=${FAIL_ON_BREACH}"
+          } > "$OUT_DIR/meta.txt"
+
           # A generated summary, the aggregated Closes section, and the
-          # aggregate diff-coverage result. `open-pr` passes this file to `gh`
-          # as `--body-file` and nothing else.
+          # aggregate diff-coverage result. The follow-up passes this file to
+          # `gh` as `--body-file` and nothing else.
           {
             echo "## Summary"
             echo ""
@@ -246,90 +254,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: promotion-pr
-          path: ${{ runner.temp }}/promotion-pr/body.md
+          path: |
+            ${{ runner.temp }}/promotion-pr/body.md
+            ${{ runner.temp }}/promotion-pr/meta.txt
           retention-days: 1
           if-no-files-found: error
-
-  open-pr:
-    name: Open/update the qa->main promotion PR
-    needs: prepare
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # Admits only `main` once the bot key moves here (ops #613, design D7).
-    environment: bot
-    # The PR calls use the App token; GITHUB_TOKEN needs nothing here.
-    permissions: {}
-
-    steps:
-      - name: Mint App installation token
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ vars.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-
-      - name: Download the promotion PR body
-        uses: actions/download-artifact@v8
-        with:
-          name: promotion-pr
-          path: ${{ runner.temp }}/promotion-pr
-
-      - name: Open or update the qa->main promotion PR
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          REPO: ${{ github.repository }}
-          BODY_FILE: ${{ runner.temp }}/promotion-pr/body.md
-          DIFFCOV_STATUS: ${{ needs.prepare.outputs.diffcov_status }}
-          CLOSES_COUNT: ${{ needs.prepare.outputs.closes_count }}
-          FAIL_ON_BREACH: ${{ inputs.coverage_fail_on_breach }}
-        run: |
-          set -euo pipefail
-
-          # The artefact and outputs come from a job that ran qa's code: data
-          # only. Refuse anything that is not a plain file and whole numbers.
-          case "$DIFFCOV_STATUS" in ''|*[!0-9]*) echo "::error::diffcov_status '$DIFFCOV_STATUS' is not a whole number."; exit 1 ;; esac
-          case "$CLOSES_COUNT" in ''|*[!0-9]*) echo "::error::closes_count '$CLOSES_COUNT' is not a whole number."; exit 1 ;; esac
-          if [ -L "$BODY_FILE" ] || [ ! -f "$BODY_FILE" ]; then
-            echo "::error::The promotion-pr artefact has no plain body.md."
-            exit 1
-          fi
-
-          TITLE="Promote qa to main"
-
-          # Idempotency: find an already-open PR with base main + head qa and
-          # edit it in place rather than opening a duplicate.
-          EXISTING=$(gh pr list --repo "$REPO" --state open \
-            --base main --head qa --json number --jq '.[0].number // empty')
-
-          if [ -n "$EXISTING" ]; then
-            echo "Updating existing open promotion PR #$EXISTING."
-            gh pr edit "$EXISTING" --repo "$REPO" \
-              --title "$TITLE" --body-file "$BODY_FILE"
-            # `gh pr edit` does not re-draft a PR the maintainer previously
-            # marked ready, so the "draft until preview QA" invariant would be
-            # silently violated on re-dispatch. Restore draft state explicitly.
-            # `gh pr ready --undo` is a no-op if the PR is already a draft, so
-            # this is safe to run unconditionally on the update path.
-            IS_DRAFT=$(gh pr view "$EXISTING" --repo "$REPO" --json isDraft --jq '.isDraft')
-            if [ "$IS_DRAFT" != "true" ]; then
-              echo "Re-drafting promotion PR #$EXISTING (was marked ready)."
-              gh pr ready "$EXISTING" --repo "$REPO" --undo
-            fi
-            URL=$(gh pr view "$EXISTING" --repo "$REPO" --json url --jq '.url')
-          else
-            echo "Opening a new draft promotion PR."
-            URL=$(gh pr create --repo "$REPO" \
-              --base main --head qa --draft \
-              --title "$TITLE" --body-file "$BODY_FILE")
-          fi
-          echo "Promotion PR: $URL"
-          echo "### Promotion PR: $URL" >> "$GITHUB_STEP_SUMMARY"
-          echo "$CLOSES_COUNT closing reference(s) in the body."
-
-          # Surface a below-bar coverage result as a job failure last (after the
-          # PR is open/updated so the maintainer still gets the PR), unless the
-          # dispatcher opted out via the input.
-          if [ "$DIFFCOV_STATUS" != "0" ] && [ "${FAIL_ON_BREACH}" = "true" ]; then
-            echo "::error::Aggregate diff coverage is below the bar. The promotion PR is open/updated; add catch-up tests on qa before merging."
-            exit 1
-          fi

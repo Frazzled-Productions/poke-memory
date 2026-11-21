@@ -1,0 +1,269 @@
+name: Visual Baseline Push
+
+# Commits and pushes the Playwright baselines that `visual-baseline-update.yml`
+# regenerated (OpenSpec change bot-key-main-only, #2383; the `push` job moved
+# here unchanged in what it does).
+#
+# `visual-baseline-update.yml` runs the branch's code in a run dispatched on
+# `qa`, with no bot token, and uploads `visual-baseline-target` (`branch.txt`,
+# `sha.txt`) and, when the screenshots changed, `visual-baselines`. When that
+# run succeeds, this `workflow_run` workflow takes over. GitHub always runs it
+# from `main`'s copy of this file, on `main`, so the `bot` environment, which
+# admits only `main` once the key moves (ops #613), lets it mint the
+# poke-memory-bot token; the branch's code never runs here.
+#
+# - Acts only on a successful `workflow_dispatch` run of
+#   `.github/workflows/visual-baseline-update.yml` itself, dispatched on `qa`,
+#   in this repository. `workflows:` matches by display name, which any branch
+#   can copy, so the file path is checked too.
+# - Rechecks the person who started that run against the maintainer rule.
+# - Both artefacts are data from a run that executed branch code (which could
+#   re-upload them). The branch must equal the one in the run title, which
+#   `qa`'s copy of the workflow set before any job ran, be a valid branch name
+#   other than `main` and `qa`; the commit must be 40 hex characters and still
+#   the branch's tip ("the branch moved" otherwise, and nothing is pushed). The
+#   PNGs are checked as before.
+# - No checkout: a symlink in the branch must never turn a copied file into a
+#   write elsewhere, so the commit is built with git plumbing from the recorded
+#   tip and the artefact's PNG files only, then the token is minted for the one
+#   `git push`. No `visual-baselines` artefact means nothing changed: a notice,
+#   and no token.
+#
+# Active only once this file is on `main`.
+
+on:
+  workflow_run:
+    workflows: [Visual Baseline Update]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  push:
+    name: Commit and push the regenerated baselines
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.head_branch == 'qa' &&
+      github.event.workflow_run.path == '.github/workflows/visual-baseline-update.yml' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Mints the bot token: admits only `main` once the key moves (ops #613).
+    environment: bot
+    # GITHUB_TOKEN only lists and downloads the other run's artefacts; the push
+    # uses the App token.
+    permissions:
+      actions: read
+    steps:
+      - name: Verify the dispatcher is an approved maintainer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.event.workflow_run.triggering_actor.login }}
+          OWNER: ${{ github.repository_owner }}
+          # Keep in step with MAINTAINERS in visual-baseline-update.yml.
+          MAINTAINERS: "fraserbrookhouse"
+        run: |
+          set -euo pipefail
+          for m in $MAINTAINERS; do
+            if [ "$ACTOR" = "$m" ]; then
+              echo "Dispatcher '$ACTOR' is on the maintainer allowlist. OK."
+              exit 0
+            fi
+          done
+          STATUS=$(gh api "/orgs/${OWNER}/members/${ACTOR}" \
+            --silent -i 2>/dev/null | head -n1 | grep -oE '[0-9]{3}' | head -n1 || true)
+          if [ "$STATUS" = "204" ] || [ "$STATUS" = "200" ]; then
+            echo "Dispatcher '$ACTOR' is a member of org '$OWNER' (HTTP $STATUS). OK."
+            exit 0
+          fi
+          echo "::error::Refusing to push: '$ACTOR' is neither on the maintainer allowlist nor a verifiable member of org '$OWNER'."
+          exit 1
+
+      - name: Find out whether the baselines changed
+        id: changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          NAMES=$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[].name')
+          if grep -qx 'visual-baselines' <<<"$NAMES"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No visual-baselines artefact: the regenerated PNGs match the committed ones. Nothing to push."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download the target branch and tip
+        if: steps.changed.outputs.changed == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-baseline-target
+          path: ${{ runner.temp }}/visual-baseline-target
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Check the branch and that its tip has not moved
+        if: steps.changed.outputs.changed == 'true'
+        id: target
+        env:
+          DIR: ${{ runner.temp }}/visual-baseline-target
+          REPO: ${{ github.repository }}
+          TITLE: ${{ github.event.workflow_run.display_title }}
+        run: |
+          set -euo pipefail
+          for f in branch.txt sha.txt; do
+            if [ -L "$DIR/$f" ] || [ ! -f "$DIR/$f" ]; then
+              echo "::error::The visual-baseline-target artefact has no plain $f. Nothing pushed."
+              exit 1
+            fi
+          done
+          if [ "$(wc -l < "$DIR/branch.txt")" -ne 1 ] || [ "$(wc -l < "$DIR/sha.txt")" -ne 1 ]; then
+            echo "::error::branch.txt and sha.txt must hold one line each. Nothing pushed."
+            exit 1
+          fi
+          BRANCH=$(cat "$DIR/branch.txt")
+          SHA=$(cat "$DIR/sha.txt")
+          if [ "$TITLE" != "Visual Baseline Update for $BRANCH" ]; then
+            echo "::error::The artefact names branch '$BRANCH', but the run was dispatched for '${TITLE#Visual Baseline Update for }'. Nothing pushed."
+            exit 1
+          fi
+          case "$BRANCH" in
+            ''|main|qa|-*|*'@{'*)
+              echo "::error::Refusing to push to branch '$BRANCH'. Nothing pushed."
+              exit 1 ;;
+          esac
+          if ! git check-ref-format --branch "$BRANCH" >/dev/null 2>&1; then
+            echo "::error::'$BRANCH' is not a valid branch name. Nothing pushed."
+            exit 1
+          fi
+          if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::'$SHA' is not a 40-character commit id. Nothing pushed."
+            exit 1
+          fi
+          # Public repository: no credentials. ls-remote matches ref names from
+          # the tail, so keep the exact ref only.
+          TIP=$(git ls-remote "https://github.com/${REPO}.git" "refs/heads/${BRANCH}" \
+            | awk -v r="refs/heads/${BRANCH}" '$2 == r { print $1 }')
+          if [ "$TIP" != "$SHA" ]; then
+            echo "::error::The branch moved: '$BRANCH' is at '${TIP:-nothing}', not the recorded $SHA. Nothing pushed; dispatch again."
+            exit 1
+          fi
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Branch '$BRANCH' is still at $SHA."
+
+      - name: Download the regenerated baselines
+        if: steps.changed.outputs.changed == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-baselines
+          path: ${{ runner.temp }}/visual-baselines
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Build the baseline commit without a working tree
+        # No checkout: the branch's files are never written to disk here, so a
+        # symlink in the branch cannot turn a copied "PNG" into a write to
+        # .git/config (final review of #2419). The commit is assembled with git
+        # plumbing from the recorded tip and the artefact's PNG files.
+        if: steps.changed.outputs.changed == 'true'
+        id: commit
+        env:
+          SRC: ${{ runner.temp }}/visual-baselines
+          SHA: ${{ steps.target.outputs.sha }}
+          REPO: ${{ github.repository }}
+          BOT_APP_ID: ${{ vars.BOT_APP_ID }}
+        run: |
+          set -euo pipefail
+          # The artefact comes from a job that ran the branch's code: data only.
+          # Refuse symlinks, anything that is not a regular file or directory,
+          # any file that is not a PNG (by name and by signature), and any odd
+          # path.
+          if [ -n "$(find "$SRC" -type l)" ] || [ -n "$(find "$SRC" ! -type f ! -type d)" ]; then
+            echo "::error::The visual-baselines artefact holds a symlink or a special file. Nothing pushed."
+            exit 1
+          fi
+          BAD=$(cd "$SRC" && find . -type f ! -name '*.png' | head -n 5 | tr '\n' ' ')
+          if [ -n "$BAD" ]; then
+            echo "::error::The visual-baselines artefact holds files that are not PNG: $BAD. Nothing pushed."
+            exit 1
+          fi
+          ODD=$(cd "$SRC" && find . -type f -name '*.png' | sed 's|^\./||' | grep -vxE '[A-Za-z0-9._/-]+' | head -n 5 | tr '\n' ' ' || true)
+          if [ -n "$ODD" ]; then
+            echo "::error::Unexpected file names in the artefact: $ODD. Nothing pushed."
+            exit 1
+          fi
+
+          REPO_DIR="$RUNNER_TEMP/baseline-commit"
+          git init -q "$REPO_DIR"
+          cd "$REPO_DIR"
+          # Public repository: the fetch needs no credentials.
+          git fetch -q --no-tags --depth 1 "https://github.com/${REPO}.git" "$SHA"
+          # Refuse a branch whose screenshot path is or holds a symlink.
+          LINKS=$(git ls-tree -r "$SHA" -- e2e/__screenshots__ | awk '$1 == "120000" { print $4 }' | head -n 5 | tr '\n' ' ')
+          for p in e2e e2e/__screenshots__; do
+            MODE=$(git ls-tree "$SHA" -- "$p" | awk '{ print $1 }')
+            if [ -n "$MODE" ] && [ "$MODE" != "040000" ]; then LINKS="$LINKS $p"; fi
+          done
+          if [ -n "${LINKS// /}" ]; then
+            echo "::error::The branch has symlinks or non-directories in the screenshot path: $LINKS. Nothing pushed."
+            exit 1
+          fi
+          git read-tree "$SHA"
+
+          COUNT=0
+          while IFS= read -r -d '' f; do
+            rel=${f#./}
+            if [ "$(head -c 8 "$SRC/$rel" | od -An -tx1 | tr -d ' \n')" != "89504e470d0a1a0a" ]; then
+              echo "::error::'$rel' in the artefact is not a PNG file. Nothing pushed."
+              exit 1
+            fi
+            BLOB=$(git hash-object -w --no-filters -- "$SRC/$rel")
+            git update-index --add --cacheinfo "100644,$BLOB,e2e/__screenshots__/$rel"
+            COUNT=$((COUNT + 1))
+          done < <(cd "$SRC" && find . -type f -name '*.png' -print0)
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::The visual-baselines artefact holds no PNG files. Nothing pushed."
+            exit 1
+          fi
+
+          TREE=$(git write-tree)
+          if [ "$TREE" = "$(git rev-parse "${SHA}^{tree}")" ]; then
+            echo "No baseline changes to commit - the regenerated PNGs are identical to the committed ones."
+            echo "commit=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          COMMIT=$(git -c user.name="poke-memory-bot[bot]" \
+            -c user.email="${BOT_APP_ID}+poke-memory-bot[bot]@users.noreply.github.com" \
+            commit-tree "$TREE" -p "$SHA" -m "chore(visual): regenerate baselines")
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          echo "Built $COMMIT from $COUNT PNG file(s) on top of $SHA."
+
+      - name: Mint App installation token
+        if: steps.commit.outputs.commit != ''
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
+      - name: Push regenerated baselines
+        if: steps.commit.outputs.commit != ''
+        env:
+          BRANCH: ${{ steps.target.outputs.branch }}
+          TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          COMMIT: ${{ steps.commit.outputs.commit }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/baseline-commit"
+          # The token reaches this one command only, never a git config file.
+          # A moved branch rejects the push as non-fast-forward.
+          AUTH=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" \
+            push "https://github.com/${REPO}.git" "${COMMIT}:refs/heads/${BRANCH}"
+          echo "Pushed regenerated baselines to '${BRANCH}'."

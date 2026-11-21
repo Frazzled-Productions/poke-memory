@@ -1,0 +1,35 @@
+name: QA Issue Label trigger
+
+# Unprivileged half of the issue labelling (OpenSpec change bot-key-main-only,
+# #2383). It runs on `pull_request: closed` with no permissions, no checkout and
+# no secret, and does nothing but succeed for a merged same-repository PR into
+# `qa`, or the `qa -> main` promotion. Its success starts `qa-issue-label.yml`,
+# a `workflow_run` run on `main` that finds the PR through the API and labels or
+# closes the issues with the bot token.
+#
+# A `pull_request` run's ref is `refs/pull/N/merge`, which the `main`-only `bot`
+# environment refuses, so the token cannot be minted here. This file runs the
+# PR's own copy, so a PR could change or delete it: the effect is a missing
+# label (the promotion's `## Closes` list still closes the issue), never a
+# token. The labeller trusts nothing from this run but its head branch and head
+# commit, which GitHub sets.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  merged:
+    name: Merged into qa, or the promotion
+    if: >-
+      github.event.pull_request.merged == true
+      && github.event.pull_request.head.repo.fork == false
+      && (github.event.pull_request.base.ref == 'qa'
+          || (github.event.pull_request.base.ref == 'main'
+              && github.event.pull_request.head.ref == 'qa'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: true
