@@ -190,7 +190,7 @@ workflows: the three exceptions lack `bot`, `auto-release.yml` and `qa-issue-lab
 
 ### D4. The dispatched workflows split into a run off `main` and a follow-up on `main` (O3)
 
-Recommended option; the alternative is open decision OD1.
+Chosen by Fraser on 21 November 2026 (OD1 (a)).
 
 - **`cut-release.yml`** keeps only `prepare`, dispatched on `qa` as today, with job
   `if: github.ref != 'refs/heads/main'`. Its artefact `promotion-pr` gains `meta.txt` with
@@ -259,7 +259,9 @@ Loop break, dispatch refs) and the "Bot token rule" with no exceptions; `.claude
 the follow-up rules in D5 and "never dispatch `cut-release.yml` or `visual-baseline-update.yml` on
 `main`".
 
-## Open decisions for Fraser
+## Decisions taken by Fraser (21 November 2026, about 13:15 UTC)
+
+Both were decided as recommended: OD1 (a) and OD2 (a). The options are kept for the record.
 
 - **OD1. How O3 is closed.** (a, recommended) The split in D4: code not on `main` never runs on a
   `main` ref, so `main`'s cache scope stays trusted with no rule for future jobs; cost two files and

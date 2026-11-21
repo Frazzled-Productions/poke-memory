@@ -40,10 +40,10 @@ Refs: ops #613, #2423
   unprivileged `dependabot-hotfix-label-trigger.yml` on `pull_request` into `main`, and a
   `workflow_run` labeller on `main` that checks the PR is open, into `main` and opened by Dependabot,
   then adds `hotfix` with the bot token so the source gate re-runs. It names `bot`.
-- **The two dispatched workflows split into a run on `qa` and a follow-up on `main` (O3, recommended
-  option).** `cut-release.yml` keeps only `prepare`, still dispatched on `qa`; a new
-  `cut-release-open-pr.yml` (`workflow_run`, on `main`, names `bot`) opens, edits or re-drafts the
-  promotion PR from its artefact. `visual-baseline-update.yml` keeps `gate` and `regenerate`; a new
+- **The two dispatched workflows split into a run on `qa` and a follow-up on `main` (O3, OD1 (a)).**
+  `cut-release.yml` keeps only `prepare`, still dispatched on `qa`; a new `cut-release-open-pr.yml`
+  (`workflow_run`, on `main`, names `bot`) opens, edits or re-drafts the promotion PR from its
+  artefact. `visual-baseline-update.yml` keeps `gate` and `regenerate`; a new
   `visual-baseline-push.yml` (`workflow_run`, on `main`, names `bot`) rechecks the maintainer, the
   branch and its tip, and pushes the PNG-only commit as today. A job that runs `qa` or branch code is
   skipped when the run's ref is `main`, so that code never writes `main`'s cache scope.
@@ -133,13 +133,14 @@ Refs: ops #613, #2423
 - The rulesets and the bot's bypass: unchanged.
 - Allowing `pull_request_target` in an Actions event policy (the other option in #2383): not needed
   once nothing uses it.
-- The Production deploy's npm cache: unchanged under the recommended O3 option (see the open
-  decision in design.md).
+- The Production deploy's npm cache: unchanged under the chosen O3 option (design.md, OD1 (a)).
 - `preview-upload.yml` and `deploy.yml`: unchanged.
 - Dependabot PRs #2380 and #2381 into `main` without the `hotfix` label: not investigated here.
 
 ## Owner decisions relied on
 
+- 21 November 2026, about 13:15 UTC: Fraser approved the proposal as recommended, with OD1 (a), the
+  split in design D4, and OD2 (a), the promotion opened by hand from `prepare`'s artefact.
 - 21 November 2026, about 11:55 UTC: Fraser chose "Proposal now" for open items O1 to O3 of
   `bot-token-trusted-steps`, with the proposed shapes for O1 (push to `main`, find the PR by commit)
   and O2 (unprivileged `pull_request` workflow plus a `workflow_run` labeller keeping the App token),
@@ -159,7 +160,11 @@ Refs: ops #613, #2423
   11:55 UTC, taking D7's recommendation).
 - 2026-11-21: O2 shape? Unprivileged `pull_request` workflow plus a `workflow_run` labeller on `main`
   that keeps the App token (Fraser, about 11:55 UTC).
-- 2026-11-21: O3? The proposal recommends the split into `workflow_run` pairs; dropping the
-  Production deploy's cache instead, or doing both, is an open decision for Fraser (design.md, OD1).
+- 2026-11-21: O3? The split into `workflow_run` pairs: `cut-release.yml` keeps `prepare` on `qa`
+  with `cut-release-open-pr.yml` on `main`; `visual-baseline-update.yml` keeps `gate` and
+  `regenerate` with `visual-baseline-push.yml` on `main` (Fraser, about 13:15 UTC, OD1 (a)).
 - 2026-11-21: How is the promotion that carries this change opened, since its PR-opening follow-up
-  is not on `main` yet? Open decision for Fraser (design.md, OD2).
+  is not on `main` yet? Dispatch `cut-release.yml` on `qa`, `gh run download` its prepared body, and
+  open the draft `qa` to `main` PR by hand with `gh pr create --body-file`, titled like recent
+  promotions (Fraser, about 13:15 UTC, OD2 (a)).
+- 2026-11-21: Approve the proposal? Yes, as recommended (Fraser, about 13:15 UTC).
