@@ -1,0 +1,28 @@
+name: Dependabot hotfix label trigger
+
+# Unprivileged half of the Dependabot hotfix labelling (OpenSpec change
+# bot-key-main-only, #2383). It runs on `pull_request` into `main` with no
+# permissions, no checkout and no secret, and does nothing but succeed when
+# Dependabot opened or updated the PR. Its success starts
+# `dependabot-hotfix-label.yml`, a `workflow_run` run on `main` that checks the
+# PR through the API and adds `hotfix` with the bot token.
+#
+# This replaces `pull_request_target`, which GitHub blocks by default in public
+# repositories from 2 December 2026. A Dependabot `pull_request` run gets a
+# read-only token and no secrets, which is all this needs.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  dependabot:
+    name: Opened or updated by Dependabot
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: true
