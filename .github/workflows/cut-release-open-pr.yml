@@ -32,8 +32,9 @@ on:
     types: [completed]
 
 concurrency:
-  # Same group as auto-release.yml and cut-release.yml: never race a release.
-  group: auto-release
+  # Its own group: it only edits the PR, and a run in the `auto-release` group
+  # could cancel a pending release run (GitHub keeps one pending run a group).
+  group: cut-release-open-pr
   cancel-in-progress: false
 
 permissions: {}

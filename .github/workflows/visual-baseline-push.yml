@@ -13,14 +13,16 @@ name: Visual Baseline Push
 # poke-memory-bot token; the branch's code never runs here.
 #
 # - Acts only on a successful `workflow_dispatch` run of
-#   `.github/workflows/visual-baseline-update.yml` itself, not from `main`, in
-#   this repository. `workflows:` matches by display name, which any branch can
-#   copy, so the file path is checked too.
+#   `.github/workflows/visual-baseline-update.yml` itself, dispatched on `qa`,
+#   in this repository. `workflows:` matches by display name, which any branch
+#   can copy, so the file path is checked too.
 # - Rechecks the person who started that run against the maintainer rule.
-# - Both artefacts are data from a run that executed branch code. The branch
-#   must be a valid branch name other than `main` and `qa`, the commit 40 hex
-#   characters, and that commit must still be the branch's tip ("the branch
-#   moved" otherwise, and nothing is pushed). The PNGs are checked as before.
+# - Both artefacts are data from a run that executed branch code (which could
+#   re-upload them). The branch must equal the one in the run title, which
+#   `qa`'s copy of the workflow set before any job ran, be a valid branch name
+#   other than `main` and `qa`; the commit must be 40 hex characters and still
+#   the branch's tip ("the branch moved" otherwise, and nothing is pushed). The
+#   PNGs are checked as before.
 # - No checkout: a symlink in the branch must never turn a copied file into a
 #   write elsewhere, so the commit is built with git plumbing from the recorded
 #   tip and the artefact's PNG files only, then the token is minted for the one
@@ -42,7 +44,7 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'workflow_dispatch' &&
-      github.event.workflow_run.head_branch != 'main' &&
+      github.event.workflow_run.head_branch == 'qa' &&
       github.event.workflow_run.path == '.github/workflows/visual-baseline-update.yml' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
@@ -109,6 +111,7 @@ jobs:
         env:
           DIR: ${{ runner.temp }}/visual-baseline-target
           REPO: ${{ github.repository }}
+          TITLE: ${{ github.event.workflow_run.display_title }}
         run: |
           set -euo pipefail
           for f in branch.txt sha.txt; do
@@ -123,6 +126,10 @@ jobs:
           fi
           BRANCH=$(cat "$DIR/branch.txt")
           SHA=$(cat "$DIR/sha.txt")
+          if [ "$TITLE" != "Visual Baseline Update for $BRANCH" ]; then
+            echo "::error::The artefact names branch '$BRANCH', but the run was dispatched for '${TITLE#Visual Baseline Update for }'. Nothing pushed."
+            exit 1
+          fi
           case "$BRANCH" in
             ''|main|qa|-*|*'@{'*)
               echo "::error::Refusing to push to branch '$BRANCH'. Nothing pushed."

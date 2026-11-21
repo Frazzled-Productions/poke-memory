@@ -35,8 +35,11 @@ name: Dependabot hotfix label
 # checks out nothing. No `pull_request_target`: GitHub blocks it by default in
 # public repositories from 2 December 2026.
 #
-# Normal Dependabot version-update PRs target `qa` (per dependabot.yml) and
-# never start the trigger, so only the security-update path is affected.
+# Dependabot version-update PRs target `qa` (per dependabot.yml) and do not
+# start the trigger; one that Dependabot moves onto `main` (after a base change)
+# does, and is labelled like a security PR, as before. A `pull_request` run does
+# not start while the PR conflicts with `main`, so such a PR is labelled once
+# Dependabot rebases it.
 #
 # Active only once this file and its trigger are on `main`: `workflow_run`
 # workflows run from the default branch.

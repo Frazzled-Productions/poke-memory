@@ -63,6 +63,11 @@ name: Visual Baseline Update
 # `ci.yml` is intentionally NOT path-ignored - we want it to confirm that
 # nothing else regressed on the regen PR.
 
+# The run title names the branch. It is set from the dispatched file (on `qa`)
+# before any job runs, so visual-baseline-push.yml checks the artefact's branch
+# against it: code that runs later in this run cannot change it.
+run-name: "Visual Baseline Update for ${{ inputs.branch }}"
+
 on:
   workflow_dispatch:
     inputs:

@@ -42,6 +42,9 @@ const MINTING_TRIGGERS = new Set(["push", "schedule", "issues", "workflow_run", 
 /** The job `if:` a job that runs code from a non-`main` checkout must carry. */
 const SKIP_ON_MAIN = /github\.ref\s*!=\s*'refs\/heads\/main'/;
 
+/** An `||` or a negation in a job `if:` could make every required condition moot. */
+const LOOSE_IF = /\|\||!(?!=)/;
+
 /** A `run:` block that executes repository or third-party code from the checkout. */
 const RUNS_CODE = /\b(?:npm|npx)\b|\bnode\s+[^\s-]|\bbash\s+\S+\.sh\b|(?:^|[\s"'])\.{0,2}\/?(?:\.github\/scripts|scripts)\/\S+/m;
 
@@ -105,7 +108,7 @@ function jobs(text) {
 }
 
 const mints = (step) => /actions\/create-github-app-token/.test(step) && /BOT_APP_PRIVATE_KEY/.test(step);
-const isCheckout = (step) => /uses:\s*actions\/checkout@/.test(step);
+const isCheckout = (step) => /uses:\s*["']?actions\/checkout@/.test(step);
 const checkoutRef = (step) => step.match(/^[ \t]+ref:[ \t]*(.+?)[ \t]*$/m)?.[1].replace(/^["']|["']$/g, "");
 const runBlock = (step) => {
   const m = step.match(/^(\s*-?\s*)run:\s*(\|[-+]?|>[-+]?)?\s*(.*)$/m);
@@ -167,9 +170,16 @@ function triggerViolations(text) {
 function followUpViolations(text, job) {
   if (!job.steps.some(mints)) return [];
   const out = [];
-  if (/workflow_run\.pull_requests/.test(job.body)) out.push("reads workflow_run.pull_requests");
+  // Anywhere in the workflow: another job could read it and hand it on through `needs`.
+  if (/workflow_run\.pull_requests|\.pull_requests\[/.test(text.replace(/^\s*#.*$/gm, ""))) {
+    out.push("reads workflow_run.pull_requests");
+  }
   if (!triggers(text).includes("workflow_run")) return out;
   const cond = jobIf(job);
+  if (LOOSE_IF.test(cond)) out.push("job if: uses || or a negation");
+  if (!/github\.event\.workflow_run\.event\s*==\s*'[a-z_]+'/.test(cond)) {
+    out.push("does not check the triggering event");
+  }
   if (!/github\.event\.workflow_run\.path\s*==\s*'\.github\/workflows\/[^']+'/.test(cond)) {
     out.push("does not check the triggering workflow file");
   }
@@ -190,7 +200,7 @@ function mainRefViolations(job) {
   });
   if (!other) return [];
   const runsCode = job.steps.some((s) => RUNS_CODE.test(runBlock(s)) || /uses:\s*\.\//.test(s));
-  if (!runsCode || SKIP_ON_MAIN.test(jobIf(job))) return [];
+  if (!runsCode || (SKIP_ON_MAIN.test(jobIf(job)) && !LOOSE_IF.test(jobIf(job).replace(SKIP_ON_MAIN, "")))) return [];
   return ["runs code from a non-main checkout on a main ref"];
 }
 
@@ -341,17 +351,27 @@ describe("the parser", () => {
     const good = [
       "      github.event.workflow_run.conclusion == 'success' &&",
       "      github.event.workflow_run.path == '.github/workflows/x.yml' &&",
-      "      github.event.workflow_run.head_repository.full_name == github.repository",
+      "      github.event.workflow_run.head_repository.full_name == github.repository &&",
+      "      github.event.workflow_run.event == 'workflow_dispatch'",
     ];
     const ok = text(good.join("\n"));
-    expect(jobIf(jobs(ok)[0])).toMatch(/conclusion == 'success' && .*path == .*full_name == github\.repository$/);
+    expect(jobIf(jobs(ok)[0])).toMatch(/conclusion == 'success' && .*path == .*full_name == github\.repository && .*event == 'workflow_dispatch'$/);
     expect(followUpViolations(ok, jobs(ok)[0])).toEqual([]);
-    const noPath = text([good[0], good[2]].join("\n"));
+    const noPath = text([good[0], good[2], good[3]].join("\n"));
     expect(followUpViolations(noPath, jobs(noPath)[0])).toEqual(["does not check the triggering workflow file"]);
-    const noRepo = text([good[0], good[1].replace(" &&", "")].join("\n"));
+    const noRepo = text([good[0], good[1], good[3]].join("\n"));
     expect(followUpViolations(noRepo, jobs(noRepo)[0])).toEqual(["does not check the triggering repository"]);
-    const noSuccess = text([good[1], good[2]].join("\n"));
+    const noSuccess = text([good[1], good[2], good[3]].join("\n"));
     expect(followUpViolations(noSuccess, jobs(noSuccess)[0])).toEqual(["does not require a successful triggering run"]);
+    const noEvent = text([good[0], good[1], good[2].replace(" &&", "")].join("\n"));
+    expect(followUpViolations(noEvent, jobs(noEvent)[0])).toEqual(["does not check the triggering event"]);
+    // `&&` binds tighter than `||`: one `||` lets any successful run of any same-named workflow through.
+    const loose = text([good[0].replace("&&", "||"), good[1], good[2], good[3]].join("\n"));
+    expect(followUpViolations(loose, jobs(loose)[0])).toEqual(["job if: uses || or a negation"]);
+    const negated = text(["      !(github.event.workflow_run.conclusion == 'success') &&", good[1], good[2], good[3]].join("\n"));
+    expect(followUpViolations(negated, jobs(negated)[0])).toEqual(["job if: uses || or a negation"]);
+    const handedOn = text(good.join("\n")) + "  other:\n    steps:\n      - run: echo \"${{ github.event.workflow_run.pull_requests[0].number }}\"\n";
+    expect(followUpViolations(handedOn, jobs(handedOn)[0])).toEqual(["reads workflow_run.pull_requests"]);
     const reads = text(good.join("\n"), "      - env:\n          PR: ${{ github.event.workflow_run.pull_requests[0].number }}\n        run: echo \"$PR\"\n");
     expect(followUpViolations(reads, jobs(reads)[0])).toEqual(["reads workflow_run.pull_requests"]);
   });
@@ -368,6 +388,10 @@ describe("the parser", () => {
     expect(mainRefViolations(jobs(onMain)[0])).toEqual([]);
     const readsOnly = text("", "qa", "git log -1");
     expect(mainRefViolations(jobs(readsOnly)[0])).toEqual([]);
+    const loose = text("    if: github.ref != 'refs/heads/main' || always()\n", "qa", "npm ci");
+    expect(mainRefViolations(jobs(loose)[0])).toEqual(["runs code from a non-main checkout on a main ref"]);
+    const quoted = text("", "qa", "npm ci").replace("uses: actions/checkout@v7", 'uses: "actions/checkout@v7"');
+    expect(mainRefViolations(jobs(quoted)[0])).toEqual(["runs code from a non-main checkout on a main ref"]);
   });
 });
 
@@ -389,6 +413,22 @@ describe("the bot token never meets code from outside main", () => {
     );
     const mintSteps = allJobs().reduce((n, { job: j }) => n + j.steps.filter(mints).length, 0);
     expect(mintSteps).toBe(uses);
+  });
+
+  it("reads every workflow: a trigger and a job each, every checkout and every pull_request_target seen", () => {
+    // Fail closed on YAML outside the house layout, which the parser would otherwise skip silently.
+    const unread = [];
+    for (const f of readdirSync(WORKFLOWS).filter((x) => /\.ya?ml$/.test(x))) {
+      const text = readFileSync(join(WORKFLOWS, f), "utf8");
+      const code = text.replace(/^\s*#.*$/gm, "").replace(/\s#.*$/gm, "");
+      if (triggers(text).length === 0) unread.push(`${f}: no trigger parsed`);
+      if (jobs(text).length === 0) unread.push(`${f}: no job parsed`);
+      const rawCheckouts = (code.match(/actions\/checkout@/g) ?? []).length;
+      const parsed = jobs(text).reduce((n, j) => n + j.steps.filter(isCheckout).length, 0);
+      if (rawCheckouts !== parsed) unread.push(`${f}: ${rawCheckouts} checkouts in the text, ${parsed} parsed`);
+      if (/pull_request_target/.test(code)) unread.push(`${f}: names pull_request_target`);
+    }
+    expect(unread).toEqual([]);
   });
 
   it("the minting jobs are exactly the eight it guards", () => {
@@ -493,7 +533,7 @@ describe("the split jobs keep their shape", () => {
     const ghStep = openPr.steps.find((s) => /gh pr create/.test(s));
     expect(ghStep).toMatch(/GH_TOKEN:\s*\$\{\{\s*steps\.app-token\.outputs\.token\s*\}\}/);
     expect(ghStep).toMatch(/--body-file/);
-    expect(text).toMatch(/group: auto-release/);
+    expect(text).toMatch(/^  group: cut-release-open-pr$/m);
   });
 
   it("visual-baseline-update: mints nothing, regenerate skips on main and only reads", () => {
@@ -519,8 +559,13 @@ describe("the split jobs keep their shape", () => {
     expectFollowUp(push, {
       path: ".github/workflows/visual-baseline-update.yml",
       event: "workflow_dispatch",
-      branch: "github.event.workflow_run.head_branch != 'main'",
+      branch: "github.event.workflow_run.head_branch == 'qa'",
     });
+    // The branch comes from the run title, set by qa's file before any branch code ran.
+    expect(workflow("visual-baseline-update.yml")).toMatch(/^run-name: "Visual Baseline Update for \$\{\{ inputs\.branch \}\}"$/m);
+    expect(push.body).toMatch(/TITLE: \$\{\{ github\.event\.workflow_run\.display_title \}\}/);
+    expect(push.body).toMatch(/"\$TITLE" != "Visual Baseline Update for \$BRANCH"/);
+    expect(push.body).toMatch(/RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/);
     expect(environmentOf(push)).toBe("bot");
     expect(push.body).toMatch(/workflow_run\.triggering_actor\.login/);
     expect(push.body).not.toMatch(/\b(?:npm|npx)\b/);
@@ -602,6 +647,9 @@ describe("the split jobs keep their shape", () => {
       expect(jobIf(j), name).toMatch(/needs\.find-pr\.outputs\.kind/);
     }
     expect(jobIf(job("auto-release.yml", "release"))).toContain("github.event_name != 'push'");
+    // Only this repository's PRs count, and the release commit must not start another run.
+    expect(findPr.body).toContain(".head.repo.full_name == $repo");
+    expect(text).toMatch(/git commit -m "chore\(release\): v\$\{NEW_VERSION\} \(\$\{BUMP_TYPE\}\) \[skip ci\]"/);
     expect(text).not.toMatch(/event_name\s*[!=]=\s*'pull_request'/);
   });
 });

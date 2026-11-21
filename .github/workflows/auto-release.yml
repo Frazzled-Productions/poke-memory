@@ -85,6 +85,7 @@ jobs:
           REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
           SHA: ${{ github.sha }}
+          HEAD_MSG: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
           if [ "$EVENT" != "push" ]; then
@@ -93,13 +94,20 @@ jobs:
             exit 0
           fi
           # `commits/{sha}/pulls` names the PR GitHub merged as this commit
-          # (merge, squash or rebase); keep only a merged PR into `main` whose
-          # merge commit is exactly the pushed commit.
+          # (merge, squash or rebase); keep only a merged PR into `main` from
+          # this repository whose merge commit is exactly the pushed commit.
           PULLS=$(gh api "repos/$REPO/commits/$SHA/pulls")
-          MATCHES=$(jq --arg sha "$SHA" '[.[]
-            | select(.merged_at != null and .merge_commit_sha == $sha and .base.ref == "main")
+          MATCHES=$(jq --arg sha "$SHA" --arg repo "$REPO" '[.[]
+            | select(.merged_at != null and .merge_commit_sha == $sha and .base.ref == "main"
+                and .head.repo.full_name == $repo)
             | {number, head: .head.ref}]' <<<"$PULLS")
           COUNT=$(jq 'length' <<<"$MATCHES")
+          if [ "$COUNT" -eq 0 ] && [[ "$HEAD_MSG" =~ ^Merge\ pull\ request\ \#[0-9]+\ from\  ]]; then
+            # A merge commit GitHub made for a PR, but the API names no merged
+            # PR for it: fail loudly rather than skip a release or backmerge.
+            echo "::error::$SHA is a PR merge commit, but the API names no merged PR from this repository for it. Re-run this job; if it still fails, run the release or backmerge by hand."
+            exit 1
+          fi
           if [ "$COUNT" -eq 0 ]; then
             echo "kind=none" >> "$GITHUB_OUTPUT"
             echo "No merged PR has $SHA as its merge commit: nothing to do."

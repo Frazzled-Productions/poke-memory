@@ -206,11 +206,14 @@ Chosen by Fraser on 21 November 2026 (OD1 (a)).
   changed, plus `visual-baseline-target` (`branch.txt`, `sha.txt`).
 - **New `visual-baseline-push.yml`** ("Visual Baseline Push"): `workflow_run` on "Visual Baseline
   Update", completed; job `push`, `environment: bot`, `permissions: actions: read`; `if:` success,
-  `event == 'workflow_dispatch'`, `head_branch != 'main'`, path
+  `event == 'workflow_dispatch'`, `head_branch == 'qa'` (built narrower than first written,
+  `!= 'main'`, after the final review), path
   `.github/workflows/visual-baseline-update.yml`, same repository. It rechecks
   `workflow_run.triggering_actor.login` with `gate`'s maintainer rule; reads branch and SHA from the
-  target artefact as data (branch passes `git check-ref-format --branch`, is not `main` or `qa`; SHA is
-  40 hex characters); requires `git ls-remote` to show that SHA as the branch tip (else "the branch
+  target artefact as data (branch equals the one in the run title, `run-name: "Visual Baseline Update
+  for <branch>"`, which `qa`'s file sets before any job runs, so branch code that re-uploads the
+  artefact cannot redirect the push; passes `git check-ref-format --branch`, is not `main` or `qa`;
+  SHA is 40 hex characters; the artefact is uploaded by `gate`, before any branch code runs); requires `git ls-remote` to show that SHA as the branch tip (else "the branch
   moved", nothing pushed); then today's validation, plumbing commit, mint and push, unchanged. No
   `visual-baselines` artefact means nothing changed: a notice, no mint.
 - Why this option: the code that is not on `main` never runs in a run on `main`, so it never writes
@@ -291,6 +294,8 @@ Both were decided as recommended: OD1 (a) and OD2 (a). The options are kept for 
   promotion), and the merge ref's copy, which no longer has `pull_request`, starts nothing; its
   `pull_request: closed` event runs the new trigger, and the new labeller on `main` closes the staged
   issues.
+- A `visual-baseline-update.yml` dispatch on `qa` in that window regenerates and uploads, but nothing
+  pushes until `visual-baseline-push.yml` is on `main`.
 - `dependabot-hotfix-label.yml` keeps working on `pull_request_target` until 2 December 2026 or the
   promotion, whichever is first. If the promotion lands after 2 December, a Dependabot security PR
   opened in between needs `hotfix` by hand.
@@ -301,11 +306,19 @@ Both were decided as recommended: OD1 (a) and OD2 (a). The options are kept for 
 - **A `workflow_run` started by a Dependabot run gets Dependabot's restrictions.** Not in GitHub's
   restricted list (cited), but not shown here. Check: #2427 item 4.4 on the next security PR; fallback
   is adding `hotfix` by hand and reopening #2383.
-- **`commits/{sha}/pulls` lags the push and `find-pr` says `none` for a promotion.** Not seen; the
-  release then waits for the 09:00 cron, `qa` is not reset, and `qa-drift-check` opens its tracking
-  issue the next day. Check: #2427 item 4.2.
-- **A merged PR whose title holds `[skip ci]` lands as the head commit**, so no push run: no release
-  or backmerge for it. Same as today for `pull_request` events; the cron and drift check catch it.
+- **`commits/{sha}/pulls` lags the push and `find-pr` says `none` for a promotion.** Not seen. A
+  `Merge pull request #N from ...` commit with no PR named fails `find-pr` (found in the final
+  review: a green no-op would hide it); a squash merge with none named is a green no-op, which the
+  drift check catches the next day. Check: #2427 item 4.2.
+- **A merged PR whose head commit message holds `[skip ci]` starts no push run**: no release or
+  backmerge for it. For a promotion (merge commit, message from the title) only the title matters.
+  For a squash-merged hotfix or Dependabot PR the message is the PR body (the repository's squash
+  setting), and a Dependabot body can quote an upstream `[skip ci]` commit (2 of 118 Dependabot PRs
+  did): its backmerge is then skipped, where the old `pull_request` trigger ran it. The drift check
+  opens its issue the next day; the same body already skips `deploy.yml`'s push. Changing the
+  squash setting is Fraser's call (noted in the build PR).
+- **A Dependabot PR that conflicts with `main`** starts no `pull_request` run, so it gets `hotfix`
+  only once Dependabot rebases it (`pull_request_target` ran regardless).
 - **Two PRs with the same head branch and head commit merged** (D2 lookup): fails loudly, no labels.
 - **The trigger workflows run the PR's own copy**, so a PR can delete its trigger and skip its own
   labelling. Effect: a missing label, caught by the promotion's `Closes` list; never a token.
