@@ -27,7 +27,30 @@ artefact read as data. `scripts/workflows-bot-token.test.mjs` SHALL fail on any 
 
 #### Scenario: Issue closed (baseline)
 - **WHEN** an issue closes
-- **THEN** `auto-status.yml` runs `main`'s `set-project-status.sh` with the bot token, as before this change
+- **THEN** `auto-status.yml` runs `main`'s `set-project-status.sh` with the bot token, as before this change, in a job that names the `bot` environment
+
+### Requirement: Jobs that mint the bot token name the bot environment
+Every job that mints the poke-memory-bot token SHALL name the GitHub environment `bot`, so a key kept
+only there, admitting `main`, is minted only by runs on `main`. The only exceptions SHALL be
+`auto-release.yml` `release` and `backmerge-hotfix` and `qa-issue-label.yml` `label` (they run on
+`pull_request` refs), named in `scripts/workflows-bot-token.test.mjs`. `cut-release.yml` and
+`visual-baseline-update.yml` SHALL be dispatched on `main`.
+
+#### Scenario: A new minting job leaves out the environment
+- **WHEN** a change adds a job that mints the bot token without `environment: bot` and the job is not one of the three exceptions
+- **THEN** `scripts/workflows-bot-token.test.mjs` fails in CI
+
+#### Scenario: The key is still a repository secret
+- **WHEN** a job naming `bot` runs before the key is moved into the `bot` environment
+- **THEN** it mints the token from the repository secret and behaves as before
+
+#### Scenario: Dispatched on qa after the key moved
+- **WHEN** the key is only in a `bot` environment that admits `main` and someone dispatches `cut-release.yml` on `qa`
+- **THEN** `prepare` runs, `open-pr` is refused by the environment before minting, and no PR is opened or edited
+
+#### Scenario: An exception moves to main
+- **WHEN** one of the three exceptions starts naming `environment: bot`
+- **THEN** the guard test fails until its exception entry is removed, so the list stays true
 
 ### Requirement: Opening the promotion PR
 `cut-release.yml`, dispatched by hand, SHALL open or edit one draft PR from `qa` into `main` with an

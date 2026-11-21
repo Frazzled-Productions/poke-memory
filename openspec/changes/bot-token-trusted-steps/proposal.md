@@ -29,11 +29,24 @@ Fixes: poke-memory #2419
   anything else), commits, and pushes with the token passed to that one `git push`.
 - **`qa-issue-label.yml`** checks out `main`'s `.github/scripts` (sparse, `persist-credentials: false`)
   instead of the merged branch's, so the parser that runs next to the token is `main`'s.
+- **Every job that mints the bot token names the GitHub environment `bot`**, except the three listed
+  below, so that once ops #613 moves `BOT_APP_PRIVATE_KEY` into a `bot` environment that admits only
+  `main`, only runs on a `main` ref can mint it. Until then a job naming `bot` still reads the
+  repository secret, so nothing changes. The five jobs: `cut-release.yml` `open-pr`,
+  `visual-baseline-update.yml` `push`, `auto-status.yml` `done`, `auto-close-umbrella.yml`
+  `close-umbrella` and `dependabot-hotfix-label.yml` `label`. `cut-release.yml` and
+  `visual-baseline-update.yml` are dispatched on `main` from now on (the default ref of
+  `gh workflow run`); they read `qa` or the branch only through an explicit checkout.
+- **Three jobs cannot run on a `main` ref and stay on the repository secret for now**: `auto-release.yml`
+  `release` and `backmerge-hotfix` (their main trigger is `pull_request`, whose ref is
+  `refs/pull/N/merge`) and `qa-issue-label.yml` `label` (the same). They are open items O1 and O2 for
+  Fraser (design D7); the guard test names them, so a fourth exception fails CI.
 - **Guard test** `scripts/workflows-bot-token.test.mjs`: fails if a job that mints the bot token
-  checks out anything but `main` and runs repository code, or checks out anything but `main` without
-  `persist-credentials: false`. Red on today's three workflows, green after.
-- **Docs**: the workflow headers, `WORKFLOW.md` (the three sections' Token rows) and
-  `.claude/agents/workflow-expert.md` state the rule.
+  checks out anything but `main` and runs repository code, checks out anything but `main` without
+  `persist-credentials: false`, or does not name `environment: bot` and is not one of the three named
+  exceptions. Red on today's workflows, green after.
+- **Docs**: the workflow headers, `WORKFLOW.md` (the three sections' Token rows, and "dispatch on
+  `main`" for the two dispatched workflows) and `.claude/agents/workflow-expert.md` state the rule.
 - **`auto-release.yml` is unchanged.** It checks out `main` and runs only `main`'s scripts, so keeping
   the token in its checkout (needed for the release push, tags and the backmerge into `qa`) is within
   the rule. New capability `bot-automation` records that as a baseline next to the changed workflows.
@@ -58,11 +71,15 @@ Fixes: poke-memory #2419
   still a bot-opened draft with the same title, body sections and coverage gate, so its CI still runs
   and `qa-issue-label.yml` still closes the staged issues on merge.
 - **CI and GitHub Actions:** `cut-release.yml`, `visual-baseline-update.yml`, `qa-issue-label.yml`,
-  one new guard test, `WORKFLOW.md` and `.claude/agents/workflow-expert.md`. None of these workflows
+  the `environment: bot` line in `auto-status.yml`, `auto-close-umbrella.yml` and
+  `dependabot-hotfix-label.yml`, one new guard test, `WORKFLOW.md` and `.claude/agents/workflow-expert.md`. None of these workflows
   is a required check; job names that change are not referenced by any ruleset or monitor
   (`cron-health-monitor.yml` and `pr-check-monitor.yml` name none of them). `auto-status.yml`,
   `auto-close-umbrella.yml` and `dependabot-hotfix-label.yml` mint the token but check out only `main`
-  or nothing: no change. Each split adds one runner start per dispatch.
+  or nothing: each gains one line, `environment: bot`. Each split adds one runner start per dispatch.
+  A job naming an environment creates a deployment record in it on every run, and the first run
+  creates the `bot` environment if it does not exist yet (with no rules, so it admits every ref until
+  ops #613 configures it).
 
 ## Removes
 
@@ -76,13 +93,23 @@ Fixes: poke-memory #2419
 
 ## Out of scope
 
-- Where the bot's private key is stored and which refs may use it: tracked privately in ops #613
-  (needs Fraser: a settings change).
+- Creating the `bot` environment, restricting it to `main` and moving the key into it: a settings
+  change, done after this change is promoted (ops #613). This change only names the environment.
+- Moving O1 and O2 onto a `main` ref (and O3, the dispatch workflows' cache scope): open items for
+  Fraser (design D7), a follow-up change; the key cannot leave the repository secrets before O1 and O2
+  are resolved.
+- `dependabot-hotfix-label.yml` stops running on 2 December 2026, when GitHub blocks
+  `pull_request_target` in public repositories: #2383.
 - The rulesets and the bot's bypass: unchanged; this change touches no GitHub setting.
 - koinori: checked for the same pattern; it is not there (no App token, PAT or repository secret).
   Two related findings are in koinori #2948.
 
 ## Owner decisions relied on
+
+- 21 November 2026, about 10:15 UTC: Fraser approved the proposal with all three recommendations (two
+  jobs, include `qa-issue-label.yml`, leave `auto-release.yml`'s token in its `main` checkout), and
+  ruled that every job that mints the bot token names one environment, so ops #613 can later make the
+  key `main`-only; a workflow that cannot run on `main` is recorded as an open item, not decided here.
 
 - 21 November 2026, about 09:30 UTC: Fraser chose "Fix now via OpenSpec": keep the bot token out of
   checkout (`persist-credentials: false`) and hand it only to the step that pushes or opens the PR, so
@@ -96,11 +123,12 @@ Fixes: poke-memory #2419
   to the step that pushes or opens the PR (Fraser, about 09:30 UTC).
 - 2026-11-21: Check koinori for the same pattern? Yes, report and file one issue if found (Fraser,
   about 09:30 UTC). Not found; koinori #2948 records two related exposures.
-- 2026-11-21: Two jobs, or one job that mints the token after the untrusted steps? Two jobs, because
-  earlier steps on the same runner can alter what later steps run (agent design within the ruling;
-  open for Fraser, decision 1).
-- 2026-11-21: Does `qa-issue-label.yml` belong in this change? Yes, it runs `qa`'s parser next to the
-  token (agent finding; open for Fraser, decision 2).
-- 2026-11-21: Does `auto-release.yml` change? No: it checks out `main` and runs only `main`'s code, so
-  its token stays in its checkout for the release push and backmerge (agent finding; open for Fraser,
-  decision 3).
+- 2026-11-21: Two jobs, or one job that mints the token after the untrusted steps? Two jobs (Fraser,
+  about 10:15 UTC).
+- 2026-11-21: Does `qa-issue-label.yml` belong in this change? Yes (Fraser, about 10:15 UTC).
+- 2026-11-21: Does `auto-release.yml`'s token leave its `main` checkout? No, it stays (Fraser, about
+  10:15 UTC).
+- 2026-11-21: Design for the `main`-only key environment now? Yes: every minting job names it, the
+  orchestrating session creates it and moves the key after promotion, and a workflow that cannot run on
+  `main` becomes an open item (Fraser, about 10:15 UTC). Name chosen: `bot`; open items O1 to O3 in
+  design D7.

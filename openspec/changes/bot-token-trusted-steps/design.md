@@ -176,10 +176,12 @@ The sparse checkout gains `ref: main` and `persist-credentials: false`. `parse-c
 same on `main` and `qa` today and last changed on 29 September 2026; a future parser change reaches the
 labelling at the next promotion. Inlining the parser was rejected: it has its own tests.
 
-### D5. `auto-release.yml`, `auto-status.yml`: no change
+### D5. `auto-release.yml`, `auto-status.yml`: token handling unchanged
 
 They run only `main`'s files, which is what the rule allows. Their persisted token is how the release
-push, the tags, the backmerge and the `qa` reset authenticate.
+push, the tags, the backmerge and the `qa` reset authenticate (Fraser, 21 November 2026: leave
+`auto-release.yml`'s token in its checkout). `auto-status.yml` gains `environment: bot` (D7);
+`auto-release.yml` does not yet (O1).
 
 ### D6. Guard test
 
@@ -190,7 +192,69 @@ fails when (a) a checkout's ref is not `main` (no ref counts as `main` only for 
 solely by `issues`, `issue_comment`, `schedule` or `pull_request_target`) and any step runs `npm`,
 `npx`, `node <file>` or a repository script, or (b) such a checkout lacks `persist-credentials: false`.
 It also asserts the three fixed jobs keep their shape: `prepare` and `regenerate` mint no token, and
-`open-pr` has no checkout.
+`open-pr` has no checkout. And (c) every minting job names `environment: bot`, except the three jobs in
+D7's open items, which the test lists by workflow and job; a job on that list that starts naming `bot`
+also fails, so the list cannot go stale.
+
+### D7. The `bot` environment, ready for a `main`-only key (ops #613)
+
+GitHub matches an environment's deployment branch rule against the run's `GITHUB_REF`, and a job
+naming an environment reads that environment's secret ahead of a repository secret of the same name.
+So once ops #613 adds `BOT_APP_PRIVATE_KEY` to an environment `bot` whose only rule is the branch
+`main`, and deletes the repository secret, only jobs that name `bot` in a run on `refs/heads/main` can
+mint the token. A workflow file on `qa` or a branch can no longer mint it, which is the path this
+change alone leaves open. Before that move a job naming `bot` falls back to the repository secret, so
+this change works the same either way. Name: `bot` (short, says what it holds; the existing
+environments are `Preview` and `Production`).
+
+| Workflow | Minting job | Trigger | `GITHUB_REF` | Names `bot` |
+|---|---|---|---|---|
+| `cut-release.yml` | `open-pr` | `workflow_dispatch` | the dispatch ref: dispatch on `main` | yes |
+| `visual-baseline-update.yml` | `push` | `workflow_dispatch` | the dispatch ref: dispatch on `main` | yes |
+| `auto-status.yml` | `done` | `issues` | default branch | yes |
+| `auto-close-umbrella.yml` | `close-umbrella` | `issues`, `workflow_dispatch` | default branch, or the dispatch ref | yes |
+| `dependabot-hotfix-label.yml` | `label` | `pull_request_target` | default branch (GitHub, since 8 December 2025) | yes |
+| `auto-release.yml` | `release` | `pull_request` closed into `main`; `schedule`; `workflow_dispatch` | `refs/pull/N/merge` on the main path | no, O1 |
+| `auto-release.yml` | `backmerge-hotfix` | `pull_request` closed into `main` | `refs/pull/N/merge` | no, O1 |
+| `qa-issue-label.yml` | `label` | `pull_request` closed into `qa` or `main` | `refs/pull/N/merge` | no, O2 |
+
+- **`cut-release.yml`** is dispatched on `main` (the `gh workflow run` default) from the promotion that
+  carries this change. `prepare` checks out `qa` by name with `persist-credentials: false`, so the run's
+  ref only chooses which copy of the workflow runs. Until then, dispatching on `qa` runs the new
+  two-job copy; after the move a dispatch on `qa` stops at `open-pr` ("not allowed to deploy to bot")
+  with the PR untouched.
+- **`visual-baseline-update.yml`** is dispatched on `main` with the branch as its input, as
+  `gh workflow run visual-baseline-update.yml -f branch=<branch>` already does by default.
+- **Deployment records.** Each run of a job naming `bot` adds a deployment to the `bot` environment
+  (about one per closed issue). GitHub's `deployment: false` (March 2026) skips that, but its docs do
+  not say the branch rule still applies with it, so it is not used.
+- **First run creates the environment.** If `bot` does not exist when a job first names it, GitHub
+  creates it with no rules and no secrets; ops #613 then adds the rule and the secret.
+
+**Open items for Fraser** (not decided here; each blocks or qualifies the ops #613 move):
+
+- **O1. `auto-release.yml` on a `pull_request` ref.** Its main path (a promotion or hotfix merged into
+  `main`) runs on `refs/pull/N/merge`, which a `main`-only `bot` refuses, so it cannot name `bot`, and
+  deleting the repository secret would stop releases and backmerges. Options: (a, recommended) trigger
+  on `push` to `main` and find the merged PR with `commits/{sha}/pulls` (the release commit's
+  `[skip ci]` keeps it from firing itself); (b) keep it on the repository secret, which leaves the key
+  reachable from any branch's workflow file and defeats the move; (c) release only from the daily cron
+  and dispatch, moving the `qa` reset and backmerge to their own trigger.
+- **O2. `qa-issue-label.yml` on a `pull_request` ref.** Same cause. Options: (a, recommended) keep the
+  `pull_request: closed` workflow unprivileged and do the labelling in a `workflow_run` workflow, which
+  runs `main`'s copy on the default branch and reads the PR as data (the deploy guard's pattern, ops
+  #612); (b) label and close with `GITHUB_TOKEN`, whose closes do not start `auto-status.yml` or
+  `auto-close-umbrella.yml`, so issues closed only by the label lose the board move and umbrella
+  check; (c) keep it on the repository secret, as O1 (b).
+- **O3. The dispatched workflows' cache scope.** Dispatching on `main` runs `qa`'s or the branch's
+  `npm ci` and tests in a run whose Actions cache scope is `main`, which `deploy.yml` and
+  `preview-upload.yml` restore `~/.npm` from. npm checks package integrity against the lockfile, so the
+  residual risk is a planted `~/.npm/_npx` entry run by a later `npx`. Options: (a) accept it; (b,
+  recommended) in the O1/O2 follow-up, split each dispatched workflow into an unprivileged run on `qa`
+  or the branch and a `workflow_run` run on `main` that holds the token.
+
+`dependabot-hotfix-label.yml` is admitted under `bot`, but GitHub blocks `pull_request_target` in
+public repositories from 2 December 2026 (#2383), which is separate.
 
 ## Risks
 
@@ -205,9 +269,14 @@ It also asserts the three fixed jobs keep their shape: `prepare` and `regenerate
 - **A shallow checkout cannot push.** Shown not to be a problem in the local test above; the build
   may still use `fetch-depth: 0` if the runner disagrees.
 - **Cut-release runs while this lands.** A run dispatched on `qa` uses `qa`'s copy of the workflow,
-  so the fix applies from the first dispatch after this merges into `qa`, before promotion.
+  so the fix applies from the first dispatch after this merges into `qa`, before promotion. A dispatch
+  on `main` runs the old one-job copy until the promotion.
+- **The key moves before O1 and O2 are resolved.** Releases, hotfix backmerges and `status:in-qa`
+  labelling stop. Check: ops #613's steps add the environment secret first and delete the repository
+  secret only after the O1/O2 follow-up is on `main`.
 
 ## What this does not close
 
-A workflow file is itself code from its ref. Where the bot's key is stored and which refs may use it is
-tracked privately in ops #613; it needs a settings change, which is Fraser's.
+A workflow file is itself code from its ref. This change names the `bot` environment (D7); creating
+it, restricting it to `main` and moving the key are settings changes tracked privately in ops #613,
+and the three jobs in O1 and O2 keep the repository secret until a follow-up moves them.
