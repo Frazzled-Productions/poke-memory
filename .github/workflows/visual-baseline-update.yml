@@ -132,6 +132,16 @@ jobs:
           echo "Add '$ACTOR' to MAINTAINERS in this workflow if they should be able to dispatch baseline regeneration."
           exit 1
 
+      - name: Refuse a dispatch ref other than qa
+        # visual-baseline-push.yml acts only on runs dispatched on `qa`, so a
+        # run from any other ref would regenerate and then push nothing.
+        if: github.ref != 'refs/heads/qa'
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "::error::Dispatch this workflow on qa (gh workflow run visual-baseline-update.yml --ref qa -f branch=<branch>), not on '$REF'."
+          exit 1
+
       - name: Refuse to target a long-lived branch
         env:
           BRANCH: ${{ inputs.branch }}

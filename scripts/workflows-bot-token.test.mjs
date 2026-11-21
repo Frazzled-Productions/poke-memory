@@ -199,7 +199,7 @@ function mainRefViolations(job) {
     return ref !== undefined && ref !== "main";
   });
   if (!other) return [];
-  const runsCode = job.steps.some((s) => RUNS_CODE.test(runBlock(s)) || /uses:\s*\.\//.test(s));
+  const runsCode = job.steps.some((s) => RUNS_CODE.test(runBlock(s)) || /uses:\s*["']?\.\//.test(s));
   if (!runsCode || (SKIP_ON_MAIN.test(jobIf(job)) && !LOOSE_IF.test(jobIf(job).replace(SKIP_ON_MAIN, "")))) return [];
   return ["runs code from a non-main checkout on a main ref"];
 }
@@ -223,7 +223,7 @@ function codeViolations(text, job) {
     out.push("checks out or clones another ref in a run step");
   }
   if (untrusted.length === 0) return out;
-  if (job.steps.some((s) => RUNS_CODE.test(runBlock(s)) || /uses:\s*\.\//.test(s))) {
+  if (job.steps.some((s) => RUNS_CODE.test(runBlock(s)) || /uses:\s*["']?\.\//.test(s))) {
     out.push("runs repository code from a non-main checkout");
   }
   if (untrusted.some((s) => !/persist-credentials:\s*false/.test(s))) {
@@ -319,6 +319,11 @@ describe("the parser", () => {
     ]);
   });
 
+  it("flags a quoted local action after a non-main checkout in a minting job", () => {
+    const text = `on:\n  workflow_dispatch:\njobs:\n  j:\n    environment: bot\n    steps:\n      - uses: actions/create-github-app-token@v3\n        with:\n          private-key: \${{ secrets.BOT_APP_PRIVATE_KEY }}\n      - uses: actions/checkout@v7\n        with:\n          ref: qa\n          persist-credentials: false\n      - uses: "./.github/actions/setup"\n`;
+    expect(codeViolations(text, jobs(text)[0])).toEqual(["runs repository code from a non-main checkout"]);
+  });
+
   it("flags a spliced job output and a hand-made checkout in a minting job", () => {
     const text = (run) => `on:\n  schedule:\njobs:\n  j:\n    environment: bot\n    steps:\n      - uses: actions/create-github-app-token@v3\n        with:\n          private-key: \${{ secrets.BOT_APP_PRIVATE_KEY }}\n      - run: ${run}\n`;
     const spliced = text('test "${{ needs.prepare.outputs.status }}" = 0');
@@ -392,6 +397,8 @@ describe("the parser", () => {
     expect(mainRefViolations(jobs(loose)[0])).toEqual(["runs code from a non-main checkout on a main ref"]);
     const quoted = text("", "qa", "npm ci").replace("uses: actions/checkout@v7", 'uses: "actions/checkout@v7"');
     expect(mainRefViolations(jobs(quoted)[0])).toEqual(["runs code from a non-main checkout on a main ref"]);
+    const localAction = text("", "qa", "true").replace("      - run: true\n", '      - uses: "./.github/actions/setup"\n');
+    expect(mainRefViolations(jobs(localAction)[0])).toEqual(["runs code from a non-main checkout on a main ref"]);
   });
 });
 
@@ -423,6 +430,12 @@ describe("the bot token never meets code from outside main", () => {
       const code = text.replace(/^\s*#.*$/gm, "").replace(/\s#.*$/gm, "");
       if (triggers(text).length === 0) unread.push(`${f}: no trigger parsed`);
       if (jobs(text).length === 0) unread.push(`${f}: no job parsed`);
+      // Every two-space key under `jobs:` must be a job the parser read (a quoted key would merge into the job above).
+      const lines = text.split("\n");
+      const at = lines.findIndex((l) => /^jobs:/.test(l));
+      const end = lines.findIndex((l, i) => i > at && /^[^\s#]/.test(l));
+      const rawJobs = at === -1 ? 0 : lines.slice(at + 1, end === -1 ? undefined : end).filter((l) => /^ {2}[^\s#]/.test(l)).length;
+      if (rawJobs !== jobs(text).length) unread.push(`${f}: ${rawJobs} job keys in the text, ${jobs(text).length} parsed`);
       const rawCheckouts = (code.match(/actions\/checkout@/g) ?? []).length;
       const parsed = jobs(text).reduce((n, j) => n + j.steps.filter(isCheckout).length, 0);
       if (rawCheckouts !== parsed) unread.push(`${f}: ${rawCheckouts} checkouts in the text, ${parsed} parsed`);
@@ -649,6 +662,9 @@ describe("the split jobs keep their shape", () => {
     expect(jobIf(job("auto-release.yml", "release"))).toContain("github.event_name != 'push'");
     // Only this repository's PRs count, and the release commit must not start another run.
     expect(findPr.body).toContain(".head.repo.full_name == $repo");
+    // A PR merge commit the API names no PR for fails loudly instead of skipping a release.
+    expect(findPr.body).toMatch(/HEAD_MSG: \$\{\{ github\.event\.head_commit\.message \}\}/);
+    expect(findPr.body).toMatch(/\[\[ "\$HEAD_MSG" =~ \^Merge\\ pull\\ request[^\n]*\n\s*#[^\n]*\n\s*#[^\n]*\n\s*echo "::error::[^\n]*\n\s*exit 1/);
     expect(text).toMatch(/git commit -m "chore\(release\): v\$\{NEW_VERSION\} \(\$\{BUMP_TYPE\}\) \[skip ci\]"/);
     expect(text).not.toMatch(/event_name\s*[!=]=\s*'pull_request'/);
   });
