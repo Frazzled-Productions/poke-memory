@@ -7,7 +7,16 @@ name: QA Issue Label
 # `qa` first, so those issues stay OPEN with no signal that the work is done
 # and staged. This workflow bridges that gap by labelling them `status:in-qa`.
 #
-# Two paths, both on `pull_request: [closed]` filtered to merged PRs:
+# How it runs (OpenSpec change bot-key-main-only, #2383): the unprivileged
+# `qa-issue-label-trigger.yml` runs on `pull_request: closed` and succeeds for a
+# merged same-repository PR into `qa` or the promotion. This file then runs as a
+# `workflow_run` on `main` (GitHub always runs `main`'s copy, on `main`), checks
+# that the trigger was that file, from this repository, and succeeded, and finds
+# the merged PR through the API by the trigger's head branch and head commit.
+# It never reads `workflow_run.pull_requests` (empty or a different, open PR for
+# a merged one) and takes nothing from the PR's run but those two values.
+#
+# Two paths, both for merged PRs:
 #
 #   1. A PR merged into `qa` - parse its body and commit messages for
 #      `closes/fixes/resolves #N` keywords and add `status:in-qa` to each
@@ -39,14 +48,18 @@ name: QA Issue Label
 # Token: the poke-memory-bot App token, so its closes start auto-status.yml and
 # auto-close-umbrella.yml. It can bypass the `main` ruleset, so the parser that
 # runs next to it is `main`'s, never the merged branch's (#2419, OpenSpec change
-# bot-token-trusted-steps; scripts/workflows-bot-token.test.mjs).
+# bot-token-trusted-steps; scripts/workflows-bot-token.test.mjs). The job names
+# the `bot` environment, which admits only `main` once the key moves (ops #613),
+# and mints only after the merged PR is found.
+#
+# Active only once this file and its trigger are on `main`: `workflow_run`
+# workflows run from the default branch.
 #
 # Out of scope: project-board column transitions. `auto-status.yml` owns the
 # board; this workflow only touches the `status:in-qa` label.
 #
-# Fork guard: fork PRs are excluded (`head.repo.fork == false`, matching
-# coverage.yml). Fork PRs run with a read-only token and cannot edit
-# issue labels; the `== false` form keeps a null fork value gated out.
+# Fork guard: fork PRs are excluded, in the trigger (`head.repo.fork == false`)
+# and here (`head_repository.full_name == github.repository`).
 #
 # Idempotency: `gh label create ... || true` is a no-op once the label
 # exists, and `gh issue edit --add-label` / `--remove-label` are idempotent
@@ -54,38 +67,37 @@ name: QA Issue Label
 # harmless no-op, so a re-run of this workflow changes nothing.
 
 on:
-  pull_request:
-    types: [closed]
+  workflow_run:
+    workflows: [QA Issue Label trigger]
+    types: [completed]
 
 concurrency:
-  group: qa-issue-label-${{ github.event.pull_request.number }}
+  group: qa-issue-label-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: false
 
 jobs:
   label:
     name: Label referenced issues
-    # Only merged PRs into `qa` or `main`. A closed-but-unmerged PR, or a PR
-    # into any other branch, is out of scope.
+    # Only a successful run of the one trigger file, from this repository, on
+    # a pull request event. `workflows:` matches by display name, which any
+    # branch can copy, so the path is checked too.
     if: >-
-      github.event.pull_request.merged == true
-      && github.event.pull_request.head.repo.fork == false
-      && (github.event.pull_request.base.ref == 'qa'
-          || (github.event.pull_request.base.ref == 'main'
-              && github.event.pull_request.head.ref == 'qa'))
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.path == '.github/workflows/qa-issue-label-trigger.yml' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # No `environment: bot`: a `pull_request` run's ref is `refs/pull/N/merge`,
-    # which the `main`-only `bot` environment would refuse. It keeps the
-    # repository secret until a follow-up moves it (bot-token-trusted-steps
-    # design D7, open item O2; listed in scripts/workflows-bot-token.test.mjs).
+    # Mints the bot token: admits only `main` once the key moves (ops #613).
+    environment: bot
     permissions:
       contents: read
       issues: write
       pull-requests: read
     steps:
       # Checkout is needed for `.github/scripts/parse-closing-refs.sh`. Every
-      # other input still comes from the event payload or the `gh` API (all
-      # `gh` calls pass `--repo`). It is `main`'s copy, without credentials:
+      # other input comes from the `gh` API (all `gh` calls pass `--repo`).
+      # It is `main`'s copy, without credentials:
       # the parser runs in the step that holds the bot token, so it must not
       # be the merged branch's (#2419). A parser change on `qa` reaches this
       # labelling at the next promotion.
@@ -97,7 +109,48 @@ jobs:
           sparse-checkout: .github/scripts
           sparse-checkout-cone-mode: false
 
+      - name: Find the merged PR by head branch and head commit
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          # Closed PRs from this head branch, most recently updated first; keep
+          # the merged one whose head commit is the trigger's, into `qa` or the
+          # promotion into `main`.
+          PULLS=$(gh api -X GET "repos/$REPO/pulls" \
+            -f state=closed -f head="$OWNER:$HEAD_BRANCH" \
+            -f sort=updated -f direction=desc -F per_page=100)
+          MATCHES=$(jq --arg sha "$HEAD_SHA" '[.[]
+            | select(.merged_at != null and .head.sha == $sha
+                and (.base.ref == "qa" or (.base.ref == "main" and .head.ref == "qa")))
+            | {number, base: .base.ref}]' <<<"$PULLS")
+          COUNT=$(jq 'length' <<<"$MATCHES")
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::notice::No merged PR into qa (or promotion) has head $HEAD_BRANCH at $HEAD_SHA: nothing to do."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$COUNT" -gt 1 ]; then
+            echo "::error::$COUNT merged PRs have head $HEAD_BRANCH at $HEAD_SHA; refusing to guess."
+            exit 1
+          fi
+          NUMBER=$(jq -r '.[0].number' <<<"$MATCHES")
+          BASE=$(jq -r '.[0].base' <<<"$MATCHES")
+          case "$NUMBER" in ''|*[!0-9]*) echo "::error::PR number '$NUMBER' is not a whole number."; exit 1 ;; esac
+          {
+            echo "found=true"
+            echo "number=$NUMBER"
+            echo "base=$BASE"
+          } >> "$GITHUB_OUTPUT"
+          echo "Merged PR #$NUMBER into $BASE."
+
       - name: Mint App installation token
+        if: steps.pr.outputs.found == 'true'
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
@@ -105,12 +158,12 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
       - name: Apply or strip status:in-qa on referenced issues
+        if: steps.pr.outputs.found == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          PR_BODY: ${{ github.event.pull_request.body }}
+          PR: ${{ steps.pr.outputs.number }}
+          BASE_REF: ${{ steps.pr.outputs.base }}
         run: |
           set -euo pipefail
 
@@ -153,6 +206,7 @@ jobs:
           #
           # The jq expression emits one line per commit (headline + body, null
           # body coerced to ""), so commits are never cross-joined.
+          PR_BODY=$(gh pr view "$PR" --repo "$REPO" --json body --jq '.body // ""')
           COMMIT_MSGS=$(gh pr view "$PR" --repo "$REPO" \
             --json commits \
             --jq '.commits[] | .messageHeadline + " " + (.messageBody // "")' || true)

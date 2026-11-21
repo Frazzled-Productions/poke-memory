@@ -31,24 +31,24 @@ name: Visual Baseline Update
 #
 # The push uses a `poke-memory-bot` App installation token, because a push made
 # with `GITHUB_TOKEN` would not start the branch's PR checks. That token can
-# bypass the `main` ruleset, so it never meets the branch's code (#2419,
-# OpenSpec change bot-token-trusted-steps; `scripts/workflows-bot-token.test.mjs`):
-#   - `gate` records the branch tip before any branch code runs.
+# bypass the `main` ruleset, so it never meets the branch's code, and this file
+# never mints it (#2419, #2383; OpenSpec changes bot-token-trusted-steps and
+# bot-key-main-only; `scripts/workflows-bot-token.test.mjs`):
+#   - `gate` records the branch tip before any branch code runs and uploads it
+#     as the `visual-baseline-target` artefact (`branch.txt`, `sha.txt`).
 #   - `regenerate` checks out that commit with `persist-credentials: false` and
 #     only a read-only GITHUB_TOKEN, runs its `npm ci`, build and Playwright, and
-#     uploads `e2e/__screenshots__/`.
-#   - `push` runs in the `bot` environment on a fresh runner with no checkout:
-#     it fetches the recorded commit into an empty repository, builds the new
-#     commit with git plumbing from the artefact's PNG files only (refusing
-#     symlinks, non-PNG files and odd names), then mints the token and gives it
-#     to the one `git push`. No branch file is written to disk or run there.
+#     uploads `e2e/__screenshots__/` as `visual-baselines` when they changed.
+#   - `visual-baseline-push.yml`, a `workflow_run` run on `main` in the `bot`
+#     environment, rechecks the maintainer, the branch and that its tip has not
+#     moved, builds the commit with git plumbing from the PNG files only, then
+#     mints the token for the one `git push`.
 #
-# Dispatch ref: today `qa`, with the branch as the input
-# (`gh workflow run visual-baseline-update.yml --ref qa -f branch=<branch>`); a
-# dispatch on `main` would run the branch's code in `main`'s Actions cache scope
-# (open item O3). Once the bot key lives only in the `bot` environment, which
-# admits `main` (ops #613), dispatch on `main`; any other ref then stops at
-# `push` before the token is minted.
+# Dispatch ref: `qa`, never `main`, with the branch as the input
+# (`gh workflow run visual-baseline-update.yml --ref qa -f branch=<branch>`).
+# A dispatch on `main` skips both jobs, so the branch's code never runs in
+# `main`'s Actions cache scope (which every branch and the Production deploy
+# restore), and the follow-up does not act on a run from `main`.
 #
 # The regenerated push uses a plain commit message (no `[skip ci]` marker).
 # Earlier iterations of this workflow added `[skip ci]` to suppress
@@ -81,6 +81,8 @@ jobs:
   # here keeps the audit trail tidy and avoids burning container minutes on
   # an obviously-invalid dispatch.
   gate:
+    # Branch code never runs on a `main` ref (it would write main's cache scope).
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
@@ -143,8 +145,9 @@ jobs:
 
       - name: Record the branch tip
         # Recorded here, before any branch code runs, so `regenerate` builds
-        # and `push` commits on top of this exact commit; the branch's code
-        # cannot choose another one. The repository is public: no credentials.
+        # and visual-baseline-push.yml commits on top of this exact commit, and
+        # pushes nothing if the branch has moved. The repository is public: no
+        # credentials.
         id: tip
         env:
           BRANCH: ${{ inputs.branch }}
@@ -160,9 +163,22 @@ jobs:
           fi
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "Branch '$BRANCH' is at $SHA."
+          mkdir -p "$RUNNER_TEMP/visual-baseline-target"
+          printf '%s\n' "$BRANCH" > "$RUNNER_TEMP/visual-baseline-target/branch.txt"
+          printf '%s\n' "$SHA" > "$RUNNER_TEMP/visual-baseline-target/sha.txt"
+
+      - name: Upload the target branch and tip for the push
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-baseline-target
+          path: ${{ runner.temp }}/visual-baseline-target/
+          retention-days: 1
+          if-no-files-found: error
 
   regenerate:
     needs: gate
+    # Runs the branch's code: never on a `main` ref.
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # The Playwright container image (`mcr.microsoft.com/playwright:v1.63.0-noble`)
@@ -176,10 +192,8 @@ jobs:
       run:
         shell: bash
     permissions:
-      # Runs the branch's code: read only, no bot token. The `push` job pushes.
+      # Runs the branch's code: read only, no bot token. visual-baseline-push.yml pushes.
       contents: read
-    outputs:
-      changed: ${{ steps.result.outputs.changed }}
     # Browsers + system deps are baked into the image. The tag MUST track the
     # `@playwright/test` version resolved in `package-lock.json` (enforced by
     # `npm run lint:playwright-pin`, #2074), the same pin `visual-regression.yml`
@@ -243,7 +257,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           if [ -n "$(git status --porcelain -- e2e/__screenshots__/)" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Baselines changed; the push job commits them."
+            echo "Baselines changed; visual-baseline-push.yml commits them."
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No baseline changes to commit - the regenerated PNGs are identical to the committed ones."
@@ -267,142 +281,3 @@ jobs:
           name: visual-baseline-update-report
           path: playwright-report/
           retention-days: 14
-
-  push:
-    name: Commit and push the regenerated baselines
-    needs: [gate, regenerate]
-    if: needs.regenerate.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # Admits only `main` once the bot key moves here (ops #613, design D7).
-    environment: bot
-    # No checkout and no API call with GITHUB_TOKEN; the push uses the App token.
-    permissions: {}
-    steps:
-      - name: Re-check the branch and the commit
-        env:
-          BRANCH: ${{ inputs.branch }}
-          SHA: ${{ needs.gate.outputs.sha }}
-        run: |
-          set -euo pipefail
-          # Defence in depth: re-check the branch guard here, in the same job
-          # that actually pushes. The `gate` job already enforces this, but a
-          # second check next to the push means a future refactor that drops
-          # the gate job cannot silently start writing to a protected branch.
-          if [ -z "$BRANCH" ] || [ "$BRANCH" = "main" ] || [ "$BRANCH" = "qa" ]; then
-            echo "Refusing to push: regenerated baselines must not land on '$BRANCH' directly."
-            exit 1
-          fi
-          if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::gate's sha '$SHA' is not a 40-character commit id."
-            exit 1
-          fi
-
-      - name: Download the regenerated baselines
-        uses: actions/download-artifact@v8
-        with:
-          name: visual-baselines
-          path: ${{ runner.temp }}/visual-baselines
-
-      - name: Build the baseline commit without a working tree
-        # No checkout: the branch's files are never written to disk here, so a
-        # symlink in the branch cannot turn a copied "PNG" into a write to
-        # .git/config (final review of #2419). The commit is assembled with git
-        # plumbing from the recorded tip and the artefact's PNG files.
-        id: commit
-        env:
-          SRC: ${{ runner.temp }}/visual-baselines
-          SHA: ${{ needs.gate.outputs.sha }}
-          REPO: ${{ github.repository }}
-          BOT_APP_ID: ${{ vars.BOT_APP_ID }}
-        run: |
-          set -euo pipefail
-          # The artefact comes from a job that ran the branch's code: data only.
-          # Refuse symlinks, anything that is not a regular file or directory,
-          # any file that is not a PNG (by name and by signature), and any odd
-          # path.
-          if [ -n "$(find "$SRC" -type l)" ] || [ -n "$(find "$SRC" ! -type f ! -type d)" ]; then
-            echo "::error::The visual-baselines artefact holds a symlink or a special file. Nothing pushed."
-            exit 1
-          fi
-          BAD=$(cd "$SRC" && find . -type f ! -name '*.png' | head -n 5 | tr '\n' ' ')
-          if [ -n "$BAD" ]; then
-            echo "::error::The visual-baselines artefact holds files that are not PNG: $BAD. Nothing pushed."
-            exit 1
-          fi
-          ODD=$(cd "$SRC" && find . -type f -name '*.png' | sed 's|^\./||' | grep -vxE '[A-Za-z0-9._/-]+' | head -n 5 | tr '\n' ' ' || true)
-          if [ -n "$ODD" ]; then
-            echo "::error::Unexpected file names in the artefact: $ODD. Nothing pushed."
-            exit 1
-          fi
-
-          REPO_DIR="$RUNNER_TEMP/baseline-commit"
-          git init -q "$REPO_DIR"
-          cd "$REPO_DIR"
-          # Public repository: the fetch needs no credentials.
-          git fetch -q --no-tags --depth 1 "https://github.com/${REPO}.git" "$SHA"
-          # Refuse a branch whose screenshot path is or holds a symlink.
-          LINKS=$(git ls-tree -r "$SHA" -- e2e/__screenshots__ | awk '$1 == "120000" { print $4 }' | head -n 5 | tr '\n' ' ')
-          for p in e2e e2e/__screenshots__; do
-            MODE=$(git ls-tree "$SHA" -- "$p" | awk '{ print $1 }')
-            if [ -n "$MODE" ] && [ "$MODE" != "040000" ]; then LINKS="$LINKS $p"; fi
-          done
-          if [ -n "${LINKS// /}" ]; then
-            echo "::error::The branch has symlinks or non-directories in the screenshot path: $LINKS. Nothing pushed."
-            exit 1
-          fi
-          git read-tree "$SHA"
-
-          COUNT=0
-          while IFS= read -r -d '' f; do
-            rel=${f#./}
-            if [ "$(head -c 8 "$SRC/$rel" | od -An -tx1 | tr -d ' \n')" != "89504e470d0a1a0a" ]; then
-              echo "::error::'$rel' in the artefact is not a PNG file. Nothing pushed."
-              exit 1
-            fi
-            BLOB=$(git hash-object -w --no-filters -- "$SRC/$rel")
-            git update-index --add --cacheinfo "100644,$BLOB,e2e/__screenshots__/$rel"
-            COUNT=$((COUNT + 1))
-          done < <(cd "$SRC" && find . -type f -name '*.png' -print0)
-          if [ "$COUNT" -eq 0 ]; then
-            echo "::error::The visual-baselines artefact holds no PNG files. Nothing pushed."
-            exit 1
-          fi
-
-          TREE=$(git write-tree)
-          if [ "$TREE" = "$(git rev-parse "${SHA}^{tree}")" ]; then
-            echo "No baseline changes to commit - the regenerated PNGs are identical to the committed ones."
-            echo "commit=" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          COMMIT=$(git -c user.name="poke-memory-bot[bot]" \
-            -c user.email="${BOT_APP_ID}+poke-memory-bot[bot]@users.noreply.github.com" \
-            commit-tree "$TREE" -p "$SHA" -m "chore(visual): regenerate baselines")
-          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
-          echo "Built $COMMIT from $COUNT PNG file(s) on top of $SHA."
-
-      - name: Mint App installation token
-        if: steps.commit.outputs.commit != ''
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ vars.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-
-      - name: Push regenerated baselines
-        if: steps.commit.outputs.commit != ''
-        env:
-          BRANCH: ${{ inputs.branch }}
-          TOKEN: ${{ steps.app-token.outputs.token }}
-          REPO: ${{ github.repository }}
-          COMMIT: ${{ steps.commit.outputs.commit }}
-        run: |
-          set -euo pipefail
-          cd "$RUNNER_TEMP/baseline-commit"
-          # The token reaches this one command only, never a git config file.
-          # A moved branch rejects the push as non-fast-forward.
-          AUTH=$(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)
-          echo "::add-mask::$AUTH"
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" \
-            push "https://github.com/${REPO}.git" "${COMMIT}:refs/heads/${BRANCH}"
-          echo "Pushed regenerated baselines to '${BRANCH}'."
