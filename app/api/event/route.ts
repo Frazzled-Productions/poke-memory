@@ -7,3 +7,4 @@ export async function POST(request: Request): Promise<Response> {
   const { env } = await getCloudflareContext({ async: true });
   return handleEvent(request, env as unknown as EventEnv);
 }
+// Preview proof for ops #612: throwaway branch, closed unmerged.
