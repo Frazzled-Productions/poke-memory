@@ -23,10 +23,10 @@ Fixes: poke-memory #2419
   The second mints the token, checks out nothing, and opens, edits or re-drafts the draft promotion PR
   from that body, then fails the run on below-bar coverage as today.
 - **`visual-baseline-update.yml`** keeps its `gate` job. `regenerate` loses the token and
-  `contents: write`, checks out the branch without credentials, regenerates the screenshots and
-  uploads them with the commit it used. A new `push` job mints the token, checks out that commit
-  without credentials, copies in only PNG files under `e2e/__screenshots__/` (refusing symlinks and
-  anything else), commits, and pushes with the token passed to that one `git push`.
+  `contents: write`, checks out the branch tip that `gate` recorded, without credentials, regenerates
+  the screenshots and uploads them. A new `push` job, with no checkout, builds a commit on that tip
+  with git plumbing from only the PNG files under `e2e/__screenshots__/` (refusing symlinks, non-PNG
+  files and odd names), then mints the token and passes it to that one `git push`.
 - **`qa-issue-label.yml`** checks out `main`'s `.github/scripts` (sparse, `persist-credentials: false`)
   instead of the merged branch's, so the parser that runs next to the token is `main`'s.
 - **Every job that mints the bot token names the GitHub environment `bot`**, except the three listed
@@ -35,8 +35,9 @@ Fixes: poke-memory #2419
   repository secret, so nothing changes. The five jobs: `cut-release.yml` `open-pr`,
   `visual-baseline-update.yml` `push`, `auto-status.yml` `done`, `auto-close-umbrella.yml`
   `close-umbrella` and `dependabot-hotfix-label.yml` `label`. `cut-release.yml` and
-  `visual-baseline-update.yml` are dispatched on `main` from now on (the default ref of
-  `gh workflow run`); they read `qa` or the branch only through an explicit checkout.
+  `visual-baseline-update.yml` read `qa` or the branch only through an explicit ref, so they work
+  when dispatched on `main`; until the key moves they stay dispatched on `qa`, because a dispatch on
+  `main` puts `qa` or branch code in `main`'s Actions cache scope (O3).
 - **Three jobs cannot run on a `main` ref and stay on the repository secret for now**: `auto-release.yml`
   `release` and `backmerge-hotfix` (their main trigger is `pull_request`, whose ref is
   `refs/pull/N/merge`) and `qa-issue-label.yml` `label` (the same). They are open items O1 and O2 for
@@ -99,7 +100,7 @@ Fixes: poke-memory #2419
   Fraser (design D7), a follow-up change; the key cannot leave the repository secrets before O1 and O2
   are resolved.
 - `dependabot-hotfix-label.yml` stops running on 2 December 2026, when GitHub blocks
-  `pull_request_target` in public repositories: #2383.
+  `pull_request_target` in public repositories unless an Actions event policy allows it: #2383.
 - The rulesets and the bot's bypass: unchanged; this change touches no GitHub setting.
 - koinori: checked for the same pattern; it is not there (no App token, PAT or repository secret).
   Two related findings are in koinori #2948.
@@ -132,3 +133,9 @@ Fixes: poke-memory #2419
   orchestrating session creates it and moves the key after promotion, and a workflow that cannot run on
   `main` becomes an open item (Fraser, about 10:15 UTC). Name chosen: `bot`; open items O1 to O3 in
   design D7.
+- 2026-11-21: Build fix pass after the final review (agent findings, within the rulings): the push job
+  checks out nothing and builds the commit with git plumbing, because a symlink in the branch let a
+  copied "PNG" overwrite `.git/config` and run a command next to the token (reproduced locally); the
+  tip comes from the trusted `gate` job; and the dispatched workflows stay on `qa` until O3 is settled,
+  because a dispatch on `main` lets `qa` code write `main`'s Actions cache, which the Production
+  deploy restores with `tar -P`.
