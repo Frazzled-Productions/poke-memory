@@ -2,26 +2,28 @@
 # move-to-cloudflare, design D11), modelled on the company site's stage 1 workflow.
 #
 # - Push to `main`, or a dispatch of this workflow on `main`: test, build, apply D1 migrations to
-#   the production database, deploy the Worker `poke-memory`. The job runs in the GitHub
-#   environment `Production`, which admits only `main` and is the only place the Cloudflare token
-#   and SENTRY_AUTH_TOKEN live (deploy guard, Fraser's ruling of 19 November 2026, ops #610).
+#   the production database, deploy the Worker `poke-memory`, then apply main's migrations to the
+#   preview database and load its seed (two test users), so qa.pokememory.com and every preview
+#   version run against main's schema (change preview-upload-trust-main, #2415). The job runs in the
+#   GitHub environment `Production`, which admits only `main` and is the only place the Cloudflare
+#   token and SENTRY_AUTH_TOKEN live (deploy guard, Fraser's ruling of 19 November 2026, ops #610).
 #   auto-release.yml commits the version bump and CHANGELOG.md to `main` with `[skip ci]`, which
 #   suppresses the push event, so after its release it dispatches this workflow on `main`; the
 #   released version (and its What's new section) is what ends up deployed. A published Release no
 #   longer triggers a deploy: its ref is the tag, which the environment's branch rule refuses.
 # - Pull request into `qa`, or the qa-to-main promotion PR: the `preview` job builds the PR and
 #   bundles the preview Worker with NO environment and NO secret, and uploads the result as the
-#   artefact `preview-bundle` (bundled Worker, static assets, D1 migrations; kept one day). A pull
+#   artefact `preview-bundle` (bundled Worker and static assets; kept one day). A pull
 #   request can edit this file and its own wrangler.jsonc, so nothing here may hold a Cloudflare
 #   token (change preview-deploy-guard, koinori #2925 F3): such a PR could otherwise bind the
 #   production D1 database to its preview, and Cloudflare asks no permission on bound resources.
 # - preview-upload.yml does the rest when this run succeeds: a `workflow_run` workflow, which GitHub
-#   always runs from the default branch, so a PR cannot change it. It checks out the PR's BASE branch
-#   (wrangler.jsonc, package.json and the seed script come from there), applies the migrations to the
-#   preview database, seeds it, uploads the bundle to the separate Worker `poke-memory-preview`
-#   aliased pr-<number>, comments the URL and runs the Playwright auth specs against it. Only it may
-#   use the `Preview` environment (deployment branches: `main` only) and its secret
-#   CLOUDFLARE_PREVIEW_API_TOKEN. It is active only once it is on `main`.
+#   always runs from the default branch, so a PR cannot change it. It checks out `main` (wrangler.jsonc,
+#   package.json and the specs come from there, never from the PR or qa), uploads the bundle to the
+#   separate Worker `poke-memory-preview` aliased pr-<number>, comments the URL and runs the
+#   Playwright auth specs against it. It never writes D1 (the production job above migrates and seeds
+#   the preview database). Only it may use the `Preview` environment (deployment branches: `main`
+#   only) and its secret CLOUDFLARE_PREVIEW_API_TOKEN. It is active only once it is on `main`.
 #
 # Secrets and the public repo: this is `pull_request`, never `pull_request_target`, so a fork PR
 # runs without secrets (and the preview job also skips forks outright). The Cloudflare token is
@@ -119,6 +121,27 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      # The preview database follows main (change preview-upload-trust-main): pull requests never
+      # write it, so the preview token can be Workers-only. After the production deploy, so a failure
+      # here can never hold production back; it turns this run red with production already live.
+      - if: steps.ready.outputs.ok == 'true'
+        name: Apply D1 migrations (preview database)
+        run: npx wrangler d1 migrations apply DB --remote --env preview
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - if: steps.ready.outputs.ok == 'true'
+        name: Seed the preview database (two test users)
+        env:
+          # Optional. Without it the test users get a random password nobody knows.
+          SEED_TEST_PASSWORD: ${{ secrets.PREVIEW_TEST_PASSWORD }}
+        run: node scripts/cloudflare/seed-preview.mjs --out "$RUNNER_TEMP/seed-preview.sql"
+      - if: steps.ready.outputs.ok == 'true'
+        name: Load the seed into the preview database
+        run: npx wrangler d1 execute DB --remote --env preview --yes --file "$RUNNER_TEMP/seed-preview.sql"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
 
   preview:
     # Fork PRs never reach preview-upload.yml (it refuses a head repository other than this one), so
@@ -148,8 +171,9 @@ jobs:
         # What `opennextjs-cloudflare upload` did before uploading, without a token: copy the
         # static-assets incremental cache into the assets (OpenNext 1.20's populateCache for
         # open-next.config.ts's cache), then bundle the Worker with wrangler. preview-upload.yml
-        # uploads this bundle as it is (`--no-bundle`) with the base branch's wrangler.jsonc, so the
-        # PR's bindings never reach Cloudflare; its dry runs matched byte for byte (design D2).
+        # uploads this bundle as it is (`--no-bundle`) with main's wrangler.jsonc, so the PR's
+        # bindings never reach Cloudflare; its dry runs matched byte for byte (design D2). No
+        # migrations: the preview database follows main (the production job applies them).
         run: |
           set -euo pipefail
           mkdir -p .open-next/assets/cdn-cgi/_next_cache
@@ -157,7 +181,6 @@ jobs:
           npx wrangler deploy --dry-run --env preview --outdir preview-bundle/worker
           rm -f preview-bundle/worker/*.map preview-bundle/worker/README.md
           mv .open-next/assets preview-bundle/assets
-          cp -R db/d1/migrations preview-bundle/migrations
       - uses: actions/upload-artifact@v7
         with:
           name: preview-bundle
